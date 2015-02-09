@@ -1,0 +1,29 @@
+#!/bin/bash
+if [ $# != 0 ]; then
+ for i in ${1}
+  do
+     echo -n ${i}" "
+     for (( c=2; c<=$#; c++ ))
+     do
+       echo -n ${!c}" "
+     done
+     echo ""
+ done
+else
+ echo " === Usage: === "
+ echo " ${0} \"*.spi\" <value1> <value2> ..."
+ echo " "
+ echo " === Purpose: === "
+ echo " This (bash) script generates the datablock for all images represented by the wildcard in the first argument"
+ echo " Other (optional) data values are in value1, value2, etc. "
+ echo " "
+ echo " === Example: ==="
+ echo " ${0} \"tmp/*\" 10000 10500 0.0 200 2 0.1"
+ echo " yields: "
+ echo " tmp/t1.spi 10000 10500 0.0 200 2 0.1" 
+ echo " tmp/t2.spi 10000 10500 0.0 200 2 0.1" 
+ echo " tmp/t3.spi 10000 10500 0.0 200 2 0.1" 
+fi
+
+
+
