@@ -614,7 +614,7 @@ void MlOptimiserMpi::expectation()
         }
 
     }
-    else
+    else // if node is not master, that is
     {
 
     	try

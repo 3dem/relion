@@ -5,3 +5,49 @@ http://www2.mrc-lmb.cam.ac.uk/relion
 
 The INSTALL.sh script is provided for convenient installation. Please see the above-mentioned Wiki for more information.
 
+THIS BRANCH IS DEDICATED TO DEVELOPING GPU SUPPORT FOR TRANSLATION PARAMETERS:
+
+Current:
+--------------------------
+divide particles into sets
+for set of particles
+{
+  for particle in set
+  {
+    for each orientation
+    {
+      P = Project Model M along orientation
+      C = Apply CTF to P
+      for each translation
+      {
+        S = construct fourier shift sorresponding to orientation
+	J = apply S to image I
+	D = diff between shifted image J and the current projection C
+      }
+    }
+  }
+}
+
+
+New:
+--------------------------
+divide particles into sets
+for set of particles
+{
+  for particle in set
+  {
+    for each orientation
+    {
+      P = Project Model M along orientation
+      C = Apply CTF to P
+      send the projection C, image I, and shifts to GPU
+      |
+      ----------->GPU:
+ 		  J = shift pixel in image I by shift
+		  D = diff between pixel in J and pixel in the current projection C
+		  |
+      <------------
+      }
+    }
+  }
+}
