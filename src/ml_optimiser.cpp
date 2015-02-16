@@ -3468,6 +3468,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 								}
 
 								long int ihidden = iorientclass * exp_nr_trans;
+								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -3484,6 +3485,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 									{
 										sampling.getTranslations(itrans, exp_current_oversampling,
 												oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
+
 										for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
 										{
 #ifdef TIMING
@@ -3603,7 +3605,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
 											double diff2;
-											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
+											if ((iter == 2 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 											{
 												// Do not calculate squared-differences, but signal product
 												// Negative values because smaller is worse in this case
@@ -3638,7 +3640,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
 													diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
 												}
-												std::cerr << " diff2= " << diff2 << " thisthread_min_diff2[ipart]= " << thisthread_min_diff2[ipart] << " ipart= " << ipart << std::endl;
+												std::cerr << diff2 <<  std::endl ;
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
@@ -3746,6 +3748,9 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
+								std::cerr <<  std::endl << "press any key for next iteration" ;
+								char c;
+								std::cin >> c;
 							} // end loop part_id
 						}// end loop iover_rot
 					} // end if do_proceed orientations

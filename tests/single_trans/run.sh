@@ -13,7 +13,6 @@ refine \
  --particle_diameter 200\
  --angpix 1\
  --ref 3i3e_lp50A.mrc\
- --firstiter_cc\
  --ini_high 50\
  --ctf\
  --iter 25\
@@ -29,6 +28,6 @@ refine \
  --norm\
  --scale\
  --j 1\
- --memory_per_thread 4
-
-
+ --memory_per_thread 4\
+ --random_seed 1993\
+ --onthefly_shifts
