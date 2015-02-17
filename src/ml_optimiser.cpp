@@ -21,6 +21,12 @@
 //#define DEBUG
 //#define DEBUG_CHECKSIZES
 
+#include <sys/time.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <ctime>
+
 #define NR_CLASS_MUTEXES 5
 
 //Some global threads management variables
@@ -3466,7 +3472,11 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) *= myscale;
 									}
 								}
-
+								double tstart, tend;
+							    struct timeval t2start, t2end;
+							    gettimeofday(&t2start, NULL);
+								//t2start = gettimeofday();
+								tstart = clock();
 								long int ihidden = iorientclass * exp_nr_trans;
 								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
@@ -3604,8 +3614,9 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 											if (my_ori_particle == exp_my_first_ori_particle)
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
+
 											double diff2;
-											if ((iter == 2 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
+											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 											{
 												// Do not calculate squared-differences, but signal product
 												// Negative values because smaller is worse in this case
@@ -3748,6 +3759,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
+								tend = clock();
+								gettimeofday(&t2end, NULL);
+								std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
+								std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
 								std::cerr <<  std::endl << "press any key for next iteration" ;
 								char c;
 								std::cin >> c;
