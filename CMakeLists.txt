@@ -2,17 +2,10 @@ cmake_minimum_required(VERSION 2.8.8)
 set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
 project(Relion)
+set(PROJECT_VERSION "1.4.0")
 
 find_package(CUDA)
 # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
-
-# PRINT OUT ALL CMAKE VARS
-#-------------------------
-get_cmake_property(_variableNames VARIABLES)
-foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-endforeach()
-#-------------------------
 
 SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
@@ -21,14 +14,88 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(PROJECT_VERSION "1.4.0")
+link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
-include_directories(".")
-include_directories("external/fltk-1.3.0/")
 
-file(GLOB rel_SRC
-    "src/*.cpp"
-)
+set(REL_EXTERNAL_LIBS_TAR_DIRECTORY ${CMAKE_SOURCE_DIR}/external)
+set(REL_EXTERNAL_LIBS_EXTRACT_TARGET ${CMAKE_BINARY_DIR}/external)
+include(ExternalProject)
+
+#Try find FFTW -------------------------------------------------------------------------------------
+#find_package(FFTW3) 
+# FIXME: The above searches for a FindFFTW.cmake in /usr/local/share/cmake/..... and sets FFTW_FOUND to TRUE. But there isn't one. Shouldn't there be?
+# FIXME: There are apparently single/double precision fftw libraries, which one are we using? 
+find_path (FFTW_INCLUDES fftw3.h)
+find_library (FFTW_LIBRARIES NAMES fftw3)
+   message( STATUS " FFTW: " ${FFTW_LIBRARIES})
+find_path(FFTW_PATH fftw3.h /usr/lib/* /usr/share/* /usr/include/* )
+   message( STATUS " FFTW_PATH: " ${FFTW_PATH}) 
+
+if(FFTW_PATH)
+   set(FFTW_FOUND TRUE)
+endif(FFTW_PATH)
+
+#Build FFTW if not found
+if(FFTW_FOUND)
+   message( STATUS "Found fftw, will NOT build")
+else(FFTW_FOUND)
+   message( STATUS "no fftw found, WILL build")
+   set(REL_FFTW3_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fftw-3.2.2.tar.gz)
+   set(REL_FFTW3_LIB_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
+   set(REL_FFTW3_BUILD_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
+
+   externalproject_add(FFTW3
+	URL ${REL_FFTW3_TAR_FILE}
+	SOURCE_DIR ${REL_FFTW3_LIB_DIR}
+	INSTALL_DIR ${CMAKE_BINARY_DIR}
+	CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-threads --enable-shared --prefix=<INSTALL_DIR>
+	BUILD_COMMAND ${MAKE}
+	LOG_CONFIGURE
+	LOG_BUILD
+	LOG_INSTALL
+   )
+endif(FFTW_FOUND)
+#------------------------------------------------------------------------------------------------------
+
+#Try to find FLTK--------------------------------------------------------------------------------------
+find_package(FLTK)
+#find_path (FLTK_INCLUDES Fl.H)
+#find_library (FFTW_LIBRARIES NAMES FL)
+   message( STATUS " FLTK: " ${FLTK_LIBRARIES})
+find_path(FL_PATH Fl.H /usr/lib/* /usr/share/* /usr/include/* )
+   message( STATUS " FL_PATH: " ${FL_PATH})
+
+#Build FLTK if not found
+if(FLTK_FOUND)
+   message( STATUS "Found fltk, will NOT build")
+else(FLTK_FOUND)
+   message( STATUS "No fltk found, WILL build")
+   set(REL_FLTK_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fltk-1.3.0.tar.gz)
+   set(REL_FLTK_LIB_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk)
+   set(REL_FLTK_BUILD_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk-build)
+
+   externalproject_add(FLTK
+	URL ${REL_FLTK_TAR_FILE}
+	SOURCE_DIR ${REL_FLTK_LIB_DIR}
+	INSTALL_DIR ${CMAKE_BINARY_DIR}
+	CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-shared --prefix=<INSTALL_DIR>
+	BUILD_COMMAND ${MAKE}
+	BUILD_IN_SOURCE
+	BINARY_DIR ${REL_FLTK_LIB_DIR}
+	LOG_CONFIGURE
+	LOG_BUILD
+	LOG_INSTALL
+   )
+endif(FLTK_FOUND)
+#------------------------------------------------------------------------------------------------------
+
+# PRINT OUT ALL CMAKE VARS
+#-------------------------
+#get_cmake_property(_variableNames VARIABLES)
+#foreach (_variableName ${_variableNames})
+#    message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
+#-------------------------
 
 if(CUDA_FOUND)
     cuda_add_executable(relion_refine src/apps/refine.cpp ${rel_SRC})
@@ -38,3 +105,12 @@ else(CUDA_FOUND)
     add_executable(relion_refine src/apps/refine.cpp ${rel_SRC})
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
+
+include_directories(".")
+include_directories(${CMAKE_BINARY_DIR}/include)
+
+file(GLOB REL_SRC "src/*.cpp")
+
+add_executable(REL_REFINE src/apps/refine.cpp ${REL_SRC})
+add_dependencies(REL_REFINE FFTW3 FLTK)
+target_link_libraries(REL_REFINE fltk)
