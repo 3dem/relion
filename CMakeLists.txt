@@ -10,13 +10,52 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+
+set(REL_EXTERNAL_LIBS_TAR_DIRECTORY ${CMAKE_SOURCE_DIR}/external)
+set(REL_EXTERNAL_LIBS_EXTRACT_TARGET ${CMAKE_BINARY_DIR}/external)
+
 set(PROJECT_VERSION "1.4.0")
 
-include_directories(".")
-include_directories("external/fltk-1.3.0/")
+include(ExternalProject)
 
-file(GLOB rel_SRC
-    "src/*.cpp"
+set(REL_FFTW3_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fftw-3.2.2.tar.gz)
+set(REL_FFTW3_LIB_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
+set(REL_FFTW3_BUILD_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
+
+externalproject_add(FFTW3
+	URL ${REL_FFTW3_TAR_FILE}
+	SOURCE_DIR ${REL_FFTW3_LIB_DIR}
+	INSTALL_DIR ${CMAKE_BINARY_DIR}
+	CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-threads --enable-shared --prefix=<INSTALL_DIR>
+	BUILD_COMMAND ${MAKE}
+	LOG_CONFIGURE
+	LOG_BUILD
+	LOG_INSTALL
 )
 
-add_executable(relion_refine src/apps/refine.cpp ${rel_SRC})
+set(REL_FLTK_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fltk-1.3.0.tar.gz)
+set(REL_FLTK_LIB_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk)
+set(REL_FLTK_BUILD_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk-build)
+
+externalproject_add(FLTK
+	URL ${REL_FLTK_TAR_FILE}
+	SOURCE_DIR ${REL_FLTK_LIB_DIR}
+	INSTALL_DIR ${CMAKE_BINARY_DIR}
+	CONFIGURE_COMMAND <SOURCE_DIR>/configure --enable-shared --prefix=<INSTALL_DIR>
+	BUILD_COMMAND ${MAKE}
+	BUILD_IN_SOURCE
+	BINARY_DIR ${REL_FLTK_LIB_DIR}
+	LOG_CONFIGURE
+	LOG_BUILD
+	LOG_INSTALL
+)
+
+include_directories(".")
+include_directories(${CMAKE_BINARY_DIR}/include)
+
+file(GLOB REL_SRC "src/*.cpp")
+
+add_executable(REL_REFINE src/apps/refine.cpp ${REL_SRC})
+add_dependencies(REL_REFINE FFTW3 FLTK)
+target_link_libraries(REL_REFINE fltk)
