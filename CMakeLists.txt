@@ -34,6 +34,12 @@ set(REL_EXTERNAL_LIBS_TAR_DIRECTORY ${CMAKE_SOURCE_DIR}/external)
 set(REL_EXTERNAL_LIBS_EXTRACT_TARGET ${CMAKE_BINARY_DIR}/external)
 include(ExternalProject)
 
+
+  message( STATUS " suffs: " ${CMAKE_FIND_LIBRARY_SUFFIXES})
+LIST(APPEND CMAKE_FIND_LIBRARY_SUFFIXES .so.1)
+#set(CMAKE_FIND_LIBRARY_SUFFIXES ".so.1 ${CMAKE_FIND_LIBRARY_SUFFIXES}")
+  message( STATUS " suffs: " ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
 #Try find FFTW -------------------------------------------------------------------------------------
 if(NOT BUILD_FFTW)
   find_package(FFTW) 
@@ -145,13 +151,24 @@ file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB REL_LIB "${CMAKE_SOURCE_DIR}/lib/*.so" )
 
-add_executable(REL_REFINE src/apps/refine.cpp ${REL_SRC} ${REL_SRC_H} ${REL_HP})
-add_dependencies(REL_REFINE FFTW3 FLTK)
+file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
+#	message(STATUS "ALL: ${_target}...")
 
-#file(GLOB BUILT_STUFF "${CMAKE_BINARY_DIR}/CMakeFiles/REL_REFINE.dir/src/*.o")
-#message(STATUS ${BUILT_STUFF})
+add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+foreach (_target ${RELION_TARGETS})
+	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
+	add_executable(${_target} src/apps/${_target}.cpp $<TARGET_OBJECTS:relion_lib>) # ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+	add_dependencies(${_target} FFTW FLTK)
+	#target_link_libraries(${_target} fltk ${REL_LIB} libXft.so libXext.so libXinerama.so ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+	target_link_libraries(${_target} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ${relion_lib} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+	message(STATUS "added ${_target}...")
+endforeach()
 
-#target_link_libraries(relion_refine fltk ${REL_LIB} libXft.so libXext.so libXinerama.so ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
-target_link_libraries(relion_refine ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
-
-
+#foreach (_target ${RELION_TARGETS})
+#	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
+#	add_executable(${_target} src/apps/${_target}.cpp ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+#	add_dependencies(${_target} FFTW FLTK)
+#	#target_link_libraries(${_target} fltk ${REL_LIB} libXft.so libXext.so libXinerama.so ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+#	target_link_libraries(${_target} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+#	message(STATUS "added ${_target}...")
+#endforeach()
