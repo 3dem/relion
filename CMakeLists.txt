@@ -19,6 +19,12 @@ set(PROJECT_VERSION "1.4.0")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 find_package(CUDA)
+if(CUDA_FOUND)
+    message(STATUS "Using cuda wrapper to compile....")
+else(CUDA_FOUND)
+    message(STATUS "Using non-cuda compilation....")
+endif(CUDA_FOUND)
+
 # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
 
 SET(CMAKE_C_COMPILER mpicc)
@@ -131,15 +137,6 @@ endif(FLTK_FOUND)
 #endforeach()
 #-------------------------
 
-#if(CUDA_FOUND)
-#    cuda_add_executable(relion_refine src/apps/refine.cpp ${rel_SRC})
-#    message(STATUS "Using cuda wrapper to compile....")
-#else(CUDA_FOUND)
-#    # --probably don't even want to compile in that case, but for now--
-#    add_executable(relion_refine src/apps/refine.cpp ${rel_SRC})
-#    message(STATUS "Using non-cuda compilation....")
-#endif(CUDA_FOUND)
-
 include_directories("${CMAKE_SOURCE_DIR}")
 include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
@@ -157,7 +154,11 @@ file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
-	add_executable(${_target} src/apps/${_target}.cpp $<TARGET_OBJECTS:relion_lib>) # ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+	if(CUDA_FOUND)
+	    cuda_add_executable(${_target} src/apps/${_target}.cpp $<TARGET_OBJECTS:relion_lib>) # ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+	else(CUDA_FOUND)
+	    add_executable(${_target} src/apps/${_target}.cpp $<TARGET_OBJECTS:relion_lib>) # ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+	endif(CUDA_FOUND)
 	add_dependencies(${_target} FFTW FLTK)
 	#target_link_libraries(${_target} fltk ${REL_LIB} libXft.so libXext.so libXinerama.so ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
 	target_link_libraries(${_target} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ${relion_lib} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
