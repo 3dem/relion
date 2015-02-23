@@ -17,9 +17,19 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include "src/ml_optimiser.h"
+
 //#define DEBUG
 //#define DEBUG_CHECKSIZES
+
+#include <sys/time.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <ctime>
+//#include <cuda_runtime.h>
+//#include <helper_cuda.h>
+//#include <helper_functions.h>
+#include "src/ml_optimiser.h"
 
 #define NR_CLASS_MUTEXES 5
 
@@ -3466,8 +3476,13 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) *= myscale;
 									}
 								}
-
+								double tstart, tend;
+							    struct timeval t2start, t2end;
+							    gettimeofday(&t2start, NULL);
+								//t2start = gettimeofday();
+								tstart = clock();
 								long int ihidden = iorientclass * exp_nr_trans;
+								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -3484,6 +3499,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 									{
 										sampling.getTranslations(itrans, exp_current_oversampling,
 												oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
+
 										for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
 										{
 #ifdef TIMING
@@ -3540,13 +3556,45 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
 															: global_fftshifts_ab2_current[iitrans].data;
 												}
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+
+												bool Bcuda_step1 = false;
+												if (Bcuda_step1)
 												{
-													double real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
-															- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
-													double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
-															+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													//cuda code
+
+													// Size of the image arrays
+													int N=NZYXSIZE(exp_local_Fimgs_shifted[ipart]) * sizeof(Complex);
+
+													// declare GPU memory pointers
+													Complex * d_myAB;
+													Complex * d_exp_local_Fimgs_shifted;
+													Complex * d_Fimg_otfshift;
+
+													// allocate GPU memory
+//													cudaMalloc( (void**) &d_myAB, N);
+//													cudaMalloc( (void**) &d_exp_local_Fimgs_shifted, N);
+//													cudaMalloc( (void**) &d_Fimg_otfshift, N);
+//
+//													cudaMemcpy( d_myAB, myAB, N, cudaMemcpyHostToDevice);
+//													cudaMemcpy( d_exp_local_Fimgs_shifted, exp_local_Fimgs_shifted, N, cudaMemcpyHostToDevice);
+//
+//													//let's do a simple setup for now; each pixel is a thread, each row is a block
+//													dim3 grid1 = XSIZE(exp_local_Fimgs_shifted[ipart]);
+//													dim3 grid2 = YSIZE(exp_local_Fimgs_shifted[ipart]);
+//													cuda_applyAB<<<grid1, grid2>>>(d_myAB, d_exp_local_Fimgs_shifted, d_Fimg_otfshift);
+//
+//		                                            cudaMemcpy( Fimg_otfshift, d_Fimg_otfshift, N, cudaMemcpyDeviceToHost );
+												}
+												else
+												{
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+													{
+														double real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
+																- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
+														double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
+																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													}
 												}
 												Fimg_shift = Fimg_otfshift.data;
 											}
@@ -3602,8 +3650,9 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 											if (my_ori_particle == exp_my_first_ori_particle)
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
+
 											double diff2;
-											if ((iter == 1 && do_firstiter_cc) || do_always_cc)
+											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 											{
 												// Do not calculate squared-differences, but signal product
 												// Negative values because smaller is worse in this case
@@ -3632,12 +3681,21 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												// all |Xij|2 terms that lie between current_size and ori_size
 												// Factor two because of factor 2 in division below, NOT because of 2-dimensionality of the complex plane!
 												diff2 = exp_highres_Xi2_imgs[ipart] / 2.;
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+												bool Bcuda_step2 = false;
+												if (Bcuda_step2)
 												{
-													double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
-													double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
-													diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+													//cuda code
 												}
+												else
+												{
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf) // makes an iterator n=0,1,2...NZYXSIZE(v) over Fourier-refernce-ctf:ed
+													{
+														double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
+														double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
+														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+													}
+												}
+												std::cerr << diff2 <<  std::endl ;
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
@@ -3745,6 +3803,13 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
+								tend = clock();
+								gettimeofday(&t2end, NULL);
+								std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
+								std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								std::cerr <<  std::endl << "press any key for next iteration" ;
+								char c;
+								std::cin >> c;
 							} // end loop part_id
 						}// end loop iover_rot
 					} // end if do_proceed orientations
@@ -5894,4 +5959,23 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
     }
 
 }
+
+//__global__ void cuda_applyAB(Complex *myAB, Complex* img, Complex* shifted_img)
+//{
+//    int n = blockIdx.x * blockDim.x + threadIdx.x;
+//    double real = (*(myAB + n)).real * (*(img + n)).real
+//    		- (*(myAB + n)).imag * (*(img + n)).imag;
+//	double imag = (*(myAB + n)).real * (*(img + n)).imag
+//			+ (*(myAB + n)).imag * (*(img + n)).real;
+//	*(shifted_img + n) = Complex(real, imag);
+//}
+//
+//__global__ void cuda_diff2(Complex *ref, Complex* img, Complex* Minvsigma2, double* diff)
+//{
+//    int n = threadIdx.x;
+//    double diff_real = (*(ref + n)).real - (*(img + n)).real;
+//	double diff_imag = (*(ref + n)).imag - (*(img + n)).imag;
+//	// diff2 increment add needs to be atomic
+//	diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+//}
 
