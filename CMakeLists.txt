@@ -1,11 +1,20 @@
 cmake_minimum_required(VERSION 2.8.8)
 set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
-set(BUILD_FFTW FALSE)
-set(BUILD_FLTK FALSE)
-
 project(Relion)
 set(PROJECT_VERSION "1.4.0")
+
+#Uncomment the lines below to force local builds of fftw and/or fltk
+#set(BUILD_FFTW TRUE)
+#set(BUILD_FLTK TRUE)
+
+# Uncomment following line to build relion without thread-support
+# ( this will only build binareis not relying on thread-mpi support )
+# set(NOTHREAD_RELION TRUE)
+
+#Uncomment the following line to build single precision RELION 
+# ( double precison is default ) 
+# set(SINGLE_RELION TRUE)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -26,20 +35,12 @@ set(REL_EXTERNAL_LIBS_EXTRACT_TARGET ${CMAKE_BINARY_DIR}/external)
 include(ExternalProject)
 
 #Try find FFTW -------------------------------------------------------------------------------------
-#find_package(FFTW COMPONENTS fftw) 
-# FIXME: The above searches for a FindFFTW.cmake in /usr/local/share/cmake/..... and sets FFTW_FOUND to TRUE. But there isn't one. Shouldn't there be?
-# FIXME: There are apparently single/double precision fftw libraries, which one are we using? 
 if(NOT BUILD_FFTW)
-   find_path (FFTW_INCLUDES fftw3.h)
-   find_library (FFTW_LIBRARIES NAMES fftw3)
-      message( STATUS " FFTW: " ${FFTW_LIBRARIES})
-   find_path(FFTW_PATH fftw3.h /usr/lib/* /usr/share/* /usr/include/* )
-      message( STATUS " FFTW_PATH: " ${FFTW_PATH}) 
-endif(NOT BUILD_FFTW)
-
-if(FFTW_PATH)
-   set(FFTW_FOUND TRUE)
-endif(FFTW_PATH)
+  find_package(FFTW) 
+  message( STATUS " FFTW: " ${FFTW_LIBRARIES})
+  message( STATUS " FFTW_PATH: " ${FFTW_PATH}) 
+  #message( STATUS " FFTW_FOUND: " ${FFTW_FOUND}) 
+endif()
 
 #Build FFTW if not found
 if(FFTW_FOUND)
@@ -49,7 +50,6 @@ else(FFTW_FOUND)
    set(REL_FFTW3_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fftw-3.2.2.tar.gz)
    set(REL_FFTW3_LIB_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
    set(REL_FFTW3_BUILD_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
-
    externalproject_add(FFTW3
 	URL ${REL_FFTW3_TAR_FILE}
 	SOURCE_DIR ${REL_FFTW3_LIB_DIR}
@@ -67,7 +67,7 @@ endif(FFTW_FOUND)
 find_package(X11)
 if(X11_FOUND)
    message( STATUS "Found X11, will NOT build")
-   message( STATUS ${X11_PATH})
+   message( STATUS ${X11_LIBRARIES})
 endif(X11_FOUND)
 
 find_path (X11_INCLUDES Xdbe.h)
@@ -80,11 +80,12 @@ find_path (X11_INCLUDES Xdbe.h)
 
 #Try to find FLTK--------------------------------------------------------------------------------------
 if(NOT BUILD_FLTK)
-   #find_package(FLTK)
-   find_package(FLTK REQUIRED NO_MODULE) 
+   find_package(FLTK)
+      message( STATUS " FLTK: " ${FLTK_LIBRARIES})
+   #find_package(FLTK REQUIRED NO_MODULE) 
    include(${FLTK_USE_FILE})
-   find_path (FLTK_INCLUDES Fl.H)
-   find_library (FFTW_LIBRARIES NAMES FL)
+   find_path(FLTK_INCLUDES Fl.H)
+   find_library(FLTK_LIBRARIES NAMES FL)
       message( STATUS " FLTK: " ${FLTK_LIBRARIES})
    find_path(FL_PATH Fl.H /usr/include /usr/lib/* /usr/share/* /usr/include/* )
       message( STATUS " FL_PATH: " ${FL_PATH})
@@ -93,6 +94,7 @@ endif(NOT BUILD_FLTK)
 #Build FLTK if not found
 if(FLTK_FOUND)
    message( STATUS "Found fltk, will NOT build")
+
 else(FLTK_FOUND)
    message( STATUS "No fltk found, WILL build")
    set(REL_FLTK_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fltk-1.3.0.tar.gz)
@@ -138,7 +140,7 @@ include_directories("${FFTW_INCLUDES}")
 
 message(STATUS ${CMAKE_BINARY_DIR})
 
-file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
 file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB REL_LIB "${CMAKE_SOURCE_DIR}/lib/*.so" )
@@ -149,5 +151,7 @@ add_dependencies(REL_REFINE FFTW3 FLTK)
 #file(GLOB BUILT_STUFF "${CMAKE_BINARY_DIR}/CMakeFiles/REL_REFINE.dir/src/*.o")
 #message(STATUS ${BUILT_STUFF})
 
-# ${FFTW_LIBRARIES} libfftw3_threads.so
-target_link_libraries(REL_REFINE fltk ${REL_LIB} libXft.so libXext.so libXinerama.so ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+#target_link_libraries(relion_refine fltk ${REL_LIB} libXft.so libXext.so libXinerama.so ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+target_link_libraries(relion_refine ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
+
+
