@@ -28,6 +28,10 @@
 #ifndef RWMRC_H
 #define RWMRC_H
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif 
+
 #define MRCSIZE    1024 // Minimum size of the MRC header (when nsymbt = 0)
 
 ///@defgroup MRC MRC File format
@@ -399,7 +403,25 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     }
 
     header->nsymbt = 0;
-    header->nlabl = 10; // or zero?
+
+    //Create label "Relion version    date time"
+#define MRC_LABEL_LEN 80
+    header->nlabl =  1;
+
+    char label[MRC_LABEL_LEN] = "Relion ";
+    time_t rawtime; 
+    struct tm * timeinfo;
+
+    time (&rawtime);
+    timeinfo = localtime (&rawtime);
+
+#ifdef PACKAGE_VERSION
+    strcat(label,PACKAGE_VERSION);
+#endif
+    strcat(label,"   ");
+    strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"%d-%b-%y  %R:%S",timeinfo);
+    strncpy(header->labels,label,MRC_LABEL_LEN);
+
     //strncpy(header->labels, p->label.c_str(), 799);
 
     offset = MRCSIZE + header->nsymbt;

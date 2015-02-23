@@ -1,6 +1,6 @@
 ## LibRelion
 
-AC_INIT([relion], [1.4-alpha-3], [scheres@mrc-lmb.cam.ac.uk], [relion], [http://www.relion.org])
+AC_INIT([relion], [1.4-alpha-5], [scheres@mrc-lmb.cam.ac.uk], [relion], [http://www.relion.org])
 AM_INIT_AUTOMAKE([-Wall no-define])
 
 # Define these substitions here to keep all version information in one place.

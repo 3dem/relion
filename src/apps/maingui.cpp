@@ -24,6 +24,10 @@
 #include <unistd.h>
 #include <string.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif 
+
 
 int main(int argc, char *argv[])
 {
@@ -54,8 +58,13 @@ int main(int argc, char *argv[])
 		short_dir[i] = '\0';
 	}
 
-	char titletext[57];
-	strcpy (titletext,"RELION: ");
+	char titletext[67];
+	strcpy (titletext,"RELION-");
+#ifdef PACKAGE_VERSION
+        strcat(titletext,PACKAGE_VERSION);
+#endif
+        strcat(titletext,": ");
+
 	strcat (titletext, short_dir);
 	RelionMainWindow window(GUIWIDTH, GUIHEIGHT, titletext);
 

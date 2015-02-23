@@ -78,7 +78,6 @@ void MlModel::read(FileName fn_in)
     MDlog.readStar(in, "model_general");
 
 	if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim) ||
-		!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim) ||
 		!MDlog.getValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size) ||
 		!MDlog.getValue(EMDL_MLMODEL_CURRENT_RESOLUTION, current_resolution) ||
 		!MDlog.getValue(EMDL_MLMODEL_CURRENT_SIZE, current_size) ||
@@ -98,6 +97,10 @@ void MlModel::read(FileName fn_in)
 		!MDlog.getValue(EMDL_MLMODEL_LL, LL) ||
 		!MDlog.getValue(EMDL_MLMODEL_AVE_PMAX, ave_Pmax) )
 		REPORT_ERROR("MlModel::readStar: incorrect model_general table");
+
+    // Retain compability with model files written by Relion prior to 1.4
+    if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim))
+        data_dim=2;
 
     // Take inverse again of current resolution:
     current_resolution = 1. / current_resolution;
