@@ -3,6 +3,7 @@ set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
 project(Relion)
 set(PROJECT_VERSION "1.4.0")
+enable_testing()
 
 #Uncomment the lines below to force local builds of fftw and/or fltk
 #set(BUILD_FFTW TRUE)
@@ -15,6 +16,9 @@ set(PROJECT_VERSION "1.4.0")
 #Uncomment the following line to build single precision RELION 
 # ( double precison is default ) 
 # set(SINGLE_RELION TRUE)
+
+add_definitions(-DRELION_TESTING)
+#set(RELION_TESTING 1)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -129,19 +133,11 @@ endif(FLTK_FOUND)
 #------------------------------------------------------------------------------------------------------
 
 
-# PRINT OUT ALL CMAKE VARS
-#-------------------------
-#get_cmake_property(_variableNames VARIABLES)
-#foreach (_variableName ${_variableNames})
-#    message(STATUS "${_variableName}=${${_variableName}}")
-#endforeach()
-#-------------------------
-
 include_directories("${CMAKE_SOURCE_DIR}")
 include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
-message(STATUS ${CMAKE_BINARY_DIR})
+message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
 file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
 file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h")
@@ -173,3 +169,19 @@ endforeach()
 #	target_link_libraries(${_target} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
 #	message(STATUS "added ${_target}...")
 #endforeach()
+
+#if(CMAKE_BUILD_TYPE=Debug)
+  
+#endif()
+
+include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+
+# PRINT OUT ALL CMAKE VARS
+#-------------------------
+#get_cmake_property(_variableNames VARIABLES)
+#foreach (_variableName ${_variableNames})
+#    message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
+#-------------------------
+
+

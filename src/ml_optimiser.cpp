@@ -3476,13 +3476,13 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) *= myscale;
 									}
 								}
-								double tstart, tend;
+								//double tstart, tend;
 							    struct timeval t2start, t2end;
 							    gettimeofday(&t2start, NULL);
 								//t2start = gettimeofday();
-								tstart = clock();
+								//tstart = clock();
 								long int ihidden = iorientclass * exp_nr_trans;
-								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
+								//std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -3556,6 +3556,16 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
 															: global_fftshifts_ab2_current[iitrans].data;
 												}
+//												bool cuda_testing = true;
+//												if(cuda_testing)
+//												{
+//													Image<double> myAB_out;
+//													myAB_out().resize(exp_current_image_size, exp_current_image_size);
+//													//FourierTransformer transformer;
+//													//transformer.inverseFourierTransform(myAB, myAB_out());
+//													CenterFFT(myAB_out(),false);
+//													myAB_out.write("myAB_out.mrc");
+//												}
 
 												bool Bcuda_step1 = false;
 												if (Bcuda_step1)
@@ -3596,8 +3606,22 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
 													}
 												}
+
 												Fimg_shift = Fimg_otfshift.data;
 											}
+#ifdef RELION_TESTING
+											bool cuda_testing = true;
+											if(cuda_testing)
+											{
+												Image<double> otfshift_out;
+												otfshift_out().resize(exp_current_image_size, exp_current_image_size);
+												FourierTransformer transformer;
+												transformer.inverseFourierTransform(Fimg_otfshift, otfshift_out());
+												CenterFFT(otfshift_out(),false);
+												otfshift_out.write("out_otfshift.mrc");
+												exit(0);
+											}
+#endif
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
 											if (my_ori_particle == exp_my_first_ori_particle)
@@ -3695,7 +3719,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
 													}
 												}
-												std::cerr << diff2 <<  std::endl ;
+												//std::cerr << diff2 <<  std::endl ;
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
@@ -3803,13 +3827,15 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
-								tend = clock();
+								//tend = clock();
 								gettimeofday(&t2end, NULL);
-								std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
-								std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
-								std::cerr <<  std::endl << "press any key for next iteration" ;
-								char c;
-								std::cin >> c;
+								//std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
+								//std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								// BELOW LINE OUTPUTS uSEC COUNT FOR EACH DIFF2 CALCULATION
+								//std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								//std::cerr <<  std::endl << "press any key for next iteration" ;
+								//char c;
+								//std::cin >> c;
 							} // end loop part_id
 						}// end loop iover_rot
 					} // end if do_proceed orientations

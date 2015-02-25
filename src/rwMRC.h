@@ -419,7 +419,11 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     strcat(label,PACKAGE_VERSION);
 #endif
     strcat(label,"   ");
+#ifdef RELION_TESTING
+    strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"06-jun-06  13:37:00",timeinfo);
+#else
     strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"%d-%b-%y  %R:%S",timeinfo);
+#endif
     strncpy(header->labels,label,MRC_LABEL_LEN);
 
     //strncpy(header->labels, p->label.c_str(), 799);
