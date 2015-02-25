@@ -1,4 +1,5 @@
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/../tests/3Dclassification) 
+#--------------------------------------------------------------------
 add_test(NAME 3Dclassification_produce_data 
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
         COMMAND refine --o Testing/test_data 
@@ -8,6 +9,7 @@ add_test(NAME 3Dclassification_produce_data
         --ref ref_model.mrc 
         --ini_high 50 
         --ctf 
+        --ctf_corrected_ref
         --iter 1 
         --tau2_fudge 2 
         --K 4 
@@ -24,6 +26,35 @@ add_test(NAME 3Dclassification_produce_data
         --memory_per_thread 4 
         --random_seed 1993 
         --onthefly_shifts)      
-add_test(NAME 3Dclassification_compare_data
+#--------------------------------------------------------------------
+add_test(NAME 3Dc_ref
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
-        COMMAND ${CMAKE_COMMAND} -E compare_files ref_3D_otfshift.mrc out_otfshift.mrc)
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+        ref_3D_fref.mrc 
+           out_fref.mrc)           
+#--------------------------------------------------------------------
+add_test(NAME 3Dc_ctf
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+        ref_3D_ctf.mrc 
+           out_ctf.mrc)
+#--------------------------------------------------------------------
+add_test(NAME 3Dc_refctf
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+        ref_3D_frefctf.mrc 
+           out_frefctf.mrc)
+#--------------------------------------------------------------------
+add_test(NAME 3Dc_ref-vs-refctf
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+           out_ref.mrc 
+           out_frefctf.mrc)
+SET_TESTS_PROPERTIES(3Dc_ref-vs-refctf PROPERTIES WILL_FAIL TRUE)
+#--------------------------------------------------------------------
+add_test(NAME 3Dc_otfshift
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+        ref_3D_otfshift.mrc 
+           out_otfshift.mrc)
+           

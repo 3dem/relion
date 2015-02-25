@@ -3044,6 +3044,11 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 			}
 //#define DEBUG_CTF_FFTW_IMAGE
+#ifdef RELION_TESTING
+			Image<double> tt;
+			tt()=Fctf;
+			tt.write("out_ctf.mrc");
+#endif
 #ifdef DEBUG_CTF_FFTW_IMAGE
 			Image<double> tt;
 			tt()=Fctf;
@@ -3609,19 +3614,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 
 												Fimg_shift = Fimg_otfshift.data;
 											}
-#ifdef RELION_TESTING
-											bool cuda_testing = true;
-											if(cuda_testing)
-											{
-												Image<double> otfshift_out;
-												otfshift_out().resize(exp_current_image_size, exp_current_image_size);
-												FourierTransformer transformer;
-												transformer.inverseFourierTransform(Fimg_otfshift, otfshift_out());
-												CenterFFT(otfshift_out(),false);
-												otfshift_out.write("out_otfshift.mrc");
-												exit(0);
-											}
-#endif
+
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
 											if (my_ori_particle == exp_my_first_ori_particle)
@@ -3738,8 +3731,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												std::cerr << " ipart= " << ipart << std::endl;
 												std::cerr << " diff2= " << diff2 << " thisthread_min_diff2[ipart]= " << thisthread_min_diff2[ipart] << " ipart= " << ipart << std::endl;
 												std::cerr << " exp_highres_Xi2_imgs[ipart]= " << exp_highres_Xi2_imgs[ipart] << std::endl;
-												std::cerr<< " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
-												std::cerr<< " exp_nr_oversampled_rot="<<exp_nr_oversampled_rot<<std::endl;
+												std::cerr << " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
+												std::cerr << " exp_nr_oversampled_rot="<<exp_nr_oversampled_rot<<std::endl;
 												std::cerr << " iover_rot= " << iover_rot << " iover_trans= " << iover_trans << " ihidden= " << ihidden << std::endl;
 												std::cerr << " exp_current_oversampling= " << exp_current_oversampling << std::endl;
 												std::cerr << " ihidden_over= " << ihidden_over << " XSIZE(Mweight)= " << XSIZE(exp_Mweight) << std::endl;
@@ -3781,6 +3774,38 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												std::cerr << "written Frefctf.spi" << std::endl;
 												REPORT_ERROR("diff2 is not a number");
 												pthread_mutex_unlock(&global_mutex);
+											}
+#endif
+#ifdef RELION_TESTING
+											bool cuda_testing = true;
+											if(cuda_testing)
+											{
+												Image<double> tt;
+												tt().resize(exp_current_image_size, exp_current_image_size);
+												FourierTransformer transformer;
+												transformer.inverseFourierTransform(Fimg_otfshift, tt());
+												CenterFFT(tt(),false);
+												tt.write("out_otfshift.mrc");
+
+//												FourierTransformer transformer1;
+//												tt().initZeros();
+//												tt().resize(exp_current_image_size, exp_current_image_size);
+//												transformer1.inverseFourierTransform(Fimg_shift, tt());
+//												CenterFFT(tt(),false);
+//												tt.write("out_shift.mrc");
+
+												FourierTransformer transformer2;
+												tt().initZeros();
+												transformer2.inverseFourierTransform(Frefctf, tt());
+												CenterFFT(tt(),false);
+												tt.write("out_frefctf.mrc");
+
+												FourierTransformer transformer3;
+												tt().initZeros();
+												transformer3.inverseFourierTransform(Fref, tt());
+												CenterFFT(tt(),false);
+												tt.write("out_fref.mrc");
+												exit(0);
 											}
 #endif
 //#define DEBUG_VERBOSE

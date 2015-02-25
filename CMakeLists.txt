@@ -17,8 +17,7 @@ enable_testing()
 # ( double precison is default ) 
 # set(SINGLE_RELION TRUE)
 
-add_definitions(-DRELION_TESTING)
-#set(RELION_TESTING 1)
+set(RELION_TESTING TRUE)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -170,11 +169,12 @@ endforeach()
 #	message(STATUS "added ${_target}...")
 #endforeach()
 
-#if(CMAKE_BUILD_TYPE=Debug)
-  
-#endif()
+if(RELION_TESTING)
+  add_definitions(-DRELION_TESTING)
+  include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+endif()
 
-include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+
 
 # PRINT OUT ALL CMAKE VARS
 #-------------------------
