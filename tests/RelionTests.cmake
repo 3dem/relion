@@ -1,8 +1,9 @@
-#file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/../tests/3Dclassification) 
+file(COPY ${CMAKE_SOURCE_DIR}/tests DESTINATION ${CMAKE_BINARY_DIR})
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_output)
 #--------------------------------------------------------------------
 add_test(NAME 3Dclassification_produce_data 
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
-        COMMAND refine --o Testing/test_data 
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
+        COMMAND refine --o test_output/out
         --i ap_s_c2d_red.star 
         --particle_diameter 200 
         --angpix 1 
@@ -28,32 +29,32 @@ add_test(NAME 3Dclassification_produce_data
         --onthefly_shifts)      
 #--------------------------------------------------------------------
 add_test(NAME 3Dc_ref
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
         ref_3D_fref.mrc 
            out_fref.mrc)           
 #--------------------------------------------------------------------
 add_test(NAME 3Dc_ctf
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
         ref_3D_ctf.mrc 
            out_ctf.mrc)
 #--------------------------------------------------------------------
 add_test(NAME 3Dc_refctf
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
         ref_3D_frefctf.mrc 
            out_frefctf.mrc)
 #--------------------------------------------------------------------
 add_test(NAME 3Dc_ref-vs-refctf
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
            out_ref.mrc 
            out_frefctf.mrc)
 SET_TESTS_PROPERTIES(3Dc_ref-vs-refctf PROPERTIES WILL_FAIL TRUE)
 #--------------------------------------------------------------------
 add_test(NAME 3Dc_otfshift
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/../tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
         ref_3D_otfshift.mrc 
            out_otfshift.mrc)

@@ -3,23 +3,29 @@ set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
 project(Relion)
 set(PROJECT_VERSION "1.4.0")
-enable_testing()
 
-#Uncomment the lines below to force local builds of fftw and/or fltk
+# Add the path to the additional Find<module>.cmake files 
+# which are included with the distributed RLEION-code
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+# Uncomment the lines below to force local builds of fftw and/or fltk
 #set(BUILD_FFTW TRUE)
 #set(BUILD_FLTK TRUE)
 
 # Uncomment following line to build relion without thread-support
 # ( this will only build binareis not relying on thread-mpi support )
-# set(NOTHREAD_RELION TRUE)
+#set(NOTHREAD_RELION TRUE)
 
-#Uncomment the following line to build single precision RELION 
+# Uncomment the following line to build single precision RELION 
 # ( double precison is default ) 
-# set(SINGLE_RELION TRUE)
+#set(SINGLE_RELION TRUE)
 
+# Uncomment the following to specify the code to run tests by issuing 
+# mkdir build ; cd build ; cmake .. ; make ; make test
 set(RELION_TESTING TRUE)
-
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+if(RELION_TESTING)
+   enable_testing()
+endif()
 
 find_package(CUDA)
 if(CUDA_FOUND)
@@ -169,6 +175,7 @@ endforeach()
 #	message(STATUS "added ${_target}...")
 #endforeach()
 
+# Include testing flag(s) as precomiler definitions and include test directives
 if(RELION_TESTING)
   add_definitions(-DRELION_TESTING)
   include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
@@ -183,5 +190,4 @@ endif()
 #    message(STATUS "${_variableName}=${${_variableName}}")
 #endforeach()
 #-------------------------
-
 
