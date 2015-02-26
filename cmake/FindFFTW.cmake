@@ -21,7 +21,7 @@ find_library(FFTW_LIBRARIES "${fftw}")
 
 # PARALLELISM OPTIONS
 if(NOT NOTHREAD_RELION)
-        find_library(FFTW_THREAD_LIBS "${fftw}_threads")	
+    find_library(FFTW_THREAD_LIBS "${fftw}_threads")	
 	list(APPEND FFTW_LIBRARIES ${FFTW_THREAD_LIBS} )
 endif(NOT NOTHREAD_RELION)
 
