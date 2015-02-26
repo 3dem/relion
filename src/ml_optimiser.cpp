@@ -3560,30 +3560,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												bool Bcuda_step1 = false;
 												if (Bcuda_step1)
 												{
-													//cuda code
 
-													// Size of the image arrays
-													int N=NZYXSIZE(exp_local_Fimgs_shifted[ipart]) * sizeof(Complex);
-
-													// declare GPU memory pointers
-													Complex * d_myAB;
-													Complex * d_exp_local_Fimgs_shifted;
-													Complex * d_Fimg_otfshift;
-
-													// allocate GPU memory
-//													cudaMalloc( (void**) &d_myAB, N);
-//													cudaMalloc( (void**) &d_exp_local_Fimgs_shifted, N);
-//													cudaMalloc( (void**) &d_Fimg_otfshift, N);
-//
-//													cudaMemcpy( d_myAB, myAB, N, cudaMemcpyHostToDevice);
-//													cudaMemcpy( d_exp_local_Fimgs_shifted, exp_local_Fimgs_shifted, N, cudaMemcpyHostToDevice);
-//
-//													//let's do a simple setup for now; each pixel is a thread, each row is a block
-//													dim3 grid1 = XSIZE(exp_local_Fimgs_shifted[ipart]);
-//													dim3 grid2 = YSIZE(exp_local_Fimgs_shifted[ipart]);
-//													cuda_applyAB<<<grid1, grid2>>>(d_myAB, d_exp_local_Fimgs_shifted, d_Fimg_otfshift);
-//
-//		                                            cudaMemcpy( Fimg_otfshift, d_Fimg_otfshift, N, cudaMemcpyDeviceToHost );
 												}
 												else
 												{
@@ -5959,23 +5936,4 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
     }
 
 }
-
-//__global__ void cuda_applyAB(Complex *myAB, Complex* img, Complex* shifted_img)
-//{
-//    int n = blockIdx.x * blockDim.x + threadIdx.x;
-//    double real = (*(myAB + n)).real * (*(img + n)).real
-//    		- (*(myAB + n)).imag * (*(img + n)).imag;
-//	double imag = (*(myAB + n)).real * (*(img + n)).imag
-//			+ (*(myAB + n)).imag * (*(img + n)).real;
-//	*(shifted_img + n) = Complex(real, imag);
-//}
-//
-//__global__ void cuda_diff2(Complex *ref, Complex* img, Complex* Minvsigma2, double* diff)
-//{
-//    int n = threadIdx.x;
-//    double diff_real = (*(ref + n)).real - (*(img + n)).real;
-//	double diff_imag = (*(ref + n)).imag - (*(img + n)).imag;
-//	// diff2 increment add needs to be atomic
-//	diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
-//}
 

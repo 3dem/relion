@@ -8,29 +8,26 @@
 # Double precision is default, single precision can be 
 # opted into by specifying this in CMakeLists.txt
 
-
-# PRECISION CHOICES
-if(SINGLE_RELION)
+# PRECISION OPTION
+if(FFTW_SINGLE)
 	# set fftw lib to use single (f=float) precision
 	set(fftw "fftw3f")
-else()
+else(FFTW_SINGLE)
 	# set fftw lib to use double precision
 	set(fftw "fftw3")
-endif()	
+endif(FFTW_SINGLE)	
 
+find_library(FFTW_LIBRARIES "${fftw}")
+
+# PARALLELISM OPTIONS
 if(NOT NOTHREAD_RELION)
-	set(thread_opt "_threads")
-        find_library(FFTW_LIB1 "${fftw}${thread_opt}")
-endif()
-find_library(FFTW_LIB2 "${fftw}")
-set(FFTW_LIBRARIES ${FFTW_LIB1} ${FFTW_LIB2} )
-
-
+        find_library(FFTW_THREAD_LIBS "${fftw}_threads")	
+	list(APPEND FFTW_LIBRARIES ${FFTW_THREAD_LIBS} )
+endif(NOT NOTHREAD_RELION)
 
 find_path(FFTW_INCLUDES ${fftw}.h)
 find_path(FFTW_PATH ${fftw}.h /usr/lib/* /usr/share/* /usr/include/* )
 
 if(FFTW_PATH)
    set(FFTW_FOUND TRUE)
-endif()
-
+endif(FFTW_PATH)

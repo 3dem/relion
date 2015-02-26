@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 2.8.8)
-set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
+set(REL_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
 project(Relion)
 set(PROJECT_VERSION "1.4.0")
 
 #Uncomment the lines below to force local builds of fftw and/or fltk
-#set(BUILD_FFTW TRUE)
-#set(BUILD_FLTK TRUE)
+SET(REL_OPT_BUILD_FFTW OFF CACHE BOOL "Build internal FFTW library")
+SET(REL_OPT_BUILD_FLTK OFF CACHE BOOL "Build internal FLTK library")
 
 # Uncomment following line to build relion without thread-support
 # ( this will only build binareis not relying on thread-mpi support )
@@ -18,14 +18,6 @@ set(PROJECT_VERSION "1.4.0")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-find_package(CUDA)
-if(CUDA_FOUND)
-    message(STATUS "Using cuda wrapper to compile....")
-else(CUDA_FOUND)
-    message(STATUS "Using non-cuda compilation....")
-endif(CUDA_FOUND)
-
-# DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
 
 SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
@@ -40,25 +32,50 @@ set(REL_EXTERNAL_LIBS_TAR_DIRECTORY ${CMAKE_SOURCE_DIR}/external)
 set(REL_EXTERNAL_LIBS_EXTRACT_TARGET ${CMAKE_BINARY_DIR}/external)
 include(ExternalProject)
 
+set(X11_SOVERSIONS 1 2 3 4 5 6)
 
-  message( STATUS " suffs: " ${CMAKE_FIND_LIBRARY_SUFFIXES})
-LIST(APPEND CMAKE_FIND_LIBRARY_SUFFIXES .so.1)
-#set(CMAKE_FIND_LIBRARY_SUFFIXES ".so.1 ${CMAKE_FIND_LIBRARY_SUFFIXES}")
-  message( STATUS " suffs: " ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-#Try find FFTW -------------------------------------------------------------------------------------
-if(NOT BUILD_FFTW)
-  find_package(FFTW) 
-  message( STATUS " FFTW: " ${FFTW_LIBRARIES})
-  message( STATUS " FFTW_PATH: " ${FFTW_PATH}) 
+#----------------------------------------------------------------------------------------------
+# FIND CUDA
+#----------------------------------------------------------------------------------------------
+
+# DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
+find_package(CUDA)
+if(CUDA_FOUND)
+    message(STATUS "Using cuda wrapper to compile....")
+else(CUDA_FOUND)
+    message(STATUS "Using non-cuda compilation....")
+endif(CUDA_FOUND)
+
+
+#----------------------------------------------------------------------------------------------
+# FIND FFTW
+#----------------------------------------------------------------------------------------------
+
+if(SINGLE_RELION)
+	set(FFTW_SINGLE TRUE)
+endif(SINGLE_RELION)
+
+set(FFTW_FOUND FALSE)
+
+#If user specifically requested build of internal fftw
+if(NOT REL_OPT_BUILD_FFTW)
+  find_package(FFTW)
+  #message( STATUS " FFTW: " ${FFTW_LIBRARIES})
+  #message( STATUS " FFTW_PATH: " ${FFTW_PATH}) 
   #message( STATUS " FFTW_FOUND: " ${FFTW_FOUND}) 
 endif()
 
 #Build FFTW if not found
 if(FFTW_FOUND)
-   message( STATUS "Found fftw, will NOT build")
+   message( STATUS "Found fftw libraries, will NOT build internal")
 else(FFTW_FOUND)
-   message( STATUS "no fftw found, WILL build")
+   if(REL_OPT_BUILD_FFTW)
+      message( STATUS "Will build internal fftw libraries on request")
+   else(REL_OPT_BUILD_FFTW)
+      message( STATUS "No fftw libraries found, WILL build internal")
+   endif(REL_OPT_BUILD_FFTW)
+      
    set(REL_FFTW3_TAR_FILE ${REL_EXTERNAL_LIBS_TAR_DIRECTORY}/fftw-3.2.2.tar.gz)
    set(REL_FFTW3_LIB_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
    set(REL_FFTW3_BUILD_DIR ${REL_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
@@ -73,13 +90,21 @@ else(FFTW_FOUND)
 	LOG_INSTALL
    )
 endif(FFTW_FOUND)
-#------------------------------------------------------------------------------------------------------
 
-#Try to find X11------------------------------------------------------------
+
+#----------------------------------------------------------------------------------------------
+# FIND X11
+#----------------------------------------------------------------------------------------------
+
 find_package(X11)
 if(X11_FOUND)
+   #foreach(VERSION RANGE X11_SOVERSIONS) #Loop over so-versions
+   #   set_property(TARGET fltk PROPERTY VERSION “1”)
+   #endforeach()
    message( STATUS "Found X11, will NOT build")
    message( STATUS ${X11_LIBRARIES})
+else(X11_FOUND)
+   message( FATAL_ERROR "X11 could not be found")
 endif(X11_FOUND)
 
 find_path (X11_INCLUDES Xdbe.h)
@@ -91,6 +116,7 @@ find_path (X11_INCLUDES Xdbe.h)
 
 
 #Try to find FLTK--------------------------------------------------------------------------------------
+
 if(NOT BUILD_FLTK)
    find_package(FLTK)
       message( STATUS " FLTK: " ${FLTK_LIBRARIES})
