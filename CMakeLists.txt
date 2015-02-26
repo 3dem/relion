@@ -1,22 +1,31 @@
 cmake_minimum_required(VERSION 2.8.8)
-set(REL_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
+set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
 project(Relion)
 set(PROJECT_VERSION "1.4.0")
 
-#Uncomment the lines below to force local builds of fftw and/or fltk
-SET(REL_OPT_BUILD_FFTW OFF CACHE BOOL "Build internal FFTW library")
-SET(REL_OPT_BUILD_FLTK OFF CACHE BOOL "Build internal FLTK library")
+# Add the path to the additional Find<module>.cmake files 
+# which are included with the distributed RLEION-code
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+# Uncomment the lines below to force local builds of fftw and/or fltk
+#set(BUILD_FFTW TRUE)
+#set(BUILD_FLTK TRUE)
 
 # Uncomment following line to build relion without thread-support
 # ( this will only build binareis not relying on thread-mpi support )
-# set(NOTHREAD_RELION TRUE)
+#set(NOTHREAD_RELION TRUE)
 
-#Uncomment the following line to build single precision RELION 
+# Uncomment the following line to build single precision RELION 
 # ( double precison is default ) 
-# set(SINGLE_RELION TRUE)
+#set(SINGLE_RELION TRUE)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+# Uncomment the following to specify the code to run tests by issuing 
+# mkdir build ; cd build ; cmake .. ; make ; make test
+set(RELION_TESTING TRUE)
+if(RELION_TESTING)
+   enable_testing()
+endif()
 
 
 SET(CMAKE_C_COMPILER mpicc)
@@ -116,7 +125,6 @@ find_path (X11_INCLUDES Xdbe.h)
 
 
 #Try to find FLTK--------------------------------------------------------------------------------------
-
 if(NOT BUILD_FLTK)
    find_package(FLTK)
       message( STATUS " FLTK: " ${FLTK_LIBRARIES})
@@ -155,19 +163,11 @@ endif(FLTK_FOUND)
 #------------------------------------------------------------------------------------------------------
 
 
-# PRINT OUT ALL CMAKE VARS
-#-------------------------
-#get_cmake_property(_variableNames VARIABLES)
-#foreach (_variableName ${_variableNames})
-#    message(STATUS "${_variableName}=${${_variableName}}")
-#endforeach()
-#-------------------------
-
 include_directories("${CMAKE_SOURCE_DIR}")
 include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
-message(STATUS ${CMAKE_BINARY_DIR})
+message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
 file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
 file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h")
@@ -199,3 +199,20 @@ endforeach()
 #	target_link_libraries(${_target} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ) # ${REL_SRC_H} ${REL_SRC} ${REL_LIB}) # ${BUILT_STUFF})
 #	message(STATUS "added ${_target}...")
 #endforeach()
+
+# Include testing flag(s) as precomiler definitions and include test directives
+if(RELION_TESTING)
+  add_definitions(-DRELION_TESTING)
+  include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+endif()
+
+
+
+# PRINT OUT ALL CMAKE VARS
+#-------------------------
+#get_cmake_property(_variableNames VARIABLES)
+#foreach (_variableName ${_variableNames})
+#    message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
+#-------------------------
+

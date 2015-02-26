@@ -3044,6 +3044,11 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 			}
 //#define DEBUG_CTF_FFTW_IMAGE
+#ifdef RELION_TESTING
+			Image<double> tt;
+			tt()=Fctf;
+			tt.write("out_ctf.mrc");
+#endif
 #ifdef DEBUG_CTF_FFTW_IMAGE
 			Image<double> tt;
 			tt()=Fctf;
@@ -3476,13 +3481,13 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) *= myscale;
 									}
 								}
-								double tstart, tend;
+								//double tstart, tend;
 							    struct timeval t2start, t2end;
 							    gettimeofday(&t2start, NULL);
 								//t2start = gettimeofday();
-								tstart = clock();
+								//tstart = clock();
 								long int ihidden = iorientclass * exp_nr_trans;
-								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
+								//std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -3556,6 +3561,16 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
 															: global_fftshifts_ab2_current[iitrans].data;
 												}
+//												bool cuda_testing = true;
+//												if(cuda_testing)
+//												{
+//													Image<double> myAB_out;
+//													myAB_out().resize(exp_current_image_size, exp_current_image_size);
+//													//FourierTransformer transformer;
+//													//transformer.inverseFourierTransform(myAB, myAB_out());
+//													CenterFFT(myAB_out(),false);
+//													myAB_out.write("myAB_out.mrc");
+//												}
 
 												bool Bcuda_step1 = false;
 												if (Bcuda_step1)
@@ -3573,8 +3588,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
 													}
 												}
+
 												Fimg_shift = Fimg_otfshift.data;
 											}
+
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
 											if (my_ori_particle == exp_my_first_ori_particle)
@@ -3672,7 +3689,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
 													}
 												}
-												std::cerr << diff2 <<  std::endl ;
+												//std::cerr << diff2 <<  std::endl ;
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
@@ -3691,8 +3708,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												std::cerr << " ipart= " << ipart << std::endl;
 												std::cerr << " diff2= " << diff2 << " thisthread_min_diff2[ipart]= " << thisthread_min_diff2[ipart] << " ipart= " << ipart << std::endl;
 												std::cerr << " exp_highres_Xi2_imgs[ipart]= " << exp_highres_Xi2_imgs[ipart] << std::endl;
-												std::cerr<< " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
-												std::cerr<< " exp_nr_oversampled_rot="<<exp_nr_oversampled_rot<<std::endl;
+												std::cerr << " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
+												std::cerr << " exp_nr_oversampled_rot="<<exp_nr_oversampled_rot<<std::endl;
 												std::cerr << " iover_rot= " << iover_rot << " iover_trans= " << iover_trans << " ihidden= " << ihidden << std::endl;
 												std::cerr << " exp_current_oversampling= " << exp_current_oversampling << std::endl;
 												std::cerr << " ihidden_over= " << ihidden_over << " XSIZE(Mweight)= " << XSIZE(exp_Mweight) << std::endl;
@@ -3734,6 +3751,38 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												std::cerr << "written Frefctf.spi" << std::endl;
 												REPORT_ERROR("diff2 is not a number");
 												pthread_mutex_unlock(&global_mutex);
+											}
+#endif
+#ifdef RELION_TESTING
+											bool cuda_testing = true;
+											if(cuda_testing)
+											{
+												Image<double> tt;
+												tt().resize(exp_current_image_size, exp_current_image_size);
+												FourierTransformer transformer;
+												transformer.inverseFourierTransform(Fimg_otfshift, tt());
+												CenterFFT(tt(),false);
+												tt.write("out_otfshift.mrc");
+
+//												FourierTransformer transformer1;
+//												tt().initZeros();
+//												tt().resize(exp_current_image_size, exp_current_image_size);
+//												transformer1.inverseFourierTransform(Fimg_shift, tt());
+//												CenterFFT(tt(),false);
+//												tt.write("out_shift.mrc");
+
+												FourierTransformer transformer2;
+												tt().initZeros();
+												transformer2.inverseFourierTransform(Frefctf, tt());
+												CenterFFT(tt(),false);
+												tt.write("out_frefctf.mrc");
+
+												FourierTransformer transformer3;
+												tt().initZeros();
+												transformer3.inverseFourierTransform(Fref, tt());
+												CenterFFT(tt(),false);
+												tt.write("out_fref.mrc");
+												exit(0);
 											}
 #endif
 //#define DEBUG_VERBOSE
@@ -3780,13 +3829,15 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
-								tend = clock();
+								//tend = clock();
 								gettimeofday(&t2end, NULL);
-								std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
-								std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
-								std::cerr <<  std::endl << "press any key for next iteration" ;
-								char c;
-								std::cin >> c;
+								//std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
+								//std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								// BELOW LINE OUTPUTS uSEC COUNT FOR EACH DIFF2 CALCULATION
+								//std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								//std::cerr <<  std::endl << "press any key for next iteration" ;
+								//char c;
+								//std::cin >> c;
 							} // end loop part_id
 						}// end loop iover_rot
 					} // end if do_proceed orientations
