@@ -9,8 +9,9 @@ find_path (X11_INCLUDES Xdbe.h)
 
 message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
-file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu")
-file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cuh")
+file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu")
+file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cpp")
+file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.h")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB REL_LIB "${CMAKE_SOURCE_DIR}/lib/*.so" )
 
@@ -20,7 +21,7 @@ add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	if(CUDA_FOUND)
-	    cuda_add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
+	    cuda_add_executable(${_target} ${_target}.cpp ${REL_CUDA_SRC} $<TARGET_OBJECTS:relion_lib>)
 	else(CUDA_FOUND)
 	    add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
 	endif(CUDA_FOUND)

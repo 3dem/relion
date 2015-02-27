@@ -30,7 +30,7 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
-#include "src/gpu_utils/diff2.cuh"
+#include "src/gpu_utils/diff2.h"
 
 #define NR_CLASS_MUTEXES 5
 
@@ -3302,7 +3302,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 		MultidimArray<bool> &exp_Mcoarse_significant,
 		std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 		std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
-		std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
+		std::vector<MultidimArray<Complex> > &exp_local_Fimgs_shifted,
 		std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
 		std::vector<MultidimArray<double> > &exp_local_Fctfs,
 		std::vector<double> &exp_local_sqrtXi2)
@@ -3576,7 +3576,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												bool Bcuda_step1 = true;
 												if (Bcuda_step1)
 												{
-													cuda_applyAB(ipart, exp_local_Fimgs_shifted, myAB, Fimg_otfshift);
+													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
+													std::cerr << " hej " << A << std::endl;
 												}
 												else
 												{
@@ -3587,6 +3588,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
 																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
 														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+
 													}
 												}
 
