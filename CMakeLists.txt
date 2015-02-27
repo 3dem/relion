@@ -21,6 +21,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(RELION_TESTING TRUE)
 if(RELION_TESTING)
    enable_testing()
+  add_definitions(-DRELION_TESTING)
 endif()
 
 find_package(CUDA)
@@ -47,7 +48,6 @@ ADD_SUBDIRECTORY(src/apps)
 
 # Include testing flag(s) as precomiler definitions and include test directives
 if(RELION_TESTING)
-  add_definitions(-DRELION_TESTING)
   include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
 endif()
 
