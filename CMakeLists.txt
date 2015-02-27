@@ -40,9 +40,11 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-FIND_PACKAGE(FFTW REQUIRED)
-FIND_PACKAGE(X11 REQUIRED)
-FIND_PACKAGE(FLTK REQUIRED)
+FIND_PACKAGE(FFTW)
+FIND_PACKAGE(X11)
+
+set(FLTK_SKIP_OPENGL TRUE) #Not required
+FIND_PACKAGE(FLTK)
 
 ADD_SUBDIRECTORY(src/apps)
 
@@ -55,10 +57,10 @@ endif()
 
 # PRINT OUT ALL CMAKE VARS
 #-------------------------
-#get_cmake_property(_variableNames VARIABLES)
-#foreach (_variableName ${_variableNames})
-#    message(STATUS "${_variableName}=${${_variableName}}")
-#endforeach()
+get_cmake_property(_variableNames VARIABLES)
+foreach (_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+endforeach()
 #-------------------------
 
 
