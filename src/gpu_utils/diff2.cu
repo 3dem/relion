@@ -1,7 +1,8 @@
 #include <cuda.h>
 #include <math.h>
-#include "complex.h"
-#include "multidim_array.h"
+#include "src/complex.h"
+#include "src/gpu_utils/diff2.cuh"
+#include "src/multidim_array.h"
 
 #define cuda_block_size 32
 
