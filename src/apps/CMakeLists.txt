@@ -9,8 +9,8 @@ find_path (X11_INCLUDES Xdbe.h)
 
 message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
-file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
-file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h")
+file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu")
+file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cuh")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB REL_LIB "${CMAKE_SOURCE_DIR}/lib/*.so" )
 
