@@ -30,6 +30,7 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
+#include "src/gpu_utils/diff2.cuh"
 
 #define NR_CLASS_MUTEXES 5
 
@@ -3572,10 +3573,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 //													myAB_out.write("myAB_out.mrc");
 //												}
 
-												bool Bcuda_step1 = false;
+												bool Bcuda_step1 = true;
 												if (Bcuda_step1)
 												{
-
+													cuda_applyAB(ipart, exp_local_Fimgs_shifted, myAB, Fimg_otfshift);
 												}
 												else
 												{
