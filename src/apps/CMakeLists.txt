@@ -2,6 +2,8 @@ include_directories("${CMAKE_SOURCE_DIR}")
 include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
+#set(CUDA_NVCC_FLAGS "-g -G")
+
 find_path (X11_INCLUDES Xdbe.h)
 
 #FLTK_WRAP_UI(Ui ui.fl)

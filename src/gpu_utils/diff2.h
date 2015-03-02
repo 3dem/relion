@@ -7,15 +7,15 @@ void cuda_applyAB(
 					double *h_exp_local_Fimgs_shifted,
 					double *myAB,
 					double *shifted_img
-				  );
+				);
 				  
 				  
-//void cuda_diff2(
-//					Complex *ref,
-//					Complex* img,
-//					Complex* Minvsigma2,
-//					double* diff2
-//			   );
-//
-//
+double cuda_diff2(
+					int size,
+					double *h_Frefctf,
+					double *h_Fimg_trans,
+					double *h_Minvsigma2
+				);
+
+
 #endif

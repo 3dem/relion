@@ -3573,11 +3573,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 //													myAB_out.write("myAB_out.mrc");
 //												}
 
-												bool Bcuda_step1 = true;
+												bool Bcuda_step1 = false;
 												if (Bcuda_step1)
 												{
 													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
-													std::cerr << " hej " << A << std::endl;
 												}
 												else
 												{
@@ -3681,7 +3680,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												bool Bcuda_step2 = false;
 												if (Bcuda_step2)
 												{
-													//cuda code
+													diff2 += cuda_diff2(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, Minvsigma2);
 												}
 												else
 												{
@@ -3837,7 +3836,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 								//std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
 								//std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
 								// BELOW LINE OUTPUTS uSEC COUNT FOR EACH DIFF2 CALCULATION
-								//std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
 								//std::cerr <<  std::endl << "press any key for next iteration" ;
 								//char c;
 								//std::cin >> c;
