@@ -19,6 +19,7 @@ file(GLOB REL_LIB "${CMAKE_SOURCE_DIR}/lib/*.so" )
 
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 
+
 add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
@@ -27,6 +28,7 @@ foreach (_target ${RELION_TARGETS})
 	else(CUDA_FOUND)
 	    add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
 	endif(CUDA_FOUND)
+	
 	#add_dependencies(${_target} FFTW Ui)
 	#target_link_libraries(${_target} Ui ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ${relion_lib} )
 	target_link_libraries(${_target} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ${relion_lib} )

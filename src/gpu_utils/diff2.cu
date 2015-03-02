@@ -15,19 +15,19 @@ __global__ void cuda_kernel_applyAB(double *img, double *myAB, double *shifted_i
 __global__ void cuda_kernel_diff2(double *ref, double *img, double *Minvsigma2, double *partial_sums)
 {
     int n = (blockIdx.x * blockDim.x + threadIdx.x)*2;
-    __shared__ double s[cuda_block_size];
+   __shared__ double s[cuda_block_size];
 
     double diff_real = (*(ref + n)) - (*(img + n));
 	double diff_imag = (*(ref + n + 1)) - (*(img + n + 1));
 
-	s[threadIdx.x] = (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+	s[threadIdx.x] = (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n/2));
 
 	__syncthreads();
 
 	if (threadIdx.x == 0)
 	{
 		double sum = 0;
-		for (int i = 0; i < blockDim.x; i ++)
+		for (int i = 0; i < cuda_block_size; i ++)
 			sum += s[i];
 		partial_sums[blockIdx.x] = sum;
 	}

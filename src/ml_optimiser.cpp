@@ -3681,7 +3681,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												bool Bcuda_step2 = true;
 												if (Bcuda_step2)
 												{
-													diff2 += cuda_diff2(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, Minvsigma2);
+													diff2 += cuda_diff2(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
 												else
 												{
