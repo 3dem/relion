@@ -3577,7 +3577,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												if (Bcuda_step1)
 												{
 													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
-													std::cerr << " hej " << A << std::endl;
+													std::cerr << " myAB in GPU mode " << A << std::endl;
 												}
 												else
 												{
@@ -3588,7 +3588,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
 																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
 														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
-
+														std::cerr << " myAB in CPU mode " << A << std::endl;
 													}
 												}
 
@@ -3785,7 +3785,16 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												transformer3.inverseFourierTransform(Fref, tt());
 												CenterFFT(tt(),false);
 												tt.write("out_fref.mrc");
-												exit(0);
+												std::cerr << " diff2= " << diff2 << std::endl;
+												std::cerr << " d_diff2= " << diff2-2245.83 << std::endl;
+												if(fabs(diff2-2245.83)<0.01)
+												{
+													exit(0);
+												}
+												else
+												{
+													exit(1);
+												}
 											}
 #endif
 //#define DEBUG_VERBOSE

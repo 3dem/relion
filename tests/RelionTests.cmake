@@ -1,7 +1,7 @@
 file(COPY ${CMAKE_SOURCE_DIR}/tests DESTINATION ${CMAKE_BINARY_DIR})
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_output)
 #--------------------------------------------------------------------
-add_test(NAME 3Dclassification_produce_data 
+add_test(NAME 3Dclassification_produce_data_and_diff2 
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
         COMMAND refine --o test_output/out
         --i ap_s_c2d_red.star 
