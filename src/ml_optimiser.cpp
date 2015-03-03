@@ -383,6 +383,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = parser.checkOption("--parallel_disc_io", "Let parallel (MPI) processes access the disc simultaneously (use on gluster or fhgfs; this may break NFS)");
+	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
@@ -3048,7 +3049,17 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 #ifdef RELION_TESTING
 			Image<double> tt;
 			tt()=Fctf;
-			tt.write("out_ctf.mrc");
+			std::string mode;
+			if (do_gpu)
+			{
+				mode="gpu_";
+			}
+			else
+			{
+				mode="cpu_";
+		    }
+			std::string fnm = mode + std::string("out_ctf.mrc");
+			tt.write(fnm);
 #endif
 #ifdef DEBUG_CTF_FFTW_IMAGE
 			Image<double> tt;
@@ -3573,8 +3584,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 //													myAB_out.write("myAB_out.mrc");
 //												}
 
-												bool Bcuda_step1 = false;
-												if (Bcuda_step1)
+												if (do_gpu)
 												{
 													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
 													std::cerr << " myAB in GPU mode " << A << std::endl;
@@ -3588,8 +3598,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 														double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
 																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
 														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
-														std::cerr << " myAB in CPU mode " << A << std::endl;
 													}
+													std::cerr << " myAB in CPU mode " << A << std::endl;
 												}
 
 												Fimg_shift = Fimg_otfshift.data;
@@ -3678,8 +3688,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												// all |Xij|2 terms that lie between current_size and ori_size
 												// Factor two because of factor 2 in division below, NOT because of 2-dimensionality of the complex plane!
 												diff2 = exp_highres_Xi2_imgs[ipart] / 2.;
-												bool Bcuda_step2 = true;
-												if (Bcuda_step2)
+
+												if (do_gpu)
 												{
 													diff2 += cuda_diff2(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
@@ -3760,12 +3770,22 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 											bool cuda_testing = true;
 											if(cuda_testing)
 											{
+												std::string mode;
+												if (do_gpu)
+												{
+													mode="gpu_";
+												}
+												else
+												{
+													mode="cpu_";
+											    }
 												Image<double> tt;
 												tt().resize(exp_current_image_size, exp_current_image_size);
 												FourierTransformer transformer;
 												transformer.inverseFourierTransform(Fimg_otfshift, tt());
 												CenterFFT(tt(),false);
-												tt.write("out_otfshift.mrc");
+												std::string fnm = mode + std::string("out_otfshift.mrc");
+												tt.write(fnm);
 
 //												FourierTransformer transformer1;
 //												tt().initZeros();
@@ -3778,13 +3798,15 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												tt().initZeros();
 												transformer2.inverseFourierTransform(Frefctf, tt());
 												CenterFFT(tt(),false);
-												tt.write("out_frefctf.mrc");
+												fnm = mode + std::string("out_frefctf.mrc");
+												tt.write(fnm);
 
 												FourierTransformer transformer3;
 												tt().initZeros();
 												transformer3.inverseFourierTransform(Fref, tt());
 												CenterFFT(tt(),false);
-												tt.write("out_fref.mrc");
+												fnm = mode + std::string("out_fref.mrc");
+												tt.write(fnm);
 												std::cerr << " diff2= " << diff2 << std::endl;
 												std::cerr << " d_diff2= " << diff2-2245.83 << std::endl;
 												if(fabs(diff2-2245.83)<0.01)
