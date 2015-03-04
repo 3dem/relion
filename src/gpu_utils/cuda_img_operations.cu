@@ -1,4 +1,5 @@
-#include "src/gpu_utils/diff2.h"
+#include "src/gpu_utils/cuda_img_operations.h"
+#include "src/gpu_utils/cuda_img_operations.cuh"
 #include <vector>
 
 #define cuda_block_size 32

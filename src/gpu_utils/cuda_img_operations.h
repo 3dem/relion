@@ -1,5 +1,5 @@
-#ifndef CUDA_DIFF2_H_
-#define CUDA_DIFF2_H_
+#ifndef CUDA_IMG_OPERATIONS_H_
+#define CUDA_IMG_OPERATIONS_H_
 #include <cuda.h>
 
 void cuda_applyAB(
