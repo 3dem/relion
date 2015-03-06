@@ -101,13 +101,15 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			// Local variables
 			std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 			std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-			std::vector< long unsigned > iorientclasses, iover_rots;
 			MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift;
 			double *Minvsigma2;
 			Matrix2D<double> A;
 
 			CudaImages Frefs(exp_local_Minvsigma2s[0].x, exp_local_Minvsigma2s[0].y,
 					(exp_idir_max - exp_idir_min + 1) * (exp_ipsi_max - exp_ipsi_min + 1) * exp_nr_oversampled_rot);
+
+			// Mapping index look-up table
+			std::vector< long unsigned > iorientclasses(Frefs.maxn), iover_rots(Frefs.maxn);
 
 			/*=======================================================================================
 			                           Precalculate Reference Projections
@@ -189,7 +191,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				CudaImages Fimgs(Frefs.x, Frefs.y,
 						iorientclasses.size() * ( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans);
 
-				std::vector<long unsigned> ihidden_overs;
+				// Mapping index look-up table
+				std::vector<long unsigned> ihidden_overs(Fimgs.maxn);
 
 				for (unsigned iref = 0; iref < iorientclasses.size(); iref ++)
 				{
