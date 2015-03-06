@@ -8,9 +8,9 @@ add_test(NAME GPU-3Dc_produce_data_and_diff2
         COMMAND refine --o test_output/out
         --i ap_s_c2d_red.star 
         --particle_diameter 200 
-        --angpix 1 
+        --angpix 1.0 
         --ref ref_model.mrc 
-        --ini_high 50 
+        --ini_high 40 
         --ctf 
         --ctf_corrected_ref
         --iter 1 
@@ -74,9 +74,9 @@ add_test(NAME CPU-3Dc_produce_data_and_diff2
         COMMAND refine --o test_output/out
         --i ap_s_c2d_red.star 
         --particle_diameter 200 
-        --angpix 1 
+        --angpix 1.0 
         --ref ref_model.mrc 
-        --ini_high 50 
+        --ini_high 40 
         --ctf 
         --ctf_corrected_ref
         --iter 1 
@@ -94,7 +94,7 @@ add_test(NAME CPU-3Dc_produce_data_and_diff2
         --j 1 
         --memory_per_thread 4 
         --random_seed 1993 
-        --onthefly_shifts)      
+        --onthefly_shifts)     
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_ref
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests

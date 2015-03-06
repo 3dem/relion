@@ -321,6 +321,20 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 	} // end loop iclass
 }
 
+void MlOptimiserCUDA::precalculateModelProjectionsCtfsAndInvSigma2s(bool do_also_unmasked,
+	    int exp_current_image_size, int exp_current_oversampling,
+		std::vector<MultidimArray<Complex > > &model,
+		std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
+		std::vector<MultidimArray<double> > &exp_Fctfs,
+		std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
+		std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
+		std::vector<MultidimArray<double> > &exp_local_Fctfs,
+		std::vector<double> &exp_local_sqrtXi2,
+		std::vector<MultidimArray<double> > &exp_local_Minvsigma2s)
+{
+
+}
+
 void MlOptimiserCUDA::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked,
 		long int my_ori_particle, int exp_current_image_size, int exp_current_oversampling,
 		int exp_itrans_min, int exp_itrans_max,
