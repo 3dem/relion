@@ -4,11 +4,13 @@
 #include <math.h>
 #include <ctime>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/complex.h"
 
 class CudaComplex
 {
 public:
 	double real, imag;
+	__device__ __host__ CudaComplex(): real(), imag() {};
 	__device__ __host__ CudaComplex(double real, double imag): real(real), imag(imag) {};
 };
 
@@ -35,23 +37,7 @@ public:
 
 __global__ void kernel_diff2(CudaImages *ref, CudaImages *img, CudaComplex *Minvsigma2, double *partial_sums)
 {
-    int n = (blockIdx.x * blockDim.x + threadIdx.x)*2;
-   __shared__ double s[cuda_block_size];
-
-    double diff_real = (*(ref + n)).real - (*(img + n)).real;
-	double diff_imag = (*(ref + n)).imag - (*(img + n)).imag;
-
-	s[threadIdx.x] = (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n/2));
-
-	__syncthreads();
-
-	if (threadIdx.x == 0)
-	{
-		double sum = 0;
-		for (int i = 0; i < cuda_block_size; i ++)
-			sum += s[i];
-		partial_sums[blockIdx.x] = sum;
-	}
+	//Dummy for now
 }
 
 void MlOptimiserCUDA::getAllSquaredDifferences(
@@ -105,7 +91,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			double *Minvsigma2;
 			Matrix2D<double> A;
 
-			CudaImages Frefs(exp_local_Minvsigma2s[0].x, exp_local_Minvsigma2s[0].y,
+			CudaImages Frefs(exp_local_Minvsigma2s[0].xdim, exp_local_Minvsigma2s[0].ydim,
 					(exp_idir_max - exp_idir_min + 1) * (exp_ipsi_max - exp_ipsi_min + 1) * exp_nr_oversampled_rot);
 
 			// Mapping index look-up table
@@ -159,14 +145,14 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 												oversampled_tilt[iover_rot],
 												oversampled_psi[iover_rot], A);
 
-							Fref.data = *(Frefs.current());
+							Fref.data = (Complex*) Frefs.current();
 
 							// Project the reference map (into Fref)
 							(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
 
 							//TODO REMOVE ONCE YOU KNOW THIS IS ALLWAYS TRUE
-							if (Frefs.x != Fref.x || Frefs.y != Fref.y)
-								std::err << "!!!!!!! BAD Fref size x:" << Fref.x << ":" << Frefs.x << " y:" << Fref.y << ":" << Frefs.y << std::endl;
+							if (Frefs.x != Fref.xdim || Frefs.y != Fref.ydim)
+								std::cerr << "!!!!!!! BAD Fref size x:" << Fref.xdim << ":" << Frefs.x << " y:" << Fref.ydim << ":" << Frefs.y << std::endl;
 
 							Frefs.increment();
 							iorientclasses.push_back(iorientclass);
@@ -179,7 +165,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			CudaImages *d_Frefs;
 
 			cudaMalloc( (void**) &d_Frefs, Frefs.alloc_size);
-			cudaMemcpy( d_Frefs, Frefs, Frefs.alloc_size, cudaMemcpyHostToDevice);
+			cudaMemcpy( d_Frefs, Frefs.data, Frefs.alloc_size, cudaMemcpyHostToDevice);
 
 			/*=======================================================================================
 			                                  	  Calculations
@@ -247,7 +233,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 
 				/*====================================
-				    Transfer Shifted Images To GPU
+				   Initiate Particle Related On GPU
 				======================================*/
 
 				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
@@ -257,8 +243,12 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				cudaMalloc( (void**) &d_Fimgs, Fimgs.alloc_size);
 				cudaMalloc( (void**) &d_Minvsigma2, Frefs.xy);
-				cudaMemcpy( d_Fimgs, Fimgs, Fimgs.alloc_size, cudaMemcpyHostToDevice);
+				cudaMemcpy( d_Fimgs, Fimgs.data, Fimgs.alloc_size, cudaMemcpyHostToDevice);
 				cudaMemcpy( d_Minvsigma2, Minvsigma2, Frefs.xy, cudaMemcpyHostToDevice);
+
+				CudaImages *d_diff2s;
+				cudaMalloc( (void**) &d_diff2s, ihidden_overs.size());
+				cudaMemset( (void**) &d_diff2s, 0, ihidden_overs.size()); //Initiate diff2 values with zeros
 
 				/*====================================
 				    		Kernel Call
@@ -277,13 +267,16 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				    	Write To Destination
 				======================================*/
 
+				double* diff2s = new double[ihidden_overs.size()];
+				cudaMemcpy( diff2s, d_diff2s, ihidden_overs.size(), cudaMemcpyDeviceToHost );
+
 				for (long int i = 0; i < ihidden_overs.size(); i++)
 				{
-					DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_overs[i]) = diff2;
+					DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_overs[i]) = diff2s[i];
 
 					// Keep track of minimum of all diff2, only for the last image in this series
-					if (diff2 < exp_min_diff2[ipart])
-						exp_min_diff2[ipart] = diff2;
+					if (diff2s[i] < exp_min_diff2[ipart])
+						exp_min_diff2[ipart] = diff2s[i];
 				}
 
 				cudaFree(d_Fimgs);
