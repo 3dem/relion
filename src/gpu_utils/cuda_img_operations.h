@@ -10,7 +10,7 @@ void cuda_applyAB(
 				);
 				  
 				  
-double cuda_diff2(
+double cuda_diff2_hostimage(
 					int size,
 					double *h_Frefctf,
 					double *h_Fimg_trans,

@@ -14,8 +14,9 @@ __inline__ __device__ int warpReduceSum(int val)
 __global__ void cuda_kernel_MinvSigmaCorr(double *img, double *sigma2, double *corr_img)
 {
     int n = (blockIdx.x * blockDim.x + threadIdx.x)*2;
-    *(corr_img + n)     = (*(img+ n))       * sqrt(*(sigma2 + n)/2);
-    *(corr_img + n + 1) = (*(img + n + 1 )) * sqrt(*(sigma2 + n)/2);
+    float corr_v = sqrt(*(sigma2 + n)/2);
+    *(corr_img + n)     = (*(img + n))      * corr_v;
+    *(corr_img + n + 1) = (*(img + n + 1 )) * corr_v;
 }
 
 
