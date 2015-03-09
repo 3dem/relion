@@ -246,8 +246,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				cudaMemcpy( d_Minvsigma2, Minvsigma2, Fimgs.xy, cudaMemcpyHostToDevice);
 
 				CudaImages *d_diff2s;
-				cudaMalloc( (void**) &d_diff2s, iorient*itrans);
-				cudaMemset( (void**) &d_diff2s, 0, iorient*itrans); //Initiate diff2 values with zeros
+				cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num);
+				cudaMemset( (void**) &d_diff2s, 0, orientation_num*translation_num); //Initiate diff2 values with zeros
 
 				/*====================================
 				    		Kernel Calls
@@ -265,8 +265,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				    	   Retrieve Results
 				======================================*/
 
-				double* diff2s = new double[iorient*itrans];
-				cudaMemcpy( diff2s, d_diff2s, iorient*itrans, cudaMemcpyDeviceToHost );
+				double* diff2s = new double[orientation_num*translation_num];
+				cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num, cudaMemcpyDeviceToHost );
 
 				/*====================================
 				    	Write To Destination TODO
