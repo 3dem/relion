@@ -6,6 +6,10 @@
 #include <iostream>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/complex.h"
+#include <fstream>
+#include <cuda.h>
+
+#define BLOCK_SIZE 32
 
 class CudaComplex
 {
@@ -21,33 +25,69 @@ public:
 class CudaImages
 {
 public:
-	long unsigned x,y,xy,num,max_num;
+	unsigned x,y,xy,num,max_num;
 	CudaComplex* start;
 
 	inline
-	__device__ __host__ CudaImages(long unsigned x, long unsigned y, long unsigned max_num):
+	CudaImages(long unsigned x, long unsigned y, long unsigned max_num):
 			x(x), y(y), num(0), max_num(max_num), xy(x*y), start(new CudaComplex[xy*max_num])
 	{};
 
 	inline
-	__device__ __host__ CudaComplex* current() { return start + (num*xy); };
+	CudaComplex* current() { return start + (num*xy); };
 
 	inline
-	__device__ __host__ void increment() { num++; };
+	void increment() { num++; };
 
 	inline
-	__device__ __host__ CudaComplex* operator [](long unsigned i) { return start + (i*xy); };
+	CudaComplex* operator [](long unsigned i) { return start + (i*((long unsigned) xy)); };
 
 	inline
-	__device__ __host__ long unsigned alloc_size() { return num*xy; };
+	long unsigned alloc_size() { return ((long unsigned) num)*((long unsigned) xy); };
 
 	inline
-	__device__ __host__ ~CudaImages() { delete[] start; }
+	void data_to_device(CudaComplex* d_ptr)
+	{
+		cudaMalloc( (void**) &d_ptr, alloc_size() * sizeof(CudaComplex));
+		cudaMemcpy( d_ptr, start, alloc_size() * sizeof(CudaComplex), cudaMemcpyHostToDevice);
+	}
+
+	inline
+	~CudaImages() { delete[] start; }
 };
 
-__global__ void kernel_diff2(CudaImages *ref, CudaImages *img, CudaComplex *Minvsigma2, double *partial_sums)
+__global__ void cuda_kernel_diff2(CudaComplex *g_refs, CudaComplex *g_imgs, double *g_Minvsigma2, double *g_diff2, int img_size)
 {
-	//Dummy for now
+	__shared__ double s[BLOCK_SIZE];
+
+	unsigned pass_num(ceilf(img_size/BLOCK_SIZE));
+	unsigned long img_idx(blockIdx.x * blockDim.x + blockIdx.y), local_idx, global_idx;
+
+	for (int pass = 0; pass < pass_num; pass ++)
+	{
+		local_idx = pass * BLOCK_SIZE + threadIdx.x;
+
+		if (local_idx < img_size) //Is inside image
+		{
+			global_idx = img_idx + local_idx;
+
+		    double diff_real = g_refs[global_idx].real - g_imgs[global_idx].real;
+			double diff_imag = g_refs[global_idx].imag - g_imgs[global_idx].imag;
+
+			s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * g_Minvsigma2[local_idx];
+		}
+	}
+
+	__syncthreads();
+
+	if (threadIdx.x == 0)
+	{
+		double sum = 0;
+		for (int i = 0; i < BLOCK_SIZE; i++)
+			sum += s[i];
+
+		g_diff2[img_idx] = sum;
+	}
 }
 
 void MlOptimiserCUDA::getAllSquaredDifferences(
@@ -176,10 +216,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 			}
 
-			CudaImages *d_Frefs;
-
-			cudaMalloc( (void**) &d_Frefs, Frefs.alloc_size());
-			cudaMemcpy( d_Frefs, Frefs.start, Frefs.alloc_size(), cudaMemcpyHostToDevice);
+			CudaComplex *d_Frefs(0);
+			Frefs.data_to_device(d_Frefs);
 
 			/*=======================================================================================
 			                                  	  Particle Iteration
@@ -237,36 +275,40 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
 
-				CudaImages *d_Fimgs;
-				double *d_Minvsigma2;
+				CudaComplex *d_Fimgs(0);
+				double *d_Minvsigma2(0);
 
-				cudaMalloc( (void**) &d_Fimgs, Fimgs.alloc_size());
-				cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy);
-				cudaMemcpy( d_Fimgs, Fimgs.start, Fimgs.alloc_size(), cudaMemcpyHostToDevice);
-				cudaMemcpy( d_Minvsigma2, Minvsigma2, Fimgs.xy, cudaMemcpyHostToDevice);
+				Fimgs.data_to_device(d_Fimgs);
 
-				CudaImages *d_diff2s;
-				cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num);
-				cudaMemset( (void**) &d_diff2s, 0, orientation_num*translation_num); //Initiate diff2 values with zeros
+				cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy * sizeof(double));
+				cudaMemcpy( d_Minvsigma2, Minvsigma2, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice);
+
+				double *d_diff2s(0);
+				cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num * sizeof(double));
+				cudaMemset( (void**) &d_diff2s, 0, orientation_num*translation_num * sizeof(double)); //Initiate diff2 values with zeros
 
 				/*====================================
 				    		Kernel Calls
 				======================================*/
 
-				for (unsigned iorient = 0; iorient < orientation_num; iorient ++)
-				{
-					for (unsigned itrans = 0; itrans < translation_num; itrans ++)
-					{
+				dim3 block_dim(orientation_num, translation_num);
 
-					}
-				}
+				cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy);
 
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
 
 				double* diff2s = new double[orientation_num*translation_num];
-				cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num, cudaMemcpyDeviceToHost );
+				cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num * sizeof(double), cudaMemcpyDeviceToHost );
+
+				std::ofstream myfile;
+				std::stringstream sstm;
+				sstm << "diff2s/gpu_part" << ipart << ".dat";
+				myfile.open(sstm.str().c_str());
+				for (long int i = 0; i < orientation_num*translation_num; i ++)
+					myfile << diff2s[i] << std::endl;
+				myfile.close();
 
 				/*====================================
 				    	Write To Destination TODO

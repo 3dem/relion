@@ -26,6 +26,8 @@
 #include <time.h>
 #include <math.h>
 #include <ctime>
+#include <fstream>
+#include <iostream>
 //#include <cuda_runtime.h>
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
@@ -3745,6 +3747,13 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													}
 												}
 												//std::cerr << diff2 <<  std::endl ;
+
+												std::ofstream myfile;
+												std::stringstream sstm;
+												sstm << "diff2s/cpu_part" << ipart << ".dat";
+												myfile.open(sstm.str().c_str(), std::ios_base::app);
+												myfile << diff2 << std::endl;
+												myfile.close();
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
