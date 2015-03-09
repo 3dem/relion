@@ -3733,15 +3733,15 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
 													//std::cerr << " num_blocks = " << num_blocks << std::endl;
 
-													diff2 += cuda_diff2_hostimage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
+													diff2 = cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
 												else
 												{
 													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf) // makes an iterator n=0,1,2...NZYXSIZE(v) over Fourier-refernce-ctf:ed
 													{
-														double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
-														double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
-														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+														double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real -  (*(Fimg_shift + n)).real;
+														double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag -  (*(Fimg_shift + n)).imag;
+														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 *  (*(Minvsigma2 + n));
 													}
 												}
 												//std::cerr << diff2 <<  std::endl ;
@@ -3852,6 +3852,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												if (do_firstiter_cc)
 													std::cerr << "doing CC first iter" << std::endl;
 												std::cerr << " diff2= " << diff2 << std::endl;
+												printf ("diff2: %4.8f \n", diff2);
+												int t = (int)diff2;
+											    double t2=(double)t;
+											    printf ("diff2: %4.8f \n", t2);
 												std::cerr << " d_diff2= " << diff2-2502.16 << std::endl;
 												if(fabs(diff2-2502.16)<0.01)
 												{
