@@ -2105,7 +2105,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-		/*
+
 		// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
 		getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
 				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
@@ -2113,7 +2113,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-		*/
+
 
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
@@ -3728,7 +3728,12 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 
 												if (do_gpu)
 												{
-													diff2 += cuda_diff2(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
+													//int num_blocks(ceil(NZYXSIZE(Frefctf)/32));
+
+													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
+													//std::cerr << " num_blocks = " << num_blocks << std::endl;
+
+													diff2 += cuda_diff2_hostimage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
 												else
 												{
@@ -3765,7 +3770,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												std::cerr << " ihidden_over= " << ihidden_over << " XSIZE(Mweight)= " << XSIZE(exp_Mweight) << std::endl;
 												int group_id = mydata.getGroupId(part_id);
 												std::cerr << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
-												if (std::isnan(mymodel.scale_correction[group_id]))
+												if (std::isnan(mymodel.scale_correction[grou2502.16p_id]))
 												{
 													for (int i=0; i < mymodel.scale_correction.size(); i++)
 														std::cerr << " i= " << i << " mymodel.scale_correction[i]= " << mymodel.scale_correction[i] << std::endl;
@@ -3847,8 +3852,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												if (do_firstiter_cc)
 													std::cerr << "doing CC first iter" << std::endl;
 												std::cerr << " diff2= " << diff2 << std::endl;
-												std::cerr << " d_diff2= " << diff2-2245.83 << std::endl;
-												if(fabs(diff2-2245.83)<0.01)
+												std::cerr << " d_diff2= " << diff2-2502.16 << std::endl;
+												if(fabs(diff2-2502.16)<0.01)
 												{
 													exit(0);
 												}

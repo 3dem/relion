@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <ctime>
+#include <iostream>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/complex.h"
 
@@ -10,29 +11,38 @@ class CudaComplex
 {
 public:
 	double real, imag;
+
+	inline
 	__device__ __host__ CudaComplex(): real(), imag() {};
+	inline
 	__device__ __host__ CudaComplex(double real, double imag): real(real), imag(imag) {};
 };
 
 class CudaImages
 {
 public:
-	long unsigned x,y,xy,n,maxn,alloc_size,img_size;
-	CudaComplex* data;
-	__device__ __host__ CudaImages(long unsigned x, long unsigned y, long unsigned maxn):
-			x(x), y(y), n(0), maxn(maxn), xy(x*y), alloc_size(0), img_size(xy*sizeof(CudaComplex)), data(new CudaComplex[xy*maxn]) {};
+	long unsigned x,y,xy,num,max_num;
+	CudaComplex* start;
 
 	inline
-	__device__ __host__ CudaComplex* current() { return data + n*img_size; };
+	__device__ __host__ CudaImages(long unsigned x, long unsigned y, long unsigned max_num):
+			x(x), y(y), num(0), max_num(max_num), xy(x*y), start(new CudaComplex[xy*max_num])
+	{};
 
 	inline
-	__device__ __host__ void increment() { n++; alloc_size += img_size; };
+	__device__ __host__ CudaComplex* current() { return start + (num*xy); };
 
 	inline
-	__device__ __host__ CudaComplex* operator [](long unsigned i) { return data + i*img_size; };
+	__device__ __host__ void increment() { num++; };
 
 	inline
-	__device__ __host__ ~CudaImages() { delete[] data; }
+	__device__ __host__ CudaComplex* operator [](long unsigned i) { return start + (i*xy); };
+
+	inline
+	__device__ __host__ long unsigned alloc_size() { return num*xy; };
+
+	inline
+	__device__ __host__ ~CudaImages() { delete[] start; }
 };
 
 __global__ void kernel_diff2(CudaImages *ref, CudaImages *img, CudaComplex *Minvsigma2, double *partial_sums)
@@ -95,16 +105,19 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					(exp_idir_max - exp_idir_min + 1) * (exp_ipsi_max - exp_ipsi_min + 1) * exp_nr_oversampled_rot);
 
 			// Mapping index look-up table
-			std::vector< long unsigned > iorientclasses(Frefs.maxn), iover_rots(Frefs.maxn);
+			std::vector< long unsigned > iorientclasses(Frefs.max_num), iover_rots(Frefs.max_num);
+			long unsigned orientation_num(0);
 
 			/*=======================================================================================
-			                           Precalculate Reference Projections
+			                           Generate Reference Projections
 			=========================================================================================*/
 
 			Fref.resize(exp_local_Minvsigma2s[0]);
 			Frefctf.resize(exp_local_Minvsigma2s[0]);
 			if (do_shifts_onthefly)
 				Fimg_otfshift.resize(Frefctf);
+
+			std::cerr << "This is calculation of the reference projections." << std::endl;
 
 			for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 			{
@@ -157,6 +170,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							Frefs.increment();
 							iorientclasses.push_back(iorientclass);
 							iover_rots.push_back(iover_rot);
+							orientation_num ++;
 						}
 					}
 				}
@@ -164,71 +178,56 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 			CudaImages *d_Frefs;
 
-			cudaMalloc( (void**) &d_Frefs, Frefs.alloc_size);
-			cudaMemcpy( d_Frefs, Frefs.data, Frefs.alloc_size, cudaMemcpyHostToDevice);
+			cudaMalloc( (void**) &d_Frefs, Frefs.alloc_size());
+			cudaMemcpy( d_Frefs, Frefs.start, Frefs.alloc_size(), cudaMemcpyHostToDevice);
 
 			/*=======================================================================================
-			                                  	  Calculations
+			                                  	  Particle Iteration
 			=========================================================================================*/
-
 
 			for (long int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 			{
+				/*====================================
+				        Generate Translations
+				======================================*/
+
 				CudaImages Fimgs(Frefs.x, Frefs.y,
-						iorientclasses.size() * ( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans);
+						orientation_num * ( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans);
 
-				// Mapping index look-up table
-				std::vector<long unsigned> ihidden_overs(Fimgs.maxn);
+				long unsigned translation_num(0);
 
-				for (unsigned iref = 0; iref < iorientclasses.size(); iref ++)
+				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++)
 				{
-					long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
+					sampling.getTranslations(itrans, exp_current_oversampling,
+							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
 
-					long int ihidden = iorientclasses[iref] * exp_nr_trans;
-					int iover_rot = iover_rots[iref];
-
-					for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
+					for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
 					{
-						// In the first pass, always proceed
-						// In the second pass, check whether this translations (&orientation) had a significant weight in the first pass
-						bool do_proceed = (exp_ipass == 0) ? true : exp_Mcoarse_significant.data[ipart*exp_Mcoarse_significant.xdim+ihidden];
-						if (do_proceed)
+						/// Now get the shifted image
+						// Use a pointer to avoid copying the entire array again in this highly expensive loop
+						Complex *myAB;
+						if (exp_current_oversampling == 0)
 						{
-							sampling.getTranslations(itrans, exp_current_oversampling,
-									oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
-
-							for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
-							{
-								/// Now get the shifted image
-								// Use a pointer to avoid copying the entire array again in this highly expensive loop
-								Complex *myAB;
-								if (exp_current_oversampling == 0)
-								{
-									myAB = (Frefs.y == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
-											: global_fftshifts_ab_current[itrans].data;
-								}
-								else
-								{
-									int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
-									myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
-											: global_fftshifts_ab2_current[iitrans].data;
-								}
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
-								{
-									double real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
-											- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
-									double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
-											+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-
-									*(Fimgs.current() + n) = CudaComplex(real, imag);
-								}
-								Fimgs.increment();
-
-								long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
-																								iover_rot, iover_trans);
-								ihidden_overs.push_back(ihidden_over);
-							}
+							myAB = (Frefs.y == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
+									: global_fftshifts_ab_current[itrans].data;
 						}
+						else
+						{
+							int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
+							myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
+									: global_fftshifts_ab2_current[iitrans].data;
+						}
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+						{
+							double real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
+									- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
+							double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
+									+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
+
+							*(Fimgs.current() + n) = CudaComplex(real, imag);
+						}
+						Fimgs.increment();
+						translation_num ++;
 					}
 				}
 
@@ -241,35 +240,39 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				CudaImages *d_Fimgs;
 				double *d_Minvsigma2;
 
-				cudaMalloc( (void**) &d_Fimgs, Fimgs.alloc_size);
-				cudaMalloc( (void**) &d_Minvsigma2, Frefs.xy);
-				cudaMemcpy( d_Fimgs, Fimgs.data, Fimgs.alloc_size, cudaMemcpyHostToDevice);
-				cudaMemcpy( d_Minvsigma2, Minvsigma2, Frefs.xy, cudaMemcpyHostToDevice);
+				cudaMalloc( (void**) &d_Fimgs, Fimgs.alloc_size());
+				cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy);
+				cudaMemcpy( d_Fimgs, Fimgs.start, Fimgs.alloc_size(), cudaMemcpyHostToDevice);
+				cudaMemcpy( d_Minvsigma2, Minvsigma2, Fimgs.xy, cudaMemcpyHostToDevice);
 
 				CudaImages *d_diff2s;
-				cudaMalloc( (void**) &d_diff2s, ihidden_overs.size());
-				cudaMemset( (void**) &d_diff2s, 0, ihidden_overs.size()); //Initiate diff2 values with zeros
+				cudaMalloc( (void**) &d_diff2s, iorient*itrans);
+				cudaMemset( (void**) &d_diff2s, 0, iorient*itrans); //Initiate diff2 values with zeros
 
 				/*====================================
-				    		Kernel Call
+				    		Kernel Calls
 				======================================*/
 
-				//TODO call kernels
+				for (unsigned iorient = 0; iorient < orientation_num; iorient ++)
+				{
+					for (unsigned itrans = 0; itrans < translation_num; itrans ++)
+					{
 
+					}
+				}
 
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
 
-				//TODO read in diff2 from GPU
+				double* diff2s = new double[iorient*itrans];
+				cudaMemcpy( diff2s, d_diff2s, iorient*itrans, cudaMemcpyDeviceToHost );
 
 				/*====================================
-				    	Write To Destination
+				    	Write To Destination TODO
 				======================================*/
 
-				double* diff2s = new double[ihidden_overs.size()];
-				cudaMemcpy( diff2s, d_diff2s, ihidden_overs.size(), cudaMemcpyDeviceToHost );
-
+				/*
 				for (long int i = 0; i < ihidden_overs.size(); i++)
 				{
 					DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_overs[i]) = diff2s[i];
@@ -278,6 +281,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					if (diff2s[i] < exp_min_diff2[ipart])
 						exp_min_diff2[ipart] = diff2s[i];
 				}
+				*/
 
 				cudaFree(d_Fimgs);
 
@@ -288,6 +292,20 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 		} // end if class significant
 	} // end loop iclass
 }
+
+//void MlOptimiserCUDA::precalculateModelProjectionsCtfsAndInvSigma2s(bool do_also_unmasked,
+//	    int exp_current_image_size, int exp_current_oversampling,
+//		std::vector<MultidimArray<Complex > > &model,
+//		std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
+//		std::vector<MultidimArray<double> > &exp_Fctfs,
+//		std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
+//		std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
+//		std::vector<MultidimArray<double> > &exp_local_Fctfs,
+//		std::vector<double> &exp_local_sqrtXi2,
+//		std::vector<MultidimArray<double> > &exp_local_Minvsigma2s)
+//{
+//
+//}
 
 void MlOptimiserCUDA::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked,
 		long int my_ori_particle, int exp_current_image_size, int exp_current_oversampling,
