@@ -59,8 +59,8 @@ __global__ void cuda_kernel_diff2(double *ref, double *img, double *Minvsigma2, 
     int n = (blockIdx.x * blockDim.x + threadIdx.x)*2;
    __shared__ double s[cuda_block_size];
 
-    double diff_real = (*(ref + n)) - (*(img + n));
-	double diff_imag = (*(ref + n + 1)) - (*(img + n + 1));
+    float diff_real = (*(ref + n))     - (*(img + n));
+	float diff_imag = (*(ref + n + 1)) - (*(img + n + 1));
 
 	if(n < 2*size)
 		s[threadIdx.x] = (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n/2));
@@ -71,9 +71,13 @@ __global__ void cuda_kernel_diff2(double *ref, double *img, double *Minvsigma2, 
 
 	if (threadIdx.x == 0)
 	{
-		double sum = 0;
+		float sum = 0;
 		for (int i = 0; i < cuda_block_size; i++)
 		{
+//			if(s[i]!=0)
+//			{
+//				sum = min(sum,s[i]);
+//			}
 			sum += s[i];
 		}
 		partial_sums[blockIdx.x] = sum;
@@ -93,14 +97,21 @@ __global__ void cuda_kernel_reduceArray(double * array, int size, double * sum)
 		for(int i=1; i<i_max; i++)
 		{
 			if((i*blockDim.x+n)<size)
+			{
 				array[n] += array[i*blockDim.x+n];
+				//array[n]=max(array[n],array[i*blockDim.x+n]);
+			}
 			__syncthreads();
 		}
 	}
 	// then sum the work done by all threads
 	for(int j=(blockDim.x/2); j>0; j/=2)
 	{
-		if (n<j and (n+j)<size) { array[n] += array[n+j]; }
+		if (n<j and (n+j)<size)
+		{
+			array[n] += array[n+j];
+			//array[n] = max(array[n], array[n+j]);
+		}
 			__syncthreads();
 	}
 	// finally, set the output sum

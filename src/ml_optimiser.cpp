@@ -3729,11 +3729,9 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												if (do_gpu)
 												{
 													//int num_blocks(ceil(NZYXSIZE(Frefctf)/32));
-
 													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
 													//std::cerr << " num_blocks = " << num_blocks << std::endl;
-
-													diff2 = cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
+													diff2 += cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
 												else
 												{
@@ -3741,7 +3739,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													{
 														double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real -  (*(Fimg_shift + n)).real;
 														double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag -  (*(Fimg_shift + n)).imag;
-														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 *  (*(Minvsigma2 + n));
+													    diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 *  (*(Minvsigma2 + n));
 													}
 												}
 												//std::cerr << diff2 <<  std::endl ;
@@ -3853,9 +3851,6 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													std::cerr << "doing CC first iter" << std::endl;
 												std::cerr << " diff2= " << diff2 << std::endl;
 												printf ("diff2: %4.8f \n", diff2);
-												int t = (int)diff2;
-											    double t2=(double)t;
-											    printf ("diff2: %4.8f \n", t2);
 												std::cerr << " d_diff2= " << diff2-2502.16 << std::endl;
 												if(fabs(diff2-2502.16)<0.01)
 												{
