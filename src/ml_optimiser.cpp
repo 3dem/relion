@@ -26,6 +26,8 @@
 #include <time.h>
 #include <math.h>
 #include <ctime>
+#include <iostream>
+#include <fstream>
 //#include <cuda_runtime.h>
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
@@ -3371,7 +3373,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 #endif
 
 	// Initialise min_diff and exp_Mweight for this pass
-
+	double diff2;
 	int exp_nr_particles = mydata.ori_particles[my_ori_particle].particles_id.size();
 	long int exp_nr_dir = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
 	long int exp_nr_psi = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
@@ -3621,10 +3623,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												{
 													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
 													//std::cerr << " myAB in GPU mode " << A << std::endl;
-													std::cerr << " image size " << NZYXSIZE(exp_local_Fimgs_shifted[ipart]) << " x" <<
-															exp_local_Fimgs_shifted[ipart].xdim	 << " y" <<
-															exp_local_Fimgs_shifted[ipart].ydim	 << " z" <<
-															exp_local_Fimgs_shifted[ipart].zdim	<< std::endl;
+													//std::cerr << " image size " << NZYXSIZE(exp_local_Fimgs_shifted[ipart]) << " x" <<
+													//		exp_local_Fimgs_shifted[ipart].xdim	 << " y" <<
+													//		exp_local_Fimgs_shifted[ipart].ydim	 << " z" <<
+													//		exp_local_Fimgs_shifted[ipart].zdim	<< std::endl;
 												}
 												else
 												{
@@ -3695,7 +3697,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
 
-											double diff2;
+
 											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 											{
 												// Do not calculate squared-differences, but signal product
@@ -3806,62 +3808,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												pthread_mutex_unlock(&global_mutex);
 											}
 #endif
-#ifdef RELION_TESTING
-											bool cuda_testing = true;
-											if(cuda_testing)
-											{
-												std::string mode;
-												if (do_gpu)
-												{
-													mode="gpu_";
-												}
-												else
-												{
-													mode="cpu_";
-											    }
-												Image<double> tt;
-												tt().resize(exp_current_image_size, exp_current_image_size);
-												FourierTransformer transformer;
-												transformer.inverseFourierTransform(Fimg_otfshift, tt());
-												CenterFFT(tt(),false);
-												std::string fnm = mode + std::string("out_otfshift.mrc");
-												tt.write(fnm);
 
-//												FourierTransformer transformer1;
-//												tt().initZeros();
-//												tt().resize(exp_current_image_size, exp_current_image_size);
-//												transformer1.inverseFourierTransform(Fimg_shift, tt());
-//												CenterFFT(tt(),false);
-//												tt.write("out_shift.mrc");
-
-												FourierTransformer transformer2;
-												tt().initZeros();
-												transformer2.inverseFourierTransform(Frefctf, tt());
-												CenterFFT(tt(),false);
-												fnm = mode + std::string("out_frefctf.mrc");
-												tt.write(fnm);
-
-												FourierTransformer transformer3;
-												tt().initZeros();
-												transformer3.inverseFourierTransform(Fref, tt());
-												CenterFFT(tt(),false);
-												fnm = mode + std::string("out_fref.mrc");
-												tt.write(fnm);
-												if (do_firstiter_cc)
-													std::cerr << "doing CC first iter" << std::endl;
-												std::cerr << " diff2= " << diff2 << std::endl;
-												printf ("diff2: %4.8f \n", diff2);
-												std::cerr << " d_diff2= " << diff2-2502.16 << std::endl;
-												if(fabs(diff2-2502.16)<0.01)
-												{
-													exit(0);
-												}
-												else
-												{
-													exit(1);
-												}
-											}
-#endif
 //#define DEBUG_VERBOSE
 #ifdef DEBUG_VERBOSE
 											pthread_mutex_lock(&global_mutex);
@@ -3920,6 +3867,72 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 					} // end if do_proceed orientations
 				} // end loop ipsi
 			} // end loop idir
+#ifdef RELION_TESTING
+								bool cuda_testing = true;
+								if(cuda_testing)
+								{
+									std::string mode;
+									if (do_gpu)
+									{
+										mode="gpu_";
+									}
+									else
+									{
+										mode="cpu_";
+									}
+									Image<double> tt;
+									tt().resize(exp_current_image_size, exp_current_image_size);
+									FourierTransformer transformer;
+									transformer.inverseFourierTransform(Fimg_otfshift, tt());
+									CenterFFT(tt(),false);
+									std::string fnm = mode + std::string("out_otfshift.mrc");
+									tt.write(fnm);
+
+//									FourierTransformer transformer1;
+//									tt().initZeros();
+//									tt().resize(exp_current_image_size, exp_current_image_size);
+//									transformer1.inverseFourierTransform(Fimg_shift, tt());
+//									CenterFFT(tt(),false);
+//									tt.write("out_shift.mrc");
+
+									FourierTransformer transformer2;
+									tt().initZeros();
+									transformer2.inverseFourierTransform(Frefctf, tt());
+									CenterFFT(tt(),false);
+									fnm = mode + std::string("out_frefctf.mrc");
+									tt.write(fnm);
+
+									FourierTransformer transformer3;
+									tt().initZeros();
+									transformer3.inverseFourierTransform(Fref, tt());
+									CenterFFT(tt(),false);
+									fnm = mode + std::string("out_fref.mrc");
+									tt.write(fnm);
+									if (do_firstiter_cc)
+										std::cerr << "doing CC first iter" << std::endl;
+									//std::cerr << " diff2= " << diff2 << std::endl;
+									printf ("\n diff2: %4.8f \n", diff2);
+
+									fnm = mode + std::string("_diff2s.txt");
+									char *text = &fnm[0];
+								    freopen(text,"w",stdout);
+									//FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_Mweight)
+									for(int n=0; n<96768; n++)
+									{
+										printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
+									}
+	//								freclose("diffs.txt");
+
+									if(fabs(diff2-2502.16)<0.01)
+									{
+										exit(0);
+									}
+									else
+									{
+										exit(1);
+									}
+								}
+#endif
 		} // end if mymodel.pdf_class[iclass] > 0.
 	} // end loop iclass
 

@@ -52,6 +52,10 @@ void cuda_applyAB(
 
 	//Skip padding
 	cudaMemcpy( h_Fimg_otfshift, d_Fimg_otfshift, N, cudaMemcpyDeviceToHost );
+
+	cudaFree(d_myAB);
+	cudaFree(d_exp_local_Fimgs_shifted);
+	cudaFree(d_Fimg_otfshift);
 }
 
 __global__ void cuda_kernel_diff2(double *ref, double *img, double *Minvsigma2, double *partial_sums, int size)
@@ -87,6 +91,9 @@ __global__ void cuda_kernel_diff2(double *ref, double *img, double *Minvsigma2, 
 
 __global__ void cuda_kernel_reduceArray(double * array, int size, double * sum)
 {
+	// FUTURE OPTIMIZATIONS:
+	//      -- shared memory import
+	//      -- halving number of blocks and utilizing full blocksize on second stage first iteration
 	int n =	(blockIdx.x * blockDim.x + threadIdx.x);
 	int i_max = (int)ceil((float)size/(float)blockDim.x);
 
@@ -112,7 +119,6 @@ __global__ void cuda_kernel_reduceArray(double * array, int size, double * sum)
 			array[n] += array[n+j];
 			//array[n] = max(array[n], array[n+j]);
 		}
-			__syncthreads();
 	}
 	// finally, set the output sum
 	if (n == 0 ) { *sum = array[0]; }
@@ -120,7 +126,7 @@ __global__ void cuda_kernel_reduceArray(double * array, int size, double * sum)
 }
 
 
-//       PLAYGROUND
+//  ----  PLAYGROUND  ---
 __global__ void cuda_kernel_reduceArray_1(double * Garray, int size, double * sum)
 {
 	extern __shared__ float Sarray[];
@@ -205,8 +211,12 @@ double cuda_diff2_hostImage(
 
 	cuda_diff2_deviceImage(size, d_Frefctf, d_Fimg_trans, d_Minvsigma2, d_diff2);
 
+	cudaFree(d_Frefctf);
+	cudaFree(d_Fimg_trans);
+	cudaFree(d_Minvsigma2);
 	cudaMemcpy( h_diff2, d_diff2, sizeof(double), cudaMemcpyDeviceToHost);
 	cudaFree(d_diff2);
+
 	return h_diff2[0];
 }
 
