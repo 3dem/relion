@@ -28,6 +28,8 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#include <iostream>
+#include <fstream>
 //#include <cuda_runtime.h>
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
@@ -2078,35 +2080,35 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		global_barrier->wait();
 #endif
 
-		MlOptimiserCUDA cuda_optimus_prim(mydata, mymodel, sampling);
-		cuda_optimus_prim.do_skip_align = do_skip_align;
-		cuda_optimus_prim.do_skip_rotate = do_skip_rotate;
-		cuda_optimus_prim.iter = iter;
-		cuda_optimus_prim.do_firstiter_cc = do_firstiter_cc;
-		cuda_optimus_prim.do_always_cc = do_always_cc;
-		cuda_optimus_prim.coarse_size = coarse_size;
-		cuda_optimus_prim.Mresol_fine = Mresol_fine;
-		cuda_optimus_prim.Mresol_coarse = Mresol_coarse;
-		cuda_optimus_prim.sigma2_fudge = sigma2_fudge;
-		cuda_optimus_prim.tab_sin = tab_sin;
-		cuda_optimus_prim.tab_cos = tab_cos;
-		cuda_optimus_prim.do_ctf_correction = do_ctf_correction;
-
-		cuda_optimus_prim.refs_are_ctf_corrected = refs_are_ctf_corrected;
-		cuda_optimus_prim.do_scale_correction = do_scale_correction;
-		cuda_optimus_prim.global_fftshifts_ab_coarse = global_fftshifts_ab_coarse;
-		cuda_optimus_prim.global_fftshifts_ab_current = global_fftshifts_ab_current;
-		cuda_optimus_prim.global_fftshifts_ab2_coarse = global_fftshifts_ab2_coarse;
-		cuda_optimus_prim.global_fftshifts_ab2_current = global_fftshifts_ab2_current;
-		cuda_optimus_prim.strict_highres_exp = strict_highres_exp;
-
-		cuda_optimus_prim.getAllSquaredDifferences(
-				my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+//		MlOptimiserCUDA cuda_optimus_prim(mydata, mymodel, sampling);
+//		cuda_optimus_prim.do_skip_align = do_skip_align;
+//		cuda_optimus_prim.do_skip_rotate = do_skip_rotate;
+//		cuda_optimus_prim.iter = iter;
+//		cuda_optimus_prim.do_firstiter_cc = do_firstiter_cc;
+//		cuda_optimus_prim.do_always_cc = do_always_cc;
+//		cuda_optimus_prim.coarse_size = coarse_size;
+//		cuda_optimus_prim.Mresol_fine = Mresol_fine;
+//		cuda_optimus_prim.Mresol_coarse = Mresol_coarse;
+//		cuda_optimus_prim.sigma2_fudge = sigma2_fudge;
+//		cuda_optimus_prim.tab_sin = tab_sin;
+//		cuda_optimus_prim.tab_cos = tab_cos;
+//		cuda_optimus_prim.do_ctf_correction = do_ctf_correction;
+//
+//		cuda_optimus_prim.refs_are_ctf_corrected = refs_are_ctf_corrected;
+//		cuda_optimus_prim.do_scale_correction = do_scale_correction;
+//		cuda_optimus_prim.global_fftshifts_ab_coarse = global_fftshifts_ab_coarse;
+//		cuda_optimus_prim.global_fftshifts_ab_current = global_fftshifts_ab_current;
+//		cuda_optimus_prim.global_fftshifts_ab2_coarse = global_fftshifts_ab2_coarse;
+//		cuda_optimus_prim.global_fftshifts_ab2_current = global_fftshifts_ab2_current;
+//		cuda_optimus_prim.strict_highres_exp = strict_highres_exp;
+//
+//		cuda_optimus_prim.getAllSquaredDifferences(
+//				my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+//				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+//				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+//				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+//				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+//				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
 		// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
 		getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
@@ -3373,7 +3375,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 #endif
 
 	// Initialise min_diff and exp_Mweight for this pass
-
+	double diff2;
 	int exp_nr_particles = mydata.ori_particles[my_ori_particle].particles_id.size();
 	long int exp_nr_dir = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
 	long int exp_nr_psi = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
@@ -3623,10 +3625,10 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												{
 													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
 													//std::cerr << " myAB in GPU mode " << A << std::endl;
-													std::cerr << " image size " << NZYXSIZE(exp_local_Fimgs_shifted[ipart]) << " x" <<
-															exp_local_Fimgs_shifted[ipart].xdim	 << " y" <<
-															exp_local_Fimgs_shifted[ipart].ydim	 << " z" <<
-															exp_local_Fimgs_shifted[ipart].zdim	<< std::endl;
+													//std::cerr << " image size " << NZYXSIZE(exp_local_Fimgs_shifted[ipart]) << " x" <<
+													//		exp_local_Fimgs_shifted[ipart].xdim	 << " y" <<
+													//		exp_local_Fimgs_shifted[ipart].ydim	 << " z" <<
+													//		exp_local_Fimgs_shifted[ipart].zdim	<< std::endl;
 												}
 												else
 												{
@@ -3697,7 +3699,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
 
-											double diff2;
+
 											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 											{
 												// Do not calculate squared-differences, but signal product
@@ -3731,19 +3733,17 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												if (do_gpu)
 												{
 													//int num_blocks(ceil(NZYXSIZE(Frefctf)/32));
-
 													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
 													//std::cerr << " num_blocks = " << num_blocks << std::endl;
-
 													diff2 += cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
 												else
 												{
 													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf) // makes an iterator n=0,1,2...NZYXSIZE(v) over Fourier-refernce-ctf:ed
 													{
-														double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
-														double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
-														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+														double diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real -  (*(Fimg_shift + n)).real;
+														double diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag -  (*(Fimg_shift + n)).imag;
+													    diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 *  (*(Minvsigma2 + n));
 													}
 												}
 												//std::cerr << diff2 <<  std::endl ;
@@ -3817,61 +3817,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												pthread_mutex_unlock(&global_mutex);
 											}
 #endif
-#ifdef RELION_TESTING
-											bool cuda_testing = true;
-											if(cuda_testing)
-											{
-												std::string mode;
-												if (do_gpu)
-												{
-													mode="gpu_";
-												}
-												else
-												{
-													mode="cpu_";
-											    }
-												Image<double> tt;
-												tt().resize(exp_current_image_size, exp_current_image_size);
-												FourierTransformer transformer;
-												transformer.inverseFourierTransform(Fimg_otfshift, tt());
-												CenterFFT(tt(),false);
-												std::string fnm = mode + std::string("out_otfshift.mrc");
-												tt.write(fnm);
 
-//												FourierTransformer transformer1;
-//												tt().initZeros();
-//												tt().resize(exp_current_image_size, exp_current_image_size);
-//												transformer1.inverseFourierTransform(Fimg_shift, tt());
-//												CenterFFT(tt(),false);
-//												tt.write("out_shift.mrc");
-
-												FourierTransformer transformer2;
-												tt().initZeros();
-												transformer2.inverseFourierTransform(Frefctf, tt());
-												CenterFFT(tt(),false);
-												fnm = mode + std::string("out_frefctf.mrc");
-												tt.write(fnm);
-
-												FourierTransformer transformer3;
-												tt().initZeros();
-												transformer3.inverseFourierTransform(Fref, tt());
-												CenterFFT(tt(),false);
-												fnm = mode + std::string("out_fref.mrc");
-												tt.write(fnm);
-												if (do_firstiter_cc)
-													std::cerr << "doing CC first iter" << std::endl;
-												std::cerr << " diff2= " << diff2 << std::endl;
-												std::cerr << " d_diff2= " << diff2-2502.16 << std::endl;
-												if(fabs(diff2-2502.16)<0.01)
-												{
-													exit(0);
-												}
-												else
-												{
-													exit(1);
-												}
-											}
-#endif
 //#define DEBUG_VERBOSE
 #ifdef DEBUG_VERBOSE
 											pthread_mutex_lock(&global_mutex);
@@ -3930,6 +3876,72 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 					} // end if do_proceed orientations
 				} // end loop ipsi
 			} // end loop idir
+#ifdef RELION_TESTING
+								bool cuda_testing = true;
+								if(cuda_testing)
+								{
+									std::string mode;
+									if (do_gpu)
+									{
+										mode="gpu_";
+									}
+									else
+									{
+										mode="cpu_";
+									}
+									Image<double> tt;
+									tt().resize(exp_current_image_size, exp_current_image_size);
+									FourierTransformer transformer;
+									transformer.inverseFourierTransform(Fimg_otfshift, tt());
+									CenterFFT(tt(),false);
+									std::string fnm = mode + std::string("out_otfshift.mrc");
+									tt.write(fnm);
+
+//									FourierTransformer transformer1;
+//									tt().initZeros();
+//									tt().resize(exp_current_image_size, exp_current_image_size);
+//									transformer1.inverseFourierTransform(Fimg_shift, tt());
+//									CenterFFT(tt(),false);
+//									tt.write("out_shift.mrc");
+
+									FourierTransformer transformer2;
+									tt().initZeros();
+									transformer2.inverseFourierTransform(Frefctf, tt());
+									CenterFFT(tt(),false);
+									fnm = mode + std::string("out_frefctf.mrc");
+									tt.write(fnm);
+
+									FourierTransformer transformer3;
+									tt().initZeros();
+									transformer3.inverseFourierTransform(Fref, tt());
+									CenterFFT(tt(),false);
+									fnm = mode + std::string("out_fref.mrc");
+									tt.write(fnm);
+									if (do_firstiter_cc)
+										std::cerr << "doing CC first iter" << std::endl;
+									//std::cerr << " diff2= " << diff2 << std::endl;
+									printf ("\n diff2: %4.8f \n", diff2);
+
+									fnm = mode + std::string("_diff2s.txt");
+									char *text = &fnm[0];
+								    freopen(text,"w",stdout);
+									//FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_Mweight)
+									for(int n=0; n<96768; n++)
+									{
+										printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
+									}
+	//								freclose("diffs.txt");
+
+									if(fabs(diff2-2502.16)<0.01)
+									{
+										exit(0);
+									}
+									else
+									{
+										exit(1);
+									}
+								}
+#endif
 		} // end if mymodel.pdf_class[iclass] > 0.
 	} // end loop iclass
 
