@@ -3735,7 +3735,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
 													//std::cerr << " num_blocks = " << num_blocks << std::endl;
 
-													diff2 += cuda_diff2_hostimage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
+													diff2 += cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
 												}
 												else
 												{

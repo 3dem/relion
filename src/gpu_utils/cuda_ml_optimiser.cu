@@ -5,11 +5,23 @@
 #include <ctime>
 #include <iostream>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/gpu_utils/cuda_img_operations.h"
 #include "src/complex.h"
 #include <fstream>
 #include <cuda.h>
 
 #define BLOCK_SIZE 32
+
+static void HandleError( cudaError_t err,
+                         const char *file,
+                         int line ) {
+    if (err != cudaSuccess) {
+        printf( "CUDA ERROR: %s in %s at line %d\n", cudaGetErrorString( err ),
+                file, line );
+        exit( EXIT_FAILURE );
+    }
+}
+#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
 class CudaComplex
 {
@@ -46,35 +58,44 @@ public:
 	long unsigned alloc_size() { return ((long unsigned) num)*((long unsigned) xy); };
 
 	inline
-	void data_to_device(CudaComplex* d_ptr)
+	CudaComplex* data_to_device()
 	{
-		cudaMalloc( (void**) &d_ptr, alloc_size() * sizeof(CudaComplex));
-		cudaMemcpy( d_ptr, start, alloc_size() * sizeof(CudaComplex), cudaMemcpyHostToDevice);
+		CudaComplex* d_ptr(0);
+		HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, alloc_size() * sizeof(CudaComplex)));
+		HANDLE_ERROR(cudaMemcpy( d_ptr, start, alloc_size() * sizeof(CudaComplex), cudaMemcpyHostToDevice));
+		return d_ptr;
 	}
+
+	inline
+	void clear() { delete[] start; }
 
 	inline
 	~CudaImages() { delete[] start; }
 };
 
-__global__ void cuda_kernel_diff2(CudaComplex *g_refs, CudaComplex *g_imgs, double *g_Minvsigma2, double *g_diff2, int img_size)
+__global__ void cuda_kernel_diff2(CudaComplex *g_refs, CudaComplex *g_imgs, double *g_Minvsigma2, double *g_diff2s, const unsigned img_size, const double sum_init)
 {
 	__shared__ double s[BLOCK_SIZE];
+	s[threadIdx.x] = 0;
 
 	unsigned pass_num(ceilf(img_size/BLOCK_SIZE));
-	unsigned long img_idx(blockIdx.x * blockDim.x + blockIdx.y), local_idx, global_idx;
+	unsigned long pixel,
+		ref_start(blockIdx.x * img_size),
+		img_start(blockIdx.y * img_size);
 
-	for (int pass = 0; pass < pass_num; pass ++)
+	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		local_idx = pass * BLOCK_SIZE + threadIdx.x;
+		pixel = pass * BLOCK_SIZE + threadIdx.x;
 
-		if (local_idx < img_size) //Is inside image
+		if (pixel < img_size) //Is inside image
 		{
-			global_idx = img_idx + local_idx;
+			unsigned long ref_pixel_idx = ref_start + pixel;
+			unsigned long img_pixel_idx = img_start + pixel;
 
-		    double diff_real = g_refs[global_idx].real - g_imgs[global_idx].real;
-			double diff_imag = g_refs[global_idx].imag - g_imgs[global_idx].imag;
+		    double diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
+			double diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
 
-			s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * g_Minvsigma2[local_idx];
+			s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * g_Minvsigma2[pixel];
 		}
 	}
 
@@ -82,11 +103,11 @@ __global__ void cuda_kernel_diff2(CudaComplex *g_refs, CudaComplex *g_imgs, doub
 
 	if (threadIdx.x == 0)
 	{
-		double sum = 0;
-		for (int i = 0; i < BLOCK_SIZE; i++)
+		double sum(sum_init);
+		for (unsigned i = 0; i < BLOCK_SIZE; i++)
 			sum += s[i];
 
-		g_diff2[img_idx] = sum;
+		g_diff2s[blockIdx.y * gridDim.x + blockIdx.x] = sum;
 	}
 }
 
@@ -137,7 +158,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			// Local variables
 			std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 			std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-			MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift;
+			MultidimArray<Complex > Fref;
 			double *Minvsigma2;
 			Matrix2D<double> A;
 
@@ -152,12 +173,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			                           Generate Reference Projections
 			=========================================================================================*/
 
-			Fref.resize(exp_local_Minvsigma2s[0]);
-			Frefctf.resize(exp_local_Minvsigma2s[0]);
-			if (do_shifts_onthefly)
-				Fimg_otfshift.resize(Frefctf);
-
-			std::cerr << "This is calculation of the reference projections." << std::endl;
+			Fref.resize(exp_local_Minvsigma2s[0]); //TODO remove this
+			Complex* FrefBag = Fref.data; //TODO remove this
 
 			for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 			{
@@ -216,8 +233,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 			}
 
-			CudaComplex *d_Frefs(0);
-			Frefs.data_to_device(d_Frefs);
+			Fref.data = FrefBag; //TODO remove this
+
+			CudaComplex *d_Frefs = Frefs.data_to_device();
 
 			/*=======================================================================================
 			                                  	  Particle Iteration
@@ -275,38 +293,48 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
 
-				CudaComplex *d_Fimgs(0);
 				double *d_Minvsigma2(0);
 
-				Fimgs.data_to_device(d_Fimgs);
+				CudaComplex *d_Fimgs = Fimgs.data_to_device();
 
-				cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy * sizeof(double));
-				cudaMemcpy( d_Minvsigma2, Minvsigma2, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice);
+				HANDLE_ERROR(cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy * sizeof(double)));
+				HANDLE_ERROR(cudaMemcpy( d_Minvsigma2, Minvsigma2, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
 
 				double *d_diff2s(0);
-				cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num * sizeof(double));
-				cudaMemset( (void**) &d_diff2s, 0, orientation_num*translation_num * sizeof(double)); //Initiate diff2 values with zeros
+				HANDLE_ERROR(cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num * sizeof(double)));
+				//HANDLE_ERROR(cudaMemset(d_diff2s, exp_highres_Xi2_imgs[ipart] / 2., orientation_num*translation_num * sizeof(double))); //Initiate diff2 values with zeros
 
 				/*====================================
 				    		Kernel Calls
 				======================================*/
-
 				dim3 block_dim(orientation_num, translation_num);
 
-				cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy);
+				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
+				//cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.);
+
+//				for (long unsigned i = 0; i < orientation_num; i ++)
+//				{
+//					for (long unsigned j = 0; j < translation_num; j ++)
+//					{
+//						cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs + i * Frefs.xy, (double*) d_Fimgs + j * Frefs.xy, d_Minvsigma2, d_diff2s + i * orientation_num + j);
+//					}
+//				}
+				cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs, (double*) d_Fimgs, d_Minvsigma2, d_diff2s);
 
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
 
+				HANDLE_ERROR(cudaDeviceSynchronize());
+
 				double* diff2s = new double[orientation_num*translation_num];
-				cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num * sizeof(double), cudaMemcpyDeviceToHost );
+				HANDLE_ERROR(cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num*sizeof(double), cudaMemcpyDeviceToHost ));
 
 				std::ofstream myfile;
 				std::stringstream sstm;
 				sstm << "diff2s/gpu_part" << ipart << ".dat";
-				myfile.open(sstm.str().c_str());
-				for (long int i = 0; i < orientation_num*translation_num; i ++)
+				myfile.open(sstm.str().c_str(), std::ios_base::app);
+				for (long unsigned i = 0; i < 1; i ++)
 					myfile << diff2s[i] << std::endl;
 				myfile.close();
 
@@ -326,6 +354,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				*/
 
 				cudaFree(d_Fimgs);
+				cudaFree(d_diff2s);
+				delete [] diff2s;
 
 			} // end loop ipart
 
