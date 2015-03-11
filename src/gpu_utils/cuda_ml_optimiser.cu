@@ -73,7 +73,9 @@ public:
 	~CudaImages() { delete[] start; }
 };
 
-__global__ void cuda_kernel_diff2(CudaComplex *g_refs, CudaComplex *g_imgs, double *g_Minvsigma2, double *g_diff2s, const unsigned img_size, const double sum_init)
+__global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+									double *g_Minvsigma2, double *g_diff2s,
+									const unsigned img_size, const double sum_init)
 {
 	__shared__ double s[BLOCK_SIZE];
 	s[threadIdx.x] = 0;
@@ -310,7 +312,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				dim3 block_dim(orientation_num, translation_num);
 
 				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
-				//cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.);
+				cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.);
 
 //				for (long unsigned i = 0; i < orientation_num; i ++)
 //				{
@@ -319,7 +321,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 //						cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs + i * Frefs.xy, (double*) d_Fimgs + j * Frefs.xy, d_Minvsigma2, d_diff2s + i * orientation_num + j);
 //					}
 //				}
-				cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs, (double*) d_Fimgs, d_Minvsigma2, d_diff2s);
+				//cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs, (double*) d_Fimgs, d_Minvsigma2, d_diff2s);
 
 				/*====================================
 				    	   Retrieve Results
@@ -334,7 +336,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				std::stringstream sstm;
 				sstm << "diff2s/gpu_part" << ipart << ".dat";
 				myfile.open(sstm.str().c_str(), std::ios_base::app);
-				for (long unsigned i = 0; i < 1; i ++)
+				for (long unsigned i = 0; i < orientation_num*translation_num; i ++)
 					myfile << diff2s[i] << std::endl;
 				myfile.close();
 
