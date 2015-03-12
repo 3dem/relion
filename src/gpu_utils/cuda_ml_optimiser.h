@@ -67,8 +67,24 @@ public:
 	std::vector<MultidimArray<Complex> > global_fftshifts_ab_coarse, global_fftshifts_ab_current,
 											global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
 
+	int adaptive_oversampling;
+
 	// Strict high-res limit in the expectation step
 	double strict_highres_exp;
+
+	/* Flag to indicate maximization step will be skipped: only data.star file will be written out */
+	bool do_skip_maximization;
+
+	// Flag whether to use maximum a posteriori (MAP) estimation
+	bool do_map;
+
+	MultidimArray<double> exp_metadata;
+
+	// Current weighted sums
+	MlWsumModel wsum_model;
+
+	// Flag whether to do image-wise intensity-scale correction
+	bool do_norm_correction;
 
 	MlOptimiserCUDA(const MlOptimiser &parentOptimiser)
 	{
@@ -89,7 +105,6 @@ public:
 		tab_cos = parentOptimiser.tab_cos;
 		do_ctf_correction = parentOptimiser.do_ctf_correction;
 		do_shifts_onthefly = parentOptimiser.do_shifts_onthefly;
-
 		refs_are_ctf_corrected = parentOptimiser.refs_are_ctf_corrected;
 		do_scale_correction = parentOptimiser.do_scale_correction;
 		global_fftshifts_ab_coarse = parentOptimiser.global_fftshifts_ab_coarse;
@@ -97,6 +112,13 @@ public:
 		global_fftshifts_ab2_coarse = parentOptimiser.global_fftshifts_ab2_coarse;
 		global_fftshifts_ab2_current = parentOptimiser.global_fftshifts_ab2_current;
 		strict_highres_exp = parentOptimiser.strict_highres_exp;
+
+		adaptive_oversampling = parentOptimiser.adaptive_oversampling;
+		do_skip_maximization = parentOptimiser.do_skip_maximization;
+		do_map = parentOptimiser.do_map;
+		exp_metadata = parentOptimiser.exp_metadata;
+		wsum_model = parentOptimiser.wsum_model;
+		do_norm_correction = parentOptimiser.do_norm_correction;
 	};
 
 	void getAllSquaredDifferences(
@@ -117,6 +139,31 @@ public:
 			std::vector<MultidimArray<double> > &exp_local_Fctfs,
 			std::vector<double> &exp_local_sqrtXi2
 		);
+
+	void storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
+			int exp_current_oversampling, int metadata_offset,
+			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
+			int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
+			std::vector<double> &exp_min_diff2,
+			std::vector<double> &exp_highres_Xi2_imgs,
+			std::vector<MultidimArray<Complex > > &exp_Fimgs,
+			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
+			std::vector<MultidimArray<double> > &exp_Fctfs,
+			std::vector<MultidimArray<double> > &exp_power_imgs,
+			std::vector<Matrix1D<double> > &exp_old_offset,
+			std::vector<Matrix1D<double> > &exp_prior,
+			MultidimArray<double> &exp_Mweight,
+			MultidimArray<bool> &exp_Mcoarse_significant,
+			std::vector<double> &exp_significant_weight,
+			std::vector<double> &exp_sum_weight,
+			std::vector<double> &exp_max_weight,
+			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
+			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
+			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
+			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
+			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
+			std::vector<MultidimArray<double> > &exp_local_Fctfs,
+			std::vector<double> &exp_local_sqrtXi2);
 
 	void precalculateShiftedImagesCtfsAndInvSigma2s(
 			bool do_also_unmasked,
