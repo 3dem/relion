@@ -80,7 +80,7 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 	__shared__ double s[BLOCK_SIZE];
 	s[threadIdx.x] = 0;
 
-	unsigned pass_num(ceilf(img_size/BLOCK_SIZE));
+	unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE));
 	unsigned long pixel,
 		ref_start(blockIdx.x * img_size),
 		img_start(blockIdx.y * img_size);
@@ -227,9 +227,10 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 								std::cerr << "!!!!!!! BAD Fref size x:" << Fref.xdim << ":" << Frefs.x << " y:" << Fref.ydim << ":" << Frefs.y << std::endl;
 
 							Frefs.increment();
-							iorientclasses.push_back(iorientclass);
-							iover_rots.push_back(iover_rot);
+
 							orientation_num ++;
+							iorientclasses.push_back(iorientclass); //TODO This should be calculated at sight
+							iover_rots.push_back(iover_rot); //TODO This should be calculated at sight
 						}
 					}
 				}
@@ -250,9 +251,10 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				======================================*/
 
 				CudaImages Fimgs(Frefs.x, Frefs.y,
-						orientation_num * ( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans);
+						orientation_num * ( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans); //TODO Too much
 
 				long unsigned translation_num(0);
+				std::vector< long unsigned > iover_transs(Fimgs.max_num);
 
 				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++)
 				{
@@ -286,6 +288,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						}
 						Fimgs.increment();
 						translation_num ++;
+
+						iover_transs.push_back(iover_trans); //TODO This should actually be used in "write to destination"
 					}
 				}
 
@@ -312,16 +316,15 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				dim3 block_dim(orientation_num, translation_num);
 
 				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
-				cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.);
+//				cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.);
 
-//				for (long unsigned i = 0; i < orientation_num; i ++)
-//				{
-//					for (long unsigned j = 0; j < translation_num; j ++)
-//					{
-//						cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs + i * Frefs.xy, (double*) d_Fimgs + j * Frefs.xy, d_Minvsigma2, d_diff2s + i * orientation_num + j);
-//					}
-//				}
-				//cuda_diff2_deviceImage( Frefs.xy, (double*) d_Frefs, (double*) d_Fimgs, d_Minvsigma2, d_diff2s);
+				for (long unsigned i = 0; i < orientation_num; i ++)
+				{
+					for (long unsigned j = 0; j < translation_num; j ++)
+					{
+						cuda_diff2_deviceImage( Frefs.xy, (double*) ( d_Frefs + (i * Frefs.xy) ), (double*) ( d_Fimgs + (j * Fimgs.xy) ), d_Minvsigma2, d_diff2s + (i * translation_num + j));
+					}
+				}
 
 				/*====================================
 				    	   Retrieve Results
@@ -331,29 +334,41 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				double* diff2s = new double[orientation_num*translation_num];
 				HANDLE_ERROR(cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num*sizeof(double), cudaMemcpyDeviceToHost ));
-
-				std::ofstream myfile;
-				std::stringstream sstm;
-				sstm << "diff2s/gpu_part" << ipart << ".dat";
-				myfile.open(sstm.str().c_str(), std::ios_base::app);
-				for (long unsigned i = 0; i < orientation_num*translation_num; i ++)
-					myfile << diff2s[i] << std::endl;
-				myfile.close();
+//
+//				std::ofstream myfile;
+//				std::stringstream sstm;
+//				sstm << "diff2s/gpu_part" << ipart << ".dat";
+//				myfile.open(sstm.str().c_str(), std::ios_base::app);
+//				for (long unsigned i = 0; i < orientation_num*translation_num; i ++)
+//					myfile << diff2s[i] << std::endl;
+//				myfile.close();
 
 				/*====================================
 				    	Write To Destination TODO
 				======================================*/
 
-				/*
-				for (long int i = 0; i < ihidden_overs.size(); i++)
+				for (long int i = 0; i < orientation_num; i++)
 				{
-					DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_overs[i]) = diff2s[i];
+					long int ihidden = iorientclasses[i] * exp_nr_trans;
+					long int iover_rot = iover_rots[i];
 
-					// Keep track of minimum of all diff2, only for the last image in this series
-					if (diff2s[i] < exp_min_diff2[ipart])
-						exp_min_diff2[ipart] = diff2s[i];
+					for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
+					{
+						sampling.getTranslations(itrans, exp_current_oversampling,
+								oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
+
+						for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
+						{
+							long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
+																								iover_rot, iover_trans);
+							DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) = diff2s[i];
+
+							// Keep track of minimum of all diff2, only for the last image in this series
+							if (diff2s[i] < exp_min_diff2[ipart])
+								exp_min_diff2[ipart] = diff2s[i];
+						}
+					}
 				}
-				*/
 
 				cudaFree(d_Fimgs);
 				cudaFree(d_diff2s);

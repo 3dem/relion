@@ -2,6 +2,7 @@
 #define CUDA_ML_OPTIMISER_H_
 
 #include <pthread.h>
+#include "src/ml_optimiser.h"
 #include "src/ml_model.h"
 #include "src/parallel.h"
 #include "src/exp_model.h"
@@ -69,9 +70,34 @@ public:
 	// Strict high-res limit in the expectation step
 	double strict_highres_exp;
 
-	MlOptimiserCUDA(Experiment mydata, MlModel mymodel, HealpixSampling sampling):
-		mydata(mydata), mymodel(mymodel), sampling(sampling)
-	{};
+	MlOptimiserCUDA(const MlOptimiser &parentOptimiser)
+	{
+		mydata = parentOptimiser.mydata;
+		mymodel = parentOptimiser.mymodel;
+		sampling = parentOptimiser.sampling;
+
+		do_skip_align = parentOptimiser.do_skip_align;
+		do_skip_rotate = parentOptimiser.do_skip_rotate;
+		iter = parentOptimiser.iter;
+		do_firstiter_cc = parentOptimiser.do_firstiter_cc;
+		do_always_cc = parentOptimiser.do_always_cc;
+		coarse_size = parentOptimiser.coarse_size;
+		Mresol_fine = parentOptimiser.Mresol_fine;
+		Mresol_coarse = parentOptimiser.Mresol_coarse;
+		sigma2_fudge = parentOptimiser.sigma2_fudge;
+		tab_sin = parentOptimiser.tab_sin;
+		tab_cos = parentOptimiser.tab_cos;
+		do_ctf_correction = parentOptimiser.do_ctf_correction;
+		do_shifts_onthefly = parentOptimiser.do_shifts_onthefly;
+
+		refs_are_ctf_corrected = parentOptimiser.refs_are_ctf_corrected;
+		do_scale_correction = parentOptimiser.do_scale_correction;
+		global_fftshifts_ab_coarse = parentOptimiser.global_fftshifts_ab_coarse;
+		global_fftshifts_ab_current = parentOptimiser.global_fftshifts_ab_current;
+		global_fftshifts_ab2_coarse = parentOptimiser.global_fftshifts_ab2_coarse;
+		global_fftshifts_ab2_current = parentOptimiser.global_fftshifts_ab2_current;
+		strict_highres_exp = parentOptimiser.strict_highres_exp;
+	};
 
 	void getAllSquaredDifferences(
 			long int my_ori_particle, int exp_current_image_size,

@@ -2080,43 +2080,28 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		global_barrier->wait();
 #endif
 
-//		MlOptimiserCUDA cuda_optimus_prim(mydata, mymodel, sampling);
-//		cuda_optimus_prim.do_skip_align = do_skip_align;
-//		cuda_optimus_prim.do_skip_rotate = do_skip_rotate;
-//		cuda_optimus_prim.iter = iter;
-//		cuda_optimus_prim.do_firstiter_cc = do_firstiter_cc;
-//		cuda_optimus_prim.do_always_cc = do_always_cc;
-//		cuda_optimus_prim.coarse_size = coarse_size;
-//		cuda_optimus_prim.Mresol_fine = Mresol_fine;
-//		cuda_optimus_prim.Mresol_coarse = Mresol_coarse;
-//		cuda_optimus_prim.sigma2_fudge = sigma2_fudge;
-//		cuda_optimus_prim.tab_sin = tab_sin;
-//		cuda_optimus_prim.tab_cos = tab_cos;
-//		cuda_optimus_prim.do_ctf_correction = do_ctf_correction;
-//
-//		cuda_optimus_prim.refs_are_ctf_corrected = refs_are_ctf_corrected;
-//		cuda_optimus_prim.do_scale_correction = do_scale_correction;
-//		cuda_optimus_prim.global_fftshifts_ab_coarse = global_fftshifts_ab_coarse;
-//		cuda_optimus_prim.global_fftshifts_ab_current = global_fftshifts_ab_current;
-//		cuda_optimus_prim.global_fftshifts_ab2_coarse = global_fftshifts_ab2_coarse;
-//		cuda_optimus_prim.global_fftshifts_ab2_current = global_fftshifts_ab2_current;
-//		cuda_optimus_prim.strict_highres_exp = strict_highres_exp;
-//
-//		cuda_optimus_prim.getAllSquaredDifferences(
-//				my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-//				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-//				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-//				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-//				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-//				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		if (do_gpu)
+		{
+			MlOptimiserCUDA cuda_optimus_prim(*this); //TODO This should of course be called once per reference iteration
 
-		// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
-		getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+			cuda_optimus_prim.getAllSquaredDifferences(
+					my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		}
+		else
+		{
+			// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
+			getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		}
 
 
 #ifdef DEBUG_ESP_MEM
@@ -3621,16 +3606,16 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 //													myAB_out.write("myAB_out.mrc");
 //												}
 
-												if (do_gpu)
-												{
-													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
-													//std::cerr << " myAB in GPU mode " << A << std::endl;
-													//std::cerr << " image size " << NZYXSIZE(exp_local_Fimgs_shifted[ipart]) << " x" <<
-													//		exp_local_Fimgs_shifted[ipart].xdim	 << " y" <<
-													//		exp_local_Fimgs_shifted[ipart].ydim	 << " z" <<
-													//		exp_local_Fimgs_shifted[ipart].zdim	<< std::endl;
-												}
-												else
+//												if (do_gpu)
+//												{
+//													cuda_applyAB(NZYXSIZE(exp_local_Fimgs_shifted[ipart]), (double*) exp_local_Fimgs_shifted[ipart].data, (double*) myAB, (double*) Fimg_otfshift.data);
+//													//std::cerr << " myAB in GPU mode " << A << std::endl;
+//													//std::cerr << " image size " << NZYXSIZE(exp_local_Fimgs_shifted[ipart]) << " x" <<
+//													//		exp_local_Fimgs_shifted[ipart].xdim	 << " y" <<
+//													//		exp_local_Fimgs_shifted[ipart].ydim	 << " z" <<
+//													//		exp_local_Fimgs_shifted[ipart].zdim	<< std::endl;
+//												}
+//												else
 												{
 													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 													{
@@ -3730,14 +3715,14 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												// Factor two because of factor 2 in division below, NOT because of 2-dimensionality of the complex plane!
 												diff2 = exp_highres_Xi2_imgs[ipart] / 2.;
 
-												if (do_gpu)
-												{
-													//int num_blocks(ceil(NZYXSIZE(Frefctf)/32));
-													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
-													//std::cerr << " num_blocks = " << num_blocks << std::endl;
-													diff2 += cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
-												}
-												else
+//												if (do_gpu)
+//												{
+//													//int num_blocks(ceil(NZYXSIZE(Frefctf)/32));
+//													//std::cerr << " size = " << NZYXSIZE(Frefctf) << std::endl;
+//													//std::cerr << " num_blocks = " << num_blocks << std::endl;
+//													diff2 += cuda_diff2_hostImage(NZYXSIZE(Frefctf), (double*) Frefctf.data, (double*) Fimg_shift, (double*) Minvsigma2);
+//												}
+//												else
 												{
 													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf) // makes an iterator n=0,1,2...NZYXSIZE(v) over Fourier-refernce-ctf:ed
 													{
@@ -3748,12 +3733,12 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 												}
 												//std::cerr << diff2 <<  std::endl ;
 
-												std::ofstream myfile;
-												std::stringstream sstm;
-												sstm << "diff2s/cpu_part" << ipart << ".dat";
-												myfile.open(sstm.str().c_str(), std::ios_base::app);
-												myfile << diff2 << std::endl;
-												myfile.close();
+//												std::ofstream myfile;
+//												std::stringstream sstm;
+//												sstm << "diff2s/cpu_part" << ipart << ".dat";
+//												myfile.open(sstm.str().c_str(), std::ios_base::app);
+//												myfile << diff2 << std::endl;
+//												myfile.close();
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
@@ -3867,7 +3852,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 								//std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
 								//std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
 								// BELOW LINE OUTPUTS uSEC COUNT FOR EACH DIFF2 CALCULATION
-								std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								//std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
 								//std::cerr <<  std::endl << "press any key for next iteration" ;
 								//char c;
 								//std::cin >> c;
