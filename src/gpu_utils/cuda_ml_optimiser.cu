@@ -139,7 +139,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 	long int exp_nr_oversampled_rot = sampling.oversamplingFactorOrientations(exp_current_oversampling);
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
-	printf("exp_nr_oversampled_rot=%d\n", (unsigned)exp_nr_oversampled_rot);
+	//printf("exp_nr_oversampled_rot=%d\n", (unsigned)exp_nr_oversampled_rot);
 
 	exp_Mweight.resize(exp_nr_particles, mymodel.nr_classes * exp_nr_dir * exp_nr_psi * exp_nr_trans * exp_nr_oversampled_rot * exp_nr_oversampled_trans);
 	exp_Mweight.initConstant(-999.);
@@ -177,7 +177,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			                           Generate Reference Projections
 			=========================================================================================*/
 
-			printf("Generate Reference Projections\n");
+			//printf("Generate Reference Projections\n");
 
 			Fref.resize(exp_local_Minvsigma2s[0]); //TODO remove this
 			Complex* FrefBag = Fref.data; //TODO remove this
@@ -239,7 +239,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					}
 				}
 			}
-			printf("Finished generating reference projections\n");
+			//printf("Finished generating reference projections\n");
 
 			Fref.data = FrefBag; //TODO remove this
 
@@ -261,7 +261,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				long unsigned translation_num(0), ihidden(0);
 				std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
-				printf("Generating translations \n");
+				//printf("Generating translations \n");
 
 				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 				{
@@ -301,7 +301,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						iover_transes.push_back(iover_trans);
 					}
 				}
-				printf("Generating translations finished \n");
+				//printf("Generating translations finished \n");
 
 				/*====================================
 				   Initiate Particle Related On GPU
@@ -325,7 +325,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				======================================*/
 				dim3 block_dim(orientation_num, translation_num);
 
-				printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
+				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
 				cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s, Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.);
 
 //				for (long unsigned i = 0; i < orientation_num; i ++)
@@ -341,13 +341,13 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				======================================*/
 
 				HANDLE_ERROR(cudaDeviceSynchronize());
-				printf("Kernel call finished \n");
+				//printf("Kernel call finished \n");
 
 				double* diff2s = new double[orientation_num*translation_num];
 				HANDLE_ERROR(cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num*sizeof(double), cudaMemcpyDeviceToHost ));
 
 				/*====================================
-				    	Write To Destination TODO
+				    	Write To Destination
 				======================================*/
 
 
@@ -359,7 +359,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 //				myfile.open(sstm.str().c_str(), std::ios_base::app);
 //				}
 
-				printf("Writing to destination \n");
+				//printf("Writing to destination \n");
 				for (long int i = 0; i < orientation_num; i++)
 				{
 					long int iover_rot = iover_rots[i];
@@ -385,7 +385,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							exp_min_diff2[ipart] = diff2;
 					}
 				}
-				printf("Writing to destination finished \n");
+				//printf("Writing to destination finished \n");
 
 
 				cudaFree(d_Fimgs);
