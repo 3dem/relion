@@ -2103,8 +2103,41 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 		}
+#ifdef RELION_TESTING
+		std::string mode;
+		if (do_gpu)
+		{
+			mode="gpu";
+		}
+		else
+		{
+			mode="cpu";
+		}
+		std::cerr << " "<< std::endl;
+		std::cerr << " finished running diffs in  " << mode << " mode."<< std::endl;
+		Image<double> tt;
+		tt().resize(exp_current_image_size, exp_current_image_size);
 
+		MultidimArray<Complex> Fimg1;
 
+		Fimg1 = exp_local_Fimgs_shifted[0];
+		FourierTransformer transformer;
+		transformer.inverseFourierTransform(Fimg1, tt());
+		CenterFFT(tt(),false);
+		std::string fnm = mode + std::string("_out_shifted_image.mrc");
+		tt.write(fnm);
+
+		fnm = mode + std::string("_out_10k_diff2s.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		// Write the first 10k diffs to be sure
+		for(int n=0; n<10000; n++)
+		{
+			//std::cout << DIRECT_MULTIDIM_ELEM(exp_Mweight, n) << std::endl;
+			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n));
+		}
+		exit(0);
+#endif
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
 		{
@@ -2135,7 +2168,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 	global_barrier->wait();
 #endif
 
-	}// end loop over 2 exp_ipass iterations
+}// end loop over 2 exp_ipass iterations
 
 	// For the reconstruction step use mymodel.current_size!
 	exp_current_image_size = mymodel.current_size;
@@ -2174,6 +2207,52 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 	}
+//#ifdef RELION_TESTING
+//		std::string mode;
+//		if (do_gpu)
+//		{
+//			mode="gpu";
+//		}
+//		else
+//		{
+//			mode="cpu";
+//		}
+//		std::cerr << " "<< std::endl;
+//		std::cerr << " finished running diffs in  " << mode << " mode."<< std::endl;
+//		Image<double> tt;
+//		tt().resize(exp_current_image_size, exp_current_image_size);
+//
+//		MultidimArray<Complex> Fimg1;
+//
+//		Fimg1 = exp_local_Fimgs_shifted[0];
+//		FourierTransformer transformer;
+//		transformer.inverseFourierTransform(Fimg1, tt());
+//		CenterFFT(tt(),false);
+//		std::string fnm = mode + std::string("_out_shifted_image.mrc");
+//		tt.write(fnm);
+//
+////		fnm = mode + std::string("_out_10k_diff2s.txt");
+////		char *text = &fnm[0];
+////		freopen(text,"w",stdout);
+////		// Write the first 10k diffs to be sure
+////		for(int n=0; n<10000; n++)
+////		{
+////			//std::cout << DIRECT_MULTIDIM_ELEM(exp_Mweight, n) << std::endl;
+////			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n));
+////		}
+//
+////		fnm = mode + std::string("_out_dLL.txt");
+////		text = &fnm[0];
+////		freopen(text,"w",stdout);
+////		// Write the first 10k diffs to be sure
+////		for(int n=0; n<mydata.ori_particles[my_ori_particle].particles_id.size(); n++)
+////		{
+////			printf("%4.4f \n",DIRECT_A2D_ELEM(exp_metadata, metadata_offset + n, METADATA_DLL) );
+////		}
+//		//For tests we want to exit now
+//		exit(0);
+//
+//#endif
 
 #ifdef DEBUG_ESP_MEM
 	if (thread_id==0)
@@ -3086,21 +3165,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 			}
 //#define DEBUG_CTF_FFTW_IMAGE
-#ifdef RELION_TESTING
-			Image<double> tt;
-			tt()=Fctf;
-			std::string mode;
-			if (do_gpu)
-			{
-				mode="gpu_";
-			}
-			else
-			{
-				mode="cpu_";
-		    }
-			std::string fnm = mode + std::string("out_ctf.mrc");
-			tt.write(fnm);
-#endif
 #ifdef DEBUG_CTF_FFTW_IMAGE
 			Image<double> tt;
 			tt()=Fctf;
@@ -3879,72 +3943,6 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 					} // end if do_proceed orientations
 				} // end loop ipsi
 			} // end loop idir
-#ifdef RELION_TESTING
-								bool cuda_testing = true;
-								if(cuda_testing)
-								{
-									std::string mode;
-									if (do_gpu)
-									{
-										mode="gpu_";
-									}
-									else
-									{
-										mode="cpu_";
-									}
-									Image<double> tt;
-									tt().resize(exp_current_image_size, exp_current_image_size);
-									FourierTransformer transformer;
-									transformer.inverseFourierTransform(Fimg_otfshift, tt());
-									CenterFFT(tt(),false);
-									std::string fnm = mode + std::string("out_otfshift.mrc");
-									tt.write(fnm);
-
-//									FourierTransformer transformer1;
-//									tt().initZeros();
-//									tt().resize(exp_current_image_size, exp_current_image_size);
-//									transformer1.inverseFourierTransform(Fimg_shift, tt());
-//									CenterFFT(tt(),false);
-//									tt.write("out_shift.mrc");
-
-									FourierTransformer transformer2;
-									tt().initZeros();
-									transformer2.inverseFourierTransform(Frefctf, tt());
-									CenterFFT(tt(),false);
-									fnm = mode + std::string("out_frefctf.mrc");
-									tt.write(fnm);
-
-									FourierTransformer transformer3;
-									tt().initZeros();
-									transformer3.inverseFourierTransform(Fref, tt());
-									CenterFFT(tt(),false);
-									fnm = mode + std::string("out_fref.mrc");
-									tt.write(fnm);
-									if (do_firstiter_cc)
-										std::cerr << "doing CC first iter" << std::endl;
-									//std::cerr << " diff2= " << diff2 << std::endl;
-									printf ("\n diff2: %4.8f \n", diff2);
-
-									fnm = mode + std::string("_diff2s.txt");
-									char *text = &fnm[0];
-								    freopen(text,"w",stdout);
-									//FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_Mweight)
-									for(int n=0; n<96768; n++)
-									{
-										printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
-									}
-	//								freclose("diffs.txt");
-
-									if(fabs(diff2-2502.16)<0.01)
-									{
-										exit(0);
-									}
-									else
-									{
-										exit(1);
-									}
-								}
-#endif
 		} // end if mymodel.pdf_class[iclass] > 0.
 	} // end loop iclass
 
