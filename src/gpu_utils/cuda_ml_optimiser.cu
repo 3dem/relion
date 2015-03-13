@@ -294,7 +294,12 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 									- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
 							double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
 									+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-
+							//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
+							if (do_ctf_correction && refs_are_ctf_corrected)
+							{
+								real /= DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n);
+								imag /= DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n);
+							}
 							*(Fimgs.current() + n) = CudaComplex(real, imag);
 						}
 						Fimgs.increment();
@@ -311,6 +316,14 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				   Initiate Particle Related On GPU
 				======================================*/
 
+				//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
+				if (do_ctf_correction && refs_are_ctf_corrected)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+					{
+						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2s[ipart], n) *= (DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n));
+					}
+				}
 				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
 
 				double *d_Minvsigma2(0);
