@@ -143,6 +143,10 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 	long int exp_nr_oversampled_rot = sampling.oversamplingFactorOrientations(exp_current_oversampling);
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
+	//for scale_correction
+	int group_id;
+	double myscale;
+
 	//printf("exp_nr_oversampled_rot=%d\n", (unsigned)exp_nr_oversampled_rot);
 
 	exp_Mweight.resize(exp_nr_particles, mymodel.nr_classes * exp_nr_dir * exp_nr_psi * exp_nr_trans * exp_nr_oversampled_rot * exp_nr_oversampled_trans);
@@ -262,6 +266,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				CudaImages Fimgs(Frefs.x, Frefs.y,
 						( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans);
 
+				long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
 				long unsigned translation_num(0), ihidden(0);
 				std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
@@ -295,6 +300,14 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							double imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
 									+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
 							//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
+
+							if (do_scale_correction)
+							{
+								//group_id = mydata.getGroupId(part_id);
+								float myscale = mymodel.scale_correction[group_id];
+								real /= myscale;
+								imag /= myscale;
+							}
 							if (do_ctf_correction && refs_are_ctf_corrected)
 							{
 								real /= DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n);
@@ -322,6 +335,18 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 					{
 						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2s[ipart], n) *= (DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n));
+					}
+				}
+				// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
+				//           + Make setting of myscale robust between here and above.
+				//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
+				//   meaning small-scale test will probably not catch this malfunctioning if it breaks.)
+				if (do_scale_correction)
+				{
+					float myscale = mymodel.scale_correction[group_id];
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+					{
+						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2s[ipart], n) *= (myscale*myscale);
 					}
 				}
 				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;

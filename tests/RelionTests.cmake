@@ -28,7 +28,8 @@ add_test(NAME CPU-3Dc_produce_data
         --j 1 
         --memory_per_thread 4 
         --random_seed 1993
-        --onthefly_shifts)     
+        --onthefly_shifts
+        --scale)     
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_shifted_image
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
@@ -101,7 +102,8 @@ add_test(NAME GPU-3Dc_K1-produce
         --memory_per_thread 4 
         --random_seed 1993
         --onthefly_shifts
-        --gpu)
+        --gpu
+        --scale)
 #-------------------------------------------------------------------- 
 add_test(NAME GPU-3Dc_K1-shifted_image
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
