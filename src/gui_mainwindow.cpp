@@ -69,8 +69,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title):Fl_Window(w,
     browser->add("2D classification");
     browser->add("3D classification");
     browser->add("3D auto-refine");
-    browser->add("Post-processing");
     browser->add("Particle polishing");
+    browser->add("Post-processing");
     browser->add("Local-resolution");
     browser->add("Publish!");
 
@@ -136,15 +136,15 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title):Fl_Window(w,
     }
     // browse page
     {
+
         browse_grp[9] = new Fl_Group(WCOL0, MENUHEIGHT, 550, 600-MENUHEIGHT);
-    	job_post = new PostJobWindow();
+    	job_polish = new PolishJobWindow();
        	browse_grp[9]->end();
     }
     // browse page
     {
-
         browse_grp[10] = new Fl_Group(WCOL0, MENUHEIGHT, 550, 600-MENUHEIGHT);
-    	job_polish = new PolishJobWindow();
+    	job_post = new PostJobWindow();
        	browse_grp[10]->end();
     }
     // browse page
@@ -288,18 +288,6 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 	else if (myval == 10)
 	{
 		if (do_write)
-			job_post->write(fn_settings);
-		if (do_read)
-			job_post->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_post->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			job_post->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue());
-	}
-	else if (myval == 11)
-	{
-		if (do_write)
 			job_polish->write(fn_settings);
 		if (do_read)
 			job_polish->read(fn_settings, is_main_continue);
@@ -309,6 +297,18 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_polish->getCommands(outputname, commands, final_command,
 					job_general->angpix.getValue(), job_general->particle_diameter.getValue(),
 					job_extract->black_dust.getValue(), job_extract->white_dust.getValue());
+	}
+	else if (myval == 11)
+	{
+		if (do_write)
+			job_post->write(fn_settings);
+		if (do_read)
+			job_post->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_post->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_post->getCommands(outputname, commands, final_command,
+					job_general->angpix.getValue());
 	}
 	else if (myval == 12)
 	{
@@ -512,9 +512,9 @@ void RelionMainWindow::cb_menubar_load_i()
     		browser->value(8);
     	else if  (fn_settings.rfind(".gui_auto3d.") < npos)
     		browser->value(9);
-    	else if  (fn_settings.rfind(".gui_post.") < npos)
-    		browser->value(10);
     	else if  (fn_settings.rfind(".gui_polish.") < npos)
+    		browser->value(10);
+    	else if  (fn_settings.rfind(".gui_post.") < npos)
     		browser->value(11);
     	else if  (fn_settings.rfind(".gui_resmap.") < npos)
     		browser->value(12);
@@ -563,7 +563,7 @@ void RelionMainWindow::cb_menubar_about_i()
 	ShowHelpText *help = new ShowHelpText("\
 RELION is written by Sjors Scheres at the MRC Laboratory of Molecular Biology (scheres@mrc-lmb.cam.ac.uk).\n \
 \n\
-If RELION is useful in your work, please cite us in the contexts as explained under the \"Publish!\" tab, or on the RELION wiki at http://www2.mrc-lmb.cam.ac.uk/relion. \n  \
+If RELION is useful in your work, please cite it in the contexts as explained under the \"Publish!\" tab, or on the RELION wiki at http://www2.mrc-lmb.cam.ac.uk/relion. \n  \
 \n\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of Sjors Scheres is acknowledged appropriately. In order to maintain an overview of existing versions, he would also appreciate being \
