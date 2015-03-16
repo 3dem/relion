@@ -21,7 +21,7 @@ file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_u
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 
 #file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
-file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine.cpp")
+file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine.cpp" "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
 
 cuda_add_library(gpu_util STATIC ${REL_CUDA_SRC})
 add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})

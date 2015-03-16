@@ -703,7 +703,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 #endif
 
 		// Sort input particles on micrographname
-		bool is_mic_a_movie, star_contains_micname;
+		bool is_mic_a_movie = false, star_contains_micname;
 		star_contains_micname = MDimg.containsLabel(EMDL_MICROGRAPH_NAME);
 		if (star_contains_micname)
 		{
