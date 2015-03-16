@@ -716,13 +716,13 @@ float rnd_log(float a, float b)
 
 /* Log2 -------------------------------------------------------------------- */
 // Does not work with xlc compiler
-#ifndef __xlC__
-double log2(double value)
-{
-    return 3.32192809488736*log10(value);
-    // log10(value)/log10(2)
-}
-#endif
+//#ifndef __xlC__
+//double log2(double value)
+//{
+//    return 3.32192809488736*log10(value);
+//    // log10(value)/log10(2)
+//}
+//#endif
 
 // Bsoft function
 void swapbytes(char* v, unsigned long n)

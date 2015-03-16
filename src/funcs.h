@@ -297,9 +297,9 @@ double gaussian2D(double x,
 /** Compute the logarithm in base 2
  */
 // Does not work with xlc compiler
-#ifndef __xlC__
-double log2(double value);
-#endif
+//#ifndef __xlC__
+//double log2(double value);
+//#endif
 //@}
 
 /** @name Random functions

@@ -17,9 +17,26 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include "src/ml_optimiser.h"
+
 //#define DEBUG
 //#define DEBUG_CHECKSIZES
+
+#include <sys/time.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <iostream>
+#include <fstream>
+//#include <cuda_runtime.h>
+//#include <helper_cuda.h>
+//#include <helper_functions.h>
+#include "src/ml_optimiser.h"
+
+#include "gpu_utils/cuda_ml_optimiser.h"
+#include "gpu_utils/cuda_img_operations.h"
 
 #define NR_CLASS_MUTEXES 5
 
@@ -372,6 +389,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = parser.checkOption("--parallel_disc_io", "Let parallel (MPI) processes access the disc simultaneously (use on gluster or fhgfs; this may break NFS)");
+	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
@@ -2062,13 +2080,106 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		global_barrier->wait();
 #endif
 
-		// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
-		getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		if (do_gpu)
+		{
+			MlOptimiserCUDA cuda_optimus_prim(*this); //TODO This should of course be called once per reference iteration
+
+			cuda_optimus_prim.getAllSquaredDifferences(
+					my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		}
+		else
+		{
+			// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
+			getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		}
+#ifdef RELION_TESTING
+		std::string mode;
+		if (do_gpu)
+		{
+			mode="gpu";
+		}
+		else
+		{
+			mode="cpu";
+		}
+		std::cerr << " "<< std::endl;
+		std::cerr << " finfished running diffs in  " << mode << " mode."<< std::endl;
+		Image<double> tt;
+		tt().resize(exp_current_image_size, exp_current_image_size);
+
+		MultidimArray<Complex> Fimg1;
+
+		Fimg1 = exp_local_Fimgs_shifted[0];
+		FourierTransformer transformer;
+		transformer.inverseFourierTransform(Fimg1, tt());
+		CenterFFT(tt(),false);
+		std::string fnm = mode + std::string("_out_shifted_image.mrc");
+		tt.write(fnm);
+
+		fnm = mode + std::string("_out_10k_diff2s.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		for(int n=0; n<10000; n++)
+		{
+			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
+		}
+		//freclose("diffs.txt");
+
+
+//		FourierTransformer transformer1;
+//		tt().initZeros();
+//		tt().resize(exp_current_image_size, exp_current_image_size);
+//		transformer1.inverseFourierTransform(Fimg_shift, tt());
+//		CenterFFT(tt(),false);
+//		tt.write("out_shift.mrc");
+//
+//		FourierTransformer transformer2;
+//		tt().initZeros();
+//		transformer2.inverseFourierTransform(Frefctf, tt());
+//		CenterFFT(tt(),false);
+//		fnm = mode + std::string("out_frefctf.mrc");
+//		tt.write(fnm);
+//
+//		FourierTransformer transformer3;
+//		tt().initZeros();
+//		transformer3.inverseFourierTransform(Fref, tt());
+//		CenterFFT(tt(),false);
+//		fnm = mode + std::string("out_fref.mrc");
+//		tt.write(fnm);
+//		if (do_firstiter_cc)
+//			std::cerr << "doing CC first iter" << std::endl;
+//		//std::cerr << " diff2= " << diff2 << std::endl;
+//		printf ("\n diff2: %4.8f \n", diff2);
+//
+//		fnm = mode + std::string("_diff2s.txt");
+//		char *text = &fnm[0];
+//		freopen(text,"w",stdout);
+//		//FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_Mweight)
+//		for(int n=0; n<96768; n++)
+//		{
+//			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
+//		}
+//		freclose("diffs.txt");
+//
+//		if(fabs(diff2-2502.16)<0.01)
+//		{
+      		exit(0);
+//		}
+//		else
+//		{
+//			exit(1);
+//		}
+#endif
 
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
@@ -2114,14 +2225,76 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 	global_barrier->wait();
 #endif
 
-	storeWeightedSums(my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,
-			exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-			exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
-			exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
-			exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
-			exp_significant_weight, exp_sum_weight, exp_max_weight,
-			exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-			exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+	if (do_gpu)
+	{
+		MlOptimiserCUDA cuda_optimus_prim(*this); //TODO This should of course be called once per reference iteration
+		cuda_optimus_prim.storeWeightedSums(my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,
+				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
+				exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
+				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
+				exp_significant_weight, exp_sum_weight, exp_max_weight,
+				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+	}
+	else
+	{
+		storeWeightedSums(my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,
+				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
+				exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
+				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
+				exp_significant_weight, exp_sum_weight, exp_max_weight,
+				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+	}
+
+#ifdef RELION_TESTING
+		std::string mode;
+		if (do_gpu)
+		{
+			mode="gpu";
+		}
+		else
+		{
+			mode="cpu";
+		}
+		std::cerr << " "<< std::endl;
+		std::cerr << " finished running diffs in  " << mode << " mode."<< std::endl;
+		Image<double> tt;
+		tt().resize(exp_current_image_size, exp_current_image_size);
+
+		MultidimArray<Complex> Fimg1;
+
+		Fimg1 = exp_local_Fimgs_shifted[0];
+		FourierTransformer transformer;
+		transformer.inverseFourierTransform(Fimg1, tt());
+		CenterFFT(tt(),false);
+		std::string fnm = mode + std::string("_out_shifted_image.mrc");
+		tt.write(fnm);
+
+		fnm = mode + std::string("_out_10k_diff2s.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		// Write the first 10k diffs to be sure
+		for(int n=0; n<10000; n++)
+		{
+			//std::cout << DIRECT_MULTIDIM_ELEM(exp_Mweight, n) << std::endl;
+			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n));
+		}
+
+		fnm = mode + std::string("_out_dLL.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		// Write the first 10k diffs to be sure
+		for(int n=0; n<mydata.ori_particles[my_ori_particle].particles_id.size(); n++)
+		{
+			printf("%4.4f \n",DIRECT_A2D_ELEM(exp_metadata, metadata_offset + n, METADATA_DLL) );
+		}
+		//For tests we want to exit now
+		exit(0);
+
+#endif
 
 #ifdef DEBUG_ESP_MEM
 	if (thread_id==0)
@@ -3311,7 +3484,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 #endif
 
 	// Initialise min_diff and exp_Mweight for this pass
-
+	double diff2;
 	int exp_nr_particles = mydata.ori_particles[my_ori_particle].particles_id.size();
 	long int exp_nr_dir = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
 	long int exp_nr_psi = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
@@ -3466,8 +3639,13 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) *= myscale;
 									}
 								}
-
+								double tstart, tend;
+							    struct timeval t2start, t2end;
+							    gettimeofday(&t2start, NULL);
+								//t2start = gettimeofday();
+								tstart = clock();
 								long int ihidden = iorientclass * exp_nr_trans;
+								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -3484,6 +3662,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 									{
 										sampling.getTranslations(itrans, exp_current_oversampling,
 												oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
+
 										for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
 										{
 #ifdef TIMING
@@ -3602,8 +3781,9 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 											if (my_ori_particle == exp_my_first_ori_particle)
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
-											double diff2;
-											if ((iter == 1 && do_firstiter_cc) || do_always_cc)
+
+
+											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 											{
 												// Do not calculate squared-differences, but signal product
 												// Negative values because smaller is worse in this case
@@ -3745,6 +3925,15 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
+								//tend = clock();
+								gettimeofday(&t2end, NULL);
+								//std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
+								//std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								// BELOW LINE OUTPUTS uSEC COUNT FOR EACH DIFF2 CALCULATION
+								//std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
+								//std::cerr <<  std::endl << "press any key for next iteration" ;
+								//char c;
+								//std::cin >> c;
 							} // end loop part_id
 						}// end loop iover_rot
 					} // end if do_proceed orientations
@@ -5360,7 +5549,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 
 	std::cout << " Auto-refine: Estimated accuracy angles= " << acc_rot<< " degrees; offsets= " << acc_trans << " pixels" << std::endl;
 	// Warn for inflated resolution estimates
-	if (acc_rot > 10. && do_auto_refine)
+	if (acc_rot > 10.)
 	{
 		std::cout << " Auto-refine: WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles (yet)!" << std::endl;
 		std::cout << " Auto-refine: WARNING: You probably need not worry if the accuracy improves during the next few iterations." << std::endl;

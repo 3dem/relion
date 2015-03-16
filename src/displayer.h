@@ -29,18 +29,18 @@
 #include <src/time.h>
 #include <src/args.h>
 
-#include <external/fltk-1.3.0/FL/Fl.H>
-#include <external/fltk-1.3.0/FL/Fl_Shared_Image.H>
-#include <external/fltk-1.3.0/FL/Fl_Double_Window.H>
-#include <external/fltk-1.3.0/FL/Fl_Scroll.H>
-#include <external/fltk-1.3.0/FL/Fl_Image.H>
-#include <external/fltk-1.3.0/FL/Fl_JPEG_Image.H>
-#include <external/fltk-1.3.0/FL/Fl_Box.H>
-#include <external/fltk-1.3.0/FL/fl_draw.H>
-#include <external/fltk-1.3.0/FL/Fl_Menu_Bar.H>
-#include <external/fltk-1.3.0/FL/Fl_File_Chooser.H>
-#include <external/fltk-1.3.0/FL/Fl_Float_Input.H>
-#include <external/fltk-1.3.0/FL/Fl_Text_Display.H>
+#include <FL/Fl.H>
+#include <FL/Fl_Shared_Image.H>
+#include <FL/Fl_Double_Window.H>
+#include <FL/Fl_Scroll.H>
+#include <FL/Fl_Image.H>
+#include <FL/Fl_JPEG_Image.H>
+#include <FL/Fl_Box.H>
+#include <FL/fl_draw.H>
+#include <FL/Fl_Menu_Bar.H>
+#include <FL/Fl_File_Chooser.H>
+#include <FL/Fl_Float_Input.H>
+#include <FL/Fl_Text_Display.H>
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))

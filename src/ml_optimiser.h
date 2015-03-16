@@ -262,6 +262,9 @@ public:
     // Use parallel access to disc?
     bool do_parallel_disc_io;
 
+    // Use gpu resources?
+    bool do_gpu;
+
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
