@@ -140,6 +140,31 @@ public:
 			std::vector<double> &exp_local_sqrtXi2
 		);
 
+	void storeWeightedSumsCUDA(long int my_ori_particle, int exp_current_image_size,
+			int exp_current_oversampling, int metadata_offset,
+			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
+			int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
+			std::vector<double> &exp_min_diff2,
+			std::vector<double> &exp_highres_Xi2_imgs,
+			std::vector<MultidimArray<Complex > > &exp_Fimgs,
+			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
+			std::vector<MultidimArray<double> > &exp_Fctfs,
+			std::vector<MultidimArray<double> > &exp_power_imgs,
+			std::vector<Matrix1D<double> > &exp_old_offset,
+			std::vector<Matrix1D<double> > &exp_prior,
+			MultidimArray<double> &exp_Mweight,
+			MultidimArray<bool> &exp_Mcoarse_significant,
+			std::vector<double> &exp_significant_weight,
+			std::vector<double> &exp_sum_weight,
+			std::vector<double> &exp_max_weight,
+			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
+			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
+			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
+			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
+			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
+			std::vector<MultidimArray<double> > &exp_local_Fctfs,
+			std::vector<double> &exp_local_sqrtXi2);
+
 	void storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
