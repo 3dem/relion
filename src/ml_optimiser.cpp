@@ -3645,7 +3645,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 								//t2start = gettimeofday();
 								tstart = clock();
 								long int ihidden = iorientclass * exp_nr_trans;
-								std::cerr <<  std::endl << " diff2= " <<  std::endl ;
+								//std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -4081,6 +4081,10 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 						}
 						else
 						{
+							// P(orientation) = P(idir|dir_prior) * P(ipsi|psi_prior)
+							// This is the probability of the orientation, given the gathered
+							// statistics of all assigned orientations of the dataset, since we
+							// are assigning a gaussian prior to all parameters.
 							pdf_orientation = exp_directions_prior[idir] * exp_psi_prior[ipsi];
 						}
 						// Loop over all translations
@@ -4098,9 +4102,11 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 								double offset_z = old_offset_z + sampling.translations_z[itrans];
 								tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 							}
+							// P(offset|sigma2_offset)
+							// This is the probability of the offset, given the model offset and variance.
 							double pdf_offset;
 							if (mymodel.sigma2_offset < 0.0001)
-								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
+								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.; // FIXME ?? A bit hard, no?
 							else
 								pdf_offset = exp ( tdiff2 / (-2. * mymodel.sigma2_offset) ) / ( 2. * PI * mymodel.sigma2_offset );
 
@@ -4159,6 +4165,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 									}
 									else
 									{
+										// Set the weight base to the probability of the parameters given the prior
 										double weight = pdf_orientation * pdf_offset;
 										double diff2 = DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) - exp_min_diff2[ipart];
 										// next line because of numerical precision of exp-function
@@ -4171,19 +4178,15 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 #endif
 										// Store the weight
 										DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) = weight;
-#ifdef DEBUG_CHECKSIZES
-										if (std::isnan(weight))
-										{
-											pthread_mutex_lock(&global_mutex);
-											std::cerr<< "weight= "<<weight<<" is not a number! " <<std::endl;
-											std::cerr << " exp_min_diff2[ipart]= " << exp_min_diff2[ipart] << std::endl;
-											std::cerr << " ipart= " << ipart << std::endl;
-											std::cerr << " part_id= " << part_id << std::endl;
-											std::cerr << " DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over)= " << DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) << std::endl;
-											REPORT_ERROR("weight is not a number");
-											pthread_mutex_unlock(&global_mutex);
-										}
-#endif
+
+//											std::cerr << " ipart= " << ipart << std::endl;
+//											std::cerr << " exp_min_diff2[ipart]= " << exp_min_diff2[ipart] << std::endl;
+//											std::cerr << " diff2= " <<diff2<< std::endl;
+//											std::cerr << " weight= "<<weight<< std::endl;
+//											std::cerr << " part_id= " << part_id << std::endl;
+//											std::cerr << " DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over)= " << DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) << std::endl;
+
+
 										// Keep track of sum and maximum of all weights for this particle
 										// Later add all to exp_thisparticle_sumweight, but inside this loop sum to local thisthread_sumweight first
 										exp_thisparticle_sumweight += weight;

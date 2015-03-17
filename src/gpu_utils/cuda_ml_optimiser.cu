@@ -105,16 +105,50 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 		}
 	}
 
-	__syncthreads();
+	// This version should run in             BLOCK_SIZE                  cycles
+	// -------------------------------------------------------------------------
+	//	if (threadIdx.x == 0)
+	//	{
+	//		double sum(sum_init);
+	//		for (unsigned i = 0; i < BLOCK_SIZE; i++)
+	//			sum += s[i];
+	//
+	//		g_diff2s[blockIdx.x * gridDim.y + blockIdx.y] = sum;
+	//	}
+	// -------------------------------------------------------------------------
 
-	if (threadIdx.x == 0)
+
+
+	// This version should run in     BLOCK_SIZE/trads + log2(trads)      cycles
+	// (  ~25x faster than above if memory conflicts are avoided )
+	// -------------------------------------------------------------------------
+	int trads = 32;
+	int itr = BLOCK_SIZE/trads;
+	if(itr>1)
 	{
-		double sum(sum_init);
-		for (unsigned i = 0; i < BLOCK_SIZE; i++)
-			sum += s[i];
-
-		g_diff2s[blockIdx.x * gridDim.y + blockIdx.y] = sum;
+		for(int i=1; i<itr; i++)
+		{
+			if((i*trads+threadIdx.x)<BLOCK_SIZE)
+			{
+				s[threadIdx.x] += s[i*trads + threadIdx.x];
+			}
+			//__syncthreads();
+		}
 	}
+	//__syncthreads();
+
+	for(int j=(trads/2); j>0; j/=2)
+	{
+		if(threadIdx.x<j)
+		{
+			s[threadIdx.x]+=s[threadIdx.x+j];
+		}
+	}
+
+	if (threadIdx.x*blockIdx.x == 0)
+		g_diff2s[blockIdx.x * gridDim.y + blockIdx.y] = s[0]+sum_init;
+	// -------------------------------------------------------------------------
+
 }
 
 void MlOptimiserCUDA::getAllSquaredDifferences(
