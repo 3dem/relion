@@ -2,7 +2,7 @@ include_directories("${CMAKE_SOURCE_DIR}")
 include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
-set(CUDA_NVCC_FLAGS "-g -G -O0")
+set(CUDA_NVCC_FLAGS " -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 

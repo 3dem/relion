@@ -13,7 +13,7 @@ add_test(NAME CPU-3Dc_produce_data
         --ini_high 40
         --ctf 
         --ctf_corrected_ref
-        --iter 1 
+        --iter 2 
         --tau2_fudge 2 
         --K 1 
         --flatten_solvent 
@@ -86,7 +86,7 @@ add_test(NAME GPU-3Dc_K1-produce
         --ini_high 40 
         --ctf
         --ctf_corrected_ref
-        --iter 1 
+        --iter 2 
         --tau2_fudge 2 
         --K 1 
         --flatten_solvent 
@@ -132,7 +132,7 @@ add_test(NAME GPU-3Dc_K4-produce
         --ini_high 40 
         --ctf
         --ctf_corrected_ref
-        --iter 1 
+        --iter 2 
         --tau2_fudge 2 
         --K 4 
         --flatten_solvent 
@@ -175,7 +175,7 @@ add_test(NAME GPU-3Dc_noCTF-produce
         --ref ref_model.mrc 
         --ini_high 40 
         --ctf_corrected_ref
-        --iter 1 
+        --iter 2 
         --tau2_fudge 2 
         --K 1 
         --flatten_solvent 
