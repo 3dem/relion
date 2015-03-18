@@ -3,6 +3,10 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_output)
 
 #--------------------   CPU-computation test  -----------------------
 #--------------------------------------------------------------------
+add_test(NAME deleting_old_files
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests
+        COMMAND rm gpu_out_10k_diff2s.txt cpu_out_10k_diff2s.txt )
+        
 add_test(NAME CPU-3Dc_produce_data
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
         COMMAND refine --o test_output/out
@@ -30,6 +34,7 @@ add_test(NAME CPU-3Dc_produce_data
         --random_seed 1993
         --onthefly_shifts
         --scale)     
+SET_TESTS_PROPERTIES(CPU-3Dc_produce_data PROPERTIES DEPENDS deleting_old_files)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_shifted_image
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests

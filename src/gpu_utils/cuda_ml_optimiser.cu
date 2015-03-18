@@ -81,21 +81,28 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 									double *g_Minvsigma2, double *g_diff2s,
 									const unsigned img_size, const double sum_init,
 									bool *g_exp_Mcoarse_significant,
-									int exp_nr_oversampled_rot,
-									int exp_nr_oversampled_trans)
+									long int orientation_num,
+									long int translation_num,
+									long int exp_nr_oversampled_rot,
+									long int exp_nr_oversampled_trans)
 {
-	int coarse_rot_idx   = floorf(blockDim.x/exp_nr_oversampled_rot);
-	int coarse_trans_idx = floorf(blockDim.y/exp_nr_oversampled_trans);
+//	int ex = blockIdx.x % orientation_num;
+//	int ey = (blockIdx.x - ex) / orientation_num;
+	int ex = blockIdx.x;
+	int ey = blockIdx.y;
 
-	if(g_exp_Mcoarse_significant + blockIdx.x+blockIdx.y*coarse_rot_idx)
+	unsigned long int coarse_rot_idx   = floorf(ex/exp_nr_oversampled_rot);
+	unsigned long int coarse_trans_idx = floorf(ey/exp_nr_oversampled_trans);
+
+	if(g_exp_Mcoarse_significant + ex + ey*coarse_rot_idx)
 	{
 		__shared__ double s[BLOCK_SIZE];
 		s[threadIdx.x] = 0;
 
 		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE));
 		unsigned long pixel,
-			ref_start(blockIdx.x * img_size),
-			img_start(blockIdx.y * img_size);
+		ref_start(ex * img_size),
+		img_start(ey * img_size);
 
 		unsigned long ref_pixel_idx;
 		unsigned long img_pixel_idx;
@@ -124,11 +131,9 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 	//			for (unsigned i = 0; i < BLOCK_SIZE; i++)
 	//				sum += s[i];
 	//
-	//			g_diff2s[blockIdx.x * gridDim.y + blockIdx.y] = sum;
+	//			g_diff2s[ex * translation_num + ey] = sum;
 	//		}
 		// -------------------------------------------------------------------------
-
-
 
 		// This version should run in     BLOCK_SIZE/trads + log2(trads)      cycles
 		// ( Runs ~2x as fast as the above one for BLOCK_SIZE=32 )
@@ -141,7 +146,7 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 			for(int i=1; i<itr; i++)
 			{
 				s[threadIdx.x] += s[i*trads + threadIdx.x];
-				__syncthreads();
+				//__syncthreads();
 			}
 		}
 
@@ -152,15 +157,17 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 				s[threadIdx.x] += s[threadIdx.x+j];
 			}
 		}
-
-		if (threadIdx.x*blockIdx.x == 0)
-			g_diff2s[blockIdx.x * gridDim.y + blockIdx.y] = s[0]+sum_init;
+		__syncthreads();
+//		if (threadIdx.x*ex == 0)
+		{
+			g_diff2s[ex * translation_num + ey] = s[0]+sum_init;
+		}
 		// -------------------------------------------------------------------------
 	}
-	else
-	{
-		g_diff2s[blockIdx.x * gridDim.y + blockIdx.y] = (float)g_exp_Mcoarse_significant[blockIdx.x+blockIdx.y*coarse_rot_idx];
-	}
+//	else
+//	{
+//		g_diff2s[ex * translation_num + ey] = 0; //(float)g_exp_Mcoarse_significant[blockIdx.x+blockIdx.y*coarse_rot_idx];
+//	}
 
 
 }
@@ -497,7 +504,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				/*====================================
 				    		Kernel Calls
 				======================================*/
-				dim3 block_dim(orientation_num, translation_num);
+				dim3 block_dim(orientation_num,translation_num);
 
 				clock_t t1, t2;
 				t1 = clock();
@@ -505,6 +512,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				cuda_kernel_massive_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
 																	Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
 																	d_exp_Mcoarse_significant,
+																	orientation_num,
+																	translation_num,
 																	exp_nr_oversampled_rot,
 																	exp_nr_oversampled_trans);
 
