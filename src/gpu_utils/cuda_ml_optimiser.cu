@@ -88,13 +88,17 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 {
 //	int ex = blockIdx.x % orientation_num;
 //	int ey = (blockIdx.x - ex) / orientation_num;
-	int ex = blockIdx.x;
-	int ey = blockIdx.y;
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	//int ey = blockIdx.y;
+	int ez = blockIdx.z;
 
 	unsigned long int coarse_rot_idx   = floorf(ex/exp_nr_oversampled_rot);
-	unsigned long int coarse_trans_idx = floorf(ey/exp_nr_oversampled_trans);
+	unsigned long int coarse_trans_idx = floorf(ez/exp_nr_oversampled_trans);
 
-	if(g_exp_Mcoarse_significant + ex + ey*coarse_rot_idx)
+	// 		Check if it is significant
+	//          		AND
+	// inside the padded 2D orientation grid
+	if(g_exp_Mcoarse_significant + ex + ez*coarse_rot_idx && ex < orientation_num )
 	{
 		__shared__ double s[BLOCK_SIZE];
 		s[threadIdx.x] = 0;
@@ -102,7 +106,7 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE));
 		unsigned long pixel,
 		ref_start(ex * img_size),
-		img_start(ey * img_size);
+		img_start(ez * img_size);
 
 		unsigned long ref_pixel_idx;
 		unsigned long img_pixel_idx;
@@ -160,7 +164,7 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 		__syncthreads();
 //		if (threadIdx.x*ex == 0)
 		{
-			g_diff2s[ex * translation_num + ey] = s[0]+sum_init;
+			g_diff2s[ex * translation_num + ez] = s[0]+sum_init;
 		}
 		// -------------------------------------------------------------------------
 	}
@@ -504,10 +508,25 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				/*====================================
 				    		Kernel Calls
 				======================================*/
-				dim3 block_dim(orientation_num,translation_num);
+				short int orient1, orient2;
 
-				clock_t t1, t2;
-				t1 = clock();
+				if(orientation_num>65535)
+				{
+					orient1 = ceil(sqrt(orientation_num));
+					orient2 = orient1;
+				}
+				else
+				{
+					orient1 = orientation_num;
+					orient2 = 1;
+				}
+				dim3 block_dim(orient1,orient2,translation_num);
+
+				cudaEvent_t start, stop;
+				float time;
+				cudaEventCreate(&start);
+				cudaEventCreate(&stop);
+				cudaEventRecord(start, 0);
 				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
 				cuda_kernel_massive_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
 																	Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
@@ -517,8 +536,11 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 																	exp_nr_oversampled_rot,
 																	exp_nr_oversampled_trans);
 
-
-
+				cudaEventRecord(stop, 0);
+				cudaEventSynchronize(stop);
+				cudaEventElapsedTime(&time, start, stop);
+				cudaEventDestroy(start);
+				cudaEventDestroy(stop);
 //				for (long unsigned i = 0; i < orientation_num; i ++)
 //				{
 //					for (long unsigned j = 0; j < translation_num; j ++)
@@ -530,16 +552,16 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
+
+				HANDLE_ERROR(cudaDeviceSynchronize());
+				//printf("Kernel call finished \n");
+
+				std::cerr << "It took "<< time <<" msecs."<< std::endl;
+				double* diff2s = new double[orientation_num*translation_num];
 				if (exp_ipass == 0)
 				{
 					exp_Mcoarse_significant.clear();
 				}
-				HANDLE_ERROR(cudaDeviceSynchronize());
-				//printf("Kernel call finished \n");
-				t2 = clock();
-				float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
-				std::cerr << "It took "<< td <<" msecs."<< std::endl;
-				double* diff2s = new double[orientation_num*translation_num];
 				HANDLE_ERROR(cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num*sizeof(double), cudaMemcpyDeviceToHost ));
 
 				/*====================================
