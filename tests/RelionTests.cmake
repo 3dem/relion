@@ -41,7 +41,7 @@ add_test(NAME CPU-3Dc_shifted_image
         COMMAND ${CMAKE_COMMAND} -E compare_files 
             ref_shifted_image.mrc 
         cpu_out_shifted_image.mrc)
-        SET_TESTS_PROPERTIES(CPU-3Dc_shifted_image PROPERTIES DEPENDS CPU-3Dc_produce_data_and_diff2)
+        SET_TESTS_PROPERTIES(CPU-3Dc_shifted_image PROPERTIES DEPENDS CPU-3Dc_produce_data)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_10kdiffs
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
@@ -76,7 +76,7 @@ SET_TESTS_PROPERTIES(CPU-3Dc_10kdiffs PROPERTIES DEPENDS CPU-3Dc_produce_data)
 #        COMMAND ${CMAKE_COMMAND} -E compare_files 
 #        cpu_out_ref.mrc 
 #        cpu_out_frefctf.mrc)
-#SET_TESTS_PROPERTIES(CPU-3Dc_ref-vs-refctf PROPERTIES WILL_FAIL TRUE DEPENDS CPU-3Dc_produce_data_and_diff2)
+#SET_TESTS_PROPERTIES(CPU-3Dc_ref-vs-refctf PROPERTIES WILL_FAIL TRUE DEPENDS CPU-3Dc_produce_data)
 
 
 #--------------------   GPU-computation test  -----------------------

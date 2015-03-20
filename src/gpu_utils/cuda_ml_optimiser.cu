@@ -82,33 +82,28 @@ public:
 __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 									double *g_Minvsigma2, double *g_diff2s,
 									const unsigned img_size, const double sum_init,
-									bool *g_exp_Mcoarse_significant,
-									long int orientation_num,
-									long int translation_num,
-									long int exp_nr_oversampled_rot,
-									long int exp_nr_oversampled_trans)
+									long int significant_num,
+									int translation_num,
+									int *d_rotidx,
+									int *d_transidx)
 {
-//	int ex = blockIdx.x % orientation_num;
-//	int ey = (blockIdx.x - ex) / orientation_num;
+	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-	//int ey = blockIdx.y;
-	int ez = blockIdx.z;
 
-	unsigned long int coarse_rot_idx   = floorf(ex/exp_nr_oversampled_rot);
-	unsigned long int coarse_trans_idx = floorf(ez/exp_nr_oversampled_trans);
-
-	// 		Check if it is significant
-	//          		AND
 	// inside the padded 2D orientation grid
-	if(g_exp_Mcoarse_significant + ex + ez*coarse_rot_idx && ex < orientation_num )
+	if( ex < significant_num )
 	{
+		// index of comparison
+		unsigned long int ix=d_rotidx[ex];
+		unsigned long int iy=d_transidx[ex];
+
 		__shared__ double s[PAIRWISE_BLOCK_SIZE];
 		s[threadIdx.x] = 0;
 
 		unsigned pass_num(ceilf((float)img_size/(float)PAIRWISE_BLOCK_SIZE));
 		unsigned long pixel,
-		ref_start(ex * img_size),
-		img_start(ez * img_size);
+		ref_start(ix * img_size),
+		img_start(iy * img_size);
 
 		unsigned long ref_pixel_idx;
 		unsigned long img_pixel_idx;
@@ -166,16 +161,10 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 		__syncthreads();
 //		if (threadIdx.x*ex == 0)
 		{
-			g_diff2s[ex * translation_num + ez] = s[0]+sum_init;
+			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
 		}
 		// -------------------------------------------------------------------------
 	}
-//	else
-//	{
-//		g_diff2s[ex * translation_num + ey] = 0; //(float)g_exp_Mcoarse_significant[blockIdx.x+blockIdx.y*coarse_rot_idx];
-//	}
-
-
 }
 
 //  Takes a boolean N-by-M matrix and returns pointer pairs to coordinates in two corresponding objects
@@ -272,7 +261,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 			Fref.resize(exp_local_Minvsigma2s[0]); //TODO remove this
 			Complex* FrefBag = Fref.data; //TODO remove this
-
+			clock_t t1, t2;
+			t1 = clock();
 			for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 			{
 				for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
@@ -304,6 +294,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						// This will be only the original (rot,tilt,psi) triplet in the first pass (exp_current_oversampling==0)
 						sampling.getOrientations(idir, ipsi, exp_current_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 								exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
+
 						// Loop over all oversampled orientations (only a single one in the first pass)
 						for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
 						{
@@ -330,6 +321,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					}
 				}
 			}
+			t2 = clock();
+			float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
+			std::cerr << "Proj generation took "<< td <<" msecs."<< std::endl;
 			//printf("Finished generating reference projections\n");
 
 			Fref.data = FrefBag; //TODO remove this
@@ -354,7 +348,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
 				//printf("Generating translations \n");
-
+				clock_t t1, t2;
+				t1 = clock();
 				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 				{
 					sampling.getTranslations(itrans, exp_current_oversampling,
@@ -406,6 +401,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						iover_transes.push_back(iover_trans);
 					}
 				}
+				t2 = clock();
+				float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
+				std::cerr << "Trans generation took "<< td <<" msecs."<< std::endl;
 				//printf("Generating translations finished \n");
 
 				/*===========================================
@@ -418,26 +416,31 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				long int coarse_num = exp_nr_dir*exp_nr_psi*exp_nr_trans;
 				long int significant_num=0;
 				std::cerr << "exp_ipass "<< exp_ipass << std::endl;
+				std::vector< int > transidx, rotidx;
 				if (exp_ipass == 0)
 				{
 					exp_Mcoarse_significant.resize(coarse_num, 1);
-					for (long int i = 0; i < coarse_num; i++)
+					for (int i = 0; i < orientation_num; i++)
 					{
-						DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, i)=1;
-//						std::cerr << "exp_Mcoarse_significant("<< i <<") = " <<    DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, i) << std::endl;
-//						std::cerr << "exp_Mcoarse_significant("<< i <<") = " << *(&DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, 0)+i*sizeof(bool)) << std::endl;
+						for (int j = 0; j < translation_num; j++)
+						{
+							 rotidx.push_back(i);
+							 transidx.push_back(j);
+							significant_num++;
+//							DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, i)=1;
+//							std::cerr << "exp_Mcoarse_significant("<< i <<") = " <<    DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, i) << std::endl;
+//							std::cerr << "exp_Mcoarse_significant("<< i <<") = " << *(&DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, 0)+i*sizeof(bool)) << std::endl;
+						}
 					}
-					significant_num = coarse_num;
 				}
 				else
 				{
-					std::vector< long unsigned > transidx, rotidx;
-					for (long int i = 0; i < orientation_num; i++)
+					for (int i = 0; i < orientation_num; i++)
 					{
 						long int iover_rot = iover_rots[i];
 //						long int iover_rot = i % exp_nr_oversampled_rot
 						long int coarse_rot = floor(i/exp_nr_oversampled_rot);
-						for (long int j = 0; j < translation_num; j++)
+						for (int j = 0; j < translation_num; j++)
 						{
 							long int iover_trans = iover_transes[j];
 //							long int iover_trans = j % exp_nr_oversampled_trans
@@ -447,8 +450,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							{
 								 long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden,
 										                  exp_current_oversampling, iover_rot, iover_trans);
-								 transidx.push_back(i);
-								 rotidx.push_back(j);
+								 rotidx.push_back(i);
+								 transidx.push_back(j);
 								 significant_num++;
 							}
 						}
@@ -496,47 +499,44 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				HANDLE_ERROR(cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num * sizeof(double)));
 				//HANDLE_ERROR(cudaMemset(d_diff2s, exp_highres_Xi2_imgs[ipart] / 2., orientation_num*translation_num * sizeof(double))); //Initiate diff2 values with zeros
 
+				int *d_rotidx(0);
+				HANDLE_ERROR(cudaMalloc( (void**) &d_rotidx, significant_num * sizeof(int)));
+				HANDLE_ERROR(cudaMemcpy( d_rotidx, &rotidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
 
-				bool *d_exp_Mcoarse_significant(0);
-
-				HANDLE_ERROR(cudaMalloc( (void**) &d_exp_Mcoarse_significant, coarse_num * sizeof(bool)));
-				HANDLE_ERROR(cudaMemcpy( d_exp_Mcoarse_significant, &(exp_Mcoarse_significant.data),  coarse_num * sizeof(bool), cudaMemcpyHostToDevice));
-//
-//				int *d_rotidx(0);
-//				HANDLE_ERROR(cudaMalloc( (void**) &d_rotidx, significant_num * sizeof(int)));
-//				HANDLE_ERROR(cudaMemcpy( d_rotidx, rotidx,  significant_num * sizeof(int), cudaMemcpyHostToDevice));
+				int *d_transidx(0);
+				HANDLE_ERROR(cudaMalloc( (void**) &d_transidx, significant_num * sizeof(int)));
+				HANDLE_ERROR(cudaMemcpy( d_transidx, &transidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
 
 				/*====================================
 				    		Kernel Calls
 				======================================*/
 				short int orient1, orient2;
 
-				if(orientation_num>65535)
+				if(significant_num>65535)
 				{
-					orient1 = ceil(sqrt(orientation_num));
+					orient1 = ceil(sqrt(significant_num));
 					orient2 = orient1;
 				}
 				else
 				{
-					orient1 = orientation_num;
+					orient1 = significant_num;
 					orient2 = 1;
 				}
-				dim3 block_dim(orient1,orient2,translation_num);
+				dim3 block_dim(orient1,orient2);
 
 				cudaEvent_t start, stop;
 				float time;
 				cudaEventCreate(&start);
 				cudaEventCreate(&stop);
 				cudaEventRecord(start, 0);
-				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
+				std::cerr << "Calling kernel with <<("<< orient1 <<","<< orient1 << "), " << PAIRWISE_BLOCK_SIZE << ">> " << std::endl;
+
 				cuda_kernel_massive_diff2<<<block_dim,PAIRWISE_BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
 																	Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
-																	d_exp_Mcoarse_significant,
-																	orientation_num,
+																	significant_num,
 																	translation_num,
-																	exp_nr_oversampled_rot,
-																	exp_nr_oversampled_trans);
-
+																	d_rotidx,
+																	d_transidx);
 				cudaEventRecord(stop, 0);
 				cudaEventSynchronize(stop);
 				cudaEventElapsedTime(&time, start, stop);
