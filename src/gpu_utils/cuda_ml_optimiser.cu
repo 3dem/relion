@@ -11,8 +11,8 @@
 #include <cuda.h>
 
 #define MAX_RESOL_SHARED_MEM 32
-#define PAIRWISE_BLOCK_SIZE 128         // This is optimally set as big as possible without its ceil:ed multiple exceeding imagesize by too much.
-#define PIXELWISE_BLOCK_SIZE 32
+#define PIXELWISE_BLOCK_SIZE 128         // This is optimally set as big as possible without its ceil:ed multiple exceeding imagesize by too much.
+#define TRANSWISE_BLOCK_SIZE 32			// Most optimal is 32 when doing 84 nr translations
 #define NR_CLASS_MUTEXES 5
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
@@ -102,10 +102,10 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 	// inside the padded 2D orientation grid
 	if(g_exp_Mcoarse_significant + ex + ez*coarse_rot_idx && ex < orientation_num )
 	{
-		__shared__ double s[PAIRWISE_BLOCK_SIZE];
+		__shared__ double s[PIXELWISE_BLOCK_SIZE];
 		s[threadIdx.x] = 0;
 
-		unsigned pass_num(ceilf((float)img_size/(float)PAIRWISE_BLOCK_SIZE));
+		unsigned pass_num(ceilf((float)img_size/(float)PIXELWISE_BLOCK_SIZE));
 		unsigned long pixel,
 		ref_start(ex * img_size),
 		img_start(ez * img_size);
@@ -115,7 +115,7 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 
 		for (unsigned pass = 0; pass < pass_num; pass ++)
 		{
-			pixel = pass * PAIRWISE_BLOCK_SIZE + threadIdx.x;
+			pixel = pass * PIXELWISE_BLOCK_SIZE + threadIdx.x;
 
 			if (pixel < img_size) //Is inside image
 			{
@@ -146,7 +146,7 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 		// -------------------------------------------------------------------------
 		__syncthreads();
 		int trads = 32;
-		int itr = PAIRWISE_BLOCK_SIZE/trads;
+		int itr = PIXELWISE_BLOCK_SIZE/trads;
 		if(threadIdx.x<trads)
 		{
 			for(int i=1; i<itr; i++)
@@ -529,7 +529,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				cudaEventCreate(&stop);
 				cudaEventRecord(start, 0);
 				//printf("Calling kernel with <<(%d,%d), %d>> \n", block_dim.x, block_dim.y, BLOCK_SIZE);
-				cuda_kernel_massive_diff2<<<block_dim,PAIRWISE_BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
+				cuda_kernel_massive_diff2<<<block_dim,PIXELWISE_BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
 																	Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
 																	d_exp_Mcoarse_significant,
 																	orientation_num,
@@ -570,13 +570,11 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				======================================*/
 
 
-//				if (exp_current_oversampling > 1)
-//				{
 //				std::ofstream myfile;
 //				std::stringstream sstm;
 //				sstm << "diff2s/gpu_part.dat";
 //				myfile.open(sstm.str().c_str(), std::ios_base::app);
-//				}
+//				myfile << ihidden_over << " " << diff2 << std::endl;
 
 				//printf("Writing to destination \n");
 				for (long int i = 0; i < orientation_num; i++)
@@ -622,49 +620,57 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
 									double* g_weights, double* g_ctfs, double* g_Minvsigma2s,
 									double *g_wdiff2s_parts, CudaComplex *g_wavgs, double* g_Fweights,
-									const unsigned translation_num, const double weight_norm)
+									const unsigned translation_num, const double weight_norm,
+									const double significant_weight)
 {
 	unsigned otientation = blockIdx.x;
 	unsigned pixel = blockIdx.y;
 	unsigned image_size = gridDim.y;
+	unsigned tid = threadIdx.x;
 
 	//TODO Consider Mresol_fine to speed this kernel
 
-	__shared__ double s_wdiff2[PIXELWISE_BLOCK_SIZE];
-	__shared__ double s_weight[PIXELWISE_BLOCK_SIZE];
-	__shared__ double s_real[PIXELWISE_BLOCK_SIZE];
-	__shared__ double s_imag[PIXELWISE_BLOCK_SIZE];
+	__shared__ double s_wdiff2[TRANSWISE_BLOCK_SIZE];
+	__shared__ double s_weight[TRANSWISE_BLOCK_SIZE];
+	__shared__ double s_real[TRANSWISE_BLOCK_SIZE];
+	__shared__ double s_imag[TRANSWISE_BLOCK_SIZE];
 
-	s_wdiff2[threadIdx.x] = 0;
-	s_weight[threadIdx.x] = 0;
-	s_real[threadIdx.x] = 0;
-	s_imag[threadIdx.x] = 0;
+	s_wdiff2[tid] = 0;
+	s_weight[tid] = 0;
+	s_real[tid] = 0;
+	s_imag[tid] = 0;
 
-	unsigned pass_num(ceilf((float)translation_num/(float)PIXELWISE_BLOCK_SIZE)),translation;
+	unsigned pass_num(ceilf((float)translation_num/(float)TRANSWISE_BLOCK_SIZE)),translation;
 
 	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		translation = pass * PIXELWISE_BLOCK_SIZE + threadIdx.x;
+		translation = pass * TRANSWISE_BLOCK_SIZE + tid;
 
 		if (translation < translation_num)
 		{
-			double weight = g_weights[otientation * translation_num + translation] / weight_norm;
-			unsigned long ref_pixel_idx = otientation * image_size + pixel;
-			unsigned long img_pixel_idx = translation * image_size + pixel;
+			double weight = g_weights[otientation * translation_num + translation];
 
-		    double diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
-			double diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
-			double wdiff2 = weight * (diff_real*diff_real + diff_imag*diff_imag);
+			if (weight >= significant_weight)
+			{
+				weight /= weight_norm;
 
-			s_wdiff2[threadIdx.x] += wdiff2;
+				unsigned long ref_pixel_idx = otientation * image_size + pixel;
+				unsigned long img_pixel_idx = translation * image_size + pixel;
 
-			double myctf = g_ctfs[pixel];
-			double weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
+				double diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
+				double diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
+				double wdiff2 = weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-			s_real[threadIdx.x] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
-			s_imag[threadIdx.x] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
+				s_wdiff2[tid] += wdiff2;
 
-			s_weight[threadIdx.x] += weightxinvsigma2 * myctf;
+				double myctf = g_ctfs[pixel];
+				double weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
+
+				s_real[tid] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
+				s_imag[tid] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
+
+				s_weight[tid] += weightxinvsigma2 * myctf;
+			}
 		}
 	}
 
@@ -672,34 +678,34 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 
 	//TODO Yeah, lets actually use the GPU! Following four sums should be done as a parallel reduction.
 
-	if (threadIdx.x == 0)
+	if (tid == 0)
 	{
 		double sum(0);
-		for (unsigned i = 0; i < PIXELWISE_BLOCK_SIZE; i++)
+		for (unsigned i = 0; i < TRANSWISE_BLOCK_SIZE; i++)
 			sum += s_weight[i];
 
 		g_Fweights[otientation * image_size + pixel] += sum;
 	}
-	else if (threadIdx.x == 1)
+	else if (tid == 1)
 	{
 		double sum(0);
-		for (unsigned i = 0; i < PIXELWISE_BLOCK_SIZE; i++)
+		for (unsigned i = 0; i < TRANSWISE_BLOCK_SIZE; i++)
 			sum += s_real[i];
 
 		g_wavgs[otientation * image_size + pixel].real += sum;
 	}
-	else if (threadIdx.x == 2)
+	else if (tid == 2)
 	{
 		double sum(0);
-		for (unsigned i = 0; i < PIXELWISE_BLOCK_SIZE; i++)
+		for (unsigned i = 0; i < TRANSWISE_BLOCK_SIZE; i++)
 			sum += s_imag[i];
 
 		g_wavgs[otientation * image_size + pixel].imag += sum;
 	}
-	else if (threadIdx.x == 3)
+	else if (tid == 3)
 	{
 		double sum(0);
-		for (unsigned i = 0; i < PIXELWISE_BLOCK_SIZE; i++)
+		for (unsigned i = 0; i < TRANSWISE_BLOCK_SIZE; i++)
 			sum += s_wdiff2[i];
 
 		g_wdiff2s_parts[otientation * image_size + pixel] = sum;
@@ -1006,6 +1012,10 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 					            KERNEL CALL
 			======================================================*/
 
+			for (int l = 0; l < translation_num; l++)
+				std::cerr << DIRECT_A2D_ELEM(exp_Mweight, ipart, l) << std::endl;
+			exit(0);
+
 			double *d_weights(0);
 			// TODO Is class_size = exp_Mweight.xdim?
 			HANDLE_ERROR(cudaMalloc( (void**) &d_weights, class_size * sizeof(double)));
@@ -1028,15 +1038,31 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			dim3 block_dim(orientation_num, Frefs.xy);
 			std::cerr << "cuda_kernel_wavg<<<" << block_dim.x << "," << block_dim.y << ">>>" << std::endl;
-			cuda_kernel_wavg<<<block_dim,PIXELWISE_BLOCK_SIZE>>>(
+
+			float time;
+			cudaEvent_t start, stop;
+			cudaEventCreate(&start);
+			cudaEventCreate(&stop);
+			cudaEventRecord(start, 0);
+
+			cuda_kernel_wavg<<<block_dim,TRANSWISE_BLOCK_SIZE>>>(
 												d_Frefs, d_Fimgs, d_Fimgs_nomask,		//INPUT
 												d_weights, d_ctfs, d_Minvsigma2s,		//INPUT
 												d_wdiff2s_parts, d_wavgs, d_Fweights,	//OUTPUT
-												translation_num, exp_sum_weight[ipart]	//CONTANTS
+												translation_num, exp_sum_weight[ipart],	//CONTANTS
+												exp_significant_weight[ipart]
 												);
 
 			HANDLE_ERROR(cudaDeviceSynchronize());
 			std::cerr << "cuda_kernel_wavg DONE!" << std::endl;
+
+
+			cudaEventRecord(stop, 0);
+			cudaEventSynchronize(stop);
+			cudaEventElapsedTime(&time, start, stop);
+			cudaEventDestroy(start);
+			cudaEventDestroy(stop);
+			std::cerr << "It took "<< time <<" msecs."<< std::endl;
 
 
 			cudaFree(d_Fimgs);
@@ -1183,6 +1209,13 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			Fweight.data = Fweights + i * Frefs.xy;
 
 
+			std::ofstream myfile;
+			std::string fnm = std::string("out_fweight_gpu.dat");
+			myfile.open(fnm.c_str(), std::ios_base::app);
+			for (int l = 0; l < Frefs.xy; l++)
+				myfile << Fweights[i * Frefs.xy + l] << std::endl;
+			myfile.close();
+			exit(0);
 
 //			Image<double> tt;
 //			tt().resize(exp_current_image_size, exp_current_image_size);
