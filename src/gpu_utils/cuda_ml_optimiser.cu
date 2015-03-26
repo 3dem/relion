@@ -502,10 +502,12 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				int *d_rotidx(0);
 				HANDLE_ERROR(cudaMalloc( (void**) &d_rotidx, significant_num * sizeof(int)));
 				HANDLE_ERROR(cudaMemcpy( d_rotidx, &rotidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
+				rotidx.clear();
 
 				int *d_transidx(0);
 				HANDLE_ERROR(cudaMalloc( (void**) &d_transidx, significant_num * sizeof(int)));
 				HANDLE_ERROR(cudaMemcpy( d_transidx, &transidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
+				transidx.clear();
 
 				/*====================================
 				    		Kernel Calls
@@ -609,6 +611,10 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				cudaFree(d_Fimgs);
 				cudaFree(d_diff2s);
+
+				cudaFree(d_transidx);
+				cudaFree(d_rotidx);
+
 				delete [] diff2s;
 
 			} // end loop ipart
