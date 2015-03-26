@@ -2173,7 +2173,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 //
 //		if(fabs(diff2-2502.16)<0.01)
 //		{
-      		exit(0);
+//      		exit(0);
 //		}
 //		else
 //		{
