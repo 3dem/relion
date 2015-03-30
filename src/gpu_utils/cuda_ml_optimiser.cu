@@ -669,7 +669,7 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 									const unsigned translation_num, const double weight_norm)
 {
 
-	unsigned iorient = blockIdx.x;
+	unsigned iorient = blockIdx.y*gridDim.x + blockIdx.x ;
 	int pass_num = ceilf((float)image_size/(float)PAIRWISE_BLOCK_SIZE);
 
 	__shared__ double s_real[PAIRWISE_BLOCK_SIZE];
@@ -1052,7 +1052,19 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			cudaEventCreate(&start);
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
-			dim3 block_dim(orientation_num, 1); //Frefs.xy);
+
+			short int orient1, orient2;
+			if(orientation_num>65535)
+			{
+				orient1 = ceil(sqrt(orientation_num));
+				orient2 = orient1;
+			}
+			else
+			{
+				orient1 = orientation_num;
+				orient2 = 1;
+			}
+			dim3 block_dim(orient1,orient2);
 			std::cerr << "cuda_kernel_wavg<<<" << block_dim.x << "," << block_dim.y << ">>>" << std::endl;
 			cuda_kernel_wavg<<<block_dim,PAIRWISE_BLOCK_SIZE>>>(
 												d_Frefs, d_Fimgs, d_Fimgs_nomask,		//INPUT
