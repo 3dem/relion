@@ -465,14 +465,14 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				/*====================================
 				   Initiate Particle Related On GPU
 				======================================*/
-				std::cerr << "-----------------Before moving stuff to GPU (GSD): " << std::endl;
-				size_t avail;
-				size_t total;
-				cudaMemGetInfo( &avail, &total );
-				size_t used = total - avail;
-				std::cerr << "Device memory used: " << used << std::endl;
-				std::cerr << "Of total          : " << total << std::endl;
-				std::cerr << "(Free)            : " << avail << std::endl;
+//				std::cerr << "-----------------Before moving stuff to GPU (GSD): " << std::endl;
+//				size_t avail;
+//				size_t total;
+//				cudaMemGetInfo( &avail, &total );
+//				size_t used = total - avail;
+//				std::cerr << "Device memory used: " << used << std::endl;
+//				std::cerr << "Of total          : " << total << std::endl;
+//				std::cerr << "(Free)            : " << avail << std::endl;
 				//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
 				if (do_ctf_correction && refs_are_ctf_corrected)
 				{
@@ -502,43 +502,43 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				HANDLE_ERROR(cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy * sizeof(double)));
 				HANDLE_ERROR(cudaMemcpy( d_Minvsigma2, exp_local_Minvsigma2s[ipart].data, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
-				last_size=used;
-				cudaMemGetInfo( &avail, &total );
-				used = total - avail;
-				std::cerr << "----d_Minvsigma2 takes: " << used-last_size << std::endl;
+//				last_size=used;
+//				cudaMemGetInfo( &avail, &total );
+//				used = total - avail;
+//				std::cerr << "----d_Minvsigma2 takes: " << used-last_size << std::endl;
 
 				double *d_diff2s(0);
 				HANDLE_ERROR(cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num * sizeof(double)));
 				//HANDLE_ERROR(cudaMemset(d_diff2s, exp_highres_Xi2_imgs[ipart] / 2., orientation_num*translation_num * sizeof(double))); //Initiate diff2 values with zeros
-				last_size=used;
-				cudaMemGetInfo( &avail, &total );
-				used = total - avail;
-				std::cerr << "----d_diff2s takes: " << used-last_size << std::endl;
+//				last_size=used;
+//				cudaMemGetInfo( &avail, &total );
+//				used = total - avail;
+//				std::cerr << "----d_diff2s takes: " << used-last_size << std::endl;
 
 				int *d_rotidx(0);
 				HANDLE_ERROR(cudaMalloc( (void**) &d_rotidx, significant_num * sizeof(int)));
 				HANDLE_ERROR(cudaMemcpy( d_rotidx, &rotidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
 				rotidx.clear();
-				last_size=used;
-				cudaMemGetInfo( &avail, &total );
-				used = total - avail;
-				std::cerr << "----d_rotidx takes: " << used-last_size << std::endl;
+//				last_size=used;
+//				cudaMemGetInfo( &avail, &total );
+//				used = total - avail;
+//				std::cerr << "----d_rotidx takes: " << used-last_size << std::endl;
 
 				int *d_transidx(0);
 				HANDLE_ERROR(cudaMalloc( (void**) &d_transidx, significant_num * sizeof(int)));
 				HANDLE_ERROR(cudaMemcpy( d_transidx, &transidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
 				transidx.clear();
-				last_size=used;
-				cudaMemGetInfo( &avail, &total );
-				used = total - avail;
-				std::cerr << "----d_transidx takes: " << used-last_size << std::endl;
-
-				std::cerr << "-----------------After moving stuff to GPU (GSD): "<< std::endl;
-				cudaMemGetInfo( &avail, &total );
-				used = total - avail;
-				std::cerr << "Device memory used: " << used << std::endl;
-				std::cerr << "Of total          : " << total << std::endl;
-				std::cerr << "(Free)            : " << avail << std::endl;
+//				last_size=used;
+//				cudaMemGetInfo( &avail, &total );
+//				used = total - avail;
+//				std::cerr << "----d_transidx takes: " << used-last_size << std::endl;
+//
+//				std::cerr << "-----------------After moving stuff to GPU (GSD): "<< std::endl;
+//				cudaMemGetInfo( &avail, &total );
+//				used = total - avail;
+//				std::cerr << "Device memory used: " << used << std::endl;
+//				std::cerr << "Of total          : " << total << std::endl;
+//				std::cerr << "(Free)            : " << avail << std::endl;
 
 				/*====================================
 				    		Kernel Calls
@@ -648,12 +648,12 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				delete [] diff2s;
 
-				std::cerr << "-----------------After freeing stuff from GPU (GSD): "<< std::endl;
-				cudaMemGetInfo( &avail, &total );
-				used = total - avail;
-				std::cerr << "Device memory used: " << used << std::endl;
-				std::cerr << "Of total          : " << total << std::endl;
-				std::cerr << "(Free)            : " << avail << std::endl;
+//				std::cerr << "-----------------After freeing stuff from GPU (GSD): "<< std::endl;
+//				cudaMemGetInfo( &avail, &total );
+//				used = total - avail;
+//				std::cerr << "Device memory used: " << used << std::endl;
+//				std::cerr << "Of total          : " << total << std::endl;
+//				std::cerr << "(Free)            : " << avail << std::endl;
 
 			} // end loop ipart
 
@@ -664,88 +664,53 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 }
 
 __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
-									double* g_weights, double* g_ctfs, double* g_Minvsigma2s,
+									double* g_weights, double* g_ctfs, double* g_Minvsigma2s, int image_size,
 									double *g_wdiff2s_parts, CudaComplex *g_wavgs, double* g_Fweights,
 									const unsigned translation_num, const double weight_norm)
 {
-	unsigned otientation = blockIdx.x;
-	unsigned pixel = blockIdx.y;
-	unsigned image_size = gridDim.y;
 
-	//TODO Consider Mresol_fine to speed this kernel
+	unsigned iorient = blockIdx.x;
+	int pass_num = ceilf((float)image_size/(float)PAIRWISE_BLOCK_SIZE);
 
-	__shared__ double s_wdiff2[PIXELWISE_BLOCK_SIZE];
-	__shared__ double s_weight[PIXELWISE_BLOCK_SIZE];
-	__shared__ double s_real[PIXELWISE_BLOCK_SIZE];
-	__shared__ double s_imag[PIXELWISE_BLOCK_SIZE];
+	__shared__ double s_real[PAIRWISE_BLOCK_SIZE];
+	__shared__ double s_imag[PAIRWISE_BLOCK_SIZE];
 
-	s_wdiff2[threadIdx.x] = 0;
-	s_weight[threadIdx.x] = 0;
-	s_real[threadIdx.x] = 0;
-	s_imag[threadIdx.x] = 0;
+	__shared__ double s_wdiff2[PAIRWISE_BLOCK_SIZE];
+	__shared__ double s_weight[PAIRWISE_BLOCK_SIZE];
 
-	unsigned pass_num(ceilf((float)translation_num/(float)PIXELWISE_BLOCK_SIZE)),translation;
-
-	for (unsigned pass = 0; pass < pass_num; pass ++)
+	for(int ipass=0; ipass<pass_num; ipass++) // go through all necessary passes to cover a projection
 	{
-		translation = pass * PIXELWISE_BLOCK_SIZE + threadIdx.x;
-
-		if (translation < translation_num)
+		int pixel = ipass*PAIRWISE_BLOCK_SIZE + threadIdx.x;
+		if(pixel<image_size)
 		{
-			double weight = g_weights[otientation * translation_num + translation] / weight_norm;
-			unsigned long ref_pixel_idx = otientation * image_size + pixel;
-			unsigned long img_pixel_idx = translation * image_size + pixel;
+			unsigned long ref_pixel_idx = iorient * image_size + pixel;
+			double ref_real = g_refs[ref_pixel_idx].real;
+			double ref_imag = g_refs[ref_pixel_idx].imag;
 
-		    double diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
-			double diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
-			double wdiff2 = weight * (diff_real*diff_real + diff_imag*diff_imag);
+			for(int itrans=0; itrans>translation_num; itrans++) // do the same pixels for all translations
+			{
+				double weight = g_weights[iorient * translation_num + itrans] / weight_norm;
 
-			s_wdiff2[threadIdx.x] += wdiff2;
+				unsigned long img_pixel_idx = itrans  * image_size + pixel;
+				double diff_real = ref_real * g_imgs[img_pixel_idx].real;
+				double diff_imag = ref_imag * g_imgs[img_pixel_idx].imag;
+				s_wdiff2[threadIdx.x] += weight * (diff_real+diff_imag);
 
-			double myctf = g_ctfs[pixel];
-			double weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
+				double myctf = g_ctfs[pixel];
+				double weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
 
-			s_real[threadIdx.x] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
-			s_imag[threadIdx.x] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
+				s_real[threadIdx.x] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
+				s_imag[threadIdx.x] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
 
-			s_weight[threadIdx.x] += weightxinvsigma2 * myctf;
+				s_weight[threadIdx.x] += weightxinvsigma2 * myctf;
+			}
+			g_Fweights[iorient * image_size + pixel]     = s_weight[threadIdx.x];
+			g_wavgs[iorient * image_size + pixel].real   = s_real[threadIdx.x];
+			g_wavgs[iorient * image_size + pixel].imag   = s_imag[threadIdx.x];
+			g_wdiff2s_parts[iorient * image_size + pixel] = s_wdiff2[threadIdx.x];
 		}
 	}
 
-	__syncthreads();
-	int trads = 32;
-	int itr = PIXELWISE_BLOCK_SIZE/trads;
-	//TODO More could probably be done, but this is twisce as fast as before anyway.
-
-	if(itr>1 && threadIdx.x<trads)
-	{
-		for(int i=1; i<itr; i++)
-		{
-			s_weight[threadIdx.x] += s_weight[i*trads + threadIdx.x];
-			s_real[threadIdx.x]   += s_real[i*trads + threadIdx.x];
-			s_imag[threadIdx.x]   += s_imag[i*trads + threadIdx.x];
-			s_wdiff2[threadIdx.x] += s_wdiff2[i*trads + threadIdx.x];
-			//__syncthreads();
-		}
-	}
-
-	for(int j=(trads/2); j>0; j/=2)
-	{
-		if(threadIdx.x<j)
-		{
-			s_weight[threadIdx.x] += s_weight[threadIdx.x+j];
-			s_real[threadIdx.x]   += s_real[threadIdx.x+j];
-			s_imag[threadIdx.x]   += s_imag[threadIdx.x+j];
-			s_wdiff2[threadIdx.x] += s_wdiff2[threadIdx.x+j];
-		}
-	}
-	__syncthreads();
-	{
-		g_Fweights[otientation * image_size + pixel]     += s_weight[0];
-		g_wavgs[otientation * image_size + pixel].real   += s_real[0];
-		g_wavgs[otientation * image_size + pixel].imag   += s_imag[0];
-		g_wdiff2s_parts[otientation * image_size + pixel] = s_wdiff2[0];
-	}
 }
 
 void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
@@ -947,16 +912,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		}
 		Fref.data = FrefBag; //TODO fix this
 
-		std::cerr << "---Before Intermediate (STWS): " << std::endl;
-		size_t avail2;
-		size_t total2;
-		cudaMemGetInfo( &avail2, &total2 );
-		size_t used2 = total2 - avail2;
-		std::cerr << "Device memory used: " << used2 << std::endl;
-		std::cerr << "Of total          : " << total2 << std::endl;
-		std::cerr << "(Free)            : " << avail2 << std::endl;
-
-
 		CudaComplex *d_Frefs = Frefs.data_to_device();
 
 		CudaComplex *d_wavgs(0); //Weighted image averages for each projection
@@ -967,12 +922,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		HANDLE_ERROR(cudaMalloc( (void**) &d_Fweights, orientation_num * Frefs.xy * sizeof(double)));
 		HANDLE_ERROR(cudaMemset(d_Fweights, 0, orientation_num * Frefs.xy * sizeof(double))); //Initiate zeros
 
-		std::cerr << "---After Intermediate (STWS): " << std::endl;
-		cudaMemGetInfo( &avail2, &total2 );
-		used2 = total2 - avail2;
-		std::cerr << "Device memory used: " << used2 << std::endl;
-		std::cerr << "Of total          : " << total2 << std::endl;
-		std::cerr << "(Free)            : " << avail2 << std::endl;
 
 		/*=======================================================================================
 										  PARTICLE ITERATION
@@ -1063,14 +1012,14 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			/*======================================================
 					            KERNEL CALL
 			======================================================*/
-			std::cerr << "-----------------Before moving stuff to GPU (STWS): " << std::endl;
-			size_t avail;
-			size_t total;
-			cudaMemGetInfo( &avail, &total );
-			size_t used = total - avail;
-			std::cerr << "Device memory used: " << used << std::endl;
-			std::cerr << "Of total          : " << total << std::endl;
-			std::cerr << "(Free)            : " << avail << std::endl;
+//			std::cerr << "-----------------Before moving stuff to GPU (STWS): " << std::endl;
+//			size_t avail;
+//			size_t total;
+//			cudaMemGetInfo( &avail, &total );
+//			size_t used = total - avail;
+//			std::cerr << "Device memory used: " << used << std::endl;
+//			std::cerr << "Of total          : " << total << std::endl;
+//			std::cerr << "(Free)            : " << avail << std::endl;
 			double *d_weights(0);
 			// TODO Is class_size = exp_Mweight.xdim?
 			HANDLE_ERROR(cudaMalloc( (void**) &d_weights, class_size * sizeof(double)));
@@ -1091,30 +1040,30 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			HANDLE_ERROR(cudaMemcpy( d_Minvsigma2s, exp_local_Minvsigma2s[ipart].data,
 					Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
 
-			std::cerr << "-----------------After moving stuff to GPU (STWS): " << std::endl;
-			cudaMemGetInfo( &avail, &total );
-			used = total - avail;
-			std::cerr << "Device memory used: " << used << std::endl;
-			std::cerr << "Of total          : " << total << std::endl;
-			std::cerr << "(Free)            : " << avail << std::endl;
+//			std::cerr << "-----------------After moving stuff to GPU (STWS): " << std::endl;
+//			cudaMemGetInfo( &avail, &total );
+//			used = total - avail;
+//			std::cerr << "Device memory used: " << used << std::endl;
+//			std::cerr << "Of total          : " << total << std::endl;
+//			std::cerr << "(Free)            : " << avail << std::endl;
+
 			cudaEvent_t start, stop;
 			float time;
 			cudaEventCreate(&start);
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
-
-			dim3 block_dim(orientation_num, Frefs.xy);
+			dim3 block_dim(orientation_num, 1); //Frefs.xy);
 			std::cerr << "cuda_kernel_wavg<<<" << block_dim.x << "," << block_dim.y << ">>>" << std::endl;
-			cuda_kernel_wavg<<<block_dim,PIXELWISE_BLOCK_SIZE>>>(
+			cuda_kernel_wavg<<<block_dim,PAIRWISE_BLOCK_SIZE>>>(
 												d_Frefs, d_Fimgs, d_Fimgs_nomask,		//INPUT
 												d_weights, d_ctfs, d_Minvsigma2s,		//INPUT
+												Frefs.xy,						        //INPUT (image size)
 												d_wdiff2s_parts, d_wavgs, d_Fweights,	//OUTPUT
 												translation_num, exp_sum_weight[ipart]	//CONTANTS
 												);
 
 			HANDLE_ERROR(cudaDeviceSynchronize());
 			std::cerr << "cuda_kernel_wavg DONE!" << std::endl;
-
 			cudaEventRecord(stop, 0);
 			cudaEventSynchronize(stop);
 			cudaEventElapsedTime(&time, start, stop);
@@ -1237,12 +1186,12 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			}
 
 
-			std::cerr << "-----------------After freeing stuff from GPU (STWS): "<< std::endl;
-			cudaMemGetInfo( &avail, &total );
-			used = total - avail;
-			std::cerr << "Device memory used: " << used << std::endl;
-			std::cerr << "Of total          : " << total << std::endl;
-			std::cerr << "(Free)            : " << avail << std::endl;
+//			std::cerr << "-----------------After freeing stuff from GPU (STWS): "<< std::endl;
+//			cudaMemGetInfo( &avail, &total );
+//			used = total - avail;
+//			std::cerr << "Device memory used: " << used << std::endl;
+//			std::cerr << "Of total          : " << total << std::endl;
+//			std::cerr << "(Free)            : " << avail << std::endl;
 
 		} // end loop ipart
 
