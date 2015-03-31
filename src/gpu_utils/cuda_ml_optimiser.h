@@ -163,7 +163,8 @@ public:
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
 			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2);
+			std::vector<double> &exp_local_sqrtXi2
+		);
 
 	void precalculateShiftedImagesCtfsAndInvSigma2s(
 			bool do_also_unmasked,

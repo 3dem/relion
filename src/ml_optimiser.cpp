@@ -2082,6 +2082,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 
 		if (do_gpu)
 		{
+
 			MlOptimiserCUDA cuda_optimus_prim(*this); //TODO This should of course be called once per reference iteration
 
 			cuda_optimus_prim.getAllSquaredDifferences(
@@ -2173,7 +2174,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 //
 //		if(fabs(diff2-2502.16)<0.01)
 //		{
-      		exit(0);
+//      		exit(0);
 //		}
 //		else
 //		{
@@ -2249,54 +2250,54 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 	}
 
-//#ifdef RELION_TESTING
-//		std::string mode;
-//		if (do_gpu)
-//		{
-//			mode="gpu";
-//		}
-//		else
-//		{
-//			mode="cpu";
-//		}
-//		std::cerr << " "<< std::endl;
-//		std::cerr << " finished running diffs in  " << mode << " mode."<< std::endl;
-//		Image<double> tt;
-//		tt().resize(exp_current_image_size, exp_current_image_size);
-//
-//		MultidimArray<Complex> Fimg1;
-//
-//		Fimg1 = exp_local_Fimgs_shifted[0];
-//		FourierTransformer transformer;
-//		transformer.inverseFourierTransform(Fimg1, tt());
-//		CenterFFT(tt(),false);
-//		std::string fnm = mode + std::string("_out_shifted_image.mrc");
-//		tt.write(fnm);
-//
-//		fnm = mode + std::string("_out_10k_diff2s.txt");
-//		char *text = &fnm[0];
-//		freopen(text,"w",stdout);
-//		// Write the first 10k diffs to be sure
-//		for(int n=0; n<10000; n++)
-//		{
-//			//std::cout << DIRECT_MULTIDIM_ELEM(exp_Mweight, n) << std::endl;
-//			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n));
-//		}
-//
-//		fnm = mode + std::string("_out_dLL.txt");
-//		text = &fnm[0];
-//		freopen(text,"w",stdout);
-//		// Write the first 10k diffs to be sure
-//		for(int n=0; n<mydata.ori_particles[my_ori_particle].particles_id.size(); n++)
-//		{
-//			printf("%4.4f \n",DIRECT_A2D_ELEM(exp_metadata, metadata_offset + n, METADATA_DLL) );
-//		}
-//		//For tests we want to exit now
-//		//if(iter == 2)
-//			exit(0);
-//
-//
-//#endif
+#ifdef RELION_TESTING
+		std::string mode;
+		if (do_gpu)
+		{
+			mode="gpu";
+		}
+		else
+		{
+			mode="cpu";
+		}
+		std::cerr << " "<< std::endl;
+		std::cerr << " finished running diffs in  " << mode << " mode."<< std::endl;
+		Image<double> tt;
+		tt().resize(exp_current_image_size, exp_current_image_size);
+
+		MultidimArray<Complex> Fimg1;
+
+		Fimg1 = exp_local_Fimgs_shifted[0];
+		FourierTransformer transformer;
+		transformer.inverseFourierTransform(Fimg1, tt());
+		CenterFFT(tt(),false);
+		std::string fnm = mode + std::string("_out_shifted_image.mrc");
+		tt.write(fnm);
+
+		fnm = mode + std::string("_out_10k_weights.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		// Write the first 10k diffs to be sure
+		for(int n=0; n<10000; n++)
+		{
+			//std::cout << DIRECT_MULTIDIM_ELEM(exp_Mweight, n) << std::endl;
+			printf("%4.8f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n));
+		}
+
+		fnm = mode + std::string("_out_dLL.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		// Write the first 10k diffs to be sure
+		for(int n=0; n<mydata.ori_particles[my_ori_particle].particles_id.size(); n++)
+		{
+			printf("%4.4f \n",DIRECT_A2D_ELEM(exp_metadata, metadata_offset + n, METADATA_DLL) );
+		}
+		//For tests we want to exit now
+		//if(iter == 2)
+			exit(0);
+
+
+#endif
 
 #ifdef DEBUG_ESP_MEM
 	if (thread_id==0)
