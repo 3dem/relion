@@ -32,8 +32,7 @@ add_test(NAME CPU-3Dc_produce_data
         --j 1 
         --memory_per_thread 4 
         --random_seed 1993
-        --onthefly_shifts
-        --scale)     
+        --onthefly_shifts)     
 SET_TESTS_PROPERTIES(CPU-3Dc_produce_data PROPERTIES DEPENDS deleting_old_files)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_shifted_image

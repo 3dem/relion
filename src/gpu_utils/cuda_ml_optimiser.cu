@@ -6,6 +6,7 @@
 #include <iostream>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_img_operations.h"
+#include "src/gpu_utils/cuda_utils.cuh"
 #include "src/complex.h"
 #include <fstream>
 #include <cuda.h>
@@ -16,17 +17,6 @@
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static void HandleError( cudaError_t err,
-                         const char *file,
-                         int line ) {
-    if (err != cudaSuccess) {
-        printf( "CUDA ERROR: %s in %s at line %d\n", cudaGetErrorString( err ),
-                file, line );
-        exit( EXIT_FAILURE );
-    }
-}
-#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
 class CudaComplex
 {
@@ -759,9 +749,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 //	}
 //}
 
-__global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
+__global__ void cuda_kernel_wavg(	Complex *g_refs, Complex *g_imgs, Complex *g_imgs_nomask,
 									double* g_weights, double* g_ctfs, double* g_Minvsigma2s,
-									double *g_wdiff2s_parts, CudaComplex *g_wavgs, double* g_Fweights,
+									double *g_wdiff2s_parts, Complex *g_wavgs, double* g_Fweights,
 									const unsigned translation_num, const double weight_norm,
 									const double significant_weight, const unsigned image_size)
 {
@@ -886,11 +876,19 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 	std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
 	std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	Matrix2D<double> A;
-	MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift, Fimg_otfshift_nomask;
-	MultidimArray<double> Minvsigma2, Mctf, Fweight;
+	MultidimArray<Complex > Frefctf, Fimg_otfshift, Fimg_otfshift_nomask;
+	MultidimArray<double> Minvsigma2, Mctf;
 	bool have_warned_small_scale = false;
-	// Initialising... exp_Fimgs[0] has mymodel.current_size (not coarse_size!)
-	Fref.resize(exp_Fimgs[0]);
+
+	MultidimArray<Complex > Fref( exp_Fimgs[0].ndim, exp_Fimgs[0].zdim, exp_Fimgs[0].ydim, exp_Fimgs[0].xdim);
+	Fref.destroyData = false;
+
+	MultidimArray<Complex > Fimg( exp_Fimgs[0].ndim, exp_Fimgs[0].zdim, exp_Fimgs[0].ydim, exp_Fimgs[0].xdim);
+	Fimg.destroyData = false;
+
+	MultidimArray<double > Fweight( exp_Fimgs[0].ndim, exp_Fimgs[0].zdim, exp_Fimgs[0].ydim, exp_Fimgs[0].xdim);
+	Fweight.destroyData = false;
+
 	Frefctf.resize(exp_Fimgs[0]);
 	// Initialise Mctf to all-1 for if !do_ctf_corection
 	Mctf.resize(exp_Fimgs[0]);
@@ -928,34 +926,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 	// wsum_sigma2_offset is just a double
 	thr_wsum_sigma2_offset = 0.;
 
-
-
-
-	/*
-	This should be helpful:
-
-	ihidden_over =
-	iclass * exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans +
-	idir *                exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans +
-	ipsi *                             exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans +
-	iover_rot *                                                 exp_nr_trans * exp_nr_oversampled_trans +
-	itrans *                                                                   exp_nr_oversampled_trans +
-	iover_trans
-	*/
-
-	unsigned long class_size = exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans;
-//	unsigned long dir_size =                exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans;
-//	unsigned long psi_size =                             exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans;
-//	unsigned long over_rot_size =                                                 exp_nr_trans * exp_nr_oversampled_trans;
-//	unsigned long trans_size =                                                                   exp_nr_oversampled_trans;
-
-	/*
-	Inverse map:
-	iclass = ihidden_over / class_size
-	idir =   ihidden_over / class_size
-	ipsi =   ihidden_over / psi_size
-	...
-	*/
+	unsigned image_size = exp_local_Minvsigma2s[0].xdim*exp_local_Minvsigma2s[0].ydim;
 
 	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
@@ -968,13 +939,11 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		=======================================================================================*/
 
 
-		CudaImages Frefs(exp_local_Minvsigma2s[0].xdim, exp_local_Minvsigma2s[0].ydim, exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot);
+		CudaGlobalPtr<Complex> Frefs(image_size * exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot);
 
 		std::vector< long unsigned > iorientclasses, idirs, iover_rots;
 		std::vector< double > rots, tilts, psis;
 		long unsigned orientation_num(0);
-
-		Complex* FrefBag = Fref.data; //TODO fix this
 
 		for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 		{
@@ -999,10 +968,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 						tilts.push_back(tilt);
 						psis.push_back(psi);
 
-						Fref.data = (Complex*) Frefs.current();
+						Fref.data = &Frefs[image_size * orientation_num];
 						(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
-
-						Frefs.increment();
 
 						orientation_num ++;
 						idirs.push_back(idir);
@@ -1012,17 +979,18 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 				}
 			}
 		}
-		Fref.data = FrefBag; //TODO fix this
 
-		CudaComplex *d_Frefs = Frefs.data_to_device();
+		Frefs.device_alloc();
+		Frefs.cp_to_device();
+		Frefs.free_host();
 
-		CudaComplex *d_wavgs(0); //Weighted image averages for each projection
-		HANDLE_ERROR(cudaMalloc( (void**) &d_wavgs, orientation_num * Frefs.xy * sizeof(CudaComplex)));
-		HANDLE_ERROR(cudaMemset(d_wavgs, 0, orientation_num * Frefs.xy * sizeof(CudaComplex))); //Initiate zeros
+		CudaGlobalPtr<Complex> wavgs(orientation_num * image_size);
+		wavgs.device_alloc();
+		//wavgs.device_init(0);
 
-		double *d_Fweights(0);
-		HANDLE_ERROR(cudaMalloc( (void**) &d_Fweights, orientation_num * Frefs.xy * sizeof(double)));
-		//HANDLE_ERROR(cudaMemset(d_Fweights, 0, orientation_num * Frefs.xy * sizeof(double))); //Initiate zeros
+		CudaGlobalPtr<double> Fweights(orientation_num * image_size);
+		Fweights.device_alloc();
+		//Fweights.device_init(0);
 
 
 		/*=======================================================================================
@@ -1061,8 +1029,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 								 TRANSLATIONS
 			======================================================*/
 
-			CudaImages Fimgs(Frefs.x, Frefs.y, exp_nr_trans * exp_nr_oversampled_trans);
-			CudaImages Fimgs_nomask(Frefs.x, Frefs.y, exp_nr_trans * exp_nr_oversampled_trans);
+			CudaGlobalPtr<Complex> Fimgs(image_size * exp_nr_trans * exp_nr_oversampled_trans);
+			CudaGlobalPtr<Complex> Fimgs_nomask(Fimgs.sz);
 
 			long unsigned translation_num(0), ihidden(0);
 			std::vector< long unsigned > iover_transes, itranses, ihiddens;
@@ -1087,18 +1055,15 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 								- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
 						double imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
 								+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-						*(Fimgs.current() + n) = CudaComplex(real, imag);
+						Fimgs[translation_num * image_size + n] = Complex(real, imag);
 
 						// Fimg_shift_nomask
 						real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real
 								- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag;
 						imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag
 								+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real;
-						*(Fimgs_nomask.current() + n) = CudaComplex(real, imag);
+						Fimgs_nomask[translation_num * image_size + n] = Complex(real, imag);
 					}
-
-					Fimgs.increment();
-					Fimgs_nomask.increment();
 
 					translation_num ++;
 
@@ -1108,26 +1073,29 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 				}
 			}
 
-			CudaComplex *d_Fimgs = Fimgs.data_to_device();
-			CudaComplex *d_Fimgs_nomask = Fimgs_nomask.data_to_device();
+			Fimgs.device_alloc();
+			Fimgs.cp_to_device();
+			Fimgs_nomask.device_alloc();
+			Fimgs_nomask.cp_to_device();
 
 
 			/*======================================================
 					            MAP WEIGHTS
 			======================================================*/
 
-			double *sorted_weights = new double[orientation_num * translation_num];
+			CudaGlobalPtr<double> sorted_weights(orientation_num * translation_num);
 
-			for (int i = 0; i < orientation_num; i++)
+			for (unsigned i = 0; i < orientation_num; i++)
 			{
-				long int iover_rot = iover_rots[i];
-				for (int j = 0; j < translation_num; j++)
+				long unsigned iover_rot = iover_rots[i];
+				for (unsigned j = 0; j < translation_num; j++)
 				{
-					long int iover_trans = iover_transes[j];
-					long int ihidden = iorientclasses[i] * exp_nr_trans + ihiddens[j];
-					long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden,
+					long unsigned iover_trans = iover_transes[j];
+					long unsigned ihidden = iorientclasses[i] * exp_nr_trans + ihiddens[j];
+					long unsigned ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden,
 											  exp_current_oversampling, iover_rot, iover_trans);
-					sorted_weights[i * translation_num + j] = DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over);
+					sorted_weights[(long unsigned) i * translation_num + j] =
+							DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over);
 				}
 			}
 
@@ -1135,39 +1103,25 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			/*======================================================
 					            KERNEL CALL
 			======================================================*/
-//			std::cerr << "-----------------Before moving stuff to GPU (STWS): " << std::endl;
-//			size_t avail;
-//			size_t total;
-//			cudaMemGetInfo( &avail, &total );
-//			size_t used = total - avail;
-//			std::cerr << "Device memory used: " << used << std::endl;
-//			std::cerr << "Of total          : " << total << std::endl;
-//			std::cerr << "(Free)            : " << avail << std::endl;
+#ifdef DEBUG_CUDA_MEM
+		printf("Before Cpy to Device: ");
+		cudaPrintMemInfo();
+#endif
 
-			double *d_weights(0);
-			// TODO Is class_size = exp_Mweight.xdim?
-			HANDLE_ERROR(cudaMalloc( (void**) &d_weights, orientation_num * translation_num * sizeof(double))); //TODO Almost same size for all iparts, should be allocated once
-			HANDLE_ERROR(cudaMemcpy( d_weights, sorted_weights,
-					orientation_num * translation_num * sizeof(double), cudaMemcpyHostToDevice));
+			sorted_weights.device_alloc();
+			sorted_weights.cp_to_device();
+			sorted_weights.free_host();
 
-			delete [] sorted_weights;
+			CudaGlobalPtr<double> ctfs(exp_local_Fctfs[ipart].data, image_size); //TODO Almost same size for all iparts, should be allocated once
+			ctfs.device_alloc();
+			ctfs.cp_to_device();
 
-			double *d_wdiff2s_parts(0);
-			HANDLE_ERROR(cudaMalloc( (void**) &d_wdiff2s_parts,
-					orientation_num * Frefs.xy * sizeof(double))); //TODO Almost same size for all iparts, should be allocated once
+			CudaGlobalPtr<double> Minvsigma2s(exp_local_Minvsigma2s[ipart].data, image_size); //TODO Almost same size for all iparts, should be allocated once
+			Minvsigma2s.device_alloc();
+			Minvsigma2s.cp_to_device();
 
-			double *d_ctfs(0);
-			HANDLE_ERROR(cudaMalloc( (void**) &d_ctfs, class_size * sizeof(double))); //TODO Almost same size for all iparts, should be allocated once
-			HANDLE_ERROR(cudaMemcpy( d_ctfs, exp_local_Fctfs[ipart].data,
-					Frefs.xy * sizeof(double), cudaMemcpyHostToDevice));
-
-			double *d_Minvsigma2s(0);
-			HANDLE_ERROR(cudaMalloc( (void**) &d_Minvsigma2s, Fimgs.xy * sizeof(double))); //TODO Almost same size for all iparts, should be allocated once
-			HANDLE_ERROR(cudaMemcpy( d_Minvsigma2s, exp_local_Minvsigma2s[ipart].data,
-					Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
-
-//			dim3 block_dim(orientation_num, Frefs.xy);
-//			std::cerr << "cuda_kernel_wavg<<<" << block_dim.x << "," << block_dim.y << ">>>" << std::endl;
+			CudaGlobalPtr<double> wdiff2s_parts(orientation_num * image_size); //TODO Almost same size for all iparts, should be allocated once
+			wdiff2s_parts.device_alloc();
 
 			dim3 block_dim(orientation_num);
 			std::cerr << "cuda_kernel_wavg<<<" << block_dim.x << ">>>" << std::endl;
@@ -1179,12 +1133,12 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			cudaEventRecord(start, 0);
 
 			cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-												d_Frefs, d_Fimgs, d_Fimgs_nomask,		//INPUT
-												d_weights, d_ctfs, d_Minvsigma2s,		//INPUT
-												d_wdiff2s_parts, d_wavgs, d_Fweights,	//OUTPUT
+												Frefs.d, Fimgs.d, Fimgs_nomask.d,		//INPUT
+												sorted_weights.d, ctfs.d, Minvsigma2s.d,//INPUT
+												wdiff2s_parts.d, wavgs.d, Fweights.d,	//OUTPUT
 												translation_num, exp_sum_weight[ipart],	//CONTANTS
 												exp_significant_weight[ipart], 			//CONTANTS
-												Frefs.xy								//CONTANTS
+												image_size								//CONTANTS
 												);
 
 			HANDLE_ERROR(cudaDeviceSynchronize());
@@ -1198,12 +1152,17 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			cudaEventDestroy(stop);
 			std::cerr << "It took "<< time <<" msecs."<< std::endl;
 
-			cudaFree(d_Fimgs);
-			cudaFree(d_Fimgs_nomask);
+			std::cerr << "Fimgs"<< std::endl;
+			Fimgs.free_device();
+			std::cerr << "Fimgs_nomask"<< std::endl;
+			Fimgs_nomask.free_device();
 
-			cudaFree(d_weights);
-			cudaFree(d_ctfs);
-			cudaFree(d_Minvsigma2s);
+			std::cerr << "sorted_weights"<< std::endl;
+			sorted_weights.free_device();
+			std::cerr << "ctfs"<< std::endl;
+			ctfs.free_device();
+			std::cerr << "Minvsigma2s"<< std::endl;
+			Minvsigma2s.free_device();
 
 			/*======================================================
 								COLLECT DATA
@@ -1211,26 +1170,25 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 
 			//TODO Following reduction should be done on the GPU
-			double* wdiff2s_parts = new double[orientation_num*Frefs.xy];
-			HANDLE_ERROR(cudaMemcpy( wdiff2s_parts, d_wdiff2s_parts,
-					orientation_num*Frefs.xy*sizeof(double), cudaMemcpyDeviceToHost ));
-			cudaFree(d_wdiff2s_parts);
+			wdiff2s_parts.cp_to_host();
+			wdiff2s_parts.free_device();
+			std::cerr << "wdiff2s_parts"<< std::endl;
 
-			for (long int j = 0; j < Frefs.xy; j++)
+			for (long int j = 0; j < image_size; j++)
 			{
 				int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine, j);
 				if (ires > -1)
 				{
 					double sum = 0;
 					for (long int i = 0; i < orientation_num; i++)
-						sum += wdiff2s_parts[i * Frefs.xy + j];
+						sum += wdiff2s_parts[i * image_size + j];
 
 					exp_wsum_norm_correction[ipart] += sum;
 					thr_wsum_sigma2_noise[group_id].data[ires] += sum;
 				}
 			}
 
-			delete [] wdiff2s_parts;
+			wdiff2s_parts.free_host();
 
 			//TODO much in the following double loop can be GPU accelerated
 			// exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans
@@ -1314,35 +1272,27 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 				}
 			}
 
-
-//			std::cerr << "-----------------After freeing stuff from GPU (STWS): "<< std::endl;
-//			cudaMemGetInfo( &avail, &total );
-//			used = total - avail;
-//			std::cerr << "Device memory used: " << used << std::endl;
-//			std::cerr << "Of total          : " << total << std::endl;
-//			std::cerr << "(Free)            : " << avail << std::endl;
+#ifdef DEBUG_CUDA_MEM
+		printf("After Freeing Device Mem: ");
+		cudaPrintMemInfo();
+#endif
 
 		} // end loop ipart
 
-		cudaFree(d_Frefs);
+		std::cerr << "Frefs"<< std::endl;
+		Frefs.free_device();
 
 		/*=======================================================================================
 										   BACKPROJECTION
 		=======================================================================================*/
 
-		CudaComplex* wavgs = new CudaComplex[orientation_num * Frefs.xy];
-		HANDLE_ERROR(cudaMemcpy( wavgs, d_wavgs, orientation_num * Frefs.xy*sizeof(CudaComplex), cudaMemcpyDeviceToHost ));
-		cudaFree(d_wavgs);
+		wavgs.cp_to_host();
+		std::cerr << "wavgs"<< std::endl;
+		wavgs.free_device();
 
-		double* Fweights = new double[orientation_num * Frefs.xy];
-		HANDLE_ERROR(cudaMemcpy( Fweights, d_Fweights, orientation_num * Frefs.xy *sizeof(double), cudaMemcpyDeviceToHost ));
-		cudaFree(d_Fweights);
-
-		Fweight.resize(exp_Fimgs[0]);
-		double* FweightBag = Fweight.data; //TODO fix this
-
-		Fimg.resize(exp_Fimgs[0]);
-		Complex* FimgBag = Fimg.data; //TODO fix this
+		Fweights.cp_to_host();
+		std::cerr << "Fweights"<< std::endl;
+		Fweights.free_device();
 
 //		std::ofstream fweightFile;
 //		std::string fnm = std::string("out_fweight_gpu.dat");
@@ -1356,8 +1306,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		{
 			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
 
-			Fimg.data = (Complex*) wavgs + i * Frefs.xy;
-			Fweight.data = Fweights + i * Frefs.xy;
+			Fimg.data = &wavgs[i * image_size];
+			Fweight.data = &Fweights[i * image_size];
 
 //			fweightFile << rots[i] << " " << tilts[i] << " " << psis[i] << std::endl;
 //			fweightFile << Fweight.data[0] << std::endl;
@@ -1384,11 +1334,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 //		imgFile.close();
 //		exit(0);
 
-		delete [] wavgs;
-		delete [] Fweights;
-
-		Fweight.data = FweightBag; //TODO fix this
-		Fimg.data = FimgBag; //TODO fix this
 	} // end loop iclass
 
 
