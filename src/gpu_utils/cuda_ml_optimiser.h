@@ -88,38 +88,73 @@ public:
 
 	MlOptimiserCUDA(const MlOptimiser &parentOptimiser)
 	{
-		mydata = parentOptimiser.mydata;
-		mymodel = parentOptimiser.mymodel;
-		sampling = parentOptimiser.sampling;
+		mydata = 		parentOptimiser.mydata;
+		mymodel = 		parentOptimiser.mymodel;
+		sampling = 		parentOptimiser.sampling;
 
-		do_skip_align = parentOptimiser.do_skip_align;
-		do_skip_rotate = parentOptimiser.do_skip_rotate;
-		iter = parentOptimiser.iter;
-		do_firstiter_cc = parentOptimiser.do_firstiter_cc;
-		do_always_cc = parentOptimiser.do_always_cc;
-		coarse_size = parentOptimiser.coarse_size;
-		Mresol_fine = parentOptimiser.Mresol_fine;
-		Mresol_coarse = parentOptimiser.Mresol_coarse;
-		sigma2_fudge = parentOptimiser.sigma2_fudge;
-		tab_sin = parentOptimiser.tab_sin;
-		tab_cos = parentOptimiser.tab_cos;
-		do_ctf_correction = parentOptimiser.do_ctf_correction;
-		do_shifts_onthefly = parentOptimiser.do_shifts_onthefly;
-		refs_are_ctf_corrected = parentOptimiser.refs_are_ctf_corrected;
-		do_scale_correction = parentOptimiser.do_scale_correction;
-		global_fftshifts_ab_coarse = parentOptimiser.global_fftshifts_ab_coarse;
-		global_fftshifts_ab_current = parentOptimiser.global_fftshifts_ab_current;
-		global_fftshifts_ab2_coarse = parentOptimiser.global_fftshifts_ab2_coarse;
-		global_fftshifts_ab2_current = parentOptimiser.global_fftshifts_ab2_current;
-		strict_highres_exp = parentOptimiser.strict_highres_exp;
+		do_skip_align = 	parentOptimiser.do_skip_align;
+		do_skip_rotate = 	parentOptimiser.do_skip_rotate;
+		iter = 				parentOptimiser.iter;
+		do_firstiter_cc = 	parentOptimiser.do_firstiter_cc;
+		do_always_cc = 		parentOptimiser.do_always_cc;
+		coarse_size = 		parentOptimiser.coarse_size;
+		Mresol_fine = 		parentOptimiser.Mresol_fine;
+		Mresol_coarse = 	parentOptimiser.Mresol_coarse;
+		sigma2_fudge = 		parentOptimiser.sigma2_fudge;
+		tab_sin = 			parentOptimiser.tab_sin;
+		tab_cos = 			parentOptimiser.tab_cos;
+		do_ctf_correction = 			parentOptimiser.do_ctf_correction;
+		do_shifts_onthefly = 			parentOptimiser.do_shifts_onthefly;
+		refs_are_ctf_corrected = 		parentOptimiser.refs_are_ctf_corrected;
+		do_scale_correction = 			parentOptimiser.do_scale_correction;
+		global_fftshifts_ab_coarse = 	parentOptimiser.global_fftshifts_ab_coarse;
+		global_fftshifts_ab_current = 	parentOptimiser.global_fftshifts_ab_current;
+		global_fftshifts_ab2_coarse = 	parentOptimiser.global_fftshifts_ab2_coarse;
+		global_fftshifts_ab2_current = 	parentOptimiser.global_fftshifts_ab2_current;
+		strict_highres_exp = 			parentOptimiser.strict_highres_exp;
 
-		adaptive_oversampling = parentOptimiser.adaptive_oversampling;
-		do_skip_maximization = parentOptimiser.do_skip_maximization;
-		do_map = parentOptimiser.do_map;
-		exp_metadata = parentOptimiser.exp_metadata;
-		wsum_model = parentOptimiser.wsum_model;
-		do_norm_correction = parentOptimiser.do_norm_correction;
+		adaptive_oversampling = 	parentOptimiser.adaptive_oversampling;
+		do_skip_maximization = 		parentOptimiser.do_skip_maximization;
+		do_map = 					parentOptimiser.do_map;
+		exp_metadata = 				parentOptimiser.exp_metadata;
+		wsum_model = 				parentOptimiser.wsum_model;
+		do_norm_correction = 		parentOptimiser.do_norm_correction;
 	};
+
+	void putBackValues(MlOptimiser &parentOptimiser)
+	{
+		parentOptimiser.mydata  = 		mydata;
+		parentOptimiser.mymodel = 		mymodel;
+		parentOptimiser.sampling = 		sampling;
+
+		parentOptimiser.do_skip_align = 	do_skip_align;
+		parentOptimiser.do_skip_rotate = 	do_skip_rotate;
+		parentOptimiser.iter = 				iter;
+		parentOptimiser.do_firstiter_cc = 	do_firstiter_cc;
+		parentOptimiser.do_always_cc = 		do_always_cc;
+		parentOptimiser.coarse_size = 		coarse_size;
+		parentOptimiser.Mresol_fine = 		Mresol_fine;
+		parentOptimiser.Mresol_coarse = 	Mresol_coarse;
+		parentOptimiser.sigma2_fudge = 		sigma2_fudge;
+		parentOptimiser.tab_sin = 			tab_sin;
+		parentOptimiser.tab_cos = 			tab_cos;
+		parentOptimiser.do_ctf_correction = 			do_ctf_correction;
+		parentOptimiser.do_shifts_onthefly = 			do_shifts_onthefly;
+		parentOptimiser.refs_are_ctf_corrected = 		refs_are_ctf_corrected;
+		parentOptimiser.do_scale_correction = 			do_scale_correction;
+		parentOptimiser.global_fftshifts_ab_coarse = 	global_fftshifts_ab_coarse;
+		parentOptimiser.global_fftshifts_ab_current = 	global_fftshifts_ab_current;
+		parentOptimiser.global_fftshifts_ab2_coarse = 	global_fftshifts_ab2_coarse;
+		parentOptimiser.global_fftshifts_ab2_current = 	global_fftshifts_ab2_current;
+		parentOptimiser.strict_highres_exp = 			strict_highres_exp;
+
+		parentOptimiser.adaptive_oversampling = 	adaptive_oversampling;
+		parentOptimiser.do_skip_maximization = 		do_skip_maximization;
+		parentOptimiser.do_map = 					do_map;
+		parentOptimiser.exp_metadata = 				exp_metadata;
+		parentOptimiser.wsum_model = 				wsum_model;
+		parentOptimiser.do_norm_correction = 		do_norm_correction;
+	}
 
 	void getAllSquaredDifferences(
 			long int my_ori_particle, int exp_current_image_size,

@@ -2092,6 +2092,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+			cuda_optimus_prim.putBackValues(*this);
 		}
 		else
 		{
@@ -2152,13 +2153,45 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		tt().resize(exp_current_image_size, exp_current_image_size);
 
 		MultidimArray<Complex> Fimg1;
-
 		Fimg1 = exp_local_Fimgs_shifted[0];
 		FourierTransformer transformer;
 		transformer.inverseFourierTransform(Fimg1, tt());
 		CenterFFT(tt(),false);
 		std::string fnm = mode + std::string("_out_shifted_image.mrc");
 		tt.write(fnm);
+
+		tt().resize(YSIZE(Mresol_coarse),XSIZE(Mresol_coarse));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tt())
+		{
+			DIRECT_MULTIDIM_ELEM(tt(), n) = (double)DIRECT_MULTIDIM_ELEM(Mresol_coarse, n);
+		}
+		fnm = mode + std::string("_out_mresol_coarse.mrc");
+		tt.write(fnm);
+
+		tt().resize(YSIZE(Mresol_fine),XSIZE(Mresol_fine));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tt())
+		{
+			DIRECT_MULTIDIM_ELEM(tt(), n) = (double)DIRECT_MULTIDIM_ELEM(Mresol_fine, n);
+		}
+		fnm = mode + std::string("_out_mresol_fine.mrc");
+		tt.write(fnm);
+
+		tt().resize(YSIZE(exp_local_Fctfs[0]),XSIZE(exp_local_Fctfs[0]));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fctfs[0])
+		{
+			DIRECT_MULTIDIM_ELEM(tt(), n) = (double)DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[0], n);
+		}
+		fnm = mode + std::string("_out_ctf.mrc");
+		tt.write(fnm);
+
+
+//		exp_local_Fctfs[0]), tt());
+//		CenterFFT(tt(),false);
+//		fnm = mode + std::string("_out_ctf.mrc");
+//		tt.write(fnm);
+
+
+
 
 		fnm = mode + std::string("_out_10k_weights.txt");
 		char *text = &fnm[0];
@@ -2197,6 +2230,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		cuda_optimus_prim.putBackValues(*this);
 	}
 	else
 	{
