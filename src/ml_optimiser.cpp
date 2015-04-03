@@ -2103,6 +2103,39 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 		}
+
+
+#ifdef DEBUG_ESP_MEM
+		if (thread_id==0)
+		{
+			char c;
+			std::cerr << "After getAllSquaredDifferences, use top to see memory usage and then press any key to continue... " << std::endl;
+			std::cin >> c;
+		}
+		global_barrier->wait();
+#endif
+
+		// Now convert the squared difference terms to weights,
+		// also calculate exp_sum_weight, and in case of adaptive oversampling also exp_significant_weight
+		convertAllSquaredDifferencesToWeights(my_ori_particle, exp_ipass, exp_current_oversampling, metadata_offset,
+				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
+				exp_Mweight, exp_Mcoarse_significant, exp_significant_weight,
+				exp_sum_weight, exp_old_offset, exp_prior, exp_min_diff2,
+				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
+
+#ifdef DEBUG_ESP_MEM
+		if (thread_id==0)
+		{
+			char c;
+			std::cerr << "After convertAllSquaredDifferencesToWeights, press any key to continue... " << std::endl;
+			std::cin >> c;
+		}
+		global_barrier->wait();
+#endif
+
+	}   // end loop over 2 exp_ipass iterations
+
 #ifdef RELION_TESTING
 		std::string mode;
 		if (do_gpu)
@@ -2127,91 +2160,18 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		std::string fnm = mode + std::string("_out_shifted_image.mrc");
 		tt.write(fnm);
 
-		fnm = mode + std::string("_out_10k_diff2s.txt");
+		fnm = mode + std::string("_out_10k_weights.txt");
 		char *text = &fnm[0];
 		freopen(text,"w",stdout);
 		for(int n=0; n<10000; n++)
 		{
-			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
+			printf("%4.8f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
 		}
-		//freclose("diffs.txt");
+		fclose(stdout);
 
+//      	exit(0);
 
-//		FourierTransformer transformer1;
-//		tt().initZeros();
-//		tt().resize(exp_current_image_size, exp_current_image_size);
-//		transformer1.inverseFourierTransform(Fimg_shift, tt());
-//		CenterFFT(tt(),false);
-//		tt.write("out_shift.mrc");
-//
-//		FourierTransformer transformer2;
-//		tt().initZeros();
-//		transformer2.inverseFourierTransform(Frefctf, tt());
-//		CenterFFT(tt(),false);
-//		fnm = mode + std::string("out_frefctf.mrc");
-//		tt.write(fnm);
-//
-//		FourierTransformer transformer3;
-//		tt().initZeros();
-//		transformer3.inverseFourierTransform(Fref, tt());
-//		CenterFFT(tt(),false);
-//		fnm = mode + std::string("out_fref.mrc");
-//		tt.write(fnm);
-//		if (do_firstiter_cc)
-//			std::cerr << "doing CC first iter" << std::endl;
-//		//std::cerr << " diff2= " << diff2 << std::endl;
-//		printf ("\n diff2: %4.8f \n", diff2);
-//
-//		fnm = mode + std::string("_diff2s.txt");
-//		char *text = &fnm[0];
-//		freopen(text,"w",stdout);
-//		//FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_Mweight)
-//		for(int n=0; n<96768; n++)
-//		{
-//			printf("%4.4f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n)); // << std::endl;
-//		}
-//		freclose("diffs.txt");
-//
-//		if(fabs(diff2-2502.16)<0.01)
-//		{
-//      		exit(0);
-//		}
-//		else
-//		{
-//			exit(1);
-//		}
 #endif
-
-#ifdef DEBUG_ESP_MEM
-		if (thread_id==0)
-		{
-			char c;
-			std::cerr << "After getAllSquaredDifferences, use top to see memory usage and then press any key to continue... " << std::endl;
-			std::cin >> c;
-		}
-		global_barrier->wait();
-#endif
-
-		// Now convert the squared difference terms to weights,
-		// also calculate exp_sum_weight, and in case of adaptive oversampling also exp_significant_weight
-		convertAllSquaredDifferencesToWeights(my_ori_particle, exp_ipass, exp_current_oversampling, metadata_offset,
-				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
-				exp_Mweight, exp_Mcoarse_significant, exp_significant_weight,
-				exp_sum_weight, exp_old_offset, exp_prior, exp_min_diff2,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
-
-#ifdef DEBUG_ESP_MEM
-	if (thread_id==0)
-	{
-		char c;
-		std::cerr << "After convertAllSquaredDifferencesToWeights, press any key to continue... " << std::endl;
-		std::cin >> c;
-	}
-	global_barrier->wait();
-#endif
-
-	}// end loop over 2 exp_ipass iterations
 
 	// For the reconstruction step use mymodel.current_size!
 	exp_current_image_size = mymodel.current_size;
@@ -2251,7 +2211,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 	}
 
 #ifdef RELION_TESTING
-		std::string mode;
+//		std::string mode;
 		if (do_gpu)
 		{
 			mode="gpu";
@@ -2262,20 +2222,9 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		}
 		std::cerr << " "<< std::endl;
 		std::cerr << " finished running diffs in  " << mode << " mode."<< std::endl;
-		Image<double> tt;
-		tt().resize(exp_current_image_size, exp_current_image_size);
 
-		MultidimArray<Complex> Fimg1;
-
-		Fimg1 = exp_local_Fimgs_shifted[0];
-		FourierTransformer transformer;
-		transformer.inverseFourierTransform(Fimg1, tt());
-		CenterFFT(tt(),false);
-		std::string fnm = mode + std::string("_out_shifted_image.mrc");
-		tt.write(fnm);
-
-		fnm = mode + std::string("_out_10k_weights.txt");
-		char *text = &fnm[0];
+		fnm = mode + std::string("_out_10k_weights_afterstore.txt");
+		text = &fnm[0];
 		freopen(text,"w",stdout);
 		// Write the first 10k diffs to be sure
 		for(int n=0; n<10000; n++)
@@ -2283,19 +2232,9 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 			//std::cout << DIRECT_MULTIDIM_ELEM(exp_Mweight, n) << std::endl;
 			printf("%4.8f \n",DIRECT_MULTIDIM_ELEM(exp_Mweight, n));
 		}
-
-		fnm = mode + std::string("_out_dLL.txt");
-		text = &fnm[0];
-		freopen(text,"w",stdout);
-		// Write the first 10k diffs to be sure
-		for(int n=0; n<mydata.ori_particles[my_ori_particle].particles_id.size(); n++)
-		{
-			printf("%4.4f \n",DIRECT_A2D_ELEM(exp_metadata, metadata_offset + n, METADATA_DLL) );
-		}
 		//For tests we want to exit now
 		//if(iter == 2)
 			exit(0);
-
 
 #endif
 
