@@ -24,6 +24,9 @@ if(RELION_TESTING)
   add_definitions(-DRELION_TESTING)
 endif()
 
+add_definitions(-DDEBUG_CUDA)
+add_definitions(-DDEBUG_CUDA_MEM)
+
 find_package(CUDA)
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
