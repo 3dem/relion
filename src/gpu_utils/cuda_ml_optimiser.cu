@@ -233,6 +233,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 			MultidimArray<Complex > Fref;
 			double *Minvsigma2;
+			double *gpuMinvsigma2 = new double[exp_local_Minvsigma2s[0].xdim*exp_local_Minvsigma2s[0].ydim];
 			Matrix2D<double> A;
 
 			CudaImages Frefs(exp_local_Minvsigma2s[0].xdim, exp_local_Minvsigma2s[0].ydim,
@@ -364,6 +365,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
 									: global_fftshifts_ab2_current[iitrans].data;
 						}
+
+
 						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 						{
 							double real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
@@ -466,11 +469,22 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 //				std::cerr << "Of total          : " << total << std::endl;
 //				std::cerr << "(Free)            : " << avail << std::endl;
 				//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
+
+				// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
+				// we need to make a modified copy, since the global object shouldn't be
+				// changed
+				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+				{
+					gpuMinvsigma2[n] = *(exp_local_Minvsigma2s[ipart].data + n );
+					std::cerr <<  *(exp_local_Minvsigma2s[ipart].data + n )<< " ";
+				}
+
 				if (do_ctf_correction && refs_are_ctf_corrected)
 				{
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 					{
-						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2s[ipart], n) *= (DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n));
+						gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n));
 					}
 				}
 				// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
@@ -482,18 +496,17 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					float myscale = mymodel.scale_correction[group_id];
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 					{
-						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2s[ipart], n) *= (myscale*myscale);
+						gpuMinvsigma2[n] *= (myscale*myscale);
 					}
 				}
 
-				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
 				double *d_Minvsigma2(0);
 
 				CudaComplex *d_Fimgs = Fimgs.data_to_device();
 //				size_t last_size;
 
 				HANDLE_ERROR(cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy * sizeof(double)));
-				HANDLE_ERROR(cudaMemcpy( d_Minvsigma2, exp_local_Minvsigma2s[ipart].data, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
+				HANDLE_ERROR(cudaMemcpy( d_Minvsigma2, gpuMinvsigma2, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
 //				last_size=used;
 //				cudaMemGetInfo( &avail, &total );
 //				used = total - avail;
