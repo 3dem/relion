@@ -68,7 +68,7 @@ public:
 	~CudaImages() { delete[] start; }
 };
 
-__global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 									double *g_Minvsigma2, double *g_diff2s,
 									const unsigned img_size, const double sum_init,
 									long int significant_num,
@@ -155,6 +155,77 @@ __global__ void cuda_kernel_massive_diff2(	CudaComplex *g_refs, CudaComplex *g_i
 		// -------------------------------------------------------------------------
 	}
 }
+
+__global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+										double *g_Minvsigma2, double *g_diff2s,
+										const unsigned img_size, const double exp_local_sqrtXi2,
+										long int significant_num,
+										int translation_num,
+										int *d_rotidx,
+										int *d_transidx)
+{
+	// blockid
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	// inside the padded 2D orientation grid
+	if( ex < significant_num )
+	{
+		// index of comparison
+		unsigned long int ix=d_rotidx[ex];
+		unsigned long int iy=d_transidx[ex];
+		__shared__ double    s[BLOCK_SIZE];
+		__shared__ double norm[BLOCK_SIZE];
+		s[threadIdx.x] = 0;
+		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE));
+		unsigned long pixel,
+		ref_start(ix * img_size),
+		img_start(iy * img_size);
+		unsigned long ref_pixel_idx;
+		unsigned long img_pixel_idx;
+		for (unsigned pass = 0; pass < pass_num; pass ++)
+		{
+			pixel = pass * BLOCK_SIZE + threadIdx.x;
+
+			if (pixel < img_size) //Is inside image
+			{
+				ref_pixel_idx = ref_start + pixel;
+				img_pixel_idx = img_start + pixel;
+
+				double diff_real = g_refs[ref_pixel_idx].real * g_imgs[img_pixel_idx].real;
+				double diff_imag = g_refs[ref_pixel_idx].imag * g_imgs[img_pixel_idx].imag;
+
+				double nR = g_refs[ref_pixel_idx].real*g_refs[ref_pixel_idx].real;
+				double nI = g_refs[ref_pixel_idx].imag*g_refs[ref_pixel_idx].imag;
+
+				s[threadIdx.x] -= (diff_real + diff_imag);
+				norm[threadIdx.x] += nR+nI;
+			}
+		}
+		// -------------------------------------------------------------------------
+		__syncthreads();
+		int trads = 32;
+		int itr = BLOCK_SIZE/trads;
+		if(threadIdx.x<trads)
+		{
+			for(int i=1; i<itr; i++)
+			{
+				s[threadIdx.x] += s[i*trads + threadIdx.x];
+				norm[threadIdx.x] += norm[i*trads + threadIdx.x];
+			}
+		}
+		for(int j=(trads/2); j>0; j/=2)
+		{
+			if(threadIdx.x<j)
+			{
+				s[threadIdx.x] += s[threadIdx.x+j];
+				norm[threadIdx.x] += norm[threadIdx.x+j];
+			}
+		}
+		__syncthreads();
+		// -------------------------------------------------------------------------
+		g_diff2s[ix * translation_num + iy] = s[0]/(sqrt(norm[0])*exp_local_sqrtXi2);
+	}
+}
+
 
 //  Takes a boolean N-by-M matrix and returns pointer pairs to coordinates in two corresponding objects
 //__global__ void cuda_kernel_boolToPointers(	bool *matrix,
@@ -568,13 +639,24 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				cudaEventCreate(&stop);
 				cudaEventRecord(start, 0);
 				std::cerr << "Calling kernel with <<("<< orient1 <<","<< orient1 << "), " << BLOCK_SIZE << ">> " << std::endl;
-
-				cuda_kernel_massive_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
-																	Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
+				if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
+				{
+					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
+																	Frefs.xy, exp_highres_Xi2_imgs[ipart],
 																	significant_num,
 																	translation_num,
 																	d_rotidx,
 																	d_transidx);
+				}
+				else
+				{
+					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
+																Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
+																significant_num,
+																translation_num,
+																d_rotidx,
+																d_transidx);
+				}
 				cudaEventRecord(stop, 0);
 				cudaEventSynchronize(stop);
 				cudaEventElapsedTime(&time, start, stop);
