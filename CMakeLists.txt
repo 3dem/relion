@@ -24,6 +24,10 @@ if(RELION_TESTING)
    add_definitions(-DRELION_TESTING)
 endif()
 
+#Flags set for CUDA code debugging
+add_definitions(-DDEBUG_CUDA)
+add_definitions(-DDEBUG_CUDA_MEM)
+
 find_package(CUDA)
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
@@ -40,13 +44,24 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-FIND_PACKAGE(FFTW)
+FIND_PACKAGE(FFTW REQUIRED)
 
 #--BELOW DOES NOT WORK ON K80-MACHINES YET--
-#FIND_PACKAGE(X11)
-#set(FLTK_SKIP_OPENGL TRUE) #Not required
-#FIND_PACKAGE(FLTK)
+FIND_PACKAGE(X11)
 
+if(X11_FOUND)
+    set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
+    FIND_PACKAGE(FLTK)
+    if(FLTK_FOUND)
+        set(BUILD_GUI_TARGETS TRUE)
+        message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
+    else(FLTK_FOUND)
+        message(STATUS "FLTK not found, omitting GUI targets.")
+    endif(FLTK_FOUND)
+else(X11_FOUND)
+    set(BUILD_GUI_TARGETS FALSE)
+    message(STATUS "X11 not found, omitting GUI targets.")
+endif(X11_FOUND)
 
 ADD_SUBDIRECTORY(src/apps)
 

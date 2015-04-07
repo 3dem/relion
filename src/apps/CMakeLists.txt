@@ -21,16 +21,16 @@ file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_u
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 
 #--Apps using X11--
-if(NOT X11_FOUND)
+if(BUILD_GUI_TARGETS)
+    file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine.cpp" "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
+else(BUILD_GUI_TARGETS)
     file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine.cpp")
     list(REMOVE_ITEM REL_SRC "/nethome/bjornf/RELION/relion-1.4/src/manualpicker.cpp")
     list(REMOVE_ITEM REL_SRC "/nethome/bjornf/RELION/relion-1.4/src/gui_entries.cpp")
     list(REMOVE_ITEM REL_SRC "/nethome/bjornf/RELION/relion-1.4/src/gui_jobwindow.cpp")
     list(REMOVE_ITEM REL_SRC "/nethome/bjornf/RELION/relion-1.4/src/gui_mainwindow.cpp")
     list(REMOVE_ITEM REL_SRC "/nethome/bjornf/RELION/relion-1.4/src/displayer.cpp")
-else(NOT X11_FOUND)
-    file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine.cpp" "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
-endif(NOT X11_FOUND)
+endif(BUILD_GUI_TARGETS)
 
 #file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 
@@ -41,8 +41,6 @@ foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
     add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
 	
-	#add_dependencies(${_target} FFTW Ui)
-	#target_link_libraries(${_target} Ui ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ${relion_lib} )
 	target_link_libraries(${_target} ${FLTK_LIBRARIES} gpu_util ${FFTW_LIBRARIES} ${X11} ${relion_lib} )
 	message(STATUS "added ${_target}...")
 endforeach()
