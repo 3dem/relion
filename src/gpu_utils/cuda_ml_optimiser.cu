@@ -548,7 +548,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 				{
 					gpuMinvsigma2[n] = *(exp_local_Minvsigma2s[ipart].data + n );
-					std::cerr <<  *(exp_local_Minvsigma2s[ipart].data + n )<< " ";
+//					std::cerr <<  *(exp_local_Minvsigma2s[ipart].data + n )<< " ";
 				}
 
 				if (do_ctf_correction && refs_are_ctf_corrected)
@@ -1374,6 +1374,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 		} // end loop ipart
 
+
 		std::cerr << "Frefs"<< std::endl;
 		Frefs.free_device();
 
@@ -1388,6 +1389,35 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		Fweights.cp_to_host();
 		std::cerr << "Fweights"<< std::endl;
 		Fweights.free_device();
+
+#ifdef RELION_TESTING
+		std::string fnm = std::string("gpu_out_exp_wsum_norm_correction.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		for (long int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
+		{
+			printf("%4.8f \n",exp_wsum_norm_correction[ipart]);
+		}
+		fclose(stdout);
+		//----------
+		fnm = std::string("gpu_out_thr_wsum_sigma2_noise.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine)
+		{
+			printf("%4.8f \n",thr_wsum_sigma2_noise[0].data[n]);
+		}
+		fclose(stdout);
+		//----------
+		fnm = std::string("gpu_out_Fweights.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		for(int n = 0; n < 1000; n++)
+		{
+			printf("%4.8f \n",Fweights[n*60+50]);
+		}
+		fclose(stdout);
+#endif
 
 //		std::ofstream fweightFile;
 //		std::string fnm = std::string("out_fweight_gpu.dat");

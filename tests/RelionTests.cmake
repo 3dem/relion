@@ -100,6 +100,20 @@ add_test(NAME CPU-3Dc_mresol_fine
         cpu_out_mresol_fine.mrc)
 SET_TESTS_PROPERTIES(CPU-3Dc_mresol_fine PROPERTIES DEPENDS CPU-3Dc_produce)
 #--------------------------------------------------------------------
+add_test(NAME CPU-3Dc_norm_correction
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+            ref_norm_correction.mrc
+        cpu_out_norm_correction.mrc)
+SET_TESTS_PROPERTIES(CPU-3Dc_norm_correction PROPERTIES DEPENDS CPU-3Dc_produce)
+#--------------------------------------------------------------------
+add_test(NAME CPU-3Dc_sigma2_noise
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+            ref_sigma2_noise.mrc
+        cpu_out_sigma2_noise.mrc)
+SET_TESTS_PROPERTIES(CPU-3Dc_sigma2_noise PROPERTIES DEPENDS CPU-3Dc_produce)
+#--------------------------------------------------------------------
 
 
   
@@ -195,7 +209,20 @@ add_test(NAME GPU-3Dc_mresol_fine
         gpu_out_mresol_fine.mrc)
 SET_TESTS_PROPERTIES(GPU-3Dc_mresol_fine PROPERTIES DEPENDS GPU-3Dc_produce)
 #--------------------------------------------------------------------
-
+add_test(NAME GPU-3Dc_norm_correction
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+            ref_norm_correction.mrc
+        cpu_out_norm_correction.mrc)
+SET_TESTS_PROPERTIES(GPU-3Dc_norm_correction PROPERTIES DEPENDS GPU-3Dc_produce)
+#--------------------------------------------------------------------
+add_test(NAME GPU-3Dc_sigma2_noise
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+        COMMAND ${CMAKE_COMMAND} -E compare_files 
+            ref_sigma2_noise.mrc
+        cpu_out_sigma2_noise.mrc)
+SET_TESTS_PROPERTIES(GPU-3Dc_sigma2_noise PROPERTIES DEPENDS GPU-3Dc_produce)
+#-------------------------------------------------------------------- 
 
 #--------------------------------------------------------------------
 add_test(NAME GPU-3Dc_noCTF-produce
