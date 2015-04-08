@@ -4856,7 +4856,34 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 								} // end loop iover_trans
 							} // end loop itrans
 						} // end loop ipart
-
+#ifdef RELION_TESTING
+		std::string fnm = std::string("cpu_out_exp_wsum_norm_correction.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		for (long int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
+		{
+			printf("%4.8f \n",exp_wsum_norm_correction[ipart]);
+		}
+		fclose(stdout);
+		//----------
+		fnm = std::string("cpu_out_thr_wsum_sigma2_noise.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine)
+		{
+			printf("%4.8f \n",thr_wsum_sigma2_noise[0].data[n]);
+		}
+		fclose(stdout);
+		//----------
+		fnm = std::string("cpu_out_Fweights.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		for(int n = 0; n < 1000; n++)
+		{
+			printf("%4.8f \n",*(Fweight.data + n*60+50));
+		}
+		fclose(stdout);
+#endif
 						if (!do_skip_maximization)
 						{
 #ifdef TIMING

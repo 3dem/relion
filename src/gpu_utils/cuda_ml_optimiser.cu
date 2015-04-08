@@ -1316,6 +1316,43 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		Fweights.cp_to_host();
 		Fweights.free_device();
 
+#ifdef RELION_TESTING
+		std::string fnm = std::string("gpu_out_exp_wsum_norm_correction.txt");
+		char *text = &fnm[0];
+		freopen(text,"w",stdout);
+		for (long int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
+		{
+			printf("%4.8f \n",exp_wsum_norm_correction[ipart]);
+		}
+		fclose(stdout);
+		//----------
+		fnm = std::string("gpu_out_thr_wsum_sigma2_noise.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine)
+		{
+			printf("%4.8f \n",thr_wsum_sigma2_noise[0].data[n]);
+		}
+		fclose(stdout);
+		//----------
+		fnm = std::string("gpu_out_Fweights.txt");
+		text = &fnm[0];
+		freopen(text,"w",stdout);
+		for(int n = 0; n < 1000; n++)
+		{
+			printf("%4.8f \n",Fweights[n*60+50]);
+		}
+		fclose(stdout);
+#endif
+
+//		std::ofstream fweightFile;
+//		std::string fnm = std::string("out_fweight_gpu.dat");
+//		fweightFile.open(fnm.c_str(), std::ios_base::app);
+//
+//		std::ofstream imgFile;
+//		fnm = std::string("out_img_gpu.dat");
+//		imgFile.open(fnm.c_str(), std::ios_base::app);
+
 		for (long int i = 0; i < orientation_num; i++)
 		{
 			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
