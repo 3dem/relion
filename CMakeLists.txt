@@ -18,15 +18,16 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Uncomment the following to specify the code to run tests by issuing 
 # mkdir build ; cd build ; cmake .. ; make ; make test
-set(RELION_TESTING TRUE)
+
+set(DEBUG_MODE TRUE)
+
+#set(RELION_TESTING TRUE)
 if(RELION_TESTING)
    enable_testing()
    add_definitions(-DRELION_TESTING)
 endif()
 
 #Flags set for CUDA code debugging
-add_definitions(-DDEBUG_CUDA)
-add_definitions(-DDEBUG_CUDA_MEM)
 
 find_package(CUDA)
 if(CUDA_FOUND)
