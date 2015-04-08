@@ -23,84 +23,24 @@ static void cudaPrintMemInfo()
 	size_t free;
 	size_t total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-	float free_hr(free/(8*1024*1024));
-	float total_hr(total/(8*1024*1024));
-    printf( "free %.2fMB, total %.2fMB, used %.2fMB\n",
+	float free_hr(free/(1024.*1024.));
+	float total_hr(total/(1024.*1024.));
+    printf( "free %.2fMiB, total %.2fMiB, used %.2fMiB\n",
     		free_hr, total_hr, total_hr - free_hr);
 }
-
-/*
- * Wraps CUDA functions for memory management on the device only
- */
-template <typename T>
-class CudaDevicePtr
-{
-public:
-	const size_t sz;
-	T *d;
-	bool d_free;
-
-	inline
-	__host__ CudaDevicePtr<T>(T * d_start, size_t size):
-		sz(size), d(d_start), d_free(false)
-	{};
-
-	inline
-	__host__ CudaDevicePtr<T>(size_t size):
-		sz(size), d(0), d_free(true)
-	{
-		HANDLE_ERROR(cudaMalloc( (void**) &d, size * sizeof(T)));
-	};
-
-	inline
-	__host__ void device_init(int value)
-	{
-#ifdef DEBUG_CUDA
-		if (d == 0)
-		{
-			printf("Memset requested before allocation in %s at line %d\n.",
-					__FILE__, __LINE__);
-			exit( EXIT_FAILURE );
-		}
-#endif
-		HANDLE_ERROR(cudaMemset(d, value, sz * sizeof(T)));
-	}
-
-	inline
-	__device__ T& operator[](std::size_t idx)       { return d[idx]; };
-	inline
-	__device__ const T& operator[](std::size_t idx) const { return d[idx]; };
-
-	inline
-	__host__ void free()
-	{
-#ifdef DEBUG_CUDA
-		if (d == 0)
-		{
-			printf("Free device memory was called on NULL pointer in %s at line %d\n.",
-					__FILE__, __LINE__);
-			exit( EXIT_FAILURE );
-		}
-#endif
-		HANDLE_ERROR(cudaFree(d));
-		d = 0;
-		d_free = false;
-	}
-
-	inline
-	__host__ ~CudaDevicePtr()
-	{
-		if (d_free) free();
-	}
-};
 
 template <typename T>
 class CudaGlobalPtr
 {
 public:
-	const size_t sz;
+	size_t sz;
 	T *h, *d;
 	bool h_free, d_free;
+
+	inline
+	__host__ CudaGlobalPtr<T>():
+		sz(0), h(0), d(0), h_free(false), d_free(false)
+	{};
 
 	inline
 	__host__ CudaGlobalPtr<T>(T * h_start, size_t size):
@@ -111,13 +51,6 @@ public:
 	__host__ CudaGlobalPtr<T>(size_t size):
 		sz(size), h(new T[size]), d(0), h_free(true), d_free(false)
 	{};
-
-	inline
-	__host__ CudaGlobalPtr<T>(CudaDevicePtr<T> *ptr):
-		sz(ptr->size), h(new T[sz]), d(ptr->d), h_free(true), d_free(false)
-	{
-		cp_to_host();
-	};
 
 	inline
 	__host__ void device_alloc()
@@ -132,8 +65,7 @@ public:
 #ifdef DEBUG_CUDA
 		if (d == 0)
 		{
-			printf("Memset requested before allocation in %s at line %d\n.",
-					__FILE__, __LINE__);
+			printf("Memset requested before allocation in device_init().\n");
 			exit( EXIT_FAILURE );
 		}
 #endif
@@ -146,12 +78,23 @@ public:
 #ifdef DEBUG_CUDA
 		if (d == 0)
 		{
-			printf("Cpy to device requested before allocation in %s at line %d\n.",
-					__FILE__, __LINE__);
+			printf("Cpy to device requested before allocation in cp_to_device().\n");
+			exit( EXIT_FAILURE );
+		}
+		if (h == 0)
+		{
+			printf("NULL host pointer in cp_to_device().\n");
 			exit( EXIT_FAILURE );
 		}
 #endif
 		HANDLE_ERROR(cudaMemcpy( d, h, sz * sizeof(T), cudaMemcpyHostToDevice));
+	}
+
+	inline
+	__host__ void cp_to_device(T * hostPtr)
+	{
+		h = hostPtr;
+		cp_to_device();
 	}
 
 	inline
@@ -171,8 +114,7 @@ public:
 #ifdef DEBUG_CUDA
 		if (d == 0)
 		{
-			printf("Free device memory was called on NULL pointer in %s at line %d\n.",
-					__FILE__, __LINE__);
+			printf("Free device memory was called on NULL pointer in free_device().\n");
 			exit( EXIT_FAILURE );
 		}
 #endif

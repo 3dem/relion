@@ -369,10 +369,6 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							// Project the reference map (into Fref)
 							(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
 
-							//TODO REMOVE ONCE YOU KNOW THIS IS ALLWAYS TRUE
-							if (Frefs.x != Fref.xdim || Frefs.y != Fref.ydim)
-								std::cerr << "!!!!!!! BAD Fref size x:" << Fref.xdim << ":" << Frefs.x << " y:" << Fref.ydim << ":" << Frefs.y << std::endl;
-
 							Frefs.increment();
 
 							orientation_num ++;
@@ -385,7 +381,6 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			t2 = clock();
 			float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
 			std::cerr << "Proj generation took "<< td <<" msecs."<< std::endl;
-			//printf("Finished generating reference projections\n");
 
 			Fref.data = FrefBag; //TODO remove this
 
@@ -449,7 +444,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							if (do_scale_correction)
 							{
 								//group_id = mydata.getGroupId(part_id);
-								float myscale = mymodel.scale_correction[group_id];
+								double myscale = mymodel.scale_correction[group_id];
 								real /= myscale;
 								imag /= myscale;
 							}
@@ -471,7 +466,6 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				t2 = clock();
 				float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
 				std::cerr << "Trans generation took "<< td <<" msecs."<< std::endl;
-				//printf("Generating translations finished \n");
 
 				/*===========================================
 				   Determine significant comparison indices
@@ -482,7 +476,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				long int coarse_num = exp_nr_dir*exp_nr_psi*exp_nr_trans;
 				long int significant_num=0;
-				std::cerr << "exp_ipass "<< exp_ipass << std::endl;
+				//std::cerr << "exp_ipass "<< exp_ipass << std::endl;
 				if (exp_ipass == 0)
 				{
 					exp_Mcoarse_significant.resize(coarse_num, 1);
@@ -523,10 +517,10 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						}
 					}
 				}
-				std::cerr << "orientation_num "<< orientation_num << std::endl;
-				std::cerr << "translation_num "<< translation_num << std::endl;
-				std::cerr << "my_nr_significant_coarse_samples "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) << std::endl;
-				std::cerr << "significant_num "<< significant_num << std::endl;
+//				std::cerr << "orientation_num "<< orientation_num << std::endl;
+//				std::cerr << "translation_num "<< translation_num << std::endl;
+//				std::cerr << "my_nr_significant_coarse_samples "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) << std::endl;
+//				std::cerr << "significant_num "<< significant_num << std::endl;
 
 				/*====================================
 				   Initiate Particle Related On GPU
@@ -548,7 +542,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 				{
 					gpuMinvsigma2[n] = *(exp_local_Minvsigma2s[ipart].data + n );
-					std::cerr <<  *(exp_local_Minvsigma2s[ipart].data + n )<< " ";
+					//std::cerr <<  *(exp_local_Minvsigma2s[ipart].data + n )<< " ";
 				}
 
 				if (do_ctf_correction && refs_are_ctf_corrected)
@@ -564,7 +558,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
 				if (do_scale_correction)
 				{
-					float myscale = mymodel.scale_correction[group_id];
+					double myscale = mymodel.scale_correction[group_id];
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 					{
 						gpuMinvsigma2[n] *= (myscale*myscale);
@@ -638,7 +632,6 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				cudaEventCreate(&start);
 				cudaEventCreate(&stop);
 				cudaEventRecord(start, 0);
-				std::cerr << "Calling kernel with <<("<< orient1 <<","<< orient1 << "), " << BLOCK_SIZE << ">> " << std::endl;
 				if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 				{
 					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
@@ -674,10 +667,11 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				    	   Retrieve Results
 				======================================*/
 
-				HANDLE_ERROR(cudaDeviceSynchronize());
+				HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 				//printf("Kernel call finished \n");
 
-				std::cerr << "It took "<< time <<" msecs."<< std::endl;
+				std::cerr << "cuda_kernel_diff2<<" << block_dim.x << ", " << BLOCK_SIZE << ">> took "<< time <<" msecs."<< std::endl;
+
 				double* diff2s = new double[orientation_num*translation_num];
 				if (exp_ipass == 0)
 				{
@@ -747,108 +741,13 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 		} // end if class significant
 	} // end loop iclass
 }
-//
-//__global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
-//									double* g_weights, double* g_ctfs, double* g_Minvsigma2s,
-//									double *g_wdiff2s_parts, CudaComplex *g_wavgs, double* g_Fweights,
-//									const unsigned translation_num, const double weight_norm,
-//									const double significant_weight)
-//{
-//	unsigned orientation = blockIdx.x;
-//	unsigned pixel = blockIdx.y;
-//	unsigned image_size = gridDim.y;
-//	unsigned tid = threadIdx.x;
-//
-//	//TODO Consider Mresol_fine to speed this kernel
-//
-//	__shared__ double s_wdiff2[BLOCK_SIZE];
-//	__shared__ double s_weight[84];
-//	__shared__ double s_real[BLOCK_SIZE];
-//	__shared__ double s_imag[BLOCK_SIZE];
-//
-//	s_wdiff2[tid] = 0;
-//	//s_weight[tid] = 0;
-//	s_real[tid] = 0;
-//	s_imag[tid] = 0;
-//
-//	unsigned pass_num(ceilf((float)translation_num/(float)BLOCK_SIZE)),translation;
-//
-//	for (unsigned pass = 0; pass < pass_num; pass ++)
-//	{
-//		translation = pass * BLOCK_SIZE + tid;
-//
-//		if (translation < translation_num)
-//		{
-//			double weight = g_weights[orientation * translation_num + translation];
-//
-//			if (weight >= significant_weight)
-//			{
-//				weight /= weight_norm;
-//
-//				unsigned long ref_pixel_idx = orientation * image_size + pixel;
-//				unsigned long img_pixel_idx = translation * image_size + pixel;
-//
-//				double diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
-//				double diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
-//				double wdiff2 = weight * (diff_real*diff_real + diff_imag*diff_imag);
-//
-//				s_wdiff2[tid] += wdiff2;
-//
-//				double myctf = g_ctfs[pixel];
-//				double weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
-//				s_real[tid] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
-//				s_imag[tid] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
-//
-//				s_weight[translation] = weightxinvsigma2 * myctf;
-//			}
-//			else
-//				s_weight[translation] = 0;
-//		}
-//	}
-//
-//	__syncthreads();
-//
-//	//TODO Yeah, lets actually use the GPU! Following four sums should be done as a parallel reduction.
-//
-//	if (tid == 0)
-//	{
-//		double sum(0);
-//		for (unsigned i = 0; i < translation_num; i++)
-//			sum += s_weight[i];
-//
-//		g_Fweights[orientation * image_size + pixel] = sum;
-//	}
-//	else if (tid == 1)
-//	{
-//		double sum(0);
-//		for (unsigned i = 0; i < BLOCK_SIZE; i++)
-//			sum += s_real[i];
-//
-//		g_wavgs[orientation * image_size + pixel].real += sum;
-//	}
-//	else if (tid == 2)
-//	{
-//		double sum(0);
-//		for (unsigned i = 0; i < BLOCK_SIZE; i++)
-//			sum += s_imag[i];
-//
-//		g_wavgs[orientation * image_size + pixel].imag += sum;
-//	}
-//	else if (tid == 3)
-//	{
-//		double sum(0);
-//		for (unsigned i = 0; i < BLOCK_SIZE; i++)
-//			sum += s_wdiff2[i];
-//
-//		g_wdiff2s_parts[orientation * image_size + pixel] = sum;
-//	}
-//}
 
 __global__ void cuda_kernel_wavg(	Complex *g_refs, Complex *g_imgs, Complex *g_imgs_nomask,
 									double* g_weights, double* g_ctfs, double* g_Minvsigma2s,
 									double *g_wdiff2s_parts, Complex *g_wavgs, double* g_Fweights,
 									const unsigned translation_num, const double weight_norm,
-									const double significant_weight, const unsigned image_size)
+									const double significant_weight, const unsigned image_size,
+									const bool refs_are_ctf_corrected)
 {
 	unsigned orientation = blockIdx.x;
 	unsigned tid = threadIdx.x;
@@ -869,6 +768,8 @@ __global__ void cuda_kernel_wavg(	Complex *g_refs, Complex *g_imgs, Complex *g_i
 
 		if (pixel < image_size)
 		{
+			unsigned long orientation_pixel = orientation * image_size + pixel;
+
 			for (unsigned translation = 0; translation < translation_num; translation++)
 			{
 				double weight = g_weights[orientation * translation_num + translation];
@@ -877,14 +778,18 @@ __global__ void cuda_kernel_wavg(	Complex *g_refs, Complex *g_imgs, Complex *g_i
 				{
 					weight /= weight_norm;
 
-					unsigned long ref_pixel_idx = orientation * image_size + pixel;
 					unsigned long img_pixel_idx = translation * image_size + pixel;
 
-					double diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
-					double diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
-					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
-
 					double myctf = g_ctfs[pixel];
+					Complex ref = g_refs[orientation_pixel];
+					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+					{
+						ref.real *= myctf;
+						ref.imag *= myctf;
+					}
+					double diff_real = ref.real - g_imgs[img_pixel_idx].real;
+					double diff_imag = ref.imag - g_imgs[img_pixel_idx].imag;
+					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
 					double weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
 					wavgs_real += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
 					wavgs_imag += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
@@ -892,13 +797,15 @@ __global__ void cuda_kernel_wavg(	Complex *g_refs, Complex *g_imgs, Complex *g_i
 				}
 			}
 
-			g_wavgs[orientation * image_size + pixel].real = wavgs_real; //TODO should be buffered into shared
-			g_wavgs[orientation * image_size + pixel].imag = wavgs_imag; //TODO should be buffered into shared
-			g_wdiff2s_parts[orientation * image_size + pixel] = wdiff2s_parts; //TODO this should be reduced in here
-			g_Fweights[orientation * image_size + pixel] = Fweight; //TODO should be buffered into shared
+			g_wavgs[orientation_pixel].real = wavgs_real; //TODO should be buffered into shared
+			g_wavgs[orientation_pixel].imag = wavgs_imag; //TODO should be buffered into shared
+			g_wdiff2s_parts[orientation_pixel] = wdiff2s_parts; //TODO this could be further reduced in here
+			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
 		}
 	}
 }
+
+
 
 void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
 		int exp_current_oversampling, int metadata_offset,
@@ -1207,9 +1114,14 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			sorted_weights.cp_to_device();
 			sorted_weights.free_host();
 
-			CudaGlobalPtr<double> ctfs(exp_local_Fctfs[ipart].data, image_size); //TODO Almost same size for all iparts, should be allocated once
+			CudaGlobalPtr<double> ctfs; //TODO Almost same size for all iparts, should be allocated once
+			ctfs.sz = image_size;
 			ctfs.device_alloc();
-			ctfs.cp_to_device();
+
+			if (do_ctf_correction)
+				ctfs.cp_to_device(exp_local_Fctfs[ipart].data);
+			else
+				ctfs.device_init(1.);
 
 			CudaGlobalPtr<double> Minvsigma2s(exp_local_Minvsigma2s[ipart].data, image_size); //TODO Almost same size for all iparts, should be allocated once
 			Minvsigma2s.device_alloc();
@@ -1219,7 +1131,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			wdiff2s_parts.device_alloc();
 
 			dim3 block_dim(orientation_num);
-			std::cerr << "cuda_kernel_wavg<<<" << block_dim.x << ">>>" << std::endl;
 
 			float time;
 			cudaEvent_t start, stop;
@@ -1233,41 +1144,32 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 												wdiff2s_parts.d, wavgs.d, Fweights.d,	//OUTPUT
 												translation_num, exp_sum_weight[ipart],	//CONTANTS
 												exp_significant_weight[ipart], 			//CONTANTS
-												image_size								//CONTANTS
+												image_size, refs_are_ctf_corrected		//CONTANTS
 												);
 
-			HANDLE_ERROR(cudaDeviceSynchronize());
-			std::cerr << "cuda_kernel_wavg DONE!" << std::endl;
-
+			HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 
 			cudaEventRecord(stop, 0);
 			cudaEventSynchronize(stop);
 			cudaEventElapsedTime(&time, start, stop);
 			cudaEventDestroy(start);
 			cudaEventDestroy(stop);
-			std::cerr << "It took "<< time <<" msecs."<< std::endl;
+			std::cerr << "cuda_kernel_wavg<<" << block_dim.x << ", " << BLOCK_SIZE << ">> took "<< time <<" msecs."<< std::endl;
 
-			std::cerr << "Fimgs"<< std::endl;
 			Fimgs.free_device();
-			std::cerr << "Fimgs_nomask"<< std::endl;
 			Fimgs_nomask.free_device();
 
-			std::cerr << "sorted_weights"<< std::endl;
 			sorted_weights.free_device();
-			std::cerr << "ctfs"<< std::endl;
 			ctfs.free_device();
-			std::cerr << "Minvsigma2s"<< std::endl;
 			Minvsigma2s.free_device();
 
 			/*======================================================
 								COLLECT DATA
 			======================================================*/
 
-
 			//TODO Following reduction should be done on the GPU
 			wdiff2s_parts.cp_to_host();
 			wdiff2s_parts.free_device();
-			std::cerr << "wdiff2s_parts"<< std::endl;
 
 			for (long int j = 0; j < image_size; j++)
 			{
@@ -1276,10 +1178,9 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 				{
 					double sum = 0;
 					for (long int i = 0; i < orientation_num; i++)
-						sum += wdiff2s_parts[i * image_size + j];
-
-					exp_wsum_norm_correction[ipart] += sum;
+						sum += (double) wdiff2s_parts[i * image_size + j];
 					thr_wsum_sigma2_noise[group_id].data[ires] += sum;
+					exp_wsum_norm_correction[ipart] += sum;
 				}
 			}
 
@@ -1287,82 +1188,111 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			//TODO much in the following double loop can be GPU accelerated
 			// exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans
-			for (long int i = 0; i < orientation_num; i++)
+			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 			{
-				long int idir = idirs[i];
-				long int iover_rot = iover_rots[i];
-				double rot = rots[i];
-				double tilt = tilts[i];
-				double psi = psis[i];
-
-				for (long int j = 0; j < translation_num; j++)
+				for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 				{
-					long int ihidden = iorientclasses[i] * exp_nr_trans + ihiddens[j];
-					long int iover_trans = iover_transes[j];
-
-					long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
-																						iover_rot, iover_trans);
-
-					double weight = DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over);
-					weight /= exp_sum_weight[ipart];
-
-					// Store sum of weights for this group
-					thr_sumw_group[group_id] += weight;
-					// Store weights for this class and orientation
-					thr_wsum_pdf_class[exp_iclass] += weight;
-
-					double diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
-					double diffy = myprior_y - old_offset_y - oversampled_translations_y[iover_trans];
-
-					if (mymodel.data_dim == 3)
+					for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
 					{
-						double diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
-					}
+						long int iorientclass = exp_iclass * exp_nr_dir * exp_nr_psi + iorient;
 
-					// The following goes MUCH faster than the original lines below....
-					if (mymodel.ref_dim == 2)
-					{
-						thr_wsum_prior_offsetx_class[exp_iclass] += weight * (old_offset_x + oversampled_translations_x[iover_trans]);
-						thr_wsum_prior_offsety_class[exp_iclass] += weight * (old_offset_y + oversampled_translations_y[iover_trans]);
-						thr_wsum_sigma2_offset += weight * (diffx*diffx + diffy*diffy);
-					}
-					else if (mymodel.data_dim == 3)
-					{
-						double diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
-						thr_wsum_sigma2_offset += weight * (diffx*diffx + diffy*diffy + diffz*diffz);
-					}
+						// Only proceed if any of the particles had any significant coarsely sampled translation
+						if (isSignificantAnyParticleAnyTranslation(iorientclass, exp_itrans_min, exp_itrans_max, exp_Mcoarse_significant))
+						{
+							// Now get the oversampled (rot, tilt, psi) triplets
+							// This will be only the original (rot,tilt,psi) triplet if (adaptive_oversampling==0)
+							sampling.getOrientations(idir, ipsi, adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+									exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
+							// Loop over all oversampled orientations (only a single one in the first pass)
+							for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
+							{
+								double rot = oversampled_rot[iover_rot];
+								double tilt = oversampled_tilt[iover_rot];
+								double psi = oversampled_psi[iover_rot];
 
-					// Store weight for this direction of this class
-					if (mymodel.orientational_prior_mode == NOPRIOR)
-					{
-						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], idir) += weight;
-					}
-					else
-					{
-						// In the case of orientational priors, get the original number of the direction back
-						long int mydir = exp_pointer_dir_nonzeroprior[idir];
-						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
-					}
+								// Get the Euler matrix
+								Euler_angles2matrix(rot, tilt, psi, A);
 
-					if (weight > exp_max_weight[ipart])
-					{
-						// Store optimal image parameters
-						exp_max_weight[ipart] = weight;
 
-						// TODO: remove, for now to maintain exact numerical version of old threads....
-						A = A.inv();
-						A = A.inv();
-						Euler_matrix2angles(A, rot, tilt, psi);
+								long int ihidden = iorientclass * exp_nr_trans;
+								for (long int itrans = exp_itrans_min, iitrans = 0; itrans <= exp_itrans_max; itrans++, ihidden++)
+								{
+									sampling.getTranslations(itrans, adaptive_oversampling,
+											oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+									for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++, iitrans++)
+									{
+										// Only deal with this sampling point if its weight was significant
+										long int ihidden_over = ihidden * exp_nr_oversampled_trans * exp_nr_oversampled_rot +
+												iover_rot * exp_nr_oversampled_trans + iover_trans;
 
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT) = rot;
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT) = tilt;
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI) = psi;
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF) = XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans];
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_YOFF) = YY(exp_old_offset[ipart]) + oversampled_translations_y[iover_trans];
-						if (mymodel.data_dim == 3)
-							DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ZOFF) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CLASS) = (double)exp_iclass + 1;
-						DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PMAX) = exp_max_weight[ipart];
+										double weight = DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over);
+										if (weight >= exp_significant_weight[ipart])
+										{
+											weight /= exp_sum_weight[ipart];
+
+											// Store sum of weights for this group
+											thr_sumw_group[group_id] += weight;
+											// Store weights for this class and orientation
+											thr_wsum_pdf_class[exp_iclass] += weight;
+
+											// The following goes MUCH faster than the original lines below....
+											if (mymodel.ref_dim == 2)
+											{
+												thr_wsum_prior_offsetx_class[exp_iclass] += weight * (old_offset_x + oversampled_translations_x[iover_trans]);
+												thr_wsum_prior_offsety_class[exp_iclass] += weight * (old_offset_y + oversampled_translations_y[iover_trans]);
+											}
+											double diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
+											double diffy = myprior_y - old_offset_y - oversampled_translations_y[iover_trans];
+											if (mymodel.data_dim == 3)
+											{
+												double diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
+												thr_wsum_sigma2_offset += weight * (diffx*diffx + diffy*diffy + diffz*diffz);
+											}
+											else
+											{
+												thr_wsum_sigma2_offset += weight * (diffx*diffx + diffy*diffy);
+											}
+
+											// Store weight for this direction of this class
+											if (do_skip_align || do_skip_rotate )
+											{
+												//ignore pdf_direction
+											}
+											else if (mymodel.orientational_prior_mode == NOPRIOR)
+											{
+												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], idir) += weight;
+											}
+											else
+											{
+												// In the case of orientational priors, get the original number of the direction back
+												long int mydir = exp_pointer_dir_nonzeroprior[idir];
+												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
+											}
+
+											if (weight > exp_max_weight[ipart])
+											{
+												// Store optimal image parameters
+												exp_max_weight[ipart] = weight;
+
+												A = A.inv();
+												A = A.inv();
+												Euler_matrix2angles(A, rot, tilt, psi);
+
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT) = rot;
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT) = tilt;
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI) = psi;
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF) = XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans];
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_YOFF) = YY(exp_old_offset[ipart]) + oversampled_translations_y[iover_trans];
+												if (mymodel.data_dim == 3)
+													DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ZOFF) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CLASS) = (double)exp_iclass + 1;
+												DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PMAX) = exp_max_weight[ipart];
+											}
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -1374,7 +1304,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 		} // end loop ipart
 
-		std::cerr << "Frefs"<< std::endl;
 		Frefs.free_device();
 
 		/*=======================================================================================
@@ -1382,20 +1311,10 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		=======================================================================================*/
 
 		wavgs.cp_to_host();
-		std::cerr << "wavgs"<< std::endl;
 		wavgs.free_device();
 
 		Fweights.cp_to_host();
-		std::cerr << "Fweights"<< std::endl;
 		Fweights.free_device();
-
-//		std::ofstream fweightFile;
-//		std::string fnm = std::string("out_fweight_gpu.dat");
-//		fweightFile.open(fnm.c_str(), std::ios_base::app);
-//
-//		std::ofstream imgFile;
-//		fnm = std::string("out_img_gpu.dat");
-//		imgFile.open(fnm.c_str(), std::ios_base::app);
 
 		for (long int i = 0; i < orientation_num; i++)
 		{
@@ -1404,33 +1323,13 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			Fimg.data = &wavgs[i * image_size];
 			Fweight.data = &Fweights[i * image_size];
 
-//			fweightFile << rots[i] << " " << tilts[i] << " " << psis[i] << std::endl;
-//			fweightFile << Fweight.data[0] << std::endl;
-//			fweightFile << Fweight.data[1] << std::endl;
-//			fweightFile << Fweight.data[300] << std::endl;
-//			fweightFile << Fweight.data[401] << std::endl;
-//			fweightFile << std::endl;
-//
-//
-//			imgFile << rots[i] << " " << tilts[i] << " " << psis[i] << std::endl;
-//			imgFile << Fimg.data[0].real << " " << Fimg.data[0].imag << std::endl;
-//			imgFile << Fimg.data[1].real << " " << Fimg.data[1].imag << std::endl;
-//			imgFile << Fimg.data[300].real << " " << Fimg.data[300].imag << std::endl;
-//			imgFile << Fimg.data[400].real << " " << Fimg.data[400].imag << std::endl;
-//			imgFile << std::endl;
-
 			int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 			pthread_mutex_lock(&global_mutex2[my_mutex]);
 			(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
 			pthread_mutex_unlock(&global_mutex2[my_mutex]);
 		}
 
-//		fweightFile.close();
-//		imgFile.close();
-//		exit(0);
-
 	} // end loop iclass
-
 
 	// Extend norm_correction and sigma2_noise estimation to higher resolutions for all particles
 	// Also calculate dLL for each particle and store in metadata
@@ -1462,6 +1361,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			thr_avg_norm_correction += normcorr;
 			// Now set the new norm_correction in the relevant position of exp_metadata
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) = normcorr;
+
 
 			// Print warning for strange norm-correction values
 			if (!(iter == 1 && do_firstiter_cc) && DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) > 10.)
