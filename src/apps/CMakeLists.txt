@@ -8,7 +8,7 @@ if(DEBUG_MODE)
     if (CUDA_FOUND)
         set(CUDA_NVCC_FLAGS "-g -Xcompiler \"-O0\"")
         add_definitions(-DDEBUG_CUDA)
-        add_definitions(-DDEBUG_CUDA_MEM)
+        #add_definitions(-DCUDA_BENCHMARK)
     endif(CUDA_FOUND)
     
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
