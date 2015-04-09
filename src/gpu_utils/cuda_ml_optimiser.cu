@@ -318,12 +318,11 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			                           Generate Reference Projections
 			=========================================================================================*/
 
-			//printf("Generate Reference Projections\n");
-
 			Fref.resize(exp_local_Minvsigma2s[0]); //TODO remove this
 			Complex* FrefBag = Fref.data; //TODO remove this
-			clock_t t1, t2;
-			t1 = clock();
+
+			CUDA_TIC("projection 1");
+
 			for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 			{
 				for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
@@ -378,9 +377,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					}
 				}
 			}
-			t2 = clock();
-			float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
-			std::cerr << "Proj generation took "<< td <<" msecs."<< std::endl;
+
+			CUDA_TOC("projection 1");
 
 			Fref.data = FrefBag; //TODO remove this
 
@@ -407,9 +405,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				long unsigned translation_num(0), ihidden(0);
 				std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
-				//printf("Generating translations \n");
-				clock_t t1, t2;
-				t1 = clock();
+
+				CUDA_TIC("translation 1");
+
 				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 				{
 					sampling.getTranslations(itrans, exp_current_oversampling,
@@ -463,9 +461,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						iover_transes.push_back(iover_trans);
 					}
 				}
-				t2 = clock();
-				float td = (((float)t2 - (float)t1) / CLOCKS_PER_SEC ) * 1000;
-				std::cerr << "Trans generation took "<< td <<" msecs."<< std::endl;
+
+				CUDA_TOC("translation 1");
 
 				/*===========================================
 				   Determine significant comparison indices
@@ -627,11 +624,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 				dim3 block_dim(orient1,orient2);
 
-				cudaEvent_t start, stop;
-				float time;
-				cudaEventCreate(&start);
-				cudaEventCreate(&stop);
-				cudaEventRecord(start, 0);
+				CUDA_KERNEL_TIC("cuda_kernel_diff2");
+
 				if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 				{
 					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
@@ -650,27 +644,16 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 																d_rotidx,
 																d_transidx);
 				}
-				cudaEventRecord(stop, 0);
-				cudaEventSynchronize(stop);
-				cudaEventElapsedTime(&time, start, stop);
-				cudaEventDestroy(start);
-				cudaEventDestroy(stop);
-//				for (long unsigned i = 0; i < orientation_num; i ++)
-//				{
-//					for (long unsigned j = 0; j < translation_num; j ++)
-//					{
-//						cuda_diff2_deviceImage( Frefs.xy, (double*) ( d_Frefs + (i * Frefs.xy) ), (double*) ( d_Fimgs + (j * Fimgs.xy) ), d_Minvsigma2, d_diff2s + (i * translation_num + j));
-//					}
-//				}
+
+				CUDA_KERNEL_TAC("cuda_kernel_diff2");
 
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
 
 				HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
-				//printf("Kernel call finished \n");
 
-				std::cerr << "cuda_kernel_diff2<<" << block_dim.x << ", " << BLOCK_SIZE << ">> took "<< time <<" msecs."<< std::endl;
+				CUDA_KERNEL_TOC("cuda_kernel_diff2");
 
 				double* diff2s = new double[orientation_num*translation_num];
 				if (exp_ipass == 0)
@@ -939,7 +922,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		/*=======================================================================================
 		                            REFERENCE PROJECTION GENERATION
 		=======================================================================================*/
-
+		CUDA_TIC("projection 2");
 
 		CudaGlobalPtr<Complex> Frefs(image_size * exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot);
 
@@ -994,6 +977,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		Fweights.device_alloc();
 		//Fweights.device_init(0);
 
+		CUDA_TOC("projection 2");
 
 		/*=======================================================================================
 										  PARTICLE ITERATION
@@ -1032,7 +1016,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			======================================================*/
 
 			CudaGlobalPtr<Complex> Fimgs(image_size * exp_nr_trans * exp_nr_oversampled_trans);
-			CudaGlobalPtr<Complex> Fimgs_nomask(Fimgs.sz);
+			CudaGlobalPtr<Complex> Fimgs_nomask(Fimgs.size);
 
 			long unsigned translation_num(0), ihidden(0);
 			std::vector< long unsigned > iover_transes, itranses, ihiddens;
@@ -1115,7 +1099,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			sorted_weights.free_host();
 
 			CudaGlobalPtr<double> ctfs; //TODO Almost same size for all iparts, should be allocated once
-			ctfs.sz = image_size;
+			ctfs.size = image_size;
 			ctfs.device_alloc();
 
 			if (do_ctf_correction)
@@ -1132,29 +1116,22 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			dim3 block_dim(orientation_num);
 
-			float time;
-			cudaEvent_t start, stop;
-			cudaEventCreate(&start);
-			cudaEventCreate(&stop);
-			cudaEventRecord(start, 0);
+			CUDA_KERNEL_TIC("cuda_kernel_wavg");
 
 			cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-												Frefs.d, Fimgs.d, Fimgs_nomask.d,		//INPUT
-												sorted_weights.d, ctfs.d, Minvsigma2s.d,//INPUT
-												wdiff2s_parts.d, wavgs.d, Fweights.d,	//OUTPUT
+												~Frefs, ~Fimgs, ~Fimgs_nomask,			//INPUTS
+												~sorted_weights, ~ctfs, ~Minvsigma2s,	//INPUTS
+												~wdiff2s_parts, ~wavgs, ~Fweights,		//OUTPUTS
 												translation_num, exp_sum_weight[ipart],	//CONTANTS
 												exp_significant_weight[ipart], 			//CONTANTS
 												image_size, refs_are_ctf_corrected		//CONTANTS
 												);
 
+			CUDA_KERNEL_TAC("cuda_kernel_wavg");
+
 			HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 
-			cudaEventRecord(stop, 0);
-			cudaEventSynchronize(stop);
-			cudaEventElapsedTime(&time, start, stop);
-			cudaEventDestroy(start);
-			cudaEventDestroy(stop);
-			std::cerr << "cuda_kernel_wavg<<" << block_dim.x << ", " << BLOCK_SIZE << ">> took "<< time <<" msecs."<< std::endl;
+			CUDA_KERNEL_TOC("cuda_kernel_wavg");
 
 			Fimgs.free_device();
 			Fimgs_nomask.free_device();
@@ -1186,7 +1163,9 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			wdiff2s_parts.free_host();
 
-			//TODO much in the following double loop can be GPU accelerated
+			//TODO some in the following double loop can be GPU accelerated
+			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
+
 			// exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot * exp_nr_trans * exp_nr_oversampled_trans
 			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 			{

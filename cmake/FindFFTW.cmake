@@ -25,9 +25,15 @@ if(NOT NOTHREAD_RELION)
 	list(APPEND FFTW_LIBRARIES ${FFTW_THREAD_LIBS} )
 endif(NOT NOTHREAD_RELION)
 
-message(STATUS "Looking for ${fftw}.h in $ENV{FFTW_INCLUDE}...")
-find_path(FFTW_PATH     NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
-find_path(FFTW_INCLUDES NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
+message(STATUS "Looking for ${fftw}.h ...")
+if(DEFINED ENV{FFTW_INCLUDE})
+    find_path(FFTW_PATH     NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
+    find_path(FFTW_INCLUDES NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
+else()
+    find_path(FFTW_PATH     NAMES ${fftw}.h )
+    find_path(FFTW_INCLUDES     NAMES ${fftw}.h )
+endif()
+
 #find_library(FFTW_LIBRARIES /opt/tcbsys/fftw/3.3.4-sse2-avx/lib )
 
 message(STATUS "FFTW_PATH: ${FFTW_PATH}")
