@@ -18,63 +18,13 @@
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-class CudaComplex
-{
-public:
-	double real, imag;
-
-	inline
-	__device__ __host__ CudaComplex(): real(), imag() {};
-	inline
-	__device__ __host__ CudaComplex(double real, double imag): real(real), imag(imag) {};
-};
-
-class CudaImages
-{
-public:
-	unsigned x,y,xy,num,max_num;
-	CudaComplex* start;
-
-	inline
-	CudaImages(long unsigned x, long unsigned y, long unsigned max_num):
-			x(x), y(y), num(0), max_num(max_num), xy(x*y), start(new CudaComplex[xy*max_num])
-	{};
-
-	inline
-	CudaComplex* current() { return start + (num*xy); };
-
-	inline
-	void increment() { num++; };
-
-	inline
-	CudaComplex* operator [](long unsigned i) { return start + (i*((long unsigned) xy)); };
-
-	inline
-	long unsigned alloc_size() { return ((long unsigned) num)*((long unsigned) xy); };
-
-	inline
-	CudaComplex* data_to_device()
-	{
-		CudaComplex* d_ptr(0);
-		HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, alloc_size() * sizeof(CudaComplex)));
-		HANDLE_ERROR(cudaMemcpy( d_ptr, start, alloc_size() * sizeof(CudaComplex), cudaMemcpyHostToDevice));
-		return d_ptr;
-	}
-
-	inline
-	void clear() { delete[] start; }
-
-	inline
-	~CudaImages() { delete[] start; }
-};
-
-__global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_diff2(	Complex *g_refs, Complex *g_imgs,
 									double *g_Minvsigma2, double *g_diff2s,
 									const unsigned img_size, const double sum_init,
-									long int significant_num,
-									int translation_num,
-									int *d_rotidx,
-									int *d_transidx)
+									long unsigned significant_num,
+									unsigned translation_num,
+									unsigned *d_rotidx,
+									unsigned *d_transidx)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -156,13 +106,13 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 	}
 }
 
-__global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_cc_diff2(	Complex *g_refs, Complex *g_imgs,
 										double *g_Minvsigma2, double *g_diff2s,
 										const unsigned img_size, const double exp_local_sqrtXi2,
-										long int significant_num,
-										int translation_num,
-										int *d_rotidx,
-										int *d_transidx)
+										long unsigned significant_num,
+										unsigned translation_num,
+										unsigned *d_rotidx,
+										unsigned *d_transidx)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -268,6 +218,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 		std::vector<MultidimArray<double> > &exp_local_Fctfs,
 		std::vector<double> &exp_local_sqrtXi2)
 {
+
+	CUDA_CPU_TIC("diff_pre_gpu");
+
 	// Initialise min_diff and exp_Mweight for this pass
 	int exp_nr_particles = mydata.ori_particles[my_ori_particle].particles_id.size();
 	long int exp_nr_dir = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
@@ -294,6 +247,14 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			exp_itrans_min, exp_itrans_max, exp_Fimgs, dummy, exp_Fctfs, exp_local_Fimgs_shifted, dummy,
 			exp_local_Fctfs, exp_local_sqrtXi2, exp_local_Minvsigma2s);
 
+
+	MultidimArray<Complex > Fref( exp_local_Minvsigma2s[0].ndim, exp_local_Minvsigma2s[0].zdim, exp_local_Minvsigma2s[0].ydim, exp_local_Minvsigma2s[0].xdim);
+	Fref.destroyData = false;
+
+	unsigned image_size = exp_local_Minvsigma2s[0].nzyxdim;
+
+	CUDA_CPU_TOC("diff_pre_gpu");
+
 	// Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 	{
@@ -302,13 +263,12 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			// Local variables
 			std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 			std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-			MultidimArray<Complex > Fref;
-			double *Minvsigma2;
-			double *gpuMinvsigma2 = new double[exp_local_Minvsigma2s[0].xdim*exp_local_Minvsigma2s[0].ydim];
+			CudaGlobalPtr<double> gpuMinvsigma2(image_size);
+			gpuMinvsigma2.device_alloc();
+
 			Matrix2D<double> A;
 
-			CudaImages Frefs(exp_local_Minvsigma2s[0].xdim, exp_local_Minvsigma2s[0].ydim,
-					(exp_idir_max - exp_idir_min + 1) * (exp_ipsi_max - exp_ipsi_min + 1) * exp_nr_oversampled_rot);
+			CudaGlobalPtr<Complex> Frefs(image_size * exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot);
 
 			// Mapping index look-up table
 			std::vector< long unsigned > iorientclasses, iover_rots;
@@ -318,10 +278,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 			                           Generate Reference Projections
 			=========================================================================================*/
 
-			Fref.resize(exp_local_Minvsigma2s[0]); //TODO remove this
-			Complex* FrefBag = Fref.data; //TODO remove this
-
-			CUDA_TIC("projection 1");
+			CUDA_CPU_TIC("projection_1");
 
 			for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 			{
@@ -363,12 +320,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 												oversampled_tilt[iover_rot],
 												oversampled_psi[iover_rot], A);
 
-							Fref.data = (Complex*) Frefs.current();
-
-							// Project the reference map (into Fref)
+							Fref.data = &Frefs[image_size * orientation_num];
 							(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
-
-							Frefs.increment();
 
 							orientation_num ++;
 							iorientclasses.push_back(iorientclass);
@@ -378,35 +331,30 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 			}
 
-			CUDA_TOC("projection 1");
+			Frefs.size = orientation_num * image_size;
+			Frefs.device_alloc();
+			Frefs.cp_to_device();
+			Frefs.free_host();
 
-			Fref.data = FrefBag; //TODO remove this
-
-			CudaComplex *d_Frefs = Frefs.data_to_device();
+			CUDA_CPU_TOC("projection_1");
 
 			/*=======================================================================================
 			                                  	  Particle Iteration
 			=========================================================================================*/
 
-			std::vector< int > transidx, rotidx;
-
 			for (long int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 			{
-				transidx.clear();
-				rotidx.clear();
 				/*====================================
 				        Generate Translations
 				======================================*/
 
-				CudaImages Fimgs(Frefs.x, Frefs.y,
-						( exp_itrans_max - exp_itrans_min + 1) * exp_nr_oversampled_trans);
+				CUDA_CPU_TIC("translation_1");
+
+				CudaGlobalPtr<Complex> Fimgs(image_size * exp_nr_trans * exp_nr_oversampled_trans);
 
 				long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
 				long unsigned translation_num(0), ihidden(0);
 				std::vector< long unsigned > iover_transes, itranses, ihiddens;
-
-
-				CUDA_TIC("translation 1");
 
 				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 				{
@@ -420,7 +368,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 						Complex *myAB;
 						if (exp_current_oversampling == 0)
 						{
-							myAB = (Frefs.y == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
+							myAB = (Fref.ydim == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
 									: global_fftshifts_ab_current[itrans].data;
 						}
 						else
@@ -451,9 +399,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 								real /= DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n);
 								imag /= DIRECT_MULTIDIM_ELEM(exp_local_Fctfs[ipart], n);
 							}
-							*(Fimgs.current() + n) = CudaComplex(real, imag);
+							Fimgs[translation_num * image_size + n] = Complex(real, imag);
 						}
-						Fimgs.increment();
 						translation_num ++;
 
 						ihiddens.push_back(ihidden);
@@ -462,7 +409,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					}
 				}
 
-				CUDA_TOC("translation 1");
+				CUDA_CPU_TOC("translation_1");
 
 				/*===========================================
 				   Determine significant comparison indices
@@ -471,9 +418,14 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				//		it can't complete on first pass, since
 				//		the significance has never been set
 
-				long int coarse_num = exp_nr_dir*exp_nr_psi*exp_nr_trans;
-				long int significant_num=0;
-				//std::cerr << "exp_ipass "<< exp_ipass << std::endl;
+
+				CUDA_CPU_TIC("pair_list_1");
+
+				CudaGlobalPtr<unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
+
+				long unsigned coarse_num = exp_nr_dir*exp_nr_psi*exp_nr_trans;
+				long unsigned significant_num(0);
+
 				if (exp_ipass == 0)
 				{
 					exp_Mcoarse_significant.resize(coarse_num, 1);
@@ -481,8 +433,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					{
 						for (int j = 0; j < translation_num; j++)
 						{
-							 rotidx.push_back(i);
-							 transidx.push_back(j);
+							rotidx[significant_num] = i;
+							transidx[significant_num] = j;
 							significant_num++;
 //							DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, i)=1;
 //							std::cerr << "exp_Mcoarse_significant("<< i <<") = " <<    DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, i) << std::endl;
@@ -507,13 +459,17 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 							{
 								 long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden,
 										                  exp_current_oversampling, iover_rot, iover_trans);
-								 rotidx.push_back(i);
-								 transidx.push_back(j);
-								 significant_num++;
+
+								rotidx[significant_num] = i;
+								transidx[significant_num] = j;
+								significant_num++;
 							}
 						}
 					}
 				}
+
+				CUDA_CPU_TOC("pair_list_1");
+
 //				std::cerr << "orientation_num "<< orientation_num << std::endl;
 //				std::cerr << "translation_num "<< translation_num << std::endl;
 //				std::cerr << "my_nr_significant_coarse_samples "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) << std::endl;
@@ -522,20 +478,15 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				/*====================================
 				   Initiate Particle Related On GPU
 				======================================*/
-//				std::cerr << "-----------------Before moving stuff to GPU (GSD): " << std::endl;
-//				size_t avail;
-//				size_t total;
-//				cudaMemGetInfo( &avail, &total );
-//				size_t used = total - avail;
-//				std::cerr << "Device memory used: " << used << std::endl;
-//				std::cerr << "Of total          : " << total << std::endl;
-//				std::cerr << "(Free)            : " << avail << std::endl;
-				//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
+
+
+				CUDA_CPU_TIC("kernel_init_1");
 
 				// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
 				// we need to make a modified copy, since the global object shouldn't be
 				// changed
-				Minvsigma2 = exp_local_Minvsigma2s[ipart].data;
+
+
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
 				{
 					gpuMinvsigma2[n] = *(exp_local_Minvsigma2s[ipart].data + n );
@@ -562,50 +513,22 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					}
 				}
 
-				double *d_Minvsigma2(0);
+				Fimgs.size = translation_num * image_size;
+				Fimgs.device_alloc();
+				Fimgs.cp_to_device();
 
-				CudaComplex *d_Fimgs = Fimgs.data_to_device();
-//				size_t last_size;
+				gpuMinvsigma2.cp_to_device();
 
-				HANDLE_ERROR(cudaMalloc( (void**) &d_Minvsigma2, Fimgs.xy * sizeof(double)));
-				HANDLE_ERROR(cudaMemcpy( d_Minvsigma2, gpuMinvsigma2, Fimgs.xy * sizeof(double), cudaMemcpyHostToDevice));
-//				last_size=used;
-//				cudaMemGetInfo( &avail, &total );
-//				used = total - avail;
-//				std::cerr << "----d_Minvsigma2 takes: " << used-last_size << std::endl;
+				CudaGlobalPtr<double> diff2s(orientation_num*translation_num);
+				diff2s.device_alloc();
 
-				double *d_diff2s(0);
-				HANDLE_ERROR(cudaMalloc( (void**) &d_diff2s, orientation_num*translation_num * sizeof(double)));
-				//HANDLE_ERROR(cudaMemset(d_diff2s, exp_highres_Xi2_imgs[ipart] / 2., orientation_num*translation_num * sizeof(double))); //Initiate diff2 values with zeros
-//				last_size=used;
-//				cudaMemGetInfo( &avail, &total );
-//				used = total - avail;
-//				std::cerr << "----d_diff2s takes: " << used-last_size << std::endl;
+				rotidx.size = significant_num;
+				rotidx.device_alloc();
+				rotidx.cp_to_device();
 
-				int *d_rotidx(0);
-				HANDLE_ERROR(cudaMalloc( (void**) &d_rotidx, significant_num * sizeof(int)));
-				HANDLE_ERROR(cudaMemcpy( d_rotidx, &rotidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
-//				rotidx.clear();
-//				last_size=used;
-//				cudaMemGetInfo( &avail, &total );
-//				used = total - avail;
-//				std::cerr << "----d_rotidx takes: " << used-last_size << std::endl;
-
-				int *d_transidx(0);
-				HANDLE_ERROR(cudaMalloc( (void**) &d_transidx, significant_num * sizeof(int)));
-				HANDLE_ERROR(cudaMemcpy( d_transidx, &transidx[0],  significant_num * sizeof(int), cudaMemcpyHostToDevice));
-//				transidx.clear();
-//				last_size=used;
-//				cudaMemGetInfo( &avail, &total );
-//				used = total - avail;
-//				std::cerr << "----d_transidx takes: " << used-last_size << std::endl;
-//
-//				std::cerr << "-----------------After moving stuff to GPU (GSD): "<< std::endl;
-//				cudaMemGetInfo( &avail, &total );
-//				used = total - avail;
-//				std::cerr << "Device memory used: " << used << std::endl;
-//				std::cerr << "Of total          : " << total << std::endl;
-//				std::cerr << "(Free)            : " << avail << std::endl;
+				transidx.size = significant_num;
+				transidx.device_alloc();
+				transidx.cp_to_device();
 
 				/*====================================
 				    		Kernel Calls
@@ -624,28 +547,30 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 				dim3 block_dim(orient1,orient2);
 
-				CUDA_KERNEL_TIC("cuda_kernel_diff2");
+				CUDA_CPU_TOC("kernel_init_1");
+
+				CUDA_GPU_TIC("cuda_kernel_diff2");
 
 				if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
 				{
-					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
-																	Frefs.xy, exp_highres_Xi2_imgs[ipart],
+					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs, ~Fimgs, ~gpuMinvsigma2,  ~diff2s,
+																	image_size, exp_highres_Xi2_imgs[ipart],
 																	significant_num,
 																	translation_num,
-																	d_rotidx,
-																	d_transidx);
+																	~rotidx,
+																	~transidx);
 				}
 				else
 				{
-					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(d_Frefs, d_Fimgs, d_Minvsigma2, d_diff2s,
-																Frefs.xy, exp_highres_Xi2_imgs[ipart] / 2.,
+					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs, ~Fimgs, ~gpuMinvsigma2, ~diff2s,
+																image_size, exp_highres_Xi2_imgs[ipart] / 2.,
 																significant_num,
 																translation_num,
-																d_rotidx,
-																d_transidx);
+																~rotidx,
+																~transidx);
 				}
 
-				CUDA_KERNEL_TAC("cuda_kernel_diff2");
+				CUDA_GPU_TAC("cuda_kernel_diff2");
 
 				/*====================================
 				    	   Retrieve Results
@@ -653,29 +578,23 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 
-				CUDA_KERNEL_TOC("cuda_kernel_diff2");
+				CUDA_GPU_TOC("cuda_kernel_diff2");
 
-				double* diff2s = new double[orientation_num*translation_num];
+				diff2s.cp_to_host();
+
 				if (exp_ipass == 0)
 				{
 					exp_Mcoarse_significant.clear();
 				}
-				HANDLE_ERROR(cudaMemcpy( diff2s, d_diff2s, orientation_num*translation_num*sizeof(double), cudaMemcpyDeviceToHost ));
 
 				/*====================================
 				    	Write To Destination
 				======================================*/
 
 
-//				if (exp_current_oversampling > 1)
-//				{
-//				std::ofstream myfile;
-//				std::stringstream sstm;
-//				sstm << "diff2s/gpu_part.dat";
-//				myfile.open(sstm.str().c_str(), std::ios_base::app);
-//				}
+				CUDA_CPU_TIC("collect_data_1");
 
-				for (long unsigned k = 0; k < transidx.size(); k ++)
+				for (long unsigned k = 0; k < significant_num; k ++)
 				{
 					unsigned i = rotidx[k];
 					unsigned j = transidx[k];
@@ -688,10 +607,6 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 																						iover_rot, iover_trans);
 
 					double diff2 = diff2s[i * translation_num + j];
-					//diff2 += exp_highres_Xi2_imgs[ipart] / 2.;
-//
-//						if (exp_current_oversampling > 1)
-//							myfile << ihidden_over << " " << diff2 << std::endl;
 
 					DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) = diff2;
 
@@ -699,27 +614,10 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 					if (diff2 < exp_min_diff2[ipart])
 						exp_min_diff2[ipart] = diff2;
 				}
-				//printf("Writing to destination finished \n");
 
-
-				cudaFree(d_Fimgs);
-				cudaFree(d_diff2s);
-
-				cudaFree(d_transidx);
-				cudaFree(d_rotidx);
-
-				delete [] diff2s;
-
-//				std::cerr << "-----------------After freeing stuff from GPU (GSD): "<< std::endl;
-//				cudaMemGetInfo( &avail, &total );
-//				used = total - avail;
-//				std::cerr << "Device memory used: " << used << std::endl;
-//				std::cerr << "Of total          : " << total << std::endl;
-//				std::cerr << "(Free)            : " << avail << std::endl;
+				CUDA_CPU_TOC("collect_data_1");
 
 			} // end loop ipart
-
-			cudaFree(d_Frefs);
 
 		} // end if class significant
 	} // end loop iclass
@@ -815,6 +713,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		std::vector<MultidimArray<double> > &exp_local_Fctfs,
 		std::vector<double> &exp_local_sqrtXi2)
 {
+	CUDA_CPU_TIC("store_pre_gpu");
 
 	int exp_nr_particles = mydata.ori_particles[my_ori_particle].particles_id.size();
 	long int exp_nr_dir = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
@@ -913,6 +812,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 	unsigned image_size = exp_local_Minvsigma2s[0].xdim*exp_local_Minvsigma2s[0].ydim;
 
+	CUDA_CPU_TOC("store_pre_gpu");
+
 	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 	{
@@ -922,7 +823,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		/*=======================================================================================
 		                            REFERENCE PROJECTION GENERATION
 		=======================================================================================*/
-		CUDA_TIC("projection 2");
+		CUDA_CPU_TIC("projection_2");
 
 		CudaGlobalPtr<Complex> Frefs(image_size * exp_nr_dir * exp_nr_psi * exp_nr_oversampled_rot);
 
@@ -965,6 +866,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			}
 		}
 
+		Frefs.size = orientation_num * image_size;
 		Frefs.device_alloc();
 		Frefs.cp_to_device();
 		Frefs.free_host();
@@ -977,7 +879,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		Fweights.device_alloc();
 		//Fweights.device_init(0);
 
-		CUDA_TOC("projection 2");
+		CUDA_CPU_TOC("projection_2");
 
 		/*=======================================================================================
 										  PARTICLE ITERATION
@@ -1014,6 +916,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			/*======================================================
 								 TRANSLATIONS
 			======================================================*/
+
+			CUDA_CPU_TIC("translation_2");
 
 			CudaGlobalPtr<Complex> Fimgs(image_size * exp_nr_trans * exp_nr_oversampled_trans);
 			CudaGlobalPtr<Complex> Fimgs_nomask(Fimgs.size);
@@ -1059,11 +963,15 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 				}
 			}
 
+			Fimgs.size = translation_num * image_size;
 			Fimgs.device_alloc();
 			Fimgs.cp_to_device();
+
+			Fimgs_nomask.size = translation_num * image_size;
 			Fimgs_nomask.device_alloc();
 			Fimgs_nomask.cp_to_device();
 
+			CUDA_CPU_TOC("translation_2");
 
 			/*======================================================
 					            MAP WEIGHTS
@@ -1116,7 +1024,7 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			dim3 block_dim(orientation_num);
 
-			CUDA_KERNEL_TIC("cuda_kernel_wavg");
+			CUDA_GPU_TIC("cuda_kernel_wavg");
 
 			cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
 												~Frefs, ~Fimgs, ~Fimgs_nomask,			//INPUTS
@@ -1127,11 +1035,11 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 												image_size, refs_are_ctf_corrected		//CONTANTS
 												);
 
-			CUDA_KERNEL_TAC("cuda_kernel_wavg");
+			CUDA_GPU_TAC("cuda_kernel_wavg");
 
 			HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 
-			CUDA_KERNEL_TOC("cuda_kernel_wavg");
+			CUDA_GPU_TOC("cuda_kernel_wavg");
 
 			Fimgs.free_device();
 			Fimgs_nomask.free_device();
@@ -1143,6 +1051,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			/*======================================================
 								COLLECT DATA
 			======================================================*/
+
+			CUDA_CPU_TIC("reduce_wdiff2s");
 
 			//TODO Following reduction should be done on the GPU
 			wdiff2s_parts.cp_to_host();
@@ -1163,6 +1073,9 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			wdiff2s_parts.free_host();
 
+			CUDA_CPU_TOC("reduce_wdiff2s");
+
+			CUDA_CPU_TIC("collect_data_2");
 			//TODO some in the following double loop can be GPU accelerated
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
 
@@ -1276,6 +1189,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 				}
 			}
 
+			CUDA_CPU_TOC("collect_data_2");
+
 #ifdef DEBUG_CUDA_MEM
 		printf("After Freeing Device Mem: ");
 		cudaPrintMemInfo();
@@ -1288,6 +1203,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		/*=======================================================================================
 										   BACKPROJECTION
 		=======================================================================================*/
+
+		CUDA_CPU_TIC("backprojection");
 
 		wavgs.cp_to_host();
 		wavgs.free_device();
@@ -1324,14 +1241,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		fclose(stdout);
 #endif
 
-//		std::ofstream fweightFile;
-//		std::string fnm = std::string("out_fweight_gpu.dat");
-//		fweightFile.open(fnm.c_str(), std::ios_base::app);
-//
-//		std::ofstream imgFile;
-//		fnm = std::string("out_img_gpu.dat");
-//		imgFile.open(fnm.c_str(), std::ios_base::app);
-
 		for (long int i = 0; i < orientation_num; i++)
 		{
 			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
@@ -1345,7 +1254,11 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			pthread_mutex_unlock(&global_mutex2[my_mutex]);
 		}
 
+		CUDA_CPU_TOC("backprojection");
+
 	} // end loop iclass
+
+	CUDA_CPU_TIC("store_post_gpu");
 
 	// Extend norm_correction and sigma2_noise estimation to higher resolutions for all particles
 	// Also calculate dLL for each particle and store in metadata
@@ -1470,6 +1383,8 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		wsum_model.ave_Pmax += thr_sum_Pmax;
 		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
+
+	CUDA_CPU_TOC("store_post_gpu");
 }
 
 //void MlOptimiserCUDA::precalculateModelProjectionsCtfsAndInvSigma2s(bool do_also_unmasked,
