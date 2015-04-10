@@ -4,11 +4,19 @@ static void HandleError( cudaError_t err, const char *file, int line )
 {
     if (err != cudaSuccess)
     {
-        printf( "CUDA ERROR: %s in %s at line %d\n",
+        printf( "DEBUG_ERROR: %s in %s at line %d\n",
         		cudaGetErrorString( err ), file, line );
         exit( EXIT_FAILURE );
     }
 }
+
+#ifdef CUDA_DOUBLE_PRECISION
+#define FLOAT double
+class CudaComplex { public: double real, imag; };
+#else
+#define FLOAT float
+class CudaComplex { public: float real, imag; };
+#endif
 
 #ifdef DEBUG_CUDA
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
@@ -56,7 +64,7 @@ static void cuda_cpu_tic(std::string id)
 	}
 	else
 	{
-		printf("Provided identifier '%s' already exists in call to cuda_cpu_tic.\n", id.c_str());
+		printf("DEBUG_ERROR: Provided identifier '%s' already exists in call to cuda_cpu_tic.\n", id.c_str());
 		exit( EXIT_FAILURE );
 	}
 }
@@ -67,7 +75,7 @@ static void cuda_cpu_toc(std::string id)
 	int idx = cuda_benchmark_find_id(id, cuda_cpu_identifiers);
 	if (idx == -1)
 	{
-		printf("Provided identifier '%s' not found in call to cuda_cpu_toc.\n", id.c_str());
+		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_cpu_toc.\n", id.c_str());
 		exit( EXIT_FAILURE );
 	}
 	else
@@ -100,7 +108,7 @@ static void cuda_gpu_tic(std::string id)
 	}
 	else
 	{
-		printf("Provided identifier '%s' already exists in call to cuda_gpu_tic.\n",
+		printf("DEBUG_ERROR: Provided identifier '%s' already exists in call to cuda_gpu_tic.\n",
 				id.c_str());
 		exit( EXIT_FAILURE );
 	}
@@ -112,7 +120,7 @@ static void cuda_gpu_tac(std::string id)
 	int idx = cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers);
 	if (idx == -1)
 	{
-		printf("Provided identifier '%s' not found in call to cuda_gpu_tac.\n",
+		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_tac.\n",
 				id.c_str());
 		exit( EXIT_FAILURE );
 	}
@@ -129,7 +137,7 @@ static void cuda_gpu_toc(std::string id)
 	int idx = cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers);
 	if (idx == -1)
 	{
-		printf("Provided identifier '%s' not found in call to cuda_gpu_toc.\n",
+		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_toc.\n",
 				id.c_str());
 		exit( EXIT_FAILURE );
 	}
@@ -183,19 +191,28 @@ public:
 	inline
 	__host__ void device_alloc()
 	{
+#ifdef DEBUG_CUDA
+		if (d_free) printf("DEBUG_WARNING: Device double allocation.\n");
+#endif
 		HANDLE_ERROR(cudaMalloc( (void**) &dPtr, size * sizeof(T)));
 		d_free = true;
+	}
+
+	inline
+	__host__ void host_alloc()
+	{
+#ifdef DEBUG_CUDA
+		if (h_free) printf("DEBUG_WARNING: Host double allocation.\n");
+#endif
+		hPtr = new T[size];
+		h_free = true;
 	}
 
 	inline
 	__host__ void device_init(int value)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
-		{
-			printf("Memset requested before allocation in device_init().\n");
-			exit( EXIT_FAILURE );
-		}
+		if (dPtr == 0) printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
 #endif
 		HANDLE_ERROR(cudaMemset( dPtr, value, size * sizeof(T)));
 	}
@@ -204,16 +221,8 @@ public:
 	__host__ void cp_to_device()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
-		{
-			printf("Cpy to device requested before allocation in cp_to_device().\n");
-			exit( EXIT_FAILURE );
-		}
-		if (hPtr == 0)
-		{
-			printf("NULL host pointer in cp_to_device().\n");
-			exit( EXIT_FAILURE );
-		}
+		if (dPtr == 0) printf("DEBUG_WARNING: cp_to_device() called before allocation.\n");
+		if (hPtr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_device().\n");
 #endif
 		HANDLE_ERROR(cudaMemcpy( dPtr, hPtr, size * sizeof(T), cudaMemcpyHostToDevice));
 	}
@@ -228,6 +237,10 @@ public:
 	inline
 	__host__ void cp_to_host()
 	{
+#ifdef DEBUG_CUDA
+		if (dPtr == 0) printf("DEBUG_WARNING: cp_to_host() called before allocation.\n");
+		if (hPtr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
+#endif
 		HANDLE_ERROR(cudaMemcpy( hPtr, dPtr, size * sizeof(T), cudaMemcpyDeviceToHost ));
 	}
 
@@ -237,17 +250,18 @@ public:
 	__host__ const T& operator[](size_t idx) const { return hPtr[idx]; };
 
 	inline
-	__host__ T* operator~() { return dPtr; };
+	__host__ T* operator~() {
+#ifdef DEBUG_CUDA
+		if (dPtr == 0) printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+#endif
+		return dPtr;
+	};
 
 	inline
 	__host__ void free_device()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
-		{
-			printf("Free device memory was called on NULL pointer in free_device().\n");
-			exit( EXIT_FAILURE );
-		}
+		if (dPtr == 0) printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
 #endif
 		HANDLE_ERROR(cudaFree(dPtr));
 		dPtr = 0;
@@ -257,6 +271,13 @@ public:
 	inline
 	__host__ void free_host()
 	{
+#ifdef DEBUG_CUDA
+		if (dPtr == 0)
+		{
+			printf("DEBUG_ERROR: free_host() called on NULL pointer.\n");
+	        exit( EXIT_FAILURE );
+		}
+#endif
 		delete [] hPtr;
 		hPtr = 0;
 		h_free = false;
