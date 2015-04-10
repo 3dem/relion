@@ -1,15 +1,5 @@
 #include <cuda.h>
 
-static void HandleError( cudaError_t err, const char *file, int line )
-{
-    if (err != cudaSuccess)
-    {
-        printf( "DEBUG_ERROR: %s in %s at line %d\n",
-        		cudaGetErrorString( err ), file, line );
-        exit( EXIT_FAILURE );
-    }
-}
-
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
 class CudaComplex { public: double real, imag; };
@@ -23,7 +13,19 @@ class CudaComplex { public: float real, imag; };
 #else
 #define HANDLE_ERROR( err ) (err) //Do nothing
 #endif
+static void HandleError( cudaError_t err, const char *file, int line )
+{
+    if (err != cudaSuccess)
+    {
+        printf( "DEBUG_ERROR: %s in %s at line %d\n",
+        		cudaGetErrorString( err ), file, line );
+        exit( EXIT_FAILURE );
+    }
+}
 
+/**
+ * Print cuda device memory info
+ */
 static void cudaPrintMemInfo()
 {
 	size_t free;
@@ -167,8 +169,8 @@ template <typename T>
 class CudaGlobalPtr
 {
 public:
-	size_t size;
-	T *h_ptr, *d_ptr;
+	size_t size; //Size used when copying data from and to device
+	T *h_ptr, *d_ptr; //Host and device pointers
 	bool h_do_free, d_do_free; //True if host or device needs to be freed
 
 	inline
@@ -186,6 +188,9 @@ public:
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true), d_do_free(false)
 	{};
 
+	/**
+	 * Allocate memory on device
+	 */
 	inline
 	__host__ void device_alloc()
 	{
@@ -196,6 +201,9 @@ public:
 		HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
+	/**
+	 * Allocate memory on host
+	 */
 	inline
 	__host__ void host_alloc()
 	{
@@ -206,6 +214,9 @@ public:
 		h_ptr = new T[size];
 	}
 
+	/**
+	 * Initiate device memory with provided value
+	 */
 	inline
 	__host__ void device_init(int value)
 	{
@@ -215,6 +226,9 @@ public:
 		HANDLE_ERROR(cudaMemset( d_ptr, value, size * sizeof(T)));
 	}
 
+	/**
+	 * Copy a number (size) of bytes to device stored in the host pointer
+	 */
 	inline
 	__host__ void cp_to_device()
 	{
@@ -225,6 +239,9 @@ public:
 		HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
 	}
 
+	/**
+	 * Copy a number (size) of bytes to device stored in the provided host pointer
+	 */
 	inline
 	__host__ void cp_to_device(T * hostPtr)
 	{
@@ -232,6 +249,9 @@ public:
 		cp_to_device();
 	}
 
+	/**
+	 * Copy a number (size) of bytes from device to the host pointer
+	 */
 	inline
 	__host__ void cp_to_host()
 	{
@@ -242,11 +262,22 @@ public:
 		HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost ));
 	}
 
+	/**
+	 * Host data quick access
+	 */
 	inline
 	__host__ T& operator[](size_t idx) { return h_ptr[idx]; };
+
+
+	/**
+	 * Host data quick access
+	 */
 	inline
 	__host__ const T& operator[](size_t idx) const { return h_ptr[idx]; };
 
+	/**
+	 * Device pointer quick access
+	 */
 	inline
 	__host__ T* operator~() {
 #ifdef DEBUG_CUDA
@@ -255,6 +286,9 @@ public:
 		return d_ptr;
 	};
 
+	/**
+	 * Delete device data
+	 */
 	inline
 	__host__ void free_device()
 	{
@@ -266,6 +300,9 @@ public:
 		d_ptr = 0;
 	}
 
+	/**
+	 * Delete host data
+	 */
 	inline
 	__host__ void free_host()
 	{
@@ -281,6 +318,9 @@ public:
 		h_ptr = 0;
 	}
 
+	/**
+	 * Delete both device and host data
+	 */
 	inline
 	__host__ void free()
 	{
