@@ -22,9 +22,9 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 									FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
 									unsigned img_size, FLOAT sum_init,
 									unsigned long significant_num,
-									unsigned translation_num,
-									unsigned *d_rotidx,
-									unsigned *d_transidx)
+									unsigned long translation_num,
+									unsigned long *d_rotidx,
+									unsigned long *d_transidx)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -109,9 +109,9 @@ __global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 										FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
 										unsigned img_size, FLOAT exp_local_sqrtXi2,
 										unsigned long significant_num,
-										unsigned translation_num,
-										unsigned *d_rotidx,
-										unsigned *d_transidx)
+										unsigned long translation_num,
+										unsigned long *d_rotidx,
+										unsigned long *d_transidx)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -426,7 +426,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				CUDA_CPU_TIC("pair_list_1");
 
-				CudaGlobalPtr<unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
+				CudaGlobalPtr<long unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
 
 				long unsigned coarse_num = exp_nr_dir*exp_nr_psi*exp_nr_trans;
 				long unsigned significant_num(0);
@@ -434,9 +434,9 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				if (exp_ipass == 0)
 				{
 					exp_Mcoarse_significant.resize(coarse_num, 1);
-					for (int i = 0; i < orientation_num; i++)
+					for (long unsigned i = 0; i < orientation_num; i++)
 					{
-						for (int j = 0; j < translation_num; j++)
+						for (long unsigned j = 0; j < translation_num; j++)
 						{
 							rotidx[significant_num] = i;
 							transidx[significant_num] = j;
@@ -449,12 +449,12 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				}
 				else
 				{
-					for (int i = 0; i < orientation_num; i++)
+					for (long unsigned i = 0; i < orientation_num; i++)
 					{
 						long int iover_rot = iover_rots[i];
 //						long int iover_rot = i % exp_nr_oversampled_rot
 						long int coarse_rot = floor(i/exp_nr_oversampled_rot);
-						for (int j = 0; j < translation_num; j++)
+						for (long unsigned j = 0; j < translation_num; j++)
 						{
 							long int iover_trans = iover_transes[j];
 //							long int iover_trans = j % exp_nr_oversampled_trans
@@ -538,7 +538,7 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 				/*====================================
 				    		Kernel Calls
 				======================================*/
-				short int orient1, orient2;
+				unsigned orient1, orient2;
 
 				if(significant_num>65535)
 				{
@@ -601,8 +601,8 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 
 				for (long unsigned k = 0; k < significant_num; k ++)
 				{
-					unsigned i = rotidx[k];
-					unsigned j = transidx[k];
+					long unsigned i = rotidx[k];
+					long unsigned j = transidx[k];
 					long int iover_rot = iover_rots[i];
 
 					long int ihidden = iorientclasses[i] * exp_nr_trans + ihiddens[j];
@@ -631,11 +631,11 @@ void MlOptimiserCUDA::getAllSquaredDifferences(
 __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
 									FLOAT* g_weights, FLOAT* g_ctfs, FLOAT* g_Minvsigma2s,
 									FLOAT *g_wdiff2s_parts, CudaComplex *g_wavgs, FLOAT* g_Fweights,
-									const unsigned translation_num, const FLOAT weight_norm,
-									const FLOAT significant_weight, const unsigned image_size,
-									const bool refs_are_ctf_corrected)
+									unsigned long translation_num, FLOAT weight_norm,
+									FLOAT significant_weight, unsigned image_size,
+									bool refs_are_ctf_corrected)
 {
-	unsigned orientation = blockIdx.x;
+	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
 	unsigned tid = threadIdx.x;
 
 	//TODO Consider Mresol_fine to speed up this kernel
@@ -654,17 +654,17 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 
 		if (pixel < image_size)
 		{
-			unsigned long orientation_pixel = orientation * image_size + pixel;
+			unsigned long orientation_pixel = iorient * image_size + pixel;
 
-			for (unsigned translation = 0; translation < translation_num; translation++)
+			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
-				FLOAT weight = g_weights[orientation * translation_num + translation];
+				FLOAT weight = g_weights[iorient * translation_num + itrans];
 
 				if (weight >= significant_weight)
 				{
 					weight /= weight_norm;
 
-					unsigned long img_pixel_idx = translation * image_size + pixel;
+					unsigned long img_pixel_idx = itrans * image_size + pixel;
 
 					FLOAT myctf = g_ctfs[pixel];
 					CudaComplex ref = g_refs[orientation_pixel];
@@ -978,10 +978,10 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 
 			CudaGlobalPtr<FLOAT> sorted_weights(orientation_num * translation_num);
 
-			for (unsigned i = 0; i < orientation_num; i++)
+			for (long unsigned i = 0; i < orientation_num; i++)
 			{
 				long unsigned iover_rot = iover_rots[i];
-				for (unsigned j = 0; j < translation_num; j++)
+				for (long unsigned j = 0; j < translation_num; j++)
 				{
 					long unsigned iover_trans = iover_transes[j];
 					long unsigned ihidden = iorientclasses[i] * exp_nr_trans + ihiddens[j];
@@ -1027,7 +1027,18 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			CudaGlobalPtr<FLOAT> wdiff2s_parts(orientation_num * image_size); //TODO Almost same size for all iparts, should be allocated once
 			wdiff2s_parts.device_alloc();
 
-			dim3 block_dim(orientation_num);
+			unsigned orient1, orient2;
+			if(orientation_num>65535)
+			{
+				orient1 = ceil(sqrt(orientation_num));
+				orient2 = orient1;
+			}
+			else
+			{
+				orient1 = orientation_num;
+				orient2 = 1;
+			}
+			dim3 block_dim(orient1,orient2);
 
 			CUDA_GPU_TIC("cuda_kernel_wavg");
 

@@ -36,8 +36,6 @@ static void cudaPrintMemInfo()
 }
 
 //Non-concurrent benchmarking tools (only for Linux)
-#if defined(CUDA_BENCHMARK) && ! defined(__linux__)
-#endif
 #if defined(CUDA_BENCHMARK) && defined(__linux__)
 #include <vector>
 #include <ctime>
