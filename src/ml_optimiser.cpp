@@ -2268,7 +2268,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		}
 		//For tests we want to exit now
 		//if(iter == 2)
-			exit(0);
+		//	exit(0);
 
 #endif
 

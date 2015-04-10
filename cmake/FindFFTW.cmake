@@ -26,11 +26,15 @@ if(NOT NOTHREAD_RELION)
 endif(NOT NOTHREAD_RELION)
 
 message(STATUS "Looking for ${fftw}.h ...")
+if(DEFINED ENV{FFTW_INCLUDE})
+    find_path(FFTW_PATH     NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
+    find_path(FFTW_INCLUDES NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
+else()
+    find_path(FFTW_PATH     NAMES ${fftw}.h )
+    find_path(FFTW_INCLUDES     NAMES ${fftw}.h )
+endif()
 
-find_path(FFTW_PATH ${fftw}.h /usr/lib/* /usr/share/* /usr/include/* $ENV{FFTW_INCLUDE} )
-find_path(FFTW_INCLUDES ${fftw}.h /usr/lib/* /usr/share/* /usr/include/* $ENV{FFTW_INCLUDE})
 #find_library(FFTW_LIBRARIES /opt/tcbsys/fftw/3.3.4-sse2-avx/lib )
-
 
 message(STATUS "FFTW_PATH: ${FFTW_PATH}")
 message(STATUS "FFTW_INCLUDES: ${FFTW_INCLUDES}")
