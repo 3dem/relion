@@ -170,67 +170,67 @@ class CudaGlobalPtr
 {
 public:
 	size_t size;
-	T *hPtr, *dPtr;
-	bool h_free, d_free; //True if host or device needs to be freed
+	T *h_ptr, *d_ptr;
+	bool h_do_free, d_do_free; //True if host or device needs to be freed
 
 	inline
 	__host__ CudaGlobalPtr<T>():
-		size(0), hPtr(0), dPtr(0), h_free(false), d_free(false)
+		size(0), h_ptr(0), d_ptr(0), h_do_free(false), d_do_free(false)
 	{};
 
 	inline
 	__host__ CudaGlobalPtr<T>(T * h_start, size_t size):
-		size(size), hPtr(h_start), dPtr(0), h_free(false), d_free(false)
+		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false), d_do_free(false)
 	{};
 
 	inline
 	__host__ CudaGlobalPtr<T>(size_t size):
-		size(size), hPtr(new T[size]), dPtr(0), h_free(true), d_free(false)
+		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true), d_do_free(false)
 	{};
 
 	inline
 	__host__ void device_alloc()
 	{
 #ifdef DEBUG_CUDA
-		if (d_free) printf("DEBUG_WARNING: Device double allocation.\n");
+		if (d_do_free) printf("DEBUG_WARNING: Device double allocation.\n");
 #endif
-		HANDLE_ERROR(cudaMalloc( (void**) &dPtr, size * sizeof(T)));
-		d_free = true;
+		d_do_free = true;
+		HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
 	inline
 	__host__ void host_alloc()
 	{
 #ifdef DEBUG_CUDA
-		if (h_free) printf("DEBUG_WARNING: Host double allocation.\n");
+		if (h_do_free) printf("DEBUG_WARNING: Host double allocation.\n");
 #endif
-		hPtr = new T[size];
-		h_free = true;
+		h_do_free = true;
+		h_ptr = new T[size];
 	}
 
 	inline
 	__host__ void device_init(int value)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0) printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
+		if (d_ptr == 0) printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
 #endif
-		HANDLE_ERROR(cudaMemset( dPtr, value, size * sizeof(T)));
+		HANDLE_ERROR(cudaMemset( d_ptr, value, size * sizeof(T)));
 	}
 
 	inline
 	__host__ void cp_to_device()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0) printf("DEBUG_WARNING: cp_to_device() called before allocation.\n");
-		if (hPtr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_device().\n");
+		if (d_ptr == 0) printf("DEBUG_WARNING: cp_to_device() called before allocation.\n");
+		if (h_ptr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_device().\n");
 #endif
-		HANDLE_ERROR(cudaMemcpy( dPtr, hPtr, size * sizeof(T), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
 	}
 
 	inline
 	__host__ void cp_to_device(T * hostPtr)
 	{
-		hPtr = hostPtr;
+		h_ptr = hostPtr;
 		cp_to_device();
 	}
 
@@ -238,49 +238,49 @@ public:
 	__host__ void cp_to_host()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0) printf("DEBUG_WARNING: cp_to_host() called before allocation.\n");
-		if (hPtr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
+		if (d_ptr == 0) printf("DEBUG_WARNING: cp_to_host() called before allocation.\n");
+		if (h_ptr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
 #endif
-		HANDLE_ERROR(cudaMemcpy( hPtr, dPtr, size * sizeof(T), cudaMemcpyDeviceToHost ));
+		HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost ));
 	}
 
 	inline
-	__host__ T& operator[](size_t idx) { return hPtr[idx]; };
+	__host__ T& operator[](size_t idx) { return h_ptr[idx]; };
 	inline
-	__host__ const T& operator[](size_t idx) const { return hPtr[idx]; };
+	__host__ const T& operator[](size_t idx) const { return h_ptr[idx]; };
 
 	inline
 	__host__ T* operator~() {
 #ifdef DEBUG_CUDA
-		if (dPtr == 0) printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+		if (d_ptr == 0) printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
 #endif
-		return dPtr;
+		return d_ptr;
 	};
 
 	inline
 	__host__ void free_device()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0) printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
+		if (d_ptr == 0) printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
 #endif
-		HANDLE_ERROR(cudaFree(dPtr));
-		dPtr = 0;
-		d_free = false;
+		d_do_free = false;
+		HANDLE_ERROR(cudaFree(d_ptr));
+		d_ptr = 0;
 	}
 
 	inline
 	__host__ void free_host()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
+		if (h_ptr == 0)
 		{
 			printf("DEBUG_ERROR: free_host() called on NULL pointer.\n");
 	        exit( EXIT_FAILURE );
 		}
 #endif
-		delete [] hPtr;
-		hPtr = 0;
-		h_free = false;
+		h_do_free = false;
+		delete [] h_ptr;
+		h_ptr = 0;
 	}
 
 	inline
@@ -293,7 +293,7 @@ public:
 	inline
 	__host__ ~CudaGlobalPtr()
 	{
-		if (d_free) free_device();
-		if (h_free) free_host();
+		if (d_do_free) free_device();
+		if (h_do_free) free_host();
 	}
 };
