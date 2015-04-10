@@ -666,20 +666,24 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 
 					unsigned long img_pixel_idx = itrans * image_size + pixel;
 
-					FLOAT myctf = g_ctfs[pixel];
+					FLOAT ctf = g_ctfs[pixel];
 					CudaComplex ref = g_refs[orientation_pixel];
 					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
 					{
-						ref.real *= myctf;
-						ref.imag *= myctf;
+						ref.real *= ctf;
+						ref.imag *= ctf;
 					}
 					FLOAT diff_real = ref.real - g_imgs[img_pixel_idx].real;
 					FLOAT diff_imag = ref.imag - g_imgs[img_pixel_idx].imag;
+
 					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
-					FLOAT weightxinvsigma2 = weight * myctf * g_Minvsigma2s[pixel];
+
+					FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel];
+
 					wavgs_real += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
 					wavgs_imag += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
-					Fweight += weightxinvsigma2 * myctf;
+
+					Fweight += weightxinvsigma2 * ctf;
 				}
 			}
 
@@ -973,6 +977,32 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			CUDA_CPU_TOC("translation_2");
 
 			/*======================================================
+					            	SCALE
+			======================================================*/
+
+			FLOAT part_scale(1.);
+
+			if (do_scale_correction)
+			{
+				part_scale = mymodel.scale_correction[group_id];
+				if (part_scale > 10000.)
+				{
+					std::cerr << " rlnMicrographScaleCorrection= " << part_scale << " group= " << group_id + 1 << std::endl;
+					REPORT_ERROR("ERROR: rlnMicrographScaleCorrection is very high. Did you normalize your data?");
+				}
+				else if (part_scale < 0.001)
+				{
+					if (!have_warned_small_scale)
+					{
+						std::cout << " WARNING: ignoring group " << group_id + 1 << " with very small or negative scale (" << part_scale <<
+								"); Use larger groups for more stable scale estimates." << std::endl;
+						have_warned_small_scale = true;
+					}
+					part_scale = 0.001;
+				}
+			}
+
+			/*======================================================
 					            MAP WEIGHTS
 			======================================================*/
 
@@ -1005,23 +1035,30 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 			sorted_weights.cp_to_device();
 			sorted_weights.free_host();
 
-			CudaGlobalPtr<FLOAT> ctfs(image_size); //TODO Almost same size for all iparts, should be allocated once
+			CudaGlobalPtr<FLOAT> ctfs(image_size); //TODO Same size for all iparts, should be allocated once
 			ctfs.device_alloc();
 
 			if (do_ctf_correction)
 			{
 				for (unsigned i = 0; i < image_size; i++)
-					ctfs[i] = (FLOAT) exp_local_Fctfs[ipart].data[i];
-				ctfs.cp_to_device();
+					ctfs[i] = (FLOAT) exp_local_Fctfs[ipart].data[i] * part_scale;
 			}
-			else
-				ctfs.device_init(1.);
+			else //TODO should be handled by memset
+				for (unsigned i = 0; i < image_size; i++)
+					ctfs[i] = part_scale;
 
-			CudaGlobalPtr<FLOAT> Minvsigma2s(image_size); //TODO Almost same size for all iparts, should be allocated once
-			for (unsigned i = 0; i < image_size; i++)
-				Minvsigma2s[i] = exp_local_Minvsigma2s[ipart].data[i];
+			ctfs.cp_to_device();
 
+			CudaGlobalPtr<FLOAT> Minvsigma2s(image_size); //TODO Same size for all iparts, should be allocated once
 			Minvsigma2s.device_alloc();
+
+			if (do_map)
+				for (unsigned i = 0; i < image_size; i++)
+					Minvsigma2s[i] = exp_local_Minvsigma2s[ipart].data[i];
+			else //TODO should be handled by memset
+				for (unsigned i = 0; i < image_size; i++)
+					Minvsigma2s[i] = 1;
+
 			Minvsigma2s.cp_to_device();
 
 			CudaGlobalPtr<FLOAT> wdiff2s_parts(orientation_num * image_size); //TODO Almost same size for all iparts, should be allocated once
@@ -1222,8 +1259,6 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 										   BACKPROJECTION
 		=======================================================================================*/
 
-		CUDA_CPU_TIC("backprojection");
-
 		wavgs.cp_to_host();
 		wavgs.free_device();
 
@@ -1259,7 +1294,9 @@ void MlOptimiserCUDA::storeWeightedSums(long int my_ori_particle, int exp_curren
 		fclose(stdout);
 #endif
 
-		for (long int i = 0; i < orientation_num; i++)
+		CUDA_CPU_TIC("backprojection");
+
+		for (long int i = 0; i < 8; i++)
 		{
 			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
 
