@@ -117,35 +117,35 @@ SET_TESTS_PROPERTIES(CPU-3Dc_sigma2_noise PROPERTIES DEPENDS CPU-3Dc_produce)
 add_test(NAME CPU-3Dc_angdist
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                             ref_it002_angdist.bild
+         ref_output/out_it002_class001_angdist.bild
         test_output/out_it002_class001_angdist.bild)
 SET_TESTS_PROPERTIES(CPU-3Dc_angdist PROPERTIES DEPENDS CPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_data
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_data.star
+         ref_output/out_it002_data.star
         test_output/out_it002_data.star)
 SET_TESTS_PROPERTIES(CPU-3Dc_angdist PROPERTIES DEPENDS CPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_sampling
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_sampling.star
+         ref_output/out_it002_sampling.star
         test_output/out_it002_sampling.star)
 SET_TESTS_PROPERTIES(CPU-3Dc_sampling PROPERTIES DEPENDS CPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_model
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_model.star
+         ref_output/out_it002_model.star
         test_output/out_it002_model.star)
 SET_TESTS_PROPERTIES(CPU-3Dc_model PROPERTIES DEPENDS CPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME CPU-3Dc_optimiser
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_optimiser.star
+         ref_output/out_it002_optimiser.star
         test_output/out_it002_optimiser.star)
 SET_TESTS_PROPERTIES(CPU-3Dc_optimiser PROPERTIES DEPENDS CPU-3Dc_produce)
 #--------------------------------------------------------------------
@@ -261,35 +261,35 @@ SET_TESTS_PROPERTIES(GPU-3Dc_sigma2_noise PROPERTIES DEPENDS GPU-3Dc_produce)
 add_test(NAME GPU-3Dc_angdist
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                             ref_it002_angdist.bild
+         ref_output/out_it002_class001_angdist.bild
         test_output/out_it002_class001_angdist.bild)
 SET_TESTS_PROPERTIES(GPU-3Dc_angdist PROPERTIES DEPENDS GPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME GPU-3Dc_data
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_data.star
+         ref_output/out_it002_data.star
         test_output/out_it002_data.star)
 SET_TESTS_PROPERTIES(GPU-3Dc_angdist PROPERTIES DEPENDS GPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME GPU-3Dc_sampling
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_sampling.star
+         ref_output/out_it002_sampling.star
         test_output/out_it002_sampling.star)
 SET_TESTS_PROPERTIES(GPU-3Dc_sampling PROPERTIES DEPENDS GPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME GPU-3Dc_model
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_model.star
+         ref_output/out_it002_model.star
         test_output/out_it002_model.star)
 SET_TESTS_PROPERTIES(GPU-3Dc_model PROPERTIES DEPENDS GPU-3Dc_produce)
 #--------------------------------------------------------------------
 add_test(NAME GPU-3Dc_optimiser
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
         COMMAND ${CMAKE_COMMAND} -E compare_files 
-                    ref_it002_optimiser.star
+         ref_output/out_it002_optimiser.star
         test_output/out_it002_optimiser.star)
 SET_TESTS_PROPERTIES(GPU-3Dc_optimiser PROPERTIES DEPENDS GPU-3Dc_produce)
 #--------------------------------------------------------------------
