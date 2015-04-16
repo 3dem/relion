@@ -34,9 +34,7 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
-
 #include "gpu_utils/cuda_ml_optimiser.h"
-#include "gpu_utils/cuda_img_operations.h"
 
 #define NR_CLASS_MUTEXES 5
 
@@ -50,7 +48,15 @@ ThreadManager * global_ThreadManager;
 
 void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 {
-	((MlOptimiser*)thArg.workClass)->doThreadExpectationSomeParticles(thArg.thread_id);
+	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
+
+	if (MLO->do_gpu)
+	{
+		MlOptimiserCuda cuda_optimiser(MLO);
+		cuda_optimiser.doThreadExpectationSomeParticles(thArg.thread_id);
+	}
+	else
+		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
 
 
@@ -2080,30 +2086,22 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		global_barrier->wait();
 #endif
 
-		if (do_gpu)
-		{
+		// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
+		getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
-			MlOptimiserCUDA cuda_optimus_prim(*this); //TODO This should of course be called once per reference iteration
+//		MlOptimiserCuda cuda_optimiser(this);
+//		cuda_optimiser.getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
+//				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+//				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
+//				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
+//				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+//				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
-			cuda_optimus_prim.getAllSquaredDifferences(
-					my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-			cuda_optimus_prim.putBackValues(*this);
-		}
-		else
-		{
-			// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
-			getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-		}
 
 
 #ifdef DEBUG_ESP_MEM
@@ -2219,30 +2217,14 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 	global_barrier->wait();
 #endif
 
-	if (do_gpu)
-	{
-		MlOptimiserCUDA cuda_optimus_prim(*this); //TODO This should of course be called once per reference iteration
-		cuda_optimus_prim.storeWeightedSums(my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,
-				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
-				exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
-				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
-				exp_significant_weight, exp_sum_weight, exp_max_weight,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-		cuda_optimus_prim.putBackValues(*this);
-	}
-	else
-	{
-		storeWeightedSums(my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,
-				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
-				exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
-				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
-				exp_significant_weight, exp_sum_weight, exp_max_weight,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-	}
+	storeWeightedSums(my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,
+			exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
+			exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
+			exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
+			exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
+			exp_significant_weight, exp_sum_weight, exp_max_weight,
+			exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
+			exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
 #ifdef RELION_TESTING
 //		std::string mode;
@@ -5066,6 +5048,16 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
 
+
+
+//	FILE *fPtr = fopen("cpu.dat","w");
+//	fprintf(fPtr,"exp_metadata\n");
+//	for (unsigned i = 0; i < std::min((int) exp_metadata.nzyxdim, 1000); i ++)
+//			fprintf(fPtr," %.10e\n", exp_metadata.data[i]);
+//
+//	wsum_model.printMe(fPtr);
+//	fclose(fPtr);
+//	exit(0);
 
 #ifdef DEBUG_OVERSAMPLING
 	std::cerr << " max_weight= " << max_weight << " nr_sign_sam= "<<nr_significant_samples<<" sign w= "<<exp_significant_weight<<std::endl;

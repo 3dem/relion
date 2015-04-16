@@ -1,21 +1,31 @@
 #include <cuda.h>
 
-static void HandleError( cudaError_t err, const char *file, int line )
-{
-    if (err != cudaSuccess)
-    {
-        printf( "CUDA ERROR: %s in %s at line %d\n",
-        		cudaGetErrorString( err ), file, line );
-        exit( EXIT_FAILURE );
-    }
-}
+#ifdef CUDA_DOUBLE_PRECISION
+#define FLOAT double
+class CudaComplex { public: double real, imag; };
+#else
+#define FLOAT float
+class CudaComplex { public: float real, imag; };
+#endif
 
 #ifdef DEBUG_CUDA
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 #else
 #define HANDLE_ERROR( err ) (err) //Do nothing
 #endif
+static void HandleError( cudaError_t err, const char *file, int line )
+{
+    if (err != cudaSuccess)
+    {
+        printf( "DEBUG_ERROR: %s in %s at line %d\n",
+        		cudaGetErrorString( err ), file, line );
+        exit( EXIT_FAILURE );
+    }
+}
 
+/**
+ * Print cuda device memory info
+ */
 static void cudaPrintMemInfo()
 {
 	size_t free;
@@ -27,14 +37,11 @@ static void cudaPrintMemInfo()
     		free_hr, total_hr, total_hr - free_hr);
 }
 
-//Non-concurrent benchmarking tools
-#ifdef CUDA_BENCHMARK
+//Non-concurrent benchmarking tools (only for Linux)
+#if defined(CUDA_BENCHMARK) && defined(__linux__)
 #include <vector>
 #include <ctime>
 #include <string>
-
-std::vector<std::string> cuda_benchmark_identifiers;
-std::vector<clock_t>     cuda_benchmark_start_times;
 
 static int cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
 {
@@ -44,223 +51,276 @@ static int cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
 	return -1;
 }
 
-#define CUDA_TIC(ID) (cuda_benchmark_tic(ID))
-static void cuda_benchmark_tic(std::string id)
+std::vector<std::string> cuda_cpu_identifiers;
+std::vector<clock_t>     cuda_cpu_start_times;
+
+#define CUDA_CPU_TIC(ID) (cuda_cpu_tic(ID))
+static void cuda_cpu_tic(std::string id)
 {
-	if (cuda_benchmark_find_id(id, cuda_benchmark_identifiers) == -1)
+	if (cuda_benchmark_find_id(id, cuda_cpu_identifiers) == -1)
 	{
-		cuda_benchmark_identifiers.push_back(id);
-		cuda_benchmark_start_times.push_back(clock());
+		cuda_cpu_identifiers.push_back(id);
+		cuda_cpu_start_times.push_back(clock());
 	}
 	else
 	{
-		printf("Provided identifier '%s' already exists in call to cuda_benchmark_tic.\n", id.c_str());
+		printf("DEBUG_ERROR: Provided identifier '%s' already exists in call to cuda_cpu_tic.\n", id.c_str());
 		exit( EXIT_FAILURE );
 	}
 }
 
-#define CUDA_TOC(ID) (cuda_benchmark_toc(ID))
-static void cuda_benchmark_toc(std::string id)
+#define CUDA_CPU_TOC(ID) (cuda_cpu_toc(ID))
+static void cuda_cpu_toc(std::string id)
 {
-	int idx = cuda_benchmark_find_id(id, cuda_benchmark_identifiers);
+	int idx = cuda_benchmark_find_id(id, cuda_cpu_identifiers);
 	if (idx == -1)
 	{
-		printf("Provided identifier '%s' not found in call to cuda_benchmark_toc.\n", id.c_str());
+		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_cpu_toc.\n", id.c_str());
 		exit( EXIT_FAILURE );
 	}
 	else
 	{
-		clock_t start_time = cuda_benchmark_start_times[idx];
-		cuda_benchmark_identifiers.erase(cuda_benchmark_identifiers.begin()+idx);
-		cuda_benchmark_start_times.erase(cuda_benchmark_start_times.begin()+idx);
+		clock_t start_time = cuda_cpu_start_times[idx];
+		cuda_cpu_identifiers.erase(cuda_cpu_identifiers.begin()+idx);
+		cuda_cpu_start_times.erase(cuda_cpu_start_times.begin()+idx);
 		FILE *fPtr = fopen("benchmark.dat","a");
 		fprintf(fPtr,"CPU: %s \t %.2f \xC2\xB5s\n", id.c_str(),
 				(((float)clock() - (float)start_time) / CLOCKS_PER_SEC ) * 1000.);
 		fclose(fPtr);
 	}
 }
-std::vector<std::string> cuda_benchmark_kernel_identifiers;
-std::vector<cudaEvent_t> cuda_benchmark_kernel_start_times;
-std::vector<cudaEvent_t> cuda_benchmark_kernel_stop_times;
+std::vector<std::string> cuda_gpu_kernel_identifiers;
+std::vector<cudaEvent_t> cuda_gpu_kernel_start_times;
+std::vector<cudaEvent_t> cuda_gpu_kernel_stop_times;
 
-#define CUDA_KERNEL_TIC(ID) (cuda_kernel_benchmark_tic(ID))
-static void cuda_kernel_benchmark_tic(std::string id)
+#define CUDA_GPU_TIC(ID) (cuda_gpu_tic(ID))
+static void cuda_gpu_tic(std::string id)
 {
-	if (cuda_benchmark_find_id(id, cuda_benchmark_kernel_identifiers) == -1)
+	if (cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers) == -1)
 	{
 		cudaEvent_t start, stop;
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		cudaEventRecord(start, 0);
-		cuda_benchmark_kernel_identifiers.push_back(id);
-		cuda_benchmark_kernel_start_times.push_back(start);
-		cuda_benchmark_kernel_stop_times.push_back(stop);
+		cuda_gpu_kernel_identifiers.push_back(id);
+		cuda_gpu_kernel_start_times.push_back(start);
+		cuda_gpu_kernel_stop_times.push_back(stop);
 	}
 	else
 	{
-		printf("Provided identifier '%s' already exists in call to cuda_kernel_benchmark_toc.\n",
+		printf("DEBUG_ERROR: Provided identifier '%s' already exists in call to cuda_gpu_tic.\n",
 				id.c_str());
 		exit( EXIT_FAILURE );
 	}
 }
 
-#define CUDA_KERNEL_TAC(ID) (cuda_kernel_benchmark_tac(ID))
-static void cuda_kernel_benchmark_tac(std::string id)
+#define CUDA_GPU_TAC(ID) (cuda_gpu_tac(ID))
+static void cuda_gpu_tac(std::string id)
 {
-	int idx = cuda_benchmark_find_id(id, cuda_benchmark_kernel_identifiers);
+	int idx = cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers);
 	if (idx == -1)
 	{
-		printf("Provided identifier '%s' not found in call to cuda_kernel_benchmark_tac.\n",
+		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_tac.\n",
 				id.c_str());
 		exit( EXIT_FAILURE );
 	}
 	else
 	{
-		cudaEventRecord(cuda_benchmark_kernel_stop_times[idx], 0);
-		cudaEventSynchronize(cuda_benchmark_kernel_stop_times[idx]);
+		cudaEventRecord(cuda_gpu_kernel_stop_times[idx], 0);
+		cudaEventSynchronize(cuda_gpu_kernel_stop_times[idx]);
 	}
 }
 
-#define CUDA_KERNEL_TOC(ID) (cuda_kernel_benchmark_toc(ID))
-static void cuda_kernel_benchmark_toc(std::string id)
+#define CUDA_GPU_TOC(ID) (cuda_gpu_toc(ID))
+static void cuda_gpu_toc(std::string id)
 {
-	int idx = cuda_benchmark_find_id(id, cuda_benchmark_kernel_identifiers);
+	int idx = cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers);
 	if (idx == -1)
 	{
-		printf("Provided identifier '%s' not found in call to cuda_kernel_benchmark_toc.\n",
+		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_toc.\n",
 				id.c_str());
 		exit( EXIT_FAILURE );
 	}
 	else
 	{
 		float time;
-		cudaEventElapsedTime(&time, cuda_benchmark_kernel_start_times[idx],
-				cuda_benchmark_kernel_stop_times[idx]);
-		cudaEventDestroy(cuda_benchmark_kernel_start_times[idx]);
-		cudaEventDestroy(cuda_benchmark_kernel_stop_times[idx]);
-		cuda_benchmark_kernel_identifiers.erase(cuda_benchmark_kernel_identifiers.begin()+idx);
-		cuda_benchmark_kernel_start_times.erase(cuda_benchmark_kernel_start_times.begin()+idx);
-		cuda_benchmark_kernel_stop_times.erase(cuda_benchmark_kernel_stop_times.begin()+idx);
+		cudaEventElapsedTime(&time, cuda_gpu_kernel_start_times[idx],
+				cuda_gpu_kernel_stop_times[idx]);
+		cudaEventDestroy(cuda_gpu_kernel_start_times[idx]);
+		cudaEventDestroy(cuda_gpu_kernel_stop_times[idx]);
+		cuda_gpu_kernel_identifiers.erase(cuda_gpu_kernel_identifiers.begin()+idx);
+		cuda_gpu_kernel_start_times.erase(cuda_gpu_kernel_start_times.begin()+idx);
+		cuda_gpu_kernel_stop_times.erase(cuda_gpu_kernel_stop_times.begin()+idx);
 
 		FILE *fPtr = fopen("benchmark.dat","a");
 		fprintf(fPtr,"GPU: %s \t %.2f \xC2\xB5s\n", id.c_str(), time);
 		fclose(fPtr);
 	}
 }
-
 #else
-#define CUDA_TIC(ID)
-#define CUDA_TOC(ID)
-#define CUDA_KERNEL_TIC(ID)
-#define CUDA_KERNEL_TAC(ID)
-#define CUDA_KERNEL_TOC(ID)
+#define CUDA_CPU_TIC(ID)
+#define CUDA_CPU_TOC(ID)
+#define CUDA_GPU_TIC(ID)
+#define CUDA_GPU_TAC(ID)
+#define CUDA_GPU_TOC(ID)
 #endif
 
 template <typename T>
 class CudaGlobalPtr
 {
 public:
-	size_t size;
-	T *hPtr, *dPtr;
-	bool h_free, d_free; //True if host or device needs to be freed
+	size_t size; //Size used when copying data from and to device
+	T *h_ptr, *d_ptr; //Host and device pointers
+	bool h_do_free, d_do_free; //True if host or device needs to be freed
 
 	inline
 	__host__ CudaGlobalPtr<T>():
-		size(0), hPtr(0), dPtr(0), h_free(false), d_free(false)
+		size(0), h_ptr(0), d_ptr(0), h_do_free(false), d_do_free(false)
 	{};
 
 	inline
 	__host__ CudaGlobalPtr<T>(T * h_start, size_t size):
-		size(size), hPtr(h_start), dPtr(0), h_free(false), d_free(false)
+		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false), d_do_free(false)
 	{};
 
 	inline
 	__host__ CudaGlobalPtr<T>(size_t size):
-		size(size), hPtr(new T[size]), dPtr(0), h_free(true), d_free(false)
+		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true), d_do_free(false)
 	{};
 
+	/**
+	 * Allocate memory on device
+	 */
 	inline
 	__host__ void device_alloc()
 	{
-		HANDLE_ERROR(cudaMalloc( (void**) &dPtr, size * sizeof(T)));
-		d_free = true;
+#ifdef DEBUG_CUDA
+		if (d_do_free) printf("DEBUG_WARNING: Device double allocation.\n");
+#endif
+		d_do_free = true;
+		HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
+	/**
+	 * Allocate memory on host
+	 */
+	inline
+	__host__ void host_alloc()
+	{
+#ifdef DEBUG_CUDA
+		if (h_do_free) printf("DEBUG_WARNING: Host double allocation.\n");
+#endif
+		h_do_free = true;
+		h_ptr = new T[size];
+	}
+
+	/**
+	 * Initiate device memory with provided value
+	 */
 	inline
 	__host__ void device_init(int value)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
-		{
-			printf("Memset requested before allocation in device_init().\n");
-			exit( EXIT_FAILURE );
-		}
+		if (d_ptr == 0) printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
 #endif
-		HANDLE_ERROR(cudaMemset( dPtr, value, size * sizeof(T)));
+		HANDLE_ERROR(cudaMemset( d_ptr, value, size * sizeof(T)));
 	}
 
+	/**
+	 * Copy a number (size) of bytes to device stored in the host pointer
+	 */
 	inline
 	__host__ void cp_to_device()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
-		{
-			printf("Cpy to device requested before allocation in cp_to_device().\n");
-			exit( EXIT_FAILURE );
-		}
-		if (hPtr == 0)
-		{
-			printf("NULL host pointer in cp_to_device().\n");
-			exit( EXIT_FAILURE );
-		}
+		if (d_ptr == 0) printf("DEBUG_WARNING: cp_to_device() called before allocation.\n");
+		if (h_ptr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_device().\n");
 #endif
-		HANDLE_ERROR(cudaMemcpy( dPtr, hPtr, size * sizeof(T), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
 	}
 
+	/**
+	 * Copy a number (size) of bytes to device stored in the provided host pointer
+	 */
 	inline
 	__host__ void cp_to_device(T * hostPtr)
 	{
-		hPtr = hostPtr;
+		h_ptr = hostPtr;
 		cp_to_device();
 	}
 
+	/**
+	 * Copy a number (size) of bytes from device to the host pointer
+	 */
 	inline
 	__host__ void cp_to_host()
 	{
-		HANDLE_ERROR(cudaMemcpy( hPtr, dPtr, size * sizeof(T), cudaMemcpyDeviceToHost ));
+#ifdef DEBUG_CUDA
+		if (d_ptr == 0) printf("DEBUG_WARNING: cp_to_host() called before allocation.\n");
+		if (h_ptr == 0) printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
+#endif
+		HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost ));
 	}
 
+	/**
+	 * Host data quick access
+	 */
 	inline
-	__host__ T& operator[](size_t idx) { return hPtr[idx]; };
-	inline
-	__host__ const T& operator[](size_t idx) const { return hPtr[idx]; };
+	__host__ T& operator[](size_t idx) { return h_ptr[idx]; };
 
-	inline
-	__host__ T* operator~() { return dPtr; };
 
+	/**
+	 * Host data quick access
+	 */
+	inline
+	__host__ const T& operator[](size_t idx) const { return h_ptr[idx]; };
+
+	/**
+	 * Device pointer quick access
+	 */
+	inline
+	__host__ T* operator~() {
+#ifdef DEBUG_CUDA
+		if (d_ptr == 0) printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+#endif
+		return d_ptr;
+	};
+
+	/**
+	 * Delete device data
+	 */
 	inline
 	__host__ void free_device()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == 0)
-		{
-			printf("Free device memory was called on NULL pointer in free_device().\n");
-			exit( EXIT_FAILURE );
-		}
+		if (d_ptr == 0) printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
 #endif
-		HANDLE_ERROR(cudaFree(dPtr));
-		dPtr = 0;
-		d_free = false;
+		d_do_free = false;
+		HANDLE_ERROR(cudaFree(d_ptr));
+		d_ptr = 0;
 	}
 
+	/**
+	 * Delete host data
+	 */
 	inline
 	__host__ void free_host()
 	{
-		delete [] hPtr;
-		hPtr = 0;
-		h_free = false;
+#ifdef DEBUG_CUDA
+		if (h_ptr == 0)
+		{
+			printf("DEBUG_ERROR: free_host() called on NULL pointer.\n");
+	        exit( EXIT_FAILURE );
+		}
+#endif
+		h_do_free = false;
+		delete [] h_ptr;
+		h_ptr = 0;
 	}
 
+	/**
+	 * Delete both device and host data
+	 */
 	inline
 	__host__ void free()
 	{
@@ -271,7 +331,7 @@ public:
 	inline
 	__host__ ~CudaGlobalPtr()
 	{
-		if (d_free) free_device();
-		if (h_free) free_host();
+		if (d_do_free) free_device();
+		if (h_do_free) free_host();
 	}
 };

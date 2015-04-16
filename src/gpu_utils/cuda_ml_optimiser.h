@@ -1,226 +1,88 @@
 #ifndef CUDA_ML_OPTIMISER_H_
 #define CUDA_ML_OPTIMISER_H_
 
-#include <pthread.h>
 #include "src/ml_optimiser.h"
-#include "src/ml_model.h"
-#include "src/parallel.h"
-#include "src/exp_model.h"
-#include "src/ctf.h"
-#include "src/time.h"
-#include "src/mask.h"
-#include "src/healpix_sampling.h"
 
-class MlOptimiserCUDA
+
+class OptimisationParamters
 {
 public:
+	unsigned metadata_offset;
 
+	unsigned long my_ori_particle;
 
-	/* Flag to indicate orientational (i.e. rotational AND translational) searches will be skipped */
-	bool do_skip_align;
+	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
+	std::vector<MultidimArray<double> > Fctfs, local_Fctfs, local_Minvsigma2s;
+	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
+	std::vector<double> directions_prior, psi_prior, local_sqrtXi2;
+	std::vector<double> highres_Xi2_imgs, min_diff2;
+	MultidimArray<bool> Mcoarse_significant;
+	// And from storeWeightedSums
+	std::vector<double> sum_weight, significant_weight, max_weight;
+	std::vector<Matrix1D<double> > old_offset, prior;
+	std::vector<MultidimArray<double> > power_imgs;
+	MultidimArray<double> Mweight;
 
-	/* Flag to indicate rotational searches will be skipped */
-	bool do_skip_rotate;
-
-	// Experimental metadata model
-	Experiment mydata;
-
-	// Current ML model
-	MlModel mymodel;
-
-	// HEALPix sampling object for coarse sampling
-	HealpixSampling sampling;
-
-	// Tabulated sin and cosine functions for shifts in Fourier space
-	TabSine tab_sin;
-	TabCosine tab_cos;
-
-	// Calculate translated images on-the-fly
-	bool do_shifts_onthefly;
-
-	int iter;
-
-	// Skip marginalisation in first iteration and use signal cross-product instead of Gaussian
-	bool do_firstiter_cc;
-
-	/// Always perform cross-correlation instead of marginalization
-	bool do_always_cc;
-
-	//  Use images only up to a certain resolution in the expectation step
-	int coarse_size;
-
-    // Array with pointers to the resolution of each point in a Fourier-space FFTW-like array
-	MultidimArray<int> Mresol_fine, Mresol_coarse;
-
-	// Multiplicative fdge factor for the sigma estimates
-	double sigma2_fudge;
-
-	// Flag whether to do CTF correction
-	bool do_ctf_correction;
-
-	// Flag whether current references are ctf corrected
-	bool refs_are_ctf_corrected;
-
-	// Flag whether to do group-wise intensity bfactor correction
-	bool do_scale_correction;
-
-	std::vector<MultidimArray<Complex> > global_fftshifts_ab_coarse, global_fftshifts_ab_current,
-											global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
-
-	int adaptive_oversampling;
-
-	// Strict high-res limit in the expectation step
-	double strict_highres_exp;
-
-	/* Flag to indicate maximization step will be skipped: only data.star file will be written out */
-	bool do_skip_maximization;
-
-	// Flag whether to use maximum a posteriori (MAP) estimation
-	bool do_map;
-
-	MultidimArray<double> exp_metadata;
-
-	// Current weighted sums
-	MlWsumModel wsum_model;
-
-	// Flag whether to do image-wise intensity-scale correction
-	bool do_norm_correction;
-
-	MlOptimiserCUDA(const MlOptimiser &parentOptimiser)
+	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
+		metadata_offset(0),
+		my_ori_particle(my_ori_particle)
 	{
-		mydata = 		parentOptimiser.mydata;
-		mymodel = 		parentOptimiser.mymodel;
-		sampling = 		parentOptimiser.sampling;
-
-		do_skip_align = 	parentOptimiser.do_skip_align;
-		do_skip_rotate = 	parentOptimiser.do_skip_rotate;
-		iter = 				parentOptimiser.iter;
-		do_firstiter_cc = 	parentOptimiser.do_firstiter_cc;
-		do_always_cc = 		parentOptimiser.do_always_cc;
-		coarse_size = 		parentOptimiser.coarse_size;
-		Mresol_fine = 		parentOptimiser.Mresol_fine;
-		Mresol_coarse = 	parentOptimiser.Mresol_coarse;
-		sigma2_fudge = 		parentOptimiser.sigma2_fudge;
-		tab_sin = 			parentOptimiser.tab_sin;
-		tab_cos = 			parentOptimiser.tab_cos;
-		do_ctf_correction = 			parentOptimiser.do_ctf_correction;
-		do_shifts_onthefly = 			parentOptimiser.do_shifts_onthefly;
-		refs_are_ctf_corrected = 		parentOptimiser.refs_are_ctf_corrected;
-		do_scale_correction = 			parentOptimiser.do_scale_correction;
-		global_fftshifts_ab_coarse = 	parentOptimiser.global_fftshifts_ab_coarse;
-		global_fftshifts_ab_current = 	parentOptimiser.global_fftshifts_ab_current;
-		global_fftshifts_ab2_coarse = 	parentOptimiser.global_fftshifts_ab2_coarse;
-		global_fftshifts_ab2_current = 	parentOptimiser.global_fftshifts_ab2_current;
-		strict_highres_exp = 			parentOptimiser.strict_highres_exp;
-
-		adaptive_oversampling = 	parentOptimiser.adaptive_oversampling;
-		do_skip_maximization = 		parentOptimiser.do_skip_maximization;
-		do_map = 					parentOptimiser.do_map;
-		exp_metadata = 				parentOptimiser.exp_metadata;
-		wsum_model = 				parentOptimiser.wsum_model;
-		do_norm_correction = 		parentOptimiser.do_norm_correction;
+		power_imgs.resize(nr_particles);
+		highres_Xi2_imgs.resize(nr_particles);
+		Fimgs.resize(nr_particles);
+		Fimgs_nomask.resize(nr_particles);
+		Fctfs.resize(nr_particles);
+		old_offset.resize(nr_particles);
+		prior.resize(nr_particles);
 	};
+};
 
-	void putBackValues(MlOptimiser &parentOptimiser)
-	{
-		parentOptimiser.mydata  = 		mydata;
-		parentOptimiser.mymodel = 		mymodel;
-		parentOptimiser.sampling = 		sampling;
+class SamplingParameters
+{
+public:
+	unsigned long nr_dir,
+	nr_psi,
+	nr_trans,
+	nr_oversampled_rot,
+	nr_oversampled_trans,
+	nr_particles,
+	current_oversampling,
+	current_image_size,
+	iclass_min, iclass_max,
+	idir_min, idir_max,
+	ipsi_min, ipsi_max,
+	itrans_min, itrans_max;
 
-		parentOptimiser.do_skip_align = 	do_skip_align;
-		parentOptimiser.do_skip_rotate = 	do_skip_rotate;
-		parentOptimiser.iter = 				iter;
-		parentOptimiser.do_firstiter_cc = 	do_firstiter_cc;
-		parentOptimiser.do_always_cc = 		do_always_cc;
-		parentOptimiser.coarse_size = 		coarse_size;
-		parentOptimiser.Mresol_fine = 		Mresol_fine;
-		parentOptimiser.Mresol_coarse = 	Mresol_coarse;
-		parentOptimiser.sigma2_fudge = 		sigma2_fudge;
-		parentOptimiser.tab_sin = 			tab_sin;
-		parentOptimiser.tab_cos = 			tab_cos;
-		parentOptimiser.do_ctf_correction = 			do_ctf_correction;
-		parentOptimiser.do_shifts_onthefly = 			do_shifts_onthefly;
-		parentOptimiser.refs_are_ctf_corrected = 		refs_are_ctf_corrected;
-		parentOptimiser.do_scale_correction = 			do_scale_correction;
-		parentOptimiser.global_fftshifts_ab_coarse = 	global_fftshifts_ab_coarse;
-		parentOptimiser.global_fftshifts_ab_current = 	global_fftshifts_ab_current;
-		parentOptimiser.global_fftshifts_ab2_coarse = 	global_fftshifts_ab2_coarse;
-		parentOptimiser.global_fftshifts_ab2_current = 	global_fftshifts_ab2_current;
-		parentOptimiser.strict_highres_exp = 			strict_highres_exp;
+	SamplingParameters():
+		nr_dir(0),
+		nr_psi(0),
+		nr_trans(0),
+		nr_oversampled_rot(0),
+		nr_oversampled_trans(0),
+		nr_particles(0),
+		current_oversampling(0),
+		current_image_size(0),
+		iclass_min(0), iclass_max(0),
+		idir_min(0), idir_max(0),
+		ipsi_min(0), ipsi_max(0),
+		itrans_min(0), itrans_max(0)
+	{};
+};
 
-		parentOptimiser.adaptive_oversampling = 	adaptive_oversampling;
-		parentOptimiser.do_skip_maximization = 		do_skip_maximization;
-		parentOptimiser.do_map = 					do_map;
-		parentOptimiser.exp_metadata = 				exp_metadata;
-		parentOptimiser.wsum_model = 				wsum_model;
-		parentOptimiser.do_norm_correction = 		do_norm_correction;
-	}
+class MlOptimiserCuda
+{
+public:
+	MlOptimiser *baseMLO;
 
-	void getAllSquaredDifferences(
-			long int my_ori_particle, int exp_current_image_size,
-			int exp_ipass, int exp_current_oversampling, int metadata_offset,
-			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<double> &exp_min_diff2,
-			std::vector<double> &exp_highres_Xi2_imgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
-			MultidimArray<double> &exp_Mweight,
-			MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
-			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2
-		);
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser) : baseMLO(baseMLOptimiser) {};
 
-	void storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
-			int exp_current_oversampling, int metadata_offset,
-			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-			int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
-			std::vector<double> &exp_min_diff2,
-			std::vector<double> &exp_highres_Xi2_imgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
-			std::vector<MultidimArray<double> > &exp_power_imgs,
-			std::vector<Matrix1D<double> > &exp_old_offset,
-			std::vector<Matrix1D<double> > &exp_prior,
-			MultidimArray<double> &exp_Mweight,
-			MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<double> &exp_significant_weight,
-			std::vector<double> &exp_sum_weight,
-			std::vector<double> &exp_max_weight,
-			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
-			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2
-		);
+	void doThreadExpectationSomeParticles(unsigned thread_id);
 
-	void precalculateShiftedImagesCtfsAndInvSigma2s(
-			bool do_also_unmasked,
-			long int my_ori_particle, int exp_current_image_size, int exp_current_oversampling,
-			int exp_itrans_min, int exp_itrans_max,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s
-		);
+	void getAllSquaredDifferences(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp);
 
-	bool isSignificantAnyParticleAnyTranslation(
-			long int iorient,
-			int exp_itrans_min,
-			int exp_itrans_max,
-			MultidimArray<bool> &exp_Mcoarse_significant
-		);
+	void convertAllSquaredDifferencesToWeights(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp);
+
+	void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp);
 };
 
 #endif
