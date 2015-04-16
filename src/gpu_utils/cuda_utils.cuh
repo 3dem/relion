@@ -38,7 +38,7 @@ static void cudaPrintMemInfo()
 }
 
 //Non-concurrent benchmarking tools (only for Linux)
-#if defined(CUDA_BENCHMARK) && defined(__linux__)
+#ifdef CUDA_BENCHMARK
 #include <vector>
 #include <ctime>
 #include <string>
@@ -84,7 +84,7 @@ static void cuda_cpu_toc(std::string id)
 		cuda_cpu_identifiers.erase(cuda_cpu_identifiers.begin()+idx);
 		cuda_cpu_start_times.erase(cuda_cpu_start_times.begin()+idx);
 		FILE *fPtr = fopen("benchmark.dat","a");
-		fprintf(fPtr,"CPU: %s \t %.2f \xC2\xB5s\n", id.c_str(),
+		fprintf(fPtr,"CPU: %s \t %.2f ms\n", id.c_str(),
 				(((float)clock() - (float)start_time) / CLOCKS_PER_SEC ) * 1000.);
 		fclose(fPtr);
 	}
@@ -153,7 +153,7 @@ static void cuda_gpu_toc(std::string id)
 		cuda_gpu_kernel_stop_times.erase(cuda_gpu_kernel_stop_times.begin()+idx);
 
 		FILE *fPtr = fopen("benchmark.dat","a");
-		fprintf(fPtr,"GPU: %s \t %.2f \xC2\xB5s\n", id.c_str(), time);
+		fprintf(fPtr,"GPU: %s \t %.2f ms\n", id.c_str(), time);
 		fclose(fPtr);
 	}
 }

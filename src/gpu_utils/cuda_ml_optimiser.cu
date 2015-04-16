@@ -124,14 +124,20 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				sp.nr_oversampled_rot = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				sp.nr_oversampled_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 
+				CUDA_CPU_TIC("getAllSquaredDifferences");
 				getAllSquaredDifferences(ipass, op, sp);
+				CUDA_CPU_TOC("getAllSquaredDifferences");
+				CUDA_CPU_TIC("convertAllSquaredDifferencesToWeights");
 				convertAllSquaredDifferencesToWeights(ipass, op, sp);
+				CUDA_CPU_TOC("convertAllSquaredDifferencesToWeights");
 			}
 
 			// For the reconstruction step use mymodel.current_size!
 			sp.current_image_size = baseMLO->mymodel.current_size;
 
+			CUDA_CPU_TIC("storeWeightedSums");
 			storeWeightedSums(op, sp);
+			CUDA_CPU_TOC("storeWeightedSums");
 		}
 	}
 }
