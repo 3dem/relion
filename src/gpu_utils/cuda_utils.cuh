@@ -2,11 +2,33 @@
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
-class CudaComplex { public: double real, imag; };
 #else
 #define FLOAT float
-class CudaComplex { public: float real, imag; };
 #endif
+
+
+class CudaComplex
+{
+public:
+	FLOAT real, imag;
+
+	inline
+	__device__ __host__ CudaComplex(): real(), imag() {};
+	inline
+	__device__ __host__ CudaComplex(FLOAT real, FLOAT imag): real(real), imag(imag) {};
+
+public:
+	__device__ CudaComplex operator-(CudaComplex a)  {
+	     return CudaComplex(real-a.real,imag-a.imag);
+	   }
+	__device__ CudaComplex operator+(CudaComplex a)  {
+	     return CudaComplex(real+a.real,imag+a.imag);
+	   }
+	__device__ CudaComplex operator*(FLOAT s)  {
+	     return CudaComplex(real*s,imag*s);
+	   }
+
+};
 
 #ifdef DEBUG_CUDA
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
