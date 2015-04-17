@@ -1,3 +1,4 @@
+
 #include <cuda.h>
 
 #ifdef CUDA_DOUBLE_PRECISION
@@ -12,9 +13,7 @@ class CudaComplex
 public:
 	FLOAT real, imag;
 
-	inline
 	__device__ __host__ CudaComplex(): real(), imag() {};
-	inline
 	__device__ __host__ CudaComplex(FLOAT real, FLOAT imag): real(real), imag(imag) {};
 
 public:

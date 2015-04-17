@@ -5,7 +5,6 @@
 #include <ctime>
 #include <iostream>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
-#include "src/gpu_utils/cuda_img_operations.h"
 #include "src/gpu_utils/cuda_utils.cuh"
 #include "src/complex.h"
 #include <fstream>
@@ -19,6 +18,286 @@
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
+__global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
+													FLOAT *g_eulers,
+													CudaComplex *g_Frefs,
+													int my_r_max,
+													int max_r2,
+													int min_r2_nn,
+													int image_size,
+													int orientation_num,
+													int XSIZE_img,
+													int YSIZE_img,
+													int XSIZE_mdl,
+													int YSIZE_mdl,
+													int STARTINGY_mdl,
+													int STARTINGZ_mdl)
+{
+	FLOAT fx, fy, fz, xp, yp, zp;
+	int x0, x1, y0, y1, z0, z1; //y2;
+	long int r2;
+	int YXSIZE_mdl = XSIZE_mdl*YSIZE_mdl;
+	int pixel;
+	bool is_neg_x;
+	//FLOAT* A;
+	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
+	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
+
+	// blockid
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+
+	// inside the padded 2D orientation grid
+	if( ex < orientation_num ) // we only need to make
+	{
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+
+		long ref_pixel = ex*(image_size);
+
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		{
+			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+
+			if(pixel<image_size)
+			{
+				int x = pixel % XSIZE_img;
+				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
+
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
+				{
+					if (y >= YSIZE_img - my_r_max)
+						y = y - YSIZE_img ;
+					else
+						x=r2;
+				}
+
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					// Get logical coordinates in the 3D map
+	//				if(threadIdx.x==0)
+	//				{
+	//					&A = g_eulers[blockIdx.x*9];
+	//				}
+					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					//is_neg_x = false; //TODO remove after debugging
+					// Trilinear interpolation (with physical coords)
+					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
+					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+					x0 = floorf(xp);
+					fx = xp - x0;
+					x1 = x0 + 1;
+
+					y0 = floorf(yp);
+					fy = yp - y0;
+					y0 -=  STARTINGY_mdl;
+					y1 = y0 + 1;
+
+					z0 = floorf(zp);
+					fz = zp - z0;
+					z0 -= STARTINGZ_mdl;
+					z1 = z0 + 1;
+
+	//				  P(z,y,x) = z*YXSIZE+y*XSIZE+x
+					d000.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
+					d001.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
+					d010.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
+					d011.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
+					d100.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
+					d101.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
+					d110.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
+					d111.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
+
+					d000.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
+					d001.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
+					d010.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
+					d011.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
+					d100.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
+					d101.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
+					d110.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
+					d111.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
+					// Set the interpolated value in the 2D output array
+					dx00 = d000 + (d001 - d000)*fx;
+					dx01 = d100 + (d101 - d100)*fx;
+					dx10 = d010 + (d011 - d010)*fx;
+					dx11 = d110 + (d111 - d110)*fx;
+
+					dxy0 = dx00 + (dx10 - dx00)*fy;
+					dxy1 = dx01 + (dx11 - dx01)*fy;
+
+					val = dxy0 + (dxy1 - dxy0)*fz;
+//					val.real= dx00.real;
+//					val.imag= dx00.imag;
+					if (is_neg_x)
+					{
+						val.imag = -val.imag;
+					}
+				}
+				else
+				{
+					val.real=0;
+					val.imag=0;
+				}
+				g_Frefs[ref_pixel+ pixel].real = val.real;
+				g_Frefs[ref_pixel+ pixel].imag = val.imag;
+
+			}
+		}
+	}
+}
+
+static long unsigned generateModelProjections(
+		OptimisationParamters &op, SamplingParameters &sp,
+		MlOptimiser *baseMLO,
+		CudaGlobalPtr<CudaComplex> &Frefs,
+		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
+		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
+		bool course, unsigned iclass, unsigned image_size)
+{
+
+	long unsigned orientation_num(0);
+
+	// Local variables
+	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
+
+	Matrix2D<FLOAT> A;
+
+	CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
+
+	for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
+	{
+		for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
+		{
+			long int iorientclass = iclass * sp.nr_dir * sp.nr_psi + iorient;
+
+			// Get prior for this direction and skip calculation if prior==0
+			double pdf_orientation;
+			if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
+			{
+				pdf_orientation = baseMLO->mymodel.pdf_class[iclass];
+			}
+			else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+			{
+				pdf_orientation = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[iclass], idir);
+			}
+			else
+			{
+				pdf_orientation = op.directions_prior[idir] * op.psi_prior[ipsi];
+			}
+			// In the first pass, always proceed
+			// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
+			// if so, proceed with projecting the reference in that direction
+			bool do_proceed = course ? true :
+					baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
+
+			if (do_proceed && pdf_orientation > 0.)
+			{
+				// Now get the oversampled (rot, tilt, psi) triplets
+				// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)
+				baseMLO->sampling.getOrientations(idir, ipsi, sp.current_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+
+				// Loop over all oversampled orientations (only a single one in the first pass)
+				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
+				{
+					double rot = oversampled_rot[iover_rot];
+					double tilt = oversampled_tilt[iover_rot];
+					double psi = oversampled_psi[iover_rot];
+
+					// Get the Euler matrix
+					Euler_angles2matrix(rot, tilt, psi, A);
+
+					if(!IS_NOT_INV)
+						A = A.transpose();
+
+					A =  A * (FLOAT) baseMLO->mymodel.PPref[iclass].padding_factor;
+
+					for(unsigned i = 0; i < 9; i++)
+						eulers[9 * orientation_num + i] = *(A.mdata + i);
+
+					rots.push_back(rot);
+					tilts.push_back(tilt);
+					psis.push_back(psi);
+					iorientclasses.push_back(iorientclass);
+					iover_rots.push_back(iover_rot);
+					orientation_num ++;
+				}
+			}
+		}
+	}
+
+	int my_r_max = XMIPP_MIN(baseMLO->mymodel.PPref[iclass].r_max, op.local_Minvsigma2s[0].xdim - 1);
+	int max_r2 = my_r_max * my_r_max;
+	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
+
+	CudaGlobalPtr<CudaComplex > model((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
+	for(unsigned i = 0; i < model.size; i++)
+	{
+		model[i].real = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].real;
+		model[i].imag = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].imag;
+	}
+
+	model.device_alloc();
+	model.cp_to_device();
+
+	eulers.size = orientation_num * 9;
+	eulers.device_alloc();
+	eulers.cp_to_device();
+
+	Frefs.size = orientation_num * image_size;
+	Frefs.device_alloc();
+
+	unsigned int orient1, orient2;
+	if(orientation_num>65535)
+	{
+		orient1 = ceil(sqrt(orientation_num));
+		orient2 = orient1;
+	}
+	else
+	{
+		orient1 = orientation_num;
+		orient2 = 1;
+	}
+
+	dim3 block_dim(orient1,orient2);
+	std::cerr << "using block dimensions " << orient1 << "," << orient2 <<  std::endl;
+
+	cuda_kernel_projectAllViews_trilin<<<block_dim,BLOCK_SIZE>>>(~model,
+															~eulers,
+															~Frefs,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.xdim,
+															baseMLO->mymodel.PPref[iclass].data.ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+
+	return orientation_num;
+}
+
+
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
@@ -301,149 +580,6 @@ __global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 	}
 }
 
-__global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
-													FLOAT *g_eulers,
-													CudaComplex *g_Frefs,
-													int my_r_max,
-													int max_r2,
-													int min_r2_nn,
-													int image_size,
-													int orientation_num,
-													int XSIZE_img,
-													int YSIZE_img,
-													int XSIZE_mdl,
-													int YSIZE_mdl,
-													int STARTINGY_mdl,
-													int STARTINGZ_mdl)
-{
-	FLOAT fx, fy, fz, xp, yp, zp;
-	int x0, x1, y0, y1, z0, z1; //y2;
-	long int r2;
-	int YXSIZE_mdl = XSIZE_mdl*YSIZE_mdl;
-	int pixel;
-	bool is_neg_x;
-	//FLOAT* A;
-	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
-	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
-
-	// blockid
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-
-	// inside the padded 2D orientation grid
-	if( ex < orientation_num ) // we only need to make
-	{
-		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-
-		long ref_pixel = ex*(image_size);
-
-		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
-		{
-			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
-
-			if(pixel<image_size)
-			{
-				int x = pixel % XSIZE_img;
-				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
-
-				// Dont search beyond square with side max_r
-				if (y > my_r_max)
-				{
-					if (y >= YSIZE_img - my_r_max)
-						y = y - YSIZE_img ;
-					else
-						x=r2;
-				}
-
-				r2 = x*x + y*y;
-				if (r2 <= max_r2)
-				{
-					// Get logical coordinates in the 3D map
-	//				if(threadIdx.x==0)
-	//				{
-	//					&A = g_eulers[blockIdx.x*9];
-	//				}
-					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
-					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
-					// Only asymmetric half is stored
-					if (xp < 0)
-					{
-						// Get complex conjugated hermitian symmetry pair
-						xp = -xp;
-						yp = -yp;
-						zp = -zp;
-						is_neg_x = true;
-					}
-					else
-					{
-						is_neg_x = false;
-					}
-					//is_neg_x = false; //TODO remove after debugging
-					// Trilinear interpolation (with physical coords)
-					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
-					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-					x0 = floorf(xp);
-					fx = xp - x0;
-					x1 = x0 + 1;
-
-					y0 = floorf(yp);
-					fy = yp - y0;
-					y0 -=  STARTINGY_mdl;
-					y1 = y0 + 1;
-
-					z0 = floorf(zp);
-					fz = zp - z0;
-					z0 -= STARTINGZ_mdl;
-					z1 = z0 + 1;
-
-	//				  P(z,y,x) = z*YXSIZE+y*XSIZE+x
-					d000.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
-					d001.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
-					d010.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
-					d011.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
-					d100.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
-					d101.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
-					d110.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
-					d111.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
-
-					d000.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
-					d001.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
-					d010.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
-					d011.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
-					d100.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
-					d101.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
-					d110.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
-					d111.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
-					// Set the interpolated value in the 2D output array
-					dx00 = d000 + (d001 - d000)*fx;
-					dx01 = d100 + (d101 - d100)*fx;
-					dx10 = d010 + (d011 - d010)*fx;
-					dx11 = d110 + (d111 - d110)*fx;
-
-					dxy0 = dx00 + (dx10 - dx00)*fy;
-					dxy1 = dx01 + (dx11 - dx01)*fy;
-
-					val = dxy0 + (dxy1 - dxy0)*fz;
-//					val.real= dx00.real;
-//					val.imag= dx00.imag;
-					if (is_neg_x)
-					{
-						val.imag = -val.imag;
-					}
-				}
-				else
-				{
-					val.real=0;
-					val.imag=0;
-				}
-				g_Frefs[ref_pixel+ pixel].real = val.real;
-				g_Frefs[ref_pixel+ pixel].imag = val.imag;
-
-			}
-		}
-	}
-}
-
 
 void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp)
 {
@@ -492,202 +628,18 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 			// Mapping index look-up table
 			std::vector< long unsigned > iorientclasses, iover_rots;
-			long unsigned orientation_num(0);
-
-			/*=======================================================================================
-			                           Generate Reference Projections
-			=========================================================================================*/
+			std::vector< double > rots, tilts, psis;
 
 			CUDA_CPU_TIC("projection_1");
-			bool do_gpu_proj=true;
-			if(do_gpu_proj)
-			{
-				CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
 
-				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
-				{
-					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
-					{
-						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-
-						// Get prior for this direction and skip calculation if prior==0
-						double pdf_orientation;
-						if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
-						{
-							pdf_orientation = baseMLO->mymodel.pdf_class[exp_iclass];
-						}
-						else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-						{
-							pdf_orientation = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
-						}
-						else
-						{
-							pdf_orientation = op.directions_prior[idir] * op.psi_prior[ipsi];
-						}
-						// In the first pass, always proceed
-						// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
-						// if so, proceed with projecting the reference in that direction
-						bool do_proceed = (exp_ipass==0) ? true :
-								baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
-						if (do_proceed && pdf_orientation > 0.)
-						{
-							// Now get the oversampled (rot, tilt, psi) triplets
-							// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)
-							baseMLO->sampling.getOrientations(idir, ipsi, sp.current_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-									op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-
-							// Loop over all oversampled orientations (only a single one in the first pass)
-							for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
-							{
-								// Get the Euler matrix
-								Euler_angles2matrix(oversampled_rot[iover_rot],
-													oversampled_tilt[iover_rot],
-													oversampled_psi[iover_rot], A);
-	//							std::cerr << "A("<< orientation_num <<")=" << A <<  std::endl;
-								if(!IS_NOT_INV)
-								{
-									A = A.transpose();
-								}
-								A =  A * (FLOAT) baseMLO->mymodel.PPref[exp_iclass].padding_factor;
-
-								for(unsigned i = 0; i < 9; i++)
-									eulers[9 * orientation_num + i] = *(A.mdata + i);
-
-	//							std::cerr << "A("<< orientation_num <<")=" << A <<  std::endl;
-								orientation_num ++;
-								iorientclasses.push_back(iorientclass);
-								iover_rots.push_back(iover_rot);
-							}
-						}
-					}
-				}
-	//			for(int n=0; n<10; n++)
-	//			{
-	//				for (int m=0; m<9; m++)
-	//				std::cerr << "A("<< n << "," << m <<")=" << eulers[9*n+m] <<  std::endl;
-	//			}
-				int my_r_max = XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1);
-				int max_r2 = my_r_max * my_r_max;
-				int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
-
-				CudaGlobalPtr<CudaComplex > model((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
-				for(unsigned i = 0; i < model.size; i++)
-				{
-					model[i].real = (FLOAT) baseMLO->mymodel.PPref[exp_iclass].data.data[i].real;
-					model[i].imag = (FLOAT) baseMLO->mymodel.PPref[exp_iclass].data.data[i].imag;
-				}
-
-				model.device_alloc();
-				model.cp_to_device();
-
-				eulers.size = orientation_num * 9;
-				eulers.device_alloc();
-				eulers.cp_to_device();
-
-				Frefs.size = orientation_num * image_size;
-				Frefs.device_alloc();
-
-				unsigned int orient1, orient2;
-				if(orientation_num>65535)
-				{
-					orient1 = ceil(sqrt(orientation_num));
-					orient2 = orient1;
-				}
-				else
-				{
-					orient1 = orientation_num;
-					orient2 = 1;
-				}
-
-				dim3 block_dim(orient1,orient2);
-				std::cerr << "using block dimensions " << orient1 << "," << orient2 <<  std::endl;
-
-				cuda_kernel_projectAllViews_trilin<<<block_dim,BLOCK_SIZE>>>(~model,
-																		~eulers,
-																		~Frefs,
-																		my_r_max,
-																		max_r2,
-																		min_r2_nn,
-																		image_size,
-																		orientation_num,
-																		op.local_Minvsigma2s[0].xdim,
-																		op.local_Minvsigma2s[0].ydim,
-																		baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-																		baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-																		baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-																		baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-				eulers.free();
-				model.free();
-
-				HANDLE_ERROR(cudaDeviceSynchronize());
-			}
-			else
-			{
-				Frefs.size = (image_size * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
-				Frefs.host_alloc();
-
-				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
-				{
-					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
-					{
-						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-
-						// Get prior for this direction and skip calculation if prior==0
-						double pdf_orientation;
-						if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
-						{
-							pdf_orientation = baseMLO->mymodel.pdf_class[exp_iclass];
-						}
-						else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-						{
-							pdf_orientation = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
-						}
-						else
-						{
-							pdf_orientation = op.directions_prior[idir] * op.psi_prior[ipsi];
-						}
-						// In the first pass, always proceed
-						// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
-						// if so, proceed with projecting the reference in that direction
-						bool do_proceed = (exp_ipass==0) ? true :
-								baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
-						if (do_proceed && pdf_orientation > 0.)
-						{
-							// Now get the oversampled (rot, tilt, psi) triplets
-							// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)
-							baseMLO->sampling.getOrientations(idir, ipsi, sp.current_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-									op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-
-							// Loop over all oversampled orientations (only a single one in the first pass)
-							for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
-							{
-								// Get the Euler matrix
-								Euler_angles2matrix(oversampled_rot[iover_rot],
-													oversampled_tilt[iover_rot],
-													oversampled_psi[iover_rot], A);
-
-								//Fref.data = &Frefs[image_size * orientation_num];
-								(baseMLO->mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
-
-								for (unsigned i = 0; i < image_size; i++)
-								{
-									Frefs[image_size * orientation_num + i].real = Fref.data[i].real;
-									Frefs[image_size * orientation_num + i].imag = Fref.data[i].imag;
-								}
-
-								orientation_num ++;
-								iorientclasses.push_back(iorientclass);
-								iover_rots.push_back(iover_rot);
-							}
-						}
-					}
-				}
-
-				Frefs.size = orientation_num * image_size;
-				Frefs.device_alloc();
-				Frefs.cp_to_device();
-				Frefs.free_host();
-			}
+			long unsigned orientation_num = generateModelProjections(
+					op, sp,
+					baseMLO,
+					Frefs,
+					iorientclasses, iover_rots,
+					rots, tilts, psis,
+					(exp_ipass == 0), exp_iclass,
+					image_size);
 
 			CUDA_CPU_TOC("projection_1");
 
@@ -1406,59 +1358,24 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		/*=======================================================================================
 		                            REFERENCE PROJECTION GENERATION
 		=======================================================================================*/
+
+		CudaGlobalPtr<CudaComplex> Frefs;
+
+		std::vector< long unsigned > iorientclasses, iover_rots;
+		std::vector< double > rots, tilts, psis;
+
 		CUDA_CPU_TIC("projection_2");
 
-		CudaGlobalPtr<CudaComplex> Frefs(image_size * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
+		long unsigned orientation_num = generateModelProjections(
+				op, sp,
+				baseMLO,
+				Frefs,
+				iorientclasses, iover_rots,
+				rots, tilts, psis,
+				false, exp_iclass,
+				image_size);
 
-		std::vector< long unsigned > iorientclasses, idirs, iover_rots;
-		std::vector< double > rots, tilts, psis;
-		long unsigned orientation_num(0);
-
-		for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
-		{
-			for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
-			{
-				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-
-				baseMLO->sampling.getOrientations(idir, ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-
-				if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
-				{
-					for (long unsigned iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
-					{
-						double rot = oversampled_rot[iover_rot];
-						double tilt = oversampled_tilt[iover_rot];
-						double psi = oversampled_psi[iover_rot];
-						// Get the Euler matrix
-						Euler_angles2matrix(rot, tilt, psi, A);
-
-						rots.push_back(rot);
-						tilts.push_back(tilt);
-						psis.push_back(psi);
-
-						//Fref.data = &Frefs[image_size * orientation_num];
-						(baseMLO->mymodel.PPref[exp_iclass]).get2DFourierTransform(Fimg, A, IS_NOT_INV);
-
-						for (unsigned i = 0; i < image_size; i++)
-						{
-							Frefs[image_size * orientation_num + i].real = Fimg.data[i].real;
-							Frefs[image_size * orientation_num + i].imag = Fimg.data[i].imag;
-						}
-
-						orientation_num ++;
-						idirs.push_back(idir);
-						iorientclasses.push_back(iorientclass);
-						iover_rots.push_back(iover_rot);
-					}
-				}
-			}
-		}
-
-		Frefs.size = orientation_num * image_size;
-		Frefs.device_alloc();
-		Frefs.cp_to_device();
-		Frefs.free_host();
+		CUDA_CPU_TOC("projection_2");
 
 		CudaGlobalPtr<CudaComplex> wavgs(orientation_num * image_size);
 		wavgs.device_alloc();
@@ -1467,8 +1384,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		CudaGlobalPtr<FLOAT> Fweights(orientation_num * image_size);
 		Fweights.device_alloc();
 		//Fweights.device_init(0);
-
-		CUDA_CPU_TOC("projection_2");
 
 		/*=======================================================================================
 										  PARTICLE ITERATION
