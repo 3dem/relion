@@ -19,6 +19,44 @@
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+void Euler_angles2matrix_cuda(double alpha, double beta, double gamma,
+                         Matrix2D<FLOAT> &A, bool homogeneous)
+{
+    double ca, sa, cb, sb, cg, sg;
+    double cc, cs, sc, ss;
+
+    if (homogeneous)
+    {
+        A.initZeros(4,4);
+        MAT_ELEM(A,3,3)=1;
+    }
+    else
+        if (MAT_XSIZE(A) != 3 || MAT_YSIZE(A) != 3)
+            A.resize(3, 3);
+
+    alpha = DEG2RAD(alpha);
+    beta  = DEG2RAD(beta);
+    gamma = DEG2RAD(gamma);
+
+    sincos(alpha, &sa, &ca);
+    sincos(beta,  &sb, &cb);
+    sincos(gamma, &sg, &cg);
+
+    cc = cb * ca;
+    cs = cb * sa;
+    sc = sb * ca;
+    ss = sb * sa;
+
+    A(0, 0) =  cg * cc - sg * sa;
+    A(0, 1) =  cg * cs + sg * ca;
+    A(0, 2) = -cg * sb;
+    A(1, 0) = -sg * cc - cg * sa;
+    A(1, 1) = -sg * cs + cg * ca;
+    A(1, 2) = sg * sb;
+    A(2, 0) =  sc;
+    A(2, 1) =  ss;
+    A(2, 2) = cb;
+}
 
 __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 													FLOAT *g_eulers,
@@ -222,7 +260,7 @@ static long unsigned generateModelProjections(
 					double psi = oversampled_psi[iover_rot];
 
 					// Get the Euler matrix
-					Euler_angles2matrix(rot, tilt, psi, A);
+					Euler_angles2matrix_cuda(rot, tilt, psi, A, false);
 
 					if(!IS_NOT_INV)
 						A = A.transpose();
