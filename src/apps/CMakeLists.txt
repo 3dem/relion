@@ -2,24 +2,6 @@ include_directories("${CMAKE_SOURCE_DIR}")
 include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
-if(DEBUG_MODE)
-    message(STATUS "Setting compilers to debug mode.")
-    
-    if (CUDA_FOUND)
-        set(CUDA_NVCC_FLAGS "-g -Xcompiler \"-O0\"")
-        add_definitions(-DDEBUG_CUDA)
-        #add_definitions(-DCUDA_BENCHMARK)
-        add_definitions(-DCUDA_DOUBLE_PRECISION)
-    endif(CUDA_FOUND)
-    
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
-else(DEBUG_MODE)
-    set(CUDA_NVCC_FLAGS "-Xcompiler \"-O3\"")
-    set(CMAKE_CXX_FLAGS "-O3")
-    set(CMAKE_C_FLAGS "-O3")
-endif(DEBUG_MODE)
-
 find_path (X11_INCLUDES Xdbe.h)
 
 #FLTK_WRAP_UI(Ui ui.fl)
