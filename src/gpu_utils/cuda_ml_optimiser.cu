@@ -1246,7 +1246,11 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
 	unsigned tid = threadIdx.x;
 
-	//TODO Consider Mresol_fine to speed up this kernel
+	// TODO Consider Mresol_fine to speed up this kernel
+	// TODO Profiling indicates the following marked (**) lines as
+	//      limiting performace by L2-cache access pattern / alignment
+	// 		see bitbucket issue/3/gpu-wavg-kernel-l2-cache-limit
+	//      for proposed fix
 
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
 	FLOAT Fweight, wavgs_real, wavgs_imag, wdiff2s_parts;
@@ -1263,6 +1267,7 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 		if (pixel < image_size)
 		{
 			unsigned long orientation_pixel = iorient * image_size + pixel;
+			CudaComplex ref = g_refs[orientation_pixel];
 
 			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
@@ -1275,28 +1280,27 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 					unsigned long img_pixel_idx = itrans * image_size + pixel;
 
 					FLOAT ctf = g_ctfs[pixel];
-					CudaComplex ref = g_refs[orientation_pixel];
 					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
 					{
 						ref.real *= ctf;
 						ref.imag *= ctf;
 					}
-					FLOAT diff_real = ref.real - g_imgs[img_pixel_idx].real;
-					FLOAT diff_imag = ref.imag - g_imgs[img_pixel_idx].imag;
+					FLOAT diff_real = ref.real - g_imgs[img_pixel_idx].real;    // **
+					FLOAT diff_imag = ref.imag - g_imgs[img_pixel_idx].imag;    // **
 
 					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
 					FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel];
 
-					wavgs_real += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
-					wavgs_imag += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
+					wavgs_real += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;    // **
+					wavgs_imag += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;    // **
 
 					Fweight += weightxinvsigma2 * ctf;
 				}
 			}
 
-			g_wavgs[orientation_pixel].real = wavgs_real; //TODO should be buffered into shared
-			g_wavgs[orientation_pixel].imag = wavgs_imag; //TODO should be buffered into shared
+			g_wavgs[orientation_pixel].real = wavgs_real; //TODO should be buffered into shared    // **
+			g_wavgs[orientation_pixel].imag = wavgs_imag; //TODO should be buffered into shared    // **
 			g_wdiff2s_parts[orientation_pixel] = wdiff2s_parts; //TODO this could be further reduced in here
 			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
 		}
