@@ -12,7 +12,12 @@
 #include "src/parallel.h"
 
 #define MAX_RESOL_SHARED_MEM 32
-#define BLOCK_SIZE 128         // This is optimally set as big as possible without its ceil:ed multiple exceeding imagesize by too much.
+#define BLOCK_SIZE 128         		// -- Number of threads on a block --
+									//This is optimally set as big as possible without
+									//its ceil:ed multiple exceeding imagesize by too much.
+#define REF_GROUP_SIZE 2			// -- Number of references to be treated per block --
+									//This applies to wavg and reduces global memory
+									//accesses roughly proportienally
 
 #define NR_CLASS_MUTEXES 5
 
@@ -1253,56 +1258,71 @@ __global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, Cuda
 	//      for proposed fix
 
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
-	FLOAT Fweight, wavgs_real, wavgs_imag, wdiff2s_parts;
+
+	__shared__ CudaComplex    s_refs[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_wdiff2s_parts[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT    s_wavgs_real[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT    s_wavgs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT       s_Fweight[REF_GROUP_SIZE*BLOCK_SIZE];
 
 	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		wavgs_real = 0;
-		wavgs_imag = 0;
-		wdiff2s_parts = 0;
-		Fweight = 0;
-
-		pixel = pass * BLOCK_SIZE + tid;
+		pixel = pass * BLOCK_SIZE + tid; //which pixel index in an arbitrary image should be handled by this thread
+		FLOAT ctf = g_ctfs[pixel];
 
 		if (pixel < image_size)
 		{
-			unsigned long orientation_pixel = iorient * image_size + pixel;
-			CudaComplex ref = g_refs[orientation_pixel];
+			// Make REF_GROUP_SIZE*image_size the new basic unit and load in BLOCK_SIZE
+			// elements from REF_GROUP_SIZE references into shared memory. iorient no
+			// longer indexes orientations, but blocks of REF_GROUP_SIZE orientations.
+			unsigned long orientation_pixel = iorient * (image_size * REF_GROUP_SIZE) + pixel;
+			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+				{
+					s_wdiff2s_parts[iref*BLOCK_SIZE+tid]=0; // Zero reductions before passes
+					s_Fweight[iref*BLOCK_SIZE+tid]      =0;
+					s_wavgs_real[iref*BLOCK_SIZE+tid]   =0;
+					s_wavgs_imag[iref*BLOCK_SIZE+tid]   =0;
 
+					s_refs[iref*BLOCK_SIZE+tid] = g_refs[orientation_pixel+iref*image_size]; //Load reference data
+					if (refs_are_ctf_corrected) // Correct if needed FIXME Create two kernels for the different cases
+					{
+						s_refs[iref*BLOCK_SIZE+tid].real *= ctf;
+						s_refs[iref*BLOCK_SIZE+tid].imag *= ctf;
+					}
+				}
+			// Now go through all translations, reducing to REF_GROUP_SIZE number of outputs at each one
 			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
-				FLOAT weight = g_weights[iorient * translation_num + itrans];
-
-				if (weight >= significant_weight)
+				unsigned long img_pixel_idx = itrans * image_size + pixel;
+				for (int iref=0; iref<REF_GROUP_SIZE; iref++)
 				{
-					weight /= weight_norm;
-
-					unsigned long img_pixel_idx = itrans * image_size + pixel;
-
-					FLOAT ctf = g_ctfs[pixel];
-					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+					FLOAT weight = g_weights[(iorient+iref) * translation_num + itrans]; //TODO load REF_GROUP_SIZE weights once and check against since it is inside a deep loop
+					if (weight >= significant_weight)
 					{
-						ref.real *= ctf;
-						ref.imag *= ctf;
+						weight /= weight_norm;
+
+						FLOAT diff_real = s_refs[iref*BLOCK_SIZE+tid].real - g_imgs[img_pixel_idx].real;    // **?
+						FLOAT diff_imag = s_refs[iref*BLOCK_SIZE+tid].imag - g_imgs[img_pixel_idx].imag;    // **?
+
+						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
+
+						FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel]; //TODO load into shared
+
+						s_wavgs_real[iref*BLOCK_SIZE+tid] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;    // **?
+						s_wavgs_imag[iref*BLOCK_SIZE+tid] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;    // **?
+
+						s_Fweight[iref*BLOCK_SIZE+tid] += weightxinvsigma2 * ctf;
 					}
-					FLOAT diff_real = ref.real - g_imgs[img_pixel_idx].real;    // **
-					FLOAT diff_imag = ref.imag - g_imgs[img_pixel_idx].imag;    // **
-
-					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
-
-					FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel];
-
-					wavgs_real += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;    // **
-					wavgs_imag += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;    // **
-
-					Fweight += weightxinvsigma2 * ctf;
 				}
 			}
-
-			g_wavgs[orientation_pixel].real = wavgs_real; //TODO should be buffered into shared    // **
-			g_wavgs[orientation_pixel].imag = wavgs_imag; //TODO should be buffered into shared    // **
-			g_wdiff2s_parts[orientation_pixel] = wdiff2s_parts; //TODO this could be further reduced in here
-			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
+			// Now write shared memory data to global memory for all REF_GROUP_SIZE images in this block
+			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+			{
+				g_wavgs[orientation_pixel+iref*image_size].real    =    s_wavgs_real[iref*BLOCK_SIZE+tid]; // **?
+				g_wavgs[orientation_pixel+iref*image_size].imag    =    s_wavgs_imag[iref*BLOCK_SIZE+tid]; // **?
+				g_wdiff2s_parts[orientation_pixel+iref*image_size] = s_wdiff2s_parts[iref*BLOCK_SIZE+tid]; //TODO this could be further reduced in here
+				g_Fweights[orientation_pixel+iref*image_size]      =       s_Fweight[iref*BLOCK_SIZE+tid];
+			}
 		}
 	}
 }
@@ -1610,14 +1630,17 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			wdiff2s_parts.device_alloc();
 
 			unsigned orient1, orient2;
-			if(orientation_num>65535)
+			//We only want as many blocks as there are chunks of orientations to be treated
+			//within the same block (this is done to reduce memory loads in the kernel).
+			unsigned orientation_chunks = ceil((float)orientation_num/(float)REF_GROUP_SIZE);
+			if(orientation_chunks>65535)
 			{
-				orient1 = ceil(sqrt(orientation_num));
+				orient1 = ceil(sqrt(orientation_chunks));
 				orient2 = orient1;
 			}
 			else
 			{
-				orient1 = orientation_num;
+				orient1 = orientation_chunks;
 				orient2 = 1;
 			}
 			dim3 block_dim(orient1,orient2);
