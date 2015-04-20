@@ -12,12 +12,15 @@
 #include "src/parallel.h"
 
 #define MAX_RESOL_SHARED_MEM 32
-#define BLOCK_SIZE 128         		// -- Number of threads on a block --
-									//This is optimally set as big as possible without
-									//its ceil:ed multiple exceeding imagesize by too much.
-#define REF_GROUP_SIZE 2			// -- Number of references to be treated per block --
-									//This applies to wavg and reduces global memory
-									//accesses roughly proportienally
+#define BLOCK_SIZE  128         	// -- Number of threads in a block --
+									// This is optimally set as big as possible without
+									// its ceil:ed multiple exceeding imagesize by too much.
+#define REF_GROUP_SIZE 3			// -- Number of references to be treated per block --
+									// This applies to wavg and reduces global memory
+									// accesses roughly proportionally, but scales shared
+									// memory usage by allocating
+									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE
+									// FLOATS.
 
 #define NR_CLASS_MUTEXES 5
 
@@ -65,7 +68,8 @@ void Euler_angles2matrix_cuda(double alpha, double beta, double gamma,
 
 __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 													FLOAT *g_eulers,
-													CudaComplex *g_Frefs,
+													FLOAT *g_Frefs_real,
+													FLOAT *g_Frefs_imag,
 													int my_r_max,
 													int max_r2,
 													int min_r2_nn,
@@ -198,8 +202,8 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					val.real=0;
 					val.imag=0;
 				}
-				g_Frefs[ref_pixel+ pixel].real = val.real;
-				g_Frefs[ref_pixel+ pixel].imag = val.imag;
+				g_Frefs_real[ref_pixel+ pixel] = val.real;
+				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
 
 			}
 		}
@@ -209,7 +213,8 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 static long unsigned generateModelProjections(
 		OptimisationParamters &op, SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		CudaGlobalPtr<CudaComplex> &Frefs,
+		CudaGlobalPtr<FLOAT> &Frefs_real,
+		CudaGlobalPtr<FLOAT> &Frefs_imag,
 		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
 		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
 		bool course, unsigned iclass, unsigned image_size)
@@ -304,8 +309,10 @@ static long unsigned generateModelProjections(
 	eulers.device_alloc();
 	eulers.cp_to_device();
 
-	Frefs.size = orientation_num * image_size;
-	Frefs.device_alloc();
+	Frefs_real.size = orientation_num * image_size;
+	Frefs_real.device_alloc();
+	Frefs_imag.size = orientation_num * image_size;
+	Frefs_imag.device_alloc();
 
 	unsigned int orient1, orient2;
 	if(orientation_num>65535)
@@ -324,7 +331,8 @@ static long unsigned generateModelProjections(
 
 	cuda_kernel_projectAllViews_trilin<<<block_dim,BLOCK_SIZE>>>(~model,
 															~eulers,
-															~Frefs,
+															~Frefs_real,
+															~Frefs_imag,
 															my_r_max,
 															max_r2,
 															min_r2_nn,
@@ -466,7 +474,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 
 
-__global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
+									FLOAT *g_refs_imag,
+									FLOAT *g_imgs_real,
+									FLOAT *g_imgs_imag,
 									FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
 									unsigned img_size, FLOAT sum_init,
 									unsigned long significant_num,
@@ -503,8 +514,8 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 				ref_pixel_idx = ref_start + pixel;
 				img_pixel_idx = img_start + pixel;
 
-				FLOAT diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
-				FLOAT diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
+				FLOAT diff_real = g_refs_real[ref_pixel_idx] - g_imgs_real[img_pixel_idx];
+				FLOAT diff_imag = g_refs_imag[ref_pixel_idx] - g_imgs_imag[img_pixel_idx];
 
 				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * g_Minvsigma2[pixel];
 			}
@@ -553,7 +564,10 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 	}
 }
 
-__global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_cc_diff2(	FLOAT *g_refs_real,
+										FLOAT *g_refs_imag,
+										FLOAT *g_imgs_real,
+										FLOAT *g_imgs_imag,
 										FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
 										unsigned img_size, FLOAT exp_local_sqrtXi2,
 										unsigned long significant_num,
@@ -587,11 +601,11 @@ __global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 				ref_pixel_idx = ref_start + pixel;
 				img_pixel_idx = img_start + pixel;
 
-				double diff_real = g_refs[ref_pixel_idx].real * g_imgs[img_pixel_idx].real;
-				double diff_imag = g_refs[ref_pixel_idx].imag * g_imgs[img_pixel_idx].imag;
+				double diff_real = g_refs_real[ref_pixel_idx] * g_imgs_real[img_pixel_idx];
+				double diff_imag = g_refs_imag[ref_pixel_idx] * g_imgs_imag[img_pixel_idx];
 
-				double nR = g_refs[ref_pixel_idx].real*g_refs[ref_pixel_idx].real;
-				double nI = g_refs[ref_pixel_idx].imag*g_refs[ref_pixel_idx].imag;
+				double nR = g_refs_real[ref_pixel_idx]*g_refs_real[ref_pixel_idx];
+				double nI = g_refs_imag[ref_pixel_idx]*g_refs_imag[ref_pixel_idx];
 
 				s[threadIdx.x] -= (diff_real + diff_imag);
 				norm[threadIdx.x] += nR+nI;
@@ -667,7 +681,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 			Matrix2D<FLOAT> A;
 
-			CudaGlobalPtr<CudaComplex> Frefs;
+			CudaGlobalPtr<FLOAT> Frefs_real;
+			CudaGlobalPtr<FLOAT> Frefs_imag;
 
 			// Mapping index look-up table
 			std::vector< long unsigned > iorientclasses, iover_rots;
@@ -678,7 +693,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			long unsigned orientation_num = generateModelProjections(
 					op, sp,
 					baseMLO,
-					Frefs,
+					Frefs_real,
+					Frefs_imag,
 					iorientclasses, iover_rots,
 					rots, tilts, psis,
 					(exp_ipass == 0), exp_iclass,
@@ -698,7 +714,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CUDA_CPU_TIC("translation_1");
 
-				CudaGlobalPtr<CudaComplex> Fimgs(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+				CudaGlobalPtr<FLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+				CudaGlobalPtr<FLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans);
 
 				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 				long unsigned translation_num(0), ihidden(0);
@@ -747,8 +764,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 								real /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
 								imag /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
 							}
-							Fimgs[translation_num * image_size + n].real = real;
-							Fimgs[translation_num * image_size + n].imag = imag;
+							Fimgs_real[translation_num * image_size + n] = real;
+							Fimgs_imag[translation_num * image_size + n] = imag;
 						}
 						translation_num ++;
 
@@ -861,9 +878,12 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					}
 				}
 
-				Fimgs.size = translation_num * image_size;
-				Fimgs.device_alloc();
-				Fimgs.cp_to_device();
+				Fimgs_real.size = translation_num * image_size;
+				Fimgs_real.device_alloc();
+				Fimgs_real.cp_to_device();
+				Fimgs_imag.size = translation_num * image_size;
+				Fimgs_imag.device_alloc();
+				Fimgs_imag.cp_to_device();
 
 				gpuMinvsigma2.cp_to_device();
 
@@ -901,7 +921,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
 				{
-					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs, ~Fimgs, ~gpuMinvsigma2,  ~diff2s,
+					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
 																	image_size, op.highres_Xi2_imgs[ipart],
 																	significant_num,
 																	translation_num,
@@ -910,7 +930,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				}
 				else
 				{
-					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs, ~Fimgs, ~gpuMinvsigma2, ~diff2s,
+					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2, ~diff2s,
 																image_size, op.highres_Xi2_imgs[ipart] / 2.,
 																significant_num,
 																translation_num,
@@ -1241,90 +1261,111 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 }
 
 
-__global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
+__global__ void cuda_kernel_wavg(	FLOAT *g_refs_real,
+									FLOAT *g_refs_imag,
+									FLOAT *g_imgs_real,
+									FLOAT *g_imgs_imag,
+									FLOAT *g_imgs_nm_real,
+									FLOAT *g_imgs_nm_imag,
 									FLOAT* g_weights, FLOAT* g_ctfs, FLOAT* g_Minvsigma2s,
-									FLOAT *g_wdiff2s_parts, CudaComplex *g_wavgs, FLOAT* g_Fweights,
+									FLOAT *g_wdiff2s_parts,
+									FLOAT *g_wavgs_real,
+									FLOAT *g_wavgs_imag,
+									FLOAT* g_Fweights,
 									unsigned long translation_num, FLOAT weight_norm,
 									FLOAT significant_weight, unsigned image_size,
 									bool refs_are_ctf_corrected)
 {
-	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
-	unsigned tid = threadIdx.x;
+	// Internal
+	__shared__ FLOAT s_wavgs_real[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_wavgs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_Fweight[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_wdiff2s_parts[REF_GROUP_SIZE*BLOCK_SIZE];
+
+	// External to load in
+	__shared__ FLOAT s_refs_real[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_refs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_real[BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_imag[BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_nm_real[BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_nm_imag[BLOCK_SIZE];
 
 	// TODO Consider Mresol_fine to speed up this kernel
-	// TODO Profiling indicates the following marked (**) lines as
-	//      limiting performace by L2-cache access pattern / alignment
-	// 		see bitbucket issue/3/gpu-wavg-kernel-l2-cache-limit
-	//      for proposed fix
 
+    FLOAT val;
+	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
+	unsigned tid = threadIdx.x;
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
 
-	__shared__ CudaComplex    s_refs[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT s_wdiff2s_parts[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT    s_wavgs_real[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT    s_wavgs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT       s_Fweight[REF_GROUP_SIZE*BLOCK_SIZE];
 
 	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		pixel = pass * BLOCK_SIZE + tid; //which pixel index in an arbitrary image should be handled by this thread
-		FLOAT ctf = g_ctfs[pixel];
-
+		//Zero everythin that is reduced (+=) in any one pass
+		for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+		{
+			s_wdiff2s_parts[iref*BLOCK_SIZE+tid]= 0;
+			s_Fweight[iref*BLOCK_SIZE+tid]      = 0;
+			s_wavgs_real[iref*BLOCK_SIZE+tid]   = 0;
+			s_wavgs_imag[iref*BLOCK_SIZE+tid]   = 0;
+		}
+		pixel = pass * BLOCK_SIZE + tid;
+		FLOAT ctf = g_ctfs[pixel]; // TODO Put in read-only cache
 		if (pixel < image_size)
 		{
 			// Make REF_GROUP_SIZE*image_size the new basic unit and load in BLOCK_SIZE
 			// elements from REF_GROUP_SIZE references into shared memory. iorient no
 			// longer indexes orientations, but blocks of REF_GROUP_SIZE orientations.
-			unsigned long orientation_pixel = iorient * (image_size * REF_GROUP_SIZE) + pixel;
+			unsigned long orientation_pixel = iorient * (REF_GROUP_SIZE*image_size) + pixel;
 			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+			{
+				s_refs_real[iref*BLOCK_SIZE+tid] = g_refs_real[orientation_pixel+iref*image_size];   //---------------------------
+				s_refs_imag[iref*BLOCK_SIZE+tid] = g_refs_imag[orientation_pixel+iref*image_size];   //---------------------------
+				if (refs_are_ctf_corrected) // Correct if needed FIXME Create two kernels for the different cases
 				{
-					s_wdiff2s_parts[iref*BLOCK_SIZE+tid]=0; // Zero reductions before passes
-					s_Fweight[iref*BLOCK_SIZE+tid]      =0;
-					s_wavgs_real[iref*BLOCK_SIZE+tid]   =0;
-					s_wavgs_imag[iref*BLOCK_SIZE+tid]   =0;
-
-					s_refs[iref*BLOCK_SIZE+tid] = g_refs[orientation_pixel+iref*image_size]; //Load reference data
-					if (refs_are_ctf_corrected) // Correct if needed FIXME Create two kernels for the different cases
-					{
-						s_refs[iref*BLOCK_SIZE+tid].real *= ctf;
-						s_refs[iref*BLOCK_SIZE+tid].imag *= ctf;
-					}
+					s_refs_real[iref*BLOCK_SIZE+tid] *= ctf;
+					s_refs_imag[iref*BLOCK_SIZE+tid] *= ctf;
 				}
+			}
 			// Now go through all translations, reducing to REF_GROUP_SIZE number of outputs at each one
 			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
 				unsigned long img_pixel_idx = itrans * image_size + pixel;
+				s_imgs_real[tid]    = g_imgs_real[img_pixel_idx];  //---------------------------
+				s_imgs_imag[tid]    = g_imgs_imag[img_pixel_idx];  //---------------------------
+				s_imgs_nm_real[tid] = g_imgs_nm_real[img_pixel_idx];  //---------------------------
+				s_imgs_nm_imag[tid] = g_imgs_nm_imag[img_pixel_idx];  //---------------------------
+
 				for (int iref=0; iref<REF_GROUP_SIZE; iref++)
 				{
-					FLOAT weight = g_weights[(iorient+iref) * translation_num + itrans]; //TODO load REF_GROUP_SIZE weights once and check against since it is inside a deep loop
+					FLOAT weight = g_weights[(iorient*REF_GROUP_SIZE+iref) * translation_num + itrans]; //TODO load all neccessary weights at once to avoid global access inside a deep loop OR put in read-only cache
 					if (weight >= significant_weight)
 					{
 						weight /= weight_norm;
 
-						FLOAT diff_real = s_refs[iref*BLOCK_SIZE+tid].real - g_imgs[img_pixel_idx].real;    // **?
-						FLOAT diff_imag = s_refs[iref*BLOCK_SIZE+tid].imag - g_imgs[img_pixel_idx].imag;    // **?
+						val = s_refs_real[iref*BLOCK_SIZE+tid] - s_imgs_real[tid];
+						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * val*val;
+						val = s_refs_imag[iref*BLOCK_SIZE+tid] - s_imgs_imag[tid];
+						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * val*val;
 
-						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
+						val = weight * ctf * g_Minvsigma2s[pixel];
 
-						FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel]; //TODO load into shared
+						s_wavgs_real[iref*BLOCK_SIZE+tid] += s_imgs_nm_real[tid] * val;
+						s_wavgs_imag[iref*BLOCK_SIZE+tid] += s_imgs_nm_imag[tid] * val;
 
-						s_wavgs_real[iref*BLOCK_SIZE+tid] += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;    // **?
-						s_wavgs_imag[iref*BLOCK_SIZE+tid] += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;    // **?
-
-						s_Fweight[iref*BLOCK_SIZE+tid] += weightxinvsigma2 * ctf;
+						s_Fweight[iref*BLOCK_SIZE+tid] += val * ctf;
 					}
 				}
 			}
 			// Now write shared memory data to global memory for all REF_GROUP_SIZE images in this block
 			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
 			{
-				g_wavgs[orientation_pixel+iref*image_size].real    =    s_wavgs_real[iref*BLOCK_SIZE+tid]; // **?
-				g_wavgs[orientation_pixel+iref*image_size].imag    =    s_wavgs_imag[iref*BLOCK_SIZE+tid]; // **?
+				g_wavgs_real[orientation_pixel+iref*image_size]    = s_wavgs_real[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
+				g_wavgs_imag[orientation_pixel+iref*image_size]    = s_wavgs_imag[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
 				g_wdiff2s_parts[orientation_pixel+iref*image_size] = s_wdiff2s_parts[iref*BLOCK_SIZE+tid]; //TODO this could be further reduced in here
-				g_Fweights[orientation_pixel+iref*image_size]      =       s_Fweight[iref*BLOCK_SIZE+tid];
+				g_Fweights[orientation_pixel+iref*image_size]      = s_Fweight[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared
 			}
-		}
-	}
+		} // endif(pixel < image__size)
+	} // endfor(pass)
 }
 
 
@@ -1371,10 +1412,13 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 	std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
 	std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	Matrix2D<double> A;
-	MultidimArray<Complex > Fimg, Fimg_otfshift_nomask;
+	MultidimArray<FLOAT > Fimg_real, Fimg_imag;
+	MultidimArray<Complex > Fimg, Fimg_otfshift_nomask;  //TODO remove, currently needed for Fourier stuff, which is based on the complex class
 	MultidimArray<double> Fweight, Minvsigma2, Mctf;
 	bool have_warned_small_scale = false;
 
+	Fimg_real.resize(op.Fimgs[0]);
+	Fimg_imag.resize(op.Fimgs[0]);
 	Fimg.resize(op.Fimgs[0]);
 	Fweight.resize(op.Fimgs[0]);
 
@@ -1421,7 +1465,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		                            REFERENCE PROJECTION GENERATION
 		=======================================================================================*/
 
-		CudaGlobalPtr<CudaComplex> Frefs;
+		CudaGlobalPtr<FLOAT> Frefs_real;
+		CudaGlobalPtr<FLOAT> Frefs_imag;
 
 		std::vector< long unsigned > iorientclasses, iover_rots;
 		std::vector< double > rots, tilts, psis;
@@ -1431,7 +1476,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		long unsigned orientation_num = generateModelProjections(
 				op, sp,
 				baseMLO,
-				Frefs,
+				Frefs_real,
+				Frefs_imag,
 				iorientclasses, iover_rots,
 				rots, tilts, psis,
 				false, exp_iclass,
@@ -1439,8 +1485,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		CUDA_CPU_TOC("projection_2");
 
-		CudaGlobalPtr<CudaComplex> wavgs(orientation_num * image_size);
-		wavgs.device_alloc();
+		CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
+		wavgs_real.device_alloc();
+		CudaGlobalPtr<FLOAT> wavgs_imag(orientation_num * image_size);
+		wavgs_imag.device_alloc();
 		//wavgs.device_init(0);
 
 		CudaGlobalPtr<FLOAT> Fweights(orientation_num * image_size);
@@ -1485,8 +1533,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_CPU_TIC("translation_2");
 
-			CudaGlobalPtr<CudaComplex> Fimgs(image_size * sp.nr_trans * sp.nr_oversampled_trans);
-			CudaGlobalPtr<CudaComplex> Fimgs_nomask(Fimgs.size);
+			CudaGlobalPtr<FLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+			CudaGlobalPtr<FLOAT> Fimgs_imag(Fimgs_real.size);
+			CudaGlobalPtr<FLOAT> Fimgs_nomask_real(Fimgs_real.size);
+			CudaGlobalPtr<FLOAT> Fimgs_nomask_imag(Fimgs_real.size);
 
 			long unsigned translation_num(0), ihidden(0);
 			std::vector< long unsigned > iover_transes, itranses, ihiddens;
@@ -1511,16 +1561,16 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 								- b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag;
 						FLOAT imag = a * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag
 								+ b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real;
-						Fimgs[translation_num * image_size + n].real = real;
-						Fimgs[translation_num * image_size + n].imag = imag;
+						Fimgs_real[translation_num * image_size + n] = real;
+						Fimgs_imag[translation_num * image_size + n] = imag;
 
 						// Fimg_shift_nomask
 						real = a * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).real
 								- b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).imag;
 						imag = a * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).imag
 								+ b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).real;
-						Fimgs_nomask[translation_num * image_size + n].real = real;
-						Fimgs_nomask[translation_num * image_size + n].imag = imag;
+						Fimgs_nomask_real[translation_num * image_size + n] = real;
+						Fimgs_nomask_imag[translation_num * image_size + n] = imag;
 					}
 
 					translation_num ++;
@@ -1531,13 +1581,19 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				}
 			}
 
-			Fimgs.size = translation_num * image_size;
-			Fimgs.device_alloc();
-			Fimgs.cp_to_device();
+			Fimgs_real.size = translation_num * image_size;
+			Fimgs_real.device_alloc();
+			Fimgs_real.cp_to_device();
+			Fimgs_imag.size = translation_num * image_size;
+			Fimgs_imag.device_alloc();
+			Fimgs_imag.cp_to_device();
 
-			Fimgs_nomask.size = translation_num * image_size;
-			Fimgs_nomask.device_alloc();
-			Fimgs_nomask.cp_to_device();
+			Fimgs_nomask_real.size = translation_num * image_size;
+			Fimgs_nomask_real.device_alloc();
+			Fimgs_nomask_real.cp_to_device();
+			Fimgs_nomask_imag.size = translation_num * image_size;
+			Fimgs_nomask_imag.device_alloc();
+			Fimgs_nomask_imag.cp_to_device();
 
 			CUDA_CPU_TOC("translation_2");
 
@@ -1647,10 +1703,15 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_GPU_TIC("cuda_kernel_wavg");
 
+			cudaFuncSetCacheConfig(cuda_kernel_wavg, cudaFuncCachePreferShared);
 			cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-												~Frefs, ~Fimgs, ~Fimgs_nomask,
+												~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag,
+												 ~Fimgs_nomask_real, ~Fimgs_nomask_imag,
 												~sorted_weights, ~ctfs, ~Minvsigma2s,
-												~wdiff2s_parts, ~wavgs, ~Fweights,
+												~wdiff2s_parts,
+												~wavgs_real,
+												~wavgs_imag,
+												~Fweights,
 												translation_num,
 												(FLOAT) op.sum_weight[ipart],
 												(FLOAT) op.significant_weight[ipart],
@@ -1664,8 +1725,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_GPU_TOC("cuda_kernel_wavg");
 
-			Fimgs.free_device();
-			Fimgs_nomask.free_device();
+			Fimgs_real.free_device();
+			Fimgs_imag.free_device();
+			Fimgs_nomask_real.free_device();
+			Fimgs_nomask_imag.free_device();
 
 			sorted_weights.free_device();
 			ctfs.free_device();
@@ -1821,14 +1884,17 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		} // end loop ipart
 
-		Frefs.free_device();
+		Frefs_real.free_device();
+		Frefs_imag.free_device();
 
 		/*=======================================================================================
 										   BACKPROJECTION
 		=======================================================================================*/
 
-		wavgs.cp_to_host();
-		wavgs.free_device();
+		wavgs_real.cp_to_host();
+		wavgs_real.free_device();
+		wavgs_imag.cp_to_host();
+		wavgs_imag.free_device();
 
 		Fweights.cp_to_host();
 		Fweights.free_device();
@@ -1870,8 +1936,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			for (unsigned j = 0; j < image_size; j++)
 			{
-				Fimg.data[j].real = wavgs[i * image_size + j].real;
-				Fimg.data[j].imag = wavgs[i * image_size + j].imag;
+				Fimg.data[j].real = wavgs_real[i * image_size + j];
+				Fimg.data[j].imag = wavgs_imag[i * image_size + j];
+				Fimg_real.data[j]= wavgs_real[i * image_size + j];
+				Fimg_imag.data[j]= wavgs_real[i * image_size + j];
 				Fweight.data[j] = Fweights[i * image_size + j];
 			}
 
