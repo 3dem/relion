@@ -496,7 +496,7 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 		unsigned long int iy=d_transidx[ex];
 
 		__shared__ FLOAT s[BLOCK_SIZE];
-		s[threadIdx.x] = 0;
+		s[threadIdx.x] = 0.0f;
 
 		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
 
@@ -517,7 +517,7 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 				FLOAT diff_real = g_refs_real[ref_pixel_idx] - g_imgs_real[img_pixel_idx];
 				FLOAT diff_imag = g_refs_imag[ref_pixel_idx] - g_imgs_imag[img_pixel_idx];
 
-				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * g_Minvsigma2[pixel];
+				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * g_Minvsigma2[pixel];
 			}
 		}
 
