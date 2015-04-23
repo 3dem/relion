@@ -147,7 +147,6 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					{
 						is_neg_x = false;
 					}
-					//is_neg_x = false; //TODO remove after debugging
 					// Trilinear interpolation (with physical coords)
 					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
 					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
@@ -202,8 +201,8 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 				}
 				else
 				{
-					val.real=0;
-					val.imag=0;
+					val.real=0.0f;
+					val.imag=0.0f;
 				}
 				g_Frefs_real[ref_pixel+ pixel] = val.real;
 				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
@@ -294,6 +293,7 @@ static long unsigned generateModelProjections(
 		}
 	}
 
+//	std::cerr << "model data size : " << baseMLO->mymodel.PPref[0].data.nzyxdim << std::endl;
 	int my_r_max = XMIPP_MIN(baseMLO->mymodel.PPref[iclass].r_max, op.local_Minvsigma2s[0].xdim - 1);
 	int max_r2 = my_r_max * my_r_max;
 	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
@@ -523,42 +523,16 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * g_Minvsigma2[pixel];
 			}
 		}
-
-		// This version should run in             BLOCK_SIZE                  cycles
-		// -------------------------------------------------------------------------
-	//		if (threadIdx.x == 0)
-	//		{
-	//			double sum(sum_init);
-	//			for (unsigned i = 0; i < BLOCK_SIZE; i++)
-	//				sum += s[i];
-	//
-	//			g_diff2s[ex * translation_num + ey] = sum;
-	//		}
-		// -------------------------------------------------------------------------
-
-		// This version should run in     BLOCK_SIZE/trads + log2(trads)      cycles
-		// ( Runs ~2x as fast as the above one for BLOCK_SIZE=32 )
-		// -------------------------------------------------------------------------
 		__syncthreads();
-		int trads = 32;
-		int itr = BLOCK_SIZE/trads;
-		if(threadIdx.x<trads)
-		{
-			for(int i=1; i<itr; i++)
-			{
-				s[threadIdx.x] += s[i*trads + threadIdx.x];
-				//__syncthreads();
-			}
-		}
 
-		for(int j=(trads/2); j>0; j/=2)
+		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
 		{
 			if(threadIdx.x<j)
 			{
 				s[threadIdx.x] += s[threadIdx.x+j];
 			}
+			__syncthreads();
 		}
-		__syncthreads();
 //		if (threadIdx.x*ex == 0)
 		{
 			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
@@ -2000,9 +1974,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 												// Store optimal image parameters
 												op.max_weight[ipart] = weight;
 
-												A = A.inv();
-												A = A.inv();
-												Euler_matrix2angles(A, rot, tilt, psi);
+//												A = A.inv();
+//												A = A.inv();
+//												Euler_matrix2angles(A, rot, tilt, psi);
 
 												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
 												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
