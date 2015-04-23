@@ -4,7 +4,7 @@
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_DEBUG "-O0 -g" CACHE STRING "")
-set(RELION_NVCC_FLAGS_DEBUG "-lineinfo" CACHE STRING "")
+set(RELION_NVCC_FLAGS_DEBUG "-lineinfo -G" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_DEBUG  " ")
 

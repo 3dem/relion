@@ -1,6 +1,12 @@
 #ifndef CUDA_ML_OPTIMISER_H_
 #define CUDA_ML_OPTIMISER_H_
 
+#ifdef CUDA_DOUBLE_PRECISION
+#define FLOAT double
+#else
+#define FLOAT float
+#endif
+
 #include "src/ml_optimiser.h"
 
 
@@ -21,7 +27,7 @@ public:
 	std::vector<double> sum_weight, significant_weight, max_weight;
 	std::vector<Matrix1D<double> > old_offset, prior;
 	std::vector<MultidimArray<double> > power_imgs;
-	MultidimArray<double> Mweight;
+	MultidimArray<FLOAT> Mweight;
 
 	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
 		metadata_offset(0),
