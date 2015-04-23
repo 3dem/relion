@@ -10,6 +10,7 @@
 #include <fstream>
 #include <cuda.h>
 #include "src/parallel.h"
+#include <thrust/sort.h>
 
 #define MAX_RESOL_SHARED_MEM 32
 #define BLOCK_SIZE  128         	// -- Number of threads in a block --
@@ -1343,7 +1344,13 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 		sorted_weight.resize(np);
 
 		// Sort from low to high values
+		CUDA_CPU_TIC("sort");
+#if defined(USE_THRUST) // Thrust seems incredibly slow in debug build this is clearly a FIXME
+		thrust::sort(sorted_weight.data, sorted_weight.data + np);
+#else
 		sorted_weight.sort();
+#endif
+		CUDA_CPU_TOC("sort");
 
 		double frac_weight = 0.;
 		double my_significant_weight;
@@ -1741,7 +1748,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			/*======================================================
 					            	SCALE
 			======================================================*/
-
+			CUDA_CPU_TIC("scale");
 			FLOAT part_scale(1.);
 
 			if (baseMLO->do_scale_correction)
@@ -1763,11 +1770,11 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					part_scale = 0.001;
 				}
 			}
-
+			CUDA_CPU_TOC("scale");
 			/*======================================================
 					            MAP WEIGHTS
 			======================================================*/
-
+			CUDA_CPU_TIC("map");
 			CudaGlobalPtr<FLOAT> sorted_weights(orientation_num * translation_num);
 
 			for (long unsigned i = 0; i < orientation_num; i++)
@@ -1783,7 +1790,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 							DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over);
 				}
 			}
-
+			CUDA_CPU_TOC("map");
 
 			/*======================================================
 					            KERNEL CALL
