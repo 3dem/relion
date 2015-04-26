@@ -27,6 +27,9 @@
 
 #define NR_CLASS_MUTEXES 5
 
+texture<FLOAT,cudaTextureType3D,cudaReadModeElementType> texModel_real;
+texture<FLOAT,cudaTextureType3D,cudaReadModeElementType> texModel_imag;
+
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -69,7 +72,10 @@ void Euler_angles2matrix_cuda(double alpha, double beta, double gamma,
     A(2, 2) = cb;
 }
 
-__global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
+
+// uses global memory and explicit interpolation = can do double precision.
+__global__ void cuda_kernel_projectAllViews_trilin_gloex( FLOAT *g_model_real,
+													FLOAT *g_model_imag,
 													FLOAT *g_eulers,
 													FLOAT *g_Frefs_real,
 													FLOAT *g_Frefs_imag,
@@ -83,32 +89,26 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 													int XSIZE_mdl,
 													int YSIZE_mdl,
 													int STARTINGY_mdl,
-													int STARTINGZ_mdl)
+													int STARTINGZ_mdl
+												   	   )
 {
 	FLOAT fx, fy, fz, xp, yp, zp;
 	int x0, x1, y0, y1, z0, z1; //y2;
 	long int r2;
-	int YXSIZE_mdl = XSIZE_mdl*YSIZE_mdl;
 	int pixel;
+	int YXSIZE_mdl = YSIZE_mdl * XSIZE_mdl;
 	bool is_neg_x;
-	//FLOAT* A;
 	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
 	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
-
-	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-
 	// inside the padded 2D orientation grid
 	if( ex < orientation_num ) // we only need to make
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-
 		long ref_pixel = ex*(image_size);
-
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
 			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
-
 			if(pixel<image_size)
 			{
 				int x = pixel % XSIZE_img;
@@ -126,11 +126,6 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					// Get logical coordinates in the 3D map
-	//				if(threadIdx.x==0)
-	//				{
-	//					&A = g_eulers[blockIdx.x*9];
-	//				}
 					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
 					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
 					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
@@ -153,6 +148,8 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					x0 = floorf(xp);
 					fx = xp - x0;
 					x1 = x0 + 1;
+					xp = fx + x0;
+
 
 					y0 = floorf(yp);
 					fy = yp - y0;
@@ -164,24 +161,24 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					z0 -= STARTINGZ_mdl;
 					z1 = z0 + 1;
 
-	//				  P(z,y,x) = z*YXSIZE+y*XSIZE+x
-					d000.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
-					d001.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
-					d010.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
-					d011.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
-					d100.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
-					d101.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
-					d110.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
-					d111.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
+					d000.real = g_model_real[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d001.real = g_model_real[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d010.real = g_model_real[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d011.real = g_model_real[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1];
+					d100.real = g_model_real[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d101.real = g_model_real[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d110.real = g_model_real[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d111.real = g_model_real[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1];
 
-					d000.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
-					d001.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
-					d010.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
-					d011.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
-					d100.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
-					d101.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
-					d110.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
-					d111.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
+					d000.imag = g_model_imag[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d001.imag = g_model_imag[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d010.imag = g_model_imag[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d011.imag = g_model_imag[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1];
+					d100.imag = g_model_imag[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d101.imag = g_model_imag[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d110.imag = g_model_imag[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d111.imag = g_model_imag[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1];
+
 					// Set the interpolated value in the 2D output array
 					dx00 = d000 + (d001 - d000)*fx;
 					dx01 = d100 + (d101 - d100)*fx;
@@ -192,12 +189,12 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					dxy1 = dx01 + (dx11 - dx01)*fy;
 
 					val = dxy0 + (dxy1 - dxy0)*fz;
-//					val.real= dx00.real;
-//					val.imag= dx00.imag;
+
 					if (is_neg_x)
 					{
 						val.imag = -val.imag;
 					}
+
 				}
 				else
 				{
@@ -206,11 +203,229 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 				}
 				g_Frefs_real[ref_pixel+ pixel] = val.real;
 				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
-
 			}
 		}
 	}
 }
+
+#if !defined(CUDA_DOUBLE_PRECISION)
+// uses texture memory and explicit interpolation = requires float precision.
+__global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
+														 FLOAT *g_Frefs_real,
+														 FLOAT *g_Frefs_imag,
+														 int my_r_max,
+														 int max_r2,
+														 int min_r2_nn,
+														 int image_size,
+														 int orientation_num,
+														 int XSIZE_img,
+														 int YSIZE_img,
+														 int STARTINGY_mdl,
+														 int STARTINGZ_mdl)
+{
+	FLOAT fx, fy, fz, xp, yp, zp;
+	int x0, x1, y0, y1, z0, z1; //y2;
+	long int r2;
+	int pixel;
+	bool is_neg_x;
+	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
+	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	// inside the padded 2D orientation grid
+	if( ex < orientation_num ) // we only need to make
+	{
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		long ref_pixel = ex*(image_size);
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		{
+			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			if(pixel<image_size)
+			{
+				int x = pixel % XSIZE_img;
+				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
+
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
+				{
+					if (y >= YSIZE_img - my_r_max)
+						y = y - YSIZE_img ;
+					else
+						x=r2;
+				}
+
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					// Trilinear interpolation (with physical coords)
+					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
+					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+					x0 = floorf(xp);
+					fx = xp - x0;
+					x1 = x0 + 1;
+					xp = fx + x0;
+
+
+					y0 = floorf(yp);
+					fy = yp - y0;
+					y0 -=  STARTINGY_mdl;
+					y1 = y0 + 1;
+					yp -= STARTINGY_mdl;
+
+					z0 = floorf(zp);
+					fz = zp - z0;
+					z0 -= STARTINGZ_mdl;
+					z1 = z0 + 1;
+					zp -= STARTINGZ_mdl;
+
+					d000.real = tex3D(texModel_real,x0+0.5f,y0+0.5f,z0+0.5f);
+					d001.real = tex3D(texModel_real,x1+0.5f,y0+0.5f,z0+0.5f);
+					d010.real = tex3D(texModel_real,x0+0.5f,y1+0.5f,z0+0.5f);
+					d011.real = tex3D(texModel_real,x1+0.5f,y1+0.5f,z0+0.5f);
+					d100.real = tex3D(texModel_real,x0+0.5f,y0+0.5f,z1+0.5f);
+					d101.real = tex3D(texModel_real,x1+0.5f,y0+0.5f,z1+0.5f);
+					d110.real = tex3D(texModel_real,x0+0.5f,y1+0.5f,z1+0.5f);
+					d111.real = tex3D(texModel_real,x1+0.5f,y1+0.5f,z1+0.5f);
+
+					d000.imag = tex3D(texModel_imag,x0+0.5f,y0+0.5f,z0+0.5f);
+					d001.imag = tex3D(texModel_imag,x1+0.5f,y0+0.5f,z0+0.5f);
+					d010.imag = tex3D(texModel_imag,x0+0.5f,y1+0.5f,z0+0.5f);
+					d011.imag = tex3D(texModel_imag,x1+0.5f,y1+0.5f,z0+0.5f);
+					d100.imag = tex3D(texModel_imag,x0+0.5f,y0+0.5f,z1+0.5f);
+					d101.imag = tex3D(texModel_imag,x1+0.5f,y0+0.5f,z1+0.5f);
+					d110.imag = tex3D(texModel_imag,x0+0.5f,y1+0.5f,z1+0.5f);
+					d111.imag = tex3D(texModel_imag,x1+0.5f,y1+0.5f,z1+0.5f);
+
+					// Set the interpolated value in the 2D output array
+					dx00 = d000 + (d001 - d000)*fx;
+					dx01 = d100 + (d101 - d100)*fx;
+					dx10 = d010 + (d011 - d010)*fx;
+					dx11 = d110 + (d111 - d110)*fx;
+
+					dxy0 = dx00 + (dx10 - dx00)*fy;
+					dxy1 = dx01 + (dx11 - dx01)*fy;
+
+					val = dxy0 + (dxy1 - dxy0)*fz;
+
+					if (is_neg_x)
+					{
+						val.imag = -val.imag;
+					}
+
+				}
+				else
+				{
+					val.real=0.0f;
+					val.imag=0.0f;
+				}
+				g_Frefs_real[ref_pixel+ pixel] = val.real;
+				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
+			}
+		}
+	}
+}
+
+// uses texture memory and implicit (texture) interpolation = requires float precision.
+__global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
+														 FLOAT *g_Frefs_real,
+														 FLOAT *g_Frefs_imag,
+														 int my_r_max,
+														 int max_r2,
+														 int min_r2_nn,
+														 int image_size,
+														 int orientation_num,
+														 int XSIZE_img,
+														 int YSIZE_img,
+														 int STARTINGY_mdl,
+														 int STARTINGZ_mdl)
+{
+	FLOAT xp, yp, zp;
+	long int r2;
+	int pixel;
+	bool is_neg_x;
+	CudaComplex val;
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	// inside the padded 2D orientation grid
+	if( ex < orientation_num ) // we only need to make
+	{
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		long ref_pixel = ex*(image_size);
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		{
+			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			if(pixel<image_size)
+			{
+				int x = pixel % XSIZE_img;
+				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
+
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
+				{
+					if (y >= YSIZE_img - my_r_max)
+						y = y - YSIZE_img ;
+					else
+						x=r2;
+				}
+
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					yp -= STARTINGY_mdl;
+					zp -= STARTINGZ_mdl;
+
+					val.real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					val.imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+
+
+					if (is_neg_x)
+					{
+						val.imag = -val.imag;
+					}
+
+				}
+				else
+				{
+					val.real=0.0f;
+					val.imag=0.0f;
+				}
+				g_Frefs_real[ref_pixel+ pixel] = val.real;
+				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
+			}
+		}
+	}
+}
+#endif
 
 long int generateEulerMatrices( OptimisationParamters &op,
 							SamplingParameters &sp,
@@ -319,24 +534,72 @@ void generateModelProjections(
 												iover_rots,
 												eulers.h_ptr);
 	}
+
+	eulers.size = *orientation_num * 9;
+    eulers.device_alloc();
+	eulers.cp_to_device();
+
 //	std::cerr << "model data size : " << baseMLO->mymodel.PPref[0].data.nzyxdim << std::endl;
 	int my_r_max = XMIPP_MIN(baseMLO->mymodel.PPref[iclass].r_max, op.local_Minvsigma2s[0].xdim - 1);
 	int max_r2 = my_r_max * my_r_max;
 	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
 
-	CudaGlobalPtr<CudaComplex > model((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
-	for(unsigned i = 0; i < model.size; i++)
+	CudaGlobalPtr<FLOAT > model_real((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
+	CudaGlobalPtr<FLOAT > model_imag((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
+
+	for(unsigned i = 0; i < model_real.size; i++)
 	{
-		model[i].real = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].real;
-		model[i].imag = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].imag;
+		model_real[i] = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].real;
+		model_imag[i] = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].imag;
 	}
 
-	model.device_alloc();
-	model.cp_to_device();
+	/*===========================
+	 *      TEXTURE STUFF
+	 * ==========================*/
+	// TODO Use bindless textures to reduce some of this clutter
 
-	eulers.size = *orientation_num * 9;
-	eulers.device_alloc();
-	eulers.cp_to_device();
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize=make_cudaExtent(baseMLO->mymodel.PPref[iclass].data.xdim,
+												 baseMLO->mymodel.PPref[iclass].data.ydim,
+												 baseMLO->mymodel.PPref[iclass].data.zdim);
+	// create channel to describe data type (bits,bits,bits,bits,type)
+	// TODO model should carry real & imag in separate channels of the same texture
+	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+
+	//allocate device memory for cuda 3D array
+	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
+	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
+
+	//set cuda array copy parameters to be supplied to copy-command
+	cudaMemcpy3DParms copyParams = {0};
+	copyParams.extent   = volumeSize;
+
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_real;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_imag;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+
+	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
+	texModel_real.normalized = false;
+	texModel_real.filterMode = cudaFilterModeLinear;
+	texModel_imag.normalized = false;
+	texModel_imag.filterMode = cudaFilterModeLinear;
+
+	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
+	for(int n=0; n<3; n++)
+	{
+		texModel_real.addressMode[n]=cudaAddressModeClamp;
+		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+	}
+
+    //bind texture reference with cuda array
+	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
+	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
 
 	Frefs_real.size = *orientation_num * image_size;
 	Frefs_real.device_alloc();
@@ -358,7 +621,15 @@ void generateModelProjections(
 	dim3 block_dim(orient1,orient2);
 	std::cerr << "using block dimensions " << orient1 << "," << orient2 <<  std::endl;
 
-	cuda_kernel_projectAllViews_trilin<<<block_dim,BLOCK_SIZE>>>(~model,
+#if defined(CUDA_DOUBLE_PRECISION)  // under double precision, texture won't work.
+	model_real.device_alloc();
+    model_real.cp_to_device();
+ 	model_imag.device_alloc();
+    model_imag.cp_to_device();
+
+	cuda_kernel_projectAllViews_trilin_gloex<<<block_dim,BLOCK_SIZE>>>(
+															~model_real,
+															~model_imag,
 															~eulers,
 															~Frefs_real,
 															~Frefs_imag,
@@ -370,9 +641,49 @@ void generateModelProjections(
 															op.local_Minvsigma2s[0].xdim,
 															op.local_Minvsigma2s[0].ydim,
 															baseMLO->mymodel.PPref[iclass].data.xdim,
-															baseMLO->mymodel.PPref[iclass].data.ydim,
+ 															baseMLO->mymodel.PPref[iclass].data.ydim,
 															baseMLO->mymodel.PPref[iclass].data.yinit,
 															baseMLO->mymodel.PPref[iclass].data.zinit);
+
+	model_real.free_device();
+	model_real.free_device();
+
+#elif defined(USE_TEXINTERP)   // we CAN use read-associated interpolation (fast, inaccurate)...
+	cuda_kernel_projectAllViews_trilin_texim<<<block_dim,BLOCK_SIZE>>>(
+															~eulers,
+															~Frefs_real,
+															~Frefs_imag,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															*orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+#else	// ...or explicit interpolation (slow, accurate)
+	cuda_kernel_projectAllViews_trilin_texex<<<block_dim,BLOCK_SIZE>>>(
+															~eulers,
+															~Frefs_real,
+															~Frefs_imag,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															*orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+#endif
+
+	//unbind texture reference to free resource
+	cudaUnbindTexture(texModel_real);
+    cudaUnbindTexture(texModel_imag);
+
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
 }
 
 
