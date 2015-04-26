@@ -212,24 +212,22 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 	}
 }
 
-static long unsigned generateModelProjections(
-		OptimisationParamters &op, SamplingParameters &sp,
-		MlOptimiser *baseMLO,
-		CudaGlobalPtr<FLOAT> &Frefs_real,
-		CudaGlobalPtr<FLOAT> &Frefs_imag,
-		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
-		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
-		bool course, unsigned iclass, unsigned image_size)
+long int generateEulerMatrices( OptimisationParamters &op,
+							SamplingParameters &sp,
+							MlOptimiser *baseMLO,
+							bool coarse,
+							unsigned iclass,
+							std::vector< double > &rots,
+							std::vector< double > &tilts,
+							std::vector< double > &psis,
+							std::vector< long unsigned > &iorientclasses,
+							std::vector< long unsigned > &iover_rots,
+							FLOAT *	eulers)
 {
-
-	long unsigned orientation_num(0);
-
-	// Local variables
+	//Local variables
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
-
 	Matrix2D<FLOAT> A;
-
-	CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
+	long int orientation_num = 0;
 
 	for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 	{
@@ -254,7 +252,7 @@ static long unsigned generateModelProjections(
 			// In the first pass, always proceed
 			// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
 			// if so, proceed with projecting the reference in that direction
-			bool do_proceed = course ? true :
+			bool do_proceed = coarse ? true :
 					baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
 
 			if (do_proceed && pdf_orientation > 0.)
@@ -292,7 +290,35 @@ static long unsigned generateModelProjections(
 			}
 		}
 	}
+	return orientation_num;
+}
 
+void generateModelProjections(
+		OptimisationParamters &op, SamplingParameters &sp,
+		MlOptimiser *baseMLO,
+		CudaGlobalPtr<FLOAT> &Frefs_real,
+		CudaGlobalPtr<FLOAT> &Frefs_imag,
+		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
+		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
+		bool coarse, unsigned iclass, unsigned image_size,
+		CudaGlobalPtr<FLOAT> &eulers,
+		long unsigned * orientation_num,
+		bool do_generateMatrices)
+{
+
+	if(do_generateMatrices) // can supply already set matrices by setting this to false
+	{
+		*orientation_num = generateEulerMatrices(op,sp,
+												baseMLO,
+												coarse,
+												iclass,
+												rots,
+												tilts,
+												psis,
+												iorientclasses,
+												iover_rots,
+												eulers.h_ptr);
+	}
 //	std::cerr << "model data size : " << baseMLO->mymodel.PPref[0].data.nzyxdim << std::endl;
 	int my_r_max = XMIPP_MIN(baseMLO->mymodel.PPref[iclass].r_max, op.local_Minvsigma2s[0].xdim - 1);
 	int max_r2 = my_r_max * my_r_max;
@@ -308,24 +334,24 @@ static long unsigned generateModelProjections(
 	model.device_alloc();
 	model.cp_to_device();
 
-	eulers.size = orientation_num * 9;
+	eulers.size = *orientation_num * 9;
 	eulers.device_alloc();
 	eulers.cp_to_device();
 
-	Frefs_real.size = orientation_num * image_size;
+	Frefs_real.size = *orientation_num * image_size;
 	Frefs_real.device_alloc();
-	Frefs_imag.size = orientation_num * image_size;
+	Frefs_imag.size = *orientation_num * image_size;
 	Frefs_imag.device_alloc();
 
 	unsigned int orient1, orient2;
-	if(orientation_num>65535)
+	if(*orientation_num>65535)
 	{
-		orient1 = ceil(sqrt(orientation_num));
+		orient1 = ceil(sqrt(*orientation_num));
 		orient2 = orient1;
 	}
 	else
 	{
-		orient1 = orientation_num;
+		orient1 = *orientation_num;
 		orient2 = 1;
 	}
 
@@ -340,15 +366,13 @@ static long unsigned generateModelProjections(
 															max_r2,
 															min_r2_nn,
 															image_size,
-															orientation_num,
+															*orientation_num,
 															op.local_Minvsigma2s[0].xdim,
 															op.local_Minvsigma2s[0].ydim,
 															baseMLO->mymodel.PPref[iclass].data.xdim,
 															baseMLO->mymodel.PPref[iclass].data.ydim,
 															baseMLO->mymodel.PPref[iclass].data.yinit,
 															baseMLO->mymodel.PPref[iclass].data.zinit);
-
-	return orientation_num;
 }
 
 
@@ -656,7 +680,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
 
-			Matrix2D<FLOAT> A;
+			CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
 
 			CudaGlobalPtr<FLOAT> Frefs_real;
 			CudaGlobalPtr<FLOAT> Frefs_imag;
@@ -667,7 +691,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 			CUDA_CPU_TIC("projection_1");
 
-			long unsigned orientation_num = generateModelProjections(
+			long unsigned orientation_num;
+			generateModelProjections(
 					op, sp,
 					baseMLO,
 					Frefs_real,
@@ -675,7 +700,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					iorientclasses, iover_rots,
 					rots, tilts, psis,
 					(exp_ipass == 0), exp_iclass,
-					image_size);
+					image_size,
+					eulers,
+					&orientation_num,
+					true);
 
 			CUDA_CPU_TOC("projection_1");
 
@@ -1217,8 +1245,8 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 																						oversamples
 																					 );
 
-					Mweight.cp_to_host();
-					Mweight.free_device();
+					Mweight.cp_to_host(); //FIXME make wider in scope; pass to storeWsums() to be used in collect-step. Needs som coordination with else() below.
+					Mweight.free_device();  //FIXME see line above
 					thisparticle_sumweight.cp_to_host();
 					thisparticle_sumweight.free_device();
 
@@ -1273,7 +1301,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 							} // end loop itrans
 						} // end loop ipsi
 					} // end loop idir
-				} //endif do_gpu_sumweight
+				}                            //endif do_gpu_sumweight
 			} // end loop exp_iclass
 		} // end if iter==1
 
@@ -1587,6 +1615,12 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		                            REFERENCE PROJECTION GENERATION
 		=======================================================================================*/
 
+		// Since we will need the euler matrices for all projections in the data_collect stage,
+		// we might as well make it wider in scope and retain it on the GPU until then. When we
+		// switch from pair to bool, there won't be any need to remake it every class, but for
+		// now we create only those matrices corresponding to significant orientations, which IS  * class-specific *
+		CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
+
 		CudaGlobalPtr<FLOAT> Frefs_real;
 		CudaGlobalPtr<FLOAT> Frefs_imag;
 
@@ -1595,15 +1629,23 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		CUDA_CPU_TIC("projection_2");
 
-		long unsigned orientation_num = generateModelProjections(
-				op, sp,
-				baseMLO,
-				Frefs_real,
-				Frefs_imag,
-				iorientclasses, iover_rots,
-				rots, tilts, psis,
-				false, exp_iclass,
-				image_size);
+		long unsigned orientation_num;
+
+		bool do_preGenerateEulerMatrices = true; // This is in preparation for moving generation of matrices up one or more levels (generateModelProjections takes bool to generate or not)
+		if(do_preGenerateEulerMatrices)
+		{
+			orientation_num = generateEulerMatrices(op,sp,baseMLO,false,exp_iclass,
+													rots, tilts, psis,
+													iorientclasses,	iover_rots,
+													eulers.h_ptr);
+		}
+
+		generateModelProjections(op, sp, baseMLO, Frefs_real, Frefs_imag,
+								 iorientclasses, iover_rots,
+								 rots, tilts, psis,
+								 false, exp_iclass,
+								 image_size,
+								 eulers, &orientation_num, !do_preGenerateEulerMatrices);
 
 		CUDA_CPU_TOC("projection_2");
 
@@ -1887,7 +1929,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			//TODO some in the following double loop can be GPU accelerated
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
 
-			// exp_nr_dir * sp.nr_psi * sp.nr_oversampled_rot * sp.nr_trans * sp.nr_oversampled_trans
+
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
 				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
@@ -1899,21 +1941,11 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 						// Only proceed if any of the particles had any significant coarsely sampled translation
 						if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 						{
-							// Now get the oversampled (rot, tilt, psi) triplets
-							// This will be only the original (rot,tilt,psi) triplet if (adaptive_oversampling==0)
-							baseMLO->sampling.getOrientations(idir, ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-									op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 							// Loop over all oversampled orientations (only a single one in the first pass)
 							for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
 							{
-								double rot = oversampled_rot[iover_rot];
-								double tilt = oversampled_tilt[iover_rot];
-								double psi = oversampled_psi[iover_rot];
-
-								// Get the Euler matrix
-								Euler_angles2matrix(rot, tilt, psi, A);
-
-
+//--------Kernelize---||
+//                    \/
 								long int ihidden = iorientclass * sp.nr_trans;
 								for (long int itrans = sp.itrans_min, iitrans = 0; itrans <= sp.itrans_max; itrans++, ihidden++)
 								{
@@ -1969,14 +2001,21 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
 											}
 
+//                    /\
+//--------Kernelize---||
+
+//--------- Just max-check from here
 											if (weight > op.max_weight[ipart])
 											{
+
 												// Store optimal image parameters
 												op.max_weight[ipart] = weight;
 
-//												A = A.inv();
-//												A = A.inv();
-//												Euler_matrix2angles(A, rot, tilt, psi);
+												baseMLO->sampling.getOrientations(idir, ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+														op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+												double rot = oversampled_rot[iover_rot];
+												double tilt = oversampled_tilt[iover_rot];
+												double psi = oversampled_psi[iover_rot];
 
 												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
 												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
@@ -1987,6 +2026,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 													DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[iover_trans];
 												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)exp_iclass + 1;
 												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart];
+//------
 											}
 										}
 									}
@@ -1996,7 +2036,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					}
 				}
 			}
-
+			std::cerr << "max_weight[" << ipart << "] = " << op.max_weight[ipart] << std::endl;
 			CUDA_CPU_TOC("collect_data_2");
 
 #ifdef DEBUG_CUDA_MEM
