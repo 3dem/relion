@@ -11,6 +11,8 @@
 #include <cuda.h>
 #include "src/parallel.h"
 #include <thrust/sort.h>
+#include <thrust/device_ptr.h>
+#include <thrust/extrema.h>
 
 #define MAX_RESOL_SHARED_MEM 32
 #define BLOCK_SIZE  128         	// -- Number of threads in a block --
@@ -553,6 +555,7 @@ void generateModelProjections(
 		model_imag[i] = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].imag;
 	}
 
+#if !defined(CUDA_DOUBLE_PRECISION)
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
@@ -600,6 +603,7 @@ void generateModelProjections(
     //bind texture reference with cuda array
 	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
 	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
+#endif
 
 	Frefs_real.size = *orientation_num * image_size;
 	Frefs_real.device_alloc();
@@ -621,12 +625,45 @@ void generateModelProjections(
 	dim3 block_dim(orient1,orient2);
 	std::cerr << "using block dimensions " << orient1 << "," << orient2 <<  std::endl;
 
-#if defined(CUDA_DOUBLE_PRECISION)  // under double precision, texture won't work.
+#if !defined(CUDA_DOUBLE_PRECISION) && defined(USE_TEXINTERP)
+	// we CAN use read-associated interpolation (fast, inaccurate)...
+	cuda_kernel_projectAllViews_trilin_texim<<<block_dim,BLOCK_SIZE>>>(
+															~eulers,
+															~Frefs_real,
+															~Frefs_imag,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															*orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+#elif !defined(CUDA_DOUBLE_PRECISION)	// ...or explicit interpolation (slow, accurate)
+	cuda_kernel_projectAllViews_trilin_texex<<<block_dim,BLOCK_SIZE>>>(
+															~eulers,
+															~Frefs_real,
+															~Frefs_imag,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															*orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+#else // under double precision, texture won't work.
 	model_real.device_alloc();
     model_real.cp_to_device();
  	model_imag.device_alloc();
     model_imag.cp_to_device();
-
 	cuda_kernel_projectAllViews_trilin_gloex<<<block_dim,BLOCK_SIZE>>>(
 															~model_real,
 															~model_imag,
@@ -647,43 +684,13 @@ void generateModelProjections(
 
 	model_real.free_device();
 	model_real.free_device();
-
-#elif defined(USE_TEXINTERP)   // we CAN use read-associated interpolation (fast, inaccurate)...
-	cuda_kernel_projectAllViews_trilin_texim<<<block_dim,BLOCK_SIZE>>>(
-															~eulers,
-															~Frefs_real,
-															~Frefs_imag,
-															my_r_max,
-															max_r2,
-															min_r2_nn,
-															image_size,
-															*orientation_num,
-															op.local_Minvsigma2s[0].xdim,
-															op.local_Minvsigma2s[0].ydim,
-															baseMLO->mymodel.PPref[iclass].data.yinit,
-															baseMLO->mymodel.PPref[iclass].data.zinit);
-#else	// ...or explicit interpolation (slow, accurate)
-	cuda_kernel_projectAllViews_trilin_texex<<<block_dim,BLOCK_SIZE>>>(
-															~eulers,
-															~Frefs_real,
-															~Frefs_imag,
-															my_r_max,
-															max_r2,
-															min_r2_nn,
-															image_size,
-															*orientation_num,
-															op.local_Minvsigma2s[0].xdim,
-															op.local_Minvsigma2s[0].ydim,
-															baseMLO->mymodel.PPref[iclass].data.yinit,
-															baseMLO->mymodel.PPref[iclass].data.zinit);
 #endif
 
 	//unbind texture reference to free resource
 	cudaUnbindTexture(texModel_real);
     cudaUnbindTexture(texModel_imag);
 
-	cudaFreeArray(modelArray_real);
-	cudaFreeArray(modelArray_imag);
+
 }
 
 
@@ -1828,37 +1835,41 @@ __global__ void cuda_kernel_wavg(	FLOAT *g_refs_real,
 	} // endfor(pass)
 }
 
-__global__ void cuda_kernel_collect2(	FLOAT *g_pdf_orientation,          // input --------
-										FLOAT *g_oo_otrans_x,          // itrans-size -> make const
-										FLOAT *g_oo_otrans_y,          // itrans-size -> make const
-										FLOAT *g_myp_oo_otrans_x2y2z2, // itrans-size -> make const
+__global__ void cuda_kernel_collect2(
+										FLOAT *g_oo_otrans_x,          // otrans-size -> make const
+										FLOAT *g_oo_otrans_y,          // otrans-size -> make const
+										FLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
 										FLOAT *g_Mweight,
-										FLOAT op_significant_weight,
-										FLOAT op_sum_weight,
-										int   translation_num,
-										int   oversamples,
+										double op_significant_weight,    // TODO Put in const
+										double op_sum_weight,            // TODO Put in const
+										int   coarse_trans,
+										int   oversamples_trans,
 										int   oversamples_orient,
+										int   oversamples,
 										bool  do_ignore_pdf_direction,
-										FLOAT *g_thr_sumw_group,				// output -------
-										FLOAT *g_thr_wsum_pdf_class,
+										FLOAT *g_weights,
+//										FLOAT *g_thr_sumw_group,				// output -------
+//										FLOAT *g_thr_wsum_pdf_class,
 										FLOAT *g_thr_wsum_prior_offsetx_class,
 										FLOAT *g_thr_wsum_prior_offsety_class,
-										FLOAT *g_thr_wsum_sigma2_offset,
-										FLOAT *g_thr_wsum_pdf_direction)
+										FLOAT *g_thr_wsum_sigma2_offset
+//										FLOAT *g_thr_wsum_pdf_direction
+										)
 {
 	// objects reduced in this kernel, which need to be further reduced for all blocks
 	// after the kernel has finished. Notice that all reductions span fine sampling =>
 	// a block can treat all fine samples in a coarse orientation and output a single
 	// floating point value for each reduction. We do however list the dimension of
 	// post-kernel reduction for all reductions here:
-	__shared__ FLOAT               s_thr_sumw_group[BLOCK_SIZE]; // reduce for group_id
-	__shared__ FLOAT           s_thr_wsum_pdf_class[BLOCK_SIZE]; // reduce for iclass
-	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[BLOCK_SIZE]; // reduce for iclass
-	__shared__ FLOAT s_thr_wsum_prior_offsety_class[BLOCK_SIZE]; // reduce for iclass
-	__shared__ FLOAT       s_thr_wsum_sigma2_offset[BLOCK_SIZE]; // reduce totally
-	__shared__ FLOAT       s_thr_wsum_pdf_direction[BLOCK_SIZE]; // reduce for idir - mapped
+	__shared__ FLOAT                      s_weights[SUM_BLOCK_SIZE];
+//	__shared__ FLOAT               s_thr_sumw_group[BLOCK_SIZE]; // reduce for group_id
+//	__shared__ FLOAT           s_thr_wsum_pdf_class[BLOCK_SIZE]; // reduce for iclass
+	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE]; // reduce for iclass
+	__shared__ FLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE]; // reduce for iclass
+	__shared__ FLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE]; // reduce totally
+//	__shared__ FLOAT       s_thr_wsum_pdf_direction[BLOCK_SIZE]; // reduce for idir - mapped
 
-	int ex    = blockIdx.x * gridDim.y + blockIdx.y;            // coarse orientation
+	int ex  = blockIdx.x * gridDim.y + blockIdx.y;            // coarse orientation
 	int tid = threadIdx.x;
 
 	// passes to take care of all fine samples in a coarse sample  (typically oversampling of 2 => 2^5 = 32 oversamples,
@@ -1867,14 +1878,18 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_pdf_orientation,          // inpu
 	int pass_num = ceil((float)oversamples / (float)SUM_BLOCK_SIZE);
 
 	//Where to start in g_Mweight to find all data for this *coarse* orientation
-	long int ref_Mweight_idx = ex * ( translation_num*oversamples );
+	long int ref_Mweight_idx = ex * ( coarse_trans*oversamples );
 
 	// each thread will work on a particular oversampled orient & trans for all coarse samples this block goes through,
 	// so we might as well specify it here
 	int iover_trans = tid % oversamples_orient;
+	s_weights[tid]                      = 0.0f;
+	s_thr_wsum_prior_offsetx_class[tid] = 0.0f;
+	s_thr_wsum_prior_offsety_class[tid] = 0.0f;
+	s_thr_wsum_sigma2_offset[tid]       = 0.0f;
 
 	// Go over all *coarse* translations, reducing in place
-	for (int itrans=0; itrans<translation_num; itrans++)
+	for (int itrans=0; itrans<coarse_trans; itrans++)
 	{
 		//Where to start in g_Mweights to find all fine samples for this *coarse* translation
 		int pos = ref_Mweight_idx + itrans*oversamples + tid;
@@ -1882,25 +1897,18 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_pdf_orientation,          // inpu
 		{
 			FLOAT weight = g_Mweight[pos];
 			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
-			{
 				weight /= op_sum_weight;
-				s_thr_sumw_group[tid] += weight;
-				s_thr_wsum_pdf_class[tid] += weight;
-				s_thr_wsum_prior_offsetx_class[tid] +=   weight * g_oo_otrans_x[iover_trans];    // precalc otrans_y, only overtrans-size => const
-				s_thr_wsum_prior_offsety_class[tid] +=   weight * g_oo_otrans_y[iover_trans];    // precalc otrans_y, only overtrans-size => const
-				s_thr_wsum_sigma2_offset[tid] += weight *g_myp_oo_otrans_x2y2z2[iover_trans];    // precalc x2y2z2,   only overtrans-size => const
-				// the dimension==2 or ==3 in the CPU code is completed in the pre-generation of g_myp_oo_otrans_x2y2z2,
-				// where z2 is effectively set to 0 if dim==2.
-			}
-			if(!do_ignore_pdf_direction)
-			{
-				s_thr_wsum_pdf_direction[tid] += weight;
-				// The CPU-code has an if-else statement here which decides if the orientation
-				// should be remapped. Since a block will only treat a single direction, we can
-				// move that outside the kernel, either
-				//     1. supplying the mapping index to the kernel blocks directly
-				//     2. mapping kernel output after kernel exit
-			}
+			else
+				weight = 0.0f;
+
+			s_weights[tid] += weight;
+//			s_thr_sumw_group[tid] += weight;
+//			s_thr_wsum_pdf_class[tid] += weight;
+			s_thr_wsum_prior_offsetx_class[tid] +=    weight * g_oo_otrans_x[itrans*oversamples_trans + iover_trans];    // precalc otrans_y, only overtrans-size => const
+			s_thr_wsum_prior_offsety_class[tid] +=    weight * g_oo_otrans_y[itrans*oversamples_trans + iover_trans];    // precalc otrans_y, only overtrans-size => const
+			s_thr_wsum_sigma2_offset[tid] += weight * g_myp_oo_otrans_x2y2z2[itrans*oversamples_trans + iover_trans];    // precalc x2y2z2,   only overtrans-size => const
+			// the dimension==2 or ==3 in the CPU code is completed in the pre-generation of g_myp_oo_otrans_x2y2z2,
+			// where z2 is effectively set to 0 if dim==2.
 		}
 	}
 	// Reduction of all fine samples in this coarse orientation
@@ -1908,22 +1916,24 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_pdf_orientation,          // inpu
 	{
 		if(tid<j)
 		{
-			s_thr_sumw_group[tid]               += s_thr_sumw_group[tid+j];
-			s_thr_wsum_pdf_class[tid]           += s_thr_wsum_pdf_class[tid+j];
+//			s_thr_sumw_group[tid]               += s_thr_sumw_group[tid+j];
+//			s_thr_wsum_pdf_class[tid]           += s_thr_wsum_pdf_class[tid+j];
 			s_thr_wsum_prior_offsetx_class[tid] += s_thr_wsum_prior_offsetx_class[tid+j];
 			s_thr_wsum_prior_offsety_class[tid] += s_thr_wsum_prior_offsety_class[tid+j];
 			s_thr_wsum_sigma2_offset[tid]       += s_thr_wsum_sigma2_offset[tid+j];
-			s_thr_wsum_pdf_direction[tid]       += s_thr_wsum_pdf_direction[tid+j];
+//			s_thr_wsum_pdf_direction[tid]       += s_thr_wsum_pdf_direction[tid+j];
 		}
+		__syncthreads();
 	}
-	__syncthreads();
+
 	// write pre-reduced (for all fine samples and itrans) to global mem.  (size of these allocated should be 1 FLOAT per block started)
-	g_thr_sumw_group[ex]			   = s_thr_sumw_group[0];
-	g_thr_wsum_pdf_class[ex] 		   = s_thr_wsum_pdf_class[0];
+	g_weights[ex]			           = s_weights[0];
+//	g_thr_sumw_group[ex]			   = s_thr_sumw_group[0];
+//	g_thr_wsum_pdf_class[ex] 		   = s_thr_wsum_pdf_class[0];
 	g_thr_wsum_prior_offsetx_class[ex] = s_thr_wsum_prior_offsetx_class[0];
 	g_thr_wsum_prior_offsety_class[ex] = s_thr_wsum_prior_offsety_class[0];
 	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
-	g_thr_wsum_pdf_direction[ex]       = s_thr_wsum_pdf_direction[0];
+//	g_thr_wsum_pdf_direction[ex]       = s_thr_wsum_pdf_direction[0];
 }
 
 void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
@@ -2336,8 +2346,135 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
 
 			std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
-			int mx_itrans, mx_iovertrans, mx_idir, mx_ipsi, mx_ioverrot, mx_iclass;
+//
+//
+			int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
+			CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
+											sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
+			int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
+			CudaGlobalPtr<FLOAT>     oo_otrans_x(nr_transes); // old_offset_oversampled_trans_x
+			CudaGlobalPtr<FLOAT>     oo_otrans_y(nr_transes);
+			CudaGlobalPtr<FLOAT> myp_oo_otrans_x2y2z2(nr_transes); // my_prior_old_offs....x^2*y^2*z^2
+			std::cerr << "nr_transes = " << nr_transes << std::endl;
 
+			//Pregenerate oversampled translation objects for kernel-call
+			for (long int itrans = sp.itrans_min, iitrans = 0; itrans <= sp.itrans_max; itrans++)
+			{
+				baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
+						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+				for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
+				{
+					oo_otrans_x[iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
+					oo_otrans_y[iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
+					double diffx = myprior_x - oo_otrans_x[iitrans];
+					double diffy = myprior_y - oo_otrans_y[iitrans];
+					double diffz = 0;
+					if (baseMLO->mymodel.data_dim == 3)
+						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
+
+					myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
+				}
+			}
+			Mweight.device_alloc();
+			Mweight.cp_to_device();
+
+			oo_otrans_x.device_alloc();
+			oo_otrans_x.cp_to_device();
+//			oo_otrans_x.free_host();
+			oo_otrans_y.device_alloc();
+			oo_otrans_y.cp_to_device();
+//			oo_otrans_y.free_host();
+			myp_oo_otrans_x2y2z2.device_alloc();
+			myp_oo_otrans_x2y2z2.cp_to_device();
+//			myp_oo_otrans_x2y2z2.free_host();
+
+			block_dim.x=sp.nr_dir;
+			block_dim.y=sp.nr_psi;
+			// This kernel does a full 6 separate partial ( p_ ) reductions, which need to be allocated in global-mem
+			CudaGlobalPtr<FLOAT>                      p_weights(block_dim.x * block_dim.y);
+//			CudaGlobalPtr<FLOAT>               p_thr_sumw_group(block_dim.x * block_dim.y);
+//			CudaGlobalPtr<FLOAT>           p_thr_wsum_pdf_class(block_dim.x * block_dim.y);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_dim.x * block_dim.y);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_dim.x * block_dim.y);
+			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_dim.x * block_dim.y);
+//			CudaGlobalPtr<FLOAT>       p_thr_wsum_pdf_direction(block_dim.x * block_dim.y);
+
+			p_weights.device_alloc();
+//			p_thr_sumw_group.device_alloc();
+//			p_thr_wsum_pdf_class.device_alloc();
+			p_thr_wsum_prior_offsetx_class.device_alloc();
+			p_thr_wsum_prior_offsety_class.device_alloc();
+			p_thr_wsum_sigma2_offset.device_alloc();
+//			p_thr_wsum_pdf_direction.device_alloc();
+
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			{
+				cuda_kernel_collect2<<<block_dim,SUM_BLOCK_SIZE>>>(
+																	~oo_otrans_x,          // otrans-size -> make const
+																	~oo_otrans_y,          // otrans-size -> make const
+																	~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+																	~Mweight,
+																	op.significant_weight[ipart],
+																	op.sum_weight[ipart],
+																	sp.nr_trans,
+																	sp.nr_oversampled_trans,
+																	sp.nr_oversampled_rot,
+																	oversamples,
+																	(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+																	~p_weights,
+//																	~p_thr_sumw_group,				// output -------
+//																	~p_thr_wsum_pdf_class,
+																	~p_thr_wsum_prior_offsetx_class,
+																	~p_thr_wsum_prior_offsety_class,
+																	~p_thr_wsum_sigma2_offset
+//																	~p_thr_wsum_pdf_direction
+																   );
+				HANDLE_ERROR(cudaDeviceSynchronize());
+
+				p_weights.cp_to_host();
+//				p_thr_sumw_group.cp_to_host();
+//				p_thr_wsum_pdf_class.cp_to_host();
+				p_thr_wsum_prior_offsetx_class.cp_to_host();
+				p_thr_wsum_prior_offsety_class.cp_to_host();
+				p_thr_wsum_sigma2_offset.cp_to_host();
+//				p_thr_wsum_pdf_direction.cp_to_host();
+
+				int iorient = 0;
+				for (long int idir = 0; idir < sp.nr_dir; idir++)
+				{
+					for (long int ipsi = 0; ipsi < sp.nr_psi; ipsi++, iorient++)
+					{
+						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
+						// Only proceed if any of the particles had any significant coarsely sampled translation
+						if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+						{
+							long int mydir;
+							if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+								mydir = idir;
+							else
+								long int mydir = op.pointer_dir_nonzeroprior[mydir];
+
+							// store partials according to indices of the relevant dimension
+							DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[iorient];
+							thr_sumw_group[group_id]                 						+= p_weights[iorient];
+							thr_wsum_pdf_class[exp_iclass]           						+= p_weights[iorient];
+							thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[iorient];
+
+							if (baseMLO->mymodel.ref_dim == 2)
+							{
+								thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
+								thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
+							}
+						}
+					}
+				}
+			}
+			oo_otrans_y.free_device();
+			oo_otrans_x.free_device();
+			myp_oo_otrans_x2y2z2.free_device();
+
+//			thr_wsum_sigma2_offset = 0.0;
+			int mx_itrans, mx_iovertrans, mx_idir, mx_ipsi, mx_ioverrot, mx_iclass;
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
 				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
@@ -2345,7 +2482,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
 					{
 						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-
 						// Only proceed if any of the particles had any significant coarsely sampled translation
 						if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 						{
@@ -2357,8 +2493,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 								long int ihidden = iorientclass * sp.nr_trans;
 								for (long int itrans = sp.itrans_min, iitrans = 0; itrans <= sp.itrans_max; itrans++, ihidden++)
 								{
-									baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
-											oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 									for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
 									{
 										// Only deal with this sampling point if its weight was significant
@@ -2370,44 +2504,34 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 										{
 											weight /= op.sum_weight[ipart];
 
-											// Store sum of weights for this group
-											thr_sumw_group[group_id] += weight;
-											// Store weights for this class and orientation
-											thr_wsum_pdf_class[exp_iclass] += weight;
-
-											// The following goes MUCH faster than the original lines below....
-											if (baseMLO->mymodel.ref_dim == 2)
-											{
-												thr_wsum_prior_offsetx_class[exp_iclass] += weight * (old_offset_x + oversampled_translations_x[iover_trans]);
-												thr_wsum_prior_offsety_class[exp_iclass] += weight * (old_offset_y + oversampled_translations_y[iover_trans]);
-											}
-											double diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
-											double diffy = myprior_y - old_offset_y - oversampled_translations_y[iover_trans];
-											if (baseMLO->mymodel.data_dim == 3)
-											{
-												double diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
-												thr_wsum_sigma2_offset += weight * (diffx*diffx + diffy*diffy + diffz*diffz);
-											}
-											else
-											{
-												thr_wsum_sigma2_offset += weight * (diffx*diffx + diffy*diffy);
-											}
-
-											// Store weight for this direction of this class
-											if (baseMLO->do_skip_align || baseMLO->do_skip_rotate )
-											{
-												//ignore pdf_direction
-											}
-											else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-											{
-												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], idir) += weight;
-											}
-											else
-											{
-												// In the case of orientational priors, get the original number of the direction back
-												long int mydir = op.pointer_dir_nonzeroprior[idir];
-												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
-											}
+//											// Store sum of weights for this group
+//											thr_sumw_group[group_id] += weight;
+//											// Store weights for this class and orientation
+//											thr_wsum_pdf_class[exp_iclass] += weight;
+//
+//											// The following goes MUCH faster than the original lines below.... // TODO condition post-kernel reduction  with this "if"
+//											if (baseMLO->mymodel.ref_dim == 2)
+//											{
+//												thr_wsum_prior_offsetx_class[exp_iclass] += weight * oo_otrans_x[iitrans];
+//												thr_wsum_prior_offsety_class[exp_iclass] += weight * oo_otrans_y[iitrans];
+//											}
+//											thr_wsum_sigma2_offset += weight * myp_oo_otrans_x2y2z2[iitrans];
+//											std::cerr << "thr_wsum_sigma2_offset["<< iorient <<"] = " << weight * myp_oo_otrans_x2y2z2[iitrans] << std::endl;
+//											// Store weight for this direction of this class
+//											if (baseMLO->do_skip_align || baseMLO->do_skip_rotate )
+//											{
+//												//ignore pdf_direction
+//											}
+//											else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+//											{
+//												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], idir) += weight;
+//											}
+//											else
+//											{
+//												// In the case of orientational priors, get the original number of the direction back
+//												long int mydir = op.pointer_dir_nonzeroprior[idir];
+//												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
+//											}
 
 //                    /\
 //--------Kernelize---||
@@ -2434,6 +2558,49 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					}
 				}
 			}
+			std::cerr << "mx_iclass = " << mx_iclass << std::endl;
+
+			std::cerr << "mx_idir = " << mx_idir << std::endl;
+			std::cerr << "mx_ipsi = " << mx_ipsi << std::endl;
+			std::cerr << "mx_itrans = " << mx_itrans << std::endl;
+
+			std::cerr << "mx_ioverrot = " << mx_ioverrot << std::endl;
+			std::cerr << "mx_iovertrans = " << mx_iovertrans << std::endl;
+
+//			thrust::device_ptr<FLOAT> dev_ptr = thrust::device_pointer_cast(~Mweight);
+//			thrust::device_ptr<FLOAT> max_ptr = thrust::max_element(dev_ptr, dev_ptr + (sp.iclass_max * sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples) );
+//			long int mx_idx = &max_ptr[0] - &dev_ptr[0];
+//
+//			std::cerr << "dv_ptr = " << &dev_ptr[0] << "mx_ptr = " << &max_ptr[0] << " mx_INDEX =  " << mx_idx << std::endl;
+//
+//			mx_iclass = floor( mx_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples ));
+//			mx_idx   -= mx_iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
+//
+//			mx_idir   = floor( mx_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));
+//			mx_idx   -= mx_iclass     * ( sp.nr_psi * sp.nr_trans * oversamples );
+//
+//			mx_ipsi   = floor( mx_idx / ( sp.nr_trans * oversamples ));
+//			mx_idx   -= mx_iclass     * ( sp.nr_trans * oversamples );
+//
+//			mx_itrans = floor( mx_idx /  oversamples );
+//			mx_idx   -= mx_iclass     *  oversamples ;
+//
+//			mx_ioverrot = floor( mx_idx / sp.nr_oversampled_trans );
+//			mx_idx   -= mx_iclass     *   sp.nr_oversampled_trans ;
+//
+//			mx_iovertrans = mx_idx ;
+//
+//			std::cerr << "mx_iclass = " << mx_iclass << std::endl;
+//
+//			std::cerr << "mx_idir = " << mx_idir << std::endl;
+//			std::cerr << "mx_ipsi = " << mx_ipsi << std::endl;
+//			std::cerr << "mx_itrans = " << mx_itrans << std::endl;
+//
+//			std::cerr << "mx_ioverrot = " << mx_ioverrot << std::endl;
+//			std::cerr << "mx_iovertrans = " << mx_iovertrans << std::endl;
+
+			Mweight.free_device();
+
 			baseMLO->sampling.getTranslations(mx_itrans, baseMLO->adaptive_oversampling,
 					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 
@@ -2453,6 +2620,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart];
 
 			std::cerr << "max_weight[" << ipart << "] = " << op.max_weight[ipart] << std::endl;
+			std::cerr << "thr_wsum_sigma2_offset = " << thr_wsum_sigma2_offset << std::endl;
 			CUDA_CPU_TOC("collect_data_2");
 
 #ifdef DEBUG_CUDA_MEM
