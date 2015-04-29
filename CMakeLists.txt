@@ -11,14 +11,13 @@ else()
 options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release
 RelWithDebInfo MinSizeRel.")
 endif()
-include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
 
 message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
 
-
 project(Relion)
-set(PROJECT_VERSION "1.4.0")
+include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER project()
 
+set(PROJECT_VERSION "1.4.0")
 
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
@@ -45,10 +44,8 @@ if(CUDA_FOUND)
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
-
 SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
-
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

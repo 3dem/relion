@@ -10,19 +10,75 @@
 #include <fstream>
 #include <cuda.h>
 #include "src/parallel.h"
+#include <thrust/sort.h>
 
 #define MAX_RESOL_SHARED_MEM 32
-#define BLOCK_SIZE 128         // This is optimally set as big as possible without its ceil:ed multiple exceeding imagesize by too much.
+#define BLOCK_SIZE  128         	// -- Number of threads in a block --
+									// This is optimally set as big as possible without
+									// its ceil:ed multiple exceeding imagesize by too much.
+#define SUM_BLOCK_SIZE 32
+
+#define REF_GROUP_SIZE 3			// -- Number of references to be treated per block --
+									// This applies to wavg and reduces global memory
+									// accesses roughly proportionally, but scales shared
+									// memory usage by allocating
+									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE
+									// FLOATS.
 
 #define NR_CLASS_MUTEXES 5
+
+texture<FLOAT,cudaTextureType3D,cudaReadModeElementType> texModel_real;
+texture<FLOAT,cudaTextureType3D,cudaReadModeElementType> texModel_imag;
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+void Euler_angles2matrix_cuda(double alpha, double beta, double gamma,
+                         Matrix2D<FLOAT> &A, bool homogeneous)
+{
+    double ca, sa, cb, sb, cg, sg;
+    double cc, cs, sc, ss;
 
-__global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
+    if (homogeneous)
+    {
+        A.initZeros(4,4);
+        MAT_ELEM(A,3,3)=1;
+    }
+    else
+        if (MAT_XSIZE(A) != 3 || MAT_YSIZE(A) != 3)
+            A.resize(3, 3);
+
+    alpha = DEG2RAD(alpha);
+    beta  = DEG2RAD(beta);
+    gamma = DEG2RAD(gamma);
+
+    sincos(alpha, &sa, &ca);
+    sincos(beta,  &sb, &cb);
+    sincos(gamma, &sg, &cg);
+
+    cc = cb * ca;
+    cs = cb * sa;
+    sc = sb * ca;
+    ss = sb * sa;
+
+    A(0, 0) =  cg * cc - sg * sa;
+    A(0, 1) =  cg * cs + sg * ca;
+    A(0, 2) = -cg * sb;
+    A(1, 0) = -sg * cc - cg * sa;
+    A(1, 1) = -sg * cs + cg * ca;
+    A(1, 2) = sg * sb;
+    A(2, 0) =  sc;
+    A(2, 1) =  ss;
+    A(2, 2) = cb;
+}
+
+
+// uses global memory and explicit interpolation = can do double precision.
+__global__ void cuda_kernel_projectAllViews_trilin_gloex( FLOAT *g_model_real,
+													FLOAT *g_model_imag,
 													FLOAT *g_eulers,
-													CudaComplex *g_Frefs,
+													FLOAT *g_Frefs_real,
+													FLOAT *g_Frefs_imag,
 													int my_r_max,
 													int max_r2,
 													int min_r2_nn,
@@ -33,32 +89,26 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 													int XSIZE_mdl,
 													int YSIZE_mdl,
 													int STARTINGY_mdl,
-													int STARTINGZ_mdl)
+													int STARTINGZ_mdl
+												   	   )
 {
 	FLOAT fx, fy, fz, xp, yp, zp;
 	int x0, x1, y0, y1, z0, z1; //y2;
 	long int r2;
-	int YXSIZE_mdl = XSIZE_mdl*YSIZE_mdl;
 	int pixel;
+	int YXSIZE_mdl = YSIZE_mdl * XSIZE_mdl;
 	bool is_neg_x;
-	//FLOAT* A;
 	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
 	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
-
-	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-
 	// inside the padded 2D orientation grid
 	if( ex < orientation_num ) // we only need to make
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-
 		long ref_pixel = ex*(image_size);
-
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
 			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
-
 			if(pixel<image_size)
 			{
 				int x = pixel % XSIZE_img;
@@ -76,11 +126,6 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					// Get logical coordinates in the 3D map
-	//				if(threadIdx.x==0)
-	//				{
-	//					&A = g_eulers[blockIdx.x*9];
-	//				}
 					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
 					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
 					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
@@ -97,13 +142,14 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					{
 						is_neg_x = false;
 					}
-					//is_neg_x = false; //TODO remove after debugging
 					// Trilinear interpolation (with physical coords)
 					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
 					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
 					x0 = floorf(xp);
 					fx = xp - x0;
 					x1 = x0 + 1;
+					xp = fx + x0;
+
 
 					y0 = floorf(yp);
 					fy = yp - y0;
@@ -115,24 +161,24 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					z0 -= STARTINGZ_mdl;
 					z1 = z0 + 1;
 
-	//				  P(z,y,x) = z*YXSIZE+y*XSIZE+x
-					d000.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
-					d001.real = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
-					d010.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
-					d011.real = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
-					d100.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].real;
-					d101.real = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].real;
-					d110.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].real;
-					d111.real = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].real;
+					d000.real = g_model_real[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d001.real = g_model_real[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d010.real = g_model_real[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d011.real = g_model_real[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1];
+					d100.real = g_model_real[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d101.real = g_model_real[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d110.real = g_model_real[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d111.real = g_model_real[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1];
 
-					d000.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
-					d001.imag = g_model[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
-					d010.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
-					d011.imag = g_model[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
-					d100.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0].imag;
-					d101.imag = g_model[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1].imag;
-					d110.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0].imag;
-					d111.imag = g_model[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1].imag;
+					d000.imag = g_model_imag[z0*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d001.imag = g_model_imag[z0*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d010.imag = g_model_imag[z0*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d011.imag = g_model_imag[z0*YXSIZE_mdl+y1*XSIZE_mdl+x1];
+					d100.imag = g_model_imag[z1*YXSIZE_mdl+y0*XSIZE_mdl+x0];
+					d101.imag = g_model_imag[z1*YXSIZE_mdl+y0*XSIZE_mdl+x1];
+					d110.imag = g_model_imag[z1*YXSIZE_mdl+y1*XSIZE_mdl+x0];
+					d111.imag = g_model_imag[z1*YXSIZE_mdl+y1*XSIZE_mdl+x1];
+
 					// Set the interpolated value in the 2D output array
 					dx00 = d000 + (d001 - d000)*fx;
 					dx01 = d100 + (d101 - d100)*fx;
@@ -143,43 +189,260 @@ __global__ void cuda_kernel_projectAllViews_trilin( CudaComplex *g_model,
 					dxy1 = dx01 + (dx11 - dx01)*fy;
 
 					val = dxy0 + (dxy1 - dxy0)*fz;
-//					val.real= dx00.real;
-//					val.imag= dx00.imag;
+
 					if (is_neg_x)
 					{
 						val.imag = -val.imag;
 					}
+
 				}
 				else
 				{
-					val.real=0;
-					val.imag=0;
+					val.real=0.0f;
+					val.imag=0.0f;
 				}
-				g_Frefs[ref_pixel+ pixel].real = val.real;
-				g_Frefs[ref_pixel+ pixel].imag = val.imag;
-
+				g_Frefs_real[ref_pixel+ pixel] = val.real;
+				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
 			}
 		}
 	}
 }
 
-static long unsigned generateModelProjections(
-		OptimisationParamters &op, SamplingParameters &sp,
-		MlOptimiser *baseMLO,
-		CudaGlobalPtr<CudaComplex> &Frefs,
-		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
-		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
-		bool course, unsigned iclass, unsigned image_size)
+#if !defined(CUDA_DOUBLE_PRECISION)
+// uses texture memory and explicit interpolation = requires float precision.
+__global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
+														 FLOAT *g_Frefs_real,
+														 FLOAT *g_Frefs_imag,
+														 int my_r_max,
+														 int max_r2,
+														 int min_r2_nn,
+														 int image_size,
+														 int orientation_num,
+														 int XSIZE_img,
+														 int YSIZE_img,
+														 int STARTINGY_mdl,
+														 int STARTINGZ_mdl)
 {
+	FLOAT fx, fy, fz, xp, yp, zp;
+	int x0, x1, y0, y1, z0, z1; //y2;
+	long int r2;
+	int pixel;
+	bool is_neg_x;
+	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
+	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	// inside the padded 2D orientation grid
+	if( ex < orientation_num ) // we only need to make
+	{
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		long ref_pixel = ex*(image_size);
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		{
+			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			if(pixel<image_size)
+			{
+				int x = pixel % XSIZE_img;
+				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
 
-	long unsigned orientation_num(0);
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
+				{
+					if (y >= YSIZE_img - my_r_max)
+						y = y - YSIZE_img ;
+					else
+						x=r2;
+				}
 
-	// Local variables
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					// Trilinear interpolation (with physical coords)
+					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
+					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+					x0 = floorf(xp);
+					fx = xp - x0;
+					x1 = x0 + 1;
+					xp = fx + x0;
+
+
+					y0 = floorf(yp);
+					fy = yp - y0;
+					y0 -=  STARTINGY_mdl;
+					y1 = y0 + 1;
+					yp -= STARTINGY_mdl;
+
+					z0 = floorf(zp);
+					fz = zp - z0;
+					z0 -= STARTINGZ_mdl;
+					z1 = z0 + 1;
+					zp -= STARTINGZ_mdl;
+
+					d000.real = tex3D(texModel_real,x0+0.5f,y0+0.5f,z0+0.5f);
+					d001.real = tex3D(texModel_real,x1+0.5f,y0+0.5f,z0+0.5f);
+					d010.real = tex3D(texModel_real,x0+0.5f,y1+0.5f,z0+0.5f);
+					d011.real = tex3D(texModel_real,x1+0.5f,y1+0.5f,z0+0.5f);
+					d100.real = tex3D(texModel_real,x0+0.5f,y0+0.5f,z1+0.5f);
+					d101.real = tex3D(texModel_real,x1+0.5f,y0+0.5f,z1+0.5f);
+					d110.real = tex3D(texModel_real,x0+0.5f,y1+0.5f,z1+0.5f);
+					d111.real = tex3D(texModel_real,x1+0.5f,y1+0.5f,z1+0.5f);
+
+					d000.imag = tex3D(texModel_imag,x0+0.5f,y0+0.5f,z0+0.5f);
+					d001.imag = tex3D(texModel_imag,x1+0.5f,y0+0.5f,z0+0.5f);
+					d010.imag = tex3D(texModel_imag,x0+0.5f,y1+0.5f,z0+0.5f);
+					d011.imag = tex3D(texModel_imag,x1+0.5f,y1+0.5f,z0+0.5f);
+					d100.imag = tex3D(texModel_imag,x0+0.5f,y0+0.5f,z1+0.5f);
+					d101.imag = tex3D(texModel_imag,x1+0.5f,y0+0.5f,z1+0.5f);
+					d110.imag = tex3D(texModel_imag,x0+0.5f,y1+0.5f,z1+0.5f);
+					d111.imag = tex3D(texModel_imag,x1+0.5f,y1+0.5f,z1+0.5f);
+
+					// Set the interpolated value in the 2D output array
+					dx00 = d000 + (d001 - d000)*fx;
+					dx01 = d100 + (d101 - d100)*fx;
+					dx10 = d010 + (d011 - d010)*fx;
+					dx11 = d110 + (d111 - d110)*fx;
+
+					dxy0 = dx00 + (dx10 - dx00)*fy;
+					dxy1 = dx01 + (dx11 - dx01)*fy;
+
+					val = dxy0 + (dxy1 - dxy0)*fz;
+
+					if (is_neg_x)
+					{
+						val.imag = -val.imag;
+					}
+
+				}
+				else
+				{
+					val.real=0.0f;
+					val.imag=0.0f;
+				}
+				g_Frefs_real[ref_pixel+ pixel] = val.real;
+				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
+			}
+		}
+	}
+}
+
+// uses texture memory and implicit (texture) interpolation = requires float precision.
+__global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
+														 FLOAT *g_Frefs_real,
+														 FLOAT *g_Frefs_imag,
+														 int my_r_max,
+														 int max_r2,
+														 int min_r2_nn,
+														 int image_size,
+														 int orientation_num,
+														 int XSIZE_img,
+														 int YSIZE_img,
+														 int STARTINGY_mdl,
+														 int STARTINGZ_mdl)
+{
+	FLOAT xp, yp, zp;
+	long int r2;
+	int pixel;
+	bool is_neg_x;
+	CudaComplex val;
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	// inside the padded 2D orientation grid
+	if( ex < orientation_num ) // we only need to make
+	{
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		long ref_pixel = ex*(image_size);
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		{
+			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			if(pixel<image_size)
+			{
+				int x = pixel % XSIZE_img;
+				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
+
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
+				{
+					if (y >= YSIZE_img - my_r_max)
+						y = y - YSIZE_img ;
+					else
+						x=r2;
+				}
+
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					yp -= STARTINGY_mdl;
+					zp -= STARTINGZ_mdl;
+
+					val.real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					val.imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+
+
+					if (is_neg_x)
+					{
+						val.imag = -val.imag;
+					}
+
+				}
+				else
+				{
+					val.real=0.0f;
+					val.imag=0.0f;
+				}
+				g_Frefs_real[ref_pixel+ pixel] = val.real;
+				g_Frefs_imag[ref_pixel+ pixel] = val.imag;
+			}
+		}
+	}
+}
+#endif
+
+long int generateEulerMatrices( OptimisationParamters &op,
+							SamplingParameters &sp,
+							MlOptimiser *baseMLO,
+							bool coarse,
+							unsigned iclass,
+							std::vector< double > &rots,
+							std::vector< double > &tilts,
+							std::vector< double > &psis,
+							std::vector< long unsigned > &iorientclasses,
+							std::vector< long unsigned > &iover_rots,
+							FLOAT *	eulers)
+{
+	//Local variables
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
-
 	Matrix2D<FLOAT> A;
-
-	CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
+	long int orientation_num = 0;
 
 	for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 	{
@@ -204,7 +467,7 @@ static long unsigned generateModelProjections(
 			// In the first pass, always proceed
 			// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
 			// if so, proceed with projecting the reference in that direction
-			bool do_proceed = course ? true :
+			bool do_proceed = coarse ? true :
 					baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
 
 			if (do_proceed && pdf_orientation > 0.)
@@ -222,7 +485,7 @@ static long unsigned generateModelProjections(
 					double psi = oversampled_psi[iover_rot];
 
 					// Get the Euler matrix
-					Euler_angles2matrix(rot, tilt, psi, A);
+					Euler_angles2matrix_cuda(rot, tilt, psi, A, false);
 
 					if(!IS_NOT_INV)
 						A = A.transpose();
@@ -242,61 +505,186 @@ static long unsigned generateModelProjections(
 			}
 		}
 	}
+	return orientation_num;
+}
 
+void generateModelProjections(
+		OptimisationParamters &op, SamplingParameters &sp,
+		MlOptimiser *baseMLO,
+		CudaGlobalPtr<FLOAT> &Frefs_real,
+		CudaGlobalPtr<FLOAT> &Frefs_imag,
+		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
+		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
+		bool coarse, unsigned iclass, unsigned image_size,
+		CudaGlobalPtr<FLOAT> &eulers,
+		long unsigned * orientation_num,
+		bool do_generateMatrices)
+{
+
+	if(do_generateMatrices) // can supply already set matrices by setting this to false
+	{
+		*orientation_num = generateEulerMatrices(op,sp,
+												baseMLO,
+												coarse,
+												iclass,
+												rots,
+												tilts,
+												psis,
+												iorientclasses,
+												iover_rots,
+												eulers.h_ptr);
+	}
+
+	eulers.size = *orientation_num * 9;
+    eulers.device_alloc();
+	eulers.cp_to_device();
+
+//	std::cerr << "model data size : " << baseMLO->mymodel.PPref[0].data.nzyxdim << std::endl;
 	int my_r_max = XMIPP_MIN(baseMLO->mymodel.PPref[iclass].r_max, op.local_Minvsigma2s[0].xdim - 1);
 	int max_r2 = my_r_max * my_r_max;
 	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
 
-	CudaGlobalPtr<CudaComplex > model((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
-	for(unsigned i = 0; i < model.size; i++)
+	CudaGlobalPtr<FLOAT > model_real((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
+	CudaGlobalPtr<FLOAT > model_imag((baseMLO->mymodel.PPref[iclass]).data.nzyxdim);
+
+	for(unsigned i = 0; i < model_real.size; i++)
 	{
-		model[i].real = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].real;
-		model[i].imag = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].imag;
+		model_real[i] = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].real;
+		model_imag[i] = (FLOAT) baseMLO->mymodel.PPref[iclass].data.data[i].imag;
 	}
 
-	model.device_alloc();
-	model.cp_to_device();
+	/*===========================
+	 *      TEXTURE STUFF
+	 * ==========================*/
+	// TODO Use bindless textures to reduce some of this clutter
 
-	eulers.size = orientation_num * 9;
-	eulers.device_alloc();
-	eulers.cp_to_device();
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize=make_cudaExtent(baseMLO->mymodel.PPref[iclass].data.xdim,
+												 baseMLO->mymodel.PPref[iclass].data.ydim,
+												 baseMLO->mymodel.PPref[iclass].data.zdim);
+	// create channel to describe data type (bits,bits,bits,bits,type)
+	// TODO model should carry real & imag in separate channels of the same texture
+	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 
-	Frefs.size = orientation_num * image_size;
-	Frefs.device_alloc();
+	//allocate device memory for cuda 3D array
+	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
+	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
+
+	//set cuda array copy parameters to be supplied to copy-command
+	cudaMemcpy3DParms copyParams = {0};
+	copyParams.extent   = volumeSize;
+
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_real;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_imag;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+
+	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
+	texModel_real.normalized = false;
+	texModel_real.filterMode = cudaFilterModeLinear;
+	texModel_imag.normalized = false;
+	texModel_imag.filterMode = cudaFilterModeLinear;
+
+	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
+	for(int n=0; n<3; n++)
+	{
+		texModel_real.addressMode[n]=cudaAddressModeClamp;
+		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+	}
+
+    //bind texture reference with cuda array
+	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
+	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
+
+	Frefs_real.size = *orientation_num * image_size;
+	Frefs_real.device_alloc();
+	Frefs_imag.size = *orientation_num * image_size;
+	Frefs_imag.device_alloc();
 
 	unsigned int orient1, orient2;
-	if(orientation_num>65535)
+	if(*orientation_num>65535)
 	{
-		orient1 = ceil(sqrt(orientation_num));
+		orient1 = ceil(sqrt(*orientation_num));
 		orient2 = orient1;
 	}
 	else
 	{
-		orient1 = orientation_num;
+		orient1 = *orientation_num;
 		orient2 = 1;
 	}
 
 	dim3 block_dim(orient1,orient2);
 	std::cerr << "using block dimensions " << orient1 << "," << orient2 <<  std::endl;
 
-	cuda_kernel_projectAllViews_trilin<<<block_dim,BLOCK_SIZE>>>(~model,
+#if defined(CUDA_DOUBLE_PRECISION)  // under double precision, texture won't work.
+	model_real.device_alloc();
+    model_real.cp_to_device();
+ 	model_imag.device_alloc();
+    model_imag.cp_to_device();
+
+	cuda_kernel_projectAllViews_trilin_gloex<<<block_dim,BLOCK_SIZE>>>(
+															~model_real,
+															~model_imag,
 															~eulers,
-															~Frefs,
+															~Frefs_real,
+															~Frefs_imag,
 															my_r_max,
 															max_r2,
 															min_r2_nn,
 															image_size,
-															orientation_num,
+															*orientation_num,
 															op.local_Minvsigma2s[0].xdim,
 															op.local_Minvsigma2s[0].ydim,
 															baseMLO->mymodel.PPref[iclass].data.xdim,
-															baseMLO->mymodel.PPref[iclass].data.ydim,
+ 															baseMLO->mymodel.PPref[iclass].data.ydim,
 															baseMLO->mymodel.PPref[iclass].data.yinit,
 															baseMLO->mymodel.PPref[iclass].data.zinit);
 
-	return orientation_num;
-}
+	model_real.free_device();
+	model_real.free_device();
 
+#elif defined(USE_TEXINTERP)   // we CAN use read-associated interpolation (fast, inaccurate)...
+	cuda_kernel_projectAllViews_trilin_texim<<<block_dim,BLOCK_SIZE>>>(
+															~eulers,
+															~Frefs_real,
+															~Frefs_imag,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															*orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+#else	// ...or explicit interpolation (slow, accurate)
+	cuda_kernel_projectAllViews_trilin_texex<<<block_dim,BLOCK_SIZE>>>(
+															~eulers,
+															~Frefs_real,
+															~Frefs_imag,
+															my_r_max,
+															max_r2,
+															min_r2_nn,
+															image_size,
+															*orientation_num,
+															op.local_Minvsigma2s[0].xdim,
+															op.local_Minvsigma2s[0].ydim,
+															baseMLO->mymodel.PPref[iclass].data.yinit,
+															baseMLO->mymodel.PPref[iclass].data.zinit);
+#endif
+
+	//unbind texture reference to free resource
+	cudaUnbindTexture(texModel_real);
+    cudaUnbindTexture(texModel_imag);
+
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+}
 
 
 
@@ -312,7 +700,7 @@ __global__ void cuda_kernel_backproject(
 								FLOAT *g_wavgs_real,
 								FLOAT *g_wavgs_imag,
         						FLOAT *g_Fweights,
-        						int max_r, int max_r2, FLOAT scale_2D_3D, FLOAT scale_3D_2D,
+        						int max_r2, FLOAT scale_2D_3D, FLOAT scale_3D_2D,
 		                        unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
 		                        unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz)
 {
@@ -320,7 +708,7 @@ __global__ void cuda_kernel_backproject(
 	int Y = blockIdx.y + mdl_inity;
 	int Z = blockIdx.z + mdl_initz;
 
-	if (X*X + Y*Y + Z*Z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2) //TODO this is true roughly 52% of the times
+	if (X*X + Y*Y + Z*Z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2f) //TODO this is true roughly 52% of the times
 	{
 		unsigned tid = threadIdx.x;
 		int pass_num(ceilf((float)img_count/(float)BACKPROJECTION_BLOCK_SIZE));
@@ -333,11 +721,12 @@ __global__ void cuda_kernel_backproject(
 		FLOAT d;
 		FLOAT rX,rY,rZ;
 		int x0,y0,x,y,idx;
-		FLOAT e[9];
 
-		s_weight[tid] = 0;
-		s_value_real[tid] = 0;
-		s_value_imag[tid] = 0;
+		__shared__ FLOAT e[BACKPROJECTION_BLOCK_SIZE*6];
+
+		s_weight[tid] = 0.0f;
+		s_value_real[tid] = 0.0f;
+		s_value_imag[tid] = 0.0f;
 
 		for (int pass = 0; pass < pass_num; pass ++)
 		{
@@ -345,23 +734,19 @@ __global__ void cuda_kernel_backproject(
 
 			if (img < img_count)
 			{
-				e[6] = g_eulers_z[img*3+0];
-				e[7] = g_eulers_z[img*3+1];
-				e[8] = g_eulers_z[img*3+2];
+				rZ = (g_eulers_z[img*3+0] * X + g_eulers_z[img*3+1] * Y + g_eulers_z[img*3+2] * Z) * scale_3D_2D;
 
-				rZ = (e[6] * X + e[7] * Y + e[8] * Z) * scale_3D_2D;
-
-				if (fabsf(rZ) < 0.87) //Within the unit cube, sqrt(3)/2=0.866
+				if (fabsf(rZ) < 0.87f) //Within the unit cube, sqrt(3)/2=0.866
 				{
-					e[0] = g_eulers_xy[img*6+0];
-					e[1] = g_eulers_xy[img*6+1];
-					e[2] = g_eulers_xy[img*6+2];
-					e[3] = g_eulers_xy[img*6+3];
-					e[4] = g_eulers_xy[img*6+4];
-					e[5] = g_eulers_xy[img*6+5];
+					e[0+6*tid] = g_eulers_xy[img*6+0];
+					e[1+6*tid] = g_eulers_xy[img*6+1];
+					e[2+6*tid] = g_eulers_xy[img*6+2];
+					e[3+6*tid] = g_eulers_xy[img*6+3];
+					e[4+6*tid] = g_eulers_xy[img*6+4];
+					e[5+6*tid] = g_eulers_xy[img*6+5];
 
-					rY = (e[3] * X + e[4] * Y + e[5] * Z) * scale_3D_2D;
-					rX = (e[0] * X + e[1] * Y + e[2] * Z) * scale_3D_2D;
+					rY = (e[3+6*tid] * X + e[4+6*tid] * Y + e[5+6*tid] * Z) * scale_3D_2D;
+					rX = (e[0+6*tid] * X + e[1+6*tid] * Y + e[2+6*tid] * Z) * scale_3D_2D;
 
 					if (rX < 0)
 					{
@@ -391,16 +776,16 @@ __global__ void cuda_kernel_backproject(
 								else
 									is_neg_x = is_neg_x0;
 
-								d = 0;
+								d = 0.f;
 
-								FLOAT fx, fy, fz, xp, yp, zp;
+								FLOAT xp, yp, zp;
 								int X0, X1, Y0, Y1, Z0, Z1;
 
-								xp = (e[0] * x + e[3] * y) * scale_2D_3D;
-								yp = (e[1] * x + e[4] * y) * scale_2D_3D;
-								zp = (e[2] * x + e[5] * y) * scale_2D_3D;
+								xp = (e[0+6*tid] * x + e[3+6*tid] * y) * scale_2D_3D;
+								yp = (e[1+6*tid] * x + e[4+6*tid] * y) * scale_2D_3D;
+								zp = (e[2+6*tid] * x + e[5+6*tid] * y) * scale_2D_3D;
 
-								if (xp < 0)
+								if (xp < 0.f)
 								{
 									xp = -xp;
 									yp = -yp;
@@ -408,45 +793,42 @@ __global__ void cuda_kernel_backproject(
 								}
 
 								X0 = floorf(xp);
-								fx = xp - X0;
 								X1 = X0 + 1;
 
 								Y0 = floorf(yp);
-								fy = yp - Y0;
 								Y1 = Y0 + 1;
 
 								Z0 = floorf(zp);
-								fz = zp - Z0;
 								Z1 = Z0 + 1;
 
 								if (Z0 == Z)
 								{
 									if (Y0 == Y)
 									{
-											 if (X0 == X) d = (1. - fz) * (1. - fy) * (1. - fx);
-										else if (X1 == X) d = (1. - fz) * (1. - fy) * fx;
+											 if (X0 == X) d = (1.f - zp + Z0) * (1.f - yp + Y0) * (1.f - xp + X0);
+										else if (X1 == X) d = (1.f - zp + Z0) * (1.f - yp + Y0) * (xp - X0);
 									}
 									else if (Y1 == Y)
 									{
-											 if (X0 == X) d = (1. - fz) * fy * (1. - fx);
-										else if (X1 == X) d = (1. - fz) * fy * fx;
+											 if (X0 == X) d = (1.f - zp + Z0) * (yp - Y0) * (1.f - xp + X0);
+										else if (X1 == X) d = (1.f - zp + Z0) * (yp - Y0) * (xp - X0);
 									}
 								}
 								else if (Z1 == Z)
 								{
 									if (Y0 == Y)
 									{
-											 if (X0 == X) d = fz * (1. - fy) * (1. - fx);
-										else if (X1 == X) d = fz * (1. - fy) * fx;
+											 if (X0 == X) d = (zp - Z0) * (1.f - yp + Y0) * (1.f - xp + X0);
+										else if (X1 == X) d = (zp - Z0) * (1.f - yp + Y0) * (xp - X0);
 									}
 									else if (Y1 == Y)
 									{
-											 if (X0 == X) d = fz * fy * (1. - fx);
-										else if (X1 == X) d = fz * fy * fx;
+											 if (X0 == X) d = (zp - Z0) * (yp - Y0) * (1.f - xp + X0);
+										else if (X1 == X) d = (zp - Z0) * (yp - Y0) * (xp - X0);
 									}
 								}
 
-								if (d != 0)
+								if (d != 0.f)
 								{
 									if (y < 0) y += img_y;
 									idx = img*img_xy + y * img_x + x;
@@ -475,13 +857,13 @@ __global__ void cuda_kernel_backproject(
 			__syncthreads();
 		}
 
-		if (tid == 0 && s_weight[0] != 0)
+		if (tid == 0 && s_weight[0] != 0.0f)
 			g_weight[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_weight[0];
 
-		if (tid == 1 && s_value_real[0] != 0)
+		if (tid == 1 && s_value_real[0] != 0.0f)
 			g_model_real[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_real[0];
 
-		if (tid == 2 && s_value_imag[0] != 0)
+		if (tid == 2 && s_value_imag[0] != 0.0f)
 			g_model_imag[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_imag[0];
 	}
 }
@@ -543,7 +925,6 @@ static void backproject(
 			~wavgs_real,
 			~wavgs_imag,
 			~Fweights,
-			max_r,
 			max_r * max_r,
 			scale_2D_3D,
 			1/scale_2D_3D,
@@ -556,6 +937,11 @@ static void backproject(
 			mdl_inity,
 			mdl_initz);
 }
+
+
+
+
+
 
 
 
@@ -683,7 +1069,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 
 
-__global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
+									FLOAT *g_refs_imag,
+									FLOAT *g_imgs_real,
+									FLOAT *g_imgs_imag,
 									FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
 									unsigned img_size, FLOAT sum_init,
 									unsigned long significant_num,
@@ -702,7 +1091,7 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 		unsigned long int iy=d_transidx[ex];
 
 		__shared__ FLOAT s[BLOCK_SIZE];
-		s[threadIdx.x] = 0;
+		s[threadIdx.x] = 0.0f;
 
 		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
 
@@ -720,48 +1109,22 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 				ref_pixel_idx = ref_start + pixel;
 				img_pixel_idx = img_start + pixel;
 
-				FLOAT diff_real = g_refs[ref_pixel_idx].real - g_imgs[img_pixel_idx].real;
-				FLOAT diff_imag = g_refs[ref_pixel_idx].imag - g_imgs[img_pixel_idx].imag;
+				FLOAT diff_real = g_refs_real[ref_pixel_idx] - g_imgs_real[img_pixel_idx];
+				FLOAT diff_imag = g_refs_imag[ref_pixel_idx] - g_imgs_imag[img_pixel_idx];
 
-				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * g_Minvsigma2[pixel];
+				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * g_Minvsigma2[pixel];
 			}
 		}
-
-		// This version should run in             BLOCK_SIZE                  cycles
-		// -------------------------------------------------------------------------
-	//		if (threadIdx.x == 0)
-	//		{
-	//			double sum(sum_init);
-	//			for (unsigned i = 0; i < BLOCK_SIZE; i++)
-	//				sum += s[i];
-	//
-	//			g_diff2s[ex * translation_num + ey] = sum;
-	//		}
-		// -------------------------------------------------------------------------
-
-		// This version should run in     BLOCK_SIZE/trads + log2(trads)      cycles
-		// ( Runs ~2x as fast as the above one for BLOCK_SIZE=32 )
-		// -------------------------------------------------------------------------
 		__syncthreads();
-		int trads = 32;
-		int itr = BLOCK_SIZE/trads;
-		if(threadIdx.x<trads)
-		{
-			for(int i=1; i<itr; i++)
-			{
-				s[threadIdx.x] += s[i*trads + threadIdx.x];
-				//__syncthreads();
-			}
-		}
 
-		for(int j=(trads/2); j>0; j/=2)
+		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
 		{
 			if(threadIdx.x<j)
 			{
 				s[threadIdx.x] += s[threadIdx.x+j];
 			}
+			__syncthreads();
 		}
-		__syncthreads();
 //		if (threadIdx.x*ex == 0)
 		{
 			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
@@ -770,7 +1133,10 @@ __global__ void cuda_kernel_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 	}
 }
 
-__global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
+__global__ void cuda_kernel_cc_diff2(	FLOAT *g_refs_real,
+										FLOAT *g_refs_imag,
+										FLOAT *g_imgs_real,
+										FLOAT *g_imgs_imag,
 										FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
 										unsigned img_size, FLOAT exp_local_sqrtXi2,
 										unsigned long significant_num,
@@ -804,11 +1170,11 @@ __global__ void cuda_kernel_cc_diff2(	CudaComplex *g_refs, CudaComplex *g_imgs,
 				ref_pixel_idx = ref_start + pixel;
 				img_pixel_idx = img_start + pixel;
 
-				double diff_real = g_refs[ref_pixel_idx].real * g_imgs[img_pixel_idx].real;
-				double diff_imag = g_refs[ref_pixel_idx].imag * g_imgs[img_pixel_idx].imag;
+				double diff_real = g_refs_real[ref_pixel_idx] * g_imgs_real[img_pixel_idx];
+				double diff_imag = g_refs_imag[ref_pixel_idx] * g_imgs_imag[img_pixel_idx];
 
-				double nR = g_refs[ref_pixel_idx].real*g_refs[ref_pixel_idx].real;
-				double nI = g_refs[ref_pixel_idx].imag*g_refs[ref_pixel_idx].imag;
+				double nR = g_refs_real[ref_pixel_idx]*g_refs_real[ref_pixel_idx];
+				double nI = g_refs_imag[ref_pixel_idx]*g_refs_imag[ref_pixel_idx];
 
 				s[threadIdx.x] -= (diff_real + diff_imag);
 				norm[threadIdx.x] += nR+nI;
@@ -882,9 +1248,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
 
-			Matrix2D<FLOAT> A;
+			CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
 
-			CudaGlobalPtr<CudaComplex> Frefs;
+			CudaGlobalPtr<FLOAT> Frefs_real;
+			CudaGlobalPtr<FLOAT> Frefs_imag;
 
 			// Mapping index look-up table
 			std::vector< long unsigned > iorientclasses, iover_rots;
@@ -892,14 +1259,19 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 			CUDA_CPU_TIC("projection_1");
 
-			long unsigned orientation_num = generateModelProjections(
+			long unsigned orientation_num;
+			generateModelProjections(
 					op, sp,
 					baseMLO,
-					Frefs,
+					Frefs_real,
+					Frefs_imag,
 					iorientclasses, iover_rots,
 					rots, tilts, psis,
 					(exp_ipass == 0), exp_iclass,
-					image_size);
+					image_size,
+					eulers,
+					&orientation_num,
+					true);
 
 			CUDA_CPU_TOC("projection_1");
 
@@ -915,7 +1287,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CUDA_CPU_TIC("translation_1");
 
-				CudaGlobalPtr<CudaComplex> Fimgs(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+				CudaGlobalPtr<FLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+				CudaGlobalPtr<FLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans);
 
 				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 				long unsigned translation_num(0), ihidden(0);
@@ -964,8 +1337,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 								real /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
 								imag /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
 							}
-							Fimgs[translation_num * image_size + n].real = real;
-							Fimgs[translation_num * image_size + n].imag = imag;
+							Fimgs_real[translation_num * image_size + n] = real;
+							Fimgs_imag[translation_num * image_size + n] = imag;
 						}
 						translation_num ++;
 
@@ -1078,9 +1451,12 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					}
 				}
 
-				Fimgs.size = translation_num * image_size;
-				Fimgs.device_alloc();
-				Fimgs.cp_to_device();
+				Fimgs_real.size = translation_num * image_size;
+				Fimgs_real.device_alloc();
+				Fimgs_real.cp_to_device();
+				Fimgs_imag.size = translation_num * image_size;
+				Fimgs_imag.device_alloc();
+				Fimgs_imag.cp_to_device();
 
 				gpuMinvsigma2.cp_to_device();
 
@@ -1118,7 +1494,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
 				{
-					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs, ~Fimgs, ~gpuMinvsigma2,  ~diff2s,
+					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
 																	image_size, op.highres_Xi2_imgs[ipart],
 																	significant_num,
 																	translation_num,
@@ -1127,7 +1503,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				}
 				else
 				{
-					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs, ~Fimgs, ~gpuMinvsigma2, ~diff2s,
+					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2, ~diff2s,
 																image_size, op.highres_Xi2_imgs[ipart] / 2.,
 																significant_num,
 																translation_num,
@@ -1145,7 +1521,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CUDA_GPU_TOC("cuda_kernel_diff2");
 
-				diff2s.cp_to_host();
+				diff2s.cp_to_host(); // FIXME may not be needed since we copy it back in ConvetToWeights()
 
 				if (exp_ipass == 0)
 				{
@@ -1188,7 +1564,65 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 	} // end loop iclass
 }
 
+__global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
+													FLOAT *g_pdf_offset,
+													FLOAT *g_Mweight,
+													FLOAT *g_thisparticle_sumweight,
+													FLOAT min_diff2,
+													int translation_num,
+													int oversamples)
+{
+	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
+	// blockid
+	int ex  = blockIdx.x * gridDim.y + blockIdx.y;
+	//threadid
+	int tid = threadIdx.x;
+	s_sumweight[tid]=0;
 
+	// passes to take care of all fine samples in a coarse sample
+	int pass_num = ceil((float)oversamples / (float)SUM_BLOCK_SIZE);
+	//Where to start in g_Mweight to find all data for this *coarse* orientation
+	long int ref_Mweight_idx = ex * ( translation_num*oversamples );
+
+	// Go over all *coarse* translations, reducing in place
+	for (int itrans=0; itrans<translation_num; itrans++)
+	{
+		//Where to start in g_Mweights to find all fine samples for this *coarse* translation
+		int pos = ref_Mweight_idx + itrans*oversamples + tid;
+		for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE)
+		{
+			if( g_Mweight[pos] < 0.0f ) //TODO Might be slow (divergent threads)
+			{
+				g_Mweight[pos] = 0.0f;
+			}
+			else
+			{
+				FLOAT weight = g_pdf_orientation[ex] * g_pdf_offset[itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+				FLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
+				// next line because of numerical precision of exp-function
+				if (diff2 > 700.0f)
+					weight = 0.0f;
+				else weight *= exp(-diff2);  // TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+
+				// Store the weight for each fine sample in this coarse pair
+				g_Mweight[pos] = weight; // TODO put in shared mem
+
+				// Reduce weights for each fine sample in this coarse pair
+				s_sumweight[tid] += weight;
+			}
+		}
+	}
+	// Reduction of all fine samples in this coarse orientation
+	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
+	{
+		if(tid<j)
+		{
+			s_sumweight[tid] += s_sumweight[tid+j];
+		}
+	}
+	__syncthreads();
+	g_thisparticle_sumweight[ex]=s_sumweight[0];
+}
 
 void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp)
 {
@@ -1256,21 +1690,25 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 					if (baseMLO->mymodel.data_dim == 3)
 						myprior_z = ZZ(op.prior[ipart]);
 				}
+
+				/*=========================================
+						Fetch+generate Orientation data
+				===========================================*/
+				CudaGlobalPtr<FLOAT >  pdf_orientation(sp.nr_dir * sp.nr_psi);
+				pdf_orientation.size = sp.nr_dir * sp.nr_psi;
 				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 				{
 					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
 					{
-						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-						double pdf_orientation;
-
+						//std::cerr << "orient "  << idir << "," << iorient <<  std::endl;
 						// Get prior for this direction
 						if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
 						{
-							pdf_orientation = baseMLO->mymodel.pdf_class[exp_iclass];
+							pdf_orientation[iorient] = baseMLO->mymodel.pdf_class[exp_iclass];
 						}
 						else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
 						{
-							pdf_orientation = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
+							pdf_orientation[iorient] = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
 						}
 						else
 						{
@@ -1278,85 +1716,159 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 							// This is the probability of the orientation, given the gathered
 							// statistics of all assigned orientations of the dataset, since we
 							// are assigning a gaussian prior to all parameters.
-							pdf_orientation = op.directions_prior[idir] * op.psi_prior[ipsi];
+							pdf_orientation[iorient] = op.directions_prior[idir] * op.psi_prior[ipsi];
 						}
-						// Loop over all translations
-						long int ihidden = iorientclass * sp.nr_trans;
-						for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
+					}
+				}
+//				long int ihidden = iorientclass * sp.nr_trans;
+
+				/*=========================================
+						Fetch+generate Translation data
+				===========================================*/
+				CudaGlobalPtr<FLOAT >  pdf_offset(sp.nr_trans);
+
+				int jtrans=0;
+				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++,jtrans++)
+				{
+					//std::cerr << "trans " << itrans << "," << jtrans <<  std::endl;
+			        // To speed things up, only calculate pdf_offset at the coarse sampling.
+					// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
+					double offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
+					double offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
+					double tdiff2 = (offset_x - myprior_x) * (offset_x - myprior_x) + (offset_y - myprior_y) * (offset_y - myprior_y);
+					if (baseMLO->mymodel.data_dim == 3)
+					{
+						double offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
+						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+					}
+					// P(offset|sigma2_offset)
+					// This is the probability of the offset, given the model offset and variance.
+					if (baseMLO->mymodel.sigma2_offset < 0.0001)
+						pdf_offset[jtrans] = ( tdiff2 > 0.) ? 0. : 1.;
+					else
+						pdf_offset[jtrans] = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
+				}
+
+// TODO : Put back when  convertAllSquaredDifferencesToWeights is GPU-parallel.
+//							// TMP DEBUGGING
+//							if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && (pdf_offset==0. || pdf_orientation==0.))
+//							{
+//								pthread_mutex_lock(&global_mutex);
+//								std::cerr << " pdf_offset= " << pdf_offset << " pdf_orientation= " << pdf_orientation << std::endl;
+//								std::cerr << " ipart= " << ipart << " part_id= " << part_id << std::endl;
+//								std::cerr << " iorient= " << iorient << " idir= " << idir << " ipsi= " << ipsi << std::endl;
+//								//std::cerr << " sp.nr_psi= " << sp.nr_psi << " exp_nr_dir= " << exp_nr_dir << " sp.nr_trans= " << sp.nr_trans << std::endl;
+//								for (long int i = 0; i < op.directions_prior.size(); i++)
+//									std::cerr << " op.directions_prior["<<i<<"]= " << op.directions_prior[i] << std::endl;
+//								for (long int i = 0; i < op.psi_prior.size(); i++)
+//									std::cerr << " op.psi_prior["<<i<<"]= " << op.psi_prior[i] << std::endl;
+//								REPORT_ERROR("ERROR! pdf_offset==0.|| pdf_orientation==0.");
+//								//pthread_mutex_unlock(&global_mutex);
+//							}
+//							if (sp.nr_oversampled_rot == 0)
+//								REPORT_ERROR("sp.nr_oversampled_rot == 0");
+//							if (sp.nr_oversampled_trans == 0)
+//								REPORT_ERROR("sp.nr_oversampled_trans == 0");
+
+				// Now first loop over iover_rot, because that is the order in op.Mweight as well
+//				long int ihidden_over = ihidden * sp.nr_oversampled_rot * sp.nr_oversampled_trans;
+
+				/*=========================================
+					  Kernel call over all combinations
+				===========================================*/
+
+				// One block will be started for each (coarse) orientation, and will process all (coarse) transes,
+				// and since oversmapling is by factors of 2 on 5 dofs, we get 2^5=32 fine comparisons per coarse.
+				// In case of higher oversampling this is simply factors of 32, making it warp-perfect. Having 21
+				// coarse transes allows a block to finish in 21, 100% utilized, warp passes.
+
+				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
+
+				bool do_gpu_sumweight = true;
+				if(oversamples>=SUM_BLOCK_SIZE && do_gpu_sumweight) // Send task to GPU where warps can access automatically coalesced oversamples
+				{
+					//std::cerr << "summing weights on GPU... baseMLO->mymodel.pdf_class[exp_iclass] = " << baseMLO->mymodel.pdf_class[sp.iclass_min] <<  std::endl;
+					pdf_orientation.device_alloc();
+					pdf_orientation.cp_to_device();
+					pdf_offset.device_alloc();
+					pdf_offset.cp_to_device();
+
+					CudaGlobalPtr<FLOAT >  thisparticle_sumweight(sp.nr_dir * sp.nr_psi);  // This will be reduced in a second step.
+					thisparticle_sumweight.device_alloc();
+
+					CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
+													sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
+					Mweight.device_alloc();
+					Mweight.cp_to_device();
+
+					dim3 block_dim(sp.nr_dir,sp.nr_psi);
+					//std::cerr << "using block dimensions " << sp.nr_dir << "," << sp.nr_psi <<  std::endl;
+					cuda_kernel_sumweight_oversampling<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
+																						~pdf_offset,
+																						~Mweight,
+																						~thisparticle_sumweight,
+																						op.min_diff2[ipart],
+																						sp.nr_trans,
+																						oversamples
+																					 );
+
+					Mweight.cp_to_host(); //FIXME make wider in scope; pass to storeWsums() to be used in collect-step. Needs som coordination with else() below.
+					Mweight.free_device();  //FIXME see line above
+					thisparticle_sumweight.cp_to_host();
+					thisparticle_sumweight.free_device();
+
+					// The reduced entity *MUST* be double to avoid loss of information// TODO better reduction
+					for (long int n = 0; n < sp.nr_dir * sp.nr_psi; n++)
+					{
+						exp_thisparticle_sumweight += (double)thisparticle_sumweight[n];
+					}
+				}
+				else // Not enough oversamples to utilize GPU resources effciently with current CUDA-kernel.
+				{
+					//std::cerr << "summing weights on CPU... " <<  std::endl;
+					for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
+					{
+						for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
 						{
-
-							// To speed things up, only calculate pdf_offset at the coarse sampling.
-							// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
-							double offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
-							double offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
-							double tdiff2 = (offset_x - myprior_x) * (offset_x - myprior_x) + (offset_y - myprior_y) * (offset_y - myprior_y);
-							if (baseMLO->mymodel.data_dim == 3)
+							long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
+							long int ihidden = iorientclass * sp.nr_trans;
+							for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
 							{
-								double offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
-								tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
-							}
-							// P(offset|sigma2_offset)
-							// This is the probability of the offset, given the model offset and variance.
-							double pdf_offset;
-							if (baseMLO->mymodel.sigma2_offset < 0.0001)
-								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.; // FIXME ?? A bit hard, no?
-							else
-								pdf_offset = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
-
-							// TMP DEBUGGING
-							if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && (pdf_offset==0. || pdf_orientation==0.))
-							{
-								pthread_mutex_lock(&global_mutex);
-								std::cerr << " pdf_offset= " << pdf_offset << " pdf_orientation= " << pdf_orientation << std::endl;
-								std::cerr << " ipart= " << ipart << " part_id= " << part_id << std::endl;
-								std::cerr << " iorient= " << iorient << " idir= " << idir << " ipsi= " << ipsi << std::endl;
-								//std::cerr << " sp.nr_psi= " << sp.nr_psi << " exp_nr_dir= " << exp_nr_dir << " sp.nr_trans= " << sp.nr_trans << std::endl;
-								for (long int i = 0; i < op.directions_prior.size(); i++)
-									std::cerr << " op.directions_prior["<<i<<"]= " << op.directions_prior[i] << std::endl;
-								for (long int i = 0; i < op.psi_prior.size(); i++)
-									std::cerr << " op.psi_prior["<<i<<"]= " << op.psi_prior[i] << std::endl;
-								REPORT_ERROR("ERROR! pdf_offset==0.|| pdf_orientation==0.");
-								//pthread_mutex_unlock(&global_mutex);
-							}
-							if (sp.nr_oversampled_rot == 0)
-								REPORT_ERROR("sp.nr_oversampled_rot == 0");
-							if (sp.nr_oversampled_trans == 0)
-								REPORT_ERROR("sp.nr_oversampled_trans == 0");
-							// Now first loop over iover_rot, because that is the order in op.Mweight as well
-							long int ihidden_over = ihidden * sp.nr_oversampled_rot * sp.nr_oversampled_trans;
-							for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
-							{
-								// Then loop over iover_trans
-								for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, ihidden_over++)
+								long int ihidden_over = ihidden * sp.nr_oversampled_rot * sp.nr_oversampled_trans;
+								for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
 								{
-									// Only exponentiate for determined values of op.Mweight
-									// (this is always true in the first pass, but not so in the second pass)
-									// Only deal with this sampling point if its weight was significant
-									if (DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) < 0.)
+									// Then loop over iover_trans
+									for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, ihidden_over++)
 									{
-										DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = 0.;
-									}
-									else
-									{
-										// Set the weight base to the probability of the parameters given the prior
-										double weight = pdf_orientation * pdf_offset;
-										double diff2 = DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) - op.min_diff2[ipart];
-										// next line because of numerical precision of exp-function
-										if (diff2 > 700.) weight = 0.;
-										// TODO: use tabulated exp function?
-										else weight *= exp(-diff2);
-										// Store the weight
-										DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = weight;
+										// Only exponentiate for determined values of op.Mweight
+										// (this is always true in the first pass, but not so in the second pass)
+										// Only deal with this sampling point if its weight was significant
+										if (DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) < 0.)
+										{
+											DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = 0.;
+										}
+										else
+										{
+											// Set the weight base to the probability of the parameters given the prior
+											double weight = pdf_orientation[iorient] * pdf_offset[itrans];
+											double diff2 = DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) - op.min_diff2[ipart];
+											// next line because of numerical precision of exp-function
+											if (diff2 > 700.) weight = 0.;
+											// TODO: use tabulated exp function?
+											else weight *= exp(-diff2);
+											// Store the weight
+											DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = weight;
 
-										// Keep track of sum and maximum of all weights for this particle
-										// Later add all to exp_thisparticle_sumweight, but inside this loop sum to local thisthread_sumweight first
-										exp_thisparticle_sumweight += weight;
-									} // end if/else op.Mweight < 0.
-								} // end loop iover_trans
-							}// end loop iover_rot
-						} // end loop itrans
-					} // end loop ipsi
-				} // end loop idir
+											// Keep track of sum and maximum of all weights for this particle
+											// Later add all to exp_thisparticle_sumweight, but inside this loop sum to local thisthread_sumweight first
+											exp_thisparticle_sumweight += weight;
+										} // end if/else op.Mweight < 0.
+									} // end loop iover_trans
+								}// end loop iover_rot
+							} // end loop itrans
+						} // end loop ipsi
+					} // end loop idir
+				}                            //endif do_gpu_sumweight
 			} // end loop exp_iclass
 		} // end if iter==1
 
@@ -1377,13 +1889,14 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 	if (exp_ipass==0)
 		op.Mcoarse_significant.resize(sp.nr_particles, XSIZE(op.Mweight));
 
+	CUDA_CPU_TIC("convert_post_kernel");
 	// Now, for each particle,  find the exp_significant_weight that encompasses adaptive_fraction of op.sum_weight
 	op.significant_weight.clear();
 	op.significant_weight.resize(sp.nr_particles, 0.);
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
-		MultidimArray<double> sorted_weight;
+		MultidimArray<FLOAT> sorted_weight;
 		// Get the relevant row for this particle
 		op.Mweight.getRow(ipart, sorted_weight);
 
@@ -1400,7 +1913,13 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 		sorted_weight.resize(np);
 
 		// Sort from low to high values
+		CUDA_CPU_TIC("sort");
+#if defined(USE_THRUST) // Thrust seems incredibly slow in debug build this is clearly a FIXME
+		thrust::sort(sorted_weight.data, sorted_weight.data + np);
+#else
 		sorted_weight.sort();
+#endif
+		CUDA_CPU_TOC("sort");
 
 		double frac_weight = 0.;
 		double my_significant_weight;
@@ -1419,7 +1938,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 			std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 			std::cerr << " frac-weight= " << frac_weight << std::endl;
 			std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
-			Image<double> It;
+			Image<FLOAT> It;
 			std::cerr << " XSIZE(op.Mweight)= " << XSIZE(op.Mweight) << std::endl;
 			It()=op.Mweight;
 			It() *= 10000;
@@ -1454,78 +1973,215 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 		}
 		op.significant_weight[ipart] = my_significant_weight;
 	} // end loop ipart
+	CUDA_CPU_TOC("convert_post_kernel");
 
 }
 
 
-__global__ void cuda_kernel_wavg(	CudaComplex *g_refs, CudaComplex *g_imgs, CudaComplex *g_imgs_nomask,
+__global__ void cuda_kernel_wavg(	FLOAT *g_refs_real,
+									FLOAT *g_refs_imag,
+									FLOAT *g_imgs_real,
+									FLOAT *g_imgs_imag,
+									FLOAT *g_imgs_nm_real,
+									FLOAT *g_imgs_nm_imag,
 									FLOAT* g_weights, FLOAT* g_ctfs, FLOAT* g_Minvsigma2s,
-									FLOAT *g_wdiff2s_parts, CudaComplex *g_wavgs, FLOAT* g_Fweights,
+									FLOAT *g_wdiff2s_parts,
+									FLOAT *g_wavgs_real,
+									FLOAT *g_wavgs_imag,
+									FLOAT* g_Fweights,
 									unsigned long translation_num, FLOAT weight_norm,
 									FLOAT significant_weight, unsigned image_size,
 									bool refs_are_ctf_corrected)
 {
+	// Internal
+	__shared__ FLOAT s_wavgs_real[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_wavgs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_Fweight[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_wdiff2s_parts[REF_GROUP_SIZE*BLOCK_SIZE];
+
+	// External to load in
+	__shared__ FLOAT s_refs_real[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_refs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_real[BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_imag[BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_nm_real[BLOCK_SIZE];
+	__shared__ FLOAT s_imgs_nm_imag[BLOCK_SIZE];
+
+	// TODO Consider Mresol_fine to speed up this kernel
+
+    FLOAT val;
 	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
 	unsigned tid = threadIdx.x;
-
-	//TODO Consider Mresol_fine to speed up this kernel
-
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
-	FLOAT Fweight, wavgs_real, wavgs_imag, wdiff2s_parts;
+
 
 	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		wavgs_real = 0;
-		wavgs_imag = 0;
-		wdiff2s_parts = 0;
-		Fweight = 0;
-
+		//Zero everythin that is reduced (+=) in any one pass
+		for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+		{
+			s_wdiff2s_parts[iref*BLOCK_SIZE+tid]= 0;
+			s_Fweight[iref*BLOCK_SIZE+tid]      = 0;
+			s_wavgs_real[iref*BLOCK_SIZE+tid]   = 0;
+			s_wavgs_imag[iref*BLOCK_SIZE+tid]   = 0;
+		}
 		pixel = pass * BLOCK_SIZE + tid;
-
+		FLOAT ctf = g_ctfs[pixel]; // TODO Put in read-only cache
 		if (pixel < image_size)
 		{
-			unsigned long orientation_pixel = iorient * image_size + pixel;
-
-			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
+			// Make REF_GROUP_SIZE*image_size the new basic unit and load in BLOCK_SIZE
+			// elements from REF_GROUP_SIZE references into shared memory. iorient no
+			// longer indexes orientations, but blocks of REF_GROUP_SIZE orientations.
+			unsigned long orientation_pixel = iorient * (REF_GROUP_SIZE*image_size) + pixel;
+			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
 			{
-				FLOAT weight = g_weights[iorient * translation_num + itrans];
-
-				if (weight >= significant_weight)
+				s_refs_real[iref*BLOCK_SIZE+tid] = g_refs_real[orientation_pixel+iref*image_size];   //---------------------------
+				s_refs_imag[iref*BLOCK_SIZE+tid] = g_refs_imag[orientation_pixel+iref*image_size];   //---------------------------
+				if (refs_are_ctf_corrected) // Correct if needed FIXME Create two kernels for the different cases
 				{
-					weight /= weight_norm;
-
-					unsigned long img_pixel_idx = itrans * image_size + pixel;
-
-					FLOAT ctf = g_ctfs[pixel];
-					CudaComplex ref = g_refs[orientation_pixel];
-					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
-					{
-						ref.real *= ctf;
-						ref.imag *= ctf;
-					}
-					FLOAT diff_real = ref.real - g_imgs[img_pixel_idx].real;
-					FLOAT diff_imag = ref.imag - g_imgs[img_pixel_idx].imag;
-
-					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
-
-					FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel];
-
-					wavgs_real += g_imgs_nomask[img_pixel_idx].real * weightxinvsigma2;
-					wavgs_imag += g_imgs_nomask[img_pixel_idx].imag * weightxinvsigma2;
-
-					Fweight += weightxinvsigma2 * ctf;
+					s_refs_real[iref*BLOCK_SIZE+tid] *= ctf;
+					s_refs_imag[iref*BLOCK_SIZE+tid] *= ctf;
 				}
 			}
+			// Now go through all translations, reducing to REF_GROUP_SIZE number of outputs at each one
+			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
+			{
+				unsigned long img_pixel_idx = itrans * image_size + pixel;
+				s_imgs_real[tid]    = g_imgs_real[img_pixel_idx];  //---------------------------
+				s_imgs_imag[tid]    = g_imgs_imag[img_pixel_idx];  //---------------------------
+				s_imgs_nm_real[tid] = g_imgs_nm_real[img_pixel_idx];  //---------------------------
+				s_imgs_nm_imag[tid] = g_imgs_nm_imag[img_pixel_idx];  //---------------------------
 
-			g_wavgs[orientation_pixel].real = wavgs_real; //TODO should be buffered into shared
-			g_wavgs[orientation_pixel].imag = wavgs_imag; //TODO should be buffered into shared
-			g_wdiff2s_parts[orientation_pixel] = wdiff2s_parts; //TODO this could be further reduced in here
-			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
-		}
-	}
+				for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+				{
+					FLOAT weight = g_weights[(iorient*REF_GROUP_SIZE+iref) * translation_num + itrans]; //TODO load all neccessary weights at once to avoid global access inside a deep loop OR put in read-only cache
+					if (weight >= significant_weight)
+					{
+						weight /= weight_norm;
+
+						val = s_refs_real[iref*BLOCK_SIZE+tid] - s_imgs_real[tid];
+						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * val*val;
+						val = s_refs_imag[iref*BLOCK_SIZE+tid] - s_imgs_imag[tid];
+						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * val*val;
+
+						val = weight * ctf * g_Minvsigma2s[pixel];
+
+						s_wavgs_real[iref*BLOCK_SIZE+tid] += s_imgs_nm_real[tid] * val;
+						s_wavgs_imag[iref*BLOCK_SIZE+tid] += s_imgs_nm_imag[tid] * val;
+
+						s_Fweight[iref*BLOCK_SIZE+tid] += val * ctf;
+					}
+				}
+			}
+			// Now write shared memory data to global memory for all REF_GROUP_SIZE images in this block
+			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+			{
+				g_wavgs_real[orientation_pixel+iref*image_size]    = s_wavgs_real[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
+				g_wavgs_imag[orientation_pixel+iref*image_size]    = s_wavgs_imag[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
+				g_wdiff2s_parts[orientation_pixel+iref*image_size] = s_wdiff2s_parts[iref*BLOCK_SIZE+tid]; //TODO this could be further reduced in here
+				g_Fweights[orientation_pixel+iref*image_size]      = s_Fweight[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared
+			}
+		} // endif(pixel < image__size)
+	} // endfor(pass)
 }
 
+__global__ void cuda_kernel_collect2(	FLOAT *g_pdf_orientation,          // input --------
+										FLOAT *g_oo_otrans_x,          // itrans-size -> make const
+										FLOAT *g_oo_otrans_y,          // itrans-size -> make const
+										FLOAT *g_myp_oo_otrans_x2y2z2, // itrans-size -> make const
+										FLOAT *g_Mweight,
+										FLOAT op_significant_weight,
+										FLOAT op_sum_weight,
+										int   translation_num,
+										int   oversamples,
+										int   oversamples_orient,
+										bool  do_ignore_pdf_direction,
+										FLOAT *g_thr_sumw_group,				// output -------
+										FLOAT *g_thr_wsum_pdf_class,
+										FLOAT *g_thr_wsum_prior_offsetx_class,
+										FLOAT *g_thr_wsum_prior_offsety_class,
+										FLOAT *g_thr_wsum_sigma2_offset,
+										FLOAT *g_thr_wsum_pdf_direction)
+{
+	// objects reduced in this kernel, which need to be further reduced for all blocks
+	// after the kernel has finished. Notice that all reductions span fine sampling =>
+	// a block can treat all fine samples in a coarse orientation and output a single
+	// floating point value for each reduction. We do however list the dimension of
+	// post-kernel reduction for all reductions here:
+	__shared__ FLOAT               s_thr_sumw_group[BLOCK_SIZE]; // reduce for group_id
+	__shared__ FLOAT           s_thr_wsum_pdf_class[BLOCK_SIZE]; // reduce for iclass
+	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[BLOCK_SIZE]; // reduce for iclass
+	__shared__ FLOAT s_thr_wsum_prior_offsety_class[BLOCK_SIZE]; // reduce for iclass
+	__shared__ FLOAT       s_thr_wsum_sigma2_offset[BLOCK_SIZE]; // reduce totally
+	__shared__ FLOAT       s_thr_wsum_pdf_direction[BLOCK_SIZE]; // reduce for idir - mapped
 
+	int ex    = blockIdx.x * gridDim.y + blockIdx.y;            // coarse orientation
+	int tid = threadIdx.x;
+
+	// passes to take care of all fine samples in a coarse sample  (typically oversampling of 2 => 2^5 = 32 oversamples,
+	// so pass_num only differs from 1 in exceptional cases, where one or more dimesions are strongly oversampled, but
+	// we still want to be able to handle it in general ).
+	int pass_num = ceil((float)oversamples / (float)SUM_BLOCK_SIZE);
+
+	//Where to start in g_Mweight to find all data for this *coarse* orientation
+	long int ref_Mweight_idx = ex * ( translation_num*oversamples );
+
+	// each thread will work on a particular oversampled orient & trans for all coarse samples this block goes through,
+	// so we might as well specify it here
+	int iover_trans = tid % oversamples_orient;
+
+	// Go over all *coarse* translations, reducing in place
+	for (int itrans=0; itrans<translation_num; itrans++)
+	{
+		//Where to start in g_Mweights to find all fine samples for this *coarse* translation
+		int pos = ref_Mweight_idx + itrans*oversamples + tid;
+		for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE)
+		{
+			FLOAT weight = g_Mweight[pos];
+			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
+			{
+				weight /= op_sum_weight;
+				s_thr_sumw_group[tid] += weight;
+				s_thr_wsum_pdf_class[tid] += weight;
+				s_thr_wsum_prior_offsetx_class[tid] +=   weight * g_oo_otrans_x[iover_trans];    // precalc otrans_y, only overtrans-size => const
+				s_thr_wsum_prior_offsety_class[tid] +=   weight * g_oo_otrans_y[iover_trans];    // precalc otrans_y, only overtrans-size => const
+				s_thr_wsum_sigma2_offset[tid] += weight *g_myp_oo_otrans_x2y2z2[iover_trans];    // precalc x2y2z2,   only overtrans-size => const
+				// the dimension==2 or ==3 in the CPU code is completed in the pre-generation of g_myp_oo_otrans_x2y2z2,
+				// where z2 is effectively set to 0 if dim==2.
+			}
+			if(!do_ignore_pdf_direction)
+			{
+				s_thr_wsum_pdf_direction[tid] += weight;
+				// The CPU-code has an if-else statement here which decides if the orientation
+				// should be remapped. Since a block will only treat a single direction, we can
+				// move that outside the kernel, either
+				//     1. supplying the mapping index to the kernel blocks directly
+				//     2. mapping kernel output after kernel exit
+			}
+		}
+	}
+	// Reduction of all fine samples in this coarse orientation
+	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
+	{
+		if(tid<j)
+		{
+			s_thr_sumw_group[tid]               += s_thr_sumw_group[tid+j];
+			s_thr_wsum_pdf_class[tid]           += s_thr_wsum_pdf_class[tid+j];
+			s_thr_wsum_prior_offsetx_class[tid] += s_thr_wsum_prior_offsetx_class[tid+j];
+			s_thr_wsum_prior_offsety_class[tid] += s_thr_wsum_prior_offsety_class[tid+j];
+			s_thr_wsum_sigma2_offset[tid]       += s_thr_wsum_sigma2_offset[tid+j];
+			s_thr_wsum_pdf_direction[tid]       += s_thr_wsum_pdf_direction[tid+j];
+		}
+	}
+	__syncthreads();
+	// write pre-reduced (for all fine samples and itrans) to global mem.  (size of these allocated should be 1 FLOAT per block started)
+	g_thr_sumw_group[ex]			   = s_thr_sumw_group[0];
+	g_thr_wsum_pdf_class[ex] 		   = s_thr_wsum_pdf_class[0];
+	g_thr_wsum_prior_offsetx_class[ex] = s_thr_wsum_prior_offsetx_class[0];
+	g_thr_wsum_prior_offsety_class[ex] = s_thr_wsum_prior_offsety_class[0];
+	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
+	g_thr_wsum_pdf_direction[ex]       = s_thr_wsum_pdf_direction[0];
+}
 
 void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
 {
@@ -1566,13 +2222,16 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		thr_wsum_reference_power_spectra.resize(baseMLO->mymodel.nr_groups, aux);
 	}
 
-	std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
+
 	std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	Matrix2D<double> A;
-	MultidimArray<Complex > Fimg, Fimg_otfshift_nomask;
+	MultidimArray<FLOAT > Fimg_real, Fimg_imag;
+	MultidimArray<Complex > Fimg, Fimg_otfshift_nomask;  //TODO remove, currently needed for Fourier stuff, which is based on the complex class
 	MultidimArray<double> Fweight, Minvsigma2, Mctf;
 	bool have_warned_small_scale = false;
 
+	Fimg_real.resize(op.Fimgs[0]);
+	Fimg_imag.resize(op.Fimgs[0]);
 	Fimg.resize(op.Fimgs[0]);
 	Fweight.resize(op.Fimgs[0]);
 
@@ -1619,26 +2278,44 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		                            REFERENCE PROJECTION GENERATION
 		=======================================================================================*/
 
-		CudaGlobalPtr<CudaComplex> Frefs;
+		// Since we will need the euler matrices for all projections in the data_collect stage,
+		// we might as well make it wider in scope and retain it on the GPU until then. When we
+		// switch from pair to bool, there won't be any need to remake it every class, but for
+		// now we create only those matrices corresponding to significant orientations, which IS  * class-specific *
+		CudaGlobalPtr<FLOAT> eulers(9 * sp.nr_dir * sp.nr_psi * sp.nr_oversampled_rot);
+
+		CudaGlobalPtr<FLOAT> Frefs_real;
+		CudaGlobalPtr<FLOAT> Frefs_imag;
 
 		std::vector< long unsigned > iorientclasses, iover_rots;
 		std::vector< double > rots, tilts, psis;
 
 		CUDA_CPU_TIC("projection_2");
 
-		long unsigned orientation_num = generateModelProjections(
-				op, sp,
-				baseMLO,
-				Frefs,
-				iorientclasses, iover_rots,
-				rots, tilts, psis,
-				false, exp_iclass,
-				image_size);
+		long unsigned orientation_num;
+
+		bool do_preGenerateEulerMatrices = true; // This is in preparation for moving generation of matrices up one or more levels (generateModelProjections takes bool to generate or not)
+		if(do_preGenerateEulerMatrices)
+		{
+			orientation_num = generateEulerMatrices(op,sp,baseMLO,false,exp_iclass,
+													rots, tilts, psis,
+													iorientclasses,	iover_rots,
+													eulers.h_ptr);
+		}
+
+		generateModelProjections(op, sp, baseMLO, Frefs_real, Frefs_imag,
+								 iorientclasses, iover_rots,
+								 rots, tilts, psis,
+								 false, exp_iclass,
+								 image_size,
+								 eulers, &orientation_num, !do_preGenerateEulerMatrices);
 
 		CUDA_CPU_TOC("projection_2");
 
-		CudaGlobalPtr<CudaComplex> wavgs(orientation_num * image_size);
-		wavgs.device_alloc();
+		CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
+		wavgs_real.device_alloc();
+		CudaGlobalPtr<FLOAT> wavgs_imag(orientation_num * image_size);
+		wavgs_imag.device_alloc();
 		//wavgs.device_init(0);
 
 		CudaGlobalPtr<FLOAT> Fweights(orientation_num * image_size);
@@ -1683,8 +2360,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_CPU_TIC("translation_2");
 
-			CudaGlobalPtr<CudaComplex> Fimgs(image_size * sp.nr_trans * sp.nr_oversampled_trans);
-			CudaGlobalPtr<CudaComplex> Fimgs_nomask(Fimgs.size);
+			CudaGlobalPtr<FLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+			CudaGlobalPtr<FLOAT> Fimgs_imag(Fimgs_real.size);
+			CudaGlobalPtr<FLOAT> Fimgs_nomask_real(Fimgs_real.size);
+			CudaGlobalPtr<FLOAT> Fimgs_nomask_imag(Fimgs_real.size);
 
 			long unsigned translation_num(0), ihidden(0);
 			std::vector< long unsigned > iover_transes, itranses, ihiddens;
@@ -1709,16 +2388,16 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 								- b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag;
 						FLOAT imag = a * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag
 								+ b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real;
-						Fimgs[translation_num * image_size + n].real = real;
-						Fimgs[translation_num * image_size + n].imag = imag;
+						Fimgs_real[translation_num * image_size + n] = real;
+						Fimgs_imag[translation_num * image_size + n] = imag;
 
 						// Fimg_shift_nomask
 						real = a * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).real
 								- b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).imag;
 						imag = a * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).imag
 								+ b *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted_nomask[ipart], n)).real;
-						Fimgs_nomask[translation_num * image_size + n].real = real;
-						Fimgs_nomask[translation_num * image_size + n].imag = imag;
+						Fimgs_nomask_real[translation_num * image_size + n] = real;
+						Fimgs_nomask_imag[translation_num * image_size + n] = imag;
 					}
 
 					translation_num ++;
@@ -1729,20 +2408,26 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				}
 			}
 
-			Fimgs.size = translation_num * image_size;
-			Fimgs.device_alloc();
-			Fimgs.cp_to_device();
+			Fimgs_real.size = translation_num * image_size;
+			Fimgs_real.device_alloc();
+			Fimgs_real.cp_to_device();
+			Fimgs_imag.size = translation_num * image_size;
+			Fimgs_imag.device_alloc();
+			Fimgs_imag.cp_to_device();
 
-			Fimgs_nomask.size = translation_num * image_size;
-			Fimgs_nomask.device_alloc();
-			Fimgs_nomask.cp_to_device();
+			Fimgs_nomask_real.size = translation_num * image_size;
+			Fimgs_nomask_real.device_alloc();
+			Fimgs_nomask_real.cp_to_device();
+			Fimgs_nomask_imag.size = translation_num * image_size;
+			Fimgs_nomask_imag.device_alloc();
+			Fimgs_nomask_imag.cp_to_device();
 
 			CUDA_CPU_TOC("translation_2");
 
 			/*======================================================
 					            	SCALE
 			======================================================*/
-
+			CUDA_CPU_TIC("scale");
 			FLOAT part_scale(1.);
 
 			if (baseMLO->do_scale_correction)
@@ -1764,11 +2449,11 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					part_scale = 0.001;
 				}
 			}
-
+			CUDA_CPU_TOC("scale");
 			/*======================================================
 					            MAP WEIGHTS
 			======================================================*/
-
+			CUDA_CPU_TIC("map");
 			CudaGlobalPtr<FLOAT> sorted_weights(orientation_num * translation_num);
 
 			for (long unsigned i = 0; i < orientation_num; i++)
@@ -1784,7 +2469,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 							DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over);
 				}
 			}
-
+			CUDA_CPU_TOC("map");
 
 			/*======================================================
 					            KERNEL CALL
@@ -1828,24 +2513,32 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			wdiff2s_parts.device_alloc();
 
 			unsigned orient1, orient2;
-			if(orientation_num>65535)
+			//We only want as many blocks as there are chunks of orientations to be treated
+			//within the same block (this is done to reduce memory loads in the kernel).
+			unsigned orientation_chunks = ceil((float)orientation_num/(float)REF_GROUP_SIZE);
+			if(orientation_chunks>65535)
 			{
-				orient1 = ceil(sqrt(orientation_num));
+				orient1 = ceil(sqrt(orientation_chunks));
 				orient2 = orient1;
 			}
 			else
 			{
-				orient1 = orientation_num;
+				orient1 = orientation_chunks;
 				orient2 = 1;
 			}
 			dim3 block_dim(orient1,orient2);
 
 			CUDA_GPU_TIC("cuda_kernel_wavg");
 
+			cudaFuncSetCacheConfig(cuda_kernel_wavg, cudaFuncCachePreferShared);
 			cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-												~Frefs, ~Fimgs, ~Fimgs_nomask,
+												~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag,
+												 ~Fimgs_nomask_real, ~Fimgs_nomask_imag,
 												~sorted_weights, ~ctfs, ~Minvsigma2s,
-												~wdiff2s_parts, ~wavgs, ~Fweights,
+												~wdiff2s_parts,
+												~wavgs_real,
+												~wavgs_imag,
+												~Fweights,
 												translation_num,
 												(FLOAT) op.sum_weight[ipart],
 												(FLOAT) op.significant_weight[ipart],
@@ -1859,8 +2552,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_GPU_TOC("cuda_kernel_wavg");
 
-			Fimgs.free_device();
-			Fimgs_nomask.free_device();
+			Fimgs_real.free_device();
+			Fimgs_imag.free_device();
+			Fimgs_nomask_real.free_device();
+			Fimgs_nomask_imag.free_device();
 
 			sorted_weights.free_device();
 			ctfs.free_device();
@@ -1897,7 +2592,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			//TODO some in the following double loop can be GPU accelerated
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
 
-			// exp_nr_dir * sp.nr_psi * sp.nr_oversampled_rot * sp.nr_trans * sp.nr_oversampled_trans
+			std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
+			int mx_itrans, mx_iovertrans, mx_idir, mx_ipsi, mx_ioverrot, mx_iclass;
+
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
 				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
@@ -1909,21 +2606,11 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 						// Only proceed if any of the particles had any significant coarsely sampled translation
 						if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 						{
-							// Now get the oversampled (rot, tilt, psi) triplets
-							// This will be only the original (rot,tilt,psi) triplet if (adaptive_oversampling==0)
-							baseMLO->sampling.getOrientations(idir, ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-									op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 							// Loop over all oversampled orientations (only a single one in the first pass)
 							for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
 							{
-								double rot = oversampled_rot[iover_rot];
-								double tilt = oversampled_tilt[iover_rot];
-								double psi = oversampled_psi[iover_rot];
-
-								// Get the Euler matrix
-								Euler_angles2matrix(rot, tilt, psi, A);
-
-
+//--------Kernelize---||
+//                    \/
 								long int ihidden = iorientclass * sp.nr_trans;
 								for (long int itrans = sp.itrans_min, iitrans = 0; itrans <= sp.itrans_max; itrans++, ihidden++)
 								{
@@ -1979,24 +2666,22 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
 											}
 
+//                    /\
+//--------Kernelize---||
+
+//--------- Just max-check from here
 											if (weight > op.max_weight[ipart])
 											{
-												// Store optimal image parameters
 												op.max_weight[ipart] = weight;
 
-												A = A.inv();
-												A = A.inv();
-												Euler_matrix2angles(A, rot, tilt, psi);
-
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[iover_trans];
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[iover_trans];
-												if (baseMLO->mymodel.data_dim == 3)
-													DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[iover_trans];
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)exp_iclass + 1;
-												DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart];
+												// all of these could be derived from ihidden_over, but this is just easier.
+												mx_itrans = itrans;
+												mx_iovertrans = iover_trans;
+												mx_idir = idir;
+												mx_ipsi = ipsi;
+												mx_ioverrot = iover_rot;
+												mx_iclass = exp_iclass;
+//------
 											}
 										}
 									}
@@ -2006,7 +2691,25 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					}
 				}
 			}
+			baseMLO->sampling.getTranslations(mx_itrans, baseMLO->adaptive_oversampling,
+					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 
+			baseMLO->sampling.getOrientations(mx_idir, mx_ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+			double rot = oversampled_rot[mx_ioverrot];
+			double tilt = oversampled_tilt[mx_ioverrot];
+			double psi = oversampled_psi[mx_ioverrot];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[mx_iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[mx_iovertrans];
+			if (baseMLO->mymodel.data_dim == 3)
+				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[mx_iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)mx_iclass + 1;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart];
+
+			std::cerr << "max_weight[" << ipart << "] = " << op.max_weight[ipart] << std::endl;
 			CUDA_CPU_TOC("collect_data_2");
 
 #ifdef DEBUG_CUDA_MEM
@@ -2016,45 +2719,12 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		} // end loop ipart
 
-		Frefs.free_device();
+		Frefs_real.free_device();
+		Frefs_imag.free_device();
 
 		/*=======================================================================================
 										   BACKPROJECTION
 		=======================================================================================*/
-
-
-
-
-
-
-
-
-
-
-
-
-		wavgs.cp_to_host();
-		HANDLE_ERROR(cudaDeviceSynchronize());
-
-		CudaGlobalPtr<FLOAT> wavgs_real(wavgs.size);
-		CudaGlobalPtr<FLOAT> wavgs_imag(wavgs.size);
-
-		for (long unsigned i = 0; i < wavgs.size; i++)
-		{
-			wavgs_real[i] = wavgs[i].real;
-			wavgs_imag[i] = wavgs[i].imag;
-		}
-
-		wavgs_real.device_alloc();
-		wavgs_real.cp_to_device();
-		wavgs_imag.device_alloc();
-		wavgs_imag.cp_to_device();
-
-
-
-
-
-
 
 		CUDA_CPU_TIC("backprojection");
 
