@@ -841,6 +841,229 @@ __global__ void cuda_kernel_backproject(
 	}
 }
 
+
+
+
+
+
+
+
+
+
+__global__ void cuda_kernel_backproject2(
+								FLOAT *g_model_real,
+								FLOAT *g_model_imag,
+								FLOAT *g_weight,
+								FLOAT *g_eulers,
+								FLOAT *g_wavgs_real,
+								FLOAT *g_wavgs_imag,
+        						FLOAT *g_Fweights,
+        						int max_r2, FLOAT scale_2D_3D,
+		                        unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
+		                        unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz)
+{
+	int X = blockIdx.x * blockDim.x + threadIdx.x;
+	int Y = blockIdx.y * blockDim.y + threadIdx.y + mdl_inity;
+	int Z = blockIdx.z * blockDim.z + threadIdx.z + mdl_initz;
+	int bsize = blockDim.x * blockDim.y * blockDim.z;
+	int tid = threadIdx.z * blockDim.x * blockDim.y + threadIdx.y * blockDim.y + threadIdx.x;
+
+	bool insideSphere = X*X + Y*Y + Z*Z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2f;
+
+	FLOAT weight = 0.0f;
+	FLOAT value_real = 0.0f;
+	FLOAT value_imag = 0.0f;
+
+	bool is_neg_x0, is_neg_x;
+	FLOAT d;
+	FLOAT rX,rY,rZ,xp,yp,zp,fx,fy,fz;
+	int x0,y0,x,y,idx;
+
+	__shared__ FLOAT s_eulers[4*4*2*9];
+
+	for (long int img = 0; img < img_count; img ++)
+	{
+		int b = img % bsize;
+
+		if (b == 0)
+		{
+			s_eulers[tid*9+0] = g_eulers[(img+tid)*9+0];
+			s_eulers[tid*9+1] = g_eulers[(img+tid)*9+1];
+			s_eulers[tid*9+2] = g_eulers[(img+tid)*9+2];
+			s_eulers[tid*9+3] = g_eulers[(img+tid)*9+3];
+			s_eulers[tid*9+4] = g_eulers[(img+tid)*9+4];
+			s_eulers[tid*9+5] = g_eulers[(img+tid)*9+5];
+			s_eulers[tid*9+6] = g_eulers[(img+tid)*9+6];
+			s_eulers[tid*9+7] = g_eulers[(img+tid)*9+7];
+			s_eulers[tid*9+8] = g_eulers[(img+tid)*9+8];
+
+			__syncthreads();
+		}
+
+		if (insideSphere) //TODO this is true roughly 52% of the times
+		{
+
+			rZ = (s_eulers[b + 6] * X + s_eulers[b + 7] * Y + s_eulers[b + 8] * Z);
+
+			if (fabsf(rZ) < 0.87f * scale_2D_3D) //Within the unit cube, sqrt(3)/2=0.866
+			{
+				rY = (s_eulers[b + 3] * X + s_eulers[b + 4] * Y + s_eulers[b + 5] * Z) / scale_2D_3D;
+				rX = (s_eulers[b + 0] * X + s_eulers[b + 1] * Y + s_eulers[b + 2] * Z) / scale_2D_3D;
+
+				if (rX < 0.f)
+				{
+					rY = -rY;
+					rX = -rX;
+					is_neg_x0 = true;
+				}
+				else
+					is_neg_x0 = false;
+
+				x0 = floorf(rX);
+				y0 = floorf(rY);
+
+				for (int i = 0; i < 2; i++)
+				{
+					x = x0 + i;
+					for (int j = 0; j < 2; j++)
+					{
+						y = y0 + j;
+						if (x * x + y * y <= max_r2)
+						{
+							if (y < 0 && x == 0)
+							{
+								is_neg_x = !is_neg_x0;
+								y = -y;
+							}
+							else
+								is_neg_x = is_neg_x0;
+
+							xp = (s_eulers[b + 0] * x + s_eulers[b + 3] * y) * scale_2D_3D;
+							yp = (s_eulers[b + 1] * x + s_eulers[b + 4] * y) * scale_2D_3D;
+							zp = (s_eulers[b + 2] * x + s_eulers[b + 5] * y) * scale_2D_3D;
+
+							if (xp < 0.0f) //Flip sign
+							{
+								fx = fabsf(X+xp);
+								fy = fabsf(Y+yp);
+								fz = fabsf(Z+zp);
+							}
+							else
+							{
+								fx = fabsf(X-xp);
+								fy = fabsf(Y-yp);
+								fz = fabsf(Z-zp);
+							}
+
+							if (fx < 1.0f && fy < 1.0f && fz < 1.0f)
+							{
+								if (y < 0) y += img_y;
+								idx = img*img_xy + y * img_x + x;
+								d = (1.0f - fx) * (1.0f - fy) * (1.0f - fz);
+								weight += g_Fweights[idx] * d;
+								value_real += g_wavgs_real[idx] * d;
+								if (is_neg_x) value_imag -= g_wavgs_imag[idx] * d;
+								else          value_imag += g_wavgs_imag[idx] * d;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	if (insideSphere)
+	{
+		g_weight[(blockIdx.z * blockDim.z + threadIdx.z) * gridDim.x * gridDim.y + (blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x + (blockIdx.x * blockDim.x + threadIdx.x)] = weight;
+		g_model_real[(blockIdx.z * blockDim.z + threadIdx.z) * gridDim.x * gridDim.y + (blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x + (blockIdx.x * blockDim.x + threadIdx.x)] = value_real;
+		g_model_imag[(blockIdx.z * blockDim.z + threadIdx.z) * gridDim.x * gridDim.y + (blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x + (blockIdx.x * blockDim.x + threadIdx.x)] = value_imag;
+	}
+}
+
+static void backproject2(
+		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
+		CudaGlobalPtr<FLOAT> &model_real,
+		CudaGlobalPtr<FLOAT> &model_imag,
+		CudaGlobalPtr<FLOAT> &weight,
+		CudaGlobalPtr<FLOAT> &wavgs_real,
+		CudaGlobalPtr<FLOAT> &wavgs_imag,
+		CudaGlobalPtr<FLOAT> &Fweights,
+		int max_r, FLOAT scale_2D_3D,
+		unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
+		unsigned mdl_x, unsigned mdl_y, unsigned mdl_z, int mdl_inity, int mdl_initz)
+{
+
+	Matrix2D<double> A, Ainv;
+
+	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count);
+	CudaGlobalPtr<FLOAT> eulers_z(3*img_count);
+
+	CUDA_CPU_TIC("euler_matrix_generation");
+
+	//TODO Do the following in a kernel
+	for (long int i = 0; i < img_count; i++)
+	{
+		Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
+
+		if (IS_NOT_INV) Ainv = A;
+		else 			Ainv = A.transpose();
+		Ainv = Ainv.transpose();
+
+		eulers_xy[9 * i + 0] = (FLOAT) Ainv.mdata[0];
+		eulers_xy[9 * i + 1] = (FLOAT) Ainv.mdata[1];
+		eulers_xy[9 * i + 2] = (FLOAT) Ainv.mdata[2];
+		eulers_xy[9 * i + 3] = (FLOAT) Ainv.mdata[3];
+		eulers_xy[9 * i + 4] = (FLOAT) Ainv.mdata[4];
+		eulers_xy[9 * i + 5] = (FLOAT) Ainv.mdata[5];
+
+		eulers_xy[9 * i + 6] = (FLOAT) Ainv.mdata[6];
+		eulers_xy[9 * i + 7] = (FLOAT) Ainv.mdata[7];
+		eulers_xy[9 * i + 8] = (FLOAT) Ainv.mdata[8];
+	}
+
+	CUDA_CPU_TOC("euler_matrix_generation");
+
+
+	eulers_xy.device_alloc();
+	eulers_xy.cp_to_device();
+
+	eulers_z.device_alloc();
+	eulers_z.cp_to_device();
+
+	dim3 grid_dim( (float)mdl_x/2, (float)mdl_y/4, (float)mdl_z/4 );
+	dim3 block_dim( 2, 4, 4 );
+
+	cuda_kernel_backproject2<<<grid_dim,block_dim>>>(
+			~model_real,
+			~model_imag,
+			~weight,
+			~eulers_xy,
+			~wavgs_real,
+			~wavgs_imag,
+			~Fweights,
+			max_r * max_r,
+			scale_2D_3D,
+			img_xy,
+			img_count,
+			img_x,
+			img_y,
+			mdl_x,
+			mdl_y,
+			mdl_inity,
+			mdl_initz);
+}
+
+
+
+
+
+
+
+
+
+
+
 static void backproject(
 		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
 		CudaGlobalPtr<FLOAT> &model_real,
