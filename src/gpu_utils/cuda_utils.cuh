@@ -26,6 +26,9 @@ public:
 	__device__ CudaComplex operator*(FLOAT s)  {
 	     return CudaComplex(real*s,imag*s);
 	   }
+	__device__ void operator +=(CudaComplex s)  {
+	     real+=s.real;imag+=s.imag;
+	   }
 
 };
 
@@ -266,6 +269,9 @@ public:
 	inline
 	__host__ void cp_to_device(T * hostPtr)
 	{
+#ifdef DEBUG_CUDA
+		if (h_ptr != 0) printf("DEBUG_WARNING: Host pointer already set in call to cp_to_device(hostPtr).\n");
+#endif
 		h_ptr = hostPtr;
 		cp_to_device();
 	}

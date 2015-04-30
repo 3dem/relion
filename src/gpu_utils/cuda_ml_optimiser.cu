@@ -695,6 +695,236 @@ void generateModelProjections(
 
 
 
+
+#define BACKPROJECTION_BLOCK_SIZE 256
+
+__global__ void cuda_kernel_backproject(
+								FLOAT *g_model_real,
+								FLOAT *g_model_imag,
+								FLOAT *g_weight,
+								FLOAT *g_eulers_xy,
+								FLOAT *g_eulers_z,
+								FLOAT *g_wavgs_real,
+								FLOAT *g_wavgs_imag,
+        						FLOAT *g_Fweights,
+        						int max_r2, FLOAT scale_2D_3D, FLOAT scale_3D_2D,
+		                        unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
+		                        unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz)
+{
+	int X = blockIdx.x;
+	int Y = blockIdx.y + mdl_inity;
+	int Z = blockIdx.z + mdl_initz;
+
+	if (X*X + Y*Y + Z*Z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2f) //TODO this is true roughly 52% of the times
+	{
+		unsigned tid = threadIdx.x;
+		int pass_num(ceilf((float)img_count/(float)BACKPROJECTION_BLOCK_SIZE));
+
+		__shared__ FLOAT s_weight[BACKPROJECTION_BLOCK_SIZE];
+		__shared__ FLOAT s_value_real[BACKPROJECTION_BLOCK_SIZE];
+		__shared__ FLOAT s_value_imag[BACKPROJECTION_BLOCK_SIZE];
+
+		bool is_neg_x0, is_neg_x;
+		FLOAT d, w;
+		FLOAT rX,rY,rZ,xp,yp,zp,fx,fy,fz;
+		int x0,y0,x,y,idx;
+
+		FLOAT e[6];
+
+		s_weight[tid] = 0.0f;
+		s_value_real[tid] = 0.0f;
+		s_value_imag[tid] = 0.0f;
+
+		for (int pass = 0; pass < pass_num; pass ++)
+		{
+			unsigned long img = pass * BACKPROJECTION_BLOCK_SIZE + tid;
+
+			if (img < img_count)
+			{
+				rZ = (g_eulers_z[img*3+0] * X + g_eulers_z[img*3+1] * Y + g_eulers_z[img*3+2] * Z) * scale_3D_2D;
+
+				if (fabsf(rZ) < 0.87f) //Within the unit cube, sqrt(3)/2=0.866
+				{
+					e[0] = g_eulers_xy[img*6+0];
+					e[1] = g_eulers_xy[img*6+1];
+					e[2] = g_eulers_xy[img*6+2];
+					e[3] = g_eulers_xy[img*6+3];
+					e[4] = g_eulers_xy[img*6+4];
+					e[5] = g_eulers_xy[img*6+5];
+
+					rY = (e[3] * X + e[4] * Y + e[5] * Z) * scale_3D_2D;
+					rX = (e[0] * X + e[1] * Y + e[2] * Z) * scale_3D_2D;
+
+					if (rX < 0.f)
+					{
+						rY = -rY;
+						rX = -rX;
+						is_neg_x0 = true;
+					}
+					else
+						is_neg_x0 = false;
+
+					x0 = floorf(rX);
+					y0 = floorf(rY);
+
+					for (int i = 0; i < 2; i++)
+					{
+						x = x0 + i;
+						for (int j = 0; j < 2; j++)
+						{
+							y = y0 + j;
+							if (x * x + y * y <= max_r2)
+							{
+
+								if (y < 0 && x == 0)
+								{
+									is_neg_x = !is_neg_x0;
+									y = -y;
+								}
+								else
+									is_neg_x = is_neg_x0;
+
+								xp = (e[0] * x + e[3] * y) * scale_2D_3D;
+								yp = (e[1] * x + e[4] * y) * scale_2D_3D;
+								zp = (e[2] * x + e[5] * y) * scale_2D_3D;
+
+								if (xp < 0.0f) //Flip sign
+								{
+									fx = fabsf(X+xp);
+									fy = fabsf(Y+yp);
+									fz = fabsf(Z+zp);
+								}
+								else
+								{
+									fx = fabsf(X-xp);
+									fy = fabsf(Y-yp);
+									fz = fabsf(Z-zp);
+								}
+
+								if (fx < 1.0f && fy < 1.0f && fz < 1.0f)
+								{
+									if (y < 0) y += img_y;
+									idx = img*img_xy + y * img_x + x;
+									w = g_Fweights[idx];
+
+									if (w > 0.0f)
+									{
+										d = (1.0f - fx) * (1.0f - fy) * (1.0f - fz);
+
+										s_weight[tid] += w * d;
+										s_value_real[tid] += g_wavgs_real[idx] * d;
+										if (is_neg_x) s_value_imag[tid] -= g_wavgs_imag[idx] * d;
+										else          s_value_imag[tid] += g_wavgs_imag[idx] * d;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		__syncthreads();
+
+		for (int s = BACKPROJECTION_BLOCK_SIZE/2; s>0; s>>=1)
+		{
+			if (tid < s)
+			{
+				s_weight[tid] += s_weight[tid + s];
+				s_value_real[tid] += s_value_real[tid + s];
+				s_value_imag[tid] += s_value_imag[tid + s];
+			}
+			__syncthreads();
+		}
+
+		if (tid == 0 && s_weight[0] != 0.f)
+			g_weight[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_weight[0];
+
+		if (tid == 1 && s_value_real[0] != 0.f)
+			g_model_real[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_real[0];
+
+		if (tid == 2 && s_value_imag[0] != 0.f)
+			g_model_imag[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_imag[0];
+	}
+}
+
+static void backproject(
+		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
+		CudaGlobalPtr<FLOAT> &model_real,
+		CudaGlobalPtr<FLOAT> &model_imag,
+		CudaGlobalPtr<FLOAT> &weight,
+		CudaGlobalPtr<FLOAT> &wavgs_real,
+		CudaGlobalPtr<FLOAT> &wavgs_imag,
+		CudaGlobalPtr<FLOAT> &Fweights,
+		int max_r, FLOAT scale_2D_3D,
+		unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
+		unsigned mdl_x, unsigned mdl_y, unsigned mdl_z, int mdl_inity, int mdl_initz)
+{
+
+	Matrix2D<double> A, Ainv;
+
+	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count);
+	CudaGlobalPtr<FLOAT> eulers_z(3*img_count);
+
+	//TODO Do the following in a kernel
+	for (long int i = 0; i < img_count; i++)
+	{
+		Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
+
+		if (IS_NOT_INV) Ainv = A;
+		else 			Ainv = A.transpose();
+		Ainv = Ainv.transpose();
+
+		eulers_xy[6 * i + 0] = (FLOAT) Ainv.mdata[0];
+		eulers_xy[6 * i + 1] = (FLOAT) Ainv.mdata[1];
+		eulers_xy[6 * i + 2] = (FLOAT) Ainv.mdata[2];
+		eulers_xy[6 * i + 3] = (FLOAT) Ainv.mdata[3];
+		eulers_xy[6 * i + 4] = (FLOAT) Ainv.mdata[4];
+		eulers_xy[6 * i + 5] = (FLOAT) Ainv.mdata[5];
+
+		eulers_z[3 * i + 0] = (FLOAT) Ainv.mdata[6];
+		eulers_z[3 * i + 1] = (FLOAT) Ainv.mdata[7];
+		eulers_z[3 * i + 2] = (FLOAT) Ainv.mdata[8];
+	}
+
+
+	eulers_xy.device_alloc();
+	eulers_xy.cp_to_device();
+
+	eulers_z.device_alloc();
+	eulers_z.cp_to_device();
+
+	dim3 block_dim( mdl_x, mdl_y, mdl_z );
+
+	cuda_kernel_backproject<<<block_dim,BACKPROJECTION_BLOCK_SIZE>>>(
+			~model_real,
+			~model_imag,
+			~weight,
+			~eulers_xy,
+			~eulers_z,
+			~wavgs_real,
+			~wavgs_imag,
+			~Fweights,
+			max_r * max_r,
+			scale_2D_3D,
+			1/scale_2D_3D,
+			img_xy,
+			img_count,
+			img_x,
+			img_y,
+			mdl_x,
+			mdl_y,
+			mdl_inity,
+			mdl_initz);
+}
+
+
+
+
+
+
+
+
 void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
 	size_t first_ipart = 0, last_ipart = 0;
@@ -2494,44 +2724,85 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 										   BACKPROJECTION
 		=======================================================================================*/
 
-		wavgs_real.cp_to_host();
-		wavgs_real.free_device();
-		wavgs_imag.cp_to_host();
-		wavgs_imag.free_device();
-
-		Fweights.cp_to_host();
-		Fweights.free_device();
-
-#ifdef RELION_TESTING
-		std::string fnm = std::string("gpu_out_exp_wsum_norm_correction.txt");
-		char *text = &fnm[0];
-		freopen(text,"w",stdout);
-		for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
-		{
-			printf("%4.8f \n",exp_wsum_norm_correction[ipart]);
-		}
-		fclose(stdout);
-		//----------
-		fnm = std::string("gpu_out_thr_wsum_sigma2_noise.txt");
-		text = &fnm[0];
-		freopen(text,"w",stdout);
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine)
-		{
-			printf("%4.8f \n",thr_wsum_sigma2_noise[0].data[n]);
-		}
-		fclose(stdout);
-		//----------
-		fnm = std::string("gpu_out_Fweights.txt");
-		text = &fnm[0];
-		freopen(text,"w",stdout);
-		for(int n = 0; n < 1000; n++)
-		{
-			printf("%4.8f \n",Fweights[n*60+50]);
-		}
-		fclose(stdout);
-#endif
 
 		CUDA_CPU_TIC("backprojection");
+
+		CudaGlobalPtr<FLOAT> model_real(baseMLO->wsum_model.BPref[exp_iclass].data.nzyxdim);
+		model_real.device_alloc();
+		model_real.device_init(0);
+		CudaGlobalPtr<FLOAT> model_imag(model_real.size);
+		model_imag.device_alloc();
+		model_imag.device_init(0);
+		CudaGlobalPtr<FLOAT> weight(model_real.size);
+		weight.device_alloc();
+		weight.device_init(0);
+
+
+		CUDA_GPU_TIC("backproject_kernel");
+
+		backproject(
+				rots, tilts, psis,
+				model_real,
+				model_imag,
+				weight,
+				wavgs_real,
+				wavgs_imag,
+				Fweights,
+				baseMLO->wsum_model.BPref[exp_iclass].r_max,
+				baseMLO->wsum_model.BPref[exp_iclass].padding_factor,
+				image_size,
+				orientation_num,
+				op.local_Minvsigma2s[0].xdim,
+				op.local_Minvsigma2s[0].ydim,
+				baseMLO->wsum_model.BPref[exp_iclass].data.xdim,
+				baseMLO->wsum_model.BPref[exp_iclass].data.ydim,
+				baseMLO->wsum_model.BPref[exp_iclass].data.zdim,
+				baseMLO->wsum_model.BPref[exp_iclass].data.yinit,
+				baseMLO->wsum_model.BPref[exp_iclass].data.zinit);
+
+		CUDA_GPU_TAC("backproject_kernel");
+
+		model_real.cp_to_host();
+		model_imag.cp_to_host();
+		weight.cp_to_host();
+
+		HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Optimize concurrency
+
+		CUDA_GPU_TOC("backproject_kernel");
+
+		model_real.free_device();
+		model_imag.free_device();
+		weight.free_device();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		{
+		FILE *fPtr = fopen("gpu_bp.dat","w");
+		for (unsigned i = 0; i < model_real.size; i ++)
+			fprintf(fPtr, "%.5e %.5e\n", model_real[i], model_imag[i]);
+//			fprintf(fPtr, "%.5e\n", weight[i]);
+		fclose(fPtr);
+		}
+
+		wavgs_real.cp_to_host();
+		wavgs_imag.cp_to_host();
+		Fweights.cp_to_host();
 
 		for (long int i = 0; i < orientation_num; i++)
 		{
@@ -2541,8 +2812,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			{
 				Fimg.data[j].real = wavgs_real[i * image_size + j];
 				Fimg.data[j].imag = wavgs_imag[i * image_size + j];
-				Fimg_real.data[j]= wavgs_real[i * image_size + j];
-				Fimg_imag.data[j]= wavgs_real[i * image_size + j];
 				Fweight.data[j] = Fweights[i * image_size + j];
 			}
 
@@ -2550,7 +2819,52 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			pthread_mutex_lock(&global_mutex2[my_mutex]);
 			(baseMLO->wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
 			pthread_mutex_unlock(&global_mutex2[my_mutex]);
+
 		}
+
+		{
+		FILE *fPtr = fopen("cpu_bp.dat","w");
+		for (unsigned i = 0; i < (baseMLO->wsum_model.BPref[exp_iclass]).data.nzyxdim; i ++)
+			fprintf(fPtr, "%.5e %.5e\n", (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].real, (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].imag);
+//			fprintf(fPtr, "%.5e\n", (baseMLO->wsum_model.BPref[exp_iclass]).weight.data[i]);
+		fclose(fPtr);
+		}
+
+		exit(0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		Fweights.free();
+		wavgs_real.free();
+		wavgs_imag.free();
+
+		int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
+		pthread_mutex_lock(&global_mutex2[my_mutex]);
+
+		for (long unsigned i = 0; i < model_real.size; i++)
+		{
+			baseMLO->wsum_model.BPref[exp_iclass].data.data[i].real += model_real[i];
+			baseMLO->wsum_model.BPref[exp_iclass].data.data[i].imag += model_imag[i];
+			baseMLO->wsum_model.BPref[exp_iclass].weight.data[i] += weight[i];
+		}
+
+		pthread_mutex_unlock(&global_mutex2[my_mutex]);
 
 		CUDA_CPU_TOC("backprojection");
 
