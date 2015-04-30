@@ -683,7 +683,7 @@ void generateModelProjections(
 															baseMLO->mymodel.PPref[iclass].data.zinit);
 
 	model_real.free_device();
-	model_real.free_device();
+	model_imag.free_device();
 #endif
 
 	//unbind texture reference to free resource
@@ -1835,25 +1835,21 @@ __global__ void cuda_kernel_wavg(	FLOAT *g_refs_real,
 	} // endfor(pass)
 }
 
-__global__ void cuda_kernel_collect2(
-										FLOAT *g_oo_otrans_x,          // otrans-size -> make const
+__global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
 										FLOAT *g_oo_otrans_y,          // otrans-size -> make const
 										FLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
 										FLOAT *g_Mweight,
-										double op_significant_weight,    // TODO Put in const
-										double op_sum_weight,            // TODO Put in const
+										FLOAT op_significant_weight,    // TODO Put in const
+										FLOAT op_sum_weight,            // TODO Put in const
 										int   coarse_trans,
 										int   oversamples_trans,
 										int   oversamples_orient,
 										int   oversamples,
 										bool  do_ignore_pdf_direction,
 										FLOAT *g_weights,
-//										FLOAT *g_thr_sumw_group,				// output -------
-//										FLOAT *g_thr_wsum_pdf_class,
 										FLOAT *g_thr_wsum_prior_offsetx_class,
 										FLOAT *g_thr_wsum_prior_offsety_class,
 										FLOAT *g_thr_wsum_sigma2_offset
-//										FLOAT *g_thr_wsum_pdf_direction
 										)
 {
 	// objects reduced in this kernel, which need to be further reduced for all blocks
@@ -1862,37 +1858,28 @@ __global__ void cuda_kernel_collect2(
 	// floating point value for each reduction. We do however list the dimension of
 	// post-kernel reduction for all reductions here:
 	__shared__ FLOAT                      s_weights[SUM_BLOCK_SIZE];
-//	__shared__ FLOAT               s_thr_sumw_group[BLOCK_SIZE]; // reduce for group_id
-//	__shared__ FLOAT           s_thr_wsum_pdf_class[BLOCK_SIZE]; // reduce for iclass
-	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE]; // reduce for iclass
-	__shared__ FLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE]; // reduce for iclass
-	__shared__ FLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE]; // reduce totally
-//	__shared__ FLOAT       s_thr_wsum_pdf_direction[BLOCK_SIZE]; // reduce for idir - mapped
+	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE];
+	__shared__ FLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE];
+	__shared__ FLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE];
 
 	int ex  = blockIdx.x * gridDim.y + blockIdx.y;            // coarse orientation
 	int tid = threadIdx.x;
-
-	// passes to take care of all fine samples in a coarse sample  (typically oversampling of 2 => 2^5 = 32 oversamples,
-	// so pass_num only differs from 1 in exceptional cases, where one or more dimesions are strongly oversampled, but
-	// we still want to be able to handle it in general ).
 	int pass_num = ceil((float)oversamples / (float)SUM_BLOCK_SIZE);
-
 	//Where to start in g_Mweight to find all data for this *coarse* orientation
 	long int ref_Mweight_idx = ex * ( coarse_trans*oversamples );
 
-	// each thread will work on a particular oversampled orient & trans for all coarse samples this block goes through,
-	// so we might as well specify it here
-	int iover_trans = tid % oversamples_orient;
+	int iover_trans = tid % oversamples_trans;
+	int iover_rot = floor((float) tid / (float)oversamples_trans);
 	s_weights[tid]                      = 0.0f;
 	s_thr_wsum_prior_offsetx_class[tid] = 0.0f;
 	s_thr_wsum_prior_offsety_class[tid] = 0.0f;
 	s_thr_wsum_sigma2_offset[tid]       = 0.0f;
 
-	// Go over all *coarse* translations, reducing in place
+	// Go over all (21 typically) *coarse* translations, reducing in place
 	for (int itrans=0; itrans<coarse_trans; itrans++)
 	{
 		//Where to start in g_Mweights to find all fine samples for this *coarse* translation
-		int pos = ref_Mweight_idx + itrans*oversamples + tid;
+		int pos = ref_Mweight_idx + itrans*oversamples + iover_rot*oversamples_trans + iover_trans;
 		for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE)
 		{
 			FLOAT weight = g_Mweight[pos];
@@ -1902,13 +1889,9 @@ __global__ void cuda_kernel_collect2(
 				weight = 0.0f;
 
 			s_weights[tid] += weight;
-//			s_thr_sumw_group[tid] += weight;
-//			s_thr_wsum_pdf_class[tid] += weight;
-			s_thr_wsum_prior_offsetx_class[tid] +=    weight * g_oo_otrans_x[itrans*oversamples_trans + iover_trans];    // precalc otrans_y, only overtrans-size => const
-			s_thr_wsum_prior_offsety_class[tid] +=    weight * g_oo_otrans_y[itrans*oversamples_trans + iover_trans];    // precalc otrans_y, only overtrans-size => const
-			s_thr_wsum_sigma2_offset[tid] += weight * g_myp_oo_otrans_x2y2z2[itrans*oversamples_trans + iover_trans];    // precalc x2y2z2,   only overtrans-size => const
-			// the dimension==2 or ==3 in the CPU code is completed in the pre-generation of g_myp_oo_otrans_x2y2z2,
-			// where z2 is effectively set to 0 if dim==2.
+			s_thr_wsum_prior_offsetx_class[tid] +=    weight * g_oo_otrans_x[iover_trans + itrans*oversamples_trans];    // precalc otrans_y, only overtrans-size => const
+			s_thr_wsum_prior_offsety_class[tid] +=    weight * g_oo_otrans_y[iover_trans + itrans*oversamples_trans];    // precalc otrans_y, only overtrans-size => const
+			s_thr_wsum_sigma2_offset[tid] += weight * g_myp_oo_otrans_x2y2z2[iover_trans + itrans*oversamples_trans];    // precalc x2y2z2,   only overtrans-size => const
 		}
 	}
 	// Reduction of all fine samples in this coarse orientation
@@ -1916,24 +1899,18 @@ __global__ void cuda_kernel_collect2(
 	{
 		if(tid<j)
 		{
-//			s_thr_sumw_group[tid]               += s_thr_sumw_group[tid+j];
-//			s_thr_wsum_pdf_class[tid]           += s_thr_wsum_pdf_class[tid+j];
+			s_weights[tid]                      += s_weights[tid+j];
 			s_thr_wsum_prior_offsetx_class[tid] += s_thr_wsum_prior_offsetx_class[tid+j];
 			s_thr_wsum_prior_offsety_class[tid] += s_thr_wsum_prior_offsety_class[tid+j];
 			s_thr_wsum_sigma2_offset[tid]       += s_thr_wsum_sigma2_offset[tid+j];
-//			s_thr_wsum_pdf_direction[tid]       += s_thr_wsum_pdf_direction[tid+j];
 		}
 		__syncthreads();
 	}
-
-	// write pre-reduced (for all fine samples and itrans) to global mem.  (size of these allocated should be 1 FLOAT per block started)
+	// write pre-reduced (for all fine samples and itrans) to global mem.
 	g_weights[ex]			           = s_weights[0];
-//	g_thr_sumw_group[ex]			   = s_thr_sumw_group[0];
-//	g_thr_wsum_pdf_class[ex] 		   = s_thr_wsum_pdf_class[0];
 	g_thr_wsum_prior_offsetx_class[ex] = s_thr_wsum_prior_offsetx_class[0];
 	g_thr_wsum_prior_offsety_class[ex] = s_thr_wsum_prior_offsety_class[0];
 	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
-//	g_thr_wsum_pdf_direction[ex]       = s_thr_wsum_pdf_direction[0];
 }
 
 void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
@@ -2342,12 +2319,11 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			CUDA_CPU_TOC("reduce_wdiff2s");
 
 			CUDA_CPU_TIC("collect_data_2");
-			//TODO some in the following double loop can be GPU accelerated
+			CUDA_CPU_TIC("collect_data_2_pre_kernel");
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
 
 			std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
-//
-//
+
 			int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 			CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
 											sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
@@ -2355,10 +2331,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			CudaGlobalPtr<FLOAT>     oo_otrans_x(nr_transes); // old_offset_oversampled_trans_x
 			CudaGlobalPtr<FLOAT>     oo_otrans_y(nr_transes);
 			CudaGlobalPtr<FLOAT> myp_oo_otrans_x2y2z2(nr_transes); // my_prior_old_offs....x^2*y^2*z^2
-			std::cerr << "nr_transes = " << nr_transes << std::endl;
 
 			//Pregenerate oversampled translation objects for kernel-call
-			for (long int itrans = sp.itrans_min, iitrans = 0; itrans <= sp.itrans_max; itrans++)
+			for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
 			{
 				baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
 						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
@@ -2368,77 +2343,66 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					oo_otrans_y[iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
 					double diffx = myprior_x - oo_otrans_x[iitrans];
 					double diffy = myprior_y - oo_otrans_y[iitrans];
-					double diffz = 0;
 					if (baseMLO->mymodel.data_dim == 3)
-						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
-
-					myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
+					{
+						double diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
+						myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
+					}
+					else
+					{
+						myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy ;
+					}
 				}
 			}
 			Mweight.device_alloc();
 			Mweight.cp_to_device();
-
 			oo_otrans_x.device_alloc();
 			oo_otrans_x.cp_to_device();
-//			oo_otrans_x.free_host();
 			oo_otrans_y.device_alloc();
 			oo_otrans_y.cp_to_device();
-//			oo_otrans_y.free_host();
 			myp_oo_otrans_x2y2z2.device_alloc();
 			myp_oo_otrans_x2y2z2.cp_to_device();
-//			myp_oo_otrans_x2y2z2.free_host();
 
-			block_dim.x=sp.nr_dir;
-			block_dim.y=sp.nr_psi;
-			// This kernel does a full 6 separate partial ( p_ ) reductions, which need to be allocated in global-mem
 			CudaGlobalPtr<FLOAT>                      p_weights(block_dim.x * block_dim.y);
-//			CudaGlobalPtr<FLOAT>               p_thr_sumw_group(block_dim.x * block_dim.y);
-//			CudaGlobalPtr<FLOAT>           p_thr_wsum_pdf_class(block_dim.x * block_dim.y);
 			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_dim.x * block_dim.y);
 			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_dim.x * block_dim.y);
 			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_dim.x * block_dim.y);
-//			CudaGlobalPtr<FLOAT>       p_thr_wsum_pdf_direction(block_dim.x * block_dim.y);
 
 			p_weights.device_alloc();
-//			p_thr_sumw_group.device_alloc();
-//			p_thr_wsum_pdf_class.device_alloc();
 			p_thr_wsum_prior_offsetx_class.device_alloc();
 			p_thr_wsum_prior_offsety_class.device_alloc();
 			p_thr_wsum_sigma2_offset.device_alloc();
-//			p_thr_wsum_pdf_direction.device_alloc();
 
+			block_dim.x=sp.nr_dir;
+			block_dim.y=sp.nr_psi;
+			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
-				cuda_kernel_collect2<<<block_dim,SUM_BLOCK_SIZE>>>(
-																	~oo_otrans_x,          // otrans-size -> make const
+				cuda_kernel_collect2<<<block_dim,SUM_BLOCK_SIZE>>>( ~oo_otrans_x,          // otrans-size -> make const
 																	~oo_otrans_y,          // otrans-size -> make const
 																	~myp_oo_otrans_x2y2z2, // otrans-size -> make const
 																	~Mweight,
-																	op.significant_weight[ipart],
-																	op.sum_weight[ipart],
+																	(FLOAT)op.significant_weight[ipart],
+																	(FLOAT)op.sum_weight[ipart],
 																	sp.nr_trans,
 																	sp.nr_oversampled_trans,
 																	sp.nr_oversampled_rot,
 																	oversamples,
 																	(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
 																	~p_weights,
-//																	~p_thr_sumw_group,				// output -------
-//																	~p_thr_wsum_pdf_class,
 																	~p_thr_wsum_prior_offsetx_class,
 																	~p_thr_wsum_prior_offsety_class,
 																	~p_thr_wsum_sigma2_offset
-//																	~p_thr_wsum_pdf_direction
 																   );
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
+				// TODO further reduce the below 4 arrays while data is still on gpu
 				p_weights.cp_to_host();
-//				p_thr_sumw_group.cp_to_host();
-//				p_thr_wsum_pdf_class.cp_to_host();
 				p_thr_wsum_prior_offsetx_class.cp_to_host();
 				p_thr_wsum_prior_offsety_class.cp_to_host();
 				p_thr_wsum_sigma2_offset.cp_to_host();
-//				p_thr_wsum_pdf_direction.cp_to_host();
 
+				thr_wsum_sigma2_offset = 0.0;
 				int iorient = 0;
 				for (long int idir = 0; idir < sp.nr_dir; idir++)
 				{
@@ -2452,7 +2416,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 							if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
 								mydir = idir;
 							else
-								long int mydir = op.pointer_dir_nonzeroprior[mydir];
+								mydir = op.pointer_dir_nonzeroprior[idir];
 
 							// store partials according to indices of the relevant dimension
 							DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[iorient];
@@ -2469,141 +2433,36 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					}
 				}
 			}
-			oo_otrans_y.free_device();
-			oo_otrans_x.free_device();
-			myp_oo_otrans_x2y2z2.free_device();
-
-//			thr_wsum_sigma2_offset = 0.0;
-			int mx_itrans, mx_iovertrans, mx_idir, mx_ipsi, mx_ioverrot, mx_iclass;
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			{
-				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
-				{
-					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
-					{
-						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-						// Only proceed if any of the particles had any significant coarsely sampled translation
-						if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
-						{
-							// Loop over all oversampled orientations (only a single one in the first pass)
-							for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
-							{
-//--------Kernelize---||
-//                    \/
-								long int ihidden = iorientclass * sp.nr_trans;
-								for (long int itrans = sp.itrans_min, iitrans = 0; itrans <= sp.itrans_max; itrans++, ihidden++)
-								{
-									for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
-									{
-										// Only deal with this sampling point if its weight was significant
-										long int ihidden_over = ihidden * sp.nr_oversampled_trans * sp.nr_oversampled_rot +
-												iover_rot * sp.nr_oversampled_trans + iover_trans;
-
-										double weight = DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over);
-										if (weight >= op.significant_weight[ipart])
-										{
-											weight /= op.sum_weight[ipart];
-
-//											// Store sum of weights for this group
-//											thr_sumw_group[group_id] += weight;
-//											// Store weights for this class and orientation
-//											thr_wsum_pdf_class[exp_iclass] += weight;
-//
-//											// The following goes MUCH faster than the original lines below.... // TODO condition post-kernel reduction  with this "if"
-//											if (baseMLO->mymodel.ref_dim == 2)
-//											{
-//												thr_wsum_prior_offsetx_class[exp_iclass] += weight * oo_otrans_x[iitrans];
-//												thr_wsum_prior_offsety_class[exp_iclass] += weight * oo_otrans_y[iitrans];
-//											}
-//											thr_wsum_sigma2_offset += weight * myp_oo_otrans_x2y2z2[iitrans];
-//											std::cerr << "thr_wsum_sigma2_offset["<< iorient <<"] = " << weight * myp_oo_otrans_x2y2z2[iitrans] << std::endl;
-//											// Store weight for this direction of this class
-//											if (baseMLO->do_skip_align || baseMLO->do_skip_rotate )
-//											{
-//												//ignore pdf_direction
-//											}
-//											else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-//											{
-//												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], idir) += weight;
-//											}
-//											else
-//											{
-//												// In the case of orientational priors, get the original number of the direction back
-//												long int mydir = op.pointer_dir_nonzeroprior[idir];
-//												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
-//											}
-
-//                    /\
-//--------Kernelize---||
-
-//--------- Just max-check from here
-											if (weight > op.max_weight[ipart])
-											{
-												op.max_weight[ipart] = weight;
-
-												// all of these could be derived from ihidden_over, but this is just easier.
-												mx_itrans = itrans;
-												mx_iovertrans = iover_trans;
-												mx_idir = idir;
-												mx_ipsi = ipsi;
-												mx_ioverrot = iover_rot;
-												mx_iclass = exp_iclass;
-//------
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-			std::cerr << "mx_iclass = " << mx_iclass << std::endl;
-
-			std::cerr << "mx_idir = " << mx_idir << std::endl;
-			std::cerr << "mx_ipsi = " << mx_ipsi << std::endl;
-			std::cerr << "mx_itrans = " << mx_itrans << std::endl;
-
-			std::cerr << "mx_ioverrot = " << mx_ioverrot << std::endl;
-			std::cerr << "mx_iovertrans = " << mx_iovertrans << std::endl;
-
-//			thrust::device_ptr<FLOAT> dev_ptr = thrust::device_pointer_cast(~Mweight);
-//			thrust::device_ptr<FLOAT> max_ptr = thrust::max_element(dev_ptr, dev_ptr + (sp.iclass_max * sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples) );
-//			long int mx_idx = &max_ptr[0] - &dev_ptr[0];
-//
-//			std::cerr << "dv_ptr = " << &dev_ptr[0] << "mx_ptr = " << &max_ptr[0] << " mx_INDEX =  " << mx_idx << std::endl;
-//
-//			mx_iclass = floor( mx_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples ));
-//			mx_idx   -= mx_iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
-//
-//			mx_idir   = floor( mx_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));
-//			mx_idx   -= mx_iclass     * ( sp.nr_psi * sp.nr_trans * oversamples );
-//
-//			mx_ipsi   = floor( mx_idx / ( sp.nr_trans * oversamples ));
-//			mx_idx   -= mx_iclass     * ( sp.nr_trans * oversamples );
-//
-//			mx_itrans = floor( mx_idx /  oversamples );
-//			mx_idx   -= mx_iclass     *  oversamples ;
-//
-//			mx_ioverrot = floor( mx_idx / sp.nr_oversampled_trans );
-//			mx_idx   -= mx_iclass     *   sp.nr_oversampled_trans ;
-//
-//			mx_iovertrans = mx_idx ;
-//
-//			std::cerr << "mx_iclass = " << mx_iclass << std::endl;
-//
-//			std::cerr << "mx_idir = " << mx_idir << std::endl;
-//			std::cerr << "mx_ipsi = " << mx_ipsi << std::endl;
-//			std::cerr << "mx_itrans = " << mx_itrans << std::endl;
-//
-//			std::cerr << "mx_ioverrot = " << mx_ioverrot << std::endl;
-//			std::cerr << "mx_iovertrans = " << mx_iovertrans << std::endl;
-
+			CUDA_CPU_TIC("collect_data_2_post_kernel");
 			Mweight.free_device();
+			p_weights.free();
+			p_thr_wsum_sigma2_offset.free();
+			p_thr_wsum_prior_offsetx_class.free();
+			p_thr_wsum_prior_offsety_class.free();
+
+			oo_otrans_y.free();
+			oo_otrans_x.free();
+			myp_oo_otrans_x2y2z2.free();
+
+			//Get index of max element using GPU-tool thrust
+			int mx_idx = thrust::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
+			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, mx_idx);
+
+			// TODO put below in function(s)   -  indices2index() / index2indices()
+			int mx_iclass = floor( mx_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples )); //FIXME check correct index extraction for iclass when several classes are used
+			mx_idx   -= mx_iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
+			int mx_idir   = floor( mx_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));
+			mx_idx   -= mx_idir       * ( sp.nr_psi * sp.nr_trans * oversamples );
+			int mx_ipsi   = floor( mx_idx / ( sp.nr_trans * oversamples ));
+			mx_idx   -= mx_ipsi       * ( sp.nr_trans * oversamples );
+			int mx_itrans = floor( mx_idx /  oversamples );
+			mx_idx   -= mx_itrans     *  oversamples ;
+			int mx_ioverrot = floor( mx_idx / sp.nr_oversampled_trans );
+			mx_idx   -= mx_ioverrot  *   sp.nr_oversampled_trans ;
+			int mx_iovertrans = mx_idx ;
 
 			baseMLO->sampling.getTranslations(mx_itrans, baseMLO->adaptive_oversampling,
 					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
-
 			baseMLO->sampling.getOrientations(mx_idir, mx_ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 			double rot = oversampled_rot[mx_ioverrot];
@@ -2617,10 +2476,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			if (baseMLO->mymodel.data_dim == 3)
 				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[mx_iovertrans];
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)mx_iclass + 1;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart];
-
-			std::cerr << "max_weight[" << ipart << "] = " << op.max_weight[ipart] << std::endl;
-			std::cerr << "thr_wsum_sigma2_offset = " << thr_wsum_sigma2_offset << std::endl;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+			CUDA_CPU_TOC("collect_data_2_post_kernel");
 			CUDA_CPU_TOC("collect_data_2");
 
 #ifdef DEBUG_CUDA_MEM
