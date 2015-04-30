@@ -718,11 +718,11 @@ __global__ void cuda_kernel_backproject(
 		__shared__ FLOAT s_value_imag[BACKPROJECTION_BLOCK_SIZE];
 
 		bool is_neg_x0, is_neg_x;
-		FLOAT d;
-		FLOAT rX,rY,rZ;
+		FLOAT d, w;
+		FLOAT rX,rY,rZ,xp,yp,zp,fx,fy,fz;
 		int x0,y0,x,y,idx;
 
-		__shared__ FLOAT e[BACKPROJECTION_BLOCK_SIZE*6];
+		FLOAT e[6];
 
 		s_weight[tid] = 0.0f;
 		s_value_real[tid] = 0.0f;
@@ -738,17 +738,17 @@ __global__ void cuda_kernel_backproject(
 
 				if (fabsf(rZ) < 0.87f) //Within the unit cube, sqrt(3)/2=0.866
 				{
-					e[0+6*tid] = g_eulers_xy[img*6+0];
-					e[1+6*tid] = g_eulers_xy[img*6+1];
-					e[2+6*tid] = g_eulers_xy[img*6+2];
-					e[3+6*tid] = g_eulers_xy[img*6+3];
-					e[4+6*tid] = g_eulers_xy[img*6+4];
-					e[5+6*tid] = g_eulers_xy[img*6+5];
+					e[0] = g_eulers_xy[img*6+0];
+					e[1] = g_eulers_xy[img*6+1];
+					e[2] = g_eulers_xy[img*6+2];
+					e[3] = g_eulers_xy[img*6+3];
+					e[4] = g_eulers_xy[img*6+4];
+					e[5] = g_eulers_xy[img*6+5];
 
-					rY = (e[3+6*tid] * X + e[4+6*tid] * Y + e[5+6*tid] * Z) * scale_3D_2D;
-					rX = (e[0+6*tid] * X + e[1+6*tid] * Y + e[2+6*tid] * Z) * scale_3D_2D;
+					rY = (e[3] * X + e[4] * Y + e[5] * Z) * scale_3D_2D;
+					rX = (e[0] * X + e[1] * Y + e[2] * Z) * scale_3D_2D;
 
-					if (rX < 0)
+					if (rX < 0.f)
 					{
 						rY = -rY;
 						rX = -rX;
@@ -768,6 +768,7 @@ __global__ void cuda_kernel_backproject(
 							y = y0 + j;
 							if (x * x + y * y <= max_r2)
 							{
+
 								if (y < 0 && x == 0)
 								{
 									is_neg_x = !is_neg_x0;
@@ -776,66 +777,38 @@ __global__ void cuda_kernel_backproject(
 								else
 									is_neg_x = is_neg_x0;
 
-								d = 0.f;
+								xp = (e[0] * x + e[3] * y) * scale_2D_3D;
+								yp = (e[1] * x + e[4] * y) * scale_2D_3D;
+								zp = (e[2] * x + e[5] * y) * scale_2D_3D;
 
-								FLOAT xp, yp, zp;
-								int X0, X1, Y0, Y1, Z0, Z1;
-
-								xp = (e[0+6*tid] * x + e[3+6*tid] * y) * scale_2D_3D;
-								yp = (e[1+6*tid] * x + e[4+6*tid] * y) * scale_2D_3D;
-								zp = (e[2+6*tid] * x + e[5+6*tid] * y) * scale_2D_3D;
-
-								if (xp < 0.f)
+								if (xp < 0.0f) //Flip sign
 								{
-									xp = -xp;
-									yp = -yp;
-									zp = -zp;
+									fx = fabsf(X+xp);
+									fy = fabsf(Y+yp);
+									fz = fabsf(Z+zp);
+								}
+								else
+								{
+									fx = fabsf(X-xp);
+									fy = fabsf(Y-yp);
+									fz = fabsf(Z-zp);
 								}
 
-								X0 = floorf(xp);
-								X1 = X0 + 1;
-
-								Y0 = floorf(yp);
-								Y1 = Y0 + 1;
-
-								Z0 = floorf(zp);
-								Z1 = Z0 + 1;
-
-								if (Z0 == Z)
-								{
-									if (Y0 == Y)
-									{
-											 if (X0 == X) d = (1.f - zp + Z0) * (1.f - yp + Y0) * (1.f - xp + X0);
-										else if (X1 == X) d = (1.f - zp + Z0) * (1.f - yp + Y0) * (xp - X0);
-									}
-									else if (Y1 == Y)
-									{
-											 if (X0 == X) d = (1.f - zp + Z0) * (yp - Y0) * (1.f - xp + X0);
-										else if (X1 == X) d = (1.f - zp + Z0) * (yp - Y0) * (xp - X0);
-									}
-								}
-								else if (Z1 == Z)
-								{
-									if (Y0 == Y)
-									{
-											 if (X0 == X) d = (zp - Z0) * (1.f - yp + Y0) * (1.f - xp + X0);
-										else if (X1 == X) d = (zp - Z0) * (1.f - yp + Y0) * (xp - X0);
-									}
-									else if (Y1 == Y)
-									{
-											 if (X0 == X) d = (zp - Z0) * (yp - Y0) * (1.f - xp + X0);
-										else if (X1 == X) d = (zp - Z0) * (yp - Y0) * (xp - X0);
-									}
-								}
-
-								if (d != 0.f)
+								if (fx < 1.0f && fy < 1.0f && fz < 1.0f)
 								{
 									if (y < 0) y += img_y;
 									idx = img*img_xy + y * img_x + x;
-									s_weight[tid] += g_Fweights[idx] * d;
-									s_value_real[tid] += g_wavgs_real[idx] * d;
-									if (is_neg_x) s_value_imag[tid] -= g_wavgs_imag[idx] * d;
-									else          s_value_imag[tid] += g_wavgs_imag[idx] * d;
+									w = g_Fweights[idx];
+
+									if (w > 0.0f)
+									{
+										d = (1.0f - fx) * (1.0f - fy) * (1.0f - fz);
+
+										s_weight[tid] += w * d;
+										s_value_real[tid] += g_wavgs_real[idx] * d;
+										if (is_neg_x) s_value_imag[tid] -= g_wavgs_imag[idx] * d;
+										else          s_value_imag[tid] += g_wavgs_imag[idx] * d;
+									}
 								}
 							}
 						}
@@ -857,13 +830,13 @@ __global__ void cuda_kernel_backproject(
 			__syncthreads();
 		}
 
-		if (tid == 0 && s_weight[0] != 0.0f)
+		if (tid == 0 && s_weight[0] != 0.f)
 			g_weight[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_weight[0];
 
-		if (tid == 1 && s_value_real[0] != 0.0f)
+		if (tid == 1 && s_value_real[0] != 0.f)
 			g_model_real[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_real[0];
 
-		if (tid == 2 && s_value_imag[0] != 0.0f)
+		if (tid == 2 && s_value_imag[0] != 0.f)
 			g_model_imag[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_imag[0];
 	}
 }
@@ -884,7 +857,7 @@ static void backproject(
 	Matrix2D<double> A, Ainv;
 
 	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count);
-	CudaGlobalPtr<FLOAT> eulers_z(9*img_count);
+	CudaGlobalPtr<FLOAT> eulers_z(3*img_count);
 
 	//TODO Do the following in a kernel
 	for (long int i = 0; i < img_count; i++)
@@ -2726,6 +2699,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 										   BACKPROJECTION
 		=======================================================================================*/
 
+
 		CUDA_CPU_TIC("backprojection");
 
 		CudaGlobalPtr<FLOAT> model_real(baseMLO->wsum_model.BPref[exp_iclass].data.nzyxdim);
@@ -2774,6 +2748,82 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		model_real.free_device();
 		model_imag.free_device();
 		weight.free_device();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		{
+		FILE *fPtr = fopen("gpu_bp.dat","w");
+		for (unsigned i = 0; i < model_real.size; i ++)
+			fprintf(fPtr, "%.5e %.5e\n", model_real[i], model_imag[i]);
+//			fprintf(fPtr, "%.5e\n", weight[i]);
+		fclose(fPtr);
+		}
+
+		wavgs_real.cp_to_host();
+		wavgs_imag.cp_to_host();
+		Fweights.cp_to_host();
+
+		for (long int i = 0; i < orientation_num; i++)
+		{
+			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
+
+			for (unsigned j = 0; j < image_size; j++)
+			{
+				Fimg.data[j].real = wavgs_real[i * image_size + j];
+				Fimg.data[j].imag = wavgs_imag[i * image_size + j];
+				Fweight.data[j] = Fweights[i * image_size + j];
+			}
+
+			int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
+			pthread_mutex_lock(&global_mutex2[my_mutex]);
+			(baseMLO->wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
+			pthread_mutex_unlock(&global_mutex2[my_mutex]);
+
+		}
+
+		{
+		FILE *fPtr = fopen("cpu_bp.dat","w");
+		for (unsigned i = 0; i < (baseMLO->wsum_model.BPref[exp_iclass]).data.nzyxdim; i ++)
+			fprintf(fPtr, "%.5e %.5e\n", (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].real, (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].imag);
+//			fprintf(fPtr, "%.5e\n", (baseMLO->wsum_model.BPref[exp_iclass]).weight.data[i]);
+		fclose(fPtr);
+		}
+
+		exit(0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 		Fweights.free();
 		wavgs_real.free();
