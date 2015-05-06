@@ -695,300 +695,244 @@ void generateModelProjections(
 
 
 
-
-#define BACKPROJECTION_BLOCK_SIZE 256
+#define BACKPROJECTION4_BLOCK_SIZE 64
+#define BACKPROJECTION4_GROUP_SIZE 16
+#define BACKPROJECTION4_FETCH_COUNT 4
 
 __global__ void cuda_kernel_backproject(
-								FLOAT *g_model_real,
-								FLOAT *g_model_imag,
-								FLOAT *g_weight,
-								FLOAT *g_eulers_xy,
-								FLOAT *g_eulers_z,
-								FLOAT *g_wavgs_real,
-								FLOAT *g_wavgs_imag,
-        						FLOAT *g_Fweights,
-        						int max_r2, FLOAT scale_2D_3D, FLOAT scale_3D_2D,
-		                        unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
-		                        unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz)
+		short *g_xs,
+		short *g_ys,
+		short *g_zs,
+		FLOAT *g_model_real,
+		FLOAT *g_model_imag,
+		FLOAT *g_weight,
+		FLOAT *g_eulers,
+		FLOAT *g_wavgs_real,
+		FLOAT *g_wavgs_imag,
+		FLOAT *g_Fweights,
+		int max_r2, FLOAT scale_2D_3D, FLOAT scale_3D_2D,
+		unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
+		unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz,
+		int N)
 {
-	int X = blockIdx.x;
-	int Y = blockIdx.y + mdl_inity;
-	int Z = blockIdx.z + mdl_initz;
+	unsigned gid = threadIdx.x / 4;
+	unsigned mid = threadIdx.x % 4;
+	unsigned gm = gid * 4 + mid;
+	unsigned pit = (gid * 4 + mid)*BACKPROJECTION4_FETCH_COUNT;
+	unsigned global_idx = blockIdx.x * BACKPROJECTION4_GROUP_SIZE + gid;
 
-	if (X*X + Y*Y + Z*Z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2f) //TODO this is true roughly 52% of the times
+	int X(0),Y(0),Z(0);
+
+	if (global_idx < N)
 	{
-		unsigned tid = threadIdx.x;
-		int pass_num(ceilf((float)img_count/(float)BACKPROJECTION_BLOCK_SIZE));
-
-		__shared__ FLOAT s_weight[BACKPROJECTION_BLOCK_SIZE];
-		__shared__ FLOAT s_value_real[BACKPROJECTION_BLOCK_SIZE];
-		__shared__ FLOAT s_value_imag[BACKPROJECTION_BLOCK_SIZE];
-
-		bool is_neg_x0, is_neg_x;
-		FLOAT d, w;
-		FLOAT rX,rY,rZ,xp,yp,zp,fx,fy,fz;
-		int x0,y0,x,y,idx;
-
-		FLOAT e[6];
-
-		s_weight[tid] = 0.0f;
-		s_value_real[tid] = 0.0f;
-		s_value_imag[tid] = 0.0f;
-
-		for (int pass = 0; pass < pass_num; pass ++)
-		{
-			unsigned long img = pass * BACKPROJECTION_BLOCK_SIZE + tid;
-
-			if (img < img_count)
-			{
-				rZ = (g_eulers_z[img*3+0] * X + g_eulers_z[img*3+1] * Y + g_eulers_z[img*3+2] * Z) * scale_3D_2D;
-
-				if (fabsf(rZ) < 0.87f) //Within the unit cube, sqrt(3)/2=0.866
-				{
-					e[0] = g_eulers_xy[img*6+0];
-					e[1] = g_eulers_xy[img*6+1];
-					e[2] = g_eulers_xy[img*6+2];
-					e[3] = g_eulers_xy[img*6+3];
-					e[4] = g_eulers_xy[img*6+4];
-					e[5] = g_eulers_xy[img*6+5];
-
-					rY = (e[3] * X + e[4] * Y + e[5] * Z) * scale_3D_2D;
-					rX = (e[0] * X + e[1] * Y + e[2] * Z) * scale_3D_2D;
-
-					if (rX < 0.f)
-					{
-						rY = -rY;
-						rX = -rX;
-						is_neg_x0 = true;
-					}
-					else
-						is_neg_x0 = false;
-
-					x0 = floorf(rX);
-					y0 = floorf(rY);
-
-					for (int i = 0; i < 2; i++)
-					{
-						x = x0 + i;
-						for (int j = 0; j < 2; j++)
-						{
-							y = y0 + j;
-							if (x * x + y * y <= max_r2)
-							{
-
-								if (y < 0 && x == 0)
-								{
-									is_neg_x = !is_neg_x0;
-									y = -y;
-								}
-								else
-									is_neg_x = is_neg_x0;
-
-								xp = (e[0] * x + e[3] * y) * scale_2D_3D;
-								yp = (e[1] * x + e[4] * y) * scale_2D_3D;
-								zp = (e[2] * x + e[5] * y) * scale_2D_3D;
-
-								if (xp < 0.0f) //Flip sign
-								{
-									fx = fabsf(X+xp);
-									fy = fabsf(Y+yp);
-									fz = fabsf(Z+zp);
-								}
-								else
-								{
-									fx = fabsf(X-xp);
-									fy = fabsf(Y-yp);
-									fz = fabsf(Z-zp);
-								}
-
-								if (fx < 1.0f && fy < 1.0f && fz < 1.0f)
-								{
-									if (y < 0) y += img_y;
-									idx = img*img_xy + y * img_x + x;
-									w = g_Fweights[idx];
-
-									if (w > 0.0f)
-									{
-										d = (1.0f - fx) * (1.0f - fy) * (1.0f - fz);
-
-										s_weight[tid] += w * d;
-										s_value_real[tid] += g_wavgs_real[idx] * d;
-										if (is_neg_x) s_value_imag[tid] -= g_wavgs_imag[idx] * d;
-										else          s_value_imag[tid] += g_wavgs_imag[idx] * d;
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		__syncthreads();
-
-		for (int s = BACKPROJECTION_BLOCK_SIZE/2; s>0; s>>=1)
-		{
-			if (tid < s)
-			{
-				s_weight[tid] += s_weight[tid + s];
-				s_value_real[tid] += s_value_real[tid + s];
-				s_value_imag[tid] += s_value_imag[tid + s];
-			}
-			__syncthreads();
-		}
-
-		if (tid == 0 && s_weight[0] != 0.f)
-			g_weight[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_weight[0];
-
-		if (tid == 1 && s_value_real[0] != 0.f)
-			g_model_real[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_real[0];
-
-		if (tid == 2 && s_value_imag[0] != 0.f)
-			g_model_imag[blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x] = s_value_imag[0];
+		X = g_xs[global_idx];
+		Y = g_ys[global_idx];
+		Z = g_zs[global_idx];
 	}
-}
+	else
+		X = mdl_x * 10; // Padding coordinate, place outside images
 
+	int ax(0), ay(0);
 
-
-
-
-
-
-
-
-
-__global__ void cuda_kernel_backproject2(
-								FLOAT *g_model_real,
-								FLOAT *g_model_imag,
-								FLOAT *g_weight,
-								FLOAT *g_eulers,
-								FLOAT *g_wavgs_real,
-								FLOAT *g_wavgs_imag,
-        						FLOAT *g_Fweights,
-        						int max_r2, FLOAT scale_2D_3D,
-		                        unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
-		                        unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz)
-{
-	int X = blockIdx.x * blockDim.x + threadIdx.x;
-	int Y = blockIdx.y * blockDim.y + threadIdx.y + mdl_inity;
-	int Z = blockIdx.z * blockDim.z + threadIdx.z + mdl_initz;
-	int bsize = blockDim.x * blockDim.y * blockDim.z;
-	int tid = threadIdx.z * blockDim.x * blockDim.y + threadIdx.y * blockDim.y + threadIdx.x;
-
-	bool insideSphere = X*X + Y*Y + Z*Z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2f;
-
-	FLOAT weight = 0.0f;
-	FLOAT value_real = 0.0f;
-	FLOAT value_imag = 0.0f;
-
-	bool is_neg_x0, is_neg_x;
-	FLOAT d;
-	FLOAT rX,rY,rZ,xp,yp,zp,fx,fy,fz;
-	int x0,y0,x,y,idx;
-
-	__shared__ FLOAT s_eulers[4*4*2*9];
-
-	for (long int img = 0; img < img_count; img ++)
+	if (mid == 1)
+		ax = 1;
+	else if (mid == 2)
+		ay = 1;
+	else if (mid == 3)
 	{
-		int b = img % bsize;
+		ax = 1;
+		ay = 1;
+	}
 
-		if (b == 0)
+	bool  is_neg_x;
+	FLOAT d, w;
+	FLOAT xp,yp,zp;
+	int x,y,idx;
+
+	__shared__ FLOAT s_e[BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT];
+
+	__shared__ FLOAT s_weight[BACKPROJECTION4_GROUP_SIZE*4];
+	__shared__ FLOAT s_value_real[BACKPROJECTION4_GROUP_SIZE*4];
+	__shared__ FLOAT s_value_imag[BACKPROJECTION4_GROUP_SIZE*4];
+
+	s_weight[gm] = 0.0f;
+	s_value_real[gm] = 0.0f;
+	s_value_imag[gm] = 0.0f;
+
+	for (int img = 0, b = BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT; img < img_count; img ++, b += 9)
+	{
+		if (b+9 > BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT)
 		{
-			s_eulers[tid*9+0] = g_eulers[(img+tid)*9+0];
-			s_eulers[tid*9+1] = g_eulers[(img+tid)*9+1];
-			s_eulers[tid*9+2] = g_eulers[(img+tid)*9+2];
-			s_eulers[tid*9+3] = g_eulers[(img+tid)*9+3];
-			s_eulers[tid*9+4] = g_eulers[(img+tid)*9+4];
-			s_eulers[tid*9+5] = g_eulers[(img+tid)*9+5];
-			s_eulers[tid*9+6] = g_eulers[(img+tid)*9+6];
-			s_eulers[tid*9+7] = g_eulers[(img+tid)*9+7];
-			s_eulers[tid*9+8] = g_eulers[(img+tid)*9+8];
+			__syncthreads();
+
+			int img_9 = img*9+pit;
+			if (img_9 < img_count*9)
+			{
+				s_e[pit+0] = g_eulers[img_9+0];
+				s_e[pit+1] = g_eulers[img_9+1];
+				s_e[pit+2] = g_eulers[img_9+2];
+				s_e[pit+3] = g_eulers[img_9+3];
+			}
 
 			__syncthreads();
+			b = 0;
 		}
 
-		if (insideSphere) //TODO this is true roughly 52% of the times
+		zp = (s_e[b+6] * X + s_e[b+7] * Y + s_e[b+8] * Z) * scale_3D_2D;
+		if (fabsf(zp) > 0.87f) continue; //Within the unit cube, sqrt(3)/2=0.866
+
+		yp = (s_e[b+3] * X + s_e[b+4] * Y + s_e[b+5] * Z) * scale_3D_2D;
+		xp = (s_e[b+0] * X + s_e[b+1] * Y + s_e[b+2] * Z) * scale_3D_2D;
+
+		if (xp < 0.0f)
 		{
+			yp = -yp;
+			xp = -xp;
+			is_neg_x = true;
+		}
+		else
+			is_neg_x = false;
 
-			rZ = (s_eulers[b + 6] * X + s_eulers[b + 7] * Y + s_eulers[b + 8] * Z);
+		x = (int) floorf(xp) + ax;
+		y = (int) floorf(yp) + ay;
 
-			if (fabsf(rZ) < 0.87f * scale_2D_3D) //Within the unit cube, sqrt(3)/2=0.866
+		if (x * x + y * y > max_r2) continue;
+
+		if (y < 0 && x == 0)
+		{
+			is_neg_x = !is_neg_x;
+			y = -y;
+		}
+
+		xp = (s_e[b+0] * x + s_e[b+3] * y) * scale_2D_3D;
+		yp = (s_e[b+1] * x + s_e[b+4] * y) * scale_2D_3D;
+		zp = (s_e[b+2] * x + s_e[b+5] * y) * scale_2D_3D;
+
+
+
+
+
+
+		if (xp < 0.0f) //Flip sign
+		{
+			xp = fabsf(X+xp);
+			yp = fabsf(Y+yp);
+			zp = fabsf(Z+zp);
+		}
+		else
+		{
+			xp = fabsf(X-xp);
+			yp = fabsf(Y-yp);
+			zp = fabsf(Z-zp);
+		}
+
+		if (xp < 1.0f && yp < 1.0f && zp < 1.0f)
+		{
+			if (y < 0) y += img_y;
+			idx = img*img_xy + y * img_x + x;
+			w = g_Fweights[idx];
+
+			if (w > 0.0f)
 			{
-				rY = (s_eulers[b + 3] * X + s_eulers[b + 4] * Y + s_eulers[b + 5] * Z) / scale_2D_3D;
-				rX = (s_eulers[b + 0] * X + s_eulers[b + 1] * Y + s_eulers[b + 2] * Z) / scale_2D_3D;
+				d = (1.0f - xp) * (1.0f - yp) * (1.0f - zp);
 
-				if (rX < 0.f)
-				{
-					rY = -rY;
-					rX = -rX;
-					is_neg_x0 = true;
-				}
-				else
-					is_neg_x0 = false;
-
-				x0 = floorf(rX);
-				y0 = floorf(rY);
-
-				for (int i = 0; i < 2; i++)
-				{
-					x = x0 + i;
-					for (int j = 0; j < 2; j++)
-					{
-						y = y0 + j;
-						if (x * x + y * y <= max_r2)
-						{
-							if (y < 0 && x == 0)
-							{
-								is_neg_x = !is_neg_x0;
-								y = -y;
-							}
-							else
-								is_neg_x = is_neg_x0;
-
-							xp = (s_eulers[b + 0] * x + s_eulers[b + 3] * y) * scale_2D_3D;
-							yp = (s_eulers[b + 1] * x + s_eulers[b + 4] * y) * scale_2D_3D;
-							zp = (s_eulers[b + 2] * x + s_eulers[b + 5] * y) * scale_2D_3D;
-
-							if (xp < 0.0f) //Flip sign
-							{
-								fx = fabsf(X+xp);
-								fy = fabsf(Y+yp);
-								fz = fabsf(Z+zp);
-							}
-							else
-							{
-								fx = fabsf(X-xp);
-								fy = fabsf(Y-yp);
-								fz = fabsf(Z-zp);
-							}
-
-							if (fx < 1.0f && fy < 1.0f && fz < 1.0f)
-							{
-								if (y < 0) y += img_y;
-								idx = img*img_xy + y * img_x + x;
-								d = (1.0f - fx) * (1.0f - fy) * (1.0f - fz);
-								weight += g_Fweights[idx] * d;
-								value_real += g_wavgs_real[idx] * d;
-								if (is_neg_x) value_imag -= g_wavgs_imag[idx] * d;
-								else          value_imag += g_wavgs_imag[idx] * d;
-							}
-						}
-					}
-				}
+				s_weight[gm] += w * d;
+				s_value_real[gm] += g_wavgs_real[idx] * d;
+				if (is_neg_x) s_value_imag[gm] -= g_wavgs_imag[idx] * d;
+				else          s_value_imag[gm] += g_wavgs_imag[idx] * d;
 			}
 		}
+
+
+
+
+
+
+//		d = 0;
+//
+//		FLOAT fx, fy, fz;
+//		int X0, X1, Y0, Y1, Z0, Z1;
+//
+//		if (xp < 0.0f)
+//		{
+//			xp = -xp;
+//			yp = -yp;
+//			zp = -zp;
+//		}
+//
+//		X0 = floorf(xp);
+//		fx = xp - X0;
+//		X1 = X0 + 1;
+//
+//		Y0 = floorf(yp);
+//		fy = yp - Y0;
+//		Y1 = Y0 + 1;
+//
+//		Z0 = floorf(zp);
+//		fz = zp - Z0;
+//		Z1 = Z0 + 1;
+//
+//		if (Z0 == Z)
+//		{
+//			if (Y0 == Y)
+//			{
+//					 if (X0 == X) d = (1. - fz) * (1. - fy) * (1. - fx);
+//				else if (X1 == X) d = (1. - fz) * (1. - fy) * fx;
+//			}
+//			else if (Y1 == Y)
+//			{
+//					 if (X0 == X) d = (1. - fz) * fy * (1. - fx);
+//				else if (X1 == X) d = (1. - fz) * fy * fx;
+//			}
+//		}
+//		else if (Z1 == Z)
+//		{
+//			if (Y0 == Y)
+//			{
+//					 if (X0 == X) d = fz * (1. - fy) * (1. - fx);
+//				else if (X1 == X) d = fz * (1. - fy) * fx;
+//			}
+//			else if (Y1 == Y)
+//			{
+//					 if (X0 == X) d = fz * fy * (1. - fx);
+//				else if (X1 == X) d = fz * fy * fx;
+//			}
+//		}
+//
+//		if (d != 0.0)
+//		{
+//			if (y < 0) y += img_y;
+//			idx = img*img_xy + y * img_x + x;
+//			weight += g_Fweights[idx] * d;
+//			value_real += g_wavgs_real[idx] * d;
+//			if (is_neg_x) value_imag -= g_wavgs_imag[idx] * d;
+//			else          value_imag += g_wavgs_imag[idx] * d;
+//		}
+
 	}
 
+	__syncthreads();
 
-	if (insideSphere)
+	if (mid == 0)
 	{
-		g_weight[(blockIdx.z * blockDim.z + threadIdx.z) * gridDim.x * gridDim.y + (blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x + (blockIdx.x * blockDim.x + threadIdx.x)] = weight;
-		g_model_real[(blockIdx.z * blockDim.z + threadIdx.z) * gridDim.x * gridDim.y + (blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x + (blockIdx.x * blockDim.x + threadIdx.x)] = value_real;
-		g_model_imag[(blockIdx.z * blockDim.z + threadIdx.z) * gridDim.x * gridDim.y + (blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x + (blockIdx.x * blockDim.x + threadIdx.x)] = value_imag;
+		FLOAT sum = s_weight[gid*4 + 0] + s_weight[gid*4 + 1] + s_weight[gid*4 + 2] + s_weight[gid*4 + 3];
+		if (sum != 0.0f)
+			g_weight[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] = sum;
+	}
+	else if (mid == 1)
+	{
+		FLOAT sum = s_value_real[gid*4 + 0] + s_value_real[gid*4 + 1] + s_value_real[gid*4 + 2] + s_value_real[gid*4 + 3];
+		if (sum != 0.0f)
+			g_model_real[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] = sum;
+	}
+	else if (mid == 2)
+	{
+		FLOAT sum = s_value_imag[gid*4 + 0] + s_value_imag[gid*4 + 1] + s_value_imag[gid*4 + 2] + s_value_imag[gid*4 + 3];
+		if (sum != 0.0f)
+			g_model_imag[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] = sum;
 	}
 }
-
-static void backproject2(
+static void backproject(
 		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
 		CudaGlobalPtr<FLOAT> &model_real,
 		CudaGlobalPtr<FLOAT> &model_imag,
@@ -997,21 +941,22 @@ static void backproject2(
 		CudaGlobalPtr<FLOAT> &wavgs_imag,
 		CudaGlobalPtr<FLOAT> &Fweights,
 		int max_r, FLOAT scale_2D_3D,
-		unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
-		unsigned mdl_x, unsigned mdl_y, unsigned mdl_z, int mdl_inity, int mdl_initz)
+		int img_xy, long img_count, int img_x, int img_y,
+		int mdl_x, int mdl_y, int mdl_z, int mdl_inity, int mdl_initz)
 {
 
 	Matrix2D<double> A, Ainv;
 
-	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count);
-	CudaGlobalPtr<FLOAT> eulers_z(3*img_count);
+	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count+BACKPROJECTION4_FETCH_COUNT);
 
-	CUDA_CPU_TIC("euler_matrix_generation");
+	//FILE *fPtr = fopen("cpu_bp.dat","w");
 
 	//TODO Do the following in a kernel
 	for (long int i = 0; i < img_count; i++)
 	{
 		Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
+
+		//fprintf(fPtr, "%.2f %.2f %.2f \n", rots[i], tilts[i], psis[i]);
 
 		if (IS_NOT_INV) Ainv = A;
 		else 			Ainv = A.transpose();
@@ -1023,112 +968,66 @@ static void backproject2(
 		eulers_xy[9 * i + 3] = (FLOAT) Ainv.mdata[3];
 		eulers_xy[9 * i + 4] = (FLOAT) Ainv.mdata[4];
 		eulers_xy[9 * i + 5] = (FLOAT) Ainv.mdata[5];
-
 		eulers_xy[9 * i + 6] = (FLOAT) Ainv.mdata[6];
 		eulers_xy[9 * i + 7] = (FLOAT) Ainv.mdata[7];
 		eulers_xy[9 * i + 8] = (FLOAT) Ainv.mdata[8];
 	}
 
-	CUDA_CPU_TOC("euler_matrix_generation");
-
+	//fclose(fPtr);
+	//exit(0);
 
 	eulers_xy.device_alloc();
 	eulers_xy.cp_to_device();
 
-	eulers_z.device_alloc();
-	eulers_z.cp_to_device();
 
-	dim3 grid_dim( (float)mdl_x/2, (float)mdl_y/4, (float)mdl_z/4 );
-	dim3 block_dim( 2, 4, 4 );
+	int max_r2 = max_r * max_r;
 
-	cuda_kernel_backproject2<<<grid_dim,block_dim>>>(
-			~model_real,
-			~model_imag,
-			~weight,
-			~eulers_xy,
-			~wavgs_real,
-			~wavgs_imag,
-			~Fweights,
-			max_r * max_r,
-			scale_2D_3D,
-			img_xy,
-			img_count,
-			img_x,
-			img_y,
-			mdl_x,
-			mdl_y,
-			mdl_inity,
-			mdl_initz);
-}
+	CudaGlobalPtr<short> xs(mdl_x*mdl_y*mdl_z); // >52% will actually be used, allocate some padding
+	CudaGlobalPtr<short> ys(xs.size);
+	CudaGlobalPtr<short> zs(xs.size);
+	unsigned N(0);
 
-
-
-
-
-
-
-
-
-
-
-static void backproject(
-		std::vector< double > &rots, std::vector< double > &tilts, std::vector< double > &psis,
-		CudaGlobalPtr<FLOAT> &model_real,
-		CudaGlobalPtr<FLOAT> &model_imag,
-		CudaGlobalPtr<FLOAT> &weight,
-		CudaGlobalPtr<FLOAT> &wavgs_real,
-		CudaGlobalPtr<FLOAT> &wavgs_imag,
-		CudaGlobalPtr<FLOAT> &Fweights,
-		int max_r, FLOAT scale_2D_3D,
-		unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
-		unsigned mdl_x, unsigned mdl_y, unsigned mdl_z, int mdl_inity, int mdl_initz)
-{
-
-	Matrix2D<double> A, Ainv;
-
-	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count);
-	CudaGlobalPtr<FLOAT> eulers_z(3*img_count);
-
-	//TODO Do the following in a kernel
-	for (long int i = 0; i < img_count; i++)
+	for (short x = 0; x < mdl_x; x ++)
 	{
-		Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
-
-		if (IS_NOT_INV) Ainv = A;
-		else 			Ainv = A.transpose();
-		Ainv = Ainv.transpose();
-
-		eulers_xy[6 * i + 0] = (FLOAT) Ainv.mdata[0];
-		eulers_xy[6 * i + 1] = (FLOAT) Ainv.mdata[1];
-		eulers_xy[6 * i + 2] = (FLOAT) Ainv.mdata[2];
-		eulers_xy[6 * i + 3] = (FLOAT) Ainv.mdata[3];
-		eulers_xy[6 * i + 4] = (FLOAT) Ainv.mdata[4];
-		eulers_xy[6 * i + 5] = (FLOAT) Ainv.mdata[5];
-
-		eulers_z[3 * i + 0] = (FLOAT) Ainv.mdata[6];
-		eulers_z[3 * i + 1] = (FLOAT) Ainv.mdata[7];
-		eulers_z[3 * i + 2] = (FLOAT) Ainv.mdata[8];
+		for (short y = mdl_inity; y < mdl_y; y++)
+		{
+			for (short z = mdl_initz; z < mdl_z; z++)
+			{
+				if (x*x + y*y + z*z <= max_r2 * scale_2D_3D * scale_2D_3D * 1.2f)
+				{
+					xs[N] = x;
+					ys[N] = y;
+					zs[N] = z;
+					N ++;
+				}
+			}
+		}
 	}
+	xs.size = N + N%BACKPROJECTION4_GROUP_SIZE;
+	ys.size = xs.size;
+	zs.size = xs.size;
 
+	xs.device_alloc();
+	ys.device_alloc();
+	zs.device_alloc();
 
-	eulers_xy.device_alloc();
-	eulers_xy.cp_to_device();
+	xs.cp_to_device();
+	ys.cp_to_device();
+	zs.cp_to_device();
 
-	eulers_z.device_alloc();
-	eulers_z.cp_to_device();
+	int grid_dim = ceil((float)N / BACKPROJECTION4_GROUP_SIZE);
+	dim3 block_dim( BACKPROJECTION4_GROUP_SIZE *4 );
 
-	dim3 block_dim( mdl_x, mdl_y, mdl_z );
-
-	cuda_kernel_backproject<<<block_dim,BACKPROJECTION_BLOCK_SIZE>>>(
+	cuda_kernel_backproject<<<grid_dim,block_dim>>>(
+			~xs,~ys,~zs,
 			~model_real,
 			~model_imag,
 			~weight,
 			~eulers_xy,
-			~eulers_z,
 			~wavgs_real,
 			~wavgs_imag,
 			~Fweights,
-			max_r * max_r,
+			max_r2,
 			scale_2D_3D,
 			1/scale_2D_3D,
 			img_xy,
@@ -1138,8 +1037,10 @@ static void backproject(
 			mdl_x,
 			mdl_y,
 			mdl_inity,
-			mdl_initz);
+			mdl_initz,
+			N);
 }
+
 
 
 
@@ -2947,7 +2848,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 										   BACKPROJECTION
 		=======================================================================================*/
 
-
 		CUDA_CPU_TIC("backprojection");
 
 		CudaGlobalPtr<FLOAT> model_real(baseMLO->wsum_model.BPref[exp_iclass].data.nzyxdim);
@@ -2960,8 +2860,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		weight.device_alloc();
 		weight.device_init(0);
 
-
-		CUDA_GPU_TIC("backproject_kernel");
 
 		backproject(
 				rots, tilts, psis,
@@ -2983,95 +2881,91 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				baseMLO->wsum_model.BPref[exp_iclass].data.yinit,
 				baseMLO->wsum_model.BPref[exp_iclass].data.zinit);
 
-		CUDA_GPU_TAC("backproject_kernel");
-
 		model_real.cp_to_host();
 		model_imag.cp_to_host();
 		weight.cp_to_host();
 
 		HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Optimize concurrency
 
-		CUDA_GPU_TOC("backproject_kernel");
-
 		model_real.free_device();
 		model_imag.free_device();
 		weight.free_device();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		{
-		FILE *fPtr = fopen("gpu_bp.dat","w");
-		for (unsigned i = 0; i < model_real.size; i ++)
-			fprintf(fPtr, "%.5e %.5e\n", model_real[i], model_imag[i]);
-//			fprintf(fPtr, "%.5e\n", weight[i]);
-		fclose(fPtr);
-		}
-
-		wavgs_real.cp_to_host();
-		wavgs_imag.cp_to_host();
-		Fweights.cp_to_host();
-
-		for (long int i = 0; i < orientation_num; i++)
-		{
-			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
-
-			for (unsigned j = 0; j < image_size; j++)
-			{
-				Fimg.data[j].real = wavgs_real[i * image_size + j];
-				Fimg.data[j].imag = wavgs_imag[i * image_size + j];
-				Fweight.data[j] = Fweights[i * image_size + j];
-			}
-
-			int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
-			pthread_mutex_lock(&global_mutex2[my_mutex]);
-			(baseMLO->wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
-			pthread_mutex_unlock(&global_mutex2[my_mutex]);
-
-		}
-
-		{
-		FILE *fPtr = fopen("cpu_bp.dat","w");
-		for (unsigned i = 0; i < (baseMLO->wsum_model.BPref[exp_iclass]).data.nzyxdim; i ++)
-			fprintf(fPtr, "%.5e %.5e\n", (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].real, (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].imag);
-//			fprintf(fPtr, "%.5e\n", (baseMLO->wsum_model.BPref[exp_iclass]).weight.data[i]);
-		fclose(fPtr);
-		}
-
-		exit(0);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//		{
+//		FILE *fPtr = fopen("gpu_bp.dat","w");
+//		for (unsigned i = 0; i < model_real.size; i ++)
+//			fprintf(fPtr, "%.1e %.1e\n", model_real[i], model_imag[i]);
+////			fprintf(fPtr, "%.1e\n", weight[i]);
+//		fclose(fPtr);
+//		}
+//
+//		wavgs_real.cp_to_host();
+//		wavgs_imag.cp_to_host();
+//		Fweights.cp_to_host();
+//
+//		for (long int i = 0; i < orientation_num; i++)
+//		{
+//			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
+//
+//			for (unsigned j = 0; j < image_size; j++)
+//			{
+//				Fimg.data[j].real = (double) wavgs_real[i * image_size + j];
+//				Fimg.data[j].imag = (double) wavgs_imag[i * image_size + j];
+//				Fweight.data[j] = (double) Fweights[i * image_size + j];
+//			}
+//
+//			int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
+//			pthread_mutex_lock(&global_mutex2[my_mutex]);
+//			(baseMLO->wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
+//			pthread_mutex_unlock(&global_mutex2[my_mutex]);
+//
+//		}
+//
+//		{
+//		FILE *fPtr = fopen("cpu_bp.dat","w");
+//		for (unsigned i = 0; i < (baseMLO->wsum_model.BPref[exp_iclass]).data.nzyxdim; i ++)
+//			fprintf(fPtr, "%.1e %.1e\n", (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].real, (baseMLO->wsum_model.BPref[exp_iclass]).data.data[i].imag);
+////			fprintf(fPtr, "%.1e\n", (baseMLO->wsum_model.BPref[exp_iclass]).weight.data[i]);
+//		fclose(fPtr);
+//		}
+//
+//		exit(0);
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 		Fweights.free();
 		wavgs_real.free();
