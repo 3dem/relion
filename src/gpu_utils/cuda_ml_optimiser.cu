@@ -1232,6 +1232,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			CUDA_CPU_TIC("storeWeightedSums");
 			storeWeightedSums(op, sp);
 			CUDA_CPU_TOC("storeWeightedSums");
+//			exit(0);
 		}
 	}
 }
@@ -1251,6 +1252,7 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+    int tid = threadIdx.x;
 
 	// inside the padded 2D orientation grid
 	if( ex < significant_num )
@@ -1260,7 +1262,7 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 		unsigned long int iy=d_transidx[ex];
 
 		__shared__ FLOAT s[BLOCK_SIZE];
-		s[threadIdx.x] = 0.0f;
+		s[tid] = 0.0f;
 
 		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
 
@@ -1271,26 +1273,26 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 
 		for (unsigned pass = 0; pass < pass_num; pass ++)
 		{
-			pixel = pass * BLOCK_SIZE + threadIdx.x;
+			pixel = pass * BLOCK_SIZE + tid;
 
 			if (pixel < img_size) //Is inside image
 			{
 				ref_pixel_idx = ref_start + pixel;
 				img_pixel_idx = img_start + pixel;
 
-				FLOAT diff_real = g_refs_real[ref_pixel_idx] - g_imgs_real[img_pixel_idx];
-				FLOAT diff_imag = g_refs_imag[ref_pixel_idx] - g_imgs_imag[img_pixel_idx];
+				FLOAT diff_real = __ldg(&g_refs_real[ref_pixel_idx]) - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
+				FLOAT diff_imag = __ldg(&g_refs_imag[ref_pixel_idx]) - __ldg(&g_imgs_imag[img_pixel_idx]);
 
-				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * g_Minvsigma2[pixel];
+				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
 			}
 		}
 		__syncthreads();
 
 		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
 		{
-			if(threadIdx.x<j)
+			if(tid<j)
 			{
-				s[threadIdx.x] += s[threadIdx.x+j];
+				s[tid] += s[tid+j];
 			}
 			__syncthreads();
 		}
@@ -1691,6 +1693,11 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				CUDA_CPU_TOC("kernel_init_1");
 
 				CUDA_GPU_TIC("cuda_kernel_diff2");
+
+				// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
+//				cudaDeviceProp dP;
+//				cudaGetDeviceProperties(&dP, 0);
+//				printf("-arch=sm_%d%d\n", dP.major, dP.minor);
 
 				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
 				{
@@ -2202,26 +2209,35 @@ __global__ void cuda_kernel_wavg(
 	unsigned tid = threadIdx.x;
 
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
-	FLOAT Fweight, wavgs_real, wavgs_imag, wdiff2s_parts;
-
+	FLOAT Fweight;
+	__shared__ FLOAT s_wavgs_real[BLOCK_SIZE];
+	__shared__ FLOAT s_wavgs_imag[BLOCK_SIZE];
+	__shared__ FLOAT s_wdiff2s_parts[BLOCK_SIZE];
+	__shared__ FLOAT s_Minvsigma2s[BLOCK_SIZE];
 	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		wavgs_real = 0;
-		wavgs_imag = 0;
-		wdiff2s_parts = 0;
+		s_wavgs_real[tid]  = 0.0f;
+		s_wavgs_imag[tid]  = 0.0f;
+		s_wdiff2s_parts[tid] = 0.0f;
 		Fweight = 0;
 
 		pixel = pass * BLOCK_SIZE + tid;
+		s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
 
 		if (pixel < image_size)
 		{
 			unsigned long orientation_pixel = iorient * image_size + pixel;
 			FLOAT ref_real = g_refs_real[orientation_pixel];
 			FLOAT ref_imag = g_refs_imag[orientation_pixel];
+			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+			{
+				ref_real *= __ldg(&g_ctfs[pixel]);
+				ref_imag *= __ldg(&g_ctfs[pixel]);
+			}
 
 			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
-				FLOAT weight = g_weights[iorient * translation_num + itrans];
+				FLOAT weight = __ldg(&g_weights[iorient * translation_num + itrans]);
 
 				if (weight >= significant_weight)
 				{
@@ -2229,29 +2245,23 @@ __global__ void cuda_kernel_wavg(
 
 					unsigned long img_pixel_idx = itrans * image_size + pixel;
 
-					FLOAT ctf = g_ctfs[pixel];
-					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
-					{
-						ref_real *= ctf;
-						ref_imag *= ctf;
-					}
-					FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // **
-					FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];    // **
+					FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+					FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
 
-					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
+					s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-					FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel];
+					FLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
 
-					wavgs_real += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // **
-					wavgs_imag += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;    // **
+					s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+					s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
 
-					Fweight += weightxinvsigma2 * ctf;
+					Fweight += weightxinvsigma2 * __ldg(&g_ctfs[pixel]);
 				}
 			}
 
-			g_wavgs_real[orientation_pixel] = wavgs_real; //TODO should be buffered into shared    // **
-			g_wavgs_imag[orientation_pixel] = wavgs_imag; //TODO should be buffered into shared    // **
-			g_wdiff2s_parts[orientation_pixel] = wdiff2s_parts; //TODO this could be further reduced in here
+			g_wavgs_real[orientation_pixel] = s_wavgs_real[tid];
+			g_wavgs_imag[orientation_pixel] = s_wavgs_imag[tid];
+			g_wdiff2s_parts[orientation_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
 			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
 		}
 	}
