@@ -1009,7 +1009,7 @@ static void backproject(
 		int img_xy, long img_count, int img_x, int img_y,
 		int mdl_x, int mdl_y, int mdl_z, int mdl_inity, int mdl_initz)
 {
-
+	CUDA_CPU_TIC("pre_kernel_backprojection");
 	Matrix2D<double> A, Ainv;
 
 	CudaGlobalPtr<FLOAT> eulers_xy(9*img_count+BACKPROJECTION4_FETCH_COUNT);
@@ -1082,7 +1082,7 @@ static void backproject(
 
 	int grid_dim = ceil((float)N / BACKPROJECTION4_GROUP_SIZE);
 	dim3 block_dim( BACKPROJECTION4_GROUP_SIZE *4 );
-
+	CUDA_CPU_TOC("pre_kernel_backprojection");
 	cuda_kernel_backproject<<<grid_dim,block_dim>>>(
 			~xs,~ys,~zs,
 			~model_real,
@@ -1426,7 +1426,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			std::vector< double > rots, tilts, psis;
 
 			CUDA_CPU_TIC("projection_1");
-
+			CUDA_CPU_TIC("generateProjectionSetup");
 			long unsigned orientation_num = generateProjectionSetup(
 					op,
 					sp,
@@ -1437,7 +1437,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					iorientclasses,
 					iover_rots);
 
-
+			CUDA_CPU_TOC("generateProjectionSetup");
+			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
 
 			generateEulerMatrices(
@@ -1449,7 +1450,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 		    eulers.device_alloc();
 			eulers.cp_to_device();
-
+			CUDA_CPU_TOC("generateEulerMatrices");
+			CUDA_CPU_TIC("modelAssignment");
 			CudaGlobalPtr<FLOAT > model_real((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
 			CudaGlobalPtr<FLOAT > model_imag((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
 
@@ -1461,7 +1463,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 			CudaGlobalPtr<FLOAT> Frefs_real;
 			CudaGlobalPtr<FLOAT> Frefs_imag;
-
+			CUDA_CPU_TOC("modelAssignment");
+			CUDA_CPU_TIC("generateModelProjections");
 			generateModelProjections(
 					model_real,
 					model_imag,
@@ -1478,7 +1481,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 					baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 					baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-
+			CUDA_CPU_TOC("generateModelProjections");
 			CUDA_CPU_TOC("projection_1");
 
 			/*=======================================================================================
@@ -1739,10 +1742,9 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				    	Write To Destination
 				======================================*/
 
-
 				CUDA_CPU_TIC("collect_data_1");
 
-				for (long unsigned k = 0; k < significant_num; k ++)
+				for (long unsigned k = 0; k < significant_num; k++)
 				{
 					long unsigned i = rotidx[k];
 					long unsigned j = transidx[k];
@@ -1753,15 +1755,16 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 					long int ihidden_over = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden, sp.current_oversampling,
 																						iover_rot, iover_trans);
-
 					double diff2 = diff2s[i * translation_num + j];
-
 					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = diff2;
-
 					// Keep track of minimum of all diff2, only for the last image in this series
 					if (diff2 < op.min_diff2[ipart])
 						op.min_diff2[ipart] = diff2;
 				}
+//				std::cerr << "true min = " << op.min_diff2[ipart] << std::endl;
+//				int min_idx = thrust::min_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
+//				op.min_diff2[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, min_idx);
+//				std::cerr << "thrust min = " << op.min_diff2[ipart] << std::endl;
 
 				CUDA_CPU_TOC("collect_data_1");
 
@@ -2378,6 +2381,27 @@ __global__ void cuda_kernel_wavg_fast(
 	} // endfor(pass)
 }
 
+// Stacks images in place, reducing at most 2*gridDim.x images down to gridDim.x images.
+// Ex; 19 -> 16 or 32 -> 16,
+__global__ void cuda_kernel_reduce_wdiff2s(FLOAT *g_wdiff2s_parts,
+										   long int orientation_num,
+										   int image_size)
+{
+	unsigned long bid = blockIdx.y*gridDim.x + blockIdx.x;
+	unsigned tid = threadIdx.x;
+	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
+	int current_block_num = gridDim.x;
+	if((current_block_num+bid)<orientation_num)
+	{
+		for (unsigned pass = 0; pass < pass_num; pass++)
+		{
+			pixel = pass * BLOCK_SIZE + tid;
+			if(pixel<image_size)
+				g_wdiff2s_parts[bid*image_size+pixel] += g_wdiff2s_parts[(current_block_num+bid)*image_size+pixel];
+		}
+	}
+}
+
 __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
 										FLOAT *g_oo_otrans_y,          // otrans-size -> make const
 										FLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
@@ -2858,26 +2882,36 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			======================================================*/
 
 			CUDA_CPU_TIC("reduce_wdiff2s");
+			// reduction_block_num = the highest possible power of two that covers more than or exactly half of all images to be reduced
+			int num_reductions = (int)floor(log2((float)orientation_num));
+			int reduction_block_num = pow(2,num_reductions);
+			if(reduction_block_num==orientation_num) // (possibly) very special case where orientation_num is a power of 2
+				reduction_block_num /= 2;
 
-			//TODO Following reduction should be done on the GPU
+			// FIXME Cannot handle reduction_block_num > 65535 ATM
+			CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
+			for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
+			{
+				dim3 block_dim(k,1);
+				 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
+				cuda_kernel_reduce_wdiff2s<<<k,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size);
+			}
+			CUDA_GPU_TOC("cuda_kernels_reduce_wdiff2s");
+
+			wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
 			wdiff2s_parts.cp_to_host();
+			wdiff2s_parts.size = orientation_num * image_size;
 			wdiff2s_parts.free_device();
-
 			for (long int j = 0; j < image_size; j++)
 			{
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
 				if (ires > -1)
 				{
-					double sum = 0;
-					for (long int i = 0; i < orientation_num; i++)
-						sum += (double) wdiff2s_parts[i * image_size + j];
-					thr_wsum_sigma2_noise[group_id].data[ires] += sum;
-					exp_wsum_norm_correction[ipart] += sum;
+					thr_wsum_sigma2_noise[group_id].data[ires] += (double) wdiff2s_parts[j];
+					exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j];
 				}
 			}
-
 			wdiff2s_parts.free_host();
-
 			CUDA_CPU_TOC("reduce_wdiff2s");
 
 			CUDA_CPU_TIC("collect_data_2");
