@@ -1,6 +1,10 @@
 # Extra flags defined on each build type (this file is all optional to include)
+#
+#
 
-# ** Debug BUILD ***************************************************************************************
+# -------------------------- 
+#        Debug BUILD 
+# -------------------------- 
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_DEBUG "-O0" CACHE STRING "")
@@ -28,10 +32,43 @@ message(STATUS "CMAKE_CXX_FLAGS_DEBUG : ${CMAKE_CXX_FLAGS_DEBUG}")
 #--------------------------------------------------------------------
 
 
+# -------------------------- 
+#       Release BUILD 
+# -------------------------- 
+
+# -- Compiler flags -------------------------------------------------
+#
+#   -pg		gprof profiling output (needs linker flag)
+#
+set(RELION_FLAGS_RELEASE "" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELEASE "-arch=sm_52" CACHE STRING "")
+# -- Linker flags ---------------------------------------------------
+set(RELION_LINKER_FLAGS_RELEASE  "")
+
+# -- Append compiler and linker flags -------------------------------
+message(STATUS "CCF_RELEASE :       ${CMAKE_CXX_FLAGS_RELEASE}")
+set(CMAKE_CXX_FLAGS_RELEASE        "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_FLAGS_RELEASE}"        CACHE STRING "")
+set(CMAKE_C_FLAGS_RELEASE          "${CMAKE_C_FLAGS_RELEASE} ${RELION_FLAGS_RELEASE}"          CACHE STRING "")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${RELION_LINKER_FLAGS_RELEASE}" CACHE STRING "")
+set(CUDA_NVCC_FLAGS_RELEASE        "${RELION_NVCC_FLAGS_RELEASE}"                                     CACHE STRING "")
+
+# -- Add preprocessor defintions ------------------------------------
+set(RELION_DEFINITIONS_RELEASE "-DUSE_THRUST -DUSE_TEXINTERP" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_RELEASE}")
+
+message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
+message(STATUS "CMAKE_CXX_FLAGS_PROFILING : ${CMAKE_CXX_FLAGS_PROFILING}")
+#--------------------------------------------------------------------
 
 
-# ** Profiling BUILD (Release with profiling output) ***************************************************
-# ** NOTE: this will not have overall Release perf. ****************************************************
+
+
+
+# ---------------------------------- 
+#       Profiling BUILD 
+#  (Release with profiling output) 
+# ----------------------------------
+# ** NOTE: this will not have overall Release perf. **
 
 # -- Compiler flags -------------------------------------------------
 #

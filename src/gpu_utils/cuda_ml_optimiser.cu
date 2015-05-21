@@ -1248,7 +1248,8 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 									unsigned long significant_num,
 									unsigned long translation_num,
 									unsigned long *d_rotidx,
-									unsigned long *d_transidx)
+									unsigned long *d_transidx,
+									unsigned long *d_ihidden_overs)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -1570,7 +1571,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				CUDA_CPU_TIC("pair_list_1");
 
 				CudaGlobalPtr<long unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
-
+				CudaGlobalPtr<long unsigned> ihidden_overs(orientation_num*translation_num);
 				long unsigned coarse_num = sp.nr_dir*sp.nr_psi*sp.nr_trans;
 				long unsigned significant_num(0);
 
@@ -1581,6 +1582,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					{
 						for (long unsigned j = 0; j < translation_num; j++)
 						{
+							ihidden_overs[significant_num] = i * sp.nr_trans + j;
 							rotidx[significant_num] = i;
 							transidx[significant_num] = j;
 							significant_num++;
@@ -1601,7 +1603,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 							if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 							{
-								 long int ihidden_over = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden,
+								ihidden_overs[significant_num] = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden,
 										                  sp.current_oversampling, iover_rot, iover_trans);
 
 								rotidx[significant_num] = i;
@@ -1676,6 +1678,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				transidx.device_alloc();
 				transidx.cp_to_device();
 
+				ihidden_overs.size = significant_num;
+				ihidden_overs.device_alloc();
+				ihidden_overs.cp_to_device();
+
 				/*====================================
 				    		Kernel Calls
 				======================================*/
@@ -1718,7 +1724,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 																significant_num,
 																translation_num,
 																~rotidx,
-																~transidx);
+																~transidx,
+																~ihidden_overs);
 				}
 
 				CUDA_GPU_TAC("cuda_kernel_diff2");
@@ -1748,15 +1755,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				{
 					long unsigned i = rotidx[k];
 					long unsigned j = transidx[k];
-					long int iover_rot = iover_rots[i];
-
-					long int ihidden = iorientclasses[i] * sp.nr_trans + ihiddens[j];
-					long int iover_trans = iover_transes[j];
-
-					long int ihidden_over = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden, sp.current_oversampling,
-																						iover_rot, iover_trans);
 					double diff2 = diff2s[i * translation_num + j];
-					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = diff2;
+					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = diff2; // TODO if we can write diff2 to the correct pos in the kernel we can just memcpy to a pointer and use thrust to find min
 					// Keep track of minimum of all diff2, only for the last image in this series
 					if (diff2 < op.min_diff2[ipart])
 						op.min_diff2[ipart] = diff2;
