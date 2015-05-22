@@ -9,7 +9,6 @@
 
 #include "src/ml_optimiser.h"
 
-
 class OptimisationParamters
 {
 public:
@@ -73,6 +72,83 @@ public:
 		ipsi_min(0), ipsi_max(0),
 		itrans_min(0), itrans_max(0)
 	{};
+};
+
+class Indices
+{
+public:
+	int fineIdx,
+	coarseIdx,
+	iclass,
+	idir,
+	ipsi,
+	itrans,
+	ioverrot,
+	iovertrans;
+
+	Indices():
+		fineIdx(0),
+		coarseIdx(0),
+		iclass(0),
+		idir(0),
+		ipsi(0),
+		itrans(0),
+		ioverrot(0),
+		iovertrans(0)
+	{};
+
+	void fineIndexToFineIndices(SamplingParameters sp) // converts an "ihidden_over" (finely sampled) index to partial indices (and coarse index)
+	{
+		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
+		int t_idx = fineIdx;
+		iclass = floor( t_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples )); //FIXME check correct index extraction for iclass when several classes are used
+		t_idx   -= iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
+		idir   = floor( t_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));
+		t_idx   -= idir       * ( sp.nr_psi * sp.nr_trans * oversamples );
+		ipsi   = floor( t_idx / ( sp.nr_trans * oversamples ));
+		t_idx   -= ipsi       * ( sp.nr_trans * oversamples );
+		itrans = floor( t_idx /  oversamples );
+		t_idx   -= itrans     *  oversamples ;
+		ioverrot = floor( t_idx / sp.nr_oversampled_trans );
+		t_idx   -= ioverrot  *   sp.nr_oversampled_trans ;
+		iovertrans = t_idx ;
+
+		coarseIdx = sp.nr_trans * sp.nr_psi * idir   +   sp.nr_trans * ipsi   +   itrans;
+	}
+
+	void fineIndicesToFineIndex(SamplingParameters sp) // converts partial indices to an "ihidden_over" (finely sampled) index // FIXME Untested
+	{
+		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
+		int idx = 0;
+		idx += iclass   * sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples;
+		idx += idir     * sp.nr_psi * sp.nr_trans * oversamples;
+		idx += ipsi     * sp.nr_trans * oversamples;
+		idx += itrans   * oversamples;
+		idx += ioverrot * sp.nr_oversampled_trans;
+		idx += iovertrans;
+		fineIdx = idx;
+	}
+
+	void coarseIndexToCoarseIndices(SamplingParameters sp) // converts an "ihidden" (coarsely sampled) index to coarse partial indices // FIXME Untested
+	{
+		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
+		int t_idx = coarseIdx;
+		idir   = floor( t_idx / ( sp.nr_psi * sp.nr_trans ));
+		t_idx   -= idir       * ( sp.nr_psi * sp.nr_trans  );
+		ipsi   = floor( t_idx / ( sp.nr_trans ));
+		t_idx   -= ipsi       * ( sp.nr_trans  );
+		itrans = t_idx ;
+	}
+
+	void coarseIndicesToCoarseIndex(SamplingParameters sp) // converts coarse partial indices to an "ihidden" (coarsely sampled) index // FIXME Untested
+	{
+		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
+		int idx = 0;
+		idx += idir     * sp.nr_psi * sp.nr_trans;
+		idx += ipsi     * sp.nr_trans;
+		idx += itrans;
+		coarseIdx = idx;
+	}
 };
 
 class MlOptimiserCuda

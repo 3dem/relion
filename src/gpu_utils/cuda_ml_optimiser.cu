@@ -198,15 +198,16 @@ __global__ void cuda_kernel_projectAllViews_trilin_gloex( FLOAT *g_model_real,
 	bool is_neg_x;
 	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
 	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( ex < orientation_num ) // we only need to make
+	if( bid < orientation_num ) // we only need to make
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-		long ref_pixel = ex*(image_size);
+		long ref_pixel = bid*(image_size);
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
-			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			pixel = (pass * BLOCK_SIZE) + tid;
 			if(pixel<image_size)
 			{
 				int x = pixel % XSIZE_img;
@@ -224,9 +225,9 @@ __global__ void cuda_kernel_projectAllViews_trilin_gloex( FLOAT *g_model_real,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
-					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					xp = g_eulers[bid*9]   * x + g_eulers[bid*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[bid*9+3] * x + g_eulers[bid*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[bid*9+6] * x + g_eulers[bid*9+7] * y;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -328,15 +329,16 @@ __global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
 	bool is_neg_x;
 	CudaComplex d000, d001, d010, d011, d100, d101, d110, d111;
 	CudaComplex dx00, dx01, dx10, dx11, dxy0, dxy1, val;
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( ex < orientation_num ) // we only need to make
+	if( bid < orientation_num ) // we only need to make
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-		long ref_pixel = ex*(image_size);
+		long ref_pixel = bid*(image_size);
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
-			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			pixel = (pass * BLOCK_SIZE) + tid;
 			if(pixel<image_size)
 			{
 				int x = pixel % XSIZE_img;
@@ -354,9 +356,9 @@ __global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
-					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					xp = g_eulers[bid*9]   * x + g_eulers[bid*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = g_eulers[bid*9+3] * x + g_eulers[bid*9+4] * y;  // compared to CPU-based projection. This
+					zp = g_eulers[bid*9+6] * x + g_eulers[bid*9+7] * y;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -457,15 +459,16 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 	int pixel;
 	bool is_neg_x;
 	CudaComplex val;
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( ex < orientation_num ) // we only need to make
+	if( bid < orientation_num ) // we only need to make
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-		long ref_pixel = ex*(image_size);
+		long ref_pixel = bid*(image_size);
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
-			pixel = (pass * BLOCK_SIZE) + threadIdx.x;
+			pixel = (pass * BLOCK_SIZE) + tid;
 			if(pixel<image_size)
 			{
 				int x = pixel % XSIZE_img;
@@ -483,9 +486,9 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = g_eulers[blockIdx.x*9]   * x + g_eulers[blockIdx.x*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = g_eulers[blockIdx.x*9+3] * x + g_eulers[blockIdx.x*9+4] * y;  // compared to CPU-based projection. This
-					zp = g_eulers[blockIdx.x*9+6] * x + g_eulers[blockIdx.x*9+7] * y;  // propagates to dx00, dx10, and so on.
+					xp = __ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = __ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y;  // compared to CPU-based projection. This
+					zp = __ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -1249,7 +1252,8 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 									unsigned long translation_num,
 									unsigned long *d_rotidx,
 									unsigned long *d_transidx,
-									unsigned long *d_ihidden_overs)
+									unsigned long *d_ihidden_overs // TODO use it to map in here, get rid of collect_data_1
+									)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
@@ -1658,26 +1662,23 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					}
 				}
 
+				gpuMinvsigma2.cp_to_device();
+
+				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
+				diff2s.device_alloc();
+
 				Fimgs_real.size = translation_num * image_size;
 				Fimgs_real.device_alloc();
 				Fimgs_real.cp_to_device();
 				Fimgs_imag.size = translation_num * image_size;
 				Fimgs_imag.device_alloc();
 				Fimgs_imag.cp_to_device();
-
-				gpuMinvsigma2.cp_to_device();
-
-				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
-				diff2s.device_alloc();
-
 				rotidx.size = significant_num;
 				rotidx.device_alloc();
 				rotidx.cp_to_device();
-
 				transidx.size = significant_num;
 				transidx.device_alloc();
 				transidx.cp_to_device();
-
 				ihidden_overs.size = significant_num;
 				ihidden_overs.device_alloc();
 				ihidden_overs.cp_to_device();
@@ -1700,7 +1701,6 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				dim3 block_dim(orient1,orient2);
 
 				CUDA_CPU_TOC("kernel_init_1");
-
 				CUDA_GPU_TIC("cuda_kernel_diff2");
 
 				// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
@@ -2385,12 +2385,12 @@ __global__ void cuda_kernel_wavg_fast(
 // Ex; 19 -> 16 or 32 -> 16,
 __global__ void cuda_kernel_reduce_wdiff2s(FLOAT *g_wdiff2s_parts,
 										   long int orientation_num,
-										   int image_size)
+										   int image_size,
+										   int current_block_num)
 {
 	unsigned long bid = blockIdx.y*gridDim.x + blockIdx.x;
 	unsigned tid = threadIdx.x;
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
-	int current_block_num = gridDim.x;
 	if((current_block_num+bid)<orientation_num)
 	{
 		for (unsigned pass = 0; pass < pass_num; pass++)
@@ -2888,13 +2888,23 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			if(reduction_block_num==orientation_num) // (possibly) very special case where orientation_num is a power of 2
 				reduction_block_num /= 2;
 
-			// FIXME Cannot handle reduction_block_num > 65535 ATM
 			CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
 			for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
 			{
-				dim3 block_dim(k,1);
+				if(k>65535)
+				{
+					orient1 = ceil(sqrt(k));
+					orient2 = orient1 + (orient1 % 2);  // For some reason the "optimal" values in the METADATA ooutput is sensitive to the choice of block-grid dims,
+					orient1 +=          (orient1 % 2);  // and seems to work properly only when even numbers are used. // TODO examine why
+				}
+				else
+				{
+					orient1 = k;
+					orient2 = 1;
+				}
+				dim3 block_dim(orient1,orient2);
 				 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
-				cuda_kernel_reduce_wdiff2s<<<k,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size);
+				cuda_kernel_reduce_wdiff2s<<<k,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
 			}
 			CUDA_GPU_TOC("cuda_kernels_reduce_wdiff2s");
 
@@ -3042,37 +3052,26 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			myp_oo_otrans_x2y2z2.free();
 
 			//Get index of max element using GPU-tool thrust
-			int mx_idx = thrust::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
-			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, mx_idx);
+			Indices max_index;
+			max_index.fineIdx = thrust::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
+			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, max_index.fineIdx);
+			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 
-			// TODO put below in function(s)   -  indices2index() / index2indices()
-			int mx_iclass = floor( mx_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples )); //FIXME check correct index extraction for iclass when several classes are used
-			mx_idx   -= mx_iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
-			int mx_idir   = floor( mx_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));
-			mx_idx   -= mx_idir       * ( sp.nr_psi * sp.nr_trans * oversamples );
-			int mx_ipsi   = floor( mx_idx / ( sp.nr_trans * oversamples ));
-			mx_idx   -= mx_ipsi       * ( sp.nr_trans * oversamples );
-			int mx_itrans = floor( mx_idx /  oversamples );
-			mx_idx   -= mx_itrans     *  oversamples ;
-			int mx_ioverrot = floor( mx_idx / sp.nr_oversampled_trans );
-			mx_idx   -= mx_ioverrot  *   sp.nr_oversampled_trans ;
-			int mx_iovertrans = mx_idx ;
-
-			baseMLO->sampling.getTranslations(mx_itrans, baseMLO->adaptive_oversampling,
+			baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
 					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
-			baseMLO->sampling.getOrientations(mx_idir, mx_ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+			baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-			double rot = oversampled_rot[mx_ioverrot];
-			double tilt = oversampled_tilt[mx_ioverrot];
-			double psi = oversampled_psi[mx_ioverrot];
+			double rot = oversampled_rot[max_index.ioverrot];
+			double tilt = oversampled_tilt[max_index.ioverrot];
+			double psi = oversampled_psi[max_index.ioverrot];
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[mx_iovertrans];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[mx_iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
 			if (baseMLO->mymodel.data_dim == 3)
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[mx_iovertrans];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)mx_iclass + 1;
+				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
 			CUDA_CPU_TOC("collect_data_2_post_kernel");
 			CUDA_CPU_TOC("collect_data_2");
