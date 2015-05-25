@@ -3,8 +3,32 @@
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
+__forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
+{
+	unsigned long long int* address_as_ull = (unsigned long long int*)address;
+	unsigned long long int old = *address_as_ull, assumed;
+	do
+	{
+		assumed = old;
+		old = atomicCAS(address_as_ull, assumed, __double_as_longlong(val + __longlong_as_double(assumed)));
+	}
+	while (assumed != old); // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+	return __longlong_as_double(old);
+}
 #else
 #define FLOAT float
+__forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
+{
+	unsigned int* address_as_ul = (unsigned int*)address;
+	unsigned int old = *address_as_ul, assumed;
+	do
+	{
+		assumed = old;
+		old = atomicCAS(address_as_ul, assumed, (int) (val + __longlong_as_double(assumed)));
+	}
+	while (assumed != old); // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+	return (FLOAT) old;
+}
 #endif
 
 
