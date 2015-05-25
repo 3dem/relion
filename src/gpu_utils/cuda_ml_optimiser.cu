@@ -853,9 +853,9 @@ void generateModelProjections(
 #define BACKPROJECTION4_FETCH_COUNT 4
 
 __global__ void cuda_kernel_backproject(
-		short *g_xs,
-		short *g_ys,
-		short *g_zs,
+		int *g_xs,
+		int *g_ys,
+		int *g_zs,
 		FLOAT *g_model_real,
 		FLOAT *g_model_imag,
 		FLOAT *g_weight,
@@ -962,11 +962,6 @@ __global__ void cuda_kernel_backproject(
 		yp = (s_e[b+1] * x + s_e[b+4] * y) * scale2;
 		zp = (s_e[b+2] * x + s_e[b+5] * y) * scale2;
 
-
-
-
-
-
 		if (xp < 0.0f) //Flip sign
 		{
 			xp = fabsf(X+xp);
@@ -1034,16 +1029,16 @@ static void backproject(
 {
 	int max_r2 = max_r * max_r;
 
-	CudaGlobalPtr<short> xs(mdl_x*mdl_y*mdl_z); // >52% will actually be used, allocate some padding
-	CudaGlobalPtr<short> ys(xs.size);
-	CudaGlobalPtr<short> zs(xs.size);
+	CudaGlobalPtr<int> xs(mdl_x*mdl_y*mdl_z); // >52% will actually be used, allocate some padding
+	CudaGlobalPtr<int> ys(xs.size);
+	CudaGlobalPtr<int> zs(xs.size);
 	unsigned N(0);
 
-	for (short x = 0; x < mdl_x; x ++)
+	for (int x = 0; x < mdl_x; x ++)
 	{
-		for (short y = mdl_inity; y < mdl_y; y++)
+		for (int y = mdl_inity; y < mdl_y; y++)
 		{
-			for (short z = mdl_initz; z < mdl_z; z++)
+			for (int z = mdl_initz; z < mdl_z; z++)
 			{
 				if (x*x + y*y + z*z <= max_r2 * scale2 * 1.2f)
 				{
