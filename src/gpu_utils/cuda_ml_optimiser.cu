@@ -2240,10 +2240,10 @@ __global__ void cuda_kernel_wavg(
 				}
 			}
 
-			g_wavgs_real[orientation_pixel] = s_wavgs_real[tid];
-			g_wavgs_imag[orientation_pixel] = s_wavgs_imag[tid];
+			g_wavgs_real[orientation_pixel] += s_wavgs_real[tid];
+			g_wavgs_imag[orientation_pixel] += s_wavgs_imag[tid];
 			g_wdiff2s_parts[orientation_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
-			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
+			g_Fweights[orientation_pixel] += Fweight; //TODO should be buffered into shared
 		}
 	}
 }
@@ -2350,10 +2350,10 @@ __global__ void cuda_kernel_wavg_fast(
 			// Now write shared memory data to global memory for all REF_GROUP_SIZE images in this block
 			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
 			{
-				g_wavgs_real[orientation_pixel+iref*image_size]    = s_wavgs_real[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
-				g_wavgs_imag[orientation_pixel+iref*image_size]    = s_wavgs_imag[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
+				g_wavgs_real[orientation_pixel+iref*image_size]    += s_wavgs_real[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
+				g_wavgs_imag[orientation_pixel+iref*image_size]    += s_wavgs_imag[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
 				g_wdiff2s_parts[orientation_pixel+iref*image_size] = s_wdiff2s_parts[iref*BLOCK_SIZE+tid]; //TODO this could be further reduced in here
-				g_Fweights[orientation_pixel+iref*image_size]      = s_Fweight[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared
+				g_Fweights[orientation_pixel+iref*image_size]      += s_Fweight[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared
 			}
 		} // endif(pixel < image__size)
 	} // endfor(pass)
@@ -2626,13 +2626,14 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
 		wavgs_real.device_alloc();
+		wavgs_real.device_init(0);
 		CudaGlobalPtr<FLOAT> wavgs_imag(orientation_num * image_size);
 		wavgs_imag.device_alloc();
-		//wavgs.device_init(0);
+		wavgs_imag.device_init(0);
 
 		CudaGlobalPtr<FLOAT> Fweights(orientation_num * image_size);
 		Fweights.device_alloc();
-		//Fweights.device_init(0);
+		Fweights.device_init(0);
 
 		/*=======================================================================================
 										  PARTICLE ITERATION
