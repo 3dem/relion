@@ -625,7 +625,7 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
 	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( bid < orientation_num ) // we only need to make
+	if( bid < orientation_num )
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
 		long ref_pixel = bid*(image_size);
@@ -689,6 +689,146 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 		}
 	}
 }
+
+// ===================================================
+//     Combined Projection+Difference kernels are
+// ===================================================
+//	-PAV_TTI_D2      Texture Implicit   - single prec. only
+//	-PAV_TTE_D2      Texture Explicit   - single prec. only (?)
+//	-PAV_TGE_D2      Global  Explicit
+//
+//   PAV  =   Project All Views
+//
+//   FIXME: All should be available with suffix _CC  (cross-correlation algorithm)
+
+__global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
+		                                FLOAT *g_imgs_real,
+		                                FLOAT *g_imgs_imag,
+										FLOAT *g_Minvsigma2,
+										FLOAT *g_diff2s,
+										int image_size,
+										FLOAT sum_init,
+										int orientation_num,
+										int translation_num,
+										int significant_num,
+										unsigned long *d_rotidx,
+										unsigned long *d_transidx,
+										unsigned long *d_ihidden_overs,
+										int my_r_max,
+										int max_r2,
+										int min_r2_nn,
+										long int img_x,
+										long int img_y,
+										long int mdl_x,
+										long int mdl_y,
+										long int mdl_z,
+										long int mdl_init_y,
+										long int mdl_init_z
+										)
+{
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
+
+	FLOAT xp, yp, zp;
+	long int r2;
+	int pixel;
+	bool is_neg_x;
+	FLOAT ref_real;
+	FLOAT ref_imag;
+
+	// inside the padded 2D orientation grid
+	if( bid < significant_num ) // we only need to make
+	{
+		__shared__ FLOAT s[BLOCK_SIZE];
+		s[tid] = 0.0f;
+
+		// index of comparison
+		unsigned long int ix=d_rotidx[bid];
+		unsigned long int iy=d_transidx[bid];
+
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		unsigned long img_start(iy * image_size);
+		unsigned long img_pixel_idx;
+
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		{
+			pixel = (pass * BLOCK_SIZE) + tid;
+			if(pixel<image_size)
+			{
+				int x = pixel % img_x;
+				int y = (int)floorf( (float)pixel / (float)img_x);
+				img_pixel_idx = img_start + pixel;
+
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
+				{
+					if (y >= img_y - my_r_max)
+						y = y - img_y ;
+					else
+						x=r2;
+				}
+
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					xp = __ldg(&g_eulers[ix*9])   * x + __ldg(&g_eulers[ix*9+1]) * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = __ldg(&g_eulers[ix*9+3]) * x + __ldg(&g_eulers[ix*9+4]) * y;  // compared to CPU-based projection. This
+					zp = __ldg(&g_eulers[ix*9+6]) * x + __ldg(&g_eulers[ix*9+7]) * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					yp -= mdl_init_y;
+					zp -= mdl_init_z;
+
+					ref_real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					ref_imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+
+//					printf("%i, %i", x,y);
+//					printf("%f, %f,%f", xp,yp,zp);
+					if (is_neg_x)
+					{
+						ref_imag = -ref_imag;
+					}
+				}
+				else
+				{
+					ref_real=0.0f;
+					ref_imag=0.0f;
+				}
+				FLOAT diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
+				FLOAT diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
+
+				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+//				printf(" diffs = %f, %f \n",ref_real,img_pixel_idx);
+//				printf(" diffs = %i, %i ,%i \n",x,y);
+			}
+		}
+		__syncthreads();
+
+		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
+		{
+			if(tid<j)
+			{
+				s[tid] += s[tid+j];
+			}
+			__syncthreads();
+		}
+		if (tid == 0)
+		{
+			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
+		}
+	}
+}
 #endif
 
 void generateModelProjections(
@@ -712,8 +852,6 @@ void generateModelProjections(
 	int max_r2 = max_r * max_r;
 	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
 
-
-#if !defined(CUDA_DOUBLE_PRECISION)
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
@@ -759,7 +897,6 @@ void generateModelProjections(
     //bind texture reference with cuda array
 	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
 	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
-#endif
 
 	Frefs_real.size = orientation_num * image_size;
 	Frefs_real.device_alloc();
@@ -843,13 +980,480 @@ void generateModelProjections(
 #endif
 
 	//unbind texture reference to free resource
-	cudaUnbindTexture(texModel_real);
-    cudaUnbindTexture(texModel_imag);
+
 
 
 }
 
+__global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
+									FLOAT *g_refs_imag,
+									FLOAT *g_imgs_real,
+									FLOAT *g_imgs_imag,
+									FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
+									unsigned img_size, FLOAT sum_init,
+									unsigned long significant_num,
+									unsigned long translation_num,
+									unsigned long *d_rotidx,
+									unsigned long *d_transidx,
+									unsigned long *d_ihidden_overs // TODO use it to map in here, get rid of collect_data_1
+									)
+{
+	// blockid
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+    int tid = threadIdx.x;
 
+	// inside the padded 2D orientation grid
+	if( ex < significant_num )
+	{
+		// index of comparison
+		unsigned long int ix=d_rotidx[ex];
+		unsigned long int iy=d_transidx[ex];
+
+		__shared__ FLOAT s[BLOCK_SIZE];
+		s[tid] = 0.0f;
+
+		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
+
+		unsigned long ref_start(ix * img_size);
+		unsigned long img_start(iy * img_size);
+		unsigned long ref_pixel_idx;
+		unsigned long img_pixel_idx;
+
+		for (unsigned pass = 0; pass < pass_num; pass ++)
+		{
+			pixel = pass * BLOCK_SIZE + tid;
+
+			if (pixel < img_size) //Is inside image
+			{
+				ref_pixel_idx = ref_start + pixel;
+				img_pixel_idx = img_start + pixel;
+
+				FLOAT diff_real = __ldg(&g_refs_real[ref_pixel_idx]) - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
+				FLOAT diff_imag = __ldg(&g_refs_imag[ref_pixel_idx]) - __ldg(&g_imgs_imag[img_pixel_idx]);
+
+				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+			}
+		}
+		__syncthreads();
+
+		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
+		{
+			if(tid<j)
+			{
+				s[tid] += s[tid+j];
+			}
+			__syncthreads();
+		}
+//		if (threadIdx.x*ex == 0)
+		{
+			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
+		}
+		// -------------------------------------------------------------------------
+	}
+}
+
+__global__ void cuda_kernel_cc_diff2(	FLOAT *g_refs_real,
+										FLOAT *g_refs_imag,
+										FLOAT *g_imgs_real,
+										FLOAT *g_imgs_imag,
+										FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
+										unsigned img_size, FLOAT exp_local_sqrtXi2,
+										unsigned long significant_num,
+										unsigned long translation_num,
+										unsigned long *d_rotidx,
+										unsigned long *d_transidx)
+{
+	// blockid
+	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+	// inside the padded 2D orientation grid
+	if( ex < significant_num )
+	{
+		// index of comparison
+		unsigned long int ix=d_rotidx[ex];
+		unsigned long int iy=d_transidx[ex];
+		__shared__ double    s[BLOCK_SIZE];
+		__shared__ double norm[BLOCK_SIZE];
+		s[threadIdx.x] = 0;
+		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE));
+		unsigned long pixel,
+		ref_start(ix * img_size),
+		img_start(iy * img_size);
+		unsigned long ref_pixel_idx;
+		unsigned long img_pixel_idx;
+		for (unsigned pass = 0; pass < pass_num; pass ++)
+		{
+			pixel = pass * BLOCK_SIZE + threadIdx.x;
+
+			if (pixel < img_size) //Is inside image
+			{
+				ref_pixel_idx = ref_start + pixel;
+				img_pixel_idx = img_start + pixel;
+
+				double diff_real = g_refs_real[ref_pixel_idx] * g_imgs_real[img_pixel_idx];
+				double diff_imag = g_refs_imag[ref_pixel_idx] * g_imgs_imag[img_pixel_idx];
+
+				double nR = g_refs_real[ref_pixel_idx]*g_refs_real[ref_pixel_idx];
+				double nI = g_refs_imag[ref_pixel_idx]*g_refs_imag[ref_pixel_idx];
+
+				s[threadIdx.x] -= (diff_real + diff_imag);
+				norm[threadIdx.x] += nR+nI;
+			}
+		}
+		// -------------------------------------------------------------------------
+		__syncthreads();
+		int trads = 32;
+		int itr = BLOCK_SIZE/trads;
+		if(threadIdx.x<trads)
+		{
+			for(int i=1; i<itr; i++)
+			{
+				s[threadIdx.x] += s[i*trads + threadIdx.x];
+				norm[threadIdx.x] += norm[i*trads + threadIdx.x];
+			}
+		}
+		for(int j=(trads/2); j>0; j/=2)
+		{
+			if(threadIdx.x<j)
+			{
+				s[threadIdx.x] += s[threadIdx.x+j];
+				norm[threadIdx.x] += norm[threadIdx.x+j];
+			}
+		}
+		__syncthreads();
+		// -------------------------------------------------------------------------
+		g_diff2s[ix * translation_num + iy] = s[0]/(sqrt(norm[0])*exp_local_sqrtXi2);
+	}
+}
+
+void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
+		CudaGlobalPtr<FLOAT > &Fimgs_real,
+		CudaGlobalPtr<FLOAT > &Fimgs_imag,
+		CudaGlobalPtr<FLOAT > &Frefs_real,
+		CudaGlobalPtr<FLOAT > &Frefs_imag,
+		CudaGlobalPtr<long unsigned > &rotidx,
+		CudaGlobalPtr<long unsigned > &transidx,
+		CudaGlobalPtr<long unsigned > &ihidden_overs,
+		OptimisationParamters &op,
+		MlOptimiser *baseMLO,
+		long unsigned translation_num,
+		long unsigned orientation_num,
+		long unsigned significant_num,
+		unsigned image_size,
+		int ipart,
+		int group_id,
+		CudaGlobalPtr<FLOAT > &diff2s
+		)
+{
+	/*====================================
+	   Initiate Particle Related On GPU
+	======================================*/
+	CUDA_CPU_TIC("kernel_init_1");
+	// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
+	// we need to make a modified copy, since the global object shouldn't be
+	// changed
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+	{
+		gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
+	}
+
+	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+		{
+			gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
+		}
+	}
+	// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
+	//           + Make setting of myscale robust between here and above.
+	//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
+	//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
+	if (baseMLO->do_scale_correction)
+	{
+		FLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+		{
+			gpuMinvsigma2[n] *= (myscale*myscale);
+		}
+	}
+
+	gpuMinvsigma2.cp_to_device();
+
+	Fimgs_real.size = translation_num * image_size;
+	Fimgs_real.device_alloc();
+	Fimgs_real.cp_to_device();
+	Fimgs_imag.size = translation_num * image_size;
+	Fimgs_imag.device_alloc();
+	Fimgs_imag.cp_to_device();
+	rotidx.size = significant_num;
+	rotidx.device_alloc();
+	rotidx.cp_to_device();
+	transidx.size = significant_num;
+	transidx.device_alloc();
+	transidx.cp_to_device();
+	ihidden_overs.size = significant_num;
+	ihidden_overs.device_alloc();
+	ihidden_overs.cp_to_device();
+
+	/*====================================
+				Kernel Calls
+	======================================*/
+	unsigned orient1, orient2;
+
+	if(significant_num>65535)
+	{
+		orient1 = ceil(sqrt(significant_num));
+		orient2 = orient1;
+	}
+	else
+	{
+		orient1 = significant_num;
+		orient2 = 1;
+	}
+	dim3 block_dim(orient1,orient2);
+
+	CUDA_CPU_TOC("kernel_init_1");
+	CUDA_GPU_TIC("kernel_diff_noproj");
+	// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
+//				cudaDeviceProp dP;
+//				cudaGetDeviceProperties(&dP, 0);
+//				printf("-arch=sm_%d%d\n", dP.major, dP.minor);
+
+	if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
+	{
+		cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
+														image_size, op.highres_Xi2_imgs[ipart],
+														significant_num,
+														translation_num,
+														~rotidx,
+														~transidx);
+	}
+	else
+	{
+		cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2, ~diff2s,
+													image_size, op.highres_Xi2_imgs[ipart] / 2.,
+													significant_num,
+													translation_num,
+													~rotidx,
+													~transidx,
+													~ihidden_overs);
+	}
+	CUDA_GPU_TAC("kernel_diff_noproj");
+	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
+	CUDA_GPU_TOC("kernel_diff_noproj");
+}
+
+void runProjAndDifferenceKernel(
+		CudaGlobalPtr<FLOAT > &model_real,
+		CudaGlobalPtr<FLOAT > &model_imag,
+		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
+		CudaGlobalPtr<FLOAT> &Fimgs_real,
+		CudaGlobalPtr<FLOAT> &Fimgs_imag,
+		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<long unsigned> &rotidx,
+		CudaGlobalPtr<long unsigned> &transidx,
+		CudaGlobalPtr<long unsigned> &ihidden_overs,
+		CudaGlobalPtr<FLOAT> &diff2s,
+		OptimisationParamters op,
+		MlOptimiser *baseMLO,
+		long unsigned orientation_num,
+		long unsigned translation_num,
+		long unsigned significant_num,
+		unsigned image_size,
+		unsigned max_r,
+		int ipart,
+		int group_id,
+		int exp_iclass)
+{
+
+	CUDA_CPU_TIC("kernel_init_1");
+	int max_r2 = max_r * max_r;
+	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
+
+	/*===========================
+	 *      TEXTURE STUFF
+	 * ==========================*/
+	// TODO Use bindless textures to reduce some of this clutter
+
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+												   baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+												   baseMLO->mymodel.PPref[exp_iclass].data.zdim);
+	// create channel to describe data type (bits,bits,bits,bits,type)
+	// TODO model should carry real & imag in separate channels of the same texture
+	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+
+	//allocate device memory for cuda 3D array
+	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
+	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
+
+	//set cuda array copy parameters to be supplied to copy-command
+	cudaMemcpy3DParms copyParams = {0};
+	copyParams.extent   = volumeSize;
+
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_real;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_imag;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+
+	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
+	texModel_real.normalized = false;
+	texModel_real.filterMode = cudaFilterModeLinear;
+	texModel_imag.normalized = false;
+	texModel_imag.filterMode = cudaFilterModeLinear;
+
+	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
+	for(int n=0; n<3; n++)
+	{
+		texModel_real.addressMode[n]=cudaAddressModeClamp;
+		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+	}
+
+    //bind texture reference with cuda array
+	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
+	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
+
+	// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
+	// we need to make a modified copy, since the global object shouldn't be
+	// changed
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+	{
+		gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
+	}
+
+	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+		{
+			gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
+		}
+	}
+	// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
+	//           + Make setting of myscale robust between here and above.
+	//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
+	//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
+	if (baseMLO->do_scale_correction)
+	{
+		FLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+		{
+			gpuMinvsigma2[n] *= (myscale*myscale);
+		}
+	}
+
+	gpuMinvsigma2.cp_to_device();
+
+	Fimgs_real.size = translation_num * image_size;
+	Fimgs_real.device_alloc();
+	Fimgs_real.cp_to_device();
+	Fimgs_imag.size = translation_num * image_size;
+	Fimgs_imag.device_alloc();
+	Fimgs_imag.cp_to_device();
+	rotidx.size = significant_num;
+	rotidx.device_alloc();
+	rotidx.cp_to_device();
+	transidx.size = significant_num;
+	transidx.device_alloc();
+	transidx.cp_to_device();
+	ihidden_overs.size = significant_num;
+	ihidden_overs.device_alloc();
+	ihidden_overs.cp_to_device();
+
+	/*====================================
+				Kernel Calls
+	======================================*/
+	unsigned orient1, orient2;
+
+	if(significant_num>65535)
+	{
+		orient1 = ceil(sqrt(significant_num));
+		orient2 = orient1;
+	}
+	else
+	{
+		orient1 = significant_num;
+		orient2 = 1;
+	}
+	dim3 block_dim(orient1,orient2);
+
+	CUDA_CPU_TOC("kernel_init_1");
+	CUDA_GPU_TIC("kernel_diff_proj");
+
+
+// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
+//				cudaDeviceProp dP;
+//				cudaGetDeviceProperties(&dP, 0);
+//				printf("-arch=sm_%d%d\n", dP.major, dP.minor);
+
+	if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
+	{
+		// FIXME  make _CC
+		exit(0);
+//		cuda_kernel_PAV_TTI_D2_CC<<<block_dim,BLOCK_SIZE>>>(~eulers,
+//														 ~Fimgs_real,
+//														 ~Fimgs_imag,
+//														 ~gpuMinvsigma2,
+//														 ~diff2s,
+//														 image_size,
+//														 op.highres_Xi2_imgs[ipart] / 2.,
+//														 orientation_num,
+//														 translation_num,
+//														 significant_num,
+//														 ~rotidx,
+//														 ~transidx,
+//														 ~ihidden_overs,
+//														 max_r,
+//													     max_r2,
+//													     min_r2_nn,
+//														 op.local_Minvsigma2s[0].xdim,
+//														 op.local_Minvsigma2s[0].ydim,
+//														 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+//														 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+//														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
+//														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+//														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+//		cudaFreeArray(modelArray_real);
+//		cudaFreeArray(modelArray_imag);
+	}
+	else
+	{
+		cuda_kernel_PAV_TTI_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
+														 ~Fimgs_real,
+														 ~Fimgs_imag,
+														 ~gpuMinvsigma2,
+														 ~diff2s,
+														 image_size,
+														 op.highres_Xi2_imgs[ipart] / 2.,
+														 orientation_num,
+														 translation_num,
+														 significant_num,
+														 ~rotidx,
+														 ~transidx,
+														 ~ihidden_overs,
+														 max_r,
+													     max_r2,
+													     min_r2_nn,
+													     op.local_Minvsigma2s[0].xdim,
+														 op.local_Minvsigma2s[0].ydim,
+														 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+														 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
+														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+		cudaFreeArray(modelArray_real);
+		cudaFreeArray(modelArray_imag);
+	}
+	CUDA_GPU_TAC("kernel_diff_proj");
+	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
+
+	CUDA_GPU_TOC("kernel_diff_proj");
+	cudaUnbindTexture(texModel_real);
+    cudaUnbindTexture(texModel_imag);
+}
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
@@ -1222,145 +1826,6 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 
 
-__global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
-									FLOAT *g_refs_imag,
-									FLOAT *g_imgs_real,
-									FLOAT *g_imgs_imag,
-									FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
-									unsigned img_size, FLOAT sum_init,
-									unsigned long significant_num,
-									unsigned long translation_num,
-									unsigned long *d_rotidx,
-									unsigned long *d_transidx,
-									unsigned long *d_ihidden_overs // TODO use it to map in here, get rid of collect_data_1
-									)
-{
-	// blockid
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-    int tid = threadIdx.x;
-
-	// inside the padded 2D orientation grid
-	if( ex < significant_num )
-	{
-		// index of comparison
-		unsigned long int ix=d_rotidx[ex];
-		unsigned long int iy=d_transidx[ex];
-
-		__shared__ FLOAT s[BLOCK_SIZE];
-		s[tid] = 0.0f;
-
-		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
-
-		unsigned long ref_start(ix * img_size);
-		unsigned long img_start(iy * img_size);
-		unsigned long ref_pixel_idx;
-		unsigned long img_pixel_idx;
-
-		for (unsigned pass = 0; pass < pass_num; pass ++)
-		{
-			pixel = pass * BLOCK_SIZE + tid;
-
-			if (pixel < img_size) //Is inside image
-			{
-				ref_pixel_idx = ref_start + pixel;
-				img_pixel_idx = img_start + pixel;
-
-				FLOAT diff_real = __ldg(&g_refs_real[ref_pixel_idx]) - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
-				FLOAT diff_imag = __ldg(&g_refs_imag[ref_pixel_idx]) - __ldg(&g_imgs_imag[img_pixel_idx]);
-
-				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
-			}
-		}
-		__syncthreads();
-
-		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
-		{
-			if(tid<j)
-			{
-				s[tid] += s[tid+j];
-			}
-			__syncthreads();
-		}
-//		if (threadIdx.x*ex == 0)
-		{
-			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
-		}
-		// -------------------------------------------------------------------------
-	}
-}
-
-__global__ void cuda_kernel_cc_diff2(	FLOAT *g_refs_real,
-										FLOAT *g_refs_imag,
-										FLOAT *g_imgs_real,
-										FLOAT *g_imgs_imag,
-										FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
-										unsigned img_size, FLOAT exp_local_sqrtXi2,
-										unsigned long significant_num,
-										unsigned long translation_num,
-										unsigned long *d_rotidx,
-										unsigned long *d_transidx)
-{
-	// blockid
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-	// inside the padded 2D orientation grid
-	if( ex < significant_num )
-	{
-		// index of comparison
-		unsigned long int ix=d_rotidx[ex];
-		unsigned long int iy=d_transidx[ex];
-		__shared__ double    s[BLOCK_SIZE];
-		__shared__ double norm[BLOCK_SIZE];
-		s[threadIdx.x] = 0;
-		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE));
-		unsigned long pixel,
-		ref_start(ix * img_size),
-		img_start(iy * img_size);
-		unsigned long ref_pixel_idx;
-		unsigned long img_pixel_idx;
-		for (unsigned pass = 0; pass < pass_num; pass ++)
-		{
-			pixel = pass * BLOCK_SIZE + threadIdx.x;
-
-			if (pixel < img_size) //Is inside image
-			{
-				ref_pixel_idx = ref_start + pixel;
-				img_pixel_idx = img_start + pixel;
-
-				double diff_real = g_refs_real[ref_pixel_idx] * g_imgs_real[img_pixel_idx];
-				double diff_imag = g_refs_imag[ref_pixel_idx] * g_imgs_imag[img_pixel_idx];
-
-				double nR = g_refs_real[ref_pixel_idx]*g_refs_real[ref_pixel_idx];
-				double nI = g_refs_imag[ref_pixel_idx]*g_refs_imag[ref_pixel_idx];
-
-				s[threadIdx.x] -= (diff_real + diff_imag);
-				norm[threadIdx.x] += nR+nI;
-			}
-		}
-		// -------------------------------------------------------------------------
-		__syncthreads();
-		int trads = 32;
-		int itr = BLOCK_SIZE/trads;
-		if(threadIdx.x<trads)
-		{
-			for(int i=1; i<itr; i++)
-			{
-				s[threadIdx.x] += s[i*trads + threadIdx.x];
-				norm[threadIdx.x] += norm[i*trads + threadIdx.x];
-			}
-		}
-		for(int j=(trads/2); j>0; j/=2)
-		{
-			if(threadIdx.x<j)
-			{
-				s[threadIdx.x] += s[threadIdx.x+j];
-				norm[threadIdx.x] += norm[threadIdx.x+j];
-			}
-		}
-		__syncthreads();
-		// -------------------------------------------------------------------------
-		g_diff2s[ix * translation_num + iy] = s[0]/(sqrt(norm[0])*exp_local_sqrtXi2);
-	}
-}
 
 
 void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp)
@@ -1448,26 +1913,31 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			}
 
 			CudaGlobalPtr<FLOAT> Frefs_real;
-			CudaGlobalPtr<FLOAT> Frefs_imag;
+		    CudaGlobalPtr<FLOAT> Frefs_imag;
+
 			CUDA_CPU_TOC("modelAssignment");
-			CUDA_CPU_TIC("generateModelProjections");
-			generateModelProjections(
-					model_real,
-					model_imag,
-					Frefs_real,
-					Frefs_imag,
-					eulers,
-					orientation_num,
-					image_size,
-					XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
-					op.local_Minvsigma2s[0].xdim,
-					op.local_Minvsigma2s[0].ydim,
-					baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-					baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-					baseMLO->mymodel.PPref[exp_iclass].data.zdim,
-					baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-					baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-			CUDA_CPU_TOC("generateModelProjections");
+			bool do_combineProjAndDiff = true;
+			if(!do_combineProjAndDiff)
+			{
+				CUDA_CPU_TIC("generateModelProjections");
+				generateModelProjections(
+						model_real,
+						model_imag,
+						Frefs_real,
+						Frefs_imag,
+						eulers,
+						orientation_num,
+						image_size,
+						XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
+						op.local_Minvsigma2s[0].xdim,
+						op.local_Minvsigma2s[0].ydim,
+						baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+						baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+						baseMLO->mymodel.PPref[exp_iclass].data.zdim,
+						baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+						baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+				CUDA_CPU_TOC("generateModelProjections");
+			}
 			CUDA_CPU_TOC("projection_1");
 
 			/*=======================================================================================
@@ -1606,121 +2076,63 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 //				std::cerr << "my_nr_significant_coarse_samples "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) << std::endl;
 //				std::cerr << "significant_num "<< significant_num << std::endl;
 
-				/*====================================
-				   Initiate Particle Related On GPU
-				======================================*/
-
-
-				CUDA_CPU_TIC("kernel_init_1");
-
-				// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
-				// we need to make a modified copy, since the global object shouldn't be
-				// changed
-
-
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-				{
-					gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
-				}
-
-				if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-					{
-						gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
-					}
-				}
-				// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
-				//           + Make setting of myscale robust between here and above.
-				//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
-				//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
-				if (baseMLO->do_scale_correction)
-				{
-					FLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-					{
-						gpuMinvsigma2[n] *= (myscale*myscale);
-					}
-				}
-
-				gpuMinvsigma2.cp_to_device();
-
 				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
 				diff2s.device_alloc();
 
-				Fimgs_real.size = translation_num * image_size;
-				Fimgs_real.device_alloc();
-				Fimgs_real.cp_to_device();
-				Fimgs_imag.size = translation_num * image_size;
-				Fimgs_imag.device_alloc();
-				Fimgs_imag.cp_to_device();
-				rotidx.size = significant_num;
-				rotidx.device_alloc();
-				rotidx.cp_to_device();
-				transidx.size = significant_num;
-				transidx.device_alloc();
-				transidx.cp_to_device();
-				ihidden_overs.size = significant_num;
-				ihidden_overs.device_alloc();
-				ihidden_overs.cp_to_device();
-
-				/*====================================
-				    		Kernel Calls
-				======================================*/
-				unsigned orient1, orient2;
-
-				if(significant_num>65535)
+				if(!do_combineProjAndDiff)
 				{
-					orient1 = ceil(sqrt(significant_num));
-					orient2 = orient1;
+					runDifferenceKernel(gpuMinvsigma2,
+										Fimgs_real,
+										Fimgs_imag,
+										Frefs_real,
+										Frefs_imag,
+										rotidx,
+										transidx,
+										ihidden_overs,
+										op,
+										baseMLO,
+										translation_num,
+										orientation_num,
+										significant_num,
+										image_size,
+										ipart,
+										group_id,
+										diff2s
+										);
 				}
 				else
 				{
-					orient1 = significant_num;
-					orient2 = 1;
+					runProjAndDifferenceKernel(model_real,
+											   model_imag,
+											   gpuMinvsigma2,
+										       Fimgs_real,
+										       Fimgs_imag,
+										       eulers,
+										       rotidx,
+										       transidx,
+										       ihidden_overs,
+										       diff2s,
+										       op,
+										       baseMLO,
+										       orientation_num,
+										       translation_num,
+										       significant_num,
+										       image_size,
+											    XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
+										       ipart,
+										       group_id,
+										       exp_iclass
+											 );
 				}
-				dim3 block_dim(orient1,orient2);
-
-				CUDA_CPU_TOC("kernel_init_1");
-				CUDA_GPU_TIC("cuda_kernel_diff2");
-
-				// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
-//				cudaDeviceProp dP;
-//				cudaGetDeviceProperties(&dP, 0);
-//				printf("-arch=sm_%d%d\n", dP.major, dP.minor);
-
-				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
-				{
-					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
-																	image_size, op.highres_Xi2_imgs[ipart],
-																	significant_num,
-																	translation_num,
-																	~rotidx,
-																	~transidx);
-				}
-				else
-				{
-					cuda_kernel_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2, ~diff2s,
-																image_size, op.highres_Xi2_imgs[ipart] / 2.,
-																significant_num,
-																translation_num,
-																~rotidx,
-																~transidx,
-																~ihidden_overs);
-				}
-
-				CUDA_GPU_TAC("cuda_kernel_diff2");
-
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
 
-				HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
-
-				CUDA_GPU_TOC("cuda_kernel_diff2");
-
 				diff2s.cp_to_host(); // FIXME may not be needed since we copy it back in ConvetToWeights()
-
+//				for (long unsigned k = 0; k < 100; k++)
+//				{
+//					std::cerr << diff2s[k] << std::endl;
+//				}
 				if (exp_ipass == 0)
 				{
 					op.Mcoarse_significant.clear();
