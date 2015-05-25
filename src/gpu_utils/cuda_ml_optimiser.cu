@@ -462,7 +462,7 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
 	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( bid < orientation_num ) // we only need to make
+	if( bid < orientation_num )
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
 		long ref_pixel = bid*(image_size);
@@ -554,13 +554,13 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										int my_r_max,
 										int max_r2,
 										int min_r2_nn,
-										unsigned img_x,
-										unsigned img_y,
-										unsigned mdl_x,
-										unsigned mdl_y,
-										unsigned mdl_z,
-										unsigned mdl_init_y,
-										unsigned mdl_init_z
+										long int img_x,
+										long int img_y,
+										long int mdl_x,
+										long int mdl_y,
+										long int mdl_z,
+										long int mdl_init_y,
+										long int mdl_init_z
 										)
 {
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
@@ -630,12 +630,12 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 					ref_real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
 					ref_imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
 
-
+//					printf("%i, %i", x,y);
+//					printf("%f, %f,%f", xp,yp,zp);
 					if (is_neg_x)
 					{
 						ref_imag = -ref_imag;
 					}
-
 				}
 				else
 				{
@@ -646,21 +646,23 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 				FLOAT diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
 
 				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+//				printf(" diffs = %f, %f \n",ref_real,img_pixel_idx);
+//				printf(" diffs = %i, %i ,%i \n",x,y);
+			}
+		}
+		__syncthreads();
+
+		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
+		{
+			if(tid<j)
+			{
+				s[tid] += s[tid+j];
 			}
 			__syncthreads();
-
-			for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
-			{
-				if(tid<j)
-				{
-					s[tid] += s[tid+j];
-				}
-				__syncthreads();
-			}
-	//		if (threadIdx.x*ex == 0)
-			{
-				g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
-			}
+		}
+		if (tid == 0)
+		{
+			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
 		}
 	}
 }
@@ -827,8 +829,6 @@ void generateModelProjections(
 	int max_r2 = max_r * max_r;
 	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
 
-
-#if !defined(CUDA_DOUBLE_PRECISION)
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
@@ -874,7 +874,6 @@ void generateModelProjections(
     //bind texture reference with cuda array
 	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
 	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
-#endif
 
 	Frefs_real.size = orientation_num * image_size;
 	Frefs_real.device_alloc();
@@ -1238,13 +1237,6 @@ void runProjAndDifferenceKernel(
 		long unsigned significant_num,
 		unsigned image_size,
 		unsigned max_r,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned mdl_x,
-		unsigned mdl_y,
-		unsigned mdl_z,
-		unsigned mdl_init_y,
-		unsigned mdl_init_z,
 		int ipart,
 		int group_id,
 		int exp_iclass)
@@ -1261,7 +1253,9 @@ void runProjAndDifferenceKernel(
 
 	cudaArray*        modelArray_real;
 	cudaArray* 		  modelArray_imag;
-	cudaExtent        volumeSize = make_cudaExtent(mdl_x, mdl_y, mdl_z);
+	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+												   baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+												   baseMLO->mymodel.PPref[exp_iclass].data.zdim);
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	// TODO model should carry real & imag in separate channels of the same texture
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
@@ -1376,7 +1370,7 @@ void runProjAndDifferenceKernel(
 	{
 		// FIXME  make _CC
 		exit(0);
-//		cuda_kernel_PAV_TTI_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
+//		cuda_kernel_PAV_TTI_D2_CC<<<block_dim,BLOCK_SIZE>>>(~eulers,
 //														 ~Fimgs_real,
 //														 ~Fimgs_imag,
 //														 ~gpuMinvsigma2,
@@ -1399,6 +1393,8 @@ void runProjAndDifferenceKernel(
 //														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 //														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 //														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+//		cudaFreeArray(modelArray_real);
+//		cudaFreeArray(modelArray_imag);
 	}
 	else
 	{
@@ -1418,13 +1414,15 @@ void runProjAndDifferenceKernel(
 														 max_r,
 													     max_r2,
 													     min_r2_nn,
-														 op.local_Minvsigma2s[0].xdim,
+													     op.local_Minvsigma2s[0].xdim,
 														 op.local_Minvsigma2s[0].ydim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+		cudaFreeArray(modelArray_real);
+		cudaFreeArray(modelArray_imag);
 	}
 	CUDA_GPU_TAC("kernel_diff_proj");
 	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
@@ -2140,13 +2138,6 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 										       significant_num,
 										       image_size,
 											    XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
-												op.local_Minvsigma2s[0].xdim,
-												op.local_Minvsigma2s[0].ydim,
-												baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-												baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-												baseMLO->mymodel.PPref[exp_iclass].data.zdim,
-												baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-												baseMLO->mymodel.PPref[exp_iclass].data.zinit,
 										       ipart,
 										       group_id,
 										       exp_iclass
@@ -2157,7 +2148,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				======================================*/
 
 				diff2s.cp_to_host(); // FIXME may not be needed since we copy it back in ConvetToWeights()
-
+//				for (long unsigned k = 0; k < 100; k++)
+//				{
+//					std::cerr << diff2s[k] << std::endl;
+//				}
 				if (exp_ipass == 0)
 				{
 					op.Mcoarse_significant.clear();
