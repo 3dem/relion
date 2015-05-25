@@ -127,49 +127,6 @@ long unsigned imageTranslation(
 	return translation_num;
 }
 
-void Euler_angles2matrix_cuda(double alpha, double beta, double gamma,
-                         Matrix2D<FLOAT> &A, bool homogeneous)
-{
-    double ca, sa, cb, sb, cg, sg;
-    double cc, cs, sc, ss;
-
-    if (homogeneous)
-    {
-        A.initZeros(4,4);
-        MAT_ELEM(A,3,3)=1;
-    }
-    else
-        if (MAT_XSIZE(A) != 3 || MAT_YSIZE(A) != 3)
-            A.resize(3, 3);
-
-
-    //TODO In a sense we're doing RAD2DEG just to do DEG2RAD here.
-    //The only place the degree value is actually used is in the metadata assignment.
-
-    alpha = DEG2RAD(alpha);
-    beta  = DEG2RAD(beta);
-    gamma = DEG2RAD(gamma);
-
-    sincos(alpha, &sa, &ca);
-    sincos(beta,  &sb, &cb);
-    sincos(gamma, &sg, &cg);
-
-    cc = cb * ca;
-    cs = cb * sa;
-    sc = sb * ca;
-    ss = sb * sa;
-
-    A(0, 0) =  cg * cc - sg * sa;
-    A(0, 1) =  cg * cs + sg * ca;
-    A(0, 2) = -cg * sb;
-    A(1, 0) = -sg * cc - cg * sa;
-    A(1, 1) = -sg * cs + cg * ca;
-    A(1, 2) = sg * sb;
-    A(2, 0) =  sc;
-    A(2, 1) =  ss;
-    A(2, 2) = cb;
-}
-
 
 void generateEulerMatrices(
 		FLOAT padding_factor,
@@ -179,20 +136,85 @@ void generateEulerMatrices(
 		CudaGlobalPtr<FLOAT> &eulers,
 		bool inverse)
 {
-	Matrix2D<FLOAT> A;
+	double alpha, beta, gamma;
+    double ca, sa, cb, sb, cg, sg;
+    double cc, cs, sc, ss;
 
 	for (long int i = 0; i < rots.size(); i++)
 	{
-		// Get the Euler matrix
-		Euler_angles2matrix_cuda(rots[i], tilts[i], psis[i], A, false);
+	    //TODO In a sense we're doing RAD2DEG just to do DEG2RAD here.
+	    //The only place the degree value is actually used is in the metadata assignment.
+
+	    alpha = DEG2RAD(rots[i]);
+	    beta  = DEG2RAD(tilts[i]);
+	    gamma = DEG2RAD(psis[i]);
+
+	    sincos(alpha, &sa, &ca);
+	    sincos(beta,  &sb, &cb);
+	    sincos(gamma, &sg, &cg);
+
+	    cc = cb * ca;
+	    cs = cb * sa;
+	    sc = sb * ca;
+	    ss = sb * sa;
 
 		if(inverse)
-			A = A.transpose();
+		{
+		    eulers[9 * i + 0] = ( cg * cc - sg * sa) * padding_factor; //00
+		    eulers[9 * i + 1] = (-sg * cc - cg * sa) * padding_factor; //10
+		    eulers[9 * i + 2] = ( sc )               * padding_factor; //20
+		    eulers[9 * i + 3] = ( cg * cs + sg * ca) * padding_factor; //01
+		    eulers[9 * i + 4] = (-sg * cs + cg * ca) * padding_factor; //11
+		    eulers[9 * i + 5] = ( ss )               * padding_factor; //21
+		    eulers[9 * i + 6] = (-cg * sb )          * padding_factor; //02
+		    eulers[9 * i + 7] = ( sg * sb )          * padding_factor; //12
+		    eulers[9 * i + 8] = ( cb )               * padding_factor; //22
+		}
+		else
+		{
+		    eulers[9 * i + 0] = ( cg * cc - sg * sa) * padding_factor; //00
+		    eulers[9 * i + 1] = ( cg * cs + sg * ca) * padding_factor; //01
+		    eulers[9 * i + 2] = (-cg * sb )          * padding_factor; //02
+		    eulers[9 * i + 3] = (-sg * cc - cg * sa) * padding_factor; //10
+		    eulers[9 * i + 4] = (-sg * cs + cg * ca) * padding_factor; //11
+		    eulers[9 * i + 5] = ( sg * sb )          * padding_factor; //12
+		    eulers[9 * i + 6] = ( sc )               * padding_factor; //20
+		    eulers[9 * i + 7] = ( ss )               * padding_factor; //21
+		    eulers[9 * i + 8] = ( cb )               * padding_factor; //22
+		}
+	}
+}
 
-		A =  A * padding_factor;
 
-		for(unsigned j = 0; j < 9; j++)
-			eulers[9 * i + j] = A.mdata[j];
+void generateEulerMatrices(
+		std::vector< double > &psis,
+		CudaGlobalPtr<FLOAT> &eulers,
+		bool inverse)
+{
+    double gamma, c, s;
+
+	for (long int i = 0; i < psis.size(); i++)
+	{
+	    //TODO In a sense we're doing RAD2DEG just to do DEG2RAD here.
+	    //The only place the degree value is actually used is in the metadata assignment.
+
+	    gamma = DEG2RAD(psis[i]);
+	    sincos(gamma, &s, &c);
+
+		if(inverse) //Noticed here that inverse actually yields the opposite (Hmmm)
+		{
+		    eulers[4 * i + 0] =  c; //00
+		    eulers[4 * i + 1] = -s; //10
+		    eulers[4 * i + 3] =  s; //01
+		    eulers[4 * i + 4] =  c; //11
+		}
+		else
+		{
+		    eulers[4 * i + 0] =  c; //00
+		    eulers[4 * i + 1] =  s; //01
+		    eulers[4 * i + 3] = -s; //10
+		    eulers[4 * i + 4] =  c; //11
+		}
 	}
 }
 
