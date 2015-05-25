@@ -1211,10 +1211,12 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 									unsigned long significant_num,
 									unsigned long translation_num,
 									unsigned long *d_rotidx,
-									unsigned long *d_transidx)
+									unsigned long *d_transidx,
+									unsigned long *d_ihidden_overs)
 {
 	// blockid
 	int ex = blockIdx.y * gridDim.x + blockIdx.x;
+    int tid = threadIdx.x;
 
 	// inside the padded 2D orientation grid
 	if( ex < significant_num )
@@ -1224,7 +1226,7 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 		unsigned long int iy=d_transidx[ex];
 
 		__shared__ FLOAT s[BLOCK_SIZE];
-		s[threadIdx.x] = 0.0f;
+		s[tid] = 0.0f;
 
 		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
 
@@ -1235,26 +1237,26 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 
 		for (unsigned pass = 0; pass < pass_num; pass ++)
 		{
-			pixel = pass * BLOCK_SIZE + threadIdx.x;
+			pixel = pass * BLOCK_SIZE + tid;
 
 			if (pixel < img_size) //Is inside image
 			{
 				ref_pixel_idx = ref_start + pixel;
 				img_pixel_idx = img_start + pixel;
 
-				FLOAT diff_real = g_refs_real[ref_pixel_idx] - g_imgs_real[img_pixel_idx];
-				FLOAT diff_imag = g_refs_imag[ref_pixel_idx] - g_imgs_imag[img_pixel_idx];
+				FLOAT diff_real = __ldg(&g_refs_real[ref_pixel_idx]) - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
+				FLOAT diff_imag = __ldg(&g_refs_imag[ref_pixel_idx]) - __ldg(&g_imgs_imag[img_pixel_idx]);
 
-				s[threadIdx.x] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * g_Minvsigma2[pixel];
+				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
 			}
 		}
 		__syncthreads();
 
 		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
 		{
-			if(threadIdx.x<j)
+			if(tid<j)
 			{
-				s[threadIdx.x] += s[threadIdx.x+j];
+				s[tid] += s[tid+j];
 			}
 			__syncthreads();
 		}
@@ -1388,7 +1390,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			std::vector< double > rots, tilts, psis;
 
 			CUDA_CPU_TIC("projection_1");
-
+			CUDA_CPU_TIC("generateProjectionSetup");
 			long unsigned orientation_num = generateProjectionSetup(
 					op,
 					sp,
@@ -1399,7 +1401,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					iorientclasses,
 					iover_rots);
 
-
+			CUDA_CPU_TOC("generateProjectionSetup");
+			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
 
 			generateEulerMatrices(
@@ -1412,7 +1415,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 		    eulers.device_alloc();
 			eulers.cp_to_device();
-
+			CUDA_CPU_TOC("generateEulerMatrices");
+			CUDA_CPU_TIC("modelAssignment");
 			CudaGlobalPtr<FLOAT > model_real((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
 			CudaGlobalPtr<FLOAT > model_imag((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
 
@@ -1424,7 +1428,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 			CudaGlobalPtr<FLOAT> Frefs_real;
 			CudaGlobalPtr<FLOAT> Frefs_imag;
-
+			CUDA_CPU_TOC("modelAssignment");
+			CUDA_CPU_TIC("generateModelProjections");
 			generateModelProjections(
 					model_real,
 					model_imag,
@@ -1441,7 +1446,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 					baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 					baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-
+			CUDA_CPU_TOC("generateModelProjections");
 			CUDA_CPU_TOC("projection_1");
 
 			/*=======================================================================================
@@ -1530,7 +1535,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				CUDA_CPU_TIC("pair_list_1");
 
 				CudaGlobalPtr<long unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
-
+				CudaGlobalPtr<long unsigned> ihidden_overs(orientation_num*translation_num);
 				long unsigned coarse_num = sp.nr_dir*sp.nr_psi*sp.nr_trans;
 				long unsigned significant_num(0);
 
@@ -1541,6 +1546,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					{
 						for (long unsigned j = 0; j < translation_num; j++)
 						{
+							ihidden_overs[significant_num] = i * sp.nr_trans + j;
 							rotidx[significant_num] = i;
 							transidx[significant_num] = j;
 							significant_num++;
@@ -1561,7 +1567,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 							if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 							{
-								 long int ihidden_over = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden,
+								ihidden_overs[significant_num] = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden,
 										                  sp.current_oversampling, iover_rot, iover_trans);
 
 								rotidx[significant_num] = i;
@@ -1636,6 +1642,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				transidx.device_alloc();
 				transidx.cp_to_device();
 
+				ihidden_overs.size = significant_num;
+				ihidden_overs.device_alloc();
+				ihidden_overs.cp_to_device();
+
 				/*====================================
 				    		Kernel Calls
 				======================================*/
@@ -1657,6 +1667,11 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CUDA_GPU_TIC("cuda_kernel_diff2");
 
+				// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
+//				cudaDeviceProp dP;
+//				cudaGetDeviceProperties(&dP, 0);
+//				printf("-arch=sm_%d%d\n", dP.major, dP.minor);
+
 				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
 				{
 					cuda_kernel_cc_diff2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
@@ -1673,7 +1688,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 																significant_num,
 																translation_num,
 																~rotidx,
-																~transidx);
+																~transidx,
+																~ihidden_overs);
 				}
 
 				CUDA_GPU_TAC("cuda_kernel_diff2");
@@ -1700,22 +1716,12 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CUDA_CPU_TIC("collect_data_1");
 
-				for (long unsigned k = 0; k < significant_num; k ++)
+				for (long unsigned k = 0; k < significant_num; k++)
 				{
 					long unsigned i = rotidx[k];
 					long unsigned j = transidx[k];
-					long int iover_rot = iover_rots[i];
-
-					long int ihidden = iorientclasses[i] * sp.nr_trans + ihiddens[j];
-					long int iover_trans = iover_transes[j];
-
-					long int ihidden_over = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden, sp.current_oversampling,
-																						iover_rot, iover_trans);
-
 					double diff2 = diff2s[i * translation_num + j];
-
-					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = diff2;
-
+					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = diff2; // TODO if we can write diff2 to the correct pos in the kernel we can just memcpy to a pointer and use thrust to find min
 					// Keep track of minimum of all diff2, only for the last image in this series
 					if (diff2 < op.min_diff2[ipart])
 						op.min_diff2[ipart] = diff2;
@@ -2167,26 +2173,35 @@ __global__ void cuda_kernel_wavg(
 	unsigned tid = threadIdx.x;
 
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
-	FLOAT Fweight, wavgs_real, wavgs_imag, wdiff2s_parts;
-
+	FLOAT Fweight;
+	__shared__ FLOAT s_wavgs_real[BLOCK_SIZE];
+	__shared__ FLOAT s_wavgs_imag[BLOCK_SIZE];
+	__shared__ FLOAT s_wdiff2s_parts[BLOCK_SIZE];
+	__shared__ FLOAT s_Minvsigma2s[BLOCK_SIZE];
 	for (unsigned pass = 0; pass < pass_num; pass ++)
 	{
-		wavgs_real = 0;
-		wavgs_imag = 0;
-		wdiff2s_parts = 0;
+		s_wavgs_real[tid]  = 0.0f;
+		s_wavgs_imag[tid]  = 0.0f;
+		s_wdiff2s_parts[tid] = 0.0f;
 		Fweight = 0;
 
 		pixel = pass * BLOCK_SIZE + tid;
+		s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
 
 		if (pixel < image_size)
 		{
 			unsigned long orientation_pixel = iorient * image_size + pixel;
 			FLOAT ref_real = g_refs_real[orientation_pixel];
 			FLOAT ref_imag = g_refs_imag[orientation_pixel];
+			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+			{
+				ref_real *= __ldg(&g_ctfs[pixel]);
+				ref_imag *= __ldg(&g_ctfs[pixel]);
+			}
 
 			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
-				FLOAT weight = g_weights[iorient * translation_num + itrans];
+				FLOAT weight = __ldg(&g_weights[iorient * translation_num + itrans]);
 
 				if (weight >= significant_weight)
 				{
@@ -2194,29 +2209,23 @@ __global__ void cuda_kernel_wavg(
 
 					unsigned long img_pixel_idx = itrans * image_size + pixel;
 
-					FLOAT ctf = g_ctfs[pixel];
-					if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
-					{
-						ref_real *= ctf;
-						ref_imag *= ctf;
-					}
-					FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // **
-					FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];    // **
+					FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+					FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
 
-					wdiff2s_parts += weight * (diff_real*diff_real + diff_imag*diff_imag);
+					s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-					FLOAT weightxinvsigma2 = weight * ctf * g_Minvsigma2s[pixel];
+					FLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
 
-					wavgs_real += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // **
-					wavgs_imag += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;    // **
+					s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+					s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
 
-					Fweight += weightxinvsigma2 * ctf;
+					Fweight += weightxinvsigma2 * __ldg(&g_ctfs[pixel]);
 				}
 			}
 
-			g_wavgs_real[orientation_pixel] = wavgs_real; //TODO should be buffered into shared    // **
-			g_wavgs_imag[orientation_pixel] = wavgs_imag; //TODO should be buffered into shared    // **
-			g_wdiff2s_parts[orientation_pixel] = wdiff2s_parts; //TODO this could be further reduced in here
+			g_wavgs_real[orientation_pixel] = s_wavgs_real[tid];
+			g_wavgs_imag[orientation_pixel] = s_wavgs_imag[tid];
+			g_wdiff2s_parts[orientation_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
 			g_Fweights[orientation_pixel] = Fweight; //TODO should be buffered into shared
 		}
 	}
@@ -2331,6 +2340,27 @@ __global__ void cuda_kernel_wavg_fast(
 			}
 		} // endif(pixel < image__size)
 	} // endfor(pass)
+}
+
+// Stacks images in place, reducing at most 2*gridDim.x images down to gridDim.x images.
+// Ex; 19 -> 16 or 32 -> 16,
+__global__ void cuda_kernel_reduce_wdiff2s(FLOAT *g_wdiff2s_parts,
+										   long int orientation_num,
+										   int image_size)
+{
+	unsigned long bid = blockIdx.y*gridDim.x + blockIdx.x;
+	unsigned tid = threadIdx.x;
+	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
+	int current_block_num = gridDim.x;
+	if((current_block_num+bid)<orientation_num)
+	{
+		for (unsigned pass = 0; pass < pass_num; pass++)
+		{
+			pixel = pass * BLOCK_SIZE + tid;
+			if(pixel<image_size)
+				g_wdiff2s_parts[bid*image_size+pixel] += g_wdiff2s_parts[(current_block_num+bid)*image_size+pixel];
+		}
+	}
 }
 
 __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
@@ -2551,6 +2581,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		CudaGlobalPtr<FLOAT> Frefs_real;
 		CudaGlobalPtr<FLOAT> Frefs_imag;
+
 
 		generateModelProjections(
 				model_real,
@@ -2813,9 +2844,25 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			======================================================*/
 
 			CUDA_CPU_TIC("reduce_wdiff2s");
+			// reduction_block_num = the highest possible power of two that covers more than or exactly half of all images to be reduced
+			int num_reductions = (int)floor(log2((float)orientation_num));
+			int reduction_block_num = pow(2,num_reductions);
+			if(reduction_block_num==orientation_num) // (possibly) very special case where orientation_num is a power of 2
+				reduction_block_num /= 2;
 
-			//TODO Following reduction should be done on the GPU
+			// FIXME Cannot handle reduction_block_num > 65535 ATM
+			CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
+			for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
+			{
+				dim3 block_dim(k,1);
+				 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
+				cuda_kernel_reduce_wdiff2s<<<k,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size);
+			}
+			CUDA_GPU_TOC("cuda_kernels_reduce_wdiff2s");
+
+			wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
 			wdiff2s_parts.cp_to_host();
+			wdiff2s_parts.size = orientation_num * image_size;
 			wdiff2s_parts.free_device();
 
 			for (long int j = 0; j < image_size; j++)
@@ -2823,11 +2870,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
 				if (ires > -1)
 				{
-					double sum = 0;
-					for (long int i = 0; i < orientation_num; i++)
-						sum += (double) wdiff2s_parts[i * image_size + j];
-					thr_wsum_sigma2_noise[group_id].data[ires] += sum;
-					exp_wsum_norm_correction[ipart] += sum;
+					thr_wsum_sigma2_noise[group_id].data[ires] += (double) wdiff2s_parts[j];
+					exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j];
 				}
 			}
 
@@ -3058,34 +3102,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				baseMLO->wsum_model.BPref[exp_iclass].data.yinit,
 				baseMLO->wsum_model.BPref[exp_iclass].data.zinit);
 
-
-//		Matrix2D<double> A, Ainv;
-//
-//		CudaGlobalPtr<FLOAT> eulers_xy(9*img_count+BACKPROJECTION4_FETCH_COUNT);
-//
-//		//TODO Do the following in a kernel
-//		for (long int i = 0; i < img_count; i++)
-//		{
-//			Euler_angles2matrix(rots[i], tilts[i], psis[i], A);
-//
-//			//fprintf(fPtr, "%.2f %.2f %.2f \n", rots[i], tilts[i], psis[i]);
-//
-//			if (IS_NOT_INV) Ainv = A;
-//			else 			Ainv = A.transpose();
-//			Ainv = Ainv.transpose();
-//
-//			eulers_xy[9 * i + 0] = (FLOAT) Ainv.mdata[0];
-//			eulers_xy[9 * i + 1] = (FLOAT) Ainv.mdata[1];
-//			eulers_xy[9 * i + 2] = (FLOAT) Ainv.mdata[2];
-//			eulers_xy[9 * i + 3] = (FLOAT) Ainv.mdata[3];
-//			eulers_xy[9 * i + 4] = (FLOAT) Ainv.mdata[4];
-//			eulers_xy[9 * i + 5] = (FLOAT) Ainv.mdata[5];
-//			eulers_xy[9 * i + 6] = (FLOAT) Ainv.mdata[6];
-//			eulers_xy[9 * i + 7] = (FLOAT) Ainv.mdata[7];
-//			eulers_xy[9 * i + 8] = (FLOAT) Ainv.mdata[8];
-//		}
-
-		bp_eulers.cp_to_host();
 		bp_model_real.cp_to_host();
 		bp_model_imag.cp_to_host();
 		bp_weight.cp_to_host();
