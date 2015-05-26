@@ -719,9 +719,6 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										int min_r2_nn,
 										long int img_x,
 										long int img_y,
-										long int mdl_x,
-										long int mdl_y,
-										long int mdl_z,
 										long int mdl_init_y,
 										long int mdl_init_z
 										)
@@ -1417,9 +1414,6 @@ void runProjAndDifferenceKernel(
 //													     min_r2_nn,
 //														 op.local_Minvsigma2s[0].xdim,
 //														 op.local_Minvsigma2s[0].ydim,
-//														 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-//														 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-//														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 //														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 //														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
 //		cudaFreeArray(modelArray_real);
@@ -1445,9 +1439,6 @@ void runProjAndDifferenceKernel(
 													     min_r2_nn,
 													     op.local_Minvsigma2s[0].xdim,
 														 op.local_Minvsigma2s[0].ydim,
-														 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-														 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
 		size_t avail;
@@ -1930,10 +1921,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 		    CudaGlobalPtr<FLOAT> Frefs_imag;
 
 			CUDA_CPU_TOC("modelAssignment");
-			bool do_combineProjAndDiff = false; //TODO add control flag
+			bool do_combineProjAndDiff = true; //TODO add control flag
 			if(!do_combineProjAndDiff)
 			{
-				CUDA_CPU_TIC("generateModelProjections");
+				CUDA_CPU_TIC("generateModelProjections_diff");
 				generateModelProjections(
 						model_real,
 						model_imag,
@@ -1950,7 +1941,9 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 						baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 						baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 						baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-				CUDA_CPU_TOC("generateModelProjections");
+				model_real.free_device();
+				model_imag.free_device();
+				CUDA_CPU_TOC("generateModelProjections_diff");
 			}
 			CUDA_CPU_TOC("projection_1");
 
@@ -2676,14 +2669,23 @@ __global__ void cuda_kernel_wavg(
 	}
 }
 
-
-__global__ void cuda_kernel_wavg_fast(
-		FLOAT *g_refs_real,
-		FLOAT *g_refs_imag,
+// __global__ void cuda_kernel_wavg_fast   // REMOVED in commit
+#if !defined(CUDA_DOUBLE_PRECISION)
+__global__ void cuda_kernel_ProjAndWavg(
+		FLOAT *g_eulers,
+		int my_r_max,
+		int max_r2,
+		int min_r2_nn,
+		int image_size,
+		int orientation_num,
+	 	int XSIZE_img,
+	 	int YSIZE_img,
+	 	int STARTINGY_mdl,
+	 	int STARTINGZ_mdl,
 		FLOAT *g_imgs_real,
 		FLOAT *g_imgs_imag,
-		FLOAT *g_imgs_nm_real,
-		FLOAT *g_imgs_nm_imag,
+		FLOAT *g_imgs_nomask_real,
+		FLOAT *g_imgs_nomask_imag,
 		FLOAT* g_weights,
 		FLOAT* g_ctfs,
 		FLOAT* g_Minvsigma2s,
@@ -2691,101 +2693,130 @@ __global__ void cuda_kernel_wavg_fast(
 		FLOAT *g_wavgs_real,
 		FLOAT *g_wavgs_imag,
 		FLOAT* g_Fweights,
-		unsigned long translation_num, FLOAT weight_norm,
-		FLOAT significant_weight, unsigned image_size,
+		unsigned long translation_num,
+		FLOAT weight_norm,
+		FLOAT significant_weight,
 		bool refs_are_ctf_corrected)
 {
-	// Internal
-	__shared__ FLOAT s_wavgs_real[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT s_wavgs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT s_Fweight[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT s_wdiff2s_parts[REF_GROUP_SIZE*BLOCK_SIZE];
-
-	// External to load in
-	__shared__ FLOAT s_refs_real[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT s_refs_imag[REF_GROUP_SIZE*BLOCK_SIZE];
-	__shared__ FLOAT s_imgs_real[BLOCK_SIZE];
-	__shared__ FLOAT s_imgs_imag[BLOCK_SIZE];
-	__shared__ FLOAT s_imgs_nm_real[BLOCK_SIZE];
-	__shared__ FLOAT s_imgs_nm_imag[BLOCK_SIZE];
-
-	// TODO Consider Mresol_fine to speed up this kernel
-
-    FLOAT val;
-	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
-	unsigned tid = threadIdx.x;
-	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
-
-
-	for (unsigned pass = 0; pass < pass_num; pass ++)
+	FLOAT xp, yp, zp;
+	long int r2;
+	int pixel;
+	bool is_neg_x;
+	FLOAT ref_real, ref_imag;
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
+	// inside the padded 2D orientation grid
+	if( bid < orientation_num )
 	{
-		//Zero everythin that is reduced (+=) in any one pass
-		for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		FLOAT Fweight;
+		__shared__ FLOAT s_wavgs_real[BLOCK_SIZE];
+		__shared__ FLOAT s_wavgs_imag[BLOCK_SIZE];
+		__shared__ FLOAT s_wdiff2s_parts[BLOCK_SIZE];
+		__shared__ FLOAT s_Minvsigma2s[BLOCK_SIZE];
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
-			s_wdiff2s_parts[iref*BLOCK_SIZE+tid]= 0;
-			s_Fweight[iref*BLOCK_SIZE+tid]      = 0;
-			s_wavgs_real[iref*BLOCK_SIZE+tid]   = 0;
-			s_wavgs_imag[iref*BLOCK_SIZE+tid]   = 0;
-		}
-		pixel = pass * BLOCK_SIZE + tid;
-		FLOAT ctf = g_ctfs[pixel]; // TODO Put in read-only cache
-		if (pixel < image_size)
-		{
-			// Make REF_GROUP_SIZE*image_size the new basic unit and load in BLOCK_SIZE
-			// elements from REF_GROUP_SIZE references into shared memory. iorient no
-			// longer indexes orientations, but blocks of REF_GROUP_SIZE orientations.
-			unsigned long orientation_pixel = iorient * (REF_GROUP_SIZE*image_size) + pixel;
-			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
-			{
-				s_refs_real[iref*BLOCK_SIZE+tid] = g_refs_real[orientation_pixel+iref*image_size];   //---------------------------
-				s_refs_imag[iref*BLOCK_SIZE+tid] = g_refs_imag[orientation_pixel+iref*image_size];   //---------------------------
-				if (refs_are_ctf_corrected) // Correct if needed FIXME Create two kernels for the different cases
-				{
-					s_refs_real[iref*BLOCK_SIZE+tid] *= ctf;
-					s_refs_imag[iref*BLOCK_SIZE+tid] *= ctf;
-				}
-			}
-			// Now go through all translations, reducing to REF_GROUP_SIZE number of outputs at each one
-			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
-			{
-				unsigned long img_pixel_idx = itrans * image_size + pixel;
-				s_imgs_real[tid]    = g_imgs_real[img_pixel_idx];  //---------------------------
-				s_imgs_imag[tid]    = g_imgs_imag[img_pixel_idx];  //---------------------------
-				s_imgs_nm_real[tid] = g_imgs_nm_real[img_pixel_idx];  //---------------------------
-				s_imgs_nm_imag[tid] = g_imgs_nm_imag[img_pixel_idx];  //---------------------------
+			s_wavgs_real[tid]  = 0.0f;
+			s_wavgs_imag[tid]  = 0.0f;
+			s_wdiff2s_parts[tid] = 0.0f;
+			Fweight = 0;
 
-				for (int iref=0; iref<REF_GROUP_SIZE; iref++)
+			pixel = pass * BLOCK_SIZE + tid;
+			s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
+
+			if(pixel<image_size)
+			{
+				long ref_pixel = bid*(image_size) + pixel;
+				// Now istead of loading pre-calculated ref, we project it out from the texture-model
+				//----------------------------------------------------------------------------------- =>
+				int x = pixel % XSIZE_img;
+				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
+
+				// Dont search beyond square with side max_r
+				if (y > my_r_max)
 				{
-					FLOAT weight = g_weights[(iorient*REF_GROUP_SIZE+iref) * translation_num + itrans]; //TODO load all neccessary weights at once to avoid global access inside a deep loop OR put in read-only cache
+					if (y >= YSIZE_img - my_r_max)
+						y = y - YSIZE_img ;
+					else
+						x=r2;
+				}
+
+				r2 = x*x + y*y;
+				if (r2 <= max_r2)
+				{
+					xp = __ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = __ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y;  // compared to CPU-based projection. This
+					zp = __ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y;  // propagates to dx00, dx10, and so on.
+					// Only asymmetric half is stored
+					if (xp < 0)
+					{
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+						is_neg_x = true;
+					}
+					else
+					{
+						is_neg_x = false;
+					}
+					yp -= STARTINGY_mdl;
+					zp -= STARTINGZ_mdl;
+
+					ref_real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					ref_imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+
+
+					if (is_neg_x)
+					{
+						ref_imag = -ref_imag;
+					}
+
+				}
+				else
+				{
+					ref_real=0.0f;
+					ref_imag=0.0f;
+				}
+				//-----------------------------------------------------------------------------------  <=
+				if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+				{
+					ref_real *= __ldg(&g_ctfs[pixel]);
+					ref_imag *= __ldg(&g_ctfs[pixel]);
+				}
+
+				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
+				{
+					FLOAT weight = __ldg(&g_weights[bid * translation_num + itrans]);
+
 					if (weight >= significant_weight)
 					{
 						weight /= weight_norm;
 
-						val = s_refs_real[iref*BLOCK_SIZE+tid] - s_imgs_real[tid];
-						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * val*val;
-						val = s_refs_imag[iref*BLOCK_SIZE+tid] - s_imgs_imag[tid];
-						s_wdiff2s_parts[iref*BLOCK_SIZE+tid] += weight * val*val;
+						unsigned long img_pixel_idx = itrans * image_size + pixel;
 
-						val = weight * ctf * g_Minvsigma2s[pixel];
+						FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+						FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
 
-						s_wavgs_real[iref*BLOCK_SIZE+tid] += s_imgs_nm_real[tid] * val;
-						s_wavgs_imag[iref*BLOCK_SIZE+tid] += s_imgs_nm_imag[tid] * val;
+						s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-						s_Fweight[iref*BLOCK_SIZE+tid] += val * ctf;
+						FLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
+
+						s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+						s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
+
+						Fweight += weightxinvsigma2 * __ldg(&g_ctfs[pixel]);
 					}
 				}
+				g_wavgs_real[ref_pixel] += s_wavgs_real[tid];
+				g_wavgs_imag[ref_pixel] += s_wavgs_imag[tid];
+				g_wdiff2s_parts[ref_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
+				g_Fweights[ref_pixel] += Fweight; //TODO should be buffered into shared
 			}
-			// Now write shared memory data to global memory for all REF_GROUP_SIZE images in this block
-			for (int iref=0; iref<REF_GROUP_SIZE; iref++)
-			{
-				g_wavgs_real[orientation_pixel+iref*image_size]    += s_wavgs_real[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
-				g_wavgs_imag[orientation_pixel+iref*image_size]    += s_wavgs_imag[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared    // **
-				g_wdiff2s_parts[orientation_pixel+iref*image_size] = s_wdiff2s_parts[iref*BLOCK_SIZE+tid]; //TODO this could be further reduced in here
-				g_Fweights[orientation_pixel+iref*image_size]      += s_Fweight[iref*BLOCK_SIZE+tid]; //TODO should be buffered into shared
-			}
-		} // endif(pixel < image__size)
-	} // endfor(pass)
+		}
+	}
 }
+#endif
 
 // Stacks images in place, reducing at most 2*gridDim.x images down to gridDim.x images.
 // Ex; 19 -> 16 or 32 -> 16,
@@ -2908,18 +2939,6 @@ dim3 runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 				   int group_id,
 				   int exp_iclass)
 {
-	/*======================================================
-			            KERNEL CALL
-	======================================================*/
-
-	if (baseMLO->do_map)
-		for (unsigned i = 0; i < image_size; i++)
-			Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
-	else //TODO should be handled by memset
-		for (unsigned i = 0; i < image_size; i++)
-			Minvsigma2s[i] = 1;
-
-	Minvsigma2s.cp_to_device();
 
 	unsigned orient1, orient2;
 	//We only want as many blocks as there are chunks of orientations to be treated
@@ -2975,6 +2994,150 @@ dim3 runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 	Minvsigma2s.free_device();
 	return(block_dim);
 }
+#if !defined(CUDA_DOUBLE_PRECISION)
+dim3 runProjAndWavgKernel(
+		CudaGlobalPtr<FLOAT> &model_real,
+		CudaGlobalPtr<FLOAT> &model_imag,
+		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<FLOAT> &Fimgs_real,
+	    CudaGlobalPtr<FLOAT> &Fimgs_imag,
+	    CudaGlobalPtr<FLOAT> &Fimgs_nomask_real,
+ 	    CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
+ 	    CudaGlobalPtr<FLOAT> &sorted_weights,
+ 	    CudaGlobalPtr<FLOAT> &ctfs,
+ 	    CudaGlobalPtr<FLOAT> &Minvsigma2s,
+ 	    CudaGlobalPtr<FLOAT> &wdiff2s_parts,
+ 	    CudaGlobalPtr<FLOAT> &wavgs_real,
+	    CudaGlobalPtr<FLOAT> &wavgs_imag,
+	    CudaGlobalPtr<FLOAT> &Fweights,
+	    OptimisationParamters op,
+	    MlOptimiser *baseMLO,
+	    long unsigned orientation_num,
+	    long unsigned translation_num,
+	    unsigned image_size,
+	    unsigned max_r,
+	    long int ipart,
+	    int group_id,
+	    int exp_iclass
+	   )
+{
+	int max_r2 = max_r * max_r;
+	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
+
+	/*===========================
+	 *      TEXTURE STUFF
+	 * ==========================*/
+	// TODO Use bindless textures to reduce some of this clutter
+
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+												   baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+												   baseMLO->mymodel.PPref[exp_iclass].data.zdim);
+	// create channel to describe data type (bits,bits,bits,bits,type)
+	// TODO model should carry real & imag in separate channels of the same texture
+	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+
+	//allocate device memory for cuda 3D array
+	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
+	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
+
+	//set cuda array copy parameters to be supplied to copy-command
+	cudaMemcpy3DParms copyParams = {0};
+	copyParams.extent   = volumeSize;
+
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_real;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = modelArray_imag;
+	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+
+	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
+	texModel_real.normalized = false;
+	texModel_real.filterMode = cudaFilterModeLinear;
+	texModel_imag.normalized = false;
+	texModel_imag.filterMode = cudaFilterModeLinear;
+
+	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
+	for(int n=0; n<3; n++)
+	{
+		texModel_real.addressMode[n]=cudaAddressModeClamp;
+		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+	}
+
+	//bind texture reference with cuda array
+	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
+	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
+
+	unsigned orient1, orient2;
+	//We only want as many blocks as there are chunks of orientations to be treated
+	//within the same block (this is done to reduce memory loads in the kernel).
+	unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
+	if(orientation_chunks>65535)
+	{
+		orient1 = ceil(sqrt(orientation_chunks));
+		orient2 = orient1;
+	}
+	else
+	{
+		orient1 = orientation_chunks;
+		orient2 = 1;
+	}
+	dim3 block_dim(orient1,orient2);
+
+	CUDA_GPU_TIC("cuda_kernel_wavg");
+
+	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
+	cuda_kernel_ProjAndWavg<<<block_dim,BLOCK_SIZE>>>(~eulers,
+													  max_r,
+													  max_r2,
+													  min_r2_nn,
+													  image_size,
+													  orientation_num,
+													 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+													 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+													 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+													 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+													  ~Fimgs_real, ~Fimgs_imag,
+													  ~Fimgs_nomask_real, ~Fimgs_nomask_imag,
+													  ~sorted_weights, ~ctfs, ~Minvsigma2s,
+													  ~wdiff2s_parts,
+													  ~wavgs_real,
+													  ~wavgs_imag,
+													  ~Fweights,
+													  translation_num,
+													  (FLOAT) op.sum_weight[ipart],
+													  (FLOAT) op.significant_weight[ipart],
+													  baseMLO->refs_are_ctf_corrected
+													);
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+
+	size_t avail;
+	size_t total;
+	cudaMemGetInfo( &avail, &total );
+	float used = 100*((float)(total - avail)/(float)total);
+	std::cerr << "Device memory used @ wavg: " << used << "%" << std::endl;
+	CUDA_GPU_TAC("cuda_kernel_wavg");
+
+	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
+
+	CUDA_GPU_TOC("cuda_kernel_wavg");
+
+	Fimgs_real.free_device();
+	Fimgs_imag.free_device();
+	Fimgs_nomask_real.free_device();
+	Fimgs_nomask_imag.free_device();
+
+	sorted_weights.free_device();
+	ctfs.free_device();
+	Minvsigma2s.free_device();
+	return(block_dim);
+}
+#endif
 
 void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
 {
@@ -3117,29 +3280,34 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		CudaGlobalPtr<FLOAT> Frefs_real;
 		CudaGlobalPtr<FLOAT> Frefs_imag;
 
+		bool do_combineProjAndDiff = true; //TODO add control flag
+#if !defined(CUDA_DOUBLE_PRECISION)
+		if(!do_combineProjAndDiff)
+#endif
+		{
+			CUDA_CPU_TIC("generateModelProjections_wavg");
+			generateModelProjections(
+					model_real,
+					model_imag,
+					Frefs_real,
+					Frefs_imag,
+					eulers,
+					orientation_num,
+					image_size,
+					XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
+					op.local_Minvsigma2s[0].xdim,
+					op.local_Minvsigma2s[0].ydim,
+					baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+					baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+					baseMLO->mymodel.PPref[exp_iclass].data.zdim,
+					baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+					baseMLO->mymodel.PPref[exp_iclass].data.zinit);
 
-		generateModelProjections(
-				model_real,
-				model_imag,
-				Frefs_real,
-				Frefs_imag,
-				eulers,
-				orientation_num,
-				image_size,
-				XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
-				op.local_Minvsigma2s[0].xdim,
-				op.local_Minvsigma2s[0].ydim,
-				baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-				baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-				baseMLO->mymodel.PPref[exp_iclass].data.zdim,
-				baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-				baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-
-		model_real.free_device();
-		model_imag.free_device();
-		eulers.free();
-
-
+			model_real.free_device();
+			model_imag.free_device();
+			eulers.free();
+			CUDA_CPU_TOC("generateModelProjections_wavg");
+		}
 		CUDA_CPU_TOC("projection_2");
 
 		CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
@@ -3148,7 +3316,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		CudaGlobalPtr<FLOAT> wavgs_imag(orientation_num * image_size);
 		wavgs_imag.device_alloc();
 		wavgs_imag.device_init(0);
-
 		CudaGlobalPtr<FLOAT> Fweights(orientation_num * image_size);
 		Fweights.device_alloc();
 		Fweights.device_init(0);
@@ -3312,28 +3479,73 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			CudaGlobalPtr<FLOAT> wdiff2s_parts(orientation_num * image_size); //TODO Almost same size for all iparts, should be allocated once
 			wdiff2s_parts.device_alloc();
 
-			dim3 block_dim = runWavgKernel(Frefs_real,
-						                   Frefs_imag,
-						                   Fimgs_real,
-						                   Fimgs_imag,
-						                   Fimgs_nomask_real,
-						                   Fimgs_nomask_imag,
-						                   sorted_weights,
-						                   ctfs,
-						                   Minvsigma2s,
-						                   wdiff2s_parts,
-						                   wavgs_real,
-						                   wavgs_imag,
-						                   Fweights,
-						                   op,
-						                   baseMLO,
-						                   orientation_num,
-						                   translation_num,
-						                   image_size,
-						                   ipart,
-						                   group_id,
-						                   exp_iclass);
+			if (baseMLO->do_map)
+				for (unsigned i = 0; i < image_size; i++)
+					Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
+			else //TODO should be handled by memset
+				for (unsigned i = 0; i < image_size; i++)
+					Minvsigma2s[i] = 1;
 
+			Minvsigma2s.cp_to_device();
+			dim3 block_dim;
+#if !defined(CUDA_DOUBLE_PRECISION)
+			if(do_combineProjAndDiff)
+			{
+				block_dim = runProjAndWavgKernel(model_real,
+												      model_imag,
+												      eulers,
+												      Fimgs_real,
+												      Fimgs_imag,
+												      Fimgs_nomask_real,
+												      Fimgs_nomask_imag,
+												      sorted_weights,
+												      ctfs,
+												      Minvsigma2s,
+												      wdiff2s_parts,
+												      wavgs_real,
+												      wavgs_imag,
+												      Fweights,
+												      op,
+												      baseMLO,
+												      orientation_num,
+												      translation_num,
+												      image_size,
+												      XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
+												      ipart,
+												      group_id,
+												      exp_iclass
+												      );
+			}
+			else
+#endif
+			{
+				block_dim = runWavgKernel(Frefs_real,
+											   Frefs_imag,
+											   Fimgs_real,
+											   Fimgs_imag,
+											   Fimgs_nomask_real,
+											   Fimgs_nomask_imag,
+											   sorted_weights,
+											   ctfs,
+											   Minvsigma2s,
+											   wdiff2s_parts,
+											   wavgs_real,
+											   wavgs_imag,
+											   Fweights,
+											   op,
+											   baseMLO,
+											   orientation_num,
+											   translation_num,
+											   image_size,
+											   ipart,
+											   group_id,
+											   exp_iclass);
+			}
+//			wdiff2s_parts.cp_to_host();
+//			for (long unsigned k = 0; k < 100; k++)
+//			{
+//				std::cerr << wdiff2s_parts[k] << std::endl;
+//			}
 			/*======================================================
 								COLLECT DATA
 			======================================================*/
