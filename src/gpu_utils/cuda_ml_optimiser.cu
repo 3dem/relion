@@ -1240,8 +1240,14 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 	CUDA_GPU_TAC("kernel_diff_noproj");
 	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 	CUDA_GPU_TOC("kernel_diff_noproj");
+	size_t avail;
+	size_t total;
+	cudaMemGetInfo( &avail, &total );
+	float used = 100*((float)(total - avail)/(float)total);
+	std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
 }
 
+#if !defined(CUDA_DOUBLE_PRECISION)
 void runProjAndDifferenceKernel(
 		CudaGlobalPtr<FLOAT > &model_real,
 		CudaGlobalPtr<FLOAT > &model_imag,
@@ -1444,6 +1450,12 @@ void runProjAndDifferenceKernel(
 														 baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+		size_t avail;
+		size_t total;
+		cudaMemGetInfo( &avail, &total );
+		float used = 100*((float)(total - avail)/(float)total);
+		std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
+
 		cudaFreeArray(modelArray_real);
 		cudaFreeArray(modelArray_imag);
 	}
@@ -1454,6 +1466,8 @@ void runProjAndDifferenceKernel(
 	cudaUnbindTexture(texModel_real);
     cudaUnbindTexture(texModel_imag);
 }
+#endif
+
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
@@ -1916,7 +1930,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 		    CudaGlobalPtr<FLOAT> Frefs_imag;
 
 			CUDA_CPU_TOC("modelAssignment");
-			bool do_combineProjAndDiff = true;
+			bool do_combineProjAndDiff = false; //TODO add control flag
 			if(!do_combineProjAndDiff)
 			{
 				CUDA_CPU_TIC("generateModelProjections");
@@ -2079,28 +2093,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
 				diff2s.device_alloc();
 
-				if(!do_combineProjAndDiff)
-				{
-					runDifferenceKernel(gpuMinvsigma2,
-										Fimgs_real,
-										Fimgs_imag,
-										Frefs_real,
-										Frefs_imag,
-										rotidx,
-										transidx,
-										ihidden_overs,
-										op,
-										baseMLO,
-										translation_num,
-										orientation_num,
-										significant_num,
-										image_size,
-										ipart,
-										group_id,
-										diff2s
-										);
-				}
-				else
+#if !defined(CUDA_DOUBLE_PRECISION)
+				if(do_combineProjAndDiff)
 				{
 					runProjAndDifferenceKernel(model_real,
 											   model_imag,
@@ -2123,6 +2117,28 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 										       group_id,
 										       exp_iclass
 											 );
+				}
+				else
+#endif
+				{
+					runDifferenceKernel(gpuMinvsigma2,
+										Fimgs_real,
+										Fimgs_imag,
+										Frefs_real,
+										Frefs_imag,
+										rotidx,
+										transidx,
+										ihidden_overs,
+										op,
+										baseMLO,
+										translation_num,
+										orientation_num,
+										significant_num,
+										image_size,
+										ipart,
+										group_id,
+										diff2s
+										);
 				}
 				/*====================================
 				    	   Retrieve Results
@@ -2384,7 +2400,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 
-				bool do_gpu_sumweight = true;
+				bool do_gpu_sumweight = true;  //TODO add control flag
 				if(oversamples>=SUM_BLOCK_SIZE && do_gpu_sumweight) // Send task to GPU where warps can access automatically coalesced oversamples
 				{
 					//std::cerr << "summing weights on GPU... baseMLO->mymodel.pdf_class[exp_iclass] = " << baseMLO->mymodel.pdf_class[sp.iclass_min] <<  std::endl;
@@ -2870,6 +2886,96 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-s
 	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
 }
 
+dim3 runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
+				   CudaGlobalPtr<FLOAT> &Frefs_imag,
+				   CudaGlobalPtr<FLOAT> &Fimgs_real,
+				   CudaGlobalPtr<FLOAT> &Fimgs_imag,
+				   CudaGlobalPtr<FLOAT> &Fimgs_nomask_real,
+				   CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
+				   CudaGlobalPtr<FLOAT> &sorted_weights,
+				   CudaGlobalPtr<FLOAT> &ctfs,
+				   CudaGlobalPtr<FLOAT> &Minvsigma2s,
+				   CudaGlobalPtr<FLOAT> &wdiff2s_parts,
+				   CudaGlobalPtr<FLOAT> &wavgs_real,
+				   CudaGlobalPtr<FLOAT> &wavgs_imag,
+				   CudaGlobalPtr<FLOAT> &Fweights,
+				   OptimisationParamters op,
+				   MlOptimiser *baseMLO,
+				   long unsigned orientation_num,
+				   long unsigned translation_num,
+				   unsigned image_size,
+				   long int ipart,
+				   int group_id,
+				   int exp_iclass)
+{
+	/*======================================================
+			            KERNEL CALL
+	======================================================*/
+
+	if (baseMLO->do_map)
+		for (unsigned i = 0; i < image_size; i++)
+			Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
+	else //TODO should be handled by memset
+		for (unsigned i = 0; i < image_size; i++)
+			Minvsigma2s[i] = 1;
+
+	Minvsigma2s.cp_to_device();
+
+	unsigned orient1, orient2;
+	//We only want as many blocks as there are chunks of orientations to be treated
+	//within the same block (this is done to reduce memory loads in the kernel).
+	unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
+	if(orientation_chunks>65535)
+	{
+		orient1 = ceil(sqrt(orientation_chunks));
+		orient2 = orient1;
+	}
+	else
+	{
+		orient1 = orientation_chunks;
+		orient2 = 1;
+	}
+	dim3 block_dim(orient1,orient2);
+
+	CUDA_GPU_TIC("cuda_kernel_wavg");
+
+	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
+	cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
+										~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag,
+										~Fimgs_nomask_real, ~Fimgs_nomask_imag,
+										~sorted_weights, ~ctfs, ~Minvsigma2s,
+										~wdiff2s_parts,
+										~wavgs_real,
+										~wavgs_imag,
+										~Fweights,
+										translation_num,
+										(FLOAT) op.sum_weight[ipart],
+										(FLOAT) op.significant_weight[ipart],
+										image_size,
+										baseMLO->refs_are_ctf_corrected
+										);
+	size_t avail;
+	size_t total;
+	cudaMemGetInfo( &avail, &total );
+	float used = 100*((float)(total - avail)/(float)total);
+	std::cerr << "Device memory used @ wavg: " << used << "%" << std::endl;
+	CUDA_GPU_TAC("cuda_kernel_wavg");
+
+	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
+
+	CUDA_GPU_TOC("cuda_kernel_wavg");
+
+	Fimgs_real.free_device();
+	Fimgs_imag.free_device();
+	Fimgs_nomask_real.free_device();
+	Fimgs_nomask_imag.free_device();
+
+	sorted_weights.free_device();
+	ctfs.free_device();
+	Minvsigma2s.free_device();
+	return(block_dim);
+}
+
 void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
 {
 	CUDA_CPU_TIC("store_pre_gpu");
@@ -3167,9 +3273,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					ctfs[i] = part_scale;
 
 			ctfs.cp_to_device();
-
 			CUDA_CPU_TOC("scale_ctf");
-
 
 			/*======================================================
 					            MAP WEIGHTS
@@ -3198,76 +3302,37 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_CPU_TOC("map");
 
-
 			/*======================================================
-					            KERNEL CALL
+								KERNEL CALL
 			======================================================*/
 
+			// The below allocations are kept outside runWavgKernel(...) in case we decide to make them global.
 			CudaGlobalPtr<FLOAT> Minvsigma2s(image_size); //TODO Same size for all iparts, should be allocated once
 			Minvsigma2s.device_alloc();
-
-			if (baseMLO->do_map)
-				for (unsigned i = 0; i < image_size; i++)
-					Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
-			else //TODO should be handled by memset
-				for (unsigned i = 0; i < image_size; i++)
-					Minvsigma2s[i] = 1;
-
-			Minvsigma2s.cp_to_device();
-
 			CudaGlobalPtr<FLOAT> wdiff2s_parts(orientation_num * image_size); //TODO Almost same size for all iparts, should be allocated once
 			wdiff2s_parts.device_alloc();
 
-
-
-			unsigned orient1, orient2;
-			//We only want as many blocks as there are chunks of orientations to be treated
-			//within the same block (this is done to reduce memory loads in the kernel).
-			unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
-			if(orientation_chunks>65535)
-			{
-				orient1 = ceil(sqrt(orientation_chunks));
-				orient2 = orient1;
-			}
-			else
-			{
-				orient1 = orientation_chunks;
-				orient2 = 1;
-			}
-			dim3 block_dim(orient1,orient2);
-
-			CUDA_GPU_TIC("cuda_kernel_wavg");
-
-			//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
-			cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-												~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag,
-												 ~Fimgs_nomask_real, ~Fimgs_nomask_imag,
-												~sorted_weights, ~ctfs, ~Minvsigma2s,
-												~wdiff2s_parts,
-												~wavgs_real,
-												~wavgs_imag,
-												~Fweights,
-												translation_num,
-												(FLOAT) op.sum_weight[ipart],
-												(FLOAT) op.significant_weight[ipart],
-												image_size,
-												baseMLO->refs_are_ctf_corrected
-												);
-
-			CUDA_GPU_TAC("cuda_kernel_wavg");
-
-			HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
-
-			CUDA_GPU_TOC("cuda_kernel_wavg");
-
-			Fimgs_real.free_device();
-			Fimgs_imag.free_device();
-			Fimgs_nomask_real.free_device();
-			Fimgs_nomask_imag.free_device();
-
-			sorted_weights.free_device();
-			ctfs.free_device();
-			Minvsigma2s.free_device();
+			dim3 block_dim = runWavgKernel(Frefs_real,
+						                   Frefs_imag,
+						                   Fimgs_real,
+						                   Fimgs_imag,
+						                   Fimgs_nomask_real,
+						                   Fimgs_nomask_imag,
+						                   sorted_weights,
+						                   ctfs,
+						                   Minvsigma2s,
+						                   wdiff2s_parts,
+						                   wavgs_real,
+						                   wavgs_imag,
+						                   Fweights,
+						                   op,
+						                   baseMLO,
+						                   orientation_num,
+						                   translation_num,
+						                   image_size,
+						                   ipart,
+						                   group_id,
+						                   exp_iclass);
 
 			/*======================================================
 								COLLECT DATA
@@ -3281,6 +3346,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				reduction_block_num /= 2;
 
 			CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
+			unsigned orient1, orient2;
 			for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
 			{
 				if(k>65535)
@@ -3294,9 +3360,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					orient1 = k;
 					orient2 = 1;
 				}
-				dim3 block_dim(orient1,orient2);
+				dim3 block_dim_wd(orient1,orient2);
 				 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
-				cuda_kernel_reduce_wdiff2s<<<k,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
+				cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
 			}
 			CUDA_GPU_TOC("cuda_kernels_reduce_wdiff2s");
 
