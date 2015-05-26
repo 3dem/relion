@@ -2917,7 +2917,7 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-s
 	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
 }
 
-dim3 runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
+void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 				   CudaGlobalPtr<FLOAT> &Frefs_imag,
 				   CudaGlobalPtr<FLOAT> &Fimgs_real,
 				   CudaGlobalPtr<FLOAT> &Fimgs_imag,
@@ -2992,10 +2992,11 @@ dim3 runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 	sorted_weights.free_device();
 	ctfs.free_device();
 	Minvsigma2s.free_device();
-	return(block_dim);
 }
+
+
 #if !defined(CUDA_DOUBLE_PRECISION)
-dim3 runProjAndWavgKernel(
+void runProjAndWavgKernel(
 		CudaGlobalPtr<FLOAT> &model_real,
 		CudaGlobalPtr<FLOAT> &model_imag,
 		CudaGlobalPtr<FLOAT> &eulers,
@@ -3135,7 +3136,6 @@ dim3 runProjAndWavgKernel(
 	sorted_weights.free_device();
 	ctfs.free_device();
 	Minvsigma2s.free_device();
-	return(block_dim);
 }
 #endif
 
@@ -3487,59 +3487,61 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					Minvsigma2s[i] = 1;
 
 			Minvsigma2s.cp_to_device();
-			dim3 block_dim;
+			
 #if !defined(CUDA_DOUBLE_PRECISION)
 			if(do_combineProjAndDiff)
 			{
-				block_dim = runProjAndWavgKernel(model_real,
-												      model_imag,
-												      eulers,
-												      Fimgs_real,
-												      Fimgs_imag,
-												      Fimgs_nomask_real,
-												      Fimgs_nomask_imag,
-												      sorted_weights,
-												      ctfs,
-												      Minvsigma2s,
-												      wdiff2s_parts,
-												      wavgs_real,
-												      wavgs_imag,
-												      Fweights,
-												      op,
-												      baseMLO,
-												      orientation_num,
-												      translation_num,
-												      image_size,
-												      XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
-												      ipart,
-												      group_id,
-												      exp_iclass
-												      );
+				runProjAndWavgKernel(
+						model_real,
+						model_imag,
+						eulers,
+						Fimgs_real,
+						Fimgs_imag,
+						Fimgs_nomask_real,
+						Fimgs_nomask_imag,
+						sorted_weights,
+						ctfs,
+						Minvsigma2s,
+						wdiff2s_parts,
+						wavgs_real,
+						wavgs_imag,
+						Fweights,
+						op,
+						baseMLO,
+						orientation_num,
+						translation_num,
+						image_size,
+						XMIPP_MIN(baseMLO->mymodel.PPref[exp_iclass].r_max, op.local_Minvsigma2s[0].xdim - 1),
+						ipart,
+						group_id,
+						exp_iclass
+						);
 			}
 			else
 #endif
 			{
-				block_dim = runWavgKernel(Frefs_real,
-											   Frefs_imag,
-											   Fimgs_real,
-											   Fimgs_imag,
-											   Fimgs_nomask_real,
-											   Fimgs_nomask_imag,
-											   sorted_weights,
-											   ctfs,
-											   Minvsigma2s,
-											   wdiff2s_parts,
-											   wavgs_real,
-											   wavgs_imag,
-											   Fweights,
-											   op,
-											   baseMLO,
-											   orientation_num,
-											   translation_num,
-											   image_size,
-											   ipart,
-											   group_id,
-											   exp_iclass);
+				runWavgKernel(
+						Frefs_real,
+						Frefs_imag,
+						Fimgs_real,
+						Fimgs_imag,
+						Fimgs_nomask_real,
+						Fimgs_nomask_imag,
+						sorted_weights,
+						ctfs,
+						Minvsigma2s,
+						wdiff2s_parts,
+						wavgs_real,
+						wavgs_imag,
+						Fweights,
+						op,
+						baseMLO,
+						orientation_num,
+						translation_num,
+						image_size,
+						ipart,
+						group_id,
+						exp_iclass);
 			}
 //			wdiff2s_parts.cp_to_host();
 //			for (long unsigned k = 0; k < 100; k++)
@@ -3572,9 +3574,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					orient1 = k;
 					orient2 = 1;
 				}
-				dim3 block_dim_wd(orient1,orient2);
+				dim3 grid_dim_wd(orient1,orient2);
 				 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
-				cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
+				cuda_kernel_reduce_wdiff2s<<<grid_dim_wd,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
 			}
 			CUDA_GPU_TOC("cuda_kernels_reduce_wdiff2s");
 
@@ -3643,77 +3645,76 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			myp_oo_otrans_x2y2z2.device_alloc();
 			myp_oo_otrans_x2y2z2.cp_to_device();
 
-			CudaGlobalPtr<FLOAT>                      p_weights(block_dim.x * block_dim.y);
-			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_dim.x * block_dim.y);
-			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_dim.x * block_dim.y);
-			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_dim.x * block_dim.y);
+			CudaGlobalPtr<FLOAT>                      p_weights(orientation_num);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(orientation_num);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(orientation_num);
+			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(orientation_num);
 
 			p_weights.device_alloc();
 			p_thr_wsum_prior_offsetx_class.device_alloc();
 			p_thr_wsum_prior_offsety_class.device_alloc();
 			p_thr_wsum_sigma2_offset.device_alloc();
 
-			block_dim.x=sp.nr_dir;
-			block_dim.y=sp.nr_psi;
+			dim3 grid_dim_collect2(sp.nr_dir, sp.nr_psi);
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+
+			cuda_kernel_collect2<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+					~oo_otrans_x,          // otrans-size -> make const
+					~oo_otrans_y,          // otrans-size -> make const
+					~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+					~Mweight,
+					(FLOAT)op.significant_weight[ipart],
+					(FLOAT)op.sum_weight[ipart],
+					sp.nr_trans,
+					sp.nr_oversampled_trans,
+					sp.nr_oversampled_rot,
+					oversamples,
+					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+					~p_weights,
+					~p_thr_wsum_prior_offsetx_class,
+					~p_thr_wsum_prior_offsety_class,
+					~p_thr_wsum_sigma2_offset
+				   );
+			HANDLE_ERROR(cudaDeviceSynchronize());
+
+			// TODO further reduce the below 4 arrays while data is still on gpu
+			p_weights.cp_to_host();
+			p_thr_wsum_prior_offsetx_class.cp_to_host();
+			p_thr_wsum_prior_offsety_class.cp_to_host();
+			p_thr_wsum_sigma2_offset.cp_to_host();
+
+			thr_wsum_sigma2_offset = 0.0;
+			int iorient = 0;
+			for (long int idir = 0; idir < sp.nr_dir; idir++)
 			{
-				cuda_kernel_collect2<<<block_dim,SUM_BLOCK_SIZE>>>( ~oo_otrans_x,          // otrans-size -> make const
-																	~oo_otrans_y,          // otrans-size -> make const
-																	~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-																	~Mweight,
-																	(FLOAT)op.significant_weight[ipart],
-																	(FLOAT)op.sum_weight[ipart],
-																	sp.nr_trans,
-																	sp.nr_oversampled_trans,
-																	sp.nr_oversampled_rot,
-																	oversamples,
-																	(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-																	~p_weights,
-																	~p_thr_wsum_prior_offsetx_class,
-																	~p_thr_wsum_prior_offsety_class,
-																	~p_thr_wsum_sigma2_offset
-																   );
-				HANDLE_ERROR(cudaDeviceSynchronize());
-
-				// TODO further reduce the below 4 arrays while data is still on gpu
-				p_weights.cp_to_host();
-				p_thr_wsum_prior_offsetx_class.cp_to_host();
-				p_thr_wsum_prior_offsety_class.cp_to_host();
-				p_thr_wsum_sigma2_offset.cp_to_host();
-
-				thr_wsum_sigma2_offset = 0.0;
-				int iorient = 0;
-				for (long int idir = 0; idir < sp.nr_dir; idir++)
+				for (long int ipsi = 0; ipsi < sp.nr_psi; ipsi++, iorient++)
 				{
-					for (long int ipsi = 0; ipsi < sp.nr_psi; ipsi++, iorient++)
+					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
+					// Only proceed if any of the particles had any significant coarsely sampled translation
+
+					if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 					{
-						long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-						// Only proceed if any of the particles had any significant coarsely sampled translation
+						long int mydir;
+						if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+							mydir = idir;
+						else
+							mydir = op.pointer_dir_nonzeroprior[idir];
 
-						if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+						// store partials according to indices of the relevant dimension
+						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[iorient];
+						thr_sumw_group[group_id]                 						+= p_weights[iorient];
+						thr_wsum_pdf_class[exp_iclass]           						+= p_weights[iorient];
+						thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[iorient];
+
+						if (baseMLO->mymodel.ref_dim == 2)
 						{
-							long int mydir;
-							if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-								mydir = idir;
-							else
-								mydir = op.pointer_dir_nonzeroprior[idir];
-
-							// store partials according to indices of the relevant dimension
-							DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[iorient];
-							thr_sumw_group[group_id]                 						+= p_weights[iorient];
-							thr_wsum_pdf_class[exp_iclass]           						+= p_weights[iorient];
-							thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[iorient];
-
-							if (baseMLO->mymodel.ref_dim == 2)
-							{
-								thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
-								thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
-							}
+							thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
+							thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
 						}
 					}
 				}
 			}
+
 			CUDA_CPU_TIC("collect_data_2_post_kernel");
 			Mweight.free_device();
 			p_weights.free();
