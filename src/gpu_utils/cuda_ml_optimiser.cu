@@ -2601,13 +2601,14 @@ __global__ void cuda_kernel_wavg(
 		FLOAT *g_wavgs_real,
 		FLOAT *g_wavgs_imag,
 		FLOAT* g_Fweights,
+		unsigned long orientation_num,
 		unsigned long translation_num,
 		FLOAT weight_norm,
 		FLOAT significant_weight,
 		unsigned image_size,
 		bool refs_are_ctf_corrected)
 {
-	unsigned long iorient = blockIdx.y*gridDim.x + blockIdx.x;
+	unsigned long bid = blockIdx.y*gridDim.x + blockIdx.x;
 	unsigned tid = threadIdx.x;
 
 	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
@@ -2616,72 +2617,75 @@ __global__ void cuda_kernel_wavg(
 	__shared__ FLOAT s_wavgs_imag[BLOCK_SIZE];
 	__shared__ FLOAT s_wdiff2s_parts[BLOCK_SIZE];
 	__shared__ FLOAT s_Minvsigma2s[BLOCK_SIZE];
-	for (unsigned pass = 0; pass < pass_num; pass ++)
-	{
-		s_wavgs_real[tid]  = 0.0f;
-		s_wavgs_imag[tid]  = 0.0f;
-		s_wdiff2s_parts[tid] = 0.0f;
-		Fweight = 0;
-
-		pixel = pass * BLOCK_SIZE + tid;
-		s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
-
-		if (pixel < image_size)
+//	if( bid < orientation_num )
+//	{
+		for (unsigned pass = 0; pass < pass_num; pass ++)
 		{
-			unsigned long orientation_pixel = iorient * image_size + pixel;
-			FLOAT ref_real = g_refs_real[orientation_pixel];
-			FLOAT ref_imag = g_refs_imag[orientation_pixel];
-			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
-			{
-				ref_real *= __ldg(&g_ctfs[pixel]);
-				ref_imag *= __ldg(&g_ctfs[pixel]);
-			}
+			s_wavgs_real[tid]  = 0.0f;
+			s_wavgs_imag[tid]  = 0.0f;
+			s_wdiff2s_parts[tid] = 0.0f;
+			Fweight = 0;
 
-			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
-			{
-				FLOAT weight = __ldg(&g_weights[iorient * translation_num + itrans]);
+			pixel = pass * BLOCK_SIZE + tid;
+			s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
 
-				if (weight >= significant_weight)
+			if (pixel < image_size)
+			{
+				unsigned long ref_pixel = bid * image_size + pixel;
+				FLOAT ref_real = g_refs_real[ref_pixel];
+				FLOAT ref_imag = g_refs_imag[ref_pixel];
+				if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
 				{
-					weight /= weight_norm;
-
-					unsigned long img_pixel_idx = itrans * image_size + pixel;
-
-					FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-					FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
-
-					s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
-
-					FLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
-
-					s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-					s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
-
-					Fweight += weightxinvsigma2 * __ldg(&g_ctfs[pixel]);
+					ref_real *= __ldg(&g_ctfs[pixel]);
+					ref_imag *= __ldg(&g_ctfs[pixel]);
 				}
-			}
 
-			g_wavgs_real[orientation_pixel] += s_wavgs_real[tid];
-			g_wavgs_imag[orientation_pixel] += s_wavgs_imag[tid];
-			g_wdiff2s_parts[orientation_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
-			g_Fweights[orientation_pixel] += Fweight; //TODO should be buffered into shared
+				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
+				{
+					FLOAT weight = __ldg(&g_weights[bid * translation_num + itrans]);
+
+					if (weight >= significant_weight)
+					{
+						weight /= weight_norm;
+
+						unsigned long img_pixel_idx = itrans * image_size + pixel;
+
+						FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+						FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
+
+						s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
+
+						FLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
+
+						s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+						s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
+
+						Fweight += weightxinvsigma2 * __ldg(&g_ctfs[pixel]);
+					}
+				}
+
+				g_wavgs_real[ref_pixel] += s_wavgs_real[tid];
+				g_wavgs_imag[ref_pixel] += s_wavgs_imag[tid];
+				g_wdiff2s_parts[ref_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
+				g_Fweights[ref_pixel] += Fweight; //TODO should be buffered into shared
+			}
 		}
-	}
+//	}
 }
 
 // __global__ void cuda_kernel_wavg_fast   // REMOVED in commit
 #if !defined(CUDA_DOUBLE_PRECISION)
 __global__ void cuda_kernel_ProjAndWavg(
 		FLOAT *g_eulers,
-		int my_r_max,
+		unsigned my_r_max,
 		int max_r2,
 		int min_r2_nn,
-		int image_size,
-		int orientation_num,
-	 	int XSIZE_img,
-	 	int YSIZE_img,
-	 	int STARTINGY_mdl,
-	 	int STARTINGZ_mdl,
+		unsigned image_size,
+		unsigned long orientation_num,
+	 	long int XSIZE_img,
+	 	long int YSIZE_img,
+	 	long int STARTINGY_mdl,
+	 	long int STARTINGZ_mdl,
 		FLOAT *g_imgs_real,
 		FLOAT *g_imgs_imag,
 		FLOAT *g_imgs_nomask_real,
@@ -2700,15 +2704,14 @@ __global__ void cuda_kernel_ProjAndWavg(
 {
 	FLOAT xp, yp, zp;
 	long int r2;
-	int pixel;
 	bool is_neg_x;
 	FLOAT ref_real, ref_imag;
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
 	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( bid < orientation_num )
-	{
-		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+//	if( bid < orientation_num )
+//	{
+		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  )),pixel;
 		FLOAT Fweight;
 		__shared__ FLOAT s_wavgs_real[BLOCK_SIZE];
 		__shared__ FLOAT s_wavgs_imag[BLOCK_SIZE];
@@ -2726,7 +2729,7 @@ __global__ void cuda_kernel_ProjAndWavg(
 
 			if(pixel<image_size)
 			{
-				long ref_pixel = bid*(image_size) + pixel;
+				unsigned long ref_pixel = bid * image_size + pixel;
 				// Now istead of loading pre-calculated ref, we project it out from the texture-model
 				//----------------------------------------------------------------------------------- =>
 				int x = pixel % XSIZE_img;
@@ -2814,7 +2817,7 @@ __global__ void cuda_kernel_ProjAndWavg(
 				g_Fweights[ref_pixel] += Fweight; //TODO should be buffered into shared
 			}
 		}
-	}
+//	}
 }
 #endif
 
@@ -2967,6 +2970,7 @@ void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 										~wavgs_real,
 										~wavgs_imag,
 										~Fweights,
+										orientation_num,
 										translation_num,
 										(FLOAT) op.sum_weight[ipart],
 										(FLOAT) op.significant_weight[ipart],
@@ -3098,10 +3102,10 @@ void runProjAndWavgKernel(
 													  min_r2_nn,
 													  image_size,
 													  orientation_num,
-													 baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-													 baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-													 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-													 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+													  op.local_Minvsigma2s[0].xdim,
+													  op.local_Minvsigma2s[0].ydim,
+													  baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+													  baseMLO->mymodel.PPref[exp_iclass].data.zinit,
 													  ~Fimgs_real, ~Fimgs_imag,
 													  ~Fimgs_nomask_real, ~Fimgs_nomask_imag,
 													  ~sorted_weights, ~ctfs, ~Minvsigma2s,
@@ -3280,9 +3284,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 		CudaGlobalPtr<FLOAT> Frefs_real;
 		CudaGlobalPtr<FLOAT> Frefs_imag;
 
-		bool do_combineProjAndDiff = true; //TODO add control flag
+		bool do_combineProjAndWavg = true; //TODO add control flag
 #if !defined(CUDA_DOUBLE_PRECISION)
-		if(!do_combineProjAndDiff)
+		if(!do_combineProjAndWavg)
 #endif
 		{
 			CUDA_CPU_TIC("generateModelProjections_wavg");
@@ -3489,7 +3493,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			Minvsigma2s.cp_to_device();
 			
 #if !defined(CUDA_DOUBLE_PRECISION)
-			if(do_combineProjAndDiff)
+			if(do_combineProjAndWavg)
 			{
 				runProjAndWavgKernel(
 						model_real,
