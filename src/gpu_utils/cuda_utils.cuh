@@ -1,8 +1,17 @@
+/*
+ * cuda_utils.cuh
+ *
+ *  Created on: May 26, 2015
+ *      Author: bjornf
+ */
+
+#ifndef CUDA_UTILS_CUH_
+#define CUDA_UTILS_CUH_
 
 #include <cuda.h>
+#include "src/gpu_utils/cuda_settings.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
-#define FLOAT double
 __forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
 {
 	unsigned long long int* address_as_ull = (unsigned long long int*)address;
@@ -16,7 +25,6 @@ __forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
 	return __longlong_as_double(old);
 }
 #else
-#define FLOAT float
 __forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
 {
 	unsigned int* address_as_ul = (unsigned int*)address;
@@ -396,3 +404,5 @@ public:
 		if (h_do_free) free_host();
 	}
 };
+
+#endif
