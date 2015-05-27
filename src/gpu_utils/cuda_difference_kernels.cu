@@ -9,7 +9,7 @@
 #include <vector>
 #include <iostream>
 
-__global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
+__global__ void cuda_kernel_D2(	FLOAT *g_refs_real,
 									FLOAT *g_refs_imag,
 									FLOAT *g_imgs_real,
 									FLOAT *g_imgs_imag,
@@ -76,7 +76,7 @@ __global__ void cuda_kernel_diff2(	FLOAT *g_refs_real,
 	}
 }
 
-__global__ void cuda_kernel_cc_diff2(	FLOAT *g_refs_real,
+__global__ void cuda_kernel_D2_CC(	FLOAT *g_refs_real,
 										FLOAT *g_refs_imag,
 										FLOAT *g_imgs_real,
 										FLOAT *g_imgs_imag,

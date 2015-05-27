@@ -13,6 +13,7 @@
 #else
 #define FLOAT float
 #endif
+
 #define MAX_RESOL_SHARED_MEM 32
 #define BLOCK_SIZE  128         	// -- Number of threads in a block --
 									// This is optimally set as big as possible without
@@ -23,8 +24,7 @@
 									// This applies to wavg and reduces global memory
 									// accesses roughly proportionally, but scales shared
 									// memory usage by allocating
-									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE
-									// FLOATS.
+									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE FLOATS. // DEPRECATED
 
 #define NR_CLASS_MUTEXES 5
 
