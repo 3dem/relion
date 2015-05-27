@@ -16,8 +16,6 @@
 #include <thrust/device_ptr.h>
 #include <thrust/extrema.h>
 
-texture<FLOAT,cudaTextureType3D,cudaReadModeElementType> texModel_real;
-texture<FLOAT,cudaTextureType3D,cudaReadModeElementType> texModel_imag;
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -462,6 +460,8 @@ __global__ void cuda_kernel_projectAllViews_trilin_gloex( FLOAT *g_model_real,
 __global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
 														 FLOAT *g_Frefs_real,
 														 FLOAT *g_Frefs_imag,
+														 cudaTextureObject_t texModel_real,
+														 cudaTextureObject_t texModel_imag,
 														 int my_r_max,
 														 int max_r2,
 														 int min_r2_nn,
@@ -543,23 +543,23 @@ __global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
 					z1 = z0 + 1;
 					zp -= STARTINGZ_mdl;
 
-					d000.real = tex3D(texModel_real,x0+0.5f,y0+0.5f,z0+0.5f);
-					d001.real = tex3D(texModel_real,x1+0.5f,y0+0.5f,z0+0.5f);
-					d010.real = tex3D(texModel_real,x0+0.5f,y1+0.5f,z0+0.5f);
-					d011.real = tex3D(texModel_real,x1+0.5f,y1+0.5f,z0+0.5f);
-					d100.real = tex3D(texModel_real,x0+0.5f,y0+0.5f,z1+0.5f);
-					d101.real = tex3D(texModel_real,x1+0.5f,y0+0.5f,z1+0.5f);
-					d110.real = tex3D(texModel_real,x0+0.5f,y1+0.5f,z1+0.5f);
-					d111.real = tex3D(texModel_real,x1+0.5f,y1+0.5f,z1+0.5f);
+					d000.real = tex3D<FLOAT>(texModel_real,x0+0.5f,y0+0.5f,z0+0.5f);
+					d001.real = tex3D<FLOAT>(texModel_real,x1+0.5f,y0+0.5f,z0+0.5f);
+					d010.real = tex3D<FLOAT>(texModel_real,x0+0.5f,y1+0.5f,z0+0.5f);
+					d011.real = tex3D<FLOAT>(texModel_real,x1+0.5f,y1+0.5f,z0+0.5f);
+					d100.real = tex3D<FLOAT>(texModel_real,x0+0.5f,y0+0.5f,z1+0.5f);
+					d101.real = tex3D<FLOAT>(texModel_real,x1+0.5f,y0+0.5f,z1+0.5f);
+					d110.real = tex3D<FLOAT>(texModel_real,x0+0.5f,y1+0.5f,z1+0.5f);
+					d111.real = tex3D<FLOAT>(texModel_real,x1+0.5f,y1+0.5f,z1+0.5f);
 
-					d000.imag = tex3D(texModel_imag,x0+0.5f,y0+0.5f,z0+0.5f);
-					d001.imag = tex3D(texModel_imag,x1+0.5f,y0+0.5f,z0+0.5f);
-					d010.imag = tex3D(texModel_imag,x0+0.5f,y1+0.5f,z0+0.5f);
-					d011.imag = tex3D(texModel_imag,x1+0.5f,y1+0.5f,z0+0.5f);
-					d100.imag = tex3D(texModel_imag,x0+0.5f,y0+0.5f,z1+0.5f);
-					d101.imag = tex3D(texModel_imag,x1+0.5f,y0+0.5f,z1+0.5f);
-					d110.imag = tex3D(texModel_imag,x0+0.5f,y1+0.5f,z1+0.5f);
-					d111.imag = tex3D(texModel_imag,x1+0.5f,y1+0.5f,z1+0.5f);
+					d000.imag = tex3D<FLOAT>(texModel_imag,x0+0.5f,y0+0.5f,z0+0.5f);
+					d001.imag = tex3D<FLOAT>(texModel_imag,x1+0.5f,y0+0.5f,z0+0.5f);
+					d010.imag = tex3D<FLOAT>(texModel_imag,x0+0.5f,y1+0.5f,z0+0.5f);
+					d011.imag = tex3D<FLOAT>(texModel_imag,x1+0.5f,y1+0.5f,z0+0.5f);
+					d100.imag = tex3D<FLOAT>(texModel_imag,x0+0.5f,y0+0.5f,z1+0.5f);
+					d101.imag = tex3D<FLOAT>(texModel_imag,x1+0.5f,y0+0.5f,z1+0.5f);
+					d110.imag = tex3D<FLOAT>(texModel_imag,x0+0.5f,y1+0.5f,z1+0.5f);
+					d111.imag = tex3D<FLOAT>(texModel_imag,x1+0.5f,y1+0.5f,z1+0.5f);
 
 					// Set the interpolated value in the 2D output array
 					dx00 = d000 + (d001 - d000)*fx;
@@ -594,6 +594,8 @@ __global__ void cuda_kernel_projectAllViews_trilin_texex( FLOAT *g_eulers,
 __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 														 FLOAT *g_Frefs_real,
 														 FLOAT *g_Frefs_imag,
+														 cudaTextureObject_t texModel_real,
+														 cudaTextureObject_t texModel_imag,
 														 int my_r_max,
 														 int max_r2,
 														 int min_r2_nn,
@@ -655,8 +657,8 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 					yp -= STARTINGY_mdl;
 					zp -= STARTINGZ_mdl;
 
-					val.real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
-					val.imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+					val.real=tex3D<FLOAT>(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					val.imag=tex3D<FLOAT>(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
 
 
 					if (is_neg_x)
@@ -691,6 +693,8 @@ __global__ void cuda_kernel_projectAllViews_trilin_texim( FLOAT *g_eulers,
 __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 		                                FLOAT *g_imgs_real,
 		                                FLOAT *g_imgs_imag,
+										cudaTextureObject_t texModel_real,
+										cudaTextureObject_t texModel_imag,
 										FLOAT *g_Minvsigma2,
 										FLOAT *g_diff2s,
 										int image_size,
@@ -774,8 +778,8 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 					yp -= mdl_init_y;
 					zp -= mdl_init_z;
 
-					ref_real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
-					ref_imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+					ref_real=tex3D<FLOAT>(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					ref_imag=tex3D<FLOAT>(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
 
 //					printf("%i, %i", x,y);
 //					printf("%f, %f,%f", xp,yp,zp);
@@ -839,14 +843,13 @@ void generateModelProjections(
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
-	// TODO Use bindless textures to reduce some of this clutter
 
-	cudaArray*        modelArray_real;
-	cudaArray* 		  modelArray_imag;
-	cudaExtent        volumeSize = make_cudaExtent(mdl_x, mdl_y, mdl_z);
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	// TODO model should carry real & imag in separate channels of the same texture
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize = make_cudaExtent(mdl_x, mdl_y, mdl_z);
 
 	//allocate device memory for cuda 3D array
 	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
@@ -865,22 +868,34 @@ void generateModelProjections(
 	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
 	cudaMemcpy3D(&copyParams);
 
-	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
-	texModel_real.normalized = false;
-	texModel_real.filterMode = cudaFilterModeLinear;
-	texModel_imag.normalized = false;
-	texModel_imag.filterMode = cudaFilterModeLinear;
+	// Create texture object// Specify texture
+    struct cudaResourceDesc resDesc_real,resDesc_imag;
+    memset(&resDesc_real, 0, sizeof(resDesc_real));
+    memset(&resDesc_imag, 0, sizeof(resDesc_imag));
+    resDesc_real.resType = cudaResourceTypeArray;
+    resDesc_imag.resType = cudaResourceTypeArray;
+    resDesc_real.res.array.array = modelArray_real;
+    resDesc_imag.res.array.array = modelArray_imag;
 
-	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
-	for(int n=0; n<3; n++)
+    struct cudaTextureDesc texDesc_real, texDesc_imag;
+    memset(&texDesc_real, 0, sizeof(texDesc_real));
+    memset(&texDesc_imag, 0, sizeof(texDesc_imag));
+    for(int n=0; n<3; n++)
 	{
-		texModel_real.addressMode[n]=cudaAddressModeClamp;
-		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+    	texDesc_real.addressMode[n]=cudaAddressModeClamp;
+    	texDesc_imag.addressMode[n]=cudaAddressModeClamp;
 	}
+    texDesc_real.filterMode       = cudaFilterModeLinear;
+    texDesc_real.readMode         = cudaReadModeElementType;
+    texDesc_real.normalizedCoords = false;
+    texDesc_imag.filterMode       = cudaFilterModeLinear;
+    texDesc_imag.readMode         = cudaReadModeElementType;
+    texDesc_real.normalizedCoords = false;
 
-    //bind texture reference with cuda array
-	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
-	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
+	cudaTextureObject_t texModel_real = 0;
+	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
+	cudaTextureObject_t texModel_imag = 0;
+	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
 
 	Frefs_real.size = orientation_num * image_size;
 	Frefs_real.device_alloc();
@@ -908,6 +923,8 @@ void generateModelProjections(
 															~eulers,
 															~Frefs_real,
 															~Frefs_imag,
+															texModel_real,
+															texModel_imag,
 															max_r,
 															max_r2,
 															min_r2_nn,
@@ -917,6 +934,8 @@ void generateModelProjections(
 															img_y,
 															mdl_init_y,
 															mdl_init_z);
+	cudaDestroyTextureObject(texModel_real);
+	cudaDestroyTextureObject(texModel_imag);
 	cudaFreeArray(modelArray_real);
 	cudaFreeArray(modelArray_imag);
 #elif !defined(CUDA_DOUBLE_PRECISION)	// ...or explicit interpolation (slow, accurate)
@@ -924,6 +943,8 @@ void generateModelProjections(
 															~eulers,
 															~Frefs_real,
 															~Frefs_imag,
+															texModel_real,
+															texModel_imag,
 															max_r,
 															max_r2,
 															min_r2_nn,
@@ -934,6 +955,8 @@ void generateModelProjections(
 															mdl_init_y,
 															mdl_init_z);
 
+	cudaDestroyTextureObject(texModel_real);
+	cudaDestroyTextureObject(texModel_imag);
 	cudaFreeArray(modelArray_real);
 	cudaFreeArray(modelArray_imag);
 #else // under double precision, texture won't work.
@@ -1123,16 +1146,15 @@ void runProjAndDifferenceKernel(
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
-	// TODO Use bindless textures to reduce some of this clutter
 
-	cudaArray*        modelArray_real;
-	cudaArray* 		  modelArray_imag;
-	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-												   baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-												   baseMLO->mymodel.PPref[exp_iclass].data.zdim);
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	// TODO model should carry real & imag in separate channels of the same texture
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+			   	   	   	   	   	   	   	   	       baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+			   	   	   	   	   	   	   	   	       baseMLO->mymodel.PPref[exp_iclass].data.zdim);
 
 	//allocate device memory for cuda 3D array
 	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
@@ -1151,22 +1173,35 @@ void runProjAndDifferenceKernel(
 	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
 	cudaMemcpy3D(&copyParams);
 
-	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
-	texModel_real.normalized = false;
-	texModel_real.filterMode = cudaFilterModeLinear;
-	texModel_imag.normalized = false;
-	texModel_imag.filterMode = cudaFilterModeLinear;
+	// Create texture object// Specify texture
+	struct cudaResourceDesc resDesc_real,resDesc_imag;
+	memset(&resDesc_real, 0, sizeof(resDesc_real));
+	memset(&resDesc_imag, 0, sizeof(resDesc_imag));
+	resDesc_real.resType = cudaResourceTypeArray;
+	resDesc_imag.resType = cudaResourceTypeArray;
+	resDesc_real.res.array.array = modelArray_real;
+	resDesc_imag.res.array.array = modelArray_imag;
 
-	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
+	struct cudaTextureDesc texDesc_real, texDesc_imag;
+	memset(&texDesc_real, 0, sizeof(texDesc_real));
+	memset(&texDesc_imag, 0, sizeof(texDesc_imag));
 	for(int n=0; n<3; n++)
 	{
-		texModel_real.addressMode[n]=cudaAddressModeClamp;
-		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+		texDesc_real.addressMode[n]=cudaAddressModeClamp;
+		texDesc_imag.addressMode[n]=cudaAddressModeClamp;
 	}
+	texDesc_real.filterMode       = cudaFilterModeLinear;
+	texDesc_real.readMode         = cudaReadModeElementType;
+	texDesc_real.normalizedCoords = false;
+	texDesc_imag.filterMode       = cudaFilterModeLinear;
+	texDesc_imag.readMode         = cudaReadModeElementType;
+	texDesc_real.normalizedCoords = false;
 
-    //bind texture reference with cuda array
-	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
-	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
+	cudaTextureObject_t texModel_real = 0;
+	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
+	cudaTextureObject_t texModel_imag = 0;
+	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
+
 
 	// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
 	// we need to make a modified copy, since the global object shouldn't be
@@ -1247,6 +1282,8 @@ void runProjAndDifferenceKernel(
 //		cuda_kernel_PAV_TTI_D2_CC<<<block_dim,BLOCK_SIZE>>>(~eulers,
 //														 ~Fimgs_real,
 //														 ~Fimgs_imag,
+//														 texModel_real,
+//													 	 texModel_imag,
 //														 ~gpuMinvsigma2,
 //														 ~diff2s,
 //														 image_size,
@@ -1264,6 +1301,8 @@ void runProjAndDifferenceKernel(
 //														 op.local_Minvsigma2s[0].ydim,
 //														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 //														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+//		cudaDestroyTextureObject(texModel_real);
+//		cudaDestroyTextureObject(texModel_imag);
 //		cudaFreeArray(modelArray_real);
 //		cudaFreeArray(modelArray_imag);
 	}
@@ -1272,6 +1311,8 @@ void runProjAndDifferenceKernel(
 		cuda_kernel_PAV_TTI_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
 														 ~Fimgs_real,
 														 ~Fimgs_imag,
+														 texModel_real,
+														 texModel_imag,
 														 ~gpuMinvsigma2,
 														 ~diff2s,
 														 image_size,
@@ -1294,7 +1335,8 @@ void runProjAndDifferenceKernel(
 		cudaMemGetInfo( &avail, &total );
 		float used = 100*((float)(total - avail)/(float)total);
 		std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
-
+		cudaDestroyTextureObject(texModel_real);
+		cudaDestroyTextureObject(texModel_imag);
 		cudaFreeArray(modelArray_real);
 		cudaFreeArray(modelArray_imag);
 	}
@@ -1302,8 +1344,7 @@ void runProjAndDifferenceKernel(
 	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 
 	CUDA_GPU_TOC("kernel_diff_proj");
-	cudaUnbindTexture(texModel_real);
-    cudaUnbindTexture(texModel_imag);
+
 }
 #endif
 
@@ -2379,6 +2420,8 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 #if !defined(CUDA_DOUBLE_PRECISION)
 __global__ void cuda_kernel_ProjAndWavg(
 		FLOAT *g_eulers,
+		cudaTextureObject_t texModel_real,
+		cudaTextureObject_t texModel_imag,
 		unsigned my_r_max,
 		int max_r2,
 		int min_r2_nn,
@@ -2468,8 +2511,8 @@ __global__ void cuda_kernel_ProjAndWavg(
 					yp -= STARTINGY_mdl;
 					zp -= STARTINGZ_mdl;
 
-					ref_real=tex3D(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
-					ref_imag=tex3D(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
+					ref_real=tex3D<FLOAT>(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
+					ref_imag=tex3D<FLOAT>(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
 
 
 					if (is_neg_x)
@@ -2635,16 +2678,15 @@ void runProjAndWavgKernel(
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
-	// TODO Use bindless textures to reduce some of this clutter
 
-	cudaArray*        modelArray_real;
-	cudaArray* 		  modelArray_imag;
-	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
-												   baseMLO->mymodel.PPref[exp_iclass].data.ydim,
-												   baseMLO->mymodel.PPref[exp_iclass].data.zdim);
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	// TODO model should carry real & imag in separate channels of the same texture
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+	cudaArray*        modelArray_real;
+	cudaArray* 		  modelArray_imag;
+	cudaExtent        volumeSize = make_cudaExtent(baseMLO->mymodel.PPref[exp_iclass].data.xdim,
+			   	   	   	   	   	   	   	   	       baseMLO->mymodel.PPref[exp_iclass].data.ydim,
+			   	   	   	   	   	   	   	   	       baseMLO->mymodel.PPref[exp_iclass].data.zdim);
 
 	//allocate device memory for cuda 3D array
 	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
@@ -2663,23 +2705,34 @@ void runProjAndWavgKernel(
 	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
 	cudaMemcpy3D(&copyParams);
 
-	//set texture filter mode property, use cudaFilterModePoint or cudaFilterModeLinear
-	texModel_real.normalized = false;
-	texModel_real.filterMode = cudaFilterModeLinear;
-	texModel_imag.normalized = false;
-	texModel_imag.filterMode = cudaFilterModeLinear;
+	// Create texture object// Specify texture
+    struct cudaResourceDesc resDesc_real,resDesc_imag;
+    memset(&resDesc_real, 0, sizeof(resDesc_real));
+    memset(&resDesc_imag, 0, sizeof(resDesc_imag));
+    resDesc_real.resType = cudaResourceTypeArray;
+    resDesc_imag.resType = cudaResourceTypeArray;
+    resDesc_real.res.array.array = modelArray_real;
+    resDesc_imag.res.array.array = modelArray_imag;
 
-	//set texture address mode property, use cudaAddressModeClamp , -Border, -Wrap, or -Mirror
-	for(int n=0; n<3; n++)
+    struct cudaTextureDesc texDesc_real, texDesc_imag;
+    memset(&texDesc_real, 0, sizeof(texDesc_real));
+    memset(&texDesc_imag, 0, sizeof(texDesc_imag));
+    for(int n=0; n<3; n++)
 	{
-		texModel_real.addressMode[n]=cudaAddressModeClamp;
-		texModel_imag.addressMode[n]=cudaAddressModeClamp;
+    	texDesc_real.addressMode[n]=cudaAddressModeClamp;
+    	texDesc_imag.addressMode[n]=cudaAddressModeClamp;
 	}
+    texDesc_real.filterMode       = cudaFilterModeLinear;
+    texDesc_real.readMode         = cudaReadModeElementType;
+    texDesc_real.normalizedCoords = false;
+    texDesc_imag.filterMode       = cudaFilterModeLinear;
+    texDesc_imag.readMode         = cudaReadModeElementType;
+    texDesc_real.normalizedCoords = false;
 
-	//bind texture reference with cuda array
-	cudaBindTextureToArray(texModel_real, modelArray_real, channel);
-	cudaBindTextureToArray(texModel_imag, modelArray_imag, channel);
-
+	cudaTextureObject_t texModel_real = 0;
+	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
+	cudaTextureObject_t texModel_imag = 0;
+	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
 	unsigned orient1, orient2;
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
@@ -2700,6 +2753,8 @@ void runProjAndWavgKernel(
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 	cuda_kernel_ProjAndWavg<<<block_dim,BLOCK_SIZE>>>(~eulers,
+													  texModel_real,
+													  texModel_imag,
 													  max_r,
 													  max_r2,
 													  min_r2_nn,
@@ -2721,6 +2776,8 @@ void runProjAndWavgKernel(
 													  (FLOAT) op.significant_weight[ipart],
 													  baseMLO->refs_are_ctf_corrected
 													);
+	cudaDestroyTextureObject(texModel_real);
+	cudaDestroyTextureObject(texModel_imag);
 	cudaFreeArray(modelArray_real);
 	cudaFreeArray(modelArray_imag);
 
