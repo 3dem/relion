@@ -18,16 +18,16 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										cudaTextureObject_t texModel_imag,
 										FLOAT *g_Minvsigma2,
 										FLOAT *g_diff2s,
-										int image_size,
+										unsigned image_size,
 										FLOAT sum_init,
-										int orientation_num,
-										int translation_num,
-										int significant_num,
+										unsigned long orientation_num,
+										unsigned long translation_num,
+										unsigned long todo_blocks,
 										unsigned long *d_rotidx,
 										unsigned long *d_transidx,
 										unsigned long *d_trans_num,
 										unsigned long *d_ihidden_overs,
-										int my_r_max,
+										unsigned my_r_max,
 										int max_r2,
 										int min_r2_nn,
 										long int img_x,
@@ -46,28 +46,28 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 	FLOAT ref_real;
 	FLOAT ref_imag;
 
-	// inside the padded 2D orientation grid
-	if( bid < significant_num ) // we only need to make
+	__shared__ FLOAT s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
+	// inside the padded 2D orientation gri
+	if( bid < todo_blocks ) // we only need to make
 	{
-		__shared__ FLOAT s[BLOCK_SIZE];
-		s[tid] = 0.0f;
-
+		unsigned trans_num   = d_trans_num[bid]; //how many transes we have for this rot
+		for (int itrans=0; itrans<trans_num; itrans++)
+		{
+			s[itrans*BLOCK_SIZE+tid] = 0.0f;
+		}
+		__syncthreads();
 		// index of comparison
-		unsigned long int ix=d_rotidx[bid];
-		unsigned long int iy=d_transidx[bid];
-
+		unsigned long int ix = d_rotidx[bid];
+		unsigned long int iy;
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
-		unsigned long img_start(iy * image_size);
-		unsigned long img_pixel_idx;
 
-		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
+		for (unsigned pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
 			pixel = (pass * BLOCK_SIZE) + tid;
 			if(pixel<image_size)
 			{
 				int x = pixel % img_x;
 				int y = (int)floorf( (float)pixel / (float)img_x);
-				img_pixel_idx = img_start + pixel;
 
 				// Dont search beyond square with side max_r
 				if (y > my_r_max)
@@ -115,27 +115,40 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 					ref_real=0.0f;
 					ref_imag=0.0f;
 				}
-				FLOAT diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
-				FLOAT diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
 
-				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+				FLOAT diff_real;
+				FLOAT diff_imag;
+				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+				{
+					iy=d_transidx[bid]+itrans;
+					unsigned long img_start(iy * image_size);
+					unsigned long img_pixel_idx = img_start + pixel;
+					diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
+					diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
+					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+					__syncthreads();
+				}
 //				printf(" diffs = %f, %f \n",ref_real,img_pixel_idx);
 //				printf(" diffs = %i, %i ,%i \n",x,y);
 			}
 		}
-		__syncthreads();
-
-		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
+//		__syncthreads();
+		for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 		{
-			if(tid<j)
+			for(int j=(BLOCK_SIZE/2); j>0; j/=2)
 			{
-				s[tid] += s[tid+j];
+				if(tid<j)
+				{
+					s[itrans*BLOCK_SIZE+tid] += s[itrans*BLOCK_SIZE+tid+j];
+				}
+				__syncthreads();
+			}
+			if (tid == 0)
+			{
+				iy=d_transidx[bid]+itrans;
+				g_diff2s[ix * translation_num + iy] = s[itrans*BLOCK_SIZE]+sum_init;
 			}
 			__syncthreads();
-		}
-		if (tid == 0)
-		{
-			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
 		}
 	}
 }

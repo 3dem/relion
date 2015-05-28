@@ -740,13 +740,13 @@ void runProjAndDifferenceKernel(
 	Fimgs_imag.size = translation_num * image_size;
 	Fimgs_imag.device_alloc();
 	Fimgs_imag.cp_to_device();
-	rotidx.size = significant_num;
+	rotidx.size = trans_num.size;
 	rotidx.device_alloc();
 	rotidx.cp_to_device();
-	transidx.size = significant_num;
+	transidx.size = trans_num.size;
 	transidx.device_alloc();
 	transidx.cp_to_device();
-    trans_num.size = orientation_num;
+//    trans_num.size = orientation_num;
     trans_num.device_alloc();
     trans_num.cp_to_device();
 	ihidden_overs.size = significant_num;
@@ -757,7 +757,7 @@ void runProjAndDifferenceKernel(
 				Kernel Calls
 	======================================*/
 	unsigned orient1, orient2;
-    unsigned long block_num = significant_num;
+    unsigned long block_num = trans_num.size;//significant_num;
 
 	if(block_num>65535)
 	{
@@ -822,18 +822,18 @@ void runProjAndDifferenceKernel(
 														 ~gpuMinvsigma2,
 														 ~diff2s,
 														 image_size,
-														 op.highres_Xi2_imgs[ipart] / 2.,
+														 (FLOAT)op.highres_Xi2_imgs[ipart] / 2.,
 														 orientation_num,
 														 translation_num,
-														 significant_num,
+														 block_num, //significant_num,
 														 ~rotidx,
 														 ~transidx,
 														 ~trans_num,
 														 ~ihidden_overs,
 														 max_r,
-													     max_r2,
-													     min_r2_nn,
-													     op.local_Minvsigma2s[0].xdim,
+														 max_r2,
+														 min_r2_nn,
+														 op.local_Minvsigma2s[0].xdim,
 														 op.local_Minvsigma2s[0].ydim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
@@ -1437,31 +1437,49 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CudaGlobalPtr<long unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
 				CudaGlobalPtr<long unsigned> ihidden_overs(orientation_num*translation_num);
-				CudaGlobalPtr<long unsigned> trans_num(orientation_num);
+				CudaGlobalPtr<long unsigned> trans_num(orientation_num*translation_num);
 				long unsigned coarse_num = sp.nr_dir*sp.nr_psi*sp.nr_trans;
 				long unsigned significant_num(0);
-
+//				long int check_num=0;
+				long unsigned k=0;
 				if (exp_ipass == 0)
 				{
 					op.Mcoarse_significant.resize(coarse_num, 1);
 					for (long unsigned i = 0; i < orientation_num; i++)
 					{
-						trans_num[i]=0;
+						trans_num[k]=0;
+						transidx[k]=translation_num+1;//set higher than max(j) so that XMIPP_MIN() sets
+						int tk=0;
 						for (long unsigned j = 0; j < translation_num; j++)
 						{
 							ihidden_overs[significant_num] = i * sp.nr_trans + j;
-							rotidx[significant_num] = i;
-							transidx[significant_num] = j;
-							trans_num[i]++;
+							if(tk>=PROJDIFF_CHUNK_SIZE)
+							{
+								tk=0;             // reset counter
+//								check_num+=trans_num[k];
+								k++;              // use new element
+								trans_num[k]=0;   // prepare next element for ++ incrementing
+								transidx[k]=translation_num+1; //set higher than max(j) so that XMIPP_MIN() sets
+							}
+							tk++;                 // increment limit
+							trans_num[k]++;       // increment number of transes this ProjDiff-block
+							rotidx[k] = i;
+							transidx[k] = XMIPP_MIN(j,transidx[k]);
 							significant_num++;
 						}
+//						check_num+=trans_num[k];
+						k++;   // use new element
 					}
+					trans_num.size=k;
 				}
 				else
 				{
 					for (long unsigned i = 0; i < orientation_num; i++)
 					{
-						trans_num[i]=0;
+						trans_num[k]=0;
+						transidx[k]=translation_num+1;//set higher than max(j) so that XMIPP_MIN() sets
+						int tk=0;
+
 						long int iover_rot = iover_rots[i];
 						long int coarse_rot = floor(i/sp.nr_oversampled_rot);
 						for (long unsigned j = 0; j < translation_num; j++)
@@ -1474,15 +1492,28 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 							{
 								ihidden_overs[significant_num] = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden,
 										                  sp.current_oversampling, iover_rot, iover_trans);
-
-								rotidx[significant_num] = i;
-								transidx[significant_num] = j;
-								trans_num[i]++;
+								if(tk>=PROJDIFF_CHUNK_SIZE)
+								{
+									tk=0;             // reset counter
+//									check_num+=trans_num[k];
+									k++;              // use new element
+									trans_num[k]=0;   // prepare next element for ++ incrementing
+									transidx[k]=translation_num+1; //set higher than max(j) so that XMIPP_MIN() sets
+								}
+								tk++;                 // increment limit
+								trans_num[k]++;       // increment number of transes this ProjDiff-block
+								rotidx[k] = i;
+								transidx[k] = XMIPP_MIN(j,transidx[k]);
 								significant_num++;
 							}
 						}
+//						check_num+=trans_num[k];
+						k++;   // use new element
 					}
+					trans_num.size=k;
 				}
+
+				//  check_num should equal significant_num here, and be less or equal to  PROJDIFF_CHUNK_SIZE*trans_num.size
 
 				CUDA_CPU_TOC("pair_list_1");
 
@@ -2154,8 +2185,8 @@ void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 
 	CUDA_GPU_TOC("cuda_kernel_wavg");
 
-	Fimgs_real.free_device();
-	Fimgs_imag.free_device();
+//	Fimgs_real.free_device();
+//	Fimgs_imag.free_device();
 	Fimgs_nomask_real.free_device();
 	Fimgs_nomask_imag.free_device();
 
@@ -2312,8 +2343,8 @@ void runProjAndWavgKernel(
 
 	CUDA_GPU_TOC("cuda_kernel_wavg");
 
-	Fimgs_real.free_device();
-	Fimgs_imag.free_device();
+//	Fimgs_real.free_device();
+//	Fimgs_imag.free_device();
 	Fimgs_nomask_real.free_device();
 	Fimgs_nomask_imag.free_device();
 
@@ -2725,6 +2756,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 						ipart,
 						group_id,
 						exp_iclass);
+
+				Frefs_real.free_device();
+				Frefs_imag.free_device();
 			}
 //			wdiff2s_parts.cp_to_host();
 //			for (long unsigned k = 0; k < 100; k++)
@@ -2935,9 +2969,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			CUDA_CPU_TOC("collect_data_2");
 
 		} // end loop ipart
-
-		Frefs_real.free_device();
-		Frefs_imag.free_device();
 
 		/*=======================================================================================
 										   BACKPROJECTION

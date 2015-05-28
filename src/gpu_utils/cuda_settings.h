@@ -20,6 +20,8 @@
 									// its ceil:ed multiple exceeding imagesize by too much.
 #define SUM_BLOCK_SIZE 32
 
+#define PROJDIFF_CHUNK_SIZE 1
+
 #define REF_GROUP_SIZE 3			// -- Number of references to be treated per block --
 									// This applies to wavg and reduces global memory
 									// accesses roughly proportionally, but scales shared
