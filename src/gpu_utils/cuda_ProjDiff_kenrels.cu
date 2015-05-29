@@ -6,6 +6,7 @@
  *      Author: bjornf
  */
 #include "src/gpu_utils/cuda_ProjDiff_kernels.cuh"
+#include <external/cub-1.4.1/cub/block/block_reduce.cuh>
 #include <vector>
 #include <iostream>
 
@@ -39,6 +40,11 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
 	int tid = threadIdx.x;
 
+//    // Specialize BlockReduce for a 1D block of 128 threads on type FLOAT
+//    typedef cub::BlockReduce<FLOAT, 128> BlockReduce;
+//    // Allocate shared memory for BlockReduce
+//    __shared__ typename BlockReduce::TempStorage temp_storage;
+
 	FLOAT xp, yp, zp;
 	long int r2;
 	int pixel;
@@ -47,6 +53,7 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 	FLOAT ref_imag;
 
 	__shared__ FLOAT s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
+	__shared__ FLOAT s_outs[PROJDIFF_CHUNK_SIZE];
 	// inside the padded 2D orientation gri
 	if( bid < todo_blocks ) // we only need to make
 	{
@@ -55,7 +62,6 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 		{
 			s[itrans*BLOCK_SIZE+tid] = 0.0f;
 		}
-		__syncthreads();
 		// index of comparison
 		unsigned long int ix = d_rotidx[bid];
 		unsigned long int iy;
@@ -126,8 +132,8 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 					diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
 					diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
 					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
-					__syncthreads();
 				}
+				__syncthreads();
 //				printf(" diffs = %f, %f \n",ref_real,img_pixel_idx);
 //				printf(" diffs = %i, %i ,%i \n",x,y);
 			}
@@ -135,6 +141,9 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 //		__syncthreads();
 		for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 		{
+		    // Compute the block-wide max for thread0
+//			float data = s[itrans*BLOCK_SIZE + tid];
+//			s_outs[itrans] =  BlockReduce(temp_storage).Sum(s[itrans*BLOCK_SIZE + tid]); //BlockReduce(temp_storage).Reduce(thread_data, cub::Sum());
 			for(int j=(BLOCK_SIZE/2); j>0; j/=2)
 			{
 				if(tid<j)
@@ -145,10 +154,13 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 			}
 			if (tid == 0)
 			{
-				iy=d_transidx[bid]+itrans;
-				g_diff2s[ix * translation_num + iy] = s[itrans*BLOCK_SIZE]+sum_init;
+				s_outs[itrans]=s[itrans*BLOCK_SIZE]+sum_init;
 			}
-			__syncthreads();
+		}
+		if (tid < trans_num)
+		{
+			iy=d_transidx[bid]+tid;
+			g_diff2s[ix * translation_num + iy] = s_outs[tid];
 		}
 	}
 }
