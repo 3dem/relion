@@ -1,10 +1,3 @@
-/*
- * cuda_helper_kernels.cu
- *
- *  Created on: May 26, 2015
- *      Author: bjornf
- */
-
 #include "src/gpu_utils/cuda_helper_kernels.cuh"
 #include <vector>
 #include <iostream>

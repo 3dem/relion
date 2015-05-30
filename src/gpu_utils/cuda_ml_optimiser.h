@@ -1,13 +1,13 @@
 #ifndef CUDA_ML_OPTIMISER_H_
 #define CUDA_ML_OPTIMISER_H_
 
+#include "src/ml_optimiser.h"
+
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
 #else
 #define FLOAT float
 #endif
-
-#include "src/ml_optimiser.h"
 
 class OptimisationParamters
 {

@@ -12,7 +12,7 @@
 #include "src/gpu_utils/cuda_utils.cuh"
 #include "src/complex.h"
 #include <fstream>
-#include <cuda.h>
+#include <cuda_runtime.h>
 #include "src/parallel.h"
 #include <thrust/sort.h>
 #include <thrust/device_ptr.h>

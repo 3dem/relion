@@ -1,14 +1,7 @@
-/*
- * cuda_helper_kernels.cuh
- *
- *  Created on: May 26, 2015
- *      Author: bjornf
- */
-
 #ifndef CUDA_HELPER_KERNELS_CUH_
 #define CUDA_HELPER_KERNELS_CUH_
 
-#include <cuda.h>
+#include <cuda_runtime.h>
 #include <vector>
 #include <iostream>
 #include <fstream>

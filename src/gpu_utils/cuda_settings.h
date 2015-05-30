@@ -1,10 +1,3 @@
-/*
- * cuda_settings.h
- *
- *  Created on: May 26, 2015
- *      Author: bjornf
- */
-
 #ifndef CUDA_SETTINGS_H_
 #define CUDA_SETTINGS_H_
 

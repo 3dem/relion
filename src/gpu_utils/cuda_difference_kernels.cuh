@@ -1,14 +1,7 @@
-/*
- * cuda_difference_kernels.cuh
- *
- *  Created on: May 26, 2015
- *      Author: bjornf
- */
-
 #ifndef CUDA_DIFFERENCE_KERNELS_CUH_
 #define CUDA_DIFFERENCE_KERNELS_CUH_
 
-#include <cuda.h>
+#include <cuda_runtime.h>
 #include <vector>
 #include <iostream>
 #include <fstream>

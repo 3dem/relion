@@ -1,10 +1,3 @@
-/*
- * cuda_difference_kernels.cu
-
- *
- *  Created on: May 26, 2015
- *      Author: bjornf
- */
 #include "src/gpu_utils/cuda_difference_kernels.cuh"
 #include <vector>
 #include <iostream>

@@ -1,12 +1,5 @@
-/*
- * cuda_ProjDiff_kenrels.cu
-
- *
- *  Created on: May 27, 2015
- *      Author: bjornf
- */
 #include "src/gpu_utils/cuda_ProjDiff_kernels.cuh"
-#include <external/cub-1.4.1/cub/block/block_reduce.cuh>
+//#include <external/cub-1.4.1/cub/block/block_reduce.cuh>
 #include <vector>
 #include <iostream>
 

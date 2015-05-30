@@ -1,18 +1,12 @@
-/*
- * cuda_utils.cuh
- *
- *  Created on: May 26, 2015
- *      Author: bjornf
- */
-
 #ifndef CUDA_UTILS_CUH_
 #define CUDA_UTILS_CUH_
 
-#include <cuda.h>
+#include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_settings.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
-__forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
+#define FLOAT double
+__device__ inline FLOAT cuda_atomic_add(double* address, double val)
 {
 	unsigned long long int* address_as_ull = (unsigned long long int*)address;
 	unsigned long long int old = *address_as_ull, assumed;
@@ -25,17 +19,10 @@ __forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
 	return __longlong_as_double(old);
 }
 #else
-__forceinline__ __device__ FLOAT cuda_atomic_add(FLOAT* address, FLOAT val)
+#define FLOAT float
+__device__ inline void cuda_atomic_add(float* address, float value)
 {
-	unsigned int* address_as_ul = (unsigned int*)address;
-	unsigned int old = *address_as_ul, assumed;
-	do
-	{
-		assumed = old;
-		old = atomicCAS(address_as_ul, assumed, (int) (val + __longlong_as_double(assumed)));
-	}
-	while (assumed != old); // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-	return (FLOAT) old;
+  atomicAdd(address,value);
 }
 #endif
 

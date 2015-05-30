@@ -1,10 +1,3 @@
-/*
- * cuda_projection_kernels.cu
- *
- *  Created on: May 27, 2015
- *      Author: bjornf
- */
-
 #include "src/gpu_utils/cuda_projection_kernels.cuh"
 #include <vector>
 #include <iostream>
