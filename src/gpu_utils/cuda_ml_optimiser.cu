@@ -5,10 +5,10 @@
 #include <ctime>
 #include <iostream>
 #include "src/gpu_utils/cuda_ml_optimiser.h"
-#include "src/gpu_utils/cuda_helper_kernels.cuh"
-#include "src/gpu_utils/cuda_projection_kernels.cuh"
-#include "src/gpu_utils/cuda_difference_kernels.cuh"
-#include "src/gpu_utils/cuda_ProjDiff_kernels.cuh"
+#include "src/gpu_utils/cuda_kernels/helper.cuh"
+#include "src/gpu_utils/cuda_kernels/projection.cuh"
+#include "src/gpu_utils/cuda_kernels/difference.cuh"
+#include "src/gpu_utils/cuda_kernels/proj_diff.cuh"
 #include "src/gpu_utils/cuda_utils.cuh"
 #include "src/complex.h"
 #include <fstream>

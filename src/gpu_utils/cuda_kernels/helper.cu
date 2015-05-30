@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_helper_kernels.cuh"
+#include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include <vector>
 #include <iostream>
 

@@ -27,7 +27,7 @@ else(BUILD_GUI_TARGETS)
 endif(BUILD_GUI_TARGETS)
 
 if (CUDA_FOUND)
-    file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu")
+    file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu" "${CMAKE_SOURCE_DIR}/src/gpu_utils/cuda_kernels/*.cu")
     cuda_add_library(gpu_util STATIC ${REL_CUDA_SRC})
 endif(CUDA_FOUND)
 

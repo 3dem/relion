@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_ProjDiff_kernels.cuh"
+#include "src/gpu_utils/cuda_kernels/proj_diff.cuh"
 //#include <external/cub-1.4.1/cub/block/block_reduce.cuh>
 #include <vector>
 #include <iostream>

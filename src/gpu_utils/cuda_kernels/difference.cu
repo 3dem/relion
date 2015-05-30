@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_difference_kernels.cuh"
+#include "src/gpu_utils/cuda_kernels/difference.cuh"
 #include <vector>
 #include <iostream>
 

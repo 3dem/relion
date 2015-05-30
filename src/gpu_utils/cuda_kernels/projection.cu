@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_projection_kernels.cuh"
+#include "src/gpu_utils/cuda_kernels/projection.cuh"
 #include <vector>
 #include <iostream>
 
