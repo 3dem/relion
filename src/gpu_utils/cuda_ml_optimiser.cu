@@ -147,27 +147,27 @@ void generateEulerMatrices(
 
 		if(inverse)
 		{
-		    eulers[9 * i + 0] = ( cg * cc - sg * sa) * padding_factor; //00
-		    eulers[9 * i + 1] = (-sg * cc - cg * sa) * padding_factor; //10
-		    eulers[9 * i + 2] = ( sc )               * padding_factor; //20
-		    eulers[9 * i + 3] = ( cg * cs + sg * ca) * padding_factor; //01
-		    eulers[9 * i + 4] = (-sg * cs + cg * ca) * padding_factor; //11
-		    eulers[9 * i + 5] = ( ss )               * padding_factor; //21
-		    eulers[9 * i + 6] = (-cg * sb )          * padding_factor; //02
-		    eulers[9 * i + 7] = ( sg * sb )          * padding_factor; //12
-		    eulers[9 * i + 8] = ( cb )               * padding_factor; //22
+		    eulers[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
+		    eulers[9 * i + 1] = (-sg * cc - cg * sa) ;// * padding_factor; //10
+		    eulers[9 * i + 2] = ( sc )               ;// * padding_factor; //20
+		    eulers[9 * i + 3] = ( cg * cs + sg * ca) ;// * padding_factor; //01
+		    eulers[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
+		    eulers[9 * i + 5] = ( ss )               ;// * padding_factor; //21
+		    eulers[9 * i + 6] = (-cg * sb )          ;// * padding_factor; //02
+		    eulers[9 * i + 7] = ( sg * sb )          ;// * padding_factor; //12
+		    eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
 		}
 		else
 		{
-		    eulers[9 * i + 0] = ( cg * cc - sg * sa) * padding_factor; //00
-		    eulers[9 * i + 1] = ( cg * cs + sg * ca) * padding_factor; //01
-		    eulers[9 * i + 2] = (-cg * sb )          * padding_factor; //02
-		    eulers[9 * i + 3] = (-sg * cc - cg * sa) * padding_factor; //10
-		    eulers[9 * i + 4] = (-sg * cs + cg * ca) * padding_factor; //11
-		    eulers[9 * i + 5] = ( sg * sb )          * padding_factor; //12
-		    eulers[9 * i + 6] = ( sc )               * padding_factor; //20
-		    eulers[9 * i + 7] = ( ss )               * padding_factor; //21
-		    eulers[9 * i + 8] = ( cb )               * padding_factor; //22
+		    eulers[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
+		    eulers[9 * i + 1] = ( cg * cs + sg * ca) ;// * padding_factor; //01
+		    eulers[9 * i + 2] = (-cg * sb )          ;// * padding_factor; //02
+		    eulers[9 * i + 3] = (-sg * cc - cg * sa) ;// * padding_factor; //10
+		    eulers[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
+		    eulers[9 * i + 5] = ( sg * sb )          ;// * padding_factor; //12
+		    eulers[9 * i + 6] = ( sc )               ;// * padding_factor; //20
+		    eulers[9 * i + 7] = ( ss )               ;// * padding_factor; //21
+		    eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
 		}
 	}
 }
@@ -335,7 +335,8 @@ void generateModelProjections(
 		unsigned mdl_y,
 		unsigned mdl_z,
 		unsigned mdl_init_y,
-		unsigned mdl_init_z)
+		unsigned mdl_init_z,
+		float padding_factor)
 {
 
 	int max_r2 = max_r * max_r;
@@ -434,7 +435,8 @@ void generateModelProjections(
 													img_x,
 													img_y,
 													mdl_init_y,
-													mdl_init_z);
+													mdl_init_z,
+													padding_factor);
 	cudaDestroyTextureObject(texModel_real);
 	cudaDestroyTextureObject(texModel_imag);
 	cudaFreeArray(modelArray_real);
@@ -834,7 +836,8 @@ void runProjAndDifferenceKernel(
 														 op.local_Minvsigma2s[0].xdim,
 														 op.local_Minvsigma2s[0].ydim,
 														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+														 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+														 (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor);
 		size_t avail;
 		size_t total;
 		cudaMemGetInfo( &avail, &total );
@@ -937,12 +940,12 @@ __global__ void cuda_kernel_backproject(
 			b = 0;
 		}
 
-		zp = (s_e[b+6] * X + s_e[b+7] * Y + s_e[b+8] * Z);
+		zp = (s_e[b+6] * X + s_e[b+7] * Y + s_e[b+8] * Z) / scale2;
 
 		if (fabsf(zp) > 0.87f) continue; //Within the unit cube, sqrt(3)/2=0.866
 
-		yp = (s_e[b+3] * X + s_e[b+4] * Y + s_e[b+5] * Z);
-		xp = (s_e[b+0] * X + s_e[b+1] * Y + s_e[b+2] * Z);
+		yp = (s_e[b+3] * X + s_e[b+4] * Y + s_e[b+5] * Z) / scale2;
+		xp = (s_e[b+0] * X + s_e[b+1] * Y + s_e[b+2] * Z) / scale2;
 
 		if (xp < 0.0f)
 		{
@@ -1341,7 +1344,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 						baseMLO->mymodel.PPref[exp_iclass].data.ydim,
 						baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 						baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-						baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+						baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+						baseMLO->mymodel.PPref[exp_iclass].padding_factor);
 				model_real.free_device();
 				model_imag.free_device();
 				eulers.free_device();
@@ -1601,6 +1605,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 				CUDA_CPU_TIC("collect_data_1");
 
+//				std::string fnm = std::string("_out_10k_weights.txt");
+//				char *text = &fnm[0];
 //				freopen(text,"w",stdout);
 				long unsigned m=0;
 				for (long unsigned k = 0; k < trans_num.size; k++)
@@ -1610,7 +1616,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 						long unsigned i = rotidx[k];
 						long unsigned j = transidx[k]+itrans;
 						double diff2 = diff2s[i * translation_num + j];
-//						printf("%4.8f \n",DIRECT_A2D_ELEM(op.Mweight, ipart, n));
+//						printf("%4.8f \n",DIRECT_A2D_ELEM(op.Mweight, ipart, m));
 //						printf("%4.8f, %i, %i \n",diff2,i,j);// << std::endl;
 
 						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[m]) = diff2; // TODO if we can write diff2 to the correct pos in the kernel we can just memcpy to a pointer and use thrust to find min
@@ -2010,7 +2016,8 @@ __global__ void cuda_kernel_ProjAndWavg(
 		unsigned long translation_num,
 		FLOAT weight_norm,
 		FLOAT significant_weight,
-		bool refs_are_ctf_corrected)
+		bool refs_are_ctf_corrected,
+		float padding_factor)
 {
 	FLOAT xp, yp, zp;
 	long int r2;
@@ -2057,9 +2064,9 @@ __global__ void cuda_kernel_ProjAndWavg(
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = __ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = __ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y;  // compared to CPU-based projection. This
-					zp = __ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y;  // propagates to dx00, dx10, and so on.
+					xp = (__ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y ) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = (__ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y ) * padding_factor;  // compared to CPU-based projection. This
+					zp = (__ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y ) * padding_factor;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -2339,7 +2346,8 @@ void runProjAndWavgKernel(
 													  translation_num,
 													  (FLOAT) op.sum_weight[ipart],
 													  (FLOAT) op.significant_weight[ipart],
-													  baseMLO->refs_are_ctf_corrected
+													  baseMLO->refs_are_ctf_corrected,
+													  (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor
 													);
 	cudaDestroyTextureObject(texModel_real);
 	cudaDestroyTextureObject(texModel_imag);
@@ -2530,7 +2538,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					baseMLO->mymodel.PPref[exp_iclass].data.ydim,
 					baseMLO->mymodel.PPref[exp_iclass].data.zdim,
 					baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-					baseMLO->mymodel.PPref[exp_iclass].data.zinit);
+					baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+					baseMLO->mymodel.PPref[exp_iclass].padding_factor);
 			model_real.free_device();
 			model_imag.free_device();
 			eulers.free();
@@ -3027,7 +3036,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				bp_model_imag,
 				bp_weight,
 				baseMLO->wsum_model.BPref[exp_iclass].r_max,
-				padding_factor * padding_factor,
+				padding_factor, //* padding_factor,
 				image_size,
 				orientation_num,
 				op.local_Minvsigma2s[0].xdim,
