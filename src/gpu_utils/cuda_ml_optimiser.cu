@@ -34,6 +34,9 @@ void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, 
 		MultidimArray<FLOAT> &Mweight, unsigned long current_oversampling, unsigned long nr_trans)
 {
 
+	int nr_over_orient = sampling.oversamplingFactorOrientations(current_oversampling);
+	int nr_over_trans =sampling.oversamplingFactorTranslations(current_oversampling);
+
 	for (long unsigned i = 0; i < orientation_num; i++)
 	{
 		long unsigned iover_rot = iover_rots[i];
@@ -41,15 +44,12 @@ void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, 
 		{
 			long unsigned iover_trans = iover_transes[j];
 			long unsigned ihidden = iorientclasses[i] * nr_trans + ihiddens[j];
-			long unsigned ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden,
-									  current_oversampling, iover_rot, iover_trans);
+			long unsigned ihidden_over = ihidden * nr_over_orient * nr_over_trans + nr_over_trans * iover_rot + iover_trans;
 			mapped_weights[(long unsigned) i * translation_num + j] =
 					DIRECT_A2D_ELEM(Mweight, ipart, ihidden_over);
-			//Mweight[(i)*(v).xdim+(j)]
 		}
 	}
 }
-
 
 inline
 long unsigned imageTranslation(
@@ -1446,6 +1446,9 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				long unsigned significant_num(0);
 //				long int check_num=0;
 				long unsigned k=0;
+
+				int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
+				int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 				if (exp_ipass == 0)
 				{
 					op.Mcoarse_significant.resize(coarse_num, 1);
@@ -1494,8 +1497,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 							if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 							{
-								ihidden_overs[significant_num] = baseMLO->sampling.getPositionOversampledSamplingPoint(ihidden,
-										                  sp.current_oversampling, iover_rot, iover_trans);
+								ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
+
 								if(tk>=PROJDIFF_CHUNK_SIZE)
 								{
 									tk=0;             // reset counter
@@ -2040,7 +2043,7 @@ __global__ void cuda_kernel_ProjAndWavg(
 			s_wavgs_real[tid]  = 0.0f;
 			s_wavgs_imag[tid]  = 0.0f;
 			s_wdiff2s_parts[tid] = 0.0f;
-			Fweight = 0;
+			Fweight = 0.0f;
 
 			pixel = pass * BLOCK_SIZE + tid;
 			s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
