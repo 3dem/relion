@@ -40,7 +40,8 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										long int img_x,
 										long int img_y,
 										long int mdl_init_y,
-										long int mdl_init_z
+										long int mdl_init_z,
+										float padding_factor
 										);
 #elif !defined(CUDA_DOUBLE_PRECISION)
 // __global__ void cuda_kernel_PAV_TTE_D2

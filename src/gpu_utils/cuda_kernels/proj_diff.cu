@@ -27,7 +27,8 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										long int img_x,
 										long int img_y,
 										long int mdl_init_y,
-										long int mdl_init_z
+										long int mdl_init_z,
+										float padding_factor
 										)
 {
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
@@ -80,9 +81,9 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = __ldg(&g_eulers[ix*9])   * x + __ldg(&g_eulers[ix*9+1]) * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = __ldg(&g_eulers[ix*9+3]) * x + __ldg(&g_eulers[ix*9+4]) * y;  // compared to CPU-based projection. This
-					zp = __ldg(&g_eulers[ix*9+6]) * x + __ldg(&g_eulers[ix*9+7]) * y;  // propagates to dx00, dx10, and so on.
+					xp = (__ldg(&g_eulers[ix*9])   * x + __ldg(&g_eulers[ix*9+1]) * y ) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = (__ldg(&g_eulers[ix*9+3]) * x + __ldg(&g_eulers[ix*9+4]) * y ) * padding_factor;  // compared to CPU-based projection. This
+					zp = (__ldg(&g_eulers[ix*9+6]) * x + __ldg(&g_eulers[ix*9+7]) * y ) * padding_factor;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -131,24 +132,20 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 //				printf(" diffs = %i, %i ,%i \n",x,y);
 			}
 		}
-//		__syncthreads();
-		for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+		for(int j=(BLOCK_SIZE/2); j>0; j/=2)
 		{
-		    // Compute the block-wide max for thread0
-//			float data = s[itrans*BLOCK_SIZE + tid];
-//			s_outs[itrans] =  BlockReduce(temp_storage).Sum(s[itrans*BLOCK_SIZE + tid]); //BlockReduce(temp_storage).Reduce(thread_data, cub::Sum());
-			for(int j=(BLOCK_SIZE/2); j>0; j/=2)
+			if(tid<j)
 			{
-				if(tid<j)
+				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
 					s[itrans*BLOCK_SIZE+tid] += s[itrans*BLOCK_SIZE+tid+j];
 				}
-				__syncthreads();
 			}
-			if (tid == 0)
-			{
-				s_outs[itrans]=s[itrans*BLOCK_SIZE]+sum_init;
-			}
+			__syncthreads();
+		}
+		if (tid < trans_num)
+		{
+			s_outs[tid]=s[tid*BLOCK_SIZE]+sum_init;
 		}
 		if (tid < trans_num)
 		{

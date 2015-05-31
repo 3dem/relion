@@ -154,7 +154,8 @@ __global__ void cuda_kernel_PAV_TTI( FLOAT *g_eulers,
 														 int XSIZE_img,
 														 int YSIZE_img,
 														 int STARTINGY_mdl,
-														 int STARTINGZ_mdl)
+														 int STARTINGZ_mdl,
+														 float padding_factor)
 {
 	FLOAT xp, yp, zp;
 	long int r2;
@@ -188,9 +189,9 @@ __global__ void cuda_kernel_PAV_TTI( FLOAT *g_eulers,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = __ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = __ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y;  // compared to CPU-based projection. This
-					zp = __ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y;  // propagates to dx00, dx10, and so on.
+					xp = (__ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y ) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = (__ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y ) * padding_factor;  // compared to CPU-based projection. This
+					zp = (__ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y ) * padding_factor;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
