@@ -10,6 +10,7 @@
 #include "src/gpu_utils/cuda_kernels/difference.cuh"
 #include "src/gpu_utils/cuda_kernels/proj_diff.cuh"
 #include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/complex.h"
 #include <fstream>
 #include <cuda_runtime.h>
