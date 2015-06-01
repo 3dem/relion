@@ -216,32 +216,13 @@ long int generateProjectionSetup(
 		std::vector< double > &tilts,
 		std::vector< double > &psis,
 		std::vector< long unsigned > &iorientclasses,
-		std::vector< long unsigned > &iover_rots,
-		unsigned proj_div_nr,
-		unsigned iproj_div)
+		std::vector< long unsigned > &iover_rots)
 {
 	//Local variables
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 	long int orientation_num = 0;
 
-	long int idir_min, idir_max, iorient_start;
-
-	if(proj_div_nr > 1)
-	{
-		long int idir_span = ceil((float) ( sp.idir_max - sp.idir_min ) / (float) proj_div_nr);
-		iorient_start = idir_span * iproj_div * (sp.ipsi_max - sp.ipsi_min + 1);
-		idir_min = sp.idir_min + idir_span * iproj_div;
-		if (iproj_div < proj_div_nr - 1) idir_max = idir_min + idir_span;
-		else                             idir_max = sp.idir_max+1;
-	}
-	else
-	{
-		iorient_start = 0;
-		idir_min = sp.idir_min;
-		idir_max = sp.idir_max+1;
-	}
-
-	for (long int idir = idir_min, iorient = iorient_start; idir < idir_max; idir++)
+	for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 	{
 		for (long int ipsi = sp.ipsi_min, ipart = 0; ipsi <= sp.ipsi_max; ipsi++, iorient++)
 		{
@@ -1261,8 +1242,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					exp_iclass,
 					rots, tilts, psis,
 					iorientclasses,
-					iover_rots,
-					0,0);
+					iover_rots);
 
 			CUDA_CPU_TOC("generateProjectionSetup");
 			CUDA_CPU_TIC("generateEulerMatrices");
@@ -2633,8 +2613,49 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 									          MAXIMIZATION
 		=======================================================================================*/
 
+
+		std::vector< long unsigned > iorientclasses_all, iover_rots_all;
+		std::vector< double > rots_all, tilts_all, psis_all;
+
+		CUDA_CPU_TIC("generateProjectionSetup_2");
+
+		long unsigned orientation_num_all = generateProjectionSetup(
+					op,
+					sp,
+					baseMLO,
+					false,  //coarse
+					exp_iclass,
+					rots_all, tilts_all, psis_all,
+					iorientclasses_all,
+					iover_rots_all);
+
+		CUDA_CPU_TOC("generateProjectionSetup_2");
+
+		unsigned proj_div_max_count(4096);
+
+		proj_div_nr = ceil((float)orientation_num_all / (float)proj_div_max_count);
+
 		for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 		{
+			unsigned long proj_div_start(proj_div_max_count * iproj_div),
+					proj_div_end;
+
+			if (iproj_div < proj_div_nr - 1)
+				proj_div_end = proj_div_start + proj_div_max_count;
+			else
+				proj_div_end = orientation_num_all - 1;
+
+			long unsigned orientation_num(proj_div_end - proj_div_start);
+
+			std::vector< long unsigned >
+				iorientclasses(&iorientclasses_all[proj_div_start],&iorientclasses_all[proj_div_end]),
+				iover_rots(&iover_rots_all[proj_div_start],&iover_rots_all[proj_div_end]);
+
+			std::vector< double >
+				rots(&rots_all[proj_div_start],&rots_all[proj_div_end]),
+				tilts(&tilts_all[proj_div_start],&tilts_all[proj_div_end]),
+				psis(&psis_all[proj_div_start],&psis_all[proj_div_end]);
+
 
 			/*======================================================
 								 PROJECTIONS
@@ -2644,28 +2665,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			// we might as well make it wider in scope and retain it on the GPU until then. When we
 			// switch from pair to bool, there won't be any need to remake it every class, but for
 			// now we create only those matrices corresponding to significant orientations, which IS  * class-specific *
-
-			std::vector< long unsigned > iorientclasses, iover_rots;
-			std::vector< double > rots, tilts, psis;
-
-			CUDA_CPU_TIC("generateProjectionSetup_2");
-
-			long unsigned orientation_num = generateProjectionSetup(
-						op,
-						sp,
-						baseMLO,
-						false,  //coarse
-						exp_iclass,
-						rots, tilts, psis,
-						iorientclasses,
-						iover_rots,
-						proj_div_nr,
-						iproj_div);
-
-			CUDA_CPU_TOC("generateProjectionSetup_2");
-
-			if (orientation_num == 0)
-				continue;
 
 
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
