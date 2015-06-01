@@ -1487,11 +1487,12 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 								transidx[k] = XMIPP_MIN(j,transidx[k]);
 								significant_num++;
 							}
-							else if(tk!=0) // start a new one - we expect transes to be sequential.
+							else if(tk!=0) // start a new one with the same rotidx - we expect transes to be sequential.
 							{
 								tk=0;             // reset counter
 //								check_num+=trans_num[k];
 								k++;              // use new element
+								rotidx[k] = i;
 								trans_num[k]=0;   // prepare next element for ++ incrementing
 								transidx[k]=translation_num+1; //set higher than max(j) so that XMIPP_MIN() sets
 							}
@@ -2647,7 +2648,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			std::vector< long unsigned > iorientclasses, iover_rots;
 			std::vector< double > rots, tilts, psis;
 
-			CUDA_CPU_TIC("projection_2");
+			CUDA_CPU_TIC("generateProjectionSetup_2");
 
 			long unsigned orientation_num = generateProjectionSetup(
 						op,
@@ -2661,6 +2662,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 						proj_div_nr,
 						iproj_div);
 
+			CUDA_CPU_TOC("generateProjectionSetup_2");
+
+			if (orientation_num == 0)
+				continue;
 
 
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
@@ -2717,7 +2722,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				eulers.free();
 				CUDA_CPU_TOC("generateModelProjections_wavg");
 			}
-			CUDA_CPU_TOC("projection_2");
 
 			CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
 			wavgs_real.device_alloc();
