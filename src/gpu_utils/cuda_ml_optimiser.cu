@@ -224,31 +224,24 @@ long int generateProjectionSetup(
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 	long int orientation_num = 0;
 
-	unsigned parts_size(sp.nr_psi * sp.nr_oversampled_rot);
-	std::vector< double > rots_parts(parts_size);
-	std::vector< double > tilts_parts(parts_size);
-	std::vector< double > psis_parts(parts_size);
-	std::vector< long unsigned > iorientclasses_parts(parts_size);
-	std::vector< long unsigned > iover_rots_parts(parts_size);
-
-	long int idir_min, idir_max, iorient;
+	long int idir_min, idir_max, iorient_start;
 
 	if(proj_div_nr > 1)
 	{
 		long int idir_span = ceil((float) ( sp.idir_max - sp.idir_min ) / (float) proj_div_nr);
-		iorient = idir_span * iproj_div * (sp.ipsi_max - sp.ipsi_min + 1);
+		iorient_start = idir_span * iproj_div * (sp.ipsi_max - sp.ipsi_min + 1);
 		idir_min = sp.idir_min + idir_span * iproj_div;
 		if (iproj_div < proj_div_nr - 1) idir_max = idir_min + idir_span;
 		else                             idir_max = sp.idir_max+1;
 	}
 	else
 	{
-		iorient = 0;
+		iorient_start = 0;
 		idir_min = sp.idir_min;
 		idir_max = sp.idir_max+1;
 	}
 
-	for (long int idir = idir_min; idir < idir_max; idir++)
+	for (long int idir = idir_min, iorient = iorient_start; idir < idir_max; idir++)
 	{
 		for (long int ipsi = sp.ipsi_min, ipart = 0; ipsi <= sp.ipsi_max; ipsi++, iorient++)
 		{
@@ -285,54 +278,15 @@ long int generateProjectionSetup(
 				// Loop over all oversampled orientations (only a single one in the first pass)
 				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++, ipart++)
 				{
-					iorientclasses_parts[ipart] = iorientclass;
-					iover_rots_parts[ipart] = iover_rot;
+					iorientclasses.push_back(iorientclass);
+					iover_rots.push_back(iover_rot);
 
-					rots_parts[ipart] = oversampled_rot[iover_rot];
-					tilts_parts[ipart] = oversampled_tilt[iover_rot];
-					psis_parts[ipart] = oversampled_psi[iover_rot];
+					rots.push_back(oversampled_rot[iover_rot]);
+					tilts.push_back(oversampled_tilt[iover_rot]);
+					psis.push_back(oversampled_psi[iover_rot]);
 
 					orientation_num ++;
 				}
-			}
-		}
-
-		//TODO check that the following sort always works out
-
-		if (sp.current_oversampling > 0)
-		{
-			int oversampling_per_psi = ROUND(std::pow(2., sp.current_oversampling));
-			int oversampling_per_dir = ROUND(std::pow(4., sp.current_oversampling));
-
-			//Sort the angles to have coalesced rot/tilt order
-			for (unsigned i = 0; i < oversampling_per_dir; i++) //Loop over the perturbed dir pairs
-			{
-				for (unsigned j = 0; j < sp.nr_psi; j++)
-				{
-					for (unsigned k = 0; k < oversampling_per_psi; k++) //two psis per perturbed dir pair
-					{
-						unsigned ij = j*oversampling_per_psi*oversampling_per_dir + i*oversampling_per_psi + k;
-
-						iorientclasses.push_back(iorientclasses_parts[ij]);
-						iover_rots.push_back(iover_rots_parts[ij]);
-
-						rots.push_back(rots_parts[ij]);
-						tilts.push_back(tilts_parts[ij]);
-						psis.push_back(psis_parts[ij]);
-					}
-				}
-			}
-		}
-		else
-		{
-			for (unsigned i = 0; i < iorientclasses_parts.size(); i++)
-			{
-				iorientclasses.push_back(iorientclasses_parts[i]);
-				iover_rots.push_back(iover_rots_parts[i]);
-
-				rots.push_back(rots_parts[i]);
-				tilts.push_back(tilts_parts[i]);
-				psis.push_back(psis_parts[i]);
 			}
 		}
 	}
@@ -2467,7 +2421,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 	unsigned image_size = op.Fimgs[0].nzyxdim;
 
-	unsigned proj_div_nr = 4;
+	unsigned proj_div_nr = 20;
 
 	bool do_combineProjAndWavg = true; //TODO add control flag, maybe
 
