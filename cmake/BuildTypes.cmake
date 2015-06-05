@@ -41,7 +41,7 @@ message(STATUS "CMAKE_CXX_FLAGS_DEBUG : ${CMAKE_CXX_FLAGS_DEBUG}")
 #   -pg		gprof profiling output (needs linker flag)
 #
 set(RELION_FLAGS_RELEASE "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_RELEASE "-arch=sm_52 --default-stream per-thread" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELEASE "-arch=sm_35 --default-stream per-thread" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_RELEASE  "")
 

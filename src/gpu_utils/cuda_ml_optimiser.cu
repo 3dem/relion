@@ -444,9 +444,6 @@ void generateModelProjections(
 #endif
 
 	//unbind texture reference to free resource
-
-
-
 }
 
 
@@ -537,6 +534,7 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 	dim3 block_dim(orient1,orient2);
 
 	CUDA_CPU_TOC("kernel_init_1");
+
 	CUDA_GPU_TIC("kernel_diff_noproj");
 	// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
 //				cudaDeviceProp dP;
@@ -563,13 +561,6 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 													~ihidden_overs);
 	}
 	CUDA_GPU_TAC("kernel_diff_noproj");
-	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
-	CUDA_GPU_TOC("kernel_diff_noproj");
-	size_t avail;
-	size_t total;
-	cudaMemGetInfo( &avail, &total );
-	float used = 100*((float)(total - avail)/(float)total);
-	std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
 }
 
 #if !defined(CUDA_DOUBLE_PRECISION)
@@ -604,6 +595,8 @@ void runProjAndDifferenceKernel(
 	/*===========================
 	 *      TEXTURE STUFF
 	 * ==========================*/
+
+	CUDA_GPU_TIC("projectorMemCp");
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	// TODO model should carry real & imag in separate channels of the same texture
@@ -660,6 +653,7 @@ void runProjAndDifferenceKernel(
 	cudaTextureObject_t texModel_imag = 0;
 	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
 
+	CUDA_GPU_TAC("projectorMemCp");
 
 	// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
 	// we need to make a modified copy, since the global object shouldn't be
@@ -689,8 +683,6 @@ void runProjAndDifferenceKernel(
 		}
 	}
 
-	gpuMinvsigma2.cp_to_device();
-
 	unsigned orient1, orient2;
     unsigned long block_num = trans_num.size;//significant_num;
 
@@ -706,12 +698,17 @@ void runProjAndDifferenceKernel(
 	}
 	dim3 block_dim(orient1,orient2);
 
+	CUDA_GPU_TIC("imagMemCp");
+	gpuMinvsigma2.cp_to_device();
 	Fimgs_real.size = translation_num * image_size;
 	Fimgs_real.device_alloc();
 	Fimgs_real.cp_to_device();
 	Fimgs_imag.size = translation_num * image_size;
 	Fimgs_imag.device_alloc();
 	Fimgs_imag.cp_to_device();
+	CUDA_GPU_TAC("imagMemCp");
+
+	CUDA_GPU_TIC("pairListMemCp");
 	rotidx.size = block_num;
 	rotidx.device_alloc();
 	rotidx.cp_to_device();
@@ -724,9 +721,11 @@ void runProjAndDifferenceKernel(
 	ihidden_overs.size = block_num;
 	ihidden_overs.device_alloc();
 	ihidden_overs.cp_to_device();
-
+	CUDA_GPU_TAC("pairListMemCp");
 
 	CUDA_CPU_TOC("kernel_init_1");
+
+
 	CUDA_GPU_TIC("kernel_diff_proj");
 
 
@@ -738,75 +737,44 @@ void runProjAndDifferenceKernel(
 	if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
 	{
 		// FIXME  make _CC
+		printf("Cross correlation is not supported yet.");
 		exit(0);
-//		cuda_kernel_PAV_TTI_D2_CC<<<block_dim,BLOCK_SIZE>>>(~eulers,
-//														 ~Fimgs_real,
-//														 ~Fimgs_imag,
-//														 texModel_real,
-//													 	 texModel_imag,
-//														 ~gpuMinvsigma2,
-//														 ~diff2s,
-//														 image_size,
-//														 op.highres_Xi2_imgs[ipart] / 2.,
-//														 orientation_num,
-//														 translation_num,
-//														 significant_num,
-//														 ~rotidx,
-//														 ~transidx,
-//		 	 	 	 	 	 	 	 	 	 	 	 	 ~trans_num,
-//														 ~ihidden_overs,
-//														 max_r,
-//													     max_r2,
-//													     min_r2_nn,
-//														 op.local_Minvsigma2s[0].xdim,
-//														 op.local_Minvsigma2s[0].ydim,
-//														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-//														 baseMLO->mymodel.PPref[exp_iclass].data.zinit);
-//		cudaDestroyTextureObject(texModel_real);
-//		cudaDestroyTextureObject(texModel_imag);
-//		cudaFreeArray(modelArray_real);
-//		cudaFreeArray(modelArray_imag);
 	}
-	else
-	{
-		cuda_kernel_PAV_TTI_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
-														 ~Fimgs_real,
-														 ~Fimgs_imag,
-														 texModel_real,
-														 texModel_imag,
-														 ~gpuMinvsigma2,
-														 ~diff2s,
-														 image_size,
-														 op.highres_Xi2_imgs[ipart] / 2.,
-														 orientation_num,
-														 translation_num,
-														 block_num, //significant_num,
-														 ~rotidx,
-														 ~transidx,
-														 ~trans_num,
-														 ~ihidden_overs,
-														 max_r,
-														 max_r2,
-														 min_r2_nn,
-														 op.local_Minvsigma2s[0].xdim,
-														 op.local_Minvsigma2s[0].ydim,
-														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
-														 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
-														 (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor);
-		size_t avail;
-		size_t total;
-		cudaMemGetInfo( &avail, &total );
-		float used = 100*((float)(total - avail)/(float)total);
-		std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
-		cudaDestroyTextureObject(texModel_real);
-		cudaDestroyTextureObject(texModel_imag);
-		cudaFreeArray(modelArray_real);
-		cudaFreeArray(modelArray_imag);
-	}
-	CUDA_GPU_TAC("kernel_diff_proj");
-	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
 
-	CUDA_GPU_TOC("kernel_diff_proj");
+	cuda_kernel_PAV_TTI_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
+													 ~Fimgs_real,
+													 ~Fimgs_imag,
+													 texModel_real,
+													 texModel_imag,
+													 ~gpuMinvsigma2,
+													 ~diff2s,
+													 image_size,
+													 op.highres_Xi2_imgs[ipart] / 2.,
+													 orientation_num,
+													 translation_num,
+													 block_num, //significant_num,
+													 ~rotidx,
+													 ~transidx,
+													 ~trans_num,
+													 ~ihidden_overs,
+													 max_r,
+													 max_r2,
+													 min_r2_nn,
+													 op.local_Minvsigma2s[0].xdim,
+													 op.local_Minvsigma2s[0].ydim,
+													 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+													 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+													 (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor);
+	size_t avail;
+	size_t total;
+	cudaMemGetInfo( &avail, &total );
+	float used = 100*((float)(total - avail)/(float)total);
+	std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
+	cudaDestroyTextureObject(texModel_real);
+	cudaDestroyTextureObject(texModel_imag);
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+	CUDA_GPU_TAC("kernel_diff_proj");
 
 }
 #endif
@@ -993,6 +961,8 @@ static void runBackprojectKernel(
 {
 	int max_r2 = max_r * max_r;
 
+	CUDA_CPU_TIC("sphereVixelDetermiation");
+
 	CudaGlobalPtr<int> xs(mdl_x*mdl_y*mdl_z); // >52% will actually be used, allocate some padding
 	CudaGlobalPtr<int> ys(xs.size);
 	CudaGlobalPtr<int> zs(xs.size);
@@ -1018,6 +988,10 @@ static void runBackprojectKernel(
 	ys.size = xs.size;
 	zs.size = xs.size;
 
+	CUDA_CPU_TOC("sphereVixelDetermiation");
+
+	CUDA_GPU_TIC("sphereVixelMemCp");
+
 	xs.device_alloc();
 	ys.device_alloc();
 	zs.device_alloc();
@@ -1026,8 +1000,12 @@ static void runBackprojectKernel(
 	ys.cp_to_device();
 	zs.cp_to_device();
 
+	CUDA_GPU_TAC("sphereVixelMemCp");
+
 	int grid_dim = ceil((float)N / BACKPROJECTION4_GROUP_SIZE);
 	dim3 block_dim( BACKPROJECTION4_GROUP_SIZE *4 );
+
+	CUDA_GPU_TIC("cuda_kernel_backproject");
 
 	cuda_kernel_backproject<<<grid_dim,block_dim>>>(
 			~xs,~ys,~zs,
@@ -1049,6 +1027,8 @@ static void runBackprojectKernel(
 			mdl_inity,
 			mdl_initz,
 			N);
+
+	CUDA_GPU_TAC("cuda_kernel_backproject");
 }
 
 
@@ -1066,6 +1046,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 	{
 		for (long unsigned ipart = first_ipart; ipart <= last_ipart; ipart++)
 		{
+			CUDA_CPU_TIC("oneParticle");
+
 			unsigned my_ori_particle = baseMLO->exp_my_first_ori_particle + ipart;
 			SamplingParameters sp;
 			sp.nr_particles = baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size();
@@ -1145,6 +1127,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 			for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 			{
+				CUDA_CPU_TIC("weightPass");
+
 				if (baseMLO->strict_highres_exp > 0.)
 					// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
 					sp.current_image_size = baseMLO->coarse_size;
@@ -1166,9 +1150,12 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				CUDA_CPU_TIC("getAllSquaredDifferences");
 				getAllSquaredDifferences(ipass, op, sp);
 				CUDA_CPU_TOC("getAllSquaredDifferences");
+
 				CUDA_CPU_TIC("convertAllSquaredDifferencesToWeights");
 				convertAllSquaredDifferencesToWeights(ipass, op, sp);
 				CUDA_CPU_TOC("convertAllSquaredDifferencesToWeights");
+
+				CUDA_CPU_TOC("weightPass");
 			}
 
 			// For the reconstruction step use mymodel.current_size!
@@ -1177,6 +1164,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			CUDA_CPU_TIC("storeWeightedSums");
 			storeWeightedSums(op, sp);
 			CUDA_CPU_TOC("storeWeightedSums");
+
+			CUDA_CPU_TOC("oneParticle");
 		}
 	}
 }
@@ -1232,7 +1221,6 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			std::vector< long unsigned > iorientclasses, iover_rots;
 			std::vector< double > rots, tilts, psis;
 
-			CUDA_CPU_TIC("projection_1");
 			CUDA_CPU_TIC("generateProjectionSetup");
 			long unsigned orientation_num = generateProjectionSetup(
 					op,
@@ -1245,6 +1233,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					iover_rots);
 
 			CUDA_CPU_TOC("generateProjectionSetup");
+
+
 			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
 
@@ -1256,17 +1246,15 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					eulers,
 					!IS_NOT_INV);
 
-		    eulers.device_alloc();
-			eulers.cp_to_device();
 			CUDA_CPU_TOC("generateEulerMatrices");
+
+			CUDA_GPU_TIC("eulersMemCp_1");
+			eulers.device_alloc();
+			eulers.cp_to_device();
+			CUDA_GPU_TAC("eulersMemCp_1");
+
+
 			CUDA_CPU_TIC("modelAssignment");
-
-//			CudaGlobalPtr<FLOAT > model_real;
-//			float* holder = new float[(baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim];
-//			model_real.h_ptr = holder;
-//			model_real.size=(baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim;
-//			model_real.h_do_free = true;
-
 			CudaGlobalPtr<FLOAT > model_real((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
 			CudaGlobalPtr<FLOAT > model_imag((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
 
@@ -1275,11 +1263,12 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				model_real[i] = (FLOAT) baseMLO->mymodel.PPref[exp_iclass].data.data[i].real;
 				model_imag[i] = (FLOAT) baseMLO->mymodel.PPref[exp_iclass].data.data[i].imag;
 			}
+			CUDA_CPU_TOC("modelAssignment");
+
 
 			CudaGlobalPtr<FLOAT> Frefs_real;
-		    CudaGlobalPtr<FLOAT> Frefs_imag;
+			CudaGlobalPtr<FLOAT> Frefs_imag;
 
-			CUDA_CPU_TOC("modelAssignment");
 			bool do_combineProjAndDiff = true; //TODO add control flag
 			if(!do_combineProjAndDiff)
 			{
@@ -1306,7 +1295,6 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				eulers.free_device();
 				CUDA_CPU_TOC("generateModelProjections_diff");
 			}
-			CUDA_CPU_TOC("projection_1");
 
 			/*=======================================================================================
 			                                  	  Particle Iteration
@@ -1389,7 +1377,6 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				//      This section is annoying to test because
 				//		it can't complete on first pass, since
 				//		the significance has never been set
-
 
 				CUDA_CPU_TIC("pair_list_1");
 
@@ -1543,15 +1530,18 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 										diff2s
 										);
 				}
+
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
 
+				CUDA_GPU_TIC("diff2sMemCp");
 				diff2s.cp_to_host(); // FIXME may not be needed since we copy it back in ConvetToWeights()
-//				for (long unsigned k = 0; k < 100; k++)
-//				{
-//					std::cerr << diff2s[k] << std::endl;
-//				}
+				CUDA_GPU_TAC("diff2sMemCp");
+
+				HANDLE_ERROR(cudaDeviceSynchronize());
+				CUDA_GPU_TOC();
+
 				if (exp_ipass == 0)
 				{
 					op.Mcoarse_significant.clear();
@@ -1755,6 +1745,9 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 				bool do_gpu_sumweight = true;  //TODO add control flag
 				if(oversamples>=SUM_BLOCK_SIZE && do_gpu_sumweight) // Send task to GPU where warps can access automatically coalesced oversamples
 				{
+					CUDA_CPU_TIC("sumweight1");
+					CUDA_GPU_TIC("sumweightMemCp1");
+
 					//std::cerr << "summing weights on GPU... baseMLO->mymodel.pdf_class[exp_iclass] = " << baseMLO->mymodel.pdf_class[sp.iclass_min] <<  std::endl;
 					pdf_orientation.device_alloc();
 					pdf_orientation.cp_to_device();
@@ -1769,8 +1762,12 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 					Mweight.device_alloc();
 					Mweight.cp_to_device();
 
+					CUDA_GPU_TAC("sumweightMemCp1");
+
 					dim3 block_dim(sp.nr_dir,sp.nr_psi);
 					//std::cerr << "using block dimensions " << sp.nr_dir << "," << sp.nr_psi <<  std::endl;
+
+					CUDA_GPU_TIC("cuda_kernel_sumweight_oversampling");
 					cuda_kernel_sumweight_oversampling<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
 																						~pdf_offset,
 																						~Mweight,
@@ -1779,20 +1776,26 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 																						sp.nr_trans,
 																						oversamples
 																					 );
+					CUDA_GPU_TAC("cuda_kernel_sumweight_oversampling");
 
+					CUDA_GPU_TIC("sumweightMemCp2");
 					Mweight.cp_to_host(); //FIXME make wider in scope; pass to storeWsums() to be used in collect-step. Needs som coordination with else() below.
 					Mweight.free_device();  //FIXME see line above
 					thisparticle_sumweight.cp_to_host();
 					thisparticle_sumweight.free_device();
+
+					CUDA_GPU_TAC("sumweightMemCp2");
 
 					// The reduced entity *MUST* be double to avoid loss of information// TODO better reduction
 					for (long int n = 0; n < sp.nr_dir * sp.nr_psi; n++)
 					{
 						exp_thisparticle_sumweight += (double)thisparticle_sumweight[n];
 					}
+					CUDA_CPU_TOC("sumweight1");
 				}
 				else // Not enough oversamples to utilize GPU resources effciently with current CUDA-kernel.
 				{
+					CUDA_CPU_TIC("sumweight2");
 					//std::cerr << "summing weights on CPU... " <<  std::endl;
 					for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 					{
@@ -1836,7 +1839,10 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 							} // end loop itrans
 						} // end loop ipsi
 					} // end loop idir
-				}                            //endif do_gpu_sumweight
+
+					CUDA_CPU_TOC("sumweight2");
+
+				} //endif do_gpu_sumweight
 			} // end loop exp_iclass
 		} // end if iter==1
 
@@ -2160,10 +2166,6 @@ void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 	float used = 100*((float)(total - avail)/(float)total);
 	std::cerr << "Device memory used @ wavg: " << used << "%" << std::endl;
 	CUDA_GPU_TAC("cuda_kernel_wavg");
-
-	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
-
-	CUDA_GPU_TOC("cuda_kernel_wavg");
 }
 
 
@@ -2310,10 +2312,6 @@ void runProjAndWavgKernel(
 	float used = 100*((float)(total - avail)/(float)total);
 	std::cerr << "Device memory used @ wavg: " << used << "%" << std::endl;
 	CUDA_GPU_TAC("cuda_kernel_wavg");
-
-	HANDLE_ERROR(cudaDeviceSynchronize()); //TODO Apparently this is not required here
-
-	CUDA_GPU_TOC("cuda_kernel_wavg");
 }
 #endif
 
@@ -2402,7 +2400,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 	unsigned image_size = op.Fimgs[0].nzyxdim;
 
-	unsigned proj_div_nr = 20;
+	unsigned proj_div_max_count(4096*2);
 
 	bool do_combineProjAndWavg = true; //TODO add control flag, maybe
 
@@ -2520,13 +2518,14 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					~p_thr_wsum_prior_offsety_class,
 					~p_thr_wsum_sigma2_offset
 				   );
-			HANDLE_ERROR(cudaDeviceSynchronize());
 
 			// TODO further reduce the below 4 arrays while data is still on gpu
 			p_weights.cp_to_host();
 			p_thr_wsum_prior_offsetx_class.cp_to_host();
 			p_thr_wsum_prior_offsety_class.cp_to_host();
 			p_thr_wsum_sigma2_offset.cp_to_host();
+
+			HANDLE_ERROR(cudaDeviceSynchronize());
 
 			thr_wsum_sigma2_offset = 0.0;
 			int iorient = 0;
@@ -2631,9 +2630,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 		CUDA_CPU_TOC("generateProjectionSetup_2");
 
-		unsigned proj_div_max_count(4096);
-
-		proj_div_nr = ceil((float)orientation_num_all / (float)proj_div_max_count);
+		unsigned proj_div_nr = ceil((float)orientation_num_all / (float)proj_div_max_count);
 
 		for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 		{
@@ -2981,12 +2978,16 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
 					cuda_kernel_reduce_wdiff2s<<<grid_dim_wd,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
 				}
-				CUDA_GPU_TOC("cuda_kernels_reduce_wdiff2s");
+				CUDA_GPU_TAC("cuda_kernels_reduce_wdiff2s");
 
 				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
 				wdiff2s_parts.cp_to_host();
 				wdiff2s_parts.size = orientation_num * image_size;
 				wdiff2s_parts.free_device();
+
+				HANDLE_ERROR(cudaDeviceSynchronize());
+
+				CUDA_GPU_TOC();
 
 				for (long int j = 0; j < image_size; j++)
 				{
@@ -3071,6 +3072,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			wavgs_imag.free();
 
 			HANDLE_ERROR(cudaDeviceSynchronize());
+
+			CUDA_GPU_TOC();
 
 			int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 			pthread_mutex_lock(&global_mutex2[my_mutex]);

@@ -11,7 +11,7 @@
 //Non-concurrent benchmarking tools (only for Linux)
 #ifdef CUDA_BENCHMARK
 #include <vector>
-#include <ctime>
+#include <time.h>
 #include <string>
 
 static int cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
@@ -22,16 +22,17 @@ static int cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
 	return -1;
 }
 
-std::vector<std::string> cuda_cpu_identifiers;
-std::vector<clock_t>     cuda_cpu_start_times;
+std::vector<std::string> cuda_cpu_benchmark_identifiers;
+std::vector<clock_t>     cuda_cpu_benchmark_start_times;
+FILE *cuda_cpu_benchmark_fPtr = fopen("benchmark_cpu.dat","w");
 
 #define CUDA_CPU_TIC(ID) (cuda_cpu_tic(ID))
 static void cuda_cpu_tic(std::string id)
 {
-	if (cuda_benchmark_find_id(id, cuda_cpu_identifiers) == -1)
+	if (cuda_benchmark_find_id(id, cuda_cpu_benchmark_identifiers) == -1)
 	{
-		cuda_cpu_identifiers.push_back(id);
-		cuda_cpu_start_times.push_back(clock());
+		cuda_cpu_benchmark_identifiers.push_back(id);
+		cuda_cpu_benchmark_start_times.push_back(clock());
 	}
 	else
 	{
@@ -43,7 +44,7 @@ static void cuda_cpu_tic(std::string id)
 #define CUDA_CPU_TOC(ID) (cuda_cpu_toc(ID))
 static void cuda_cpu_toc(std::string id)
 {
-	int idx = cuda_benchmark_find_id(id, cuda_cpu_identifiers);
+	int idx = cuda_benchmark_find_id(id, cuda_cpu_benchmark_identifiers);
 	if (idx == -1)
 	{
 		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_cpu_toc.\n", id.c_str());
@@ -51,31 +52,33 @@ static void cuda_cpu_toc(std::string id)
 	}
 	else
 	{
-		clock_t start_time = cuda_cpu_start_times[idx];
-		cuda_cpu_identifiers.erase(cuda_cpu_identifiers.begin()+idx);
-		cuda_cpu_start_times.erase(cuda_cpu_start_times.begin()+idx);
-		FILE *fPtr = fopen("benchmark.dat","a");
-		fprintf(fPtr,"CPU: %s \t %.2f ms\n", id.c_str(),
-				(((float)clock() - (float)start_time) / CLOCKS_PER_SEC ) * 1000.);
-		fclose(fPtr);
+		for (int i = 1; i < cuda_cpu_benchmark_identifiers.size(); i++)
+			fprintf(cuda_cpu_benchmark_fPtr,"\t");
+
+		clock_t t = clock() - cuda_cpu_benchmark_start_times[idx];
+		cuda_cpu_benchmark_identifiers.erase(cuda_cpu_benchmark_identifiers.begin()+idx);
+		cuda_cpu_benchmark_start_times.erase(cuda_cpu_benchmark_start_times.begin()+idx);
+		fprintf(cuda_cpu_benchmark_fPtr,"%s \t %.2f ms\n", id.c_str(), (float)t / CLOCKS_PER_SEC * 1000.);
+//		printf(,"%s \t %.2f ms\n", id.c_str(), (float)t / CLOCKS_PER_SEC * 1000.);
 	}
 }
-std::vector<std::string> cuda_gpu_kernel_identifiers;
-std::vector<cudaEvent_t> cuda_gpu_kernel_start_times;
-std::vector<cudaEvent_t> cuda_gpu_kernel_stop_times;
+std::vector<std::string> cuda_gpu_benchmark_identifiers;
+std::vector<cudaEvent_t> cuda_gpu_benchmark_start_times;
+std::vector<cudaEvent_t> cuda_gpu_benchmark_stop_times;
+FILE *cuda_gpu_benchmark_fPtr = fopen("benchmark_gpu.dat","w");
 
 #define CUDA_GPU_TIC(ID) (cuda_gpu_tic(ID))
 static void cuda_gpu_tic(std::string id)
 {
-	if (cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers) == -1)
+	if (cuda_benchmark_find_id(id, cuda_gpu_benchmark_identifiers) == -1)
 	{
 		cudaEvent_t start, stop;
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		cudaEventRecord(start, 0);
-		cuda_gpu_kernel_identifiers.push_back(id);
-		cuda_gpu_kernel_start_times.push_back(start);
-		cuda_gpu_kernel_stop_times.push_back(stop);
+		cuda_gpu_benchmark_identifiers.push_back(id);
+		cuda_gpu_benchmark_start_times.push_back(start);
+		cuda_gpu_benchmark_stop_times.push_back(stop);
 	}
 	else
 	{
@@ -88,7 +91,7 @@ static void cuda_gpu_tic(std::string id)
 #define CUDA_GPU_TAC(ID) (cuda_gpu_tac(ID))
 static void cuda_gpu_tac(std::string id)
 {
-	int idx = cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers);
+	int idx = cuda_benchmark_find_id(id, cuda_gpu_benchmark_identifiers);
 	if (idx == -1)
 	{
 		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_tac.\n",
@@ -97,35 +100,35 @@ static void cuda_gpu_tac(std::string id)
 	}
 	else
 	{
-		cudaEventRecord(cuda_gpu_kernel_stop_times[idx], 0);
-		cudaEventSynchronize(cuda_gpu_kernel_stop_times[idx]);
+		cudaEventRecord(cuda_gpu_benchmark_stop_times[idx], 0);
+		cudaEventSynchronize(cuda_gpu_benchmark_stop_times[idx]);
 	}
 }
 
-#define CUDA_GPU_TOC(ID) (cuda_gpu_toc(ID))
-static void cuda_gpu_toc(std::string id)
+#define CUDA_GPU_TOC() (cuda_gpu_toc())
+static void cuda_gpu_toc()
 {
-	int idx = cuda_benchmark_find_id(id, cuda_gpu_kernel_identifiers);
-	if (idx == -1)
+	if (cuda_gpu_benchmark_identifiers.size() == 0)
 	{
-		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_toc.\n",
-				id.c_str());
+		printf("DEBUG_ERROR: There were no identifiers found in the list, on call to cuda_gpu_toc.\n");
 		exit( EXIT_FAILURE );
 	}
 	else
 	{
 		float time;
-		cudaEventElapsedTime(&time, cuda_gpu_kernel_start_times[idx],
-				cuda_gpu_kernel_stop_times[idx]);
-		cudaEventDestroy(cuda_gpu_kernel_start_times[idx]);
-		cudaEventDestroy(cuda_gpu_kernel_stop_times[idx]);
-		cuda_gpu_kernel_identifiers.erase(cuda_gpu_kernel_identifiers.begin()+idx);
-		cuda_gpu_kernel_start_times.erase(cuda_gpu_kernel_start_times.begin()+idx);
-		cuda_gpu_kernel_stop_times.erase(cuda_gpu_kernel_stop_times.begin()+idx);
+		for (int idx = 0; idx < cuda_gpu_benchmark_identifiers.size(); idx ++)
+		{
+			cudaEventElapsedTime(&time, cuda_gpu_benchmark_start_times[idx],
+					cuda_gpu_benchmark_stop_times[idx]);
+			cudaEventDestroy(cuda_gpu_benchmark_start_times[idx]);
+			cudaEventDestroy(cuda_gpu_benchmark_stop_times[idx]);
+			fprintf(cuda_gpu_benchmark_fPtr,"%s \t %.2f ms\n",
+					cuda_gpu_benchmark_identifiers[idx].c_str(), time);
+		}
 
-		FILE *fPtr = fopen("benchmark.dat","a");
-		fprintf(fPtr,"GPU: %s \t %.2f ms\n", id.c_str(), time);
-		fclose(fPtr);
+		cuda_gpu_benchmark_identifiers.clear();
+		cuda_gpu_benchmark_start_times.clear();
+		cuda_gpu_benchmark_stop_times.clear();
 	}
 }
 #else
