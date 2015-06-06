@@ -4,13 +4,13 @@
 #include <math.h>
 #include <ctime>
 #include <iostream>
+#include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/projection.cuh"
 #include "src/gpu_utils/cuda_kernels/difference.cuh"
 #include "src/gpu_utils/cuda_kernels/proj_diff.cuh"
 #include "src/gpu_utils/cuda_utils.cuh"
-#include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/complex.h"
 #include <fstream>
 #include <cuda_runtime.h>
@@ -563,7 +563,7 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 	CUDA_GPU_TAC("kernel_diff_noproj");
 }
 
-#if !defined(CUDA_DOUBLE_PRECISION)
+
 void runProjAndDifferenceKernel(
 		CudaGlobalPtr<FLOAT > &model_real,
 		CudaGlobalPtr<FLOAT > &model_imag,
@@ -592,14 +592,16 @@ void runProjAndDifferenceKernel(
 	int max_r2 = max_r * max_r;
 	int min_r2_nn = 0; // r_min_nn * r_min_nn;  //FIXME add nn-algorithm
 
-	/*===========================
-	 *      TEXTURE STUFF
-	 * ==========================*/
+
 
 	CUDA_GPU_TIC("projectorMemCp");
 
+#if	!defined(CUDA_DOUBLE_PRECISION) // make a texture to speed up projector data access textures //TODO move to rank-level
+	/*===========================
+	 *      TEXTURE STUFF
+	 * ==========================*/
 	// create channel to describe data type (bits,bits,bits,bits,type)
-	// TODO model should carry real & imag in separate channels of the same texture
+	// TODO model should carry real & imag in separate channels of the same texture - speed increase? (one access)
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 	cudaArray*        modelArray_real;
 	cudaArray* 		  modelArray_imag;
@@ -652,7 +654,12 @@ void runProjAndDifferenceKernel(
 	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
 	cudaTextureObject_t texModel_imag = 0;
 	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
-
+#else
+	model_real.device_alloc();
+	model_real.cp_to_device();
+	model_imag.device_alloc();
+	model_imag.cp_to_device();
+#endif
 	CUDA_GPU_TAC("projectorMemCp");
 
 	// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
@@ -725,7 +732,6 @@ void runProjAndDifferenceKernel(
 
 	CUDA_CPU_TOC("kernel_init_1");
 
-
 	CUDA_GPU_TIC("kernel_diff_proj");
 
 
@@ -740,7 +746,8 @@ void runProjAndDifferenceKernel(
 		printf("Cross correlation is not supported yet.");
 		exit(0);
 	}
-
+#if !defined(CUDA_DOUBLE_PRECISION) && defined(USE_TEXINTERP) // use texture mem + use internal interpolation intrisics at texture-read-time
+//	std::cerr << "using texture memory pav_tti_d2 kernel" << std::endl;
 	cuda_kernel_PAV_TTI_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
 													 ~Fimgs_real,
 													 ~Fimgs_imag,
@@ -765,19 +772,78 @@ void runProjAndDifferenceKernel(
 													 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 													 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
 													 (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor);
+	cudaDestroyTextureObject(texModel_real);
+	cudaDestroyTextureObject(texModel_imag);
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+#elif !defined(CUDA_DOUBLE_PRECISION) // use texture mem
+//	std::cerr << "using texture memory pav_tte_d2 kernel" << std::endl;
+	cuda_kernel_PAV_TTE_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
+														 ~Fimgs_real,
+														 ~Fimgs_imag,
+														 texModel_real,
+														 texModel_imag,
+														 ~gpuMinvsigma2,
+														 ~diff2s,
+														 image_size,
+														 op.highres_Xi2_imgs[ipart] / 2.,
+														 orientation_num,
+														 translation_num,
+														 block_num, //significant_num,
+														 ~rotidx,
+														 ~transidx,
+														 ~trans_num,
+														 ~ihidden_overs,
+														 max_r,
+														 max_r2,
+														 min_r2_nn,
+														 op.local_Minvsigma2s[0].xdim,
+														 op.local_Minvsigma2s[0].ydim,
+														 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+														 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+														 (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor);
+	cudaDestroyTextureObject(texModel_real);
+	cudaDestroyTextureObject(texModel_imag);
+	cudaFreeArray(modelArray_real);
+	cudaFreeArray(modelArray_imag);
+#else // use global mem
+//	std::cerr << "using global memory pav_tge_d2 kernel" << std::endl;
+	cuda_kernel_PAV_TGE_D2<<<block_dim,BLOCK_SIZE>>>(~eulers,
+															 ~Fimgs_real,
+															 ~Fimgs_imag,
+															 ~model_real,														// note DIFFERENT TYPE input compared to texture-utilising functions
+															 ~model_imag,														// note DIFFERENT TYPE input compared to texture-utilising functions
+															 ~gpuMinvsigma2,
+															 ~diff2s,
+															 image_size,
+															 op.highres_Xi2_imgs[ipart] / 2.,
+															 orientation_num,
+															 translation_num,
+															 block_num, //significant_num,
+															 ~rotidx,
+															 ~transidx,
+															 ~trans_num,
+															 ~ihidden_overs,
+															 max_r,
+															 max_r2,
+															 min_r2_nn,
+															 op.local_Minvsigma2s[0].xdim,
+															 op.local_Minvsigma2s[0].ydim,
+															 baseMLO->mymodel.PPref[exp_iclass].data.yinit,
+															 baseMLO->mymodel.PPref[exp_iclass].data.zinit,
+															 baseMLO->mymodel.PPref[exp_iclass].data.xdim,						// note ADDITIONAL input compared to texture-utilising functions
+															 baseMLO->mymodel.PPref[exp_iclass].data.ydim,						// note ADDITIONAL input compared to texture-utilising functions
+															 (float)baseMLO->mymodel.PPref[exp_iclass].padding_factor);
+#endif
+
 	size_t avail;
 	size_t total;
 	cudaMemGetInfo( &avail, &total );
 	float used = 100*((float)(total - avail)/(float)total);
 	std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
-	cudaDestroyTextureObject(texModel_real);
-	cudaDestroyTextureObject(texModel_imag);
-	cudaFreeArray(modelArray_real);
-	cudaFreeArray(modelArray_imag);
 	CUDA_GPU_TAC("kernel_diff_proj");
-
 }
-#endif
+
 
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
@@ -1481,9 +1547,9 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
 				diff2s.device_alloc();
 
-#if !defined(CUDA_DOUBLE_PRECISION)
 				if(do_combineProjAndDiff)
 				{
+					std::cerr << "using proj and diff combined" << std::endl;
 					runProjAndDifferenceKernel(model_real,
 											   model_imag,
 											   gpuMinvsigma2,
@@ -1509,8 +1575,8 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 					eulers.free_device();
 				}
 				else
-#endif
 				{
+					std::cerr << "using proj and diff separate" << std::endl;
 					runDifferenceKernel(gpuMinvsigma2,
 										Fimgs_real,
 										Fimgs_imag,
@@ -1570,11 +1636,12 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[m]) = diff2; // TODO if we can write diff2 to the correct pos in the kernel we can just memcpy to a pointer and use thrust to find min
 						// Keep track of minimum of all diff2, only for the last image in this series
-						if (diff2 < op.min_diff2[ipart])
+						if (diff2 < op.min_diff2[ipart]) // TODO thrust min
 							op.min_diff2[ipart] = diff2;
 					}
 				}
 //				fclose(stdout);
+//				std::cerr << "mindiff = " << op.min_diff2[ipart] << std::endl;
 
 				CUDA_CPU_TOC("collect_data_1");
 			} // end loop ipart
@@ -1706,7 +1773,6 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 					else
 						pdf_offset[jtrans] = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
 				}
-
 // TODO : Put back when  convertAllSquaredDifferencesToWeights is GPU-parallel.
 //							// TMP DEBUGGING
 //							if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && (pdf_offset==0. || pdf_orientation==0.))
@@ -1742,7 +1808,8 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 
-				bool do_gpu_sumweight = true;  //TODO add control flag
+				bool do_gpu_sumweight = true;
+//				do_gpu_sumweight = true;  //TODO add control flag
 				if(oversamples>=SUM_BLOCK_SIZE && do_gpu_sumweight) // Send task to GPU where warps can access automatically coalesced oversamples
 				{
 					CUDA_CPU_TIC("sumweight1");
@@ -1786,10 +1853,12 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 					CUDA_GPU_TAC("sumweightMemCp2");
 
+					exp_thisparticle_sumweight=0;
 					// The reduced entity *MUST* be double to avoid loss of information// TODO better reduction
 					for (long int n = 0; n < sp.nr_dir * sp.nr_psi; n++)
 					{
-						exp_thisparticle_sumweight += (double)thisparticle_sumweight[n];
+//						std::cerr << " sumweight =  " << exp_thisparticle_sumweight << " " << thisparticle_sumweight[n] << " " << n << std::endl;
+						exp_thisparticle_sumweight += thisparticle_sumweight[n];
 					}
 					CUDA_CPU_TOC("sumweight1");
 				}
@@ -1808,6 +1877,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 								long int ihidden_over = ihidden * sp.nr_oversampled_rot * sp.nr_oversampled_trans;
 								for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
 								{
+									double weight;
 									// Then loop over iover_trans
 									for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, ihidden_over++)
 									{
@@ -1821,17 +1891,24 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 										else
 										{
 											// Set the weight base to the probability of the parameters given the prior
-											double weight = pdf_orientation[iorient] * pdf_offset[itrans];
+											weight = pdf_orientation[iorient] * pdf_offset[itrans];
 											double diff2 = DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) - op.min_diff2[ipart];
 											// next line because of numerical precision of exp-function
-											if (diff2 > 700.) weight = 0.;
-											// TODO: use tabulated exp function?
-											else weight *= exp(-diff2);
+#if defined(CUDA_DOUBLE_PRECISION)
+											if (diff2 > 700.)
+#else
+											if (diff2 > 88.)
+#endif
+												weight = 0.;
+											// TODO: use tabulated exp function? - would save double prec kernel
+											else
+												weight *= exp(-diff2);
 											// Store the weight
 											DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = weight;
 
 											// Keep track of sum and maximum of all weights for this particle
 											// Later add all to exp_thisparticle_sumweight, but inside this loop sum to local thisthread_sumweight first
+//											std::cerr << " sumweight =  " << exp_thisparticle_sumweight << " " << weight << " " << ihidden_over << std::endl;
 											exp_thisparticle_sumweight += weight;
 										} // end if/else op.Mweight < 0.
 									} // end loop iover_trans
@@ -1848,6 +1925,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
+//		std::cerr << " sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
 		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
@@ -1875,12 +1953,18 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 		// Get the relevant row for this particle
 		op.Mweight.getRow(ipart, sorted_weight);
 
+//		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
+//		{
+//			std::cerr << "weights = " << DIRECT_A2D_ELEM(op.Mweight, ipart, n) << " to " <<  DIRECT_MULTIDIM_ELEM(sorted_weight, n) << std::endl;
+//		}
+
 		// Only select non-zero probabilities to speed up sorting
 		long int np = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
 		{
 			if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) > 0.)
 			{
+//				std::cerr << "weights = " << DIRECT_A2D_ELEM(op.Mweight, ipart, n) << std::endl;
 				DIRECT_MULTIDIM_ELEM(sorted_weight, np) = DIRECT_MULTIDIM_ELEM(sorted_weight, n);
 				np++;
 			}
@@ -1889,8 +1973,9 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 		// Sort from low to high values
 		CUDA_CPU_TIC("sort");
-#if defined(USE_THRUST) // Thrust seems incredibly slow in debug build this is clearly a FIXME
-		thrust::sort(sorted_weight.data, sorted_weight.data + np);
+//		std::cerr << "sort on " << sorted_weight.xdim << " which should have np = " << np << std::endl;
+#if  defined(USE_THRUST) && !defined(CUDA_DOUBLE_PRECISION) // Thrust seems incredibly slow in debug build this is clearly a FIXME
+		thrust::sort(sorted_weight.data, sorted_weight.data + np );
 #else
 		sorted_weight.sort();
 #endif
@@ -1903,6 +1988,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 		{
 			if (exp_ipass==0) my_nr_significant_coarse_samples++;
 			my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
+			//std::cerr << "thisweight = " << my_significant_weight << std::endl;
 			frac_weight += my_significant_weight;
 			if (frac_weight > baseMLO->adaptive_fraction * op.sum_weight[ipart])
 				break;
@@ -2571,15 +2657,19 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			myp_oo_otrans_x2y2z2.free();
 
 
-
-
 			/*=======================================================================================
 												  SET META DATA
 			=======================================================================================*/
 
 			//Get index of max element using GPU-tool thrust
 			Indices max_index;
+#if !defined(CUDA_DOUBLE_PRECISION) && defined(USE_THRUST)
 			max_index.fineIdx = thrust::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
+#else
+			max_index.fineIdx = std::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
+#endif
+//			std::cerr << "max index = " << max_index.fineIdx << std::endl;
+
 			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, max_index.fineIdx);
 			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 

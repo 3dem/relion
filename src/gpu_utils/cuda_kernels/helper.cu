@@ -12,7 +12,7 @@ __global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
 {
 	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
 	// blockid
-	int ex  = blockIdx.x * gridDim.y + blockIdx.y;
+	int bid  = blockIdx.x * gridDim.y + blockIdx.y;
 	//threadid
 	int tid = threadIdx.x;
 	s_sumweight[tid]=0;
@@ -20,7 +20,7 @@ __global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
 	// passes to take care of all fine samples in a coarse sample
 	int pass_num = ceil((float)oversamples / (float)SUM_BLOCK_SIZE);
 	//Where to start in g_Mweight to find all data for this *coarse* orientation
-	long int ref_Mweight_idx = ex * ( translation_num*oversamples );
+	long int ref_Mweight_idx = bid * ( translation_num*oversamples );
 
 	// Go over all *coarse* translations, reducing in place
 	for (int itrans=0; itrans<translation_num; itrans++)
@@ -29,18 +29,27 @@ __global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
 		int pos = ref_Mweight_idx + itrans*oversamples + tid;
 		for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE)
 		{
-			if( g_Mweight[pos] < 0.0f ) //TODO Might be slow (divergent threads)
+			if( g_Mweight[pos] < (FLOAT)0.0 ) //TODO Might be slow (divergent threads)
 			{
-				g_Mweight[pos] = 0.0f;
+				g_Mweight[pos] = (FLOAT)0.0;
 			}
 			else
 			{
-				FLOAT weight = g_pdf_orientation[ex] * g_pdf_offset[itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+				FLOAT weight = g_pdf_orientation[bid] * g_pdf_offset[itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
 				FLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
 				// next line because of numerical precision of exp-function
-				if (diff2 > 700.0f)
-					weight = 0.0f;
-				else weight *= exp(-diff2);  // TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+#if defined(CUDA_DOUBLE_PRECISION)
+					if (diff2 > 700.)
+						weight = 0.;
+					else
+						weight *= exp(-diff2);
+#else
+					if (diff2 > 88.)
+						weight = 0.;
+					else
+						weight *= expf(-diff2);
+#endif
+					// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
 
 				// Store the weight for each fine sample in this coarse pair
 				g_Mweight[pos] = weight; // TODO put in shared mem
@@ -50,6 +59,7 @@ __global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
 			}
 		}
 	}
+	__syncthreads();
 	// Reduction of all fine samples in this coarse orientation
 	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
 	{
@@ -59,7 +69,7 @@ __global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
 		}
 	}
 	__syncthreads();
-	g_thisparticle_sumweight[ex]=s_sumweight[0];
+	g_thisparticle_sumweight[bid]=s_sumweight[0];
 }
 
 __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
