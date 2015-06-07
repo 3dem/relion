@@ -1797,20 +1797,13 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 				// Now first loop over iover_rot, because that is the order in op.Mweight as well
 //				long int ihidden_over = ihidden * sp.nr_oversampled_rot * sp.nr_oversampled_trans;
 
-				/*=========================================
-					  Kernel call over all combinations
-				===========================================*/
-
-				// One block will be started for each (coarse) orientation, and will process all (coarse) transes,
-				// and since oversmapling is by factors of 2 on 5 dofs, we get 2^5=32 fine comparisons per coarse.
-				// In case of higher oversampling this is simply factors of 32, making it warp-perfect. Having 21
-				// coarse transes allows a block to finish in 21, 100% utilized, warp passes.
-
+				/*================================================
+					 Sumweights - exponentiation and reduction
+				==================================================*/
 				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 
-				bool do_gpu_sumweight = true;
-//				do_gpu_sumweight = true;  //TODO add control flag
-				if(oversamples>=SUM_BLOCK_SIZE && do_gpu_sumweight) // Send task to GPU where warps can access automatically coalesced oversamples
+				bool do_gpu_sumweight = true;  //TODO add control flag
+				if(do_gpu_sumweight)
 				{
 					CUDA_CPU_TIC("sumweight1");
 					CUDA_GPU_TIC("sumweightMemCp1");
@@ -1829,20 +1822,24 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 					Mweight.device_alloc();
 					Mweight.cp_to_device();
 
+
 					CUDA_GPU_TAC("sumweightMemCp1");
 
-					dim3 block_dim(sp.nr_dir,sp.nr_psi);
-					//std::cerr << "using block dimensions " << sp.nr_dir << "," << sp.nr_psi <<  std::endl;
+					dim3 block_dim(sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE);
+//					std::cerr << "using block dimensions " << block_dim.x << "," << block_dim.y  <<  std::endl;
 
 					CUDA_GPU_TIC("cuda_kernel_sumweight_oversampling");
-					cuda_kernel_sumweight_oversampling<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
-																						~pdf_offset,
-																						~Mweight,
-																						~thisparticle_sumweight,
-																						op.min_diff2[ipart],
-																						sp.nr_trans,
-																						oversamples
-																					 );
+
+					cuda_kernel_sumweight<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
+																			~pdf_offset,
+																			~Mweight,
+																			~thisparticle_sumweight,
+																			(FLOAT)op.min_diff2[ipart],
+																			sp.nr_oversampled_rot,
+																			sp.nr_oversampled_trans,
+																			sp.nr_trans
+																		 );
+
 					CUDA_GPU_TAC("cuda_kernel_sumweight_oversampling");
 
 					CUDA_GPU_TIC("sumweightMemCp2");
@@ -1855,9 +1852,8 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 					exp_thisparticle_sumweight=0;
 					// The reduced entity *MUST* be double to avoid loss of information// TODO better reduction
-					for (long int n = 0; n < sp.nr_dir * sp.nr_psi; n++)
+					for (long int n = 0; n < block_dim.x; n++)
 					{
-//						std::cerr << " sumweight =  " << exp_thisparticle_sumweight << " " << thisparticle_sumweight[n] << " " << n << std::endl;
 						exp_thisparticle_sumweight += thisparticle_sumweight[n];
 					}
 					CUDA_CPU_TOC("sumweight1");
@@ -1936,7 +1932,6 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 #endif
 
 	} // end loop ipart
-
 	if (exp_ipass==0)
 	{
 		op.Mcoarse_significant.resize(sp.nr_particles, XSIZE(op.Mweight));

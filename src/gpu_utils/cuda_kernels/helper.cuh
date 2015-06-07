@@ -7,13 +7,14 @@
 #include <fstream>
 #include "src/gpu_utils/cuda_utils.cuh"
 
-__global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
-													FLOAT *g_pdf_offset,
-													FLOAT *g_Mweight,
-													FLOAT *g_thisparticle_sumweight,
-													FLOAT min_diff2,
-													int translation_num,
-													int oversamples);
+__global__ void cuda_kernel_sumweight(  FLOAT *g_pdf_orientation,
+									    FLOAT *g_pdf_offset,
+										FLOAT *g_Mweight,
+										FLOAT *g_thisparticle_sumweight,
+										FLOAT min_diff2,
+										int oversamples_orient,
+										int oversamples_trans,
+										int coarse_trans);
 
 __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,
 										FLOAT *g_oo_otrans_y,

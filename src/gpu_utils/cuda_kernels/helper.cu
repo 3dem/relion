@@ -2,65 +2,69 @@
 #include <vector>
 #include <iostream>
 
-__global__ void cuda_kernel_sumweight_oversampling(	FLOAT *g_pdf_orientation,
-													FLOAT *g_pdf_offset,
-													FLOAT *g_Mweight,
-													FLOAT *g_thisparticle_sumweight,
-													FLOAT min_diff2,
-													int translation_num,
-													int oversamples)
+__global__ void cuda_kernel_sumweight(  FLOAT *g_pdf_orientation,
+									    FLOAT *g_pdf_offset,
+										FLOAT *g_Mweight,
+										FLOAT *g_thisparticle_sumweight,
+										FLOAT min_diff2,
+										int oversamples_orient,
+										int oversamples_trans,
+										int coarse_trans)
 {
 	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
 	// blockid
-	int bid  = blockIdx.x * gridDim.y + blockIdx.y;
+	int bid  = blockIdx.x;
 	//threadid
 	int tid = threadIdx.x;
-	s_sumweight[tid]=0;
 
-	// passes to take care of all fine samples in a coarse sample
-	int pass_num = ceil((float)oversamples / (float)SUM_BLOCK_SIZE);
-	//Where to start in g_Mweight to find all data for this *coarse* orientation
-	long int ref_Mweight_idx = bid * ( translation_num*oversamples );
+	s_sumweight[tid]=0.;
+	int c_iorient, f_iorient, c_itrans, f_itrans, pos, iorient = bid*SUM_BLOCK_SIZE+tid;
 
-	// Go over all *coarse* translations, reducing in place
-	for (int itrans=0; itrans<translation_num; itrans++)
+	// Bacause the partion of work is so arbitrarily divided in this kernel,
+	// we need to do some brute idex work to get the correct indices.
+	c_iorient = (long int)floorf((FLOAT)iorient/(FLOAT)oversamples_orient);
+	f_iorient = iorient % oversamples_orient;
+	for (int itrans=0; itrans<(coarse_trans*oversamples_trans); itrans++)
 	{
-		//Where to start in g_Mweights to find all fine samples for this *coarse* translation
-		int pos = ref_Mweight_idx + itrans*oversamples + tid;
-		for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE)
+		c_itrans = (long int)floorf((FLOAT)itrans/(FLOAT)oversamples_trans);
+		f_itrans = itrans % oversamples_trans;
+
+		pos = c_iorient * (coarse_trans *oversamples_orient*oversamples_trans );
+		pos += c_itrans * (oversamples_orient*oversamples_trans);
+		pos += f_iorient*( oversamples_trans ) + f_itrans;
+
+		if( g_Mweight[pos] < (FLOAT)0.0 ) //TODO Might be slow (divergent threads)
 		{
-			if( g_Mweight[pos] < (FLOAT)0.0 ) //TODO Might be slow (divergent threads)
-			{
-				g_Mweight[pos] = (FLOAT)0.0;
-			}
-			else
-			{
-				FLOAT weight = g_pdf_orientation[bid] * g_pdf_offset[itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-				FLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
-				// next line because of numerical precision of exp-function
+			g_Mweight[pos] = (FLOAT)0.0;
+		}
+		else
+		{
+			FLOAT weight = g_pdf_orientation[c_iorient] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+			FLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
+			// next line because of numerical precision of exp-function
 #if defined(CUDA_DOUBLE_PRECISION)
-					if (diff2 > 700.)
-						weight = 0.;
-					else
-						weight *= exp(-diff2);
+				if (diff2 > 700.)
+					weight = 0.;
+				else
+					weight *= exp(-diff2);
 #else
-					if (diff2 > 88.)
-						weight = 0.;
-					else
-						weight *= expf(-diff2);
+				if (diff2 > 88.)
+					weight = 0.;
+				else
+					weight *= expf(-diff2);
 #endif
-					// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
 
-				// Store the weight for each fine sample in this coarse pair
-				g_Mweight[pos] = weight; // TODO put in shared mem
+			// Store the weight
+			g_Mweight[pos] = weight; // TODO put in shared mem
 
-				// Reduce weights for each fine sample in this coarse pair
-				s_sumweight[tid] += weight;
-			}
+			// Reduce weights for sum of all weights
+			s_sumweight[tid] += weight;
 		}
 	}
+
 	__syncthreads();
-	// Reduction of all fine samples in this coarse orientation
+	// Further reduction of all samples in this block
 	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
 	{
 		if(tid<j)
