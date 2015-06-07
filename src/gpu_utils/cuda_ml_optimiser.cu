@@ -24,6 +24,32 @@ static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIAL
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
+ * Splits a designated number of blocks to be run
+ * in a cuda-kernel into two components of a dim3.
+ */
+dim3 splitCudaBlocks(long int block_num, bool doForceEven)
+{
+	unsigned int orient1, orient2;
+	if(block_num>65535)
+	{
+		orient1 = ceil(sqrt(block_num));
+		orient2 = orient1;
+		if(doForceEven)
+		{
+			orient2 += orient1 + (orient1 % 2);
+			orient1 += 			 (orient1 % 2);
+		}
+	}
+	else
+	{
+		orient1 = block_num;
+		orient2 = 1;
+	}
+	dim3 block_dim(orient1,orient2);
+	return(block_dim);
+}
+
+/*
  * Maps weights to a decoupled indexing of translations and orientations
  */
 inline
@@ -359,20 +385,9 @@ void generateModelProjections(
 	Frefs_imag.size = orientation_num * image_size;
 	Frefs_imag.device_alloc();
 
-	unsigned int orient1, orient2;
-	if(orientation_num>65535)
-	{
-		orient1 = ceil(sqrt(orientation_num));
-		orient2 = orient1;
-	}
-	else
-	{
-		orient1 = orientation_num;
-		orient2 = 1;
-	}
+	dim3 block_dim = splitCudaBlocks(orientation_num,false);
 
-	dim3 block_dim(orient1,orient2);
-	std::cerr << "using block dimensions " << orient1 << "," << orient2 <<  std::endl;
+	std::cerr << "using block dimensions " << block_dim.x << "," << block_dim.y <<  std::endl;
 
 #if !defined(CUDA_DOUBLE_PRECISION) && defined(USE_TEXINTERP)
 	// we CAN use read-associated interpolation (fast, inaccurate)...
@@ -519,19 +534,8 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 	/*====================================
 				Kernel Calls
 	======================================*/
-	unsigned orient1, orient2;
 
-	if(significant_num>65535)
-	{
-		orient1 = ceil(sqrt(significant_num));
-		orient2 = orient1;
-	}
-	else
-	{
-		orient1 = significant_num;
-		orient2 = 1;
-	}
-	dim3 block_dim(orient1,orient2);
+	dim3 block_dim = splitCudaBlocks(significant_num,false);
 
 	CUDA_CPU_TOC("kernel_init_1");
 
@@ -689,21 +693,8 @@ void runProjAndDifferenceKernel(
 			gpuMinvsigma2[n] *= (myscale*myscale);
 		}
 	}
-
-	unsigned orient1, orient2;
-    unsigned long block_num = trans_num.size;//significant_num;
-
-	if(block_num>65535)
-	{
-		orient1 = ceil(sqrt(block_num));
-		orient2 = orient1;
-	}
-	else
-	{
-		orient1 = block_num;
-		orient2 = 1;
-	}
-	dim3 block_dim(orient1,orient2);
+    long int block_num = trans_num.size;
+    dim3 block_dim = splitCudaBlocks(block_num,false);
 
 	CUDA_GPU_TIC("imagMemCp");
 	gpuMinvsigma2.cp_to_device();
@@ -1828,7 +1819,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 					dim3 block_dim(sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE);
 //					std::cerr << "using block dimensions " << block_dim.x << "," << block_dim.y  <<  std::endl;
 
-					CUDA_GPU_TIC("cuda_kernel_sumweight_oversampling");
+					CUDA_GPU_TIC("cuda_kernel_sumweight");
 
 					cuda_kernel_sumweight<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
 																			~pdf_offset,
@@ -1840,7 +1831,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 																			sp.nr_trans
 																		 );
 
-					CUDA_GPU_TAC("cuda_kernel_sumweight_oversampling");
+					CUDA_GPU_TAC("cuda_kernel_sumweight");
 
 					CUDA_GPU_TIC("sumweightMemCp2");
 					Mweight.cp_to_host(); //FIXME make wider in scope; pass to storeWsums() to be used in collect-step. Needs som coordination with else() below.
@@ -2207,21 +2198,12 @@ void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 				   int exp_iclass)
 {
 
-	unsigned orient1, orient2;
+
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
 	unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
-	if(orientation_chunks>65535)
-	{
-		orient1 = ceil(sqrt(orientation_chunks));
-		orient2 = orient1;
-	}
-	else
-	{
-		orient1 = orientation_chunks;
-		orient2 = 1;
-	}
-	dim3 block_dim(orient1,orient2);
+
+	dim3 block_dim = splitCudaBlocks(orientation_chunks,false);
 
 	CUDA_GPU_TIC("cuda_kernel_wavg");
 
@@ -2338,21 +2320,12 @@ void runProjAndWavgKernel(
 	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
 	cudaTextureObject_t texModel_imag = 0;
 	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
-	unsigned orient1, orient2;
+
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
 	unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
-	if(orientation_chunks>65535)
-	{
-		orient1 = ceil(sqrt(orientation_chunks));
-		orient2 = orient1;
-	}
-	else
-	{
-		orient1 = orientation_chunks;
-		orient2 = 1;
-	}
-	dim3 block_dim(orient1,orient2);
+
+	dim3 block_dim = splitCudaBlocks(orientation_chunks,false);
 
 	CUDA_GPU_TIC("cuda_kernel_wavg");
 
@@ -3045,24 +3018,16 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					reduction_block_num /= 2;
 
 				CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
-				unsigned orient1, orient2;
+
 				for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
 				{
-					if(k>65535)
-					{
-						orient1 = ceil(sqrt(k));
-						orient2 = orient1 + (orient1 % 2);  // For some reason the "optimal" values in the METADATA ooutput is sensitive to the choice of block-grid dims,
-						orient1 +=          (orient1 % 2);  // and seems to work properly only when even numbers are used. // TODO examine why
-					}
-					else
-					{
-						orient1 = k;
-						orient2 = 1;
-					}
-					dim3 grid_dim_wd(orient1,orient2);
-					 // TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very innefficient amount of loads per store
-					cuda_kernel_reduce_wdiff2s<<<grid_dim_wd,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
+
+					dim3 block_dim_wd = splitCudaBlocks(k,true);
+
+					// TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very inefficient amount of loads per store
+					cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE>>>(~wdiff2s_parts,orientation_num,image_size,k);
 				}
+
 				CUDA_GPU_TAC("cuda_kernels_reduce_wdiff2s");
 
 				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary

@@ -80,8 +80,6 @@ static void cudaPrintMemInfo()
     		free_hr, total_hr, total_hr - free_hr);
 }
 
-
-
 template <typename T>
 class CudaGlobalPtr
 {
