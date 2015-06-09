@@ -71,7 +71,7 @@ void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, 
 			long unsigned iover_trans = iover_transes[j];
 			long unsigned ihidden = iorientclasses[i] * nr_trans + ihiddens[j];
 			long unsigned ihidden_over = ihidden * nr_over_orient * nr_over_trans + nr_over_trans * iover_rot + iover_trans;
-			mapped_weights[(long unsigned) i * translation_num + j] =
+			mapped_weights[(long unsigned) (i * translation_num + j)] =
 					DIRECT_A2D_ELEM(Mweight, ipart, ihidden_over);
 		}
 	}
@@ -310,14 +310,14 @@ void generateModelProjections(
 		long unsigned orientation_num,
 		unsigned image_size,
 		unsigned max_r,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned mdl_x,
-		unsigned mdl_y,
-		unsigned mdl_z,
-		unsigned mdl_init_y,
-		unsigned mdl_init_z,
-		float padding_factor)
+		long int img_x,
+		long int img_y,
+		long int mdl_x,
+		long int mdl_y,
+		long int mdl_z,
+		long int mdl_init_y,
+		long int mdl_init_z,
+		int padding_factor)
 {
 
 	int max_r2 = max_r * max_r;
@@ -426,7 +426,8 @@ void generateModelProjections(
 													img_x,
 													img_y,
 													mdl_init_y,
-													mdl_init_z);
+													mdl_init_z,
+												    padding_factor);
 
 	cudaDestroyTextureObject(texModel_real);
 	cudaDestroyTextureObject(texModel_imag);
@@ -453,7 +454,8 @@ void generateModelProjections(
 													mdl_x,
 													mdl_y,
 													mdl_init_y,
-													mdl_init_z);
+													mdl_init_z,
+													padding_factor);
 	model_real.free_device();
 	model_imag.free_device();
 #endif
@@ -2748,7 +2750,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CudaGlobalPtr<FLOAT> Frefs_real;
 			CudaGlobalPtr<FLOAT> Frefs_imag;
-
 #if !defined(CUDA_DOUBLE_PRECISION)
 			if(!do_combineProjAndWavg)
 #endif
@@ -2771,8 +2772,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 						baseMLO->mymodel.PPref[exp_iclass].data.yinit,
 						baseMLO->mymodel.PPref[exp_iclass].data.zinit,
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor);
-				model_real.free_device();
-				model_imag.free_device();
+//				model_real.free_device();
+//				model_imag.free_device();
 				eulers.free();
 				CUDA_CPU_TOC("generateModelProjections_wavg");
 			}
@@ -2882,6 +2883,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 				ctfs.cp_to_device();
 				CUDA_CPU_TOC("scale_ctf");
+
 
 				/*======================================================
 									MAP WEIGHTS
@@ -2993,9 +2995,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 							group_id,
 							exp_iclass);
 
-					Frefs_real.free();
-					Frefs_imag.free();
-
 					Fimgs_real.free_device();
 					Fimgs_imag.free_device();
 					Fimgs_nomask_real.free_device();
@@ -3048,7 +3047,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 						exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j];
 					}
 				}
-
 				wdiff2s_parts.free_host();
 
 				CUDA_CPU_TOC("reduce_wdiff2s");
@@ -3172,6 +3170,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			// The variance of the total image (on which one normalizes) is twice this value!
 			double normcorr = old_norm_correction * sqrt(exp_wsum_norm_correction[ipart] * 2.);
 			thr_avg_norm_correction += normcorr;
+
 			// Now set the new norm_correction in the relevant position of exp_metadata
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM) = normcorr;
 

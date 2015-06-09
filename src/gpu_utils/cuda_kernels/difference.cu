@@ -176,10 +176,10 @@ __global__ void cuda_kernel_wavg(
 //	{
 		for (unsigned pass = 0; pass < pass_num; pass ++)
 		{
-			s_wavgs_real[tid]  = 0.0f;
-			s_wavgs_imag[tid]  = 0.0f;
-			s_wdiff2s_parts[tid] = 0.0f;
-			Fweight = 0;
+			s_wavgs_real[tid]  = (FLOAT)0.0;
+			s_wavgs_imag[tid]  = (FLOAT)0.0;
+			s_wdiff2s_parts[tid] = (FLOAT)0.0;
+			Fweight = (FLOAT)0.0;
 
 			pixel = pass * BLOCK_SIZE + tid;
 			s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];

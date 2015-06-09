@@ -4,22 +4,22 @@
 
 // uses global memory and explicit interpolation = can do double precision.
 __global__ void cuda_kernel_PAV_TGE( FLOAT *g_model_real,
-													FLOAT *g_model_imag,
-													FLOAT *g_eulers,
-													FLOAT *g_Frefs_real,
-													FLOAT *g_Frefs_imag,
-													int my_r_max,
-													int max_r2,
-													int min_r2_nn,
-													int image_size,
-													int orientation_num,
-													int XSIZE_img,
-													int YSIZE_img,
-													int XSIZE_mdl,
-													int YSIZE_mdl,
-													int STARTINGY_mdl,
-													int STARTINGZ_mdl
-												   	   )
+									FLOAT *g_model_imag,
+									FLOAT *g_eulers,
+									FLOAT *g_Frefs_real,
+									FLOAT *g_Frefs_imag,
+									unsigned  my_r_max,
+									int max_r2,
+									int min_r2_nn,
+									unsigned  image_size,
+									unsigned long orientation_num,
+									long int XSIZE_img,
+									long int YSIZE_img,
+									long int XSIZE_mdl,
+									long int YSIZE_mdl,
+									long int STARTINGY_mdl,
+									long int STARTINGZ_mdl,
+									float padding_factor)
 {
 	FLOAT fx, fy, fz, xp, yp, zp;
 	int x0, x1, y0, y1, z0, z1; //y2;
@@ -56,9 +56,9 @@ __global__ void cuda_kernel_PAV_TGE( FLOAT *g_model_real,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = g_eulers[bid*9]   * x + g_eulers[bid*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = g_eulers[bid*9+3] * x + g_eulers[bid*9+4] * y;  // compared to CPU-based projection. This
-					zp = g_eulers[bid*9+6] * x + g_eulers[bid*9+7] * y;  // propagates to dx00, dx10, and so on.
+					xp = (g_eulers[bid*9]   * x + g_eulers[bid*9+1] * y) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = (g_eulers[bid*9+3] * x + g_eulers[bid*9+4] * y) * padding_factor;  // compared to CPU-based projection. This
+					zp = (g_eulers[bid*9+6] * x + g_eulers[bid*9+7] * y) * padding_factor;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -142,20 +142,20 @@ __global__ void cuda_kernel_PAV_TGE( FLOAT *g_model_real,
 
 // uses texture memory and implicit (texture) interpolation = requires float precision.
 __global__ void cuda_kernel_PAV_TTI( FLOAT *g_eulers,
-														 FLOAT *g_Frefs_real,
-														 FLOAT *g_Frefs_imag,
-														 cudaTextureObject_t texModel_real,
-														 cudaTextureObject_t texModel_imag,
-														 int my_r_max,
-														 int max_r2,
-														 int min_r2_nn,
-														 int image_size,
-														 int orientation_num,
-														 int XSIZE_img,
-														 int YSIZE_img,
-														 int STARTINGY_mdl,
-														 int STARTINGZ_mdl,
-														 float padding_factor)
+									 FLOAT *g_Frefs_real,
+									 FLOAT *g_Frefs_imag,
+									 cudaTextureObject_t texModel_real,
+									 cudaTextureObject_t texModel_imag,
+									 unsigned  my_r_max,
+									 int max_r2,
+									 int min_r2_nn,
+									 unsigned  image_size,
+									 unsigned long orientation_num,
+									 long int XSIZE_img,
+									 long int YSIZE_img,
+									 long int STARTINGY_mdl,
+									 long int STARTINGZ_mdl,
+									 float padding_factor)
 {
 	FLOAT xp, yp, zp;
 	long int r2;
@@ -234,19 +234,20 @@ __global__ void cuda_kernel_PAV_TTI( FLOAT *g_eulers,
 
 // uses texture memory and explicit interpolation = requires float precision.
 __global__ void cuda_kernel_PAV_TTE( FLOAT *g_eulers,
-														 FLOAT *g_Frefs_real,
-														 FLOAT *g_Frefs_imag,
-														 cudaTextureObject_t texModel_real,
-														 cudaTextureObject_t texModel_imag,
-														 int my_r_max,
-														 int max_r2,
-														 int min_r2_nn,
-														 int image_size,
-														 int orientation_num,
-														 int XSIZE_img,
-														 int YSIZE_img,
-														 int STARTINGY_mdl,
-														 int STARTINGZ_mdl)
+									 FLOAT *g_Frefs_real,
+									 FLOAT *g_Frefs_imag,
+									 cudaTextureObject_t texModel_real,
+									 cudaTextureObject_t texModel_imag,
+									 unsigned  my_r_max,
+									 int max_r2,
+									 int min_r2_nn,
+									 unsigned  image_size,
+									 unsigned long orientation_num,
+									 long int XSIZE_img,
+									 long int YSIZE_img,
+									 long int STARTINGY_mdl,
+									 long int STARTINGZ_mdl,
+									 float padding_factor)
 {
 	FLOAT fx, fy, fz, xp, yp, zp;
 	int x0, x1, y0, y1, z0, z1; //y2;
@@ -282,9 +283,9 @@ __global__ void cuda_kernel_PAV_TTE( FLOAT *g_eulers,
 				r2 = x*x + y*y;
 				if (r2 <= max_r2)
 				{
-					xp = g_eulers[bid*9]   * x + g_eulers[bid*9+1] * y;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = g_eulers[bid*9+3] * x + g_eulers[bid*9+4] * y;  // compared to CPU-based projection. This
-					zp = g_eulers[bid*9+6] * x + g_eulers[bid*9+7] * y;  // propagates to dx00, dx10, and so on.
+					xp = (g_eulers[bid*9]   * x + g_eulers[bid*9+1] * y) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
+					yp = (g_eulers[bid*9+3] * x + g_eulers[bid*9+4] * y) * padding_factor;  // compared to CPU-based projection. This
+					zp = (g_eulers[bid*9+6] * x + g_eulers[bid*9+7] * y) * padding_factor;  // propagates to dx00, dx10, and so on.
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
