@@ -1033,7 +1033,7 @@ static void runBackprojectKernel(
 		{
 			for (int z = mdl_initz; z < mdl_z; z++)
 			{
-				if (x*x + y*y + z*z <= max_r2 * scale2 * 1.2f)
+				if (x*x + y*y + z*z <= max_r2 * scale2 * scale2 * 1.2f)
 				{
 					xs[N] = x;
 					ys[N] = y;
@@ -2700,7 +2700,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			if (iproj_div < proj_div_nr - 1)
 				proj_div_end = proj_div_start + proj_div_max_count;
 			else
-				proj_div_end = orientation_num_all - 1;
+				proj_div_end = orientation_num_all;
 
 			long unsigned orientation_num(proj_div_end - proj_div_start);
 
