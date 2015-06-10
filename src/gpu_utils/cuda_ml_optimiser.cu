@@ -358,7 +358,6 @@ void generateModelProjections(
 	 * ==========================*/
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
-	// TODO model should carry real & imag in separate channels of the same texture
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 	cudaArray*        modelArray_real;
 	cudaArray* 		  modelArray_imag;
@@ -469,6 +468,7 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT > &Frefs_imag,
 		CudaGlobalPtr<long unsigned > &rotidx,
 		CudaGlobalPtr<long unsigned > &transidx,
+		CudaGlobalPtr<long unsigned > &trans_num,
 		CudaGlobalPtr<long unsigned > &ihidden_overs,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
@@ -512,30 +512,33 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 			gpuMinvsigma2[n] *= (myscale*myscale);
 		}
 	}
+    long int block_num = trans_num.size;
+    dim3 block_dim = splitCudaBlocks(block_num,false);
 
+	CUDA_GPU_TIC("imagMemCp");
 	gpuMinvsigma2.cp_to_device();
-
 	Fimgs_real.size = translation_num * image_size;
 	Fimgs_real.device_alloc();
 	Fimgs_real.cp_to_device();
 	Fimgs_imag.size = translation_num * image_size;
 	Fimgs_imag.device_alloc();
 	Fimgs_imag.cp_to_device();
-	rotidx.size = significant_num;
+	CUDA_GPU_TAC("imagMemCp");
+
+	CUDA_GPU_TIC("pairListMemCp");
+	rotidx.size = block_num;
 	rotidx.device_alloc();
 	rotidx.cp_to_device();
-	transidx.size = significant_num;
+	transidx.size = block_num;
 	transidx.device_alloc();
 	transidx.cp_to_device();
-	ihidden_overs.size = significant_num;
+//	trans_num.size = block_num;
+	trans_num.device_alloc();
+	trans_num.cp_to_device();
+	ihidden_overs.size = block_num;
 	ihidden_overs.device_alloc();
 	ihidden_overs.cp_to_device();
-
-	/*====================================
-				Kernel Calls
-	======================================*/
-
-	dim3 block_dim = splitCudaBlocks(significant_num,false);
+	CUDA_GPU_TAC("pairListMemCp");
 
 	CUDA_CPU_TOC("kernel_init_1");
 
@@ -547,21 +550,26 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 
 	if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
 	{
-		cuda_kernel_D2_CC<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
-														image_size, op.highres_Xi2_imgs[ipart],
-														significant_num,
-														translation_num,
-														~rotidx,
-														~transidx);
+		// FIXME  make _CC
+		printf("Cross correlation is not supported yet. There is a kernel, but it is not up to date "
+				"with the D2 kernel. If you need CC immediately, i suggest you base it on the D2 kernel.");
+		exit(0);
+//		cuda_kernel_D2_CC<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2,  ~diff2s,
+//														image_size, op.highres_Xi2_imgs[ipart],
+//														significant_num,
+//														translation_num,
+//														~rotidx,
+//														~transidx);
 	}
 	else
 	{
 		cuda_kernel_D2<<<block_dim,BLOCK_SIZE>>>(~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag, ~gpuMinvsigma2, ~diff2s,
 													image_size, op.highres_Xi2_imgs[ipart] / 2.,
-													significant_num,
+													block_num,
 													translation_num,
 													~rotidx,
 													~transidx,
+													~trans_num,
 													~ihidden_overs);
 	}
 	CUDA_GPU_TAC("kernel_diff_noproj");
@@ -1067,6 +1075,7 @@ static void runBackprojectKernel(
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
+	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;
 	while (baseMLO->exp_ipart_ThreadTaskDistributor->getTasks(first_ipart, last_ipart))
 	{
@@ -1295,7 +1304,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 			CudaGlobalPtr<FLOAT> Frefs_real;
 			CudaGlobalPtr<FLOAT> Frefs_imag;
 
-			bool do_combineProjAndDiff = true; //TODO add control flag
+			bool do_combineProjAndDiff = false; //TODO add control flag
 			if(!do_combineProjAndDiff)
 			{
 				CUDA_CPU_TIC("generateModelProjections_diff");
@@ -1544,6 +1553,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 										Frefs_imag,
 										rotidx,
 										transidx,
+									    trans_num,
 										ihidden_overs,
 										op,
 										baseMLO,
@@ -1583,6 +1593,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 //				std::string fnm = std::string("_out_10k_weights.txt");
 //				char *text = &fnm[0];
 //				freopen(text,"w",stdout);
+//				memset(&(DIRECT_A2D_ELEM(op.Mweight, ipart, exp_iclass*orientation_num*translation_num)), 0, orientation_num*translation_num*sizeof(FLOAT));
 				long unsigned m=0;
 				for (long unsigned k = 0; k < trans_num.size; k++)
 				{
@@ -1595,12 +1606,15 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 //						printf("%4.8f, %i, %i \n",diff2,i,j);// << std::endl;
 
 						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[m]) = diff2; // TODO if we can write diff2 to the correct pos in the kernel we can just memcpy to a pointer and use thrust to find min
+//						if(diff2!=diff2)
+//							std::cerr << "diff" << m << "( " << ihidden_overs[m] <<" )  is NaN " << std::endl;
 						// Keep track of minimum of all diff2, only for the last image in this series
 						if (diff2 < op.min_diff2[ipart]) // TODO thrust min
 							op.min_diff2[ipart] = diff2;
 					}
 				}
 //				fclose(stdout);
+//				exit(0);
 //				std::cerr << "mindiff = " << op.min_diff2[ipart] << std::endl;
 
 				CUDA_CPU_TOC("collect_data_1");
@@ -1762,13 +1776,13 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 				==================================================*/
 				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 
-				bool do_gpu_sumweight = true;  //TODO add control flag
+				bool do_gpu_sumweight = false;  //TODO add control flag
 				if(do_gpu_sumweight)
 				{
 					CUDA_CPU_TIC("sumweight1");
 					CUDA_GPU_TIC("sumweightMemCp1");
 
-					//std::cerr << "summing weights on GPU... baseMLO->mymodel.pdf_class[exp_iclass] = " << baseMLO->mymodel.pdf_class[sp.iclass_min] <<  std::endl;
+					std::cerr << "summing weights on GPU... baseMLO->mymodel.pdf_class[exp_iclass] = " << baseMLO->mymodel.pdf_class[sp.iclass_min] <<  std::endl;
 					pdf_orientation.device_alloc();
 					pdf_orientation.cp_to_device();
 					pdf_offset.device_alloc();
@@ -1821,7 +1835,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 				else // Not enough oversamples to utilize GPU resources effciently with current CUDA-kernel.
 				{
 					CUDA_CPU_TIC("sumweight2");
-					//std::cerr << "summing weights on CPU... " <<  std::endl;
+					std::cerr << "summing weights on CPU... " <<  std::endl;
 					for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 					{
 						for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
@@ -1841,6 +1855,10 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 										// (this is always true in the first pass, but not so in the second pass)
 										// Only deal with this sampling point if its weight was significant
 										if (DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) < 0.)
+										{
+											DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = 0.;
+										}
+										else if(DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over)!=DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over))
 										{
 											DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_over) = 0.;
 										}
@@ -1881,7 +1899,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 
 		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
-//		std::cerr << " sumweight =  " << exp_thisparticle_sumweight << std::endl;
+		std::cerr << " sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
 		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
@@ -2236,7 +2254,6 @@ void runProjAndWavgKernel(
 	 * ==========================*/
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
-	// TODO model should carry real & imag in separate channels of the same texture
 	cudaChannelFormatDesc channel = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 	cudaArray*        modelArray_real;
 	cudaArray* 		  modelArray_imag;

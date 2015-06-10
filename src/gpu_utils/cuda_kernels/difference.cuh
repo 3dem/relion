@@ -17,6 +17,7 @@ __global__ void cuda_kernel_D2(	    FLOAT *g_refs_real,
 										unsigned long translation_num,
 										unsigned long *d_rotidx,
 										unsigned long *d_transidx,
+										unsigned long *d_trans_num,
 									    unsigned long *d_ihidden_overs // TODO use it to map in here, get rid of collect_data_1
 									);
 

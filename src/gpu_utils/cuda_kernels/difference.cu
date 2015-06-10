@@ -7,65 +7,82 @@ __global__ void cuda_kernel_D2(	FLOAT *g_refs_real,
 									FLOAT *g_imgs_real,
 									FLOAT *g_imgs_imag,
 									FLOAT *g_Minvsigma2, FLOAT *g_diff2s,
-									unsigned img_size, FLOAT sum_init,
-									unsigned long significant_num,
+									unsigned image_size, FLOAT sum_init,
+									unsigned long todo_blocks,
 									unsigned long translation_num,
 									unsigned long *d_rotidx,
 									unsigned long *d_transidx,
+									unsigned long *d_trans_num,
 									unsigned long *d_ihidden_overs // TODO use it to map in here, get rid of collect_data_1
 									)
 {
 	// blockid
-	int ex = blockIdx.y * gridDim.x + blockIdx.x;
-    int tid = threadIdx.x;
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
 
-	// inside the padded 2D orientation grid
-	if( ex < significant_num )
+	unsigned long ref_pixel_idx;
+
+	__shared__ FLOAT s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
+	__shared__ FLOAT s_outs[PROJDIFF_CHUNK_SIZE];
+
+	if( bid < todo_blocks )
 	{
-		// index of comparison
-		unsigned long int ix=d_rotidx[ex];
-		unsigned long int iy=d_transidx[ex];
+		unsigned long int iy; // transidx
+		unsigned long int ix = d_rotidx[bid];
+		unsigned long ref_start(ix * image_size);
 
-		__shared__ FLOAT s[BLOCK_SIZE];
-		s[tid] = 0.0f;
+		unsigned trans_num   = d_trans_num[bid]; //how many transes we have for this rot
+		for (int itrans=0; itrans<trans_num; itrans++)
+		{
+			s[itrans*BLOCK_SIZE+tid] = 0.0;
+		}
 
-		unsigned pass_num(ceilf((float)img_size/(float)BLOCK_SIZE)), pixel;
-
-		unsigned long ref_start(ix * img_size);
-		unsigned long img_start(iy * img_size);
-		unsigned long ref_pixel_idx;
-		unsigned long img_pixel_idx;
-
-		for (unsigned pass = 0; pass < pass_num; pass ++)
+		unsigned pass_num(ceilf(((float)image_size) / (float)BLOCK_SIZE  )), pixel;
+		for (unsigned pass = 0; pass < pass_num; pass++)
 		{
 			pixel = pass * BLOCK_SIZE + tid;
-
-			if (pixel < img_size) //Is inside image
+			if (pixel < image_size) //Is inside image
 			{
 				ref_pixel_idx = ref_start + pixel;
-				img_pixel_idx = img_start + pixel;
-
-				FLOAT diff_real = __ldg(&g_refs_real[ref_pixel_idx]) - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
-				FLOAT diff_imag = __ldg(&g_refs_imag[ref_pixel_idx]) - __ldg(&g_imgs_imag[img_pixel_idx]);
-
-				s[tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+				FLOAT ref_real=__ldg(&g_refs_real[ref_pixel_idx]);
+				FLOAT ref_imag=__ldg(&g_refs_imag[ref_pixel_idx]);
+				FLOAT diff_real;
+				FLOAT diff_imag;
+				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+				{
+					iy=d_transidx[bid]+itrans;
+					unsigned long img_start(iy * image_size);
+					unsigned long img_pixel_idx = img_start + pixel;
+					diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
+					diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
+					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * __ldg(&g_Minvsigma2[pixel]);
+				}
+				__syncthreads();
 			}
 		}
 		__syncthreads();
 
-		for(int j=(BLOCK_SIZE/2); j>0; j>>=1)
+		for(int j=(BLOCK_SIZE/2); j>0; j/=2)
 		{
 			if(tid<j)
 			{
-				s[tid] += s[tid+j];
+				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+				{
+					s[itrans*BLOCK_SIZE+tid] += s[itrans*BLOCK_SIZE+tid+j];
+				}
 			}
 			__syncthreads();
 		}
-//		if (threadIdx.x*ex == 0)
+
+		if (tid < trans_num)
 		{
-			g_diff2s[ix * translation_num + iy] = s[0]+sum_init;
+			s_outs[tid]=s[tid*BLOCK_SIZE]+sum_init;
 		}
-		// -------------------------------------------------------------------------
+		if (tid < trans_num)
+		{
+			iy=d_transidx[bid]+tid;
+			g_diff2s[ix * translation_num + iy] = s_outs[tid];
+		}
 	}
 }
 

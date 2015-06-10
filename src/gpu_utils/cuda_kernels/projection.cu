@@ -32,7 +32,7 @@ __global__ void cuda_kernel_PAV_TGE( FLOAT *g_model_real,
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
 	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
-	if( bid < orientation_num ) // we only need to make
+	if( bid < orientation_num )
 	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
 		long ref_pixel = bid*(image_size);
