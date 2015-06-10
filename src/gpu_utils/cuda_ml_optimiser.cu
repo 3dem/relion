@@ -50,6 +50,36 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
 }
 
 /*
+ * Sets the correct settings for a 3D cuda texture for the projector,
+ * i.e. extent, boundary conditions, etc, then copies a host array to
+ * the allocated texture on the device.
+ */
+void cudaCopyToProjectorTextureArray(	FLOAT* hostArray,
+										cudaArray* deviceArray,
+										cudaExtent volumeSize,
+										cudaResourceDesc &resDesc,
+										cudaTextureDesc &texDesc)
+{
+	cudaMemcpy3DParms copyParams = {0};
+	copyParams.extent   = volumeSize;
+	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.dstArray = deviceArray;
+	copyParams.srcPtr   = make_cudaPitchedPtr(hostArray,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
+	cudaMemcpy3D(&copyParams);
+
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = deviceArray;
+
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.readMode         = cudaReadModeElementType;
+    texDesc.normalizedCoords = false;
+    for(int n=0; n<3; n++)
+    	texDesc.addressMode[n]=cudaAddressModeClamp;
+
+}
+/*
  * Maps weights to a decoupled indexing of translations and orientations
  */
 inline
@@ -337,43 +367,11 @@ void generateModelProjections(
 	//allocate device memory for cuda 3D array
 	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
 	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
+	struct cudaResourceDesc resDesc_real, resDesc_imag;
+	struct cudaTextureDesc texDesc_real, texDesc_imag;
 
-	//set cuda array copy parameters to be supplied to copy-command
-	cudaMemcpy3DParms copyParams = {0};
-	copyParams.extent   = volumeSize;
-
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = modelArray_real;
-	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = modelArray_imag;
-	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-
-	// Create texture object// Specify texture
-    struct cudaResourceDesc resDesc_real,resDesc_imag;
-    memset(&resDesc_real, 0, sizeof(resDesc_real));
-    memset(&resDesc_imag, 0, sizeof(resDesc_imag));
-    resDesc_real.resType = cudaResourceTypeArray;
-    resDesc_imag.resType = cudaResourceTypeArray;
-    resDesc_real.res.array.array = modelArray_real;
-    resDesc_imag.res.array.array = modelArray_imag;
-
-    struct cudaTextureDesc texDesc_real, texDesc_imag;
-    memset(&texDesc_real, 0, sizeof(texDesc_real));
-    memset(&texDesc_imag, 0, sizeof(texDesc_imag));
-    for(int n=0; n<3; n++)
-	{
-    	texDesc_real.addressMode[n]=cudaAddressModeClamp;
-    	texDesc_imag.addressMode[n]=cudaAddressModeClamp;
-	}
-    texDesc_real.filterMode       = cudaFilterModeLinear;
-    texDesc_real.readMode         = cudaReadModeElementType;
-    texDesc_real.normalizedCoords = false;
-    texDesc_imag.filterMode       = cudaFilterModeLinear;
-    texDesc_imag.readMode         = cudaReadModeElementType;
-    texDesc_real.normalizedCoords = false;
+	cudaCopyToProjectorTextureArray(model_real.h_ptr, modelArray_real, volumeSize, resDesc_real, texDesc_real);
+	cudaCopyToProjectorTextureArray(model_imag.h_ptr, modelArray_imag, volumeSize, resDesc_imag, texDesc_imag);
 
 	cudaTextureObject_t texModel_real = 0;
 	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
@@ -618,48 +616,17 @@ void runProjAndDifferenceKernel(
 	//allocate device memory for cuda 3D array
 	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
 	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
-
-	//set cuda array copy parameters to be supplied to copy-command
-	cudaMemcpy3DParms copyParams = {0};
-	copyParams.extent   = volumeSize;
-
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = modelArray_real;
-	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = modelArray_imag;
-	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-
-	// Create texture object// Specify texture
-	struct cudaResourceDesc resDesc_real,resDesc_imag;
-	memset(&resDesc_real, 0, sizeof(resDesc_real));
-	memset(&resDesc_imag, 0, sizeof(resDesc_imag));
-	resDesc_real.resType = cudaResourceTypeArray;
-	resDesc_imag.resType = cudaResourceTypeArray;
-	resDesc_real.res.array.array = modelArray_real;
-	resDesc_imag.res.array.array = modelArray_imag;
-
+	struct cudaResourceDesc resDesc_real, resDesc_imag;
 	struct cudaTextureDesc texDesc_real, texDesc_imag;
-	memset(&texDesc_real, 0, sizeof(texDesc_real));
-	memset(&texDesc_imag, 0, sizeof(texDesc_imag));
-	for(int n=0; n<3; n++)
-	{
-		texDesc_real.addressMode[n]=cudaAddressModeClamp;
-		texDesc_imag.addressMode[n]=cudaAddressModeClamp;
-	}
-	texDesc_real.filterMode       = cudaFilterModeLinear;
-	texDesc_real.readMode         = cudaReadModeElementType;
-	texDesc_real.normalizedCoords = false;
-	texDesc_imag.filterMode       = cudaFilterModeLinear;
-	texDesc_imag.readMode         = cudaReadModeElementType;
-	texDesc_real.normalizedCoords = false;
+
+	cudaCopyToProjectorTextureArray(model_real.h_ptr, modelArray_real, volumeSize, resDesc_real, texDesc_real);
+	cudaCopyToProjectorTextureArray(model_imag.h_ptr, modelArray_imag, volumeSize, resDesc_imag, texDesc_imag);
 
 	cudaTextureObject_t texModel_real = 0;
 	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
 	cudaTextureObject_t texModel_imag = 0;
 	cudaCreateTextureObject(&texModel_imag, &resDesc_imag, &texDesc_imag, NULL);
+
 #else
 	model_real.device_alloc();
 	model_real.cp_to_device();
@@ -2280,43 +2247,11 @@ void runProjAndWavgKernel(
 	//allocate device memory for cuda 3D array
 	cudaMalloc3DArray(&modelArray_real, &channel, volumeSize);
 	cudaMalloc3DArray(&modelArray_imag, &channel, volumeSize);
+	struct cudaResourceDesc resDesc_real, resDesc_imag;
+	struct cudaTextureDesc texDesc_real, texDesc_imag;
 
-	//set cuda array copy parameters to be supplied to copy-command
-	cudaMemcpy3DParms copyParams = {0};
-	copyParams.extent   = volumeSize;
-
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = modelArray_real;
-	copyParams.srcPtr   = make_cudaPitchedPtr(model_real.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = modelArray_imag;
-	copyParams.srcPtr   = make_cudaPitchedPtr(model_imag.h_ptr,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-
-	// Create texture object// Specify texture
-    struct cudaResourceDesc resDesc_real,resDesc_imag;
-    memset(&resDesc_real, 0, sizeof(resDesc_real));
-    memset(&resDesc_imag, 0, sizeof(resDesc_imag));
-    resDesc_real.resType = cudaResourceTypeArray;
-    resDesc_imag.resType = cudaResourceTypeArray;
-    resDesc_real.res.array.array = modelArray_real;
-    resDesc_imag.res.array.array = modelArray_imag;
-
-    struct cudaTextureDesc texDesc_real, texDesc_imag;
-    memset(&texDesc_real, 0, sizeof(texDesc_real));
-    memset(&texDesc_imag, 0, sizeof(texDesc_imag));
-    for(int n=0; n<3; n++)
-	{
-    	texDesc_real.addressMode[n]=cudaAddressModeClamp;
-    	texDesc_imag.addressMode[n]=cudaAddressModeClamp;
-	}
-    texDesc_real.filterMode       = cudaFilterModeLinear;
-    texDesc_real.readMode         = cudaReadModeElementType;
-    texDesc_real.normalizedCoords = false;
-    texDesc_imag.filterMode       = cudaFilterModeLinear;
-    texDesc_imag.readMode         = cudaReadModeElementType;
-    texDesc_real.normalizedCoords = false;
+	cudaCopyToProjectorTextureArray(model_real.h_ptr, modelArray_real, volumeSize, resDesc_real, texDesc_real);
+	cudaCopyToProjectorTextureArray(model_imag.h_ptr, modelArray_imag, volumeSize, resDesc_imag, texDesc_imag);
 
 	cudaTextureObject_t texModel_real = 0;
 	cudaCreateTextureObject(&texModel_real, &resDesc_real, &texDesc_real, NULL);
