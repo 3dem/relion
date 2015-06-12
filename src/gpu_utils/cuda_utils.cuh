@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_settings.h"
+#include <signal.h>
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
@@ -62,7 +63,7 @@ static void HandleError( cudaError_t err, const char *file, int line )
     {
         printf( "DEBUG_ERROR: %s in %s at line %d\n",
         		cudaGetErrorString( err ), file, line );
-        exit( EXIT_FAILURE );
+		raise(SIGSEGV);
     }
 }
 
