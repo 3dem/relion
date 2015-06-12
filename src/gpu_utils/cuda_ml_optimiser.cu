@@ -1435,7 +1435,7 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 						int tk=0;
 						for (long unsigned j = 0; j < translation_num; j++)
 						{
-							ihidden_overs[significant_num] = i * sp.nr_trans + j;
+							ihidden_overs[significant_num] = iorientclasses[i] * sp.nr_trans + j;
 							if(tk>=PROJDIFF_CHUNK_SIZE)
 							{
 								tk=0;             // reset counter
@@ -1464,11 +1464,9 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 						int tk=0;
 
 						long int iover_rot = iover_rots[i];
-						long int coarse_rot = floor(i/sp.nr_oversampled_rot);
 						for (long unsigned j = 0; j < translation_num; j++)
 						{
 							long int iover_trans = iover_transes[j];
-							long int coarse_trans = floor(j/sp.nr_oversampled_trans);
 							long int ihidden = iorientclasses[i] * sp.nr_trans + ihiddens[j];
 
 							if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
