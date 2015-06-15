@@ -22,11 +22,11 @@ __global__ void cuda_kernel_sumweight(  FLOAT *g_pdf_orientation,
 
 	// Bacause the partion of work is so arbitrarily divided in this kernel,
 	// we need to do some brute idex work to get the correct indices.
-	c_iorient = (long int)floorf((FLOAT)iorient/(FLOAT)oversamples_orient);
+	c_iorient = (iorient - (iorient % oversamples_orient)) / oversamples_orient; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
 	f_iorient = iorient % oversamples_orient;
 	for (int itrans=0; itrans<(coarse_trans*oversamples_trans); itrans++)
 	{
-		c_itrans = (long int)floorf((FLOAT)itrans/(FLOAT)oversamples_trans);
+		c_itrans = ( itrans - (itrans % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
 		f_itrans = itrans % oversamples_trans;
 
 		pos = c_iorient * (coarse_trans *oversamples_orient*oversamples_trans );
