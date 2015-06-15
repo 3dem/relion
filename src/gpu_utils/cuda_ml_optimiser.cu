@@ -20,6 +20,20 @@
 #include <thrust/extrema.h>
 #include <signal.h>
 
+/*
+ * Return the minimum value of a device-allocated CudaGlobalPtr-array
+ */
+
+FLOAT thrustGetMinVal(CudaGlobalPtr<FLOAT> &diff2s)
+{
+	thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~diff2s);
+	thrust::device_ptr<FLOAT> pos = thrust::min_element(dp, dp + diff2s.size);
+	unsigned int pos_index = thrust::distance(dp, pos);
+	FLOAT min_val;
+	HANDLE_ERROR(cudaMemcpy(&min_val, &diff2s.d_ptr[pos_index], sizeof(FLOAT), cudaMemcpyDeviceToHost));
+	return(min_val);
+}
+
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -468,10 +482,10 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT > &Fimgs_imag,
 		CudaGlobalPtr<FLOAT > &Frefs_real,
 		CudaGlobalPtr<FLOAT > &Frefs_imag,
-		CudaGlobalPtr<long unsigned > &rotidx,
-		CudaGlobalPtr<long unsigned > &transidx,
-		CudaGlobalPtr<long unsigned > &trans_num,
-		CudaGlobalPtr<long unsigned > &ihidden_overs,
+		CudaGlobalPtr<long unsigned> &rot_idx,
+		CudaGlobalPtr<long unsigned> &trans_idx,
+		CudaGlobalPtr<long unsigned> &job_idx,
+		CudaGlobalPtr<long unsigned> &job_num,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned translation_num,
@@ -514,32 +528,20 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 			gpuMinvsigma2[n] *= (myscale*myscale);
 		}
 	}
-    long int block_num = trans_num.size;
+    long int block_num = job_num.size;
     dim3 block_dim = splitCudaBlocks(block_num,false);
 
 	CUDA_GPU_TIC("imagMemCp");
 	gpuMinvsigma2.cp_to_device();
-	Fimgs_real.size = translation_num * image_size;
-	Fimgs_real.device_alloc();
-	Fimgs_real.cp_to_device();
-	Fimgs_imag.size = translation_num * image_size;
-	Fimgs_imag.device_alloc();
-	Fimgs_imag.cp_to_device();
+	Fimgs_real.put_on_device(translation_num * image_size);
+	Fimgs_imag.put_on_device(translation_num * image_size);
 	CUDA_GPU_TAC("imagMemCp");
 
 	CUDA_GPU_TIC("pairListMemCp");
-	rotidx.size = block_num;
-	rotidx.device_alloc();
-	rotidx.cp_to_device();
-	transidx.size = block_num;
-	transidx.device_alloc();
-	transidx.cp_to_device();
-//	trans_num.size = block_num;
-	trans_num.device_alloc();
-	trans_num.cp_to_device();
-	ihidden_overs.size = block_num;
-	ihidden_overs.device_alloc();
-	ihidden_overs.cp_to_device();
+	rot_idx.put_on_device(significant_num);
+	trans_idx.put_on_device(significant_num);
+	job_idx.put_on_device(block_num);
+	job_num.put_on_device(block_num);
 	CUDA_GPU_TAC("pairListMemCp");
 
 	CUDA_CPU_TOC("kernel_init_1");
@@ -569,10 +571,10 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 													image_size, op.highres_Xi2_imgs[ipart] / 2.,
 													block_num,
 													translation_num,
-													~rotidx,
-													~transidx,
-													~trans_num,
-													~ihidden_overs);
+													~rot_idx,
+													~trans_idx,
+													~job_idx,
+													~job_num);
 	}
 	CUDA_GPU_TAC("kernel_diff_noproj");
 }
@@ -585,10 +587,10 @@ void runProjAndDifferenceKernel(
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
 		CudaGlobalPtr<FLOAT> &eulers,
-		CudaGlobalPtr<long unsigned> &rotidx,
-		CudaGlobalPtr<long unsigned> &transidx,
-		CudaGlobalPtr<long unsigned> &trans_num,
-		CudaGlobalPtr<long unsigned> &ihidden_overs,
+		CudaGlobalPtr<long unsigned> &rot_idx,
+		CudaGlobalPtr<long unsigned> &trans_idx,
+		CudaGlobalPtr<long unsigned> &job_idx,
+		CudaGlobalPtr<long unsigned> &job_num,
 		CudaGlobalPtr<FLOAT> &diff2s,
 		OptimisationParamters op,
 		MlOptimiser *baseMLO,
@@ -672,32 +674,20 @@ void runProjAndDifferenceKernel(
 			gpuMinvsigma2[n] *= (myscale*myscale);
 		}
 	}
-    long int block_num = trans_num.size;
+    long int block_num = job_num.size;
     dim3 block_dim = splitCudaBlocks(block_num,false);
 
 	CUDA_GPU_TIC("imagMemCp");
 	gpuMinvsigma2.cp_to_device();
-	Fimgs_real.size = translation_num * image_size;
-	Fimgs_real.device_alloc();
-	Fimgs_real.cp_to_device();
-	Fimgs_imag.size = translation_num * image_size;
-	Fimgs_imag.device_alloc();
-	Fimgs_imag.cp_to_device();
+	Fimgs_real.put_on_device(translation_num * image_size);
+	Fimgs_imag.put_on_device(translation_num * image_size);
 	CUDA_GPU_TAC("imagMemCp");
 
 	CUDA_GPU_TIC("pairListMemCp");
-	rotidx.size = block_num;
-	rotidx.device_alloc();
-	rotidx.cp_to_device();
-	transidx.size = block_num;
-	transidx.device_alloc();
-	transidx.cp_to_device();
-//  trans_num.size = block_num; // already set
-    trans_num.device_alloc();
-    trans_num.cp_to_device();
-	ihidden_overs.size = block_num;
-	ihidden_overs.device_alloc();
-	ihidden_overs.cp_to_device();
+	rot_idx.put_on_device(significant_num);
+	trans_idx.put_on_device(significant_num);
+	job_idx.put_on_device(block_num);
+	job_num.put_on_device(block_num);
 	CUDA_GPU_TAC("pairListMemCp");
 
 	CUDA_CPU_TOC("kernel_init_1");
@@ -730,10 +720,10 @@ void runProjAndDifferenceKernel(
 													 orientation_num,
 													 translation_num,
 													 block_num, //significant_num,
-													 ~rotidx,
-													 ~transidx,
-													 ~trans_num,
-													 ~ihidden_overs,
+													 ~rot_idx,
+													 ~trans_idx,
+													 ~job_idx,
+													 ~job_num,
 													 max_r,
 													 max_r2,
 													 min_r2_nn,
@@ -760,10 +750,10 @@ void runProjAndDifferenceKernel(
 														 orientation_num,
 														 translation_num,
 														 block_num, //significant_num,
-														 ~rotidx,
-														 ~transidx,
-														 ~trans_num,
-														 ~ihidden_overs,
+														 ~rot_idx,
+														 ~trans_idx,
+														 ~job_idx,
+														 ~job_num,
 														 max_r,
 														 max_r2,
 														 min_r2_nn,
@@ -790,10 +780,10 @@ void runProjAndDifferenceKernel(
 															 orientation_num,
 															 translation_num,
 															 block_num, //significant_num,
-															 ~rotidx,
-															 ~transidx,
-															 ~trans_num,
-															 ~ihidden_overs,
+															 ~rot_idx,
+															 ~trans_idx,
+															 ~job_idx,
+															 ~job_num,
 															 max_r,
 															 max_r2,
 															 min_r2_nn,
@@ -1705,12 +1695,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 				    	   Retrieve Results
 				======================================*/
 
-				thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~diff2s);
-				thrust::device_ptr<FLOAT> pos = thrust::min_element(dp, dp + diff2s.size);
-				unsigned int pos_index = thrust::distance(dp, pos);
-				FLOAT min_val;
-				HANDLE_ERROR(cudaMemcpy(&min_val, &diff2s.d_ptr[pos_index], sizeof(FLOAT), cudaMemcpyDeviceToHost));
-				op.min_diff2[ipart] = min_val;
+				op.min_diff2[ipart] = thrustGetMinVal(diff2s);
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -2075,64 +2060,57 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 						iover_transes.push_back(iover_trans);
 					}
 				}
-
 				CUDA_CPU_TOC("translation_1");
 
-				/*===========================================
-				   Determine significant comparison indices
-				=============================================*/
-				//      This section is annoying to test because
-				//		it can't complete on first pass, since
-				//		the significance has never been set
-
 				CUDA_CPU_TIC("pair_list_1");
+				long unsigned coarse_num = sp.nr_dir*sp.nr_psi*sp.nr_trans, significant_num(0), k=0;
+				CudaGlobalPtr<long unsigned> rot_idx(orientation_num*translation_num),
+											 trans_idx(orientation_num*translation_num),
+											 ihidden_overs(orientation_num*translation_num), // TODO to be removed WHEN mapping is eliminated
+											 job_idx(orientation_num*translation_num),
+											 job_num(orientation_num*translation_num);
 
-				CudaGlobalPtr<long unsigned> transidx(orientation_num*translation_num), rotidx(orientation_num*translation_num);
-				CudaGlobalPtr<long unsigned> ihidden_overs(orientation_num*translation_num);
-				CudaGlobalPtr<long unsigned> trans_num(orientation_num*translation_num);
-				long unsigned coarse_num = sp.nr_dir*sp.nr_psi*sp.nr_trans;
-				long unsigned significant_num(0);
-//				long int check_num=0;
-				long unsigned k=0;
+				// rot/trans_idx   		= orientation and translation a datapoint referes to
+				// job_idx				= WHICH     rot/trans_idx-entry  a given diff-kernel block should go TO
+				// job_num 				= HOW MANY  rot/trns_idx-entries a given diff-kernel block should go THROUGH
 
 				int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
+				job_idx[k]=0;
+
 				if (exp_ipass == 0)
 				{
 					op.Mcoarse_significant.resize(coarse_num, 1);
 					for (long unsigned i = 0; i < orientation_num; i++)
 					{
-						trans_num[k]=0;
-						transidx[k]=translation_num+1;//set higher than max(j) so that XMIPP_MIN() sets
+						job_num[k]=0;
 						int tk=0;
 						for (long unsigned j = 0; j < translation_num; j++)
 						{
+							rot_idx[significant_num] = i;
+							trans_idx[significant_num] = j;
 							ihidden_overs[significant_num] = iorientclasses[i] * sp.nr_trans + j;
 							if(tk>=PROJDIFF_CHUNK_SIZE)
 							{
 								tk=0;             // reset counter
-//								check_num+=trans_num[k];
 								k++;              // use new element
-								trans_num[k]=0;   // prepare next element for ++ incrementing
-								transidx[k]=translation_num+1; //set higher than max(j) so that XMIPP_MIN() sets
+								job_idx[k]=significant_num;
+								job_num[k]=0;   // prepare next element for ++ incrementing
 							}
 							tk++;                 // increment limit
-							trans_num[k]++;       // increment number of transes this ProjDiff-block
-							rotidx[k] = i;
-							transidx[k] = XMIPP_MIN(j,transidx[k]);
+							job_num[k]++;       // increment number of transes this ProjDiff-block
 							significant_num++;
 						}
-//						check_num+=trans_num[k];
 						k++;   // use new element
+						job_idx[k]=significant_num;
 					}
-					trans_num.size=k;
+					job_num.size=k;
 				}
 				else
 				{
 					for (long unsigned i = 0; i < orientation_num; i++)
 					{
-						trans_num[k]=0;
-						transidx[k]=translation_num+1;//set higher than max(j) so that XMIPP_MIN() sets
+						job_num[k]=0;
 						int tk=0;
 
 						long int iover_rot = iover_rots[i];
@@ -2143,47 +2121,42 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 
 							if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 							{
+								rot_idx[significant_num] = i;
+								trans_idx[significant_num] = j;
 								ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
 								if(tk>=PROJDIFF_CHUNK_SIZE)
 								{
 									tk=0;             // reset counter
-//									check_num+=trans_num[k];
 									k++;              // use new element
-									trans_num[k]=0;   // prepare next element for ++ incrementing
-									transidx[k]=translation_num+1; //set higher than max(j) so that XMIPP_MIN() sets
+									job_idx[k]=significant_num;
+									job_num[k]=0;   // prepare next element for ++ incrementing
 								}
 								tk++;                 // increment limit
-								trans_num[k]++;       // increment number of transes this ProjDiff-block
-								rotidx[k] = i;
-								transidx[k] = XMIPP_MIN(j,transidx[k]);
+								job_num[k]++;       // increment number of transes this ProjDiff-block
 								significant_num++;
 							}
 							else if(tk!=0) // start a new one with the same rotidx - we expect transes to be sequential.
 							{
 								tk=0;             // reset counter
-//								check_num+=trans_num[k];
 								k++;              // use new element
-								rotidx[k] = i;
-								trans_num[k]=0;   // prepare next element for ++ incrementing
-								transidx[k]=translation_num+1; //set higher than max(j) so that XMIPP_MIN() sets
+								job_idx[k]=significant_num;
+								job_num[k]=0;   // prepare next element for ++ incrementing
 							}
-
 						}
-//						check_num+=trans_num[k];
-						k++;   // use new element
+						if(tk>0) // use new element (if tk==0) then we are currently on an element with no signif, so we should continue using this element
+						{
+							k++;
+							job_idx[k]=significant_num;
+							job_num[k]=0;
+						}
 					}
-					trans_num.size=k;
+					job_num.size=k;
 				}
-				//  check_num should equal significant_num here, and be less or equal to  PROJDIFF_CHUNK_SIZE*trans_num.size
 
 				CUDA_CPU_TOC("pair_list_1");
-//				std::cerr << "orientation_num "<< orientation_num << std::endl;
-//				std::cerr << "translation_num "<< translation_num << std::endl;
-//				std::cerr << "my_nr_significant_coarse_samples "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) << std::endl;
-//				std::cerr << "significant_num "<< significant_num << std::endl;
 
-				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
+				CudaGlobalPtr<FLOAT> diff2s(significant_num);
 				diff2s.device_alloc();
 
 				if(do_combineProjAndDiff)
@@ -2195,10 +2168,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 										       Fimgs_real,
 										       Fimgs_imag,
 										       eulers,
-										       rotidx,
-										       transidx,
-										       trans_num,
-										       ihidden_overs,
+										       rot_idx,
+										       trans_idx,
+										       job_idx,
+										       job_num,
 										       diff2s,
 										       op,
 										       baseMLO,
@@ -2221,10 +2194,10 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 										Fimgs_imag,
 										Frefs_real,
 										Frefs_imag,
-										rotidx,
-										transidx,
-									    trans_num,
-										ihidden_overs,
+										rot_idx,
+										trans_idx,
+									    job_idx,
+									    job_num,
 										op,
 										baseMLO,
 										translation_num,
@@ -2242,50 +2215,21 @@ void MlOptimiserCuda::getAllSquaredDifferences(unsigned exp_ipass, OptimisationP
 				======================================*/
 
 				CUDA_GPU_TIC("diff2sMemCp");
-				diff2s.cp_to_host(); // FIXME may not be needed since we copy it back in ConvetToWeights()
+				diff2s.cp_to_host();  // TODO to be removed WHEN mapping is eliminated
 				CUDA_GPU_TAC("diff2sMemCp");
 
 				HANDLE_ERROR(cudaDeviceSynchronize());
 				CUDA_GPU_TOC();
 
-				if (exp_ipass == 0)
-				{
-					op.Mcoarse_significant.clear();
-				}
-
 				/*====================================
 				    	Write To Destination
 				======================================*/
 
-
 				CUDA_CPU_TIC("collect_data_1");
 
-//				std::string fnm = std::string("_out_10k_weights.txt");
-//				char *text = &fnm[0];
-//				freopen(text,"w",stdout);
-//				memset(&(DIRECT_A2D_ELEM(op.Mweight, ipart, exp_iclass*orientation_num*translation_num)), 0, orientation_num*translation_num*sizeof(FLOAT));
-				long unsigned m=0;
-				for (long unsigned k = 0; k < trans_num.size; k++)
-				{
-					for (int itrans=0;  itrans < trans_num[k]; itrans++, m++)
-					{
-						long unsigned i = rotidx[k];
-						long unsigned j = transidx[k]+itrans;
-						double diff2 = diff2s[i * translation_num + j];
-//						printf("%4.8f \n",DIRECT_A2D_ELEM(op.Mweight, ipart, m));
-//						printf("%4.8f, %i, %i \n",diff2,i,j);// << std::endl;
-
-						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[m]) = diff2; // TODO if we can write diff2 to the correct pos in the kernel we can just memcpy to a pointer and use thrust to find min
-//						if(diff2!=diff2)
-//							std::cerr << "diff" << m << "( " << ihidden_overs[m] <<" )  is NaN " << std::endl;
-						// Keep track of minimum of all diff2, only for the last image in this series
-						if (diff2 < op.min_diff2[ipart]) // TODO thrust min
-							op.min_diff2[ipart] = diff2;
-					}
-				}
-//				fclose(stdout);
-//				exit(0);
-//				std::cerr << "mindiff = " << op.min_diff2[ipart] << std::endl;
+				op.min_diff2[ipart] = thrustGetMinVal(diff2s);
+				for (long unsigned k = 0; k<significant_num; k++)
+					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = diff2s[k];
 
 				CUDA_CPU_TOC("collect_data_1");
 			} // end loop ipart
@@ -2446,7 +2390,7 @@ void MlOptimiserCuda::convertAllSquaredDifferencesToWeights(unsigned exp_ipass, 
 				==================================================*/
 				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 
-				bool do_gpu_sumweight = false;  //TODO add control flag
+				bool do_gpu_sumweight = true;  //TODO add control flag
 				if(do_gpu_sumweight)
 				{
 					CUDA_CPU_TIC("sumweight1");
@@ -3156,14 +3100,10 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				}
 			}
 
-			Mweight.device_alloc();
-			Mweight.cp_to_device();
-			oo_otrans_x.device_alloc();
-			oo_otrans_x.cp_to_device();
-			oo_otrans_y.device_alloc();
-			oo_otrans_y.cp_to_device();
-			myp_oo_otrans_x2y2z2.device_alloc();
-			myp_oo_otrans_x2y2z2.cp_to_device();
+			Mweight.put_on_device();
+			oo_otrans_x.put_on_device();
+			oo_otrans_y.put_on_device();
+			myp_oo_otrans_x2y2z2.put_on_device();
 
 			unsigned long coarse_nr = sp.nr_dir*sp.nr_psi;
 			CudaGlobalPtr<FLOAT>                      p_weights(coarse_nr);
