@@ -34,12 +34,9 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
 	if(block_num>65535)
 	{
 		orient1 = ceil(sqrt(block_num));
-		orient2 = orient1;
 		if(doForceEven)
-		{
-			orient2 += orient1 + (orient1 % 2);
-			orient1 += 			 (orient1 % 2);
-		}
+			orient1 += 	(orient1 % 2);
+		orient2 = orient1;
 	}
 	else
 	{
