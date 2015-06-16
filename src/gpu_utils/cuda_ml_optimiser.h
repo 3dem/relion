@@ -160,8 +160,6 @@ public:
 
 	void doThreadExpectationSomeParticles(unsigned thread_id);
 
-	void convertAllSquaredDifferencesToWeights(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp);
-
 	void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp);
 };
 

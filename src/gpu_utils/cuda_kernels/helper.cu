@@ -2,14 +2,14 @@
 #include <vector>
 #include <iostream>
 
-__global__ void cuda_kernel_sumweight(  FLOAT *g_pdf_orientation,
-									    FLOAT *g_pdf_offset,
-										FLOAT *g_Mweight,
-										FLOAT *g_thisparticle_sumweight,
-										FLOAT min_diff2,
-										int oversamples_orient,
-										int oversamples_trans,
-										int coarse_trans)
+__global__ void cuda_kernel_sumweightCoarse(  FLOAT *g_pdf_orientation,
+									     	  FLOAT *g_pdf_offset,
+									     	  FLOAT *g_Mweight,
+									     	  FLOAT *g_thisparticle_sumweight,
+									     	  FLOAT min_diff2,
+									     	  int oversamples_orient,
+									     	  int oversamples_trans,
+									     	  int coarse_trans)
 {
 	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
 	// blockid
@@ -71,6 +71,93 @@ __global__ void cuda_kernel_sumweight(  FLOAT *g_pdf_orientation,
 		{
 			s_sumweight[tid] += s_sumweight[tid+j];
 		}
+	}
+	__syncthreads();
+	g_thisparticle_sumweight[bid]=s_sumweight[0];
+}
+
+
+/*
+ * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.
+ *
+ */
+__global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
+									     	  FLOAT *g_pdf_offset,
+									     	  FLOAT *g_weights,
+									     	  FLOAT *g_thisparticle_sumweight,
+									     	  FLOAT min_diff2,
+									     	  int oversamples_orient,
+									     	  int oversamples_trans,
+									     	  unsigned long *d_rot_idx,
+									     	  unsigned long *d_trans_idx,
+									     	  unsigned long *d_job_idx,
+									     	  unsigned long *d_job_num,
+									     	  long int job_num)
+{
+	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
+	__shared__ FLOAT s_weights[SUM_BLOCK_SIZE];
+
+	// blockid
+	int bid  = blockIdx.x;
+	//threadid
+	int tid = threadIdx.x;
+
+	s_sumweight[tid]=0.;
+
+	long int jobid = bid*SUM_BLOCK_SIZE+tid;
+
+	if (jobid<job_num)
+	{
+		long int pos = d_job_idx[jobid];
+		// index of comparison
+		long int ix = d_rot_idx[   pos];   // each thread gets its own orient...
+		long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
+		long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
+
+		int c_iorient, f_iorient, c_itrans, f_itrans, iorient = bid*SUM_BLOCK_SIZE+tid;
+
+		// Bacause the partion of work is so arbitrarily divided in this kernel,
+		// we need to do some brute idex work to get the correct indices.
+		c_iorient = (ix - (ix % oversamples_orient)) / oversamples_orient; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
+		f_iorient = ix % oversamples_orient;
+		for (int itrans=0; itrans < in; itrans++, iy++)
+		{
+			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
+			f_itrans = iy % oversamples_trans;
+
+			FLOAT prior = g_pdf_orientation[c_iorient] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+			FLOAT diff2 = g_weights[pos+itrans] - min_diff2;								// Different for all threads
+			// next line because of numerical precision of exp-function
+	#if defined(CUDA_DOUBLE_PRECISION)
+				if (diff2 > 700.)
+					s_weights[tid] = 0.;
+				else
+					s_weights[tid] = prior * exp(-diff2);
+	#else
+				if (diff2 > 88.)
+					s_weights[tid] = 0.;
+				else
+					s_weights[tid] = prior * expf(-diff2);
+	#endif
+				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+			// Store the weight
+			g_weights[pos+itrans] = s_weights[tid]; // TODO put in shared mem
+
+			// Reduce weights for sum of all weights
+			s_sumweight[tid] += s_weights[tid];
+		}
+	}
+	else
+	{
+		s_sumweight[tid]=0.;
+	}
+
+	__syncthreads();
+	// Further reduction of all samples in this block
+	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
+	{
+		if(tid<j)
+			s_sumweight[tid] += s_sumweight[tid+j];
 	}
 	__syncthreads();
 	g_thisparticle_sumweight[bid]=s_sumweight[0];
