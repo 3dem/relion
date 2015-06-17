@@ -34,6 +34,7 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
+#include "gpu_utils/cuda_projector.h"
 #include "gpu_utils/cuda_ml_optimiser.h"
 
 #define NR_CLASS_MUTEXES 5
@@ -1467,6 +1468,32 @@ void MlOptimiser::expectation()
 	// B. Initialise Fouriertransform, set weights in wsum_model to zero, initialise AB-matrices for FFT-phase shifts, etc
 	expectationSetup();
 
+
+
+	printf("Init gpu stuff\n");
+	fflush(stdout);
+
+	if (do_gpu)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			Cuda3DProjector p(
+							mymodel.PPref[iclass].data.xdim,
+							mymodel.PPref[iclass].data.ydim,
+							mymodel.PPref[iclass].data.zdim,
+							mymodel.PPref[iclass].data.yinit,
+							mymodel.PPref[iclass].data.zinit,
+							mymodel.PPref[iclass].r_max,
+							mymodel.PPref[iclass].padding_factor
+							);
+
+			cudaProjectors.push_back(p);
+			cudaProjectors[iclass].setData(mymodel.PPref[iclass].data.data);
+		}
+	}
+
+
+
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setup" << std::endl;
 #endif
@@ -1566,8 +1593,13 @@ void MlOptimiser::expectation()
 		progress_bar(mydata.numberOfOriginalParticles());
 
 	// Clean up some memory
+
+	if (do_gpu)
+		cudaProjectors.clear();
+
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		mymodel.PPref[iclass].data.clear();
+
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done " << std::endl;
 #endif

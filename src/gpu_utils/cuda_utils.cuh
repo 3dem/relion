@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_settings.h"
+#include <stdio.h>
 #include <signal.h>
 
 #ifdef CUDA_DOUBLE_PRECISION

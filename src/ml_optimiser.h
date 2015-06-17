@@ -29,6 +29,7 @@
 #include "src/time.h"
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
+#include "src/gpu_utils/cuda_projector.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -89,6 +90,9 @@ class MlOptimiser;
 class MlOptimiser
 {
 public:
+
+	//The CUDA accelerated projector set
+	std::vector< Cuda3DProjector > cudaProjectors;
 
 	// I/O Parser
 	IOParser parser;
