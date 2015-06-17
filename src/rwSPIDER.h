@@ -205,15 +205,15 @@ int  readSPIDER(long int img_select)
     size_t header_size = offset;
     size_t image_size  = header_size + ZYXSIZE(data)*sizeof(float);
     size_t pad         = 0;
-    long int imgStart=0;
-    long int imgEnd =_nDim;
-    if (img_select != -1)
-    {
-        imgStart=img_select;
-        imgEnd=img_select+1;
-    }
+//    long int imgStart=0;
+//    long int imgEnd =_nDim;
+//    if (img_select != -1)
+//    {
+//        imgStart=img_select;
+//        imgEnd=img_select+1;
+//    }
 
-    char*   hend;
+//    char*   hend;
 
     std::stringstream Num;
     std::stringstream Num2;

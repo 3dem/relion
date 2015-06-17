@@ -101,8 +101,7 @@ template<typename I> inline unsigned int isqrt (I arg)
   using namespace std;
   if (sizeof(I)<=4)
     return unsigned (sqrt(arg+0.5));
-  long double arg2 = arg;
-  return unsigned (sqrt(arg2+0.5));
+  return unsigned (sqrt(arg+0.5));
   }
 
 //! Returns the largest integer \a n that fulfills \a 2^n<=arg.

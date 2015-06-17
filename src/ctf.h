@@ -162,7 +162,7 @@ public:
         }
         else
         {
-        	double sine_part,cosine_part;
+//        	double sine_part,cosine_part;
             retval = -(K3*sin(argument) - Q0*cos(argument)); // Q0 should be positive
         }
         if (do_damping)
