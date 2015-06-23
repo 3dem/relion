@@ -1470,25 +1470,22 @@ void MlOptimiser::expectation()
 
 
 
-	printf("Init gpu stuff\n");
-	fflush(stdout);
 
 	if (do_gpu)
 	{
+		cudaProjectors.reserve(mymodel.nr_classes);
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
-			Cuda3DProjector p(
-							mymodel.PPref[iclass].data.xdim,
-							mymodel.PPref[iclass].data.ydim,
-							mymodel.PPref[iclass].data.zdim,
-							mymodel.PPref[iclass].data.yinit,
-							mymodel.PPref[iclass].data.zinit,
-							mymodel.PPref[iclass].r_max,
-							mymodel.PPref[iclass].padding_factor
-							);
+			cudaProjectors[iclass].setMdlDim(
+					mymodel.PPref[iclass].data.xdim,
+					mymodel.PPref[iclass].data.ydim,
+					mymodel.PPref[iclass].data.zdim,
+					mymodel.PPref[iclass].data.yinit,
+					mymodel.PPref[iclass].data.zinit,
+					mymodel.PPref[iclass].r_max,
+					mymodel.PPref[iclass].padding_factor);
 
-			cudaProjectors.push_back(p);
-			cudaProjectors[iclass].setData(mymodel.PPref[iclass].data.data);
+			cudaProjectors[iclass].setMdlData(mymodel.PPref[iclass].data.data);
 		}
 	}
 

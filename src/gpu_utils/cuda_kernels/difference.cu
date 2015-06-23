@@ -10,10 +10,10 @@ __global__ void cuda_kernel_D2(	FLOAT *g_refs_real,
 									unsigned image_size, FLOAT sum_init,
 									unsigned long todo_blocks,
 									unsigned long translation_num,
-									unsigned long *d_rotidx,
-									unsigned long *d_transidx,
-									unsigned long *d_trans_num,
-									unsigned long *d_ihidden_overs // TODO use it to map in here, get rid of collect_data_1
+									unsigned long *d_rot_idx,
+									unsigned long *d_trans_idx,
+									unsigned long *d_job_idx,
+									unsigned long *d_job_num
 									)
 {
 	// blockid
@@ -28,10 +28,10 @@ __global__ void cuda_kernel_D2(	FLOAT *g_refs_real,
 	if( bid < todo_blocks )
 	{
 		unsigned long int iy; // transidx
-		unsigned long int ix = d_rotidx[bid];
+		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
 		unsigned long ref_start(ix * image_size);
 
-		unsigned trans_num   = d_trans_num[bid]; //how many transes we have for this rot
+		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot
 		for (int itrans=0; itrans<trans_num; itrans++)
 		{
 			s[itrans*BLOCK_SIZE+tid] = 0.0;
@@ -50,7 +50,7 @@ __global__ void cuda_kernel_D2(	FLOAT *g_refs_real,
 				FLOAT diff_imag;
 				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
-					iy=d_transidx[bid]+itrans;
+					iy=d_trans_idx[d_job_idx[bid]]+itrans;
 					unsigned long img_start(iy * image_size);
 					unsigned long img_pixel_idx = img_start + pixel;
 					diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
@@ -80,8 +80,8 @@ __global__ void cuda_kernel_D2(	FLOAT *g_refs_real,
 		}
 		if (tid < trans_num)
 		{
-			iy=d_transidx[bid]+tid;
-			g_diff2s[ix * translation_num + iy] = s_outs[tid];
+			iy=d_job_idx[bid]+tid;
+			g_diff2s[iy] = s_outs[tid];
 		}
 	}
 }

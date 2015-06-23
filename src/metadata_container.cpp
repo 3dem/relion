@@ -45,22 +45,22 @@
 
 void MetaDataContainer::insertVoidPtr(EMDLabel name, void * value)
 {
-    // If values[name] already existed, first free that memory
-//    if (values[name])
-//    {
-//    	if (EMDL::isDouble(name))
-//            delete (double*)values[name];
-//        else if (EMDL::isInt(name))
-//            delete (int*)values[name];
-//        else if (EMDL::isLong(name))
-//            delete (long int*)values[name];
-//        else if (EMDL::isBool(name))
-//            delete (bool*)values[name];
-//        else if (EMDL::isString(name))
-//        	delete (std::string*)values[name];
-//        else
-//            REPORT_ERROR("Unrecognised label type in MetaDataContainer clear");
-//    }
+//     If values[name] already existed, first free that memory
+    if (values[name])
+    {
+    	if (EMDL::isDouble(name))
+            delete (double*)values[name];
+        else if (EMDL::isInt(name))
+            delete (int*)values[name];
+        else if (EMDL::isLong(name))
+            delete (long int*)values[name];
+        else if (EMDL::isBool(name))
+            delete (bool*)values[name];
+        else if (EMDL::isString(name))
+        	delete (std::string*)values[name];
+        else
+            REPORT_ERROR("Unrecognised label type in MetaDataContainer clear");
+    }
     values[name] = value;
 }
 

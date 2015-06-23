@@ -176,6 +176,28 @@ public:
 	}
 
 	/**
+	 * alloc and copy
+	 */
+	inline
+	__host__ void put_on_device()
+	{
+		device_alloc();
+		cp_to_device();
+	}
+
+	/**
+	 * alloc size and copy
+	 */
+	inline
+	__host__ void put_on_device(size_t newSize)
+	{
+		size=newSize;
+		device_alloc();
+		cp_to_device();
+	}
+
+
+	/**
 	 * Copy a number (size) of bytes from device to the host pointer
 	 */
 	inline
