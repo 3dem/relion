@@ -27,18 +27,21 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 										  std::vector< long unsigned > &iover_transes,
 										  std::vector< long unsigned > &ihiddens,
 										  long int nr_over_orient, long int nr_over_trans, int ipart,
+										  CudaGlobalPtr <long unsigned> &rot_id,
 										  CudaGlobalPtr <long unsigned> &rot_idx,
 										  CudaGlobalPtr <long unsigned> &trans_idx,
 										  CudaGlobalPtr <long unsigned> &ihidden_overs,
 										  CudaGlobalPtr <long unsigned> &job_idx,
 										  CudaGlobalPtr <long unsigned> &job_num)
 {
+	rot_id.size=		orientation_num*translation_num;
 	rot_idx.size=		orientation_num*translation_num;
 	trans_idx.size=		orientation_num*translation_num;
 	ihidden_overs.size=	orientation_num*translation_num;
 	job_idx.size=		orientation_num*translation_num;
 	job_num.size=		orientation_num*translation_num;
 
+	rot_id.host_alloc();
 	rot_idx.host_alloc();
 	trans_idx.host_alloc();
 	ihidden_overs.host_alloc();
@@ -61,8 +64,9 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 
 			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 			{
-				rot_idx[significant_num] = i;
-				trans_idx[significant_num] = j;
+				rot_id[significant_num] = iorientclasses[i]; 	// where to look for priors etc
+				rot_idx[significant_num] = i;					// which rot for this significant task
+				trans_idx[significant_num] = j;					// which trans       - || -
 				ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
 				if(tk>=PROJDIFF_CHUNK_SIZE)
@@ -92,11 +96,12 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 		}
 	}
 
-	job_num.size=k;
-	job_idx.size=k;
-	rot_idx.size=significant_num;
-	trans_idx.size=significant_num;
-	ihidden_overs.size=significant_num;
+	job_num.size		=k;
+	job_idx.size		=k;
+	rot_id.size 		=significant_num;
+	rot_idx.size		=significant_num;
+	trans_idx.size		=significant_num;
+	ihidden_overs.size  =significant_num;
 
 	return(significant_num);
 }
@@ -480,6 +485,7 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT > &Fimgs_imag,
 		CudaGlobalPtr<FLOAT > &Frefs_real,
 		CudaGlobalPtr<FLOAT > &Frefs_imag,
+		CudaGlobalPtr<long unsigned> &rot_id,
 		CudaGlobalPtr<long unsigned> &rot_idx,
 		CudaGlobalPtr<long unsigned> &trans_idx,
 		CudaGlobalPtr<long unsigned> &job_idx,
@@ -536,6 +542,7 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 	CUDA_GPU_TAC("imagMemCp");
 
 	CUDA_GPU_TIC("pairListMemCp");
+	rot_id.put_on_device(significant_num); //FIXME this is not used
 	rot_idx.put_on_device(significant_num);
 	trans_idx.put_on_device(significant_num);
 	job_idx.put_on_device(block_num);
@@ -584,6 +591,7 @@ void runProjAndDifferenceKernel(
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
 		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<long unsigned> &rot_id,
 		CudaGlobalPtr<long unsigned> &rot_idx,
 		CudaGlobalPtr<long unsigned> &trans_idx,
 		CudaGlobalPtr<long unsigned> &job_idx,
@@ -639,6 +647,7 @@ void runProjAndDifferenceKernel(
 	CUDA_GPU_TAC("imagMemCp");
 
 	CUDA_GPU_TIC("pairListMemCp");
+	rot_id.put_on_device(significant_num); //FIXME this is not used
 	rot_idx.put_on_device(significant_num);
 	trans_idx.put_on_device(significant_num);
 	job_idx.put_on_device(block_num);
@@ -1613,6 +1622,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  OptimisationParamters &op,
 		 	 	 	 	 	 	  SamplingParameters &sp,
 		 	 	 	 	 	 	  MlOptimiser *baseMLO,
+		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &rot_id,
 		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &rot_idx,
 		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &trans_idx,
 		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &ihidden_overs,
@@ -1783,7 +1793,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 																	orientation_num, translation_num,
 																	iorientclasses,	iover_rots,	iover_transes, ihiddens,
 																	nr_over_orient, nr_over_trans, ipart,
-																	rot_idx, trans_idx, ihidden_overs, job_idx,job_num);               // ..and output into index-arrays
+																	rot_id, rot_idx, trans_idx, ihidden_overs, job_idx,job_num);               // ..and output into index-arrays
 				CUDA_CPU_TOC("pair_list_1");
 
 				weights.size=significant_num; // use the weights array from the above level
@@ -1802,6 +1812,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 									       Fimgs_real,
 									       Fimgs_imag,
 									       eulers,
+									       rot_id,
 									       rot_idx,
 									       trans_idx,
 									       job_idx,
@@ -1847,6 +1858,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
 											MlOptimiser *baseMLO,
+											CudaGlobalPtr <long unsigned> &rot_id,
 											CudaGlobalPtr <long unsigned> &rot_idx,
 											CudaGlobalPtr <long unsigned> &trans_idx,
 											CudaGlobalPtr <long unsigned> &ihidden_overs,
@@ -2060,7 +2072,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    (FLOAT)op.min_diff2[ipart],
 																			    sp.nr_oversampled_rot,
 																			    sp.nr_oversampled_trans,
-																			    ~rot_idx,
+																			    ~rot_id,
 																			    ~trans_idx,
 																				~job_idx,
 																			 	~job_num,
@@ -3439,7 +3451,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			// Only perform a second pass when using adaptive oversampling
 			int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
 
-			CudaGlobalPtr<long unsigned> rot_idx_C, 		rot_idx_F,
+			CudaGlobalPtr<long unsigned> rot_id_C, 			rot_id_F,
+			 	 	 	 	 	 	 	 rot_idx_C, 		rot_idx_F,
 										 trans_idx_C,		trans_idx_F,
 										 ihidden_overs_C,  	ihidden_overs_F,      // TODO to be removed WHEN mapping is eliminated
 										 job_idx_C, 		job_idx_F,
@@ -3473,7 +3486,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				if (ipass == 0)
 					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO);
 				else
-					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, rot_idx_F,
+					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, rot_id_F,
+																		 rot_idx_F,
 																		 trans_idx_F,
 																		 ihidden_overs_F,
 																		 job_idx_F,
@@ -3484,21 +3498,21 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 				CUDA_CPU_TIC("convertAllSquaredDifferencesToWeights");
 				if (ipass == 0)
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO,
-																		 rot_idx_C,
-																		 trans_idx_C,
-																		 ihidden_overs_C,
-																		 job_idx_C,
-																		 job_num_C,
-																		 weights_C);
+					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, rot_id_C,
+																				  rot_idx_C,
+																				  trans_idx_C,
+																				  ihidden_overs_C,
+																				  job_idx_C,
+																				  job_num_C,
+																				  weights_C);
 				else
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO,
-																		 rot_idx_F,
-																		 trans_idx_F,
-																		 ihidden_overs_F,
-																		 job_idx_F,
-																		 job_num_F,
-																		 weights_F);
+					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, rot_id_F,
+																				  rot_idx_F,
+																				  trans_idx_F,
+																				  ihidden_overs_F,
+																				  job_idx_F,
+																				  job_num_F,
+																				  weights_F);
 
 				CUDA_CPU_TOC("convertAllSquaredDifferencesToWeights");
 

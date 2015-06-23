@@ -88,7 +88,7 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 									     	  FLOAT min_diff2,
 									     	  int oversamples_orient,
 									     	  int oversamples_trans,
-									     	  unsigned long *d_rot_idx,
+									     	  unsigned long *d_rot_id,
 									     	  unsigned long *d_trans_idx,
 									     	  unsigned long *d_job_idx,
 									     	  unsigned long *d_job_num,
@@ -110,7 +110,7 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 	{
 		long int pos = d_job_idx[jobid];
 		// index of comparison
-		long int ix = d_rot_idx[   pos];   // each thread gets its own orient...
+		long int ix =  d_rot_id[   pos];   // each thread gets its own orient...
 		long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
 		long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
 
@@ -118,14 +118,12 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 
 		// Bacause the partion of work is so arbitrarily divided in this kernel,
 		// we need to do some brute idex work to get the correct indices.
-		c_iorient = (ix - (ix % oversamples_orient)) / oversamples_orient; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-		f_iorient = ix % oversamples_orient;
 		for (int itrans=0; itrans < in; itrans++, iy++)
 		{
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
 			f_itrans = iy % oversamples_trans;
 
-			FLOAT prior = g_pdf_orientation[c_iorient] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+			FLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
 			FLOAT diff2 = g_weights[pos+itrans] - min_diff2;								// Different for all threads
 			// next line because of numerical precision of exp-function
 	#if defined(CUDA_DOUBLE_PRECISION)
