@@ -733,271 +733,6 @@ void runProjAndDifferenceKernel(
 }
 
 
-// >52% will actually be used, allocate some padding
-#define BACKPROJECTION4_BLOCK_SIZE 64
-#define BACKPROJECTION4_GROUP_SIZE 16
-#define BACKPROJECTION4_FETCH_COUNT 4
-
-__global__ void cuda_kernel_backproject2(
-		int *g_xs,
-		int *g_ys,
-		int *g_zs,
-		FLOAT *g_model_real,
-		FLOAT *g_model_imag,
-		FLOAT *g_weight,
-		FLOAT *g_eulers,
-		FLOAT *g_wavgs_real,
-		FLOAT *g_wavgs_imag,
-		FLOAT *g_Fweights,
-		int max_r2, FLOAT scale2,
-		unsigned img_xy, unsigned long img_count, unsigned img_x, unsigned img_y,
-		unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz,
-		int N)
-{
-	unsigned gid = threadIdx.x / 4;
-	unsigned mid = threadIdx.x % 4;
-	unsigned gm = gid * 4 + mid;
-	unsigned pit = (gid * 4 + mid)*BACKPROJECTION4_FETCH_COUNT;
-	unsigned global_idx = blockIdx.x * BACKPROJECTION4_GROUP_SIZE + gid;
-
-	int X(0),Y(0),Z(0);
-
-	if (global_idx < N)
-	{
-		X = g_xs[global_idx];
-		Y = g_ys[global_idx];
-		Z = g_zs[global_idx];
-	}
-	else
-		X = mdl_x * 10; // Padding coordinate, place outside images
-
-	int ax(0), ay(0);
-
-	if (mid == 1)
-		ax = 1;
-	else if (mid == 2)
-		ay = 1;
-	else if (mid == 3)
-	{
-		ax = 1;
-		ay = 1;
-	}
-
-	bool  is_neg_x;
-	FLOAT d, w;
-	FLOAT xp,yp,zp;
-	int x,y,idx;
-
-	__shared__ FLOAT s_e[BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT];
-
-	__shared__ FLOAT s_weight[BACKPROJECTION4_GROUP_SIZE*4];
-	__shared__ FLOAT s_value_real[BACKPROJECTION4_GROUP_SIZE*4];
-	__shared__ FLOAT s_value_imag[BACKPROJECTION4_GROUP_SIZE*4];
-
-	s_weight[gm] = 0.0f;
-	s_value_real[gm] = 0.0f;
-	s_value_imag[gm] = 0.0f;
-
-	for (int img = 0, b = BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT; img < img_count; img ++, b += 9)
-	{
-		if (b+9 > BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT)
-		{
-			__syncthreads();
-
-			int img_9 = img*9+pit;
-			if (img_9 < img_count*9)
-			{
-				s_e[pit+0] = g_eulers[img_9+0];
-				s_e[pit+1] = g_eulers[img_9+1];
-				s_e[pit+2] = g_eulers[img_9+2];
-				s_e[pit+3] = g_eulers[img_9+3];
-			}
-
-			__syncthreads();
-			b = 0;
-		}
-
-		zp = (s_e[b+6] * X + s_e[b+7] * Y + s_e[b+8] * Z) / scale2;
-
-		if (fabsf(zp) > 0.87f) continue; //Within the unit cube, sqrt(3)/2=0.866
-
-		yp = (s_e[b+3] * X + s_e[b+4] * Y + s_e[b+5] * Z) / scale2;
-		xp = (s_e[b+0] * X + s_e[b+1] * Y + s_e[b+2] * Z) / scale2;
-
-		if (xp < 0.0f)
-		{
-			yp = -yp;
-			xp = -xp;
-			is_neg_x = true;
-		}
-		else
-			is_neg_x = false;
-
-		x = (int) floorf(xp) + ax;
-		y = (int) floorf(yp) + ay;
-
-		if (x * x + y * y > max_r2) continue;
-
-		if (y < 0 && x == 0)
-		{
-			is_neg_x = !is_neg_x;
-			y = -y;
-		}
-
-		xp = (s_e[b+0] * x + s_e[b+3] * y) * scale2;
-		yp = (s_e[b+1] * x + s_e[b+4] * y) * scale2;
-		zp = (s_e[b+2] * x + s_e[b+5] * y) * scale2;
-
-		if (xp < 0.0f) //Flip sign
-		{
-			xp = fabsf(X+xp);
-			yp = fabsf(Y+yp);
-			zp = fabsf(Z+zp);
-		}
-		else
-		{
-			xp = fabsf(X-xp);
-			yp = fabsf(Y-yp);
-			zp = fabsf(Z-zp);
-		}
-
-		if (xp < 1.0f && yp < 1.0f && zp < 1.0f)
-		{
-			if (y < 0) y += img_y;
-			idx = img*img_xy + y * img_x + x;
-			w = g_Fweights[idx];
-
-			if (w > 0.0f)
-			{
-				d = (1.0f - xp) * (1.0f - yp) * (1.0f - zp);
-
-				s_weight[gm] += w * d;
-				s_value_real[gm] += g_wavgs_real[idx] * d;
-				if (is_neg_x) s_value_imag[gm] -= g_wavgs_imag[idx] * d;
-				else          s_value_imag[gm] += g_wavgs_imag[idx] * d;
-			}
-		}
-	}
-
-	__syncthreads();
-
-	if (mid == 0)
-	{
-		FLOAT sum = s_weight[gid*4 + 0] + s_weight[gid*4 + 1] + s_weight[gid*4 + 2] + s_weight[gid*4 + 3];
-		if (sum != 0.0f)
-			g_weight[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] = sum;
-	}
-	else if (mid == 1)
-	{
-		FLOAT sum = s_value_real[gid*4 + 0] + s_value_real[gid*4 + 1] + s_value_real[gid*4 + 2] + s_value_real[gid*4 + 3];
-		if (sum != 0.0f)
-			g_model_real[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] = sum;
-	}
-	else if (mid == 2)
-	{
-		FLOAT sum = s_value_imag[gid*4 + 0] + s_value_imag[gid*4 + 1] + s_value_imag[gid*4 + 2] + s_value_imag[gid*4 + 3];
-		if (sum != 0.0f)
-			g_model_imag[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] = sum;
-	}
-}
-
-static void runBackprojectKernel(
-		CudaGlobalPtr<FLOAT> &wavgs_real,
-		CudaGlobalPtr<FLOAT> &wavgs_imag,
-		CudaGlobalPtr<FLOAT> &Fweights,
-		CudaGlobalPtr<FLOAT> &eulers,
-		CudaGlobalPtr<FLOAT> &model_real,
-		CudaGlobalPtr<FLOAT> &model_imag,
-		CudaGlobalPtr<FLOAT> &weight,
-		int max_r, FLOAT scale2, //grid scale 2D -> 3D squared
-		int img_xy, long img_count, int img_x, int img_y,
-		int mdl_x, int mdl_y, int mdl_z, int mdl_inity, int mdl_initz)
-{
-	int max_r2 = max_r * max_r;
-
-	CUDA_CPU_TIC("sphereVixelDetermiation");
-
-	CudaGlobalPtr<int> xs(mdl_x*mdl_y*mdl_z); // >52% will actually be used, allocate some padding
-	CudaGlobalPtr<int> ys(xs.size);
-	CudaGlobalPtr<int> zs(xs.size);
-	unsigned N(0);
-
-	for (int x = 0; x < mdl_x; x ++)
-	{
-		for (int y = mdl_inity; y < mdl_y; y++)
-		{
-			for (int z = mdl_initz; z < mdl_z; z++)
-			{
-				if (x*x + y*y + z*z <= max_r2 * scale2 * scale2 * 1.2f)
-				{
-					xs[N] = x;
-					ys[N] = y;
-					zs[N] = z;
-					N ++;
-				}
-			}
-		}
-	}
-	xs.size = N + N%BACKPROJECTION4_GROUP_SIZE;
-	ys.size = xs.size;
-	zs.size = xs.size;
-
-	CUDA_CPU_TOC("sphereVixelDetermiation");
-
-	CUDA_GPU_TIC("sphereVixelMemCp");
-
-	xs.device_alloc();
-	ys.device_alloc();
-	zs.device_alloc();
-
-	xs.cp_to_device();
-	ys.cp_to_device();
-	zs.cp_to_device();
-
-	CUDA_GPU_TAC("sphereVixelMemCp");
-
-	int grid_dim = ceil((float)N / BACKPROJECTION4_GROUP_SIZE);
-	dim3 block_dim( BACKPROJECTION4_GROUP_SIZE *4 );
-
-	CUDA_GPU_TIC("cuda_kernel_backproject");
-
-	cuda_kernel_backproject2<<<grid_dim,block_dim>>>(
-			~xs,~ys,~zs,
-			~model_real,
-			~model_imag,
-			~weight,
-			~eulers,
-			~wavgs_real,
-			~wavgs_imag,
-			~Fweights,
-			max_r2,
-			scale2,
-			img_xy,
-			img_count,
-			img_x,
-			img_y,
-			mdl_x,
-			mdl_y,
-			mdl_inity,
-			mdl_initz,
-			N);
-
-	CUDA_GPU_TAC("cuda_kernel_backproject");
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2469,7 +2204,14 @@ void runProjAndWavgKernel(
 }
 #endif
 
-void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
+void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
+		MlOptimiser *baseMLO,
+		CudaGlobalPtr <long unsigned> &rot_idx,
+		CudaGlobalPtr <long unsigned> &trans_idx,
+		CudaGlobalPtr <long unsigned> &ihidden_overs,
+		CudaGlobalPtr <long unsigned> &job_idx,
+		CudaGlobalPtr <long unsigned> &job_num,
+		CudaGlobalPtr <FLOAT> 		  &weights)
 {
 	CUDA_CPU_TIC("store_init");
 
@@ -2594,6 +2336,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 
 			CUDA_CPU_TIC("collect_data_2");
+
 			CUDA_CPU_TIC("collect_data_2_pre_kernel");
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
 
@@ -2629,56 +2372,106 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					}
 				}
 			}
+			long int jobid=0;
+			job_idx[jobid]=0;
+			job_num[jobid]=1;
+			long int crot = rot_idx[jobid]; // set current rot
+			for(long int n=1; n<rot_idx.size; n++)
+			{
+				if(rot_idx[n]==crot)
+				{
+					job_num[jobid]++;
+				}
+				else
+				{
+					jobid++;
+					job_num[jobid]=1;
+					job_idx[jobid]=n;
+					crot=rot_idx[n];
+				}
+			}
+			job_idx.size=jobid;
+			job_num.size=jobid;
+			job_idx.cp_to_device();
+			job_num.cp_to_device();
 
-			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy1");
+			oo_otrans_x.put_on_device();
+			oo_otrans_y.put_on_device();
+			myp_oo_otrans_x2y2z2.put_on_device();
 
-			Mweight.device_alloc();
-			Mweight.cp_to_device();
-			oo_otrans_x.device_alloc();
-			oo_otrans_x.cp_to_device();
-			oo_otrans_y.device_alloc();
-			oo_otrans_y.cp_to_device();
-			myp_oo_otrans_x2y2z2.device_alloc();
-			myp_oo_otrans_x2y2z2.cp_to_device();
+			std::cerr << "(FLOAT)op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
+			int block_num;
+			bool do_indexCollect=false;
+			if(do_indexCollect)
+				block_num = job_idx.size;
+			else
+				block_num = sp.nr_dir*sp.nr_psi;
 
-			CUDA_GPU_TAC("cuda_kernel_collect2_memcpy1");
-
+			std::cerr << "block_num = " << block_num << std::endl;
+			CudaGlobalPtr<FLOAT>                      p_weights(block_num);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_num);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_num);
+			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_num);
 			unsigned long coarse_nr = sp.nr_dir*sp.nr_psi;
-			CudaGlobalPtr<FLOAT>                      p_weights(coarse_nr);
-			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(coarse_nr);
-			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(coarse_nr);
-			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(coarse_nr);
-
 			p_weights.device_alloc();
 			p_thr_wsum_prior_offsetx_class.device_alloc();
 			p_thr_wsum_prior_offsety_class.device_alloc();
 			p_thr_wsum_sigma2_offset.device_alloc();
+//			weights.device_alloc();
+//			weights.cp_to_device();
 
-			dim3 grid_dim_collect2(sp.nr_dir, sp.nr_psi);
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 
-			cuda_kernel_collect2<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-					~oo_otrans_x,          // otrans-size -> make const
-					~oo_otrans_y,          // otrans-size -> make const
-					~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-					~Mweight,
-					(FLOAT)op.significant_weight[ipart],
-					(FLOAT)op.sum_weight[ipart],
-					sp.nr_trans,
-					sp.nr_oversampled_trans,
-					sp.nr_oversampled_rot,
-					oversamples,
-					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-					~p_weights,
-					~p_thr_wsum_prior_offsetx_class,
-					~p_thr_wsum_prior_offsety_class,
-					~p_thr_wsum_sigma2_offset
-				   );
-
-
-			CUDA_CPU_TIC("collect_data_2_post_kernel");
+			if(do_indexCollect)
+			{
+				dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
+				cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+						~oo_otrans_x,          // otrans-size -> make const
+						~oo_otrans_y,          // otrans-size -> make const
+						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						~weights,
+						(FLOAT)op.significant_weight[ipart],
+						(FLOAT)op.sum_weight[ipart],
+						sp.nr_trans,
+						sp.nr_oversampled_trans,
+						sp.nr_oversampled_rot,
+						oversamples,
+						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+						~p_weights,
+						~p_thr_wsum_prior_offsetx_class,
+						~p_thr_wsum_prior_offsety_class,
+						~p_thr_wsum_sigma2_offset,
+						~rot_idx,
+						~trans_idx,
+						~job_idx,
+						~job_num
+					   );
+			}
+			else
+			{
+				Mweight.put_on_device();
+				dim3 grid_dim_collect2(sp.nr_dir, sp.nr_psi);
+				cuda_kernel_collect2<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+						~oo_otrans_x,          // otrans-size -> make const
+						~oo_otrans_y,          // otrans-size -> make const
+						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						~Mweight,
+						(FLOAT)op.significant_weight[ipart],
+						(FLOAT)op.sum_weight[ipart],
+						sp.nr_trans,
+						sp.nr_oversampled_trans,
+						sp.nr_oversampled_rot,
+						oversamples,
+						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+						~p_weights,
+						~p_thr_wsum_prior_offsetx_class,
+						~p_thr_wsum_prior_offsety_class,
+						~p_thr_wsum_sigma2_offset
+					   );
+			}
 
 			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
+
 			// TODO further reduce the below 4 arrays while data is still on gpu
 			p_weights.cp_to_host();
 			p_thr_wsum_prior_offsetx_class.cp_to_host();
@@ -2686,38 +2479,42 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			p_thr_wsum_sigma2_offset.cp_to_host();
 			CUDA_GPU_TAC("cuda_kernel_collect2_memcpy2");
 
+			CUDA_CPU_TIC("collect_data_2_post_kernel");
+
 			HANDLE_ERROR(cudaDeviceSynchronize());
 
 			CUDA_GPU_TOC();
 
 			thr_wsum_sigma2_offset = 0.0;
 			int iorient = 0;
-			for (long int idir = 0; idir < sp.nr_dir; idir++)
+			for (long int n = 0; n < block_num; n++)
 			{
-				for (long int ipsi = 0; ipsi < sp.nr_psi; ipsi++, iorient++)
+				if(do_indexCollect)
+					iorient= floor( (float)rot_idx[job_idx[n]] / (float) sp.nr_oversampled_rot);
+				else
+					iorient=n;
+
+				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
+				// Only proceed if any of the particles had any significant coarsely sampled translation
+
+				if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 				{
-					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-					// Only proceed if any of the particles had any significant coarsely sampled translation
+					long int mydir, idir=floor(iorient/sp.nr_psi);
+					if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+						mydir = idir;
+					else
+						mydir = op.pointer_dir_nonzeroprior[idir];
 
-					if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+					// store partials according to indices of the relevant dimension
+					DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
+					thr_sumw_group[group_id]                 						+= p_weights[n];
+					thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
+					thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
+
+					if (baseMLO->mymodel.ref_dim == 2)
 					{
-						long int mydir;
-						if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-							mydir = idir;
-						else
-							mydir = op.pointer_dir_nonzeroprior[idir];
-
-						// store partials according to indices of the relevant dimension
-						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[iorient];
-						thr_sumw_group[group_id]                 						+= p_weights[iorient];
-						thr_wsum_pdf_class[exp_iclass]           						+= p_weights[iorient];
-						thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[iorient];
-
-						if (baseMLO->mymodel.ref_dim == 2)
-						{
-							thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
-							thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
-						}
+						thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
+						thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
 					}
 				}
 			}
@@ -3488,7 +3285,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			sp.current_image_size = baseMLO->mymodel.current_size;
 
 			CUDA_CPU_TIC("storeWeightedSums");
-			storeWeightedSums(op, sp);
+			storeWeightedSums(op, sp, baseMLO, rot_idx_F,trans_idx_F,ihidden_overs_F,job_idx_F,job_num_F,weights_F);
 			CUDA_CPU_TOC("storeWeightedSums");
 
 			CUDA_CPU_TOC("oneParticle");
