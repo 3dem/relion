@@ -1468,29 +1468,6 @@ void MlOptimiser::expectation()
 	// B. Initialise Fouriertransform, set weights in wsum_model to zero, initialise AB-matrices for FFT-phase shifts, etc
 	expectationSetup();
 
-
-
-
-	if (do_gpu)
-	{
-		cudaProjectors.reserve(mymodel.nr_classes);
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			cudaProjectors[iclass].setMdlDim(
-					mymodel.PPref[iclass].data.xdim,
-					mymodel.PPref[iclass].data.ydim,
-					mymodel.PPref[iclass].data.zdim,
-					mymodel.PPref[iclass].data.yinit,
-					mymodel.PPref[iclass].data.zinit,
-					mymodel.PPref[iclass].r_max,
-					mymodel.PPref[iclass].padding_factor);
-
-			cudaProjectors[iclass].setMdlData(mymodel.PPref[iclass].data.data);
-		}
-	}
-
-
-
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setup" << std::endl;
 #endif
@@ -1533,6 +1510,41 @@ void MlOptimiser::expectation()
 
 	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
+
+
+
+
+
+	if (do_gpu)
+	{
+		cudaProjectors.resize(mymodel.nr_classes);
+		cudaBackprojectors.resize(mymodel.nr_classes);
+
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			cudaProjectors[iclass].setMdlDim(
+					mymodel.PPref[iclass].data.xdim,
+					mymodel.PPref[iclass].data.ydim,
+					mymodel.PPref[iclass].data.zdim,
+					mymodel.PPref[iclass].data.yinit,
+					mymodel.PPref[iclass].data.zinit,
+					mymodel.PPref[iclass].r_max,
+					mymodel.PPref[iclass].padding_factor);
+
+			cudaProjectors[iclass].setMdlData(mymodel.PPref[iclass].data.data);
+
+			cudaBackprojectors[iclass].setMdlDim(
+					wsum_model.BPref[iclass].data.xdim,
+					wsum_model.BPref[iclass].data.ydim,
+					wsum_model.BPref[iclass].data.zdim,
+					wsum_model.BPref[iclass].data.yinit,
+					wsum_model.BPref[iclass].data.zinit,
+					wsum_model.BPref[iclass].r_max,
+					wsum_model.BPref[iclass].padding_factor);
+
+			cudaBackprojectors[iclass].initMdl();
+		}
+	}
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
@@ -1586,13 +1598,25 @@ void MlOptimiser::expectation()
 		}
 	}
 
+
 	if (verb > 0)
 		progress_bar(mydata.numberOfOriginalParticles());
 
-	// Clean up some memory
-
 	if (do_gpu)
+	{
 		cudaProjectors.clear();
+
+		//Get backproject data from gpu
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			cudaBackprojectors[iclass].getMdlData(
+					wsum_model.BPref[iclass].data.data,
+					wsum_model.BPref[iclass].weight.data
+					);
+		}
+
+		cudaBackprojectors.clear();
+	}
 
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		mymodel.PPref[iclass].data.clear();

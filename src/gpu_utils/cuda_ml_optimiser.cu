@@ -733,12 +733,12 @@ void runProjAndDifferenceKernel(
 }
 
 
-
+// >52% will actually be used, allocate some padding
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_FETCH_COUNT 4
 
-__global__ void cuda_kernel_backproject(
+__global__ void cuda_kernel_backproject2(
 		int *g_xs,
 		int *g_ys,
 		int *g_zs,
@@ -961,7 +961,7 @@ static void runBackprojectKernel(
 
 	CUDA_GPU_TIC("cuda_kernel_backproject");
 
-	cuda_kernel_backproject<<<grid_dim,block_dim>>>(
+	cuda_kernel_backproject2<<<grid_dim,block_dim>>>(
 			~xs,~ys,~zs,
 			~model_real,
 			~model_imag,
@@ -1441,18 +1441,6 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 			eulers.device_alloc();
 			eulers.cp_to_device();
 			CUDA_GPU_TAC("eulersMemCpCoarse");
-
-
-			CUDA_CPU_TIC("modelAssignmentCoarse");
-			CudaGlobalPtr<FLOAT > model_real((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
-			CudaGlobalPtr<FLOAT > model_imag((baseMLO->mymodel.PPref[exp_iclass]).data.nzyxdim);
-
-			for(unsigned i = 0; i < model_real.size; i++)
-			{
-				model_real[i] = (FLOAT) baseMLO->mymodel.PPref[exp_iclass].data.data[i].real;
-				model_imag[i] = (FLOAT) baseMLO->mymodel.PPref[exp_iclass].data.data[i].imag;
-			}
-			CUDA_CPU_TOC("modelAssignmentCoarse");
 
 			/*=======================================================================================
 			                                  	  Particle Iteration
@@ -2483,7 +2471,7 @@ void runProjAndWavgKernel(
 
 void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
 {
-	CUDA_CPU_TIC("store_pre_gpu");
+	CUDA_CPU_TIC("store_init");
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
@@ -2568,7 +2556,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 	unsigned proj_div_max_count(4096*2);
 
-	CUDA_CPU_TOC("store_pre_gpu");
+	CUDA_CPU_TOC("store_init");
 
 	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2642,6 +2630,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				}
 			}
 
+			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy1");
+
 			Mweight.device_alloc();
 			Mweight.cp_to_device();
 			oo_otrans_x.device_alloc();
@@ -2650,6 +2640,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			oo_otrans_y.cp_to_device();
 			myp_oo_otrans_x2y2z2.device_alloc();
 			myp_oo_otrans_x2y2z2.cp_to_device();
+
+			CUDA_GPU_TAC("cuda_kernel_collect2_memcpy1");
 
 			unsigned long coarse_nr = sp.nr_dir*sp.nr_psi;
 			CudaGlobalPtr<FLOAT>                      p_weights(coarse_nr);
@@ -2683,13 +2675,20 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					~p_thr_wsum_sigma2_offset
 				   );
 
+
+			CUDA_CPU_TIC("collect_data_2_post_kernel");
+
+			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
 			// TODO further reduce the below 4 arrays while data is still on gpu
 			p_weights.cp_to_host();
 			p_thr_wsum_prior_offsetx_class.cp_to_host();
 			p_thr_wsum_prior_offsety_class.cp_to_host();
 			p_thr_wsum_sigma2_offset.cp_to_host();
+			CUDA_GPU_TAC("cuda_kernel_collect2_memcpy2");
 
 			HANDLE_ERROR(cudaDeviceSynchronize());
+
+			CUDA_GPU_TOC();
 
 			thr_wsum_sigma2_offset = 0.0;
 			int iorient = 0;
@@ -2723,7 +2722,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 				}
 			}
 
-			CUDA_CPU_TIC("collect_data_2_post_kernel");
 			Mweight.free_device();
 			p_weights.free();
 			p_thr_wsum_sigma2_offset.free();
@@ -2734,10 +2732,13 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			oo_otrans_x.free();
 			myp_oo_otrans_x2y2z2.free();
 
+			CUDA_CPU_TOC("collect_data_2_post_kernel");
 
 			/*=======================================================================================
 												  SET META DATA
 			=======================================================================================*/
+
+			CUDA_CPU_TIC("setMetadata");
 
 			//Get index of max element using GPU-tool thrust
 			Indices max_index;
@@ -2768,8 +2769,11 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
 
-			CUDA_CPU_TOC("collect_data_2_post_kernel");
+			CUDA_CPU_TOC("setMetadata");
+
+
 			CUDA_CPU_TOC("collect_data_2");
+
 		}
 
 
@@ -2832,6 +2836,7 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			// now we create only those matrices corresponding to significant orientations, which IS  * class-specific *
 
 
+			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
 
 			generateEulerMatrices(
@@ -2846,6 +2851,8 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			eulers.device_alloc();
 			eulers.cp_to_device();
+
+			CUDA_CPU_TOC("generateEulerMatrices");
 
 			CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
 			wavgs_real.device_alloc();
@@ -3151,17 +3158,6 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			CUDA_CPU_TIC("backprojection");
 
-			CudaGlobalPtr<FLOAT> bp_model_real(baseMLO->wsum_model.BPref[exp_iclass].data.nzyxdim);
-			bp_model_real.device_alloc();
-			bp_model_real.device_init(0);
-			CudaGlobalPtr<FLOAT> bp_model_imag(bp_model_real.size);
-			bp_model_imag.device_alloc();
-			bp_model_imag.device_init(0);
-			CudaGlobalPtr<FLOAT> bp_weight(bp_model_real.size);
-			bp_weight.device_alloc();
-			bp_weight.device_init(0);
-
-
 			CudaGlobalPtr<FLOAT> bp_eulers(9 * orientation_num);
 
 			FLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
@@ -3178,55 +3174,21 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 			bp_eulers.cp_to_device();
 			bp_eulers.free_host();
 
-
-			runBackprojectKernel(
-					wavgs_real,
-					wavgs_imag,
-					Fweights,
-					bp_eulers,
-					bp_model_real,
-					bp_model_imag,
-					bp_weight,
-					baseMLO->wsum_model.BPref[exp_iclass].r_max,
-					padding_factor,
-					image_size,
-					orientation_num,
-					op.local_Minvsigma2s[0].xdim,
-					op.local_Minvsigma2s[0].ydim,
-					baseMLO->wsum_model.BPref[exp_iclass].data.xdim,
-					baseMLO->wsum_model.BPref[exp_iclass].data.ydim,
-					baseMLO->wsum_model.BPref[exp_iclass].data.zdim,
-					baseMLO->wsum_model.BPref[exp_iclass].data.yinit,
-					baseMLO->wsum_model.BPref[exp_iclass].data.zinit);
-
-			bp_model_real.cp_to_host();
-			bp_model_imag.cp_to_host();
-			bp_weight.cp_to_host();
-
-			bp_model_real.free_device();
-			bp_model_imag.free_device();
-			bp_weight.free_device();
-
-			Fweights.free();
-			wavgs_real.free();
-			wavgs_imag.free();
-			bp_eulers.free_device();
-
-			HANDLE_ERROR(cudaDeviceSynchronize());
-
-			CUDA_GPU_TOC();
-
 			int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 			pthread_mutex_lock(&global_mutex2[my_mutex]);
 
-			for (long unsigned i = 0; i < bp_model_real.size; i++)
-			{
-				baseMLO->wsum_model.BPref[exp_iclass].data.data[i].real += bp_model_real[i];
-				baseMLO->wsum_model.BPref[exp_iclass].data.data[i].imag += bp_model_imag[i];
-				baseMLO->wsum_model.BPref[exp_iclass].weight.data[i] += bp_weight[i];
-			}
+			baseMLO->cudaBackprojectors[exp_iclass].backproject(
+					~wavgs_real,
+					~wavgs_imag,
+					~Fweights,
+					~bp_eulers,
+					op.local_Minvsigma2s[0].xdim,
+					op.local_Minvsigma2s[0].ydim,
+					orientation_num);
 
 			pthread_mutex_unlock(&global_mutex2[my_mutex]);
+
+
 
 			CUDA_CPU_TOC("backprojection");
 		}
@@ -3366,6 +3328,9 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
+
+	CUDA_CPU_TOC("interParticle");
+
 	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;
 	while (baseMLO->exp_ipart_ThreadTaskDistributor->getTasks(first_ipart, last_ipart))
@@ -3529,5 +3494,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			CUDA_CPU_TOC("oneParticle");
 		}
 	}
+
+	CUDA_CPU_TIC("interParticle");
 }
 

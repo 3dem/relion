@@ -30,6 +30,7 @@
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
 #include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_backprojector.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -93,6 +94,9 @@ public:
 
 	//The CUDA accelerated projector set
 	std::vector< Cuda3DProjector > cudaProjectors;
+
+	//The CUDA accelerated back-projector set
+	std::vector< Cuda3DBackprojector > cudaBackprojectors;
 
 	// I/O Parser
 	IOParser parser;

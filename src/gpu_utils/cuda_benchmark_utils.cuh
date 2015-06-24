@@ -48,7 +48,7 @@ static void cuda_cpu_toc(std::string id)
 	if (idx == -1)
 	{
 		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_cpu_toc.\n", id.c_str());
-		exit( EXIT_FAILURE );
+		//exit( EXIT_FAILURE );
 	}
 	else
 	{

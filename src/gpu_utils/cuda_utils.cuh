@@ -120,6 +120,16 @@ public:
 	}
 
 	/**
+	 * Allocate memory on device with given size
+	 */
+	inline
+	__host__ void device_alloc(size_t newSize)
+	{
+		size = newSize;
+		device_alloc();
+	}
+
+	/**
 	 * Allocate memory on host
 	 */
 	inline

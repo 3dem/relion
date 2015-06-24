@@ -8,9 +8,14 @@
 void Cuda3DProjector::setMdlData(float *real, float *imag)
 {
 #ifdef CUDA_DEBUG
-	if (mdlX == 0)
+	if (mdlXYZ == 0)
 	{
-        printf("Model dimensions must be set with setMdlDim before call to setMdlData.");
+        printf("DEBUG_ERROR: Model dimensions must be set with setMdlDim before call to setMdlData.");
+		raise(SIGSEGV);
+	}
+	if (mdlReal != 0)
+	{
+        printf("DEBUG_ERROR: Duplicated call to setMdlData.");
 		raise(SIGSEGV);
 	}
 #endif
@@ -78,9 +83,14 @@ void Cuda3DProjector::setMdlData(float *real, float *imag)
 void Cuda3DProjector::setMdlData(double *real, double *imag)
 {
 #ifdef CUDA_DEBUG
-	if (mdlX == 0)
+	if (mdlXYZ == 0)
 	{
-        printf("Model dimensions must be set with setMdlDim before call to setMdlData.");
+        printf("DEBUG_ERROR: Model dimensions must be set with setMdlDim before call to setMdlData.");
+		raise(SIGSEGV);
+	}
+	if (mdlReal != 0)
+	{
+        printf("DEBUG_ERROR: Duplicated call to setMdlData.");
 		raise(SIGSEGV);
 	}
 #endif
@@ -105,7 +115,7 @@ void Cuda3DProjector::setMdlData(double *real, double *imag)
 	mdlReal = (void*) r;
 	mdlImag = (void*) i;
 }
-
+:
 #endif
 
 
