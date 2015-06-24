@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_projector.cuh"
 
 // ===================================================
 //     Combined Projection+Difference kernels are
@@ -23,8 +24,7 @@
 __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 		                                FLOAT *g_imgs_real,
 		                                FLOAT *g_imgs_imag,
-										cudaTextureObject_t texModel_real,
-										cudaTextureObject_t texModel_imag,
+										Cuda3DProjectorKernel projector,
 										FLOAT *g_Minvsigma2,
 										FLOAT *g_diff2s,
 										unsigned image_size,
@@ -32,17 +32,10 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										unsigned long orientation_num,
 										unsigned long translation_num,
 										unsigned long todo_blocks,
-										unsigned long *d_rotidx,
-										unsigned long *d_transidx,
-										unsigned long *d_trans_num,
-										unsigned long *d_ihidden_overs,
-										int my_r_max,
-										int max_r2,
-										int img_x,
-										int img_y,
-										int mdl_init_y,
-										int mdl_init_z,
-										float padding_factor
+										unsigned long *d_rot_idx,
+										unsigned long *d_trans_idx,
+										unsigned long *d_job_idx,
+										unsigned long *d_job_num
 										);
 #else
 __global__ void cuda_kernel_PAV_TGE_D2( FLOAT *g_eulers,

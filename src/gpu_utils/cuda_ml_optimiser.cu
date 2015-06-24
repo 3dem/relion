@@ -4,6 +4,8 @@
 #include <math.h>
 #include <ctime>
 #include <iostream>
+#include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
@@ -150,36 +152,6 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
 	return(block_dim);
 }
 
-/*
- * Sets the correct settings for a 3D cuda texture for the projector,
- * i.e. extent, boundary conditions, etc, then copies a host array to
- * the allocated texture on the device.
- */
-void cudaCopyToProjectorTextureArray(	FLOAT* hostArray,
-										cudaArray* deviceArray,
-										cudaExtent volumeSize,
-										cudaResourceDesc &resDesc,
-										cudaTextureDesc &texDesc)
-{
-	cudaMemcpy3DParms copyParams = {0};
-	copyParams.extent   = volumeSize;
-	copyParams.kind     = cudaMemcpyHostToDevice;
-	copyParams.dstArray = deviceArray;
-	copyParams.srcPtr   = make_cudaPitchedPtr(hostArray,volumeSize.width*sizeof(FLOAT), volumeSize.height, volumeSize.depth);
-	cudaMemcpy3D(&copyParams);
-
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType = cudaResourceTypeArray;
-    resDesc.res.array.array = deviceArray;
-
-    memset(&texDesc, 0, sizeof(texDesc));
-    texDesc.filterMode       = cudaFilterModeLinear;
-    texDesc.readMode         = cudaReadModeElementType;
-    texDesc.normalizedCoords = false;
-    for(int n=0; n<3; n++)
-    	texDesc.addressMode[n]=cudaAddressModeClamp;
-
-}
 /*
  * Maps weights to a decoupled indexing of translations and orientations
  */
@@ -330,38 +302,6 @@ void generateEulerMatrices(
 	}
 }
 
-
-void generateEulerMatrices(
-		std::vector< double > &psis,
-		CudaGlobalPtr<FLOAT> &eulers,
-		bool inverse)
-{
-    double gamma, c, s;
-
-	for (long int i = 0; i < psis.size(); i++)
-	{
-	    //TODO In a sense we're doing RAD2DEG just to do DEG2RAD here.
-	    //The only place the degree value is actually used is in the metadata assignment.
-
-	    gamma = DEG2RAD(psis[i]);
-	    sincos(gamma, &s, &c);
-
-		if(inverse) //Noticed here that inverse actually yields the opposite (Hmmm)
-		{
-		    eulers[4 * i + 0] =  c; //00
-		    eulers[4 * i + 1] = -s; //10
-		    eulers[4 * i + 3] =  s; //01
-		    eulers[4 * i + 4] =  c; //11
-		}
-		else
-		{
-		    eulers[4 * i + 0] =  c; //00
-		    eulers[4 * i + 1] =  s; //01
-		    eulers[4 * i + 3] = -s; //10
-		    eulers[4 * i + 4] =  c; //11
-		}
-	}
-}
 
 long int generateProjectionSetup(
 		OptimisationParamters &op,
@@ -586,7 +526,7 @@ void runDifferenceKernel(CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 
 
 void runProjAndDifferenceKernel(
-		Cuda3DProjector &projector,
+		Cuda3DProjectorKernel &projector,
 		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
@@ -607,7 +547,6 @@ void runProjAndDifferenceKernel(
 		int group_id,
 		int exp_iclass)
 {
-
 	CUDA_CPU_TIC("kernel_init_1");
 
 	// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
@@ -675,8 +614,7 @@ void runProjAndDifferenceKernel(
 			~eulers,
 			~Fimgs_real,
 			~Fimgs_imag,
-			*(cudaTextureObject_t*)projector.mdlReal,
-			*(cudaTextureObject_t*)projector.mdlImag,
+			projector,
 			~gpuMinvsigma2,
 			~diff2s,
 			image_size,
@@ -687,14 +625,7 @@ void runProjAndDifferenceKernel(
 			~rot_idx,
 			~trans_idx,
 			~job_idx,
-			~job_num,
-			projector.maxR,
-			projector.maxR2,
-			projector.imgX,
-			projector.imgY,
-			projector.mdlInitY,
-			projector.mdlInitZ,
-			(float) projector.padding_factor);
+			~job_num);
 #else // use global mem
 	cuda_kernel_PAV_TGE_D2<<<block_dim,BLOCK_SIZE>>>(
 			~eulers,
@@ -713,10 +644,10 @@ void runProjAndDifferenceKernel(
 			~trans_idx,
 			~job_idx,
 			~job_num,
-			projector.maxR,
-			projector.maxR2,
-			projector.imgX,
-			projector.imgY,
+			max_r,
+			max_r*max_r,
+			imgX,
+			imgY,
 			projector.mdlInitY,
 			projector.mdlInitZ,
 			projector.mdlX,
@@ -741,30 +672,20 @@ __global__ void cuda_kernel_diff2_texture(
 		FLOAT *g_eulers,
 		FLOAT *g_imgs_real,
 		FLOAT *g_imgs_imag,
-		cudaTextureObject_t texModel_real,
-		cudaTextureObject_t texModel_imag,
+		Cuda3DProjectorKernel projector,
 		FLOAT *g_Minvsigma2,
 		FLOAT *g_diff2s,
 		unsigned translation_num,
 		int image_size,
-		FLOAT sum_init,
-		int my_r_max,
-		int max_r2,
-		long int img_x,
-		long int img_y,
-		long int mdl_init_y,
-		long int mdl_init_z,
-		float padding_factor
+		FLOAT sum_init
 		)
 {
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
 	int tid = threadIdx.x;
 
-	FLOAT xp, yp, zp;
-	long int r2;
-	bool is_neg_x;
 	FLOAT ref_real;
 	FLOAT ref_imag;
+
 	FLOAT e0,e1,e3,e4,e6,e7;
 	e0 = __ldg(&g_eulers[bid*9  ]);
 	e1 = __ldg(&g_eulers[bid*9+1]);
@@ -785,53 +706,10 @@ __global__ void cuda_kernel_diff2_texture(
 
 		if(pixel < image_size)
 		{
-			int x = pixel % img_x;
-			int y = (int)floorf( (float)pixel / (float)img_x);
-
-			// Dont search beyond square with side max_r
-			if (y > my_r_max)
-			{
-				if (y >= img_y - my_r_max)
-					y = y - img_y ;
-				else
-					x=r2;
-			}
-
-			r2 = x*x + y*y;
-			if (r2 <= max_r2)
-			{
-				xp = (e0 * x + e1 * y ) * padding_factor;
-				yp = (e3 * x + e4 * y ) * padding_factor;
-				zp = (e6 * x + e7 * y ) * padding_factor;
-				// Only asymmetric half is stored
-				if (xp < 0)
-				{
-					// Get complex conjugated hermitian symmetry pair
-					xp = -xp;
-					yp = -yp;
-					zp = -zp;
-					is_neg_x = true;
-				}
-				else
-				{
-					is_neg_x = false;
-				}
-				yp -= mdl_init_y;
-				zp -= mdl_init_z;
-
-				ref_real=tex3D<FLOAT>(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
-				ref_imag=tex3D<FLOAT>(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
-
-				if (is_neg_x)
-				{
-					ref_imag = -ref_imag;
-				}
-			}
-			else
-			{
-				ref_real=0.0f;
-				ref_imag=0.0f;
-			}
+			projector.project(
+					pixel,
+					e0,e1,e3,e4,e6,e7,
+					ref_real, ref_imag);
 
 			for (int itrans = 0; itrans < translation_num; itrans ++)
 			{
@@ -1043,7 +921,7 @@ __global__ void cuda_kernel_diff2(
 
 
 void runProjAndDifferenceKernelCoarse(
-		Cuda3DProjector &projector,
+		Cuda3DProjectorKernel &projector,
 		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
@@ -1067,20 +945,12 @@ void runProjAndDifferenceKernelCoarse(
 			~eulers,
 			~Fimgs_real,
 			~Fimgs_imag,
-			*(cudaTextureObject_t*)projector.mdlReal,
-			*(cudaTextureObject_t*)projector.mdlImag,
+			projector,
 			~gpuMinvsigma2,
 			~diff2s,
 			translation_num,
 			image_size,
-			op.highres_Xi2_imgs[ipart] / 2.,
-			projector.maxR,
-			projector.maxR2,
-			projector.imgX,
-			projector.imgY,
-			projector.mdlInitY,
-			projector.mdlInitZ,
-			projector.padding_factor);
+			op.highres_Xi2_imgs[ipart] / 2.);
 
 #else
 
@@ -1095,10 +965,10 @@ void runProjAndDifferenceKernelCoarse(
 			translation_num,
 			image_size,
 			op.highres_Xi2_imgs[ipart] / 2.,
-			projector.maxR,
-			projector.maxR2,
-			projector.imgX,
-			projector.imgY,
+			max_r,
+			max_r*max_r,
+			imgX,
+			imgY,
 			projector.mdlX,
 			projector.mdlY,
 			projector.mdlInitY,
@@ -1294,14 +1164,14 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 				    	   Kernel Call
 				======================================*/
 
-
-				baseMLO->cudaProjectors[exp_iclass].setImgDim(
+				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
+						baseMLO->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].xdim-1);
 
 				runProjAndDifferenceKernelCoarse(
-						baseMLO->cudaProjectors[exp_iclass],
+						projKernel,
 						gpuMinvsigma2,
 						Fimgs_real,
 						Fimgs_imag,
@@ -1314,8 +1184,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 						image_size,
 						ipart,
 						group_id,
-						exp_iclass
-						);
+						exp_iclass);
 
 				/*====================================
 				    	   Retrieve Results
@@ -1523,34 +1392,34 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				weights.host_alloc();
 				weights.device_alloc();
 
-
-				baseMLO->cudaProjectors[exp_iclass].setImgDim(
-					op.local_Minvsigma2s[0].xdim,
-					op.local_Minvsigma2s[0].ydim,
-					op.local_Minvsigma2s[0].xdim-1);
+				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
+						baseMLO->cudaProjectors[exp_iclass],
+						op.local_Minvsigma2s[0].xdim,
+						op.local_Minvsigma2s[0].ydim,
+						op.local_Minvsigma2s[0].xdim-1);
 
 				runProjAndDifferenceKernel(
-					baseMLO->cudaProjectors[exp_iclass],
-										   gpuMinvsigma2,
-									       Fimgs_real,
-									       Fimgs_imag,
-									       eulers,
-									       rot_id,
-									       rot_idx,
-									       trans_idx,
-									       job_idx,
-									       job_num,
-									       weights,
-									       op,
-									       baseMLO,
-									       orientation_num,
-									       translation_num,
-									       significant_num,
-									       image_size,
-									       ipart,
-									       group_id,
-									       exp_iclass
-										 );
+						projKernel,
+						gpuMinvsigma2,
+						Fimgs_real,
+						Fimgs_imag,
+						eulers,
+						rot_id,
+						rot_idx,
+						trans_idx,
+						job_idx,
+						job_num,
+						weights,
+						op,
+						baseMLO,
+						orientation_num,
+						translation_num,
+						significant_num,
+						image_size,
+						ipart,
+						group_id,
+						exp_iclass
+						);
 				eulers.free_device();
 
 				HANDLE_ERROR(cudaDeviceSynchronize());
@@ -1932,16 +1801,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #ifndef CUDA_DOUBLE_PRECISION
 __global__ void cuda_kernel_ProjAndWavg(
 		FLOAT *g_eulers,
-		cudaTextureObject_t texModel_real,
-		cudaTextureObject_t texModel_imag,
-		unsigned my_r_max,
-		int max_r2,
+		Cuda3DProjectorKernel projector,
 		unsigned image_size,
 		unsigned long orientation_num,
-	 	long int XSIZE_img,
-	 	long int YSIZE_img,
-	 	long int STARTINGY_mdl,
-	 	long int STARTINGZ_mdl,
 		FLOAT *g_imgs_real,
 		FLOAT *g_imgs_imag,
 		FLOAT *g_imgs_nomask_real,
@@ -1956,14 +1818,10 @@ __global__ void cuda_kernel_ProjAndWavg(
 		unsigned long translation_num,
 		FLOAT weight_norm,
 		FLOAT significant_weight,
-		bool refs_are_ctf_corrected,
-		float padding_factor)
+		bool refs_are_ctf_corrected)
 {
-	FLOAT xp, yp, zp;
-	long int r2;
-	bool is_neg_x;
 	FLOAT ref_real, ref_imag;
-	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int bid = blockIdx.y * gridDim.x + blockIdx.x; //block ID
 	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
 //	if( bid < orientation_num )
@@ -1987,63 +1845,13 @@ __global__ void cuda_kernel_ProjAndWavg(
 			if(pixel<image_size)
 			{
 				unsigned long ref_pixel = bid * image_size + pixel;
-				// Now istead of loading pre-calculated ref, we project it out from the texture-model
-				//----------------------------------------------------------------------------------- =>
-				int x = pixel % XSIZE_img;
-				int y = (int)floorf( (float)pixel / (float)XSIZE_img);
 
-				// Dont search beyond square with side max_r
-				if (y > my_r_max)
-				{
-					if (y >= YSIZE_img - my_r_max)
-						y = y - YSIZE_img ;
-					else
-						x=r2;
-				}
-
-				r2 = x*x + y*y;
-				if (r2 <= max_r2)
-				{
-					xp = (__ldg(&g_eulers[bid*9])   * x + __ldg(&g_eulers[bid*9+1]) * y ) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = (__ldg(&g_eulers[bid*9+3]) * x + __ldg(&g_eulers[bid*9+4]) * y ) * padding_factor;  // compared to CPU-based projection. This
-					zp = (__ldg(&g_eulers[bid*9+6]) * x + __ldg(&g_eulers[bid*9+7]) * y ) * padding_factor;  // propagates to dx00, dx10, and so on.
-					// Only asymmetric half is stored
-					if (xp < 0)
-					{
-						// Get complex conjugated hermitian symmetry pair
-						xp = -xp;
-						yp = -yp;
-						zp = -zp;
-						is_neg_x = true;
-					}
-					else
-					{
-						is_neg_x = false;
-					}
-					yp -= STARTINGY_mdl;
-					zp -= STARTINGZ_mdl;
-
-					ref_real=tex3D<FLOAT>(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
-					ref_imag=tex3D<FLOAT>(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
-
-
-					if (is_neg_x)
-					{
-						ref_imag = -ref_imag;
-					}
-
-				}
-				else
-				{
-					ref_real=0.0f;
-					ref_imag=0.0f;
-				}
-				//-----------------------------------------------------------------------------------  <=
-				if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
-				{
-					ref_real *= __ldg(&g_ctfs[pixel]);
-					ref_imag *= __ldg(&g_ctfs[pixel]);
-				}
+				projector.project(
+						pixel,
+						__ldg(&g_eulers[bid*9  ]), __ldg(&g_eulers[bid*9+1]),
+						__ldg(&g_eulers[bid*9+3]), __ldg(&g_eulers[bid*9+4]),
+						__ldg(&g_eulers[bid*9+6]), __ldg(&g_eulers[bid*9+7]),
+						ref_real, ref_imag);
 
 				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 				{
@@ -2078,27 +1886,28 @@ __global__ void cuda_kernel_ProjAndWavg(
 }
 #endif
 
-void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
-				   CudaGlobalPtr<FLOAT> &Frefs_imag,
-				   CudaGlobalPtr<FLOAT> &Fimgs_real,
-				   CudaGlobalPtr<FLOAT> &Fimgs_imag,
-				   CudaGlobalPtr<FLOAT> &Fimgs_nomask_real,
-				   CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
-				   CudaGlobalPtr<FLOAT> &sorted_weights,
-				   CudaGlobalPtr<FLOAT> &ctfs,
-				   CudaGlobalPtr<FLOAT> &Minvsigma2s,
-				   CudaGlobalPtr<FLOAT> &wdiff2s_parts,
-				   CudaGlobalPtr<FLOAT> &wavgs_real,
-				   CudaGlobalPtr<FLOAT> &wavgs_imag,
-				   CudaGlobalPtr<FLOAT> &Fweights,
-				   OptimisationParamters op,
-				   MlOptimiser *baseMLO,
-				   long unsigned orientation_num,
-				   long unsigned translation_num,
-				   unsigned image_size,
-				   long int ipart,
-				   int group_id,
-				   int exp_iclass)
+void runWavgKernel(
+		CudaGlobalPtr<FLOAT> &Frefs_real,
+		CudaGlobalPtr<FLOAT> &Frefs_imag,
+		CudaGlobalPtr<FLOAT> &Fimgs_real,
+		CudaGlobalPtr<FLOAT> &Fimgs_imag,
+		CudaGlobalPtr<FLOAT> &Fimgs_nomask_real,
+		CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
+		CudaGlobalPtr<FLOAT> &sorted_weights,
+		CudaGlobalPtr<FLOAT> &ctfs,
+		CudaGlobalPtr<FLOAT> &Minvsigma2s,
+		CudaGlobalPtr<FLOAT> &wdiff2s_parts,
+		CudaGlobalPtr<FLOAT> &wavgs_real,
+		CudaGlobalPtr<FLOAT> &wavgs_imag,
+		CudaGlobalPtr<FLOAT> &Fweights,
+		OptimisationParamters op,
+		MlOptimiser *baseMLO,
+		long unsigned orientation_num,
+		long unsigned translation_num,
+		unsigned image_size,
+		long int ipart,
+		int group_id,
+		int exp_iclass)
 {
 
 
@@ -2112,20 +1921,20 @@ void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 	cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-										~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag,
-										~Fimgs_nomask_real, ~Fimgs_nomask_imag,
-										~sorted_weights, ~ctfs, ~Minvsigma2s,
-										~wdiff2s_parts,
-										~wavgs_real,
-										~wavgs_imag,
-										~Fweights,
-										orientation_num,
-										translation_num,
-										(FLOAT) op.sum_weight[ipart],
-										(FLOAT) op.significant_weight[ipart],
-										image_size,
-										baseMLO->refs_are_ctf_corrected
-										);
+			~Frefs_real, ~Frefs_imag, ~Fimgs_real, ~Fimgs_imag,
+			~Fimgs_nomask_real, ~Fimgs_nomask_imag,
+			~sorted_weights, ~ctfs, ~Minvsigma2s,
+			~wdiff2s_parts,
+			~wavgs_real,
+			~wavgs_imag,
+			~Fweights,
+			orientation_num,
+			translation_num,
+			(FLOAT) op.sum_weight[ipart],
+			(FLOAT) op.significant_weight[ipart],
+			image_size,
+			baseMLO->refs_are_ctf_corrected
+			);
 	size_t avail;
 	size_t total;
 	cudaMemGetInfo( &avail, &total );
@@ -2137,7 +1946,7 @@ void runWavgKernel(CudaGlobalPtr<FLOAT> &Frefs_real,
 
 #if !defined(CUDA_DOUBLE_PRECISION)
 void runProjAndWavgKernel(
-		Cuda3DProjector &projector,
+		Cuda3DProjectorKernel &projector,
 		CudaGlobalPtr<FLOAT> &eulers,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 	    CudaGlobalPtr<FLOAT> &Fimgs_imag,
@@ -2157,8 +1966,7 @@ void runProjAndWavgKernel(
 	    unsigned image_size,
 	    long int ipart,
 	    int group_id,
-	    int exp_iclass
-	   )
+	    int exp_iclass)
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
@@ -2171,16 +1979,9 @@ void runProjAndWavgKernel(
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 	cuda_kernel_ProjAndWavg<<<block_dim,BLOCK_SIZE>>>(
 			~eulers,
-			*(cudaTextureObject_t*)projector.mdlReal,
-			*(cudaTextureObject_t*)projector.mdlImag,
-			projector.maxR,
-			projector.maxR2,
+			projector,
 			image_size,
 			orientation_num,
-			projector.imgX,
-			projector.imgY,
-			projector.mdlInitY,
-			projector.mdlInitZ,
 			~Fimgs_real, ~Fimgs_imag,
 			~Fimgs_nomask_real, ~Fimgs_nomask_imag,
 			~sorted_weights, ~ctfs, ~Minvsigma2s,
@@ -2191,8 +1992,7 @@ void runProjAndWavgKernel(
 			translation_num,
 			(FLOAT) op.sum_weight[ipart],
 			(FLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected,
-			projector.padding_factor
+			baseMLO->refs_are_ctf_corrected
 			);
 
 	size_t avail;
@@ -2803,16 +2603,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				Minvsigma2s.cp_to_device();
 
-				baseMLO->cudaProjectors[exp_iclass].setImgDim(
+#ifndef CUDA_DOUBLE_PRECISION
+
+
+				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
+						baseMLO->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].xdim-1);
 
-
-#ifndef CUDA_DOUBLE_PRECISION
-
 				runProjAndWavgKernel(
-						baseMLO->cudaProjectors[exp_iclass],
+						projKernel,
 						eulers,
 						Fimgs_real,
 						Fimgs_imag,

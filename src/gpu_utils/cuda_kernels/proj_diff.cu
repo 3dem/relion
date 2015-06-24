@@ -1,5 +1,4 @@
 #include "src/gpu_utils/cuda_kernels/proj_diff.cuh"
-//#include <external/cub-1.4.1/cub/block/block_reduce.cuh>
 #include <vector>
 #include <iostream>
 
@@ -8,8 +7,7 @@
 __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 		                                FLOAT *g_imgs_real,
 		                                FLOAT *g_imgs_imag,
-										cudaTextureObject_t texModel_real,
-										cudaTextureObject_t texModel_imag,
+										Cuda3DProjectorKernel projector,
 										FLOAT *g_Minvsigma2,
 										FLOAT *g_diff2s,
 										unsigned image_size,
@@ -20,14 +18,7 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 										unsigned long *d_rot_idx,
 										unsigned long *d_trans_idx,
 										unsigned long *d_job_idx,
-										unsigned long *d_job_num,
-										int my_r_max,
-										int max_r2,
-										int img_x,
-										int img_y,
-										int mdl_init_y,
-										int mdl_init_z,
-										float padding_factor
+										unsigned long *d_job_num
 										)
 {
 	int bid = blockIdx.y * gridDim.x + blockIdx.x;
@@ -38,10 +29,7 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 //    // Allocate shared memory for BlockReduce
 //    __shared__ typename BlockReduce::TempStorage temp_storage;
 
-	FLOAT xp, yp, zp;
-	long int r2;
 	int pixel;
-	bool is_neg_x;
 	FLOAT ref_real;
 	FLOAT ref_imag;
 
@@ -63,57 +51,15 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
 			pixel = (pass * BLOCK_SIZE) + tid;
-			if(pixel<image_size)
+
+			if(pixel < image_size)
 			{
-				int x = pixel % img_x;
-				int y = (int)floorf( (float)pixel / (float)img_x);
-
-				// Dont search beyond square with side max_r
-				if (y > my_r_max)
-				{
-					if (y >= img_y - my_r_max)
-						y = y - img_y ;
-					else
-						x=r2;
-				}
-
-				r2 = x*x + y*y;
-				if (r2 <= max_r2)
-				{
-					xp = (__ldg(&g_eulers[ix*9])   * x + __ldg(&g_eulers[ix*9+1]) * y ) * padding_factor;  // FIXME: xp,yp,zp has has accuracy loss
-					yp = (__ldg(&g_eulers[ix*9+3]) * x + __ldg(&g_eulers[ix*9+4]) * y ) * padding_factor;  // compared to CPU-based projection. This
-					zp = (__ldg(&g_eulers[ix*9+6]) * x + __ldg(&g_eulers[ix*9+7]) * y ) * padding_factor;  // propagates to dx00, dx10, and so on.
-					// Only asymmetric half is stored
-					if (xp < 0)
-					{
-						// Get complex conjugated hermitian symmetry pair
-						xp = -xp;
-						yp = -yp;
-						zp = -zp;
-						is_neg_x = true;
-					}
-					else
-					{
-						is_neg_x = false;
-					}
-					yp -= mdl_init_y;
-					zp -= mdl_init_z;
-
-					ref_real=tex3D<FLOAT>(texModel_real,xp+0.5f,yp+0.5f,zp+0.5f);
-					ref_imag=tex3D<FLOAT>(texModel_imag,xp+0.5f,yp+0.5f,zp+0.5f);
-
-//					printf("%i, %i", x,y);
-//					printf("%f, %f,%f", xp,yp,zp);
-					if (is_neg_x)
-					{
-						ref_imag = -ref_imag;
-					}
-				}
-				else
-				{
-					ref_real=0.0f;
-					ref_imag=0.0f;
-				}
+				projector.project(
+						pixel,
+						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
+						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
+						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
+						ref_real, ref_imag);
 
 				FLOAT diff_real;
 				FLOAT diff_imag;
@@ -127,8 +73,6 @@ __global__ void cuda_kernel_PAV_TTI_D2( FLOAT *g_eulers,
 					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
 				}
 				__syncthreads();
-//				printf(" diffs = %f, %f \n",ref_real,img_pixel_idx);
-//				printf(" diffs = %i, %i ,%i \n",x,y);
 			}
 		}
 		for(int j=(BLOCK_SIZE/2); j>0; j/=2)
