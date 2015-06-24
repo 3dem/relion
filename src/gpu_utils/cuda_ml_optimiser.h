@@ -160,7 +160,6 @@ public:
 
 	void doThreadExpectationSomeParticles(unsigned thread_id);
 
-	void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp);
 };
 
 #endif

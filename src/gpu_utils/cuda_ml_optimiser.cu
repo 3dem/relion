@@ -2481,7 +2481,14 @@ void runProjAndWavgKernel(
 }
 #endif
 
-void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp)
+void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
+		MlOptimiser *baseMLO,
+		CudaGlobalPtr <long unsigned> &rot_idx,
+		CudaGlobalPtr <long unsigned> &trans_idx,
+		CudaGlobalPtr <long unsigned> &ihidden_overs,
+		CudaGlobalPtr <long unsigned> &job_idx,
+		CudaGlobalPtr <long unsigned> &job_num,
+		CudaGlobalPtr <FLOAT> 		  &weights)
 {
 	CUDA_CPU_TIC("store_pre_gpu");
 
@@ -2641,47 +2648,101 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 					}
 				}
 			}
+			long int jobid=0;
+			job_idx[jobid]=0;
+			job_num[jobid]=1;
+			long int crot = rot_idx[jobid]; // set current rot
+			for(long int n=1; n<rot_idx.size; n++)
+			{
+				if(rot_idx[n]==crot)
+				{
+					job_num[jobid]++;
+				}
+				else
+				{
+					jobid++;
+					job_num[jobid]=1;
+					job_idx[jobid]=n;
+					crot=rot_idx[n];
+				}
+			}
+			job_idx.size=jobid;
+			job_num.size=jobid;
+			job_idx.cp_to_device();
+			job_num.cp_to_device();
 
-			Mweight.device_alloc();
-			Mweight.cp_to_device();
-			oo_otrans_x.device_alloc();
-			oo_otrans_x.cp_to_device();
-			oo_otrans_y.device_alloc();
-			oo_otrans_y.cp_to_device();
-			myp_oo_otrans_x2y2z2.device_alloc();
-			myp_oo_otrans_x2y2z2.cp_to_device();
+			oo_otrans_x.put_on_device();
+			oo_otrans_y.put_on_device();
+			myp_oo_otrans_x2y2z2.put_on_device();
+			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 
+			std::cerr << "(FLOAT)op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
+			int block_num;
+			bool do_indexCollect=false;
+			if(do_indexCollect)
+				block_num = job_idx.size;
+			else
+				block_num = sp.nr_dir*sp.nr_psi;
+
+			std::cerr << "block_num = " << block_num << std::endl;
+			CudaGlobalPtr<FLOAT>                      p_weights(block_num);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_num);
+			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_num);
+			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_num);
 			unsigned long coarse_nr = sp.nr_dir*sp.nr_psi;
-			CudaGlobalPtr<FLOAT>                      p_weights(coarse_nr);
-			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(coarse_nr);
-			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(coarse_nr);
-			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(coarse_nr);
-
 			p_weights.device_alloc();
 			p_thr_wsum_prior_offsetx_class.device_alloc();
 			p_thr_wsum_prior_offsety_class.device_alloc();
 			p_thr_wsum_sigma2_offset.device_alloc();
-
-			dim3 grid_dim_collect2(sp.nr_dir, sp.nr_psi);
-			CUDA_CPU_TOC("collect_data_2_pre_kernel");
-
-			cuda_kernel_collect2<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-					~oo_otrans_x,          // otrans-size -> make const
-					~oo_otrans_y,          // otrans-size -> make const
-					~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-					~Mweight,
-					(FLOAT)op.significant_weight[ipart],
-					(FLOAT)op.sum_weight[ipart],
-					sp.nr_trans,
-					sp.nr_oversampled_trans,
-					sp.nr_oversampled_rot,
-					oversamples,
-					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-					~p_weights,
-					~p_thr_wsum_prior_offsetx_class,
-					~p_thr_wsum_prior_offsety_class,
-					~p_thr_wsum_sigma2_offset
-				   );
+//			weights.device_alloc();
+//			weights.cp_to_device();
+			if(do_indexCollect)
+			{
+				dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
+				cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+						~oo_otrans_x,          // otrans-size -> make const
+						~oo_otrans_y,          // otrans-size -> make const
+						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						~weights,
+						(FLOAT)op.significant_weight[ipart],
+						(FLOAT)op.sum_weight[ipart],
+						sp.nr_trans,
+						sp.nr_oversampled_trans,
+						sp.nr_oversampled_rot,
+						oversamples,
+						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+						~p_weights,
+						~p_thr_wsum_prior_offsetx_class,
+						~p_thr_wsum_prior_offsety_class,
+						~p_thr_wsum_sigma2_offset,
+						~rot_idx,
+						~trans_idx,
+						~job_idx,
+						~job_num
+					   );
+			}
+			else
+			{
+				Mweight.put_on_device();
+				dim3 grid_dim_collect2(sp.nr_dir, sp.nr_psi);
+				cuda_kernel_collect2<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+						~oo_otrans_x,          // otrans-size -> make const
+						~oo_otrans_y,          // otrans-size -> make const
+						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						~Mweight,
+						(FLOAT)op.significant_weight[ipart],
+						(FLOAT)op.sum_weight[ipart],
+						sp.nr_trans,
+						sp.nr_oversampled_trans,
+						sp.nr_oversampled_rot,
+						oversamples,
+						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+						~p_weights,
+						~p_thr_wsum_prior_offsetx_class,
+						~p_thr_wsum_prior_offsety_class,
+						~p_thr_wsum_sigma2_offset
+					   );
+			}
 
 			// TODO further reduce the below 4 arrays while data is still on gpu
 			p_weights.cp_to_host();
@@ -2693,32 +2754,34 @@ void MlOptimiserCuda::storeWeightedSums(OptimisationParamters &op, SamplingParam
 
 			thr_wsum_sigma2_offset = 0.0;
 			int iorient = 0;
-			for (long int idir = 0; idir < sp.nr_dir; idir++)
+			for (long int n = 0; n < block_num; n++)
 			{
-				for (long int ipsi = 0; ipsi < sp.nr_psi; ipsi++, iorient++)
+				if(do_indexCollect)
+					iorient= floor( (float)rot_idx[job_idx[n]] / (float) sp.nr_oversampled_rot);
+				else
+					iorient=n;
+
+				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
+				// Only proceed if any of the particles had any significant coarsely sampled translation
+
+				if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 				{
-					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-					// Only proceed if any of the particles had any significant coarsely sampled translation
+					long int mydir, idir=floor(iorient/sp.nr_psi);
+					if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+						mydir = idir;
+					else
+						mydir = op.pointer_dir_nonzeroprior[idir];
 
-					if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+					// store partials according to indices of the relevant dimension
+					DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
+					thr_sumw_group[group_id]                 						+= p_weights[n];
+					thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
+					thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
+
+					if (baseMLO->mymodel.ref_dim == 2)
 					{
-						long int mydir;
-						if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-							mydir = idir;
-						else
-							mydir = op.pointer_dir_nonzeroprior[idir];
-
-						// store partials according to indices of the relevant dimension
-						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[iorient];
-						thr_sumw_group[group_id]                 						+= p_weights[iorient];
-						thr_wsum_pdf_class[exp_iclass]           						+= p_weights[iorient];
-						thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[iorient];
-
-						if (baseMLO->mymodel.ref_dim == 2)
-						{
-							thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
-							thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
-						}
+						thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
+						thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
 					}
 				}
 			}
@@ -3523,8 +3586,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			sp.current_image_size = baseMLO->mymodel.current_size;
 
 			CUDA_CPU_TIC("storeWeightedSums");
-			storeWeightedSums(op, sp);
 			CUDA_CPU_TOC("storeWeightedSums");
+			storeWeightedSums(op, sp, baseMLO, rot_idx_F,trans_idx_F,ihidden_overs_F,job_idx_F,job_num_F,weights_F);
 
 			CUDA_CPU_TOC("oneParticle");
 		}

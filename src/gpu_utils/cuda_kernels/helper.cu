@@ -239,6 +239,87 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-s
 	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
 }
 
+__global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
+										FLOAT *g_oo_otrans_y,          // otrans-size -> make const
+										FLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
+										FLOAT *g_i_weights,
+										FLOAT op_significant_weight,    // TODO Put in const
+										FLOAT op_sum_weight,            // TODO Put in const
+										int   coarse_trans,
+										int   oversamples_trans,
+										int   oversamples_orient,
+										int   oversamples,
+										bool  do_ignore_pdf_direction,
+										FLOAT *g_o_weights,
+										FLOAT *g_thr_wsum_prior_offsetx_class,
+										FLOAT *g_thr_wsum_prior_offsety_class,
+										FLOAT *g_thr_wsum_sigma2_offset,
+								     	unsigned long *d_rot_idx,
+								     	unsigned long *d_trans_idx,
+								     	unsigned long *d_job_idx,
+								     	unsigned long *d_job_num
+								     	)
+{
+	// blockid
+	int bid  =blockIdx.x * gridDim.y + blockIdx.y;
+	//threadid
+	int tid = threadIdx.x;
+
+	__shared__ FLOAT                    s_o_weights[SUM_BLOCK_SIZE];
+	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE];
+	__shared__ FLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE];
+	__shared__ FLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE];
+	s_o_weights[tid]                    = (FLOAT)0.0;
+	s_thr_wsum_prior_offsetx_class[tid] = (FLOAT)0.0;
+	s_thr_wsum_prior_offsety_class[tid] = (FLOAT)0.0;
+	s_thr_wsum_sigma2_offset[tid]       = (FLOAT)0.0;
+
+	long int pos = d_job_idx[bid];
+    int job_size = d_job_num[bid];
+	long int ix =  d_rot_idx[pos];      // each thread gets the orient...
+	pos = d_job_idx[bid]+tid;			// pos is updated to be thread-resolved
+
+    int pass_num = ceil((float)job_size / (float)SUM_BLOCK_SIZE);
+    for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+    {
+    	if ((pass*SUM_BLOCK_SIZE+tid)<job_size) // if there is a translation that needs to be done still for this thread
+    	{
+			// index of comparison
+			long int iy = d_trans_idx[pos];              // ...and its own trans...
+			int iy_f = iy % oversamples_trans;			 // ...which are split into fine trans...
+			int iy_c = (iy - iy_f) / oversamples_trans;  // ...and coarse trans.
+
+			FLOAT weight = g_i_weights[pos];
+			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
+				weight /= op_sum_weight;
+			else
+				weight = 0.0f;
+
+			s_o_weights[tid] += weight;
+			s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy_f + iy_c*oversamples_trans];
+			s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy_f + iy_c*oversamples_trans];
+			s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy_f + iy_c*oversamples_trans];
+    	}
+    }
+    // Reduction of all treanslations this orientation
+	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
+	{
+		if(tid<j)
+		{
+			s_o_weights[tid]                    += s_o_weights[tid+j];
+			s_thr_wsum_prior_offsetx_class[tid] += s_thr_wsum_prior_offsetx_class[tid+j];
+			s_thr_wsum_prior_offsety_class[tid] += s_thr_wsum_prior_offsety_class[tid+j];
+			s_thr_wsum_sigma2_offset[tid]       += s_thr_wsum_sigma2_offset[tid+j];
+		}
+		__syncthreads();
+	}
+	g_o_weights[bid]			           = s_o_weights[0];
+	g_thr_wsum_prior_offsetx_class[bid] = s_thr_wsum_prior_offsetx_class[0];
+	g_thr_wsum_prior_offsety_class[bid] = s_thr_wsum_prior_offsety_class[0];
+	g_thr_wsum_sigma2_offset[bid]       = s_thr_wsum_sigma2_offset[0];
+}
+
+
 __global__ void cuda_kernel_reduce_wdiff2s(FLOAT *g_wdiff2s_parts,
 										   long int orientation_num,
 										   int image_size,
