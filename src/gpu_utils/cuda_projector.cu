@@ -115,7 +115,6 @@ void Cuda3DProjector::setMdlData(double *real, double *imag)
 	mdlReal = (void*) r;
 	mdlImag = (void*) i;
 }
-:
 #endif
 
 

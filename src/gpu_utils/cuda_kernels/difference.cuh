@@ -32,24 +32,4 @@ __global__ void cuda_kernel_D2_CC(	FLOAT *g_refs_real,
 										unsigned long *d_rotidx,
 										unsigned long *d_transidx);
 
-__global__ void cuda_kernel_wavg(       FLOAT *g_refs_real,
-			                            FLOAT *g_refs_imag,
-			                            FLOAT *g_imgs_real,
-			                            FLOAT *g_imgs_imag,
-			                            FLOAT *g_imgs_nomask_real,
-			                            FLOAT *g_imgs_nomask_imag,
-			                            FLOAT* g_weights,
-			                            FLOAT* g_ctfs,
-			                            FLOAT* g_Minvsigma2s,
-			                            FLOAT *g_wdiff2s_parts,
-			                            FLOAT *g_wavgs_real,
-			                            FLOAT *g_wavgs_imag,
-			                            FLOAT* g_Fweights,
-			                            unsigned long orientation_num,
-			                            unsigned long translation_num,
-			                            FLOAT weight_norm,
-			                            FLOAT significant_weight,
-			                            unsigned image_size,
-			                            bool refs_are_ctf_corrected);
-
 #endif /* CUDA_DIFFERENCE_KERNELS_CUH_ */
