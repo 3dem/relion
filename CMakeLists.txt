@@ -14,6 +14,12 @@ endif()
 
 message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
 
+option(CudaDouble "CudaDouble" OFF)
+if(CudaDouble)
+    add_definitions(-DCUDA_DOUBLE_PRECISION)
+    message(STATUS "Building cuda files with double precision.")
+endif(CudaDouble)
+
 project(Relion)
 include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER project()
 
