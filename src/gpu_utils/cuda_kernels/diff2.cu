@@ -1,6 +1,79 @@
-#include "src/gpu_utils/cuda_kernels/proj_diff.cuh"
+#include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include <vector>
 #include <iostream>
+
+__global__ void cuda_kernel_diff2_course(
+		FLOAT *g_eulers,
+		FLOAT *g_imgs_real,
+		FLOAT *g_imgs_imag,
+		Cuda3DProjectorKernel projector,
+		FLOAT *g_Minvsigma2,
+		FLOAT *g_diff2s,
+		unsigned translation_num,
+		int image_size,
+		FLOAT sum_init
+		)
+{
+	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int tid = threadIdx.x;
+
+	FLOAT ref_real;
+	FLOAT ref_imag;
+
+	FLOAT e0,e1,e3,e4,e6,e7;
+	e0 = __ldg(&g_eulers[bid*9  ]);
+	e1 = __ldg(&g_eulers[bid*9+1]);
+	e3 = __ldg(&g_eulers[bid*9+3]);
+	e4 = __ldg(&g_eulers[bid*9+4]);
+	e6 = __ldg(&g_eulers[bid*9+6]);
+	e7 = __ldg(&g_eulers[bid*9+7]);
+
+	extern __shared__ FLOAT s_cuda_kernel_diff2s[];
+
+	for (unsigned i = 0; i < translation_num; i++)
+		s_cuda_kernel_diff2s[translation_num * tid + i] = 0.0f;
+
+	unsigned pixel_pass_num( ceilf( (float)image_size / (float)BLOCK_SIZE ) );
+	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
+	{
+		unsigned pixel = (pass * BLOCK_SIZE) + tid;
+
+		if(pixel < image_size)
+		{
+			projector.project(
+					pixel,
+					e0,e1,e3,e4,e6,e7,
+					ref_real, ref_imag);
+
+			for (int itrans = 0; itrans < translation_num; itrans ++)
+			{
+				unsigned long img_pixel_idx = itrans * image_size + pixel;
+
+				FLOAT diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]);
+				FLOAT diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
+				FLOAT diff2 = (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
+
+				s_cuda_kernel_diff2s[translation_num * tid + itrans] += diff2;
+			}
+		}
+
+		__syncthreads();
+
+		unsigned trans_pass_num( ceilf( (float)translation_num / (float)BLOCK_SIZE ) );
+		for (unsigned pass = 0; pass < trans_pass_num; pass++)
+		{
+			unsigned itrans = (pass * BLOCK_SIZE) + tid;
+			if (itrans < translation_num)
+			{
+				FLOAT sum(sum_init);
+				for (unsigned i = 0; i < BLOCK_SIZE; i++)
+					sum += s_cuda_kernel_diff2s[i * translation_num + itrans];
+
+				g_diff2s[bid * translation_num + itrans] = sum;
+			}
+		}
+	}
+}
 
 __global__ void cuda_kernel_diff2_fine(
 		FLOAT *g_eulers,
