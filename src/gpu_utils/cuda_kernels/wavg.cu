@@ -58,6 +58,12 @@ __global__ void cuda_kernel_wavg(
 						__ldg(&g_eulers[bid*9+6]), __ldg(&g_eulers[bid*9+7]),
 						ref_real, ref_imag);
 
+				if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+				{
+					ref_real *= __ldg(&g_ctfs[pixel]);
+					ref_imag *= __ldg(&g_ctfs[pixel]);
+				}
+
 				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 				{
 					FLOAT weight = __ldg(&g_weights[bid * translation_num + itrans]);
