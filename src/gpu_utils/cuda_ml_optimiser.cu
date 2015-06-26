@@ -1803,7 +1803,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					CUDA_GPU_TIC("sumweightMemCp2");
 					weights.cp_to_host();  //FIXME remove when mapping is eliminated
-					weights.free_device();
+					//weights.free_device();
 					CUDA_GPU_TAC("sumweightMemCp2");
 
 					for (long unsigned k = 0; k< weights.size; k++)
@@ -2206,6 +2206,7 @@ void runProjAndWavgKernel(
 
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		MlOptimiser *baseMLO,
+		CudaGlobalPtr <long unsigned> &rot_id,
 		CudaGlobalPtr <long unsigned> &rot_idx,
 		CudaGlobalPtr <long unsigned> &trans_idx,
 		CudaGlobalPtr <long unsigned> &ihidden_overs,
@@ -2401,7 +2402,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			std::cerr << "(FLOAT)op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
 			int block_num;
-			bool do_indexCollect=false;
+			bool do_indexCollect=true;
 			if(do_indexCollect)
 				block_num = job_idx.size;
 			else
@@ -2421,6 +2422,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 //			weights.cp_to_device();
 
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
+			CUDA_GPU_TIC("collect2-kernel");
 
 			if(do_indexCollect)
 			{
@@ -2469,7 +2471,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~p_thr_wsum_sigma2_offset
 					   );
 			}
-
+			CUDA_GPU_TAC("collect2-kernel");
 			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
 
 			// TODO further reduce the below 4 arrays while data is still on gpu
@@ -2490,7 +2492,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (long int n = 0; n < block_num; n++)
 			{
 				if(do_indexCollect)
-					iorient= floor( (float)rot_idx[job_idx[n]] / (float) sp.nr_oversampled_rot);
+					iorient= rot_id[n];
 				else
 					iorient=n;
 
@@ -3285,7 +3287,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			sp.current_image_size = baseMLO->mymodel.current_size;
 
 			CUDA_CPU_TIC("storeWeightedSums");
-			storeWeightedSums(op, sp, baseMLO, rot_idx_F,trans_idx_F,ihidden_overs_F,job_idx_F,job_num_F,weights_F);
+			storeWeightedSums(op, sp, baseMLO, rot_id_F, rot_idx_F,trans_idx_F,ihidden_overs_F,job_idx_F,job_num_F,weights_F);
 			CUDA_CPU_TOC("storeWeightedSums");
 
 			CUDA_CPU_TOC("oneParticle");
