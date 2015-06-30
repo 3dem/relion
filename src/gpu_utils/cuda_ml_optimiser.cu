@@ -1802,7 +1802,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			 	job_num.size);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					CUDA_GPU_TIC("sumweightMemCp2");
-					weights.cp_to_host();  //FIXME remove when mapping is eliminated
+					weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
 					//weights.free_device();
 					CUDA_GPU_TAC("sumweightMemCp2");
 
@@ -1924,6 +1924,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		}
 		op.significant_weight[ipart] = my_significant_weight;
+		//std::cerr << "@sort op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
+
 	} // end loop ipart
 	CUDA_CPU_TOC("convert_post_kernel");
 
@@ -2400,7 +2402,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			oo_otrans_y.put_on_device();
 			myp_oo_otrans_x2y2z2.put_on_device();
 
-			std::cerr << "(FLOAT)op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
 			int block_num;
 			bool do_indexCollect=true;
 			if(do_indexCollect)
@@ -2492,7 +2493,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (long int n = 0; n < block_num; n++)
 			{
 				if(do_indexCollect)
-					iorient= rot_id[n];
+					iorient= rot_id[job_idx[n]];
 				else
 					iorient=n;
 
@@ -2546,7 +2547,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #else
 			max_index.fineIdx = std::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
 #endif
-//			std::cerr << "max index = " << max_index.fineIdx << std::endl;
+			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
 
 			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, max_index.fineIdx);
 			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
