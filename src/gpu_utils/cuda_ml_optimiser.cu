@@ -1039,12 +1039,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			oo_otrans_y.put_on_device();
 			myp_oo_otrans_x2y2z2.put_on_device();
 
-			int block_num;
-			bool do_indexCollect=true;
-			if(do_indexCollect)
-				block_num = job_idx.size;
-			else
-				block_num = sp.nr_dir*sp.nr_psi;
+			int block_num = job_idx.size;
 
 			std::cerr << "block_num = " << block_num << std::endl;
 			CudaGlobalPtr<FLOAT>                      p_weights(block_num);
@@ -1062,56 +1057,31 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 			CUDA_GPU_TIC("collect2-kernel");
 
-			if(do_indexCollect)
-			{
-				dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
-				cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-						~oo_otrans_x,          // otrans-size -> make const
-						~oo_otrans_y,          // otrans-size -> make const
-						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-						~weights,
-						(FLOAT)op.significant_weight[ipart],
-						(FLOAT)op.sum_weight[ipart],
-						sp.nr_trans,
-						sp.nr_oversampled_trans,
-						sp.nr_oversampled_rot,
-						oversamples,
-						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-						~p_weights,
-						~p_thr_wsum_prior_offsetx_class,
-						~p_thr_wsum_prior_offsety_class,
-						~p_thr_wsum_sigma2_offset,
-						~rot_idx,
-						~trans_idx,
-						~job_idx,
-						~job_num
-					   );
-			}
-			else
-			{
-				Mweight.put_on_device();
-				dim3 grid_dim_collect2(sp.nr_dir, sp.nr_psi);
-				cuda_kernel_collect2<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-						~oo_otrans_x,          // otrans-size -> make const
-						~oo_otrans_y,          // otrans-size -> make const
-						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-						~Mweight,
-						(FLOAT)op.significant_weight[ipart],
-						(FLOAT)op.sum_weight[ipart],
-						sp.nr_trans,
-						sp.nr_oversampled_trans,
-						sp.nr_oversampled_rot,
-						oversamples,
-						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-						~p_weights,
-						~p_thr_wsum_prior_offsetx_class,
-						~p_thr_wsum_prior_offsety_class,
-						~p_thr_wsum_sigma2_offset
-					   );
-			}
+			dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
+			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+					~oo_otrans_x,          // otrans-size -> make const
+					~oo_otrans_y,          // otrans-size -> make const
+					~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+					~weights,
+					(FLOAT)op.significant_weight[ipart],
+					(FLOAT)op.sum_weight[ipart],
+					sp.nr_trans,
+					sp.nr_oversampled_trans,
+					sp.nr_oversampled_rot,
+					oversamples,
+					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+					~p_weights,
+					~p_thr_wsum_prior_offsetx_class,
+					~p_thr_wsum_prior_offsety_class,
+					~p_thr_wsum_sigma2_offset,
+					~rot_idx,
+					~trans_idx,
+					~job_idx,
+					~job_num
+						);
 			CUDA_GPU_TAC("collect2-kernel");
-			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
 
+			CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
 			// TODO further reduce the below 4 arrays while data is still on gpu
 			p_weights.cp_to_host();
 			p_thr_wsum_prior_offsetx_class.cp_to_host();
@@ -1120,20 +1090,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_GPU_TAC("cuda_kernel_collect2_memcpy2");
 
 			CUDA_CPU_TIC("collect_data_2_post_kernel");
-
 			HANDLE_ERROR(cudaDeviceSynchronize());
-
 			CUDA_GPU_TOC();
-
 			thr_wsum_sigma2_offset = 0.0;
 			int iorient = 0;
 			for (long int n = 0; n < block_num; n++)
 			{
-				if(do_indexCollect)
-					iorient= rot_id[job_idx[n]];
-				else
-					iorient=n;
-
+				iorient= rot_id[job_idx[n]];
 				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
 				// Only proceed if any of the particles had any significant coarsely sampled translation
 
@@ -1158,17 +1121,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 			}
-
 			Mweight.free_device();
 			p_weights.free();
 			p_thr_wsum_sigma2_offset.free();
 			p_thr_wsum_prior_offsetx_class.free();
 			p_thr_wsum_prior_offsety_class.free();
-
 			oo_otrans_y.free();
 			oo_otrans_x.free();
 			myp_oo_otrans_x2y2z2.free();
-
 			CUDA_CPU_TOC("collect_data_2_post_kernel");
 
 			/*=======================================================================================
