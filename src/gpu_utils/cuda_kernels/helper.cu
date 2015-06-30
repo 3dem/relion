@@ -276,8 +276,7 @@ __global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otra
 
 	long int pos = d_job_idx[bid];
     int job_size = d_job_num[bid];
-	long int ix =  d_rot_idx[pos];      // each thread gets the orient...
-	pos = d_job_idx[bid]+tid;			// pos is updated to be thread-resolved
+	pos += tid;	   					// pos is updated to be thread-resolved
 
     int pass_num = ceil((float)job_size / (float)SUM_BLOCK_SIZE);
     for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
@@ -286,8 +285,6 @@ __global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otra
     	{
 			// index of comparison
 			long int iy = d_trans_idx[pos];              // ...and its own trans...
-			int iy_f = iy % oversamples_trans;			 // ...which are split into fine trans...
-			int iy_c = (iy - iy_f) / oversamples_trans;  // ...and coarse trans.
 
 			FLOAT weight = g_i_weights[pos];
 			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
@@ -296,9 +293,9 @@ __global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otra
 				weight = 0.0f;
 
 			s_o_weights[tid] += weight;
-			s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy_f + iy_c*oversamples_trans];
-			s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy_f + iy_c*oversamples_trans];
-			s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy_f + iy_c*oversamples_trans];
+			s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy];
+			s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy];
+			s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy];
     	}
     }
     // Reduction of all treanslations this orientation
