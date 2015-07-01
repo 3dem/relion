@@ -750,7 +750,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		op.Mcoarse_significant.resize(sp.nr_particles, XSIZE(op.Mweight));
 	}
 
-	CUDA_CPU_TIC("convert_post_kernel");
+	CUDA_CPU_TIC("convertPostKernel");
 	// Now, for each particle,  find the exp_significant_weight that encompasses adaptive_fraction of op.sum_weight
 	op.significant_weight.clear();
 	op.significant_weight.resize(sp.nr_particles, 0.);
@@ -759,8 +759,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		MultidimArray<FLOAT> sorted_weight;
 		// Get the relevant row for this particle
-		op.Mweight.getRow(ipart, sorted_weight);
 
+		CUDA_CPU_TIC("getRow");
+		op.Mweight.getRow(ipart, sorted_weight);
+		CUDA_CPU_TOC("getRow");
+
+		CUDA_CPU_TIC("nonZero");
 		// Only select non-zero probabilities to speed up sorting // TODO Remove when mapping is eliminated
 		long int np = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
@@ -773,6 +777,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 		}
 		sorted_weight.resize(np);
+		CUDA_CPU_TOC("nonZero");
 
 		// Sort from low to high values
 		CUDA_CPU_TIC("sort");
@@ -839,7 +844,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		//std::cerr << "@sort op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
 
 	} // end loop ipart
-	CUDA_CPU_TOC("convert_post_kernel");
+	CUDA_CPU_TOC("convertPostKernel");
 
 }
 
@@ -1137,6 +1142,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUDA_CPU_TIC("setMetadata");
 
+			CUDA_CPU_TIC("max");
 			//Get index of max element using GPU-tool thrust
 			Indices max_index;
 #if !defined(CUDA_DOUBLE_PRECISION) && defined(USE_THRUST)
@@ -1145,14 +1151,19 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			max_index.fineIdx = std::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
 #endif
 			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
+			CUDA_CPU_TOC("max");
 
 			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, max_index.fineIdx);
 			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 
+			CUDA_CPU_TIC("sample");
 			baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
 					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 			baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+			CUDA_CPU_TOC("sample");
+
+			CUDA_CPU_TIC("assign");
 			double rot = oversampled_rot[max_index.ioverrot];
 			double tilt = oversampled_tilt[max_index.ioverrot];
 			double psi = oversampled_psi[max_index.ioverrot];
@@ -1165,6 +1176,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+			CUDA_CPU_TOC("assign");
 
 			CUDA_CPU_TOC("setMetadata");
 
@@ -1662,7 +1674,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
 
-	CUDA_CPU_TOC("interParticle");
+//	CUDA_CPU_TOC("interParticle");
 
 	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;
@@ -1780,22 +1792,12 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				sp.nr_oversampled_rot = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				sp.nr_oversampled_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 
-				CUDA_CPU_TIC("getAllSquaredDifferences");
 				if (ipass == 0)
+				{
+					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
 					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO);
-				else
-					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, rot_id_F,
-																		 rot_idx_F,
-																		 trans_idx_F,
-																		 ihidden_overs_F,
-																		 job_idx_F,
-																		 job_num_F,
-																		 weights_F);
-
-				CUDA_CPU_TOC("getAllSquaredDifferences");
-
-				CUDA_CPU_TIC("convertAllSquaredDifferencesToWeights");
-				if (ipass == 0)
+					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
+					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsCoarse");
 					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, rot_id_C,
 																				  rot_idx_C,
 																				  trans_idx_C,
@@ -1803,7 +1805,20 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 																				  job_idx_C,
 																				  job_num_C,
 																				  weights_C);
+					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsCoarse");
+				}
 				else
+				{
+					CUDA_CPU_TIC("getAllSquaredDifferencesFine");
+					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, rot_id_F,
+																		 rot_idx_F,
+																		 trans_idx_F,
+																		 ihidden_overs_F,
+																		 job_idx_F,
+																		 job_num_F,
+																		 weights_F);
+					CUDA_CPU_TOC("getAllSquaredDifferencesFine");
+					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsFine");
 					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, rot_id_F,
 																				  rot_idx_F,
 																				  trans_idx_F,
@@ -1811,8 +1826,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 																				  job_idx_F,
 																				  job_num_F,
 																				  weights_F);
-
-				CUDA_CPU_TOC("convertAllSquaredDifferencesToWeights");
+					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsFine");
+				}
 
 				CUDA_CPU_TOC("weightPass");
 			}
@@ -1828,7 +1843,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 		}
 	}
 
-	CUDA_CPU_TIC("interParticle");
-//	exit(0);
+//	CUDA_CPU_TIC("interParticle");
+	exit(0);
 }
 

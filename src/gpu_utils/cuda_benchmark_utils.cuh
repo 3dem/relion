@@ -52,13 +52,13 @@ static void cuda_cpu_toc(std::string id)
 	}
 	else
 	{
-		for (int i = 1; i < cuda_cpu_benchmark_identifiers.size(); i++)
-			fprintf(cuda_cpu_benchmark_fPtr,"\t");
-
 		clock_t t = clock() - cuda_cpu_benchmark_start_times[idx];
 		cuda_cpu_benchmark_identifiers.erase(cuda_cpu_benchmark_identifiers.begin()+idx);
 		cuda_cpu_benchmark_start_times.erase(cuda_cpu_benchmark_start_times.begin()+idx);
-		fprintf(cuda_cpu_benchmark_fPtr,"%s \t %.2f ms\n", id.c_str(), (float)t / CLOCKS_PER_SEC * 1000.);
+		fprintf(cuda_cpu_benchmark_fPtr,"%06.2f ms ......", (float)t / CLOCKS_PER_SEC * 1000.);
+		for (int i = 1; i < cuda_cpu_benchmark_identifiers.size(); i++)
+			fprintf(cuda_cpu_benchmark_fPtr,"......");
+		fprintf(cuda_cpu_benchmark_fPtr," %s\n", id.c_str());
 //		printf(,"%s \t %.2f ms\n", id.c_str(), (float)t / CLOCKS_PER_SEC * 1000.);
 	}
 }
@@ -122,8 +122,8 @@ static void cuda_gpu_toc()
 					cuda_gpu_benchmark_stop_times[idx]);
 			cudaEventDestroy(cuda_gpu_benchmark_start_times[idx]);
 			cudaEventDestroy(cuda_gpu_benchmark_stop_times[idx]);
-			fprintf(cuda_gpu_benchmark_fPtr,"%s \t %.2f ms\n",
-					cuda_gpu_benchmark_identifiers[idx].c_str(), time);
+			fprintf(cuda_gpu_benchmark_fPtr,"%.2f ms \t %s\n",
+					time, cuda_gpu_benchmark_identifiers[idx].c_str());
 		}
 
 		cuda_gpu_benchmark_identifiers.clear();
