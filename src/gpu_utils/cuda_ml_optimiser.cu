@@ -758,50 +758,82 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
-		MultidimArray<FLOAT> sorted_weight;
-		// Get the relevant row for this particle
 
-		CUDA_CPU_TIC("getRow");
-		op.Mweight.getRow(ipart, sorted_weight);
-		CUDA_CPU_TOC("getRow");
-
-		CUDA_CPU_TIC("nonZero");
-		// Only select non-zero probabilities to speed up sorting // TODO Remove when mapping is eliminated
-		long int np = 0;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
-		{
-			if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) > 0.)
-			{
-//				std::cerr << "weights = " << DIRECT_A2D_ELEM(op.Mweight, ipart, n) << std::endl;
-				DIRECT_MULTIDIM_ELEM(sorted_weight, np) = DIRECT_MULTIDIM_ELEM(sorted_weight, n);
-				np++;
-			}
-		}
-		sorted_weight.resize(np);
-		CUDA_CPU_TOC("nonZero");
-
-		// Sort from low to high values
-		CUDA_CPU_TIC("sort");
-//		std::cerr << "sort on " << sorted_weight.xdim << " which should have np = " << np << std::endl;
-#if  defined(USE_THRUST) && !defined(CUDA_DOUBLE_PRECISION) // Thrust seems incredibly slow in debug build this is clearly a FIXME
-		thrust::sort(sorted_weight.data, sorted_weight.data + np );
-#else
-		sorted_weight.sort();
-#endif
-		CUDA_CPU_TOC("sort");
-
+		MultidimArray<FLOAT > sorted_weight;
+		CudaGlobalPtr<FLOAT > sorted_weight_new;  // make new sorted weights
 		double frac_weight = 0.;
 		double my_significant_weight;
 		long int my_nr_significant_coarse_samples = 0;
-		for (long int i = XSIZE(sorted_weight) - 1; i >= 0; i--)
+		long int np = 0;
+		if (exp_ipass!=0)
 		{
-			if (exp_ipass==0) my_nr_significant_coarse_samples++;
-			my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
-			//std::cerr << "thisweight = " << my_significant_weight << std::endl;
-			frac_weight += my_significant_weight;
-			if (frac_weight > baseMLO->adaptive_fraction * op.sum_weight[ipart])
-				break;
+			CUDA_CPU_TIC("sort");
+			sorted_weight_new.size = weights.size;
+			sorted_weight_new.host_alloc();
+			sorted_weight_new.d_ptr = weights.d_ptr;			    // set pointer to weights
+			sorted_weight_new.cp_to_host();							// make host-copy
+			sorted_weight_new.d_do_free = false;
+
+			thrust::sort(sorted_weight_new.h_ptr, sorted_weight_new.h_ptr + sorted_weight_new.size );
+			CUDA_CPU_TOC("sort");
+			for (long int i=sorted_weight_new.size-1; i>=0; i--)
+			{
+//				if (exp_ipass==0) my_nr_significant_coarse_samples++;
+					my_significant_weight = sorted_weight_new[i];
+				//std::cerr << "thisweight = " << my_significant_weight << std::endl;
+				frac_weight += my_significant_weight;
+				if (frac_weight > baseMLO->adaptive_fraction * op.sum_weight[ipart])
+					break;
+			}
 		}
+		else
+		{
+
+			// Get the relevant row for this particle
+
+			CUDA_CPU_TIC("getRow");
+			op.Mweight.getRow(ipart, sorted_weight);
+			CUDA_CPU_TOC("getRow");
+
+
+			CUDA_CPU_TIC("nonZero");
+			// Only select non-zero probabilities to speed up sorting // TODO Remove when mapping is eliminated
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
+			{
+				if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) > 0.)
+				{
+//					std::cerr << "weights = " << DIRECT_A2D_ELEM(op.Mweight, ipart, n) << std::endl;
+					DIRECT_MULTIDIM_ELEM(sorted_weight, np) = DIRECT_MULTIDIM_ELEM(sorted_weight, n);
+					np++;
+				}
+			}
+			sorted_weight.resize(np);
+			CUDA_CPU_TOC("nonZero");
+
+			// Sort from low to high values
+			CUDA_CPU_TIC("sort");
+
+//			std::cerr << "sort on " << sorted_weight.xdim << " which should have np = " << np << std::endl;
+#if  defined(USE_THRUST) && !defined(CUDA_DOUBLE_PRECISION) // Thrust seems incredibly slow in debug build this is clearly a FIXME
+			thrust::sort(sorted_weight.data, sorted_weight.data + np );
+#else
+			sorted_weight.sort();
+#endif
+			CUDA_CPU_TOC("sort");
+
+			for (long int i = XSIZE(sorted_weight) - 1; i >= 0; i--)
+			{
+				if (exp_ipass==0) my_nr_significant_coarse_samples++;
+				my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
+				//std::cerr << "thisweight = " << my_significant_weight << std::endl;
+				frac_weight += my_significant_weight;
+				if (frac_weight > baseMLO->adaptive_fraction * op.sum_weight[ipart])
+					break;
+			}
+		}
+
+
 
 		if (exp_ipass==0 && my_nr_significant_coarse_samples == 0)
 		{
@@ -839,7 +871,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else
 					DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
 			}
-
 		}
 		op.significant_weight[ipart] = my_significant_weight;
 		//std::cerr << "@sort op.significant_weight[ipart]= " << (FLOAT)op.significant_weight[ipart] << std::endl;
