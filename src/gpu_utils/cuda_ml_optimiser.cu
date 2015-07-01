@@ -430,7 +430,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 																	nr_over_orient, nr_over_trans, ipart,
 																	rot_id, rot_idx, trans_idx, ihidden_overs, job_idx,job_num);               // ..and output into index-arrays
 				CUDA_CPU_TOC("pair_list_1");
-
+				CUDA_CPU_TIC("Diff2MakeKernel");
 				weights.size=significant_num; // use the weights array from the above level
 				weights.host_alloc();
 				weights.device_alloc();
@@ -440,7 +440,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].xdim-1);
-
+				CUDA_CPU_TOC("Diff2MakeKernel");
+				CUDA_CPU_TIC("Diff2CALL");
 				runDiff2KernelFine(
 						projKernel,
 						gpuMinvsigma2,
@@ -467,7 +468,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				HANDLE_ERROR(cudaDeviceSynchronize());
 				CUDA_GPU_TOC();
-
+				CUDA_CPU_TOC("Diff2CALL");
 				/*====================================
 				    	Write To Destination
 				======================================*/
@@ -1209,10 +1210,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUDA_CPU_TOC("generateProjectionSetup_2");
 
+
 		unsigned proj_div_nr = ceil((float)orientation_num_all / (float)proj_div_max_count);
 
 		for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 		{
+			CUDA_CPU_TIC("BP-ProjectionDivision");
 			unsigned long proj_div_start(proj_div_max_count * iproj_div),
 					proj_div_end;
 
@@ -1231,7 +1234,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				rots(&rots_all[proj_div_start],&rots_all[proj_div_end]),
 				tilts(&tilts_all[proj_div_start],&tilts_all[proj_div_end]),
 				psis(&psis_all[proj_div_start],&psis_all[proj_div_end]);
-
+			CUDA_CPU_TOC("BP-ProjectionDivision");
 
 			/*======================================================
 								 PROJECTIONS
@@ -1258,9 +1261,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			eulers.device_alloc();
 			eulers.cp_to_device();
-
 			CUDA_CPU_TOC("generateEulerMatrices");
 
+			CUDA_CPU_TIC("wavgObjectSetup");
 			CudaGlobalPtr<FLOAT> wavgs_real(orientation_num * image_size);
 			wavgs_real.device_alloc();
 			wavgs_real.device_init(0);
@@ -1270,6 +1273,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CudaGlobalPtr<FLOAT> Fweights(orientation_num * image_size);
 			Fweights.device_alloc();
 			Fweights.device_init(0);
+			CUDA_CPU_TOC("wavgObjectSetup");
 
 			/// Now that reference projection has been made loop over all particles inside this ori_particle
 			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
@@ -1393,11 +1397,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				sorted_weights.cp_to_device();
 
 				CUDA_CPU_TOC("map");
-
+				CUDA_CPU_TIC("WavgWrapper");
 				/*======================================================
 									KERNEL CALL
 				======================================================*/
-
+				CUDA_CPU_TIC("minvsigma_wavg");
 				CudaGlobalPtr<FLOAT> Minvsigma2s(image_size); //TODO Same size for all iparts, should be allocated once
 				Minvsigma2s.device_alloc();
 				CudaGlobalPtr<FLOAT> wdiff2s_parts(orientation_num * image_size);
@@ -1409,15 +1413,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				else //TODO should be handled by memset
 					for (unsigned i = 0; i < image_size; i++)
 						Minvsigma2s[i] = 1;
-
 				Minvsigma2s.cp_to_device();
+				CUDA_CPU_TOC("minvsigma_wavg");
 
+				CUDA_CPU_TIC("ProjMakeKernel");
 				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
 						baseMLO->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].xdim-1);
-
+				CUDA_CPU_TOC("ProjMakeKernel");
+				CUDA_CPU_TIC("wavgCALL");
 				runWavgKernel(
 						projKernel,
 						eulers,
@@ -1441,7 +1447,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						group_id,
 						exp_iclass
 						);
-
+				CUDA_CPU_TOC("wavgCALL");
+				CUDA_CPU_TIC("MemFrees");
 				Fimgs_real.free_device();
 				Fimgs_imag.free_device();
 				Fimgs_nomask_real.free_device();
@@ -1450,7 +1457,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				sorted_weights.free_device();
 				ctfs.free_device();
 				Minvsigma2s.free_device();
-
+				CUDA_CPU_TOC("MemFrees");
+				CUDA_CPU_TOC("WavgWrapper");
 				/*======================================================
 									REDUCE WDIFF2S
 				======================================================*/

@@ -372,7 +372,7 @@ long int generateProjectionSetup(
 	return orientation_num;
 }
 
-
+inline
 void runWavgKernel(
 		Cuda3DProjectorKernel &projector,
 		CudaGlobalPtr<FLOAT> &eulers,
@@ -387,7 +387,7 @@ void runWavgKernel(
  	    CudaGlobalPtr<FLOAT> &wavgs_real,
 	    CudaGlobalPtr<FLOAT> &wavgs_imag,
 	    CudaGlobalPtr<FLOAT> &Fweights,
-	    OptimisationParamters op,
+	    OptimisationParamters &op,
 	    MlOptimiser *baseMLO,
 	    long unsigned orientation_num,
 	    long unsigned translation_num,
@@ -399,9 +399,11 @@ void runWavgKernel(
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
 	unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
-
+	CUDA_CPU_TIC("splitblocks");
 	dim3 block_dim = splitCudaBlocks(orientation_chunks,false);
+	CUDA_CPU_TOC("splitblocks");
 
+	CUDA_CPU_TIC("cuda_kernel_wavg");
 	CUDA_GPU_TIC("cuda_kernel_wavg");
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
@@ -429,6 +431,7 @@ void runWavgKernel(
 	float used = 100*((float)(total - avail)/(float)total);
 	std::cerr << "Device memory used @ wavg: " << used << "%" << std::endl;
 	CUDA_GPU_TAC("cuda_kernel_wavg");
+	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
 
@@ -439,7 +442,7 @@ void runDiff2KernelCoarse(
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
 		CudaGlobalPtr<FLOAT> &eulers,
 		CudaGlobalPtr<FLOAT> &diff2s,
-		OptimisationParamters op,
+		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		long unsigned translation_num,
@@ -479,7 +482,7 @@ void runDiff2KernelFine(
 		CudaGlobalPtr<long unsigned> &job_idx,
 		CudaGlobalPtr<long unsigned> &job_num,
 		CudaGlobalPtr<FLOAT> &diff2s,
-		OptimisationParamters op,
+		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		long unsigned translation_num,
