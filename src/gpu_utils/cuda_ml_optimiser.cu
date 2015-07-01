@@ -1142,19 +1142,21 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUDA_CPU_TIC("setMetadata");
 
-			CUDA_CPU_TIC("max");
-			//Get index of max element using GPU-tool thrust
+			CUDA_CPU_TIC("max"); //Get index of max element using GPU-tool thrust
 			Indices max_index;
-#if !defined(CUDA_DOUBLE_PRECISION) && defined(USE_THRUST)
-			max_index.fineIdx = thrust::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
-#else
-			max_index.fineIdx = std::max_element(&DIRECT_A2D_ELEM(op.Mweight, ipart, 0),&DIRECT_A2D_ELEM(op.Mweight, ipart+1, 0)) - &DIRECT_A2D_ELEM(op.Mweight, ipart, 0);
-#endif
-			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-			CUDA_CPU_TOC("max");
+			thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~weights);
+			thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + weights.size);
+			unsigned int pos_idx = thrust::distance(dp, pos);
 
-			op.max_weight[ipart] = DIRECT_A2D_ELEM(op.Mweight, ipart, max_index.fineIdx);
+			FLOAT max_val;
+			HANDLE_ERROR(cudaMemcpy(&max_val, &weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
+			op.max_weight[ipart] = max_val;
+			max_index.fineIdx = ihidden_overs[pos_idx];
+
+			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
+			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
 			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+			CUDA_CPU_TOC("max");
 
 			CUDA_CPU_TIC("sample");
 			baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
@@ -1844,6 +1846,6 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 	}
 
 //	CUDA_CPU_TIC("interParticle");
-	exit(0);
+//	exit(0);
 }
 
