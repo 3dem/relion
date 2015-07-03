@@ -29,34 +29,29 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 										  std::vector< long unsigned > &iover_transes,
 										  std::vector< long unsigned > &ihiddens,
 										  long int nr_over_orient, long int nr_over_trans, int ipart,
-										  CudaGlobalPtr <long unsigned> &rot_id,
-										  CudaGlobalPtr <long unsigned> &rot_idx,
-										  CudaGlobalPtr <long unsigned> &trans_idx,
-										  CudaGlobalPtr <long unsigned> &ihidden_overs,
-										  CudaGlobalPtr <long unsigned> &job_idx,
-										  CudaGlobalPtr <long unsigned> &job_num)
+										  IndexedDataArray &FinePassWeights)
 {
-	rot_id.size=		orientation_num*translation_num;
-	rot_idx.size=		orientation_num*translation_num;
-	trans_idx.size=		orientation_num*translation_num;
-	ihidden_overs.size=	orientation_num*translation_num;
-	job_idx.size=		orientation_num*translation_num;
-	job_num.size=		orientation_num*translation_num;
+	FinePassWeights.rot_id.size=		orientation_num*translation_num;
+	FinePassWeights.rot_idx.size=		orientation_num*translation_num;
+	FinePassWeights.trans_idx.size=		orientation_num*translation_num;
+	FinePassWeights.ihidden_overs.size=	orientation_num*translation_num;
+	FinePassWeights.job_idx.size=		orientation_num*translation_num;
+	FinePassWeights.job_num.size=		orientation_num*translation_num;
 
-	rot_id.host_alloc();
-	rot_idx.host_alloc();
-	trans_idx.host_alloc();
-	ihidden_overs.host_alloc();
-	job_idx.host_alloc();
-	job_num.host_alloc();
+	FinePassWeights.rot_id.host_alloc();
+	FinePassWeights.rot_idx.host_alloc();
+	FinePassWeights.trans_idx.host_alloc();
+	FinePassWeights.ihidden_overs.host_alloc();
+	FinePassWeights.job_idx.host_alloc();
+	FinePassWeights.job_num.host_alloc();
 
 
 	long int significant_num(0), k(0);
 
-	job_idx[k]=0;
+	FinePassWeights.job_idx[k]=0;
 	for (long unsigned i = 0; i < orientation_num; i++)
 	{
-		job_num[k]=0;
+		FinePassWeights.job_num[k]=0;
 		int tk=0;
 		long int iover_rot = iover_rots[i];
 		for (long unsigned j = 0; j < translation_num; j++)
@@ -66,44 +61,44 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 
 			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 			{
-				rot_id[significant_num] = iorientclasses[i]; 	// where to look for priors etc
-				rot_idx[significant_num] = i;					// which rot for this significant task
-				trans_idx[significant_num] = j;					// which trans       - || -
-				ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
+				FinePassWeights.rot_id[significant_num] = iorientclasses[i]; 	// where to look for priors etc
+				FinePassWeights.rot_idx[significant_num] = i;					// which rot for this significant task
+				FinePassWeights.trans_idx[significant_num] = j;					// which trans       - || -
+				FinePassWeights.ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
 				if(tk>=PROJDIFF_CHUNK_SIZE)
 				{
 					tk=0;             // reset counter
 					k++;              // use new element
-					job_idx[k]=significant_num;
-					job_num[k]=0;   // prepare next element for ++ incrementing
+					FinePassWeights.job_idx[k]=significant_num;
+					FinePassWeights.job_num[k]=0;   // prepare next element for ++ incrementing
 				}
 				tk++;                 // increment limit
-				job_num[k]++;       // increment number of transes this ProjDiff-block
+				FinePassWeights.job_num[k]++;       // increment number of transes this ProjDiff-block
 				significant_num++;
 			}
 			else if(tk!=0) // start a new one with the same rotidx - we expect transes to be sequential.
 			{
 				tk=0;             // reset counter
 				k++;              // use new element
-				job_idx[k]=significant_num;
-				job_num[k]=0;   // prepare next element for ++ incrementing
+				FinePassWeights.job_idx[k]=significant_num;
+				FinePassWeights.job_num[k]=0;   // prepare next element for ++ incrementing
 			}
 		}
 		if(tk>0) // use new element (if tk==0) then we are currently on an element with no signif, so we should continue using this element
 		{
 			k++;
-			job_idx[k]=significant_num;
-			job_num[k]=0;
+			FinePassWeights.job_idx[k]=significant_num;
+			FinePassWeights.job_num[k]=0;
 		}
 	}
 
-	job_num.size		=k;
-	job_idx.size		=k;
-	rot_id.size 		=significant_num;
-	rot_idx.size		=significant_num;
-	trans_idx.size		=significant_num;
-	ihidden_overs.size  =significant_num;
+	FinePassWeights.job_num.size		=k;
+	FinePassWeights.job_idx.size		=k;
+	FinePassWeights.rot_id.size 		=significant_num;
+	FinePassWeights.rot_idx.size		=significant_num;
+	FinePassWeights.trans_idx.size		=significant_num;
+	FinePassWeights.ihidden_overs.size  =significant_num;
 
 	return(significant_num);
 }

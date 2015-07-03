@@ -298,4 +298,28 @@ public:
 	}
 };
 
+class IndexedDataArray
+{
+public:
+	//actual data
+	CudaGlobalPtr<FLOAT> weights;
+
+	// indexes with same length as data
+	// -- basic indices ---------------------------------
+	//     rot_id  = id of rot     = which of all POSSIBLE orientations                               this weight signifies
+	//     rot_idx = index of rot  = which in the sequence of the determined significant orientations this weight signifies
+	//   trans_id  = id of trans   = which of all POSSIBLE translations                               this weight signifies
+	//   class_id  = id of class   = which of all POSSIBLE classes                                    this weight signifies
+	// -- special indices ---------------------------------
+	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
+	CudaGlobalPtr<long unsigned> rot_id, rot_idx, trans_idx, ihidden_overs, class_id;
+
+	// indexes of job partition length ( length is thechnically only subject to being <=data size, but typically much less )
+	//   every element in job_idx  is a reference to point       in the above arrays for that job
+	//   every element in job_num  gives the number of elements  in the above arrays for that job
+	CudaGlobalPtr<long unsigned> job_idx, job_num;
+
+
+};
+
 #endif

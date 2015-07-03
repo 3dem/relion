@@ -233,7 +233,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 				    	   Retrieve Results
 				======================================*/
 
-				op.min_diff2[ipart] = thrustGetMinVal(diff2s);
+				op.min_diff2[ipart] = std::min((FLOAT)op.min_diff2[ipart],(FLOAT)thrustGetMinVal(diff2s)); // klass
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -257,13 +257,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  OptimisationParamters &op,
 		 	 	 	 	 	 	  SamplingParameters &sp,
 		 	 	 	 	 	 	  MlOptimiser *baseMLO,
-		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &rot_id,
-		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &rot_idx,
-		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &trans_idx,
-		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &ihidden_overs,
-		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &job_idx,
-		 	 	 	 	 	 	  CudaGlobalPtr <long unsigned> &job_num,
-		 	 	 	 	 	 	  CudaGlobalPtr <FLOAT> &weights)
+		 	 	 	 	 	 	  IndexedDataArray &FinePassWeights)
 {
 
 	CUDA_CPU_TIC("diff_pre_gpu");
@@ -433,12 +427,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 																	orientation_num, translation_num,
 																	iorientclasses,	iover_rots,	iover_transes, ihiddens,
 																	nr_over_orient, nr_over_trans, ipart,
-																	rot_id, rot_idx, trans_idx, ihidden_overs, job_idx,job_num);               // ..and output into index-arrays
+																	FinePassWeights);               // ..and output into index-arrays
 				CUDA_CPU_TOC("pair_list_1");
 				CUDA_CPU_TIC("Diff2MakeKernel");
-				weights.size=significant_num; // use the weights array from the above level
-				weights.host_alloc();
-				weights.device_alloc();
+				FinePassWeights.weights.size=significant_num; // use the weights array from the above level
+				FinePassWeights.weights.host_alloc();
+				FinePassWeights.weights.device_alloc();
 
 				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
 						baseMLO->cudaProjectors[exp_iclass],
@@ -453,12 +447,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						Fimgs_real,
 						Fimgs_imag,
 						eulers,
-						rot_id,
-						rot_idx,
-						trans_idx,
-						job_idx,
-						job_num,
-						weights,
+						FinePassWeights.rot_id,
+						FinePassWeights.rot_idx,
+						FinePassWeights.trans_idx,
+						FinePassWeights.job_idx,
+						FinePassWeights.job_num,
+						FinePassWeights.weights,
 						op,
 						baseMLO,
 						orientation_num,
@@ -479,14 +473,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				======================================*/
 
 				CUDA_CPU_TIC("collect_data_1");
-				op.min_diff2[ipart] = thrustGetMinVal(weights);
+				op.min_diff2[ipart] = thrustGetMinVal(FinePassWeights.weights);
 				if (exp_ipass == 0)
 				{
 					CUDA_GPU_TIC("diff2sMemCp");
-					weights.cp_to_host();
+					FinePassWeights.weights.cp_to_host();
 					CUDA_GPU_TAC("diff2sMemCp");
 					for (long unsigned k = 0; k<significant_num; k++)
-					DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = weights[k];
+					DIRECT_A2D_ELEM(op.Mweight, ipart, FinePassWeights.ihidden_overs[k]) = FinePassWeights.weights[k];
 				}
 				CUDA_CPU_TOC("collect_data_1");
 			} // end loop ipart
@@ -499,13 +493,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
 											MlOptimiser *baseMLO,
-											CudaGlobalPtr <long unsigned> &rot_id,
-											CudaGlobalPtr <long unsigned> &rot_idx,
-											CudaGlobalPtr <long unsigned> &trans_idx,
-											CudaGlobalPtr <long unsigned> &ihidden_overs,
-											CudaGlobalPtr <long unsigned> &job_idx,
-											CudaGlobalPtr <long unsigned> &job_num,
-											CudaGlobalPtr <FLOAT> 		  &weights)
+					 	 	 	 	 	 	IndexedDataArray &PassWeights)
 {
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
@@ -701,7 +689,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				else
 				{
-					block_num = rot_idx.size / SUM_BLOCK_SIZE;
+					block_num = PassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 					thisparticle_sumweight.size=block_num;
 					thisparticle_sumweight.host_alloc();
@@ -710,27 +698,25 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
 																			    ~pdf_offset,
-																			    ~weights,
+																			    ~PassWeights.weights,
 																			    ~thisparticle_sumweight,
 																			    (FLOAT)op.min_diff2[ipart],
 																			    sp.nr_oversampled_rot,
 																			    sp.nr_oversampled_trans,
-																			    ~rot_id,
-																			    ~trans_idx,
-																				~job_idx,
-																			 	~job_num,
-																			 	job_num.size);
+																			    ~PassWeights.rot_id,
+																			    ~PassWeights.trans_idx,
+																				~PassWeights.job_idx,
+																			 	~PassWeights.job_num,
+																			 	PassWeights.job_num.size);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					CUDA_GPU_TIC("sumweightMemCp2");
-					weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
+					PassWeights.weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
 					//weights.free_device();
 					CUDA_GPU_TAC("sumweightMemCp2");
 
 //					for (long unsigned k = 0; k< weights.size; k++)
 //						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = weights[k];
 				}
-
-
 
 				thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
 				exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
@@ -775,9 +761,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		if (exp_ipass!=0)
 		{
 			CUDA_CPU_TIC("sort");
-			sorted_weight_new.size = weights.size;
+			sorted_weight_new.size = PassWeights.weights.size;
 			sorted_weight_new.host_alloc();
-			sorted_weight_new.d_ptr = weights.d_ptr;			    // set pointer to weights
+			sorted_weight_new.d_ptr = PassWeights.weights.d_ptr;			    // set pointer to weights
 			sorted_weight_new.cp_to_host();							// make host-copy
 			sorted_weight_new.d_do_free = false;
 
@@ -888,14 +874,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 }
 
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
-		MlOptimiser *baseMLO,
-		CudaGlobalPtr <long unsigned> &rot_id,
-		CudaGlobalPtr <long unsigned> &rot_idx,
-		CudaGlobalPtr <long unsigned> &trans_idx,
-		CudaGlobalPtr <long unsigned> &ihidden_overs,
-		CudaGlobalPtr <long unsigned> &job_idx,
-		CudaGlobalPtr <long unsigned> &job_num,
-		CudaGlobalPtr <FLOAT> 		  &weights)
+						MlOptimiser *baseMLO,
+						IndexedDataArray &FinePassWeights)
 {
 	CUDA_CPU_TIC("store_init");
 
@@ -1057,33 +1037,33 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				}
 			}
 			long int jobid=0;
-			job_idx[jobid]=0;
-			job_num[jobid]=1;
-			long int crot = rot_idx[jobid]; // set current rot
-			for(long int n=1; n<rot_idx.size; n++)
+			FinePassWeights.job_idx[jobid]=0;
+			FinePassWeights.job_num[jobid]=1;
+			long int crot =FinePassWeights.rot_idx[jobid]; // set current rot
+			for(long int n=1; n<FinePassWeights.rot_idx.size; n++)
 			{
-				if(rot_idx[n]==crot)
+				if(FinePassWeights.rot_idx[n]==crot)
 				{
-					job_num[jobid]++;
+					FinePassWeights.job_num[jobid]++;
 				}
 				else
 				{
 					jobid++;
-					job_num[jobid]=1;
-					job_idx[jobid]=n;
-					crot=rot_idx[n];
+					FinePassWeights.job_num[jobid]=1;
+					FinePassWeights.job_idx[jobid]=n;
+					crot=FinePassWeights.rot_idx[n];
 				}
 			}
-			job_idx.size=jobid;
-			job_num.size=jobid;
-			job_idx.cp_to_device();
-			job_num.cp_to_device();
+			FinePassWeights.job_idx.size=jobid;
+			FinePassWeights.job_num.size=jobid;
+			FinePassWeights.job_idx.cp_to_device();
+			FinePassWeights.job_num.cp_to_device();
 
 			oo_otrans_x.put_on_device();
 			oo_otrans_y.put_on_device();
 			myp_oo_otrans_x2y2z2.put_on_device();
 
-			int block_num = job_idx.size;
+			int block_num = FinePassWeights.job_idx.size;
 
 			std::cerr << "block_num = " << block_num << std::endl;
 			CudaGlobalPtr<FLOAT>                      p_weights(block_num);
@@ -1095,8 +1075,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			p_thr_wsum_prior_offsetx_class.device_alloc();
 			p_thr_wsum_prior_offsety_class.device_alloc();
 			p_thr_wsum_sigma2_offset.device_alloc();
-//			weights.device_alloc();
-//			weights.cp_to_device();
+//			FinePassWeights.weights.device_alloc();
+//			FinePassWeights.weights.cp_to_device();
 
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 			CUDA_GPU_TIC("collect2-kernel");
@@ -1106,7 +1086,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~oo_otrans_x,          // otrans-size -> make const
 					~oo_otrans_y,          // otrans-size -> make const
 					~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-					~weights,
+					~FinePassWeights.weights,
 					(FLOAT)op.significant_weight[ipart],
 					(FLOAT)op.sum_weight[ipart],
 					sp.nr_trans,
@@ -1118,10 +1098,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~p_thr_wsum_prior_offsetx_class,
 					~p_thr_wsum_prior_offsety_class,
 					~p_thr_wsum_sigma2_offset,
-					~rot_idx,
-					~trans_idx,
-					~job_idx,
-					~job_num
+					~FinePassWeights.rot_idx,
+					~FinePassWeights.trans_idx,
+					~FinePassWeights.job_idx,
+					~FinePassWeights.job_num
 						);
 			CUDA_GPU_TAC("collect2-kernel");
 
@@ -1140,7 +1120,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int iorient = 0;
 			for (long int n = 0; n < block_num; n++)
 			{
-				iorient= rot_id[job_idx[n]];
+				iorient= FinePassWeights.rot_id[FinePassWeights.job_idx[n]];
 				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
 				// Only proceed if any of the particles had any significant coarsely sampled translation
 
@@ -1183,14 +1163,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUDA_CPU_TIC("max"); //Get index of max element using GPU-tool thrust
 			Indices max_index;
-			thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~weights);
-			thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + weights.size);
+			thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~FinePassWeights.weights);
+			thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + FinePassWeights.weights.size);
 			unsigned int pos_idx = thrust::distance(dp, pos);
 
 			FLOAT max_val;
-			HANDLE_ERROR(cudaMemcpy(&max_val, &weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
+			HANDLE_ERROR(cudaMemcpy(&max_val, &FinePassWeights.weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
 			op.max_weight[ipart] = max_val;
-			max_index.fineIdx = ihidden_overs[pos_idx];
+			max_index.fineIdx = FinePassWeights.ihidden_overs[pos_idx];
 
 			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
 			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
@@ -1421,9 +1401,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						sorted_weights,
 						orientation_num,
 						translation_num,
-						weights,
-						rot_idx,
-						trans_idx,
+						FinePassWeights.weights,
+						FinePassWeights.rot_idx,
+						FinePassWeights.trans_idx,
 						baseMLO->sampling,
 						ipart,
 						iover_transes,
@@ -1812,14 +1792,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			// Only perform a second pass when using adaptive oversampling
 			int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
 
-			CudaGlobalPtr<long unsigned> rot_id_C, 			rot_id_F,
-			 	 	 	 	 	 	 	 rot_idx_C, 		rot_idx_F,
-										 trans_idx_C,		trans_idx_F,
-										 ihidden_overs_C,  	ihidden_overs_F,      // TODO to be removed WHEN mapping is eliminated
-										 job_idx_C, 		job_idx_F,
-										 job_num_C, 		job_num_F;
-
-			CudaGlobalPtr<FLOAT> 		 weights_C,			weights_F;
+			// These are dense data-arrays which are replacements to using Mweight in the sparse Fine-sampled passes
+			IndexedDataArray CoarsePassWeights,FinePassWeights;
 
 			for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 			{
@@ -1849,34 +1823,16 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO);
 					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
 					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsCoarse");
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, rot_id_C,
-																				  rot_idx_C,
-																				  trans_idx_C,
-																				  ihidden_overs_C,
-																				  job_idx_C,
-																				  job_num_C,
-																				  weights_C);
+					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, CoarsePassWeights);
 					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsCoarse");
 				}
 				else
 				{
 					CUDA_CPU_TIC("getAllSquaredDifferencesFine");
-					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, rot_id_F,
-																		 rot_idx_F,
-																		 trans_idx_F,
-																		 ihidden_overs_F,
-																		 job_idx_F,
-																		 job_num_F,
-																		 weights_F);
+					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, FinePassWeights);
 					CUDA_CPU_TOC("getAllSquaredDifferencesFine");
 					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsFine");
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, rot_id_F,
-																				  rot_idx_F,
-																				  trans_idx_F,
-																				  ihidden_overs_F,
-																				  job_idx_F,
-																				  job_num_F,
-																				  weights_F);
+					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, FinePassWeights);
 					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsFine");
 				}
 
@@ -1887,7 +1843,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			sp.current_image_size = baseMLO->mymodel.current_size;
 
 			CUDA_CPU_TIC("storeWeightedSums");
-			storeWeightedSums(op, sp, baseMLO, rot_id_F, rot_idx_F,trans_idx_F,ihidden_overs_F,job_idx_F,job_num_F,weights_F);
+			storeWeightedSums(op, sp, baseMLO, FinePassWeights);
 			CUDA_CPU_TOC("storeWeightedSums");
 
 			CUDA_CPU_TOC("oneParticle");
