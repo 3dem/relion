@@ -24,13 +24,15 @@
 
 long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingParameters &sp,
 										  long int orientation_num, long int translation_num,
-										  std::vector< long unsigned > &iorientclasses,
-										  std::vector< long unsigned > &iover_rots,
+					 	 	 	 	 	  ProjectionParams &FineProjectionData,
 										  std::vector< long unsigned > &iover_transes,
 										  std::vector< long unsigned > &ihiddens,
 										  long int nr_over_orient, long int nr_over_trans, int ipart,
 										  IndexedDataArray &FinePassWeights)
 {
+	//NOT WORKING
+//	FinePassWeights.setIndexSize(orientation_num*translation_num);
+//	FinePassWeights.setJobNum(orientation_num*translation_num);
 	FinePassWeights.rot_id.size=		orientation_num*translation_num;
 	FinePassWeights.rot_idx.size=		orientation_num*translation_num;
 	FinePassWeights.trans_idx.size=		orientation_num*translation_num;
@@ -38,6 +40,8 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 	FinePassWeights.job_idx.size=		orientation_num*translation_num;
 	FinePassWeights.job_num.size=		orientation_num*translation_num;
 
+	//NOT WORKING
+//	FinePassWeights.host_alloc_all_indices();
 	FinePassWeights.rot_id.host_alloc();
 	FinePassWeights.rot_idx.host_alloc();
 	FinePassWeights.trans_idx.host_alloc();
@@ -53,15 +57,15 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 	{
 		FinePassWeights.job_num[k]=0;
 		int tk=0;
-		long int iover_rot = iover_rots[i];
+		long int iover_rot = FineProjectionData.iover_rots[i];
 		for (long unsigned j = 0; j < translation_num; j++)
 		{
 			long int iover_trans = iover_transes[j];
-			long int ihidden = iorientclasses[i] * sp.nr_trans + ihiddens[j];
+			long int ihidden = FineProjectionData.iorientclasses[i] * sp.nr_trans + ihiddens[j];
 
 			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 			{
-				FinePassWeights.rot_id[significant_num] = iorientclasses[i]; 	// where to look for priors etc
+				FinePassWeights.rot_id[significant_num] = FineProjectionData.iorientclasses[i]; 	// where to look for priors etc
 				FinePassWeights.rot_idx[significant_num] = i;					// which rot for this significant task
 				FinePassWeights.trans_idx[significant_num] = j;					// which trans       - || -
 				FinePassWeights.ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
@@ -93,6 +97,9 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 		}
 	}
 
+	//NOT WORKING
+//	FinePassWeights.setIndexSize(significant_num);
+//	FinePassWeights.setJobNum(k);
 	FinePassWeights.job_num.size		=k;
 	FinePassWeights.job_idx.size		=k;
 	FinePassWeights.rot_id.size 		=significant_num;
@@ -242,9 +249,7 @@ long unsigned imageTranslation(
 
 void generateEulerMatrices(
 		FLOAT padding_factor,
-		std::vector< double > &rots,
-		std::vector< double > &tilts,
-		std::vector< double > &psis,
+		ProjectionParams ProjectionData,
 		CudaGlobalPtr<FLOAT> &eulers,
 		bool inverse)
 {
@@ -252,14 +257,14 @@ void generateEulerMatrices(
     double ca, sa, cb, sb, cg, sg;
     double cc, cs, sc, ss;
 
-	for (long int i = 0; i < rots.size(); i++)
+	for (long int i = 0; i < ProjectionData.rots.size(); i++)
 	{
 	    //TODO In a sense we're doing RAD2DEG just to do DEG2RAD here.
 	    //The only place the degree value is actually used is in the metadata assignment.
 
-	    alpha = DEG2RAD(rots[i]);
-	    beta  = DEG2RAD(tilts[i]);
-	    gamma = DEG2RAD(psis[i]);
+	    alpha = DEG2RAD(ProjectionData.rots[i]);
+	    beta  = DEG2RAD(ProjectionData.tilts[i]);
+	    gamma = DEG2RAD(ProjectionData.psis[i]);
 
 	    sincos(alpha, &sa, &ca);
 	    sincos(beta,  &sb, &cb);
@@ -304,11 +309,7 @@ long int generateProjectionSetup(
 		MlOptimiser *baseMLO,
 		bool coarse,
 		unsigned iclass,
-		std::vector< double > &rots,
-		std::vector< double > &tilts,
-		std::vector< double > &psis,
-		std::vector< long unsigned > &iorientclasses,
-		std::vector< long unsigned > &iover_rots)
+		ProjectionParams &ProjectionData)
 {
 	//Local variables
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
@@ -351,13 +352,11 @@ long int generateProjectionSetup(
 				// Loop over all oversampled orientations (only a single one in the first pass)
 				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++, ipart++)
 				{
-					iorientclasses.push_back(iorientclass);
-					iover_rots.push_back(iover_rot);
-
-					rots.push_back(oversampled_rot[iover_rot]);
-					tilts.push_back(oversampled_tilt[iover_rot]);
-					psis.push_back(oversampled_psi[iover_rot]);
-
+					ProjectionData.pushBackAll(	oversampled_rot[iover_rot],
+											    oversampled_tilt[iover_rot],
+											    oversampled_psi[iover_rot],
+											    iorientclass,
+											    iover_rot 					);
 					orientation_num ++;
 				}
 			}

@@ -5,6 +5,7 @@
 #include "src/gpu_utils/cuda_settings.h"
 #include <stdio.h>
 #include <signal.h>
+#include <vector>
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
@@ -319,7 +320,84 @@ public:
 	//   every element in job_num  gives the number of elements  in the above arrays for that job
 	CudaGlobalPtr<long unsigned> job_idx, job_num;
 
+	inline
+	__host__  IndexedDataArray():
+		weights(),
+		rot_id(),
+		rot_idx(),
+		trans_idx(),
+		ihidden_overs(),
+		class_id(),
+		job_idx(),
+		job_num()
+	{};
 
+	//NOT WORKING
+//public:
+//
+//	__host__ void setIndexSize(long int newSize)
+//	{
+//		rot_id.size=newSize;
+//		rot_idx.size=newSize;
+//		trans_idx.size=newSize;
+//		ihidden_overs.size=newSize;
+//		class_id.size=newSize;
+//	}
+//
+//	__host__ void setJobNum(long int newSize)
+//	{
+//		job_idx.size=newSize;
+//		job_idx.size=newSize;
+//	}
+//
+//	__host__ void host_alloc_all_indices()
+//	{
+//		rot_id.host_alloc();
+//		rot_idx.host_alloc();
+//		trans_idx.host_alloc();
+//		ihidden_overs.host_alloc();
+//		job_idx.host_alloc();
+//		job_num.host_alloc();
+//	}
 };
 
+class ProjectionParams
+{
+
+public:
+	// Mapping index look-up table
+	std::vector< double > rots, tilts, psis;
+	std::vector< long unsigned > iorientclasses, iover_rots;
+
+	inline
+	__host__ ProjectionParams():
+		rots(),
+		tilts(),
+		psis(),
+		iorientclasses(),
+		iover_rots()
+	{};
+
+	// constructor that slices out a part of a parent ProjectionParams
+	inline
+	__host__ ProjectionParams(ProjectionParams &parent, int start, int end):
+		rots(			&parent.rots[start],  			&parent.rots[end]),
+		tilts(			&parent.tilts[start], 			&parent.tilts[end]),
+		psis(			&parent.psis[start],  			&parent.psis[end]),
+		iorientclasses( &parent.iorientclasses[start],  &parent.iorientclasses[end]),
+		iover_rots(		&parent.iover_rots[start],  	&parent.iover_rots[end])
+	{};
+
+public:
+	__host__ void pushBackAll(double NEWrot,double NEWtilt ,double NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
+	{
+		rots.push_back(NEWrot);
+		tilts.push_back(NEWtilt);
+		psis.push_back(NEWpsi);
+		iorientclasses.push_back(NEWiorientclasses);
+		iover_rots.push_back(NEWiover_rots);
+	}
+
+};
 #endif
+
