@@ -152,6 +152,8 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 
 	__syncthreads();
 	// Further reduction of all samples in this block
+	// ProTip: to test reduction order (at this level), change "tid+j" to "2*j-tid-1",
+	// since this will switch from a sliding-block-lik reduction to a fan-like reduction
 	for(int j=(SUM_BLOCK_SIZE/2); j>0; j/=2)
 	{
 		if(tid<j)

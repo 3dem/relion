@@ -3297,6 +3297,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
 		int group_id = mydata.getGroupId(part_id);
 
+
 		if (do_masked_shifts)
 			windowFourierTransform(exp_Fimgs[ipart], Fimg, exp_current_image_size);
 		if (do_also_unmasked)

@@ -272,18 +272,23 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	int group_id;
 
 	//printf("sp.nr_oversampled_rot=%d\n", (unsigned)sp.nr_oversampled_rot);
-
-	op.Mweight.resize(sp.nr_particles, baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
-	op.Mweight.initConstant(-999.);
+//	CUDA_CPU_TIC("resizeMweight");
+//	CUDA_CPU_TIC("resize");
+//	op.Mweight.resize(sp.nr_particles, baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
+//	CUDA_CPU_TOC("resize");
+//	CUDA_CPU_TIC("set");
+//	op.Mweight.initConstant(-999.);
+//	CUDA_CPU_TOC("set");
+//	CUDA_CPU_TOC("resizeMweight");
 
 	op.min_diff2.clear();
 	op.min_diff2.resize(sp.nr_particles, 99.e99);
-
+	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
-
+	CUDA_CPU_TOC("precalculateShiftedImagesCtfsAndInvSigma2s");
 	MultidimArray<Complex > Fref;
 	Fref.resize(op.local_Minvsigma2s[0]);
 
@@ -390,7 +395,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 							//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
 							if (baseMLO->do_scale_correction)
 							{
-								//group_id = mydata.getGroupId(part_id);
+								//group_id = baseMLO->mydata.getGroupId(part_id);
 								FLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
 								real /= myscale;
 								imag /= myscale;
@@ -519,6 +524,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
+			std::cerr << "the gpu inplementation cannot handle the new dense arraysbut instead needs the old Mweight. Go maketh if thous needeth it." << std::endl;
+			exit(1);
 			// Binarize the squared differences array to skip marginalisation
 			double mymindiff2 = 99.e10;
 			long int myminidx = -1;
@@ -719,8 +726,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					//weights.free_device();
 					CUDA_GPU_TAC("sumweightMemCp2");
 
-					for (long unsigned k = 0; k< weights.size; k++)
-						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = weights[k];
+//					for (long unsigned k = 0; k< weights.size; k++)
+//						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = weights[k];
 				}
 
 
@@ -1158,7 +1165,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 			}
-			Mweight.free_device();
+			//Mweight.free_device();
 			p_weights.free();
 			p_thr_wsum_sigma2_offset.free();
 			p_thr_wsum_prior_offsetx_class.free();
@@ -1414,6 +1421,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						sorted_weights,
 						orientation_num,
 						translation_num,
+						weights,
+						rot_idx,
+						trans_idx,
 						baseMLO->sampling,
 						ipart,
 						iover_transes,
@@ -1762,11 +1772,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				if (iori == my_ori_particle) break;
 				op.metadata_offset += baseMLO->mydata.ori_particles[iori].particles_id.size();
 			}
-
+			CUDA_CPU_TIC("getFourierTransformsAndCtfs");
 			baseMLO->getFourierTransformsAndCtfs(my_ori_particle, op.metadata_offset, op.Fimgs, op.Fimgs_nomask, op.Fctfs,
 					op.old_offset, op.prior, op.power_imgs, op.highres_Xi2_imgs,
 					op.pointer_dir_nonzeroprior, op.pointer_psi_nonzeroprior, op.directions_prior, op.psi_prior);
-
+			CUDA_CPU_TOC("getFourierTransformsAndCtfs");
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 			{
 				baseMLO->calculateRunningAveragesOfMovieFrames(my_ori_particle, op.Fimgs, op.power_imgs, op.highres_Xi2_imgs);

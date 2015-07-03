@@ -157,6 +157,9 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
  */
 inline
 void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, unsigned translation_num,
+		CudaGlobalPtr <FLOAT> &weights,
+		CudaGlobalPtr <long unsigned> &rot_idx,
+		CudaGlobalPtr <long unsigned> &trans_idx,
 		HealpixSampling &sampling, long int ipart,
 		std::vector< long unsigned > &iover_transes, std::vector< long unsigned > &ihiddens,
 		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
@@ -166,17 +169,14 @@ void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, 
 	int nr_over_orient = sampling.oversamplingFactorOrientations(current_oversampling);
 	int nr_over_trans =sampling.oversamplingFactorTranslations(current_oversampling);
 
-	for (long unsigned i = 0; i < orientation_num; i++)
+	for (long unsigned i = 0; i < orientation_num*translation_num; i++)
 	{
-		long unsigned iover_rot = iover_rots[i];
-		for (long unsigned j = 0; j < translation_num; j++)
-		{
-			long unsigned iover_trans = iover_transes[j];
-			long unsigned ihidden = iorientclasses[i] * nr_trans + ihiddens[j];
-			long unsigned ihidden_over = ihidden * nr_over_orient * nr_over_trans + nr_over_trans * iover_rot + iover_trans;
-			mapped_weights[(long unsigned) (i * translation_num + j)] =
-					DIRECT_A2D_ELEM(Mweight, ipart, ihidden_over);
-		}
+		mapped_weights[i] = -999.;
+	}
+
+	for (long unsigned i = 0; i < trans_idx.size; i++)
+	{
+		mapped_weights[ rot_idx[i] * translation_num + trans_idx[i] ]= weights[i];
 	}
 }
 
