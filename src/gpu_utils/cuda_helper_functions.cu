@@ -303,13 +303,22 @@ void generateEulerMatrices(
 }
 
 
-long int generateProjectionSetup(
+long unsigned generateProjectionSetup(
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
 		bool coarse,
 		unsigned iclass,
 		ProjectionParams &ProjectionData)
+// FIXME : For coarse iteration this is **SLOW**    HERE ARE SOME NOTES FOR PARALLELIZING IT (GPU OFFLOAD):
+/*
+ *    Since it is based on push_back, parallelizing sould be fine given som atomic opreation appends,
+ *    what takes time is looping through all this. The job-splitting in collect2jobs-preproccesing and
+ *    divideOrientationsIntoBlockjobs() relies on chunks of shared orientations being adjacent in
+ *    ProjectionData.rot_id (and thus also .rot_idx), but does not care which order those chunks appear
+ *    in. So as long as a parallelilsm and "atomic push_back" is organised to use an orientation as a
+ *    minimum unit, the job-splitting should be fine with the output.
+ */
 {
 	//Local variables
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;

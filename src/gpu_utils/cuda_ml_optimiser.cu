@@ -44,8 +44,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
 	CUDA_CPU_TOC("diff_pre_gpu");
-
-	ProjectionParams CoarseProjectionData;
+	long unsigned orientation_num;
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
@@ -58,18 +57,17 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 //			// Mapping index look-up table
 //			std::vector< long unsigned > iorientclasses, iover_rots;
 //			std::vector< double > rots, tilts, psis;
-
-			CUDA_CPU_TIC("generateProjectionSetupCoarse");
-			long unsigned orientation_num = generateProjectionSetup(
+			ProjectionParams CoarseProjectionData(1);
+			CUDA_CPU_TIC("generateProjectionSetupCoarse"); //FIXME Move to RANK level (construct once for all particles)
+			CoarseProjectionData.orientation_num[0] = generateProjectionSetup(
 					op,
 					sp,
 					baseMLO,
 					exp_ipass == 0, //coarse
 					exp_iclass,
 					CoarseProjectionData);
-
 			CUDA_CPU_TOC("generateProjectionSetupCoarse");
-
+			orientation_num = CoarseProjectionData.orientation_num[0];
 
 			CUDA_CPU_TIC("generateEulerMatricesCoarse");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
@@ -299,21 +297,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
 
-//			// Mapping index look-up table
-//			std::vector< long unsigned > iorientclasses, iover_rots;
-//			std::vector< double > rots, tilts, psis;
-
-			CUDA_CPU_TIC("generateProjectionSetup");
-			long unsigned orientation_num = generateProjectionSetup(
-					op,
-					sp,
-					baseMLO,
-					exp_ipass == 0, //coarse
-					exp_iclass,
-					FineProjectionData);
-
-			CUDA_CPU_TOC("generateProjectionSetup");
-
+			long unsigned orientation_num  = FineProjectionData.orientation_num[exp_iclass-sp.iclass_min];
 
 			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
@@ -1205,19 +1189,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 									          MAXIMIZATION
 		=======================================================================================*/
 
-		ProjectionParams ProjectionData_all;
-		CUDA_CPU_TIC("generateProjectionSetup_2");
-
-		long unsigned orientation_num_all = generateProjectionSetup(
-					op,
-					sp,
-					baseMLO,
-					false,  //coarse
-					exp_iclass,
-					ProjectionData_all);
-
-		CUDA_CPU_TOC("generateProjectionSetup_2");
-
+		long unsigned orientation_num_all  = ProjectionData.orientation_num[exp_iclass-sp.iclass_min];
 
 		unsigned proj_div_nr = ceil((float)orientation_num_all / (float)proj_div_max_count);
 
@@ -1234,15 +1206,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			long unsigned orientation_num(proj_div_end - proj_div_start);
 
-			ProjectionParams ProjectionData_projdiv(ProjectionData_all,proj_div_start,proj_div_end); //set this _projdiv to start and stop in the specified region of _all
-//			std::vector< long unsigned >
-//				iorientclasses(&ProjectionData_all.iorientclasses[proj_div_start],&ProjectionData_all.iorientclasses[proj_div_end]),
-//				iover_rots(&ProjectionData_all.iover_rots[proj_div_start],&ProjectionData_all.iover_rots[proj_div_end]);
-//
-//			std::vector< double >
-//				rots(&ProjectionData_all.rots[proj_div_start],  &ProjectionData_all.rots[proj_div_end]),
-//				tilts(&ProjectionData_all.tilts[proj_div_start],&ProjectionData_all.tilts[proj_div_end]),
-//				psis(&ProjectionData_all.psis[proj_div_start],  &ProjectionData_all.psis[proj_div_end]);
+			ProjectionParams ProjectionData_projdiv(ProjectionData,proj_div_start,proj_div_end); //set this _projdiv to start and stop in the specified region of _all
+
 			CUDA_CPU_TOC("BP-ProjectionDivision");
 
 			/*======================================================
@@ -1779,9 +1744,13 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			// Only perform a second pass when using adaptive oversampling
 			int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
 
-			// These are dense data-arrays which are replacements to using Mweight in the sparse Fine-sampled passes
+			// -- These are dense data-arrays which are replacements to using Mweight in the sparse Fine-sampled passes
 			IndexedDataArray CoarsePassWeights,FinePassWeights;
-			ProjectionParams FineProjectionData;
+
+			// -- These are collected data used in the projection-operations *after* the coarse pass,
+			// -- declared here to keep scope to storeWS
+			// ( apparently min = max @ one class (it makes sense, it's just a bit impractical) )
+			ProjectionParams FineProjectionData(sp.iclass_max-sp.iclass_min+1);
 
 			for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 			{
@@ -1816,6 +1785,24 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				}
 				else
 				{
+//					// -- go through all classes and generate projectionsetups for all classes - to be used in getASDF and storeWS below --
+//					// the reason to do this globally is subtle - we want the orientation_num of all classes to estimate a largest possible
+//					// weight-array, which would be insanely much larger than necessary if we had to assume the worst.
+					long int orientationNumAllClasses(0);
+					for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					{
+						CUDA_CPU_TIC("generateProjectionSetup");
+						FineProjectionData.orientation_num[exp_iclass-sp.iclass_min] = generateProjectionSetup(
+								op,
+								sp,
+								baseMLO,
+								ipass == 0, //coarse
+								exp_iclass,
+								FineProjectionData);
+						CUDA_CPU_TOC("generateProjectionSetup");
+						FineProjectionData.orientationNumAllClasses += FineProjectionData.orientation_num[exp_iclass-sp.iclass_min];
+					}
+//					FinePassWeights.setDataSize(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans); //set a maximum possible size for all weights (to be reduced by significance-checks)
 
 					CUDA_CPU_TIC("getAllSquaredDifferencesFine");
 					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, FinePassWeights, FineProjectionData);

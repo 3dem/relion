@@ -366,11 +366,15 @@ class ProjectionParams
 
 public:
 	// Mapping index look-up table
+	std::vector< long unsigned > orientation_num; 					// the number of significant orientation for each class
+	long unsigned orientationNumAllClasses;							// sum of the above
 	std::vector< double > rots, tilts, psis;
 	std::vector< long unsigned > iorientclasses, iover_rots;
 
 	inline
 	__host__ ProjectionParams():
+		orientation_num(),
+		orientationNumAllClasses(0),
 		rots(),
 		tilts(),
 		psis(),
@@ -378,6 +382,16 @@ public:
 		iover_rots()
 	{};
 
+	inline
+	__host__ ProjectionParams(unsigned long classes):
+		orientation_num(classes),
+		orientationNumAllClasses(0),
+		rots(),
+		tilts(),
+		psis(),
+		iorientclasses(),
+		iover_rots()
+	{};
 	// constructor that slices out a part of a parent ProjectionParams
 	inline
 	__host__ ProjectionParams(ProjectionParams &parent, int start, int end):
