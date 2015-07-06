@@ -365,53 +365,91 @@ class ProjectionParams
 {
 
 public:
-	// Mapping index look-up table
 	std::vector< long unsigned > orientation_num; 					// the number of significant orientation for each class
 	long unsigned orientationNumAllClasses;							// sum of the above
 	std::vector< double > rots, tilts, psis;
 	std::vector< long unsigned > iorientclasses, iover_rots;
 
+	// These are arrays which detial the number of entries in each class, and where each class starts.
+	// NOTE: There is no information about which class each class_idx refers to, there is only
+	// a distinction between different classes.
+	std::vector< long unsigned > class_entries, class_idx;
 	inline
 	__host__ ProjectionParams():
-		orientation_num(),
-		orientationNumAllClasses(0),
+
 		rots(),
 		tilts(),
 		psis(),
 		iorientclasses(),
-		iover_rots()
+		iover_rots(),
+
+		class_entries(),
+		class_idx(),
+		orientation_num(),
+		orientationNumAllClasses(0)
+
 	{};
 
 	inline
 	__host__ ProjectionParams(unsigned long classes):
-		orientation_num(classes),
-		orientationNumAllClasses(0),
+
 		rots(),
 		tilts(),
 		psis(),
 		iorientclasses(),
-		iover_rots()
+		iover_rots(),
+
+		class_entries(classes),
+		class_idx(classes),
+		orientation_num(classes),
+		orientationNumAllClasses(0)
 	{};
-	// constructor that slices out a part of a parent ProjectionParams
+
+
+	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
 	inline
-	__host__ ProjectionParams(ProjectionParams &parent, int start, int end):
+	__host__ ProjectionParams(ProjectionParams &parent, unsigned long start, unsigned long end):
 		rots(			&parent.rots[start],  			&parent.rots[end]),
 		tilts(			&parent.tilts[start], 			&parent.tilts[end]),
 		psis(			&parent.psis[start],  			&parent.psis[end]),
 		iorientclasses( &parent.iorientclasses[start],  &parent.iorientclasses[end]),
-		iover_rots(		&parent.iover_rots[start],  	&parent.iover_rots[end])
-	{};
+		iover_rots(		&parent.iover_rots[start],  	&parent.iover_rots[end]),
+		orientation_num(1),
+		class_entries(1),
+		class_idx(1)
+	{
+		class_entries[0]=end-start;
+		class_idx[0]=0; // NOTE: this is NOT the class, but rather where in these partial PrjParams to start, which is @ 0.
+	};
 
 public:
-	__host__ void pushBackAll(double NEWrot,double NEWtilt ,double NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
+	// Appends new values into the projection parameters for later use.
+	// class_idx is used as such:
+	// the n:th class (beginning with 0:th)
+	// begins @ element class_idx[n]
+	// ends   @ element class_idx[n]+class_entries[n]
+
+	__host__ void pushBackAll(long unsigned iclass, double NEWrot,double NEWtilt ,double NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
 	{
+		if ( iclass==(class_idx.size()+1)) // if iclass would refer to one beyond the last element, add new element
+		{
+			class_idx.push_back(rots.size()+1); // set index to the new element being set
+			class_entries.push_back(0);			// set number of entries in the new class to 0
+		}
+		else if (iclass>class_idx.size())
+		{
+			printf("WARNING: trying to write parameters for a class not expected (yet).\n");
+//	        exit( EXIT_FAILURE );
+		}
+		// incremement the counter for this class
+		class_entries[iclass]++;
+		// and push a new entry
 		rots.push_back(NEWrot);
 		tilts.push_back(NEWtilt);
 		psis.push_back(NEWpsi);
 		iorientclasses.push_back(NEWiorientclasses);
 		iover_rots.push_back(NEWiover_rots);
 	}
-
 };
 #endif
 

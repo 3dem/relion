@@ -361,7 +361,8 @@ long unsigned generateProjectionSetup(
 				// Loop over all oversampled orientations (only a single one in the first pass)
 				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++, ipart++)
 				{
-					ProjectionData.pushBackAll(	oversampled_rot[iover_rot],
+					ProjectionData.pushBackAll(	(long unsigned)iclass,
+												oversampled_rot[iover_rot],
 											    oversampled_tilt[iover_rot],
 											    oversampled_psi[iover_rot],
 											    iorientclass,

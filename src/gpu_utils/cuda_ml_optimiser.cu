@@ -43,6 +43,25 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
+	// Make a ProjectionPArams with space for all classes
+	ProjectionParams CoarseProjectionData(sp.iclass_max-sp.iclass_min+1);
+	// And build it
+	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+	{
+		if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
+		{
+			CUDA_CPU_TIC("generateProjectionSetupCoarse"); //FIXME Move to RANK level (construct once for all particles)
+			CoarseProjectionData.orientation_num[sp.iclass_max-sp.iclass_min] = generateProjectionSetup(
+					op,
+					sp,
+					baseMLO,
+					exp_ipass == 0, //coarse
+					exp_iclass,
+					CoarseProjectionData);
+			CUDA_CPU_TOC("generateProjectionSetupCoarse");
+		}
+	}
+
 	CUDA_CPU_TOC("diff_pre_gpu");
 	long unsigned orientation_num;
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
@@ -54,27 +73,22 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
 
-//			// Mapping index look-up table
-//			std::vector< long unsigned > iorientclasses, iover_rots;
-//			std::vector< double > rots, tilts, psis;
-			ProjectionParams CoarseProjectionData(1);
-			CUDA_CPU_TIC("generateProjectionSetupCoarse"); //FIXME Move to RANK level (construct once for all particles)
-			CoarseProjectionData.orientation_num[0] = generateProjectionSetup(
-					op,
-					sp,
-					baseMLO,
-					exp_ipass == 0, //coarse
-					exp_iclass,
-					CoarseProjectionData);
-			CUDA_CPU_TOC("generateProjectionSetupCoarse");
-			orientation_num = CoarseProjectionData.orientation_num[0];
+			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
+			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
+			ProjectionParams thisClassProjectionData(	CoarseProjectionData,
+														CoarseProjectionData.class_idx[sp.iclass_max-sp.iclass_min],
+														CoarseProjectionData.class_idx[sp.iclass_max-sp.iclass_min]+CoarseProjectionData.class_entries[sp.iclass_max-sp.iclass_min]);
+
+			thisClassProjectionData.orientation_num[0] = CoarseProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
+			orientation_num = thisClassProjectionData.orientation_num[0];
+			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
 			CUDA_CPU_TIC("generateEulerMatricesCoarse");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
 
 			generateEulerMatrices(
 					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
-					CoarseProjectionData,
+					thisClassProjectionData,
 					eulers,
 					!IS_NOT_INV);
 
@@ -239,7 +253,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 
 				for (unsigned i = 0; i < orientation_num; i ++)
 				{
-					unsigned iorientclass = CoarseProjectionData.iorientclasses[i];
+					unsigned iorientclass = thisClassProjectionData.iorientclasses[i];
 					for (unsigned j = 0; j < translation_num; j ++)
 						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = diff2s[i * translation_num + j];
 				}
@@ -289,6 +303,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
+		// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
+		ProjectionParams thisClassProjectionData(	FineProjectionData,
+													FineProjectionData.class_idx[sp.iclass_max-sp.iclass_min],
+													FineProjectionData.class_idx[sp.iclass_max-sp.iclass_min]+FineProjectionData.class_entries[sp.iclass_max-sp.iclass_min]);
+
 		if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
 		{
 			// Local variables
@@ -297,14 +316,16 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
 
-			long unsigned orientation_num  = FineProjectionData.orientation_num[exp_iclass-sp.iclass_min];
+			// since we retrieved the ProjectionParams for *the whole* class the orientation_num is also equal.
+			thisClassProjectionData.orientation_num[0] = FineProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
+			long unsigned orientation_num  = thisClassProjectionData.orientation_num[0];
 
 			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
 
 			generateEulerMatrices(
 					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
-					FineProjectionData,
+					thisClassProjectionData,
 					eulers,
 					!IS_NOT_INV);
 
@@ -401,9 +422,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				long int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				long int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 
+				// set the index-arrays of this part of FinePassWeights, in preparation for weight determination.
 				significant_num = divideOrientationsIntoBlockjobs(	op,	sp,															   // alot of different type inputs...
 																	orientation_num, translation_num,
-																	FineProjectionData,	iover_transes, ihiddens,
+																	thisClassProjectionData,
+																	iover_transes, ihiddens,
 																	nr_over_orient, nr_over_trans, ipart,
 																	FinePassWeights);               // ..and output into index-arrays
 				CUDA_CPU_TOC("pair_list_1");
