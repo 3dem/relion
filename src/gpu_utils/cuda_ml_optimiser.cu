@@ -43,7 +43,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	// Make a ProjectionPArams with space for all classes
+	// Make a ProjectionParams with space for all classes
 	ProjectionParams CoarseProjectionData(sp.iclass_max-sp.iclass_min+1);
 	// And build it
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -303,10 +303,15 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
+
 		// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 		ProjectionParams thisClassProjectionData(	FineProjectionData,
 													FineProjectionData.class_idx[sp.iclass_max-sp.iclass_min],
 													FineProjectionData.class_idx[sp.iclass_max-sp.iclass_min]+FineProjectionData.class_entries[sp.iclass_max-sp.iclass_min]);
+		// since we retrieved the ProjectionParams for *the whole* class the orientation_num is also equal.
+		thisClassProjectionData.orientation_num[0] = FineProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
+		long unsigned orientation_num  = thisClassProjectionData.orientation_num[0];
+
 
 		if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
 		{
@@ -316,9 +321,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
 
-			// since we retrieved the ProjectionParams for *the whole* class the orientation_num is also equal.
-			thisClassProjectionData.orientation_num[0] = FineProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
-			long unsigned orientation_num  = thisClassProjectionData.orientation_num[0];
 
 			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
@@ -959,16 +961,23 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	}
 	// wsum_sigma2_offset is just a double
 	thr_wsum_sigma2_offset = 0.;
-
 	unsigned image_size = op.Fimgs[0].nzyxdim;
-
-	unsigned proj_div_max_count(4096*2);
+	unsigned proj_div_max_count(32*2);
 
 	CUDA_CPU_TOC("store_init");
 
 	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
+		CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
+		// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
+		ProjectionParams thisClassProjectionData(	ProjectionData,
+													ProjectionData.class_idx[sp.iclass_max-sp.iclass_min],
+													ProjectionData.class_idx[sp.iclass_max-sp.iclass_min]+ProjectionData.class_entries[sp.iclass_max-sp.iclass_min]);
+
+		thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
+
+		CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
 		for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 		{
@@ -1203,7 +1212,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUDA_CPU_TOC("setMetadata");
 
-
 			CUDA_CPU_TOC("collect_data_2");
 
 		}
@@ -1212,9 +1220,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 									          MAXIMIZATION
 		=======================================================================================*/
 
-		long unsigned orientation_num_all  = ProjectionData.orientation_num[exp_iclass-sp.iclass_min];
-
-		unsigned proj_div_nr = ceil((float)orientation_num_all / (float)proj_div_max_count);
+		unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
 
 		for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 		{
@@ -1225,23 +1231,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			if (iproj_div < proj_div_nr - 1)
 				proj_div_end = proj_div_start + proj_div_max_count;
 			else
-				proj_div_end = orientation_num_all;
+				proj_div_end = thisClassProjectionData.orientation_num[0];
 
 			long unsigned orientation_num(proj_div_end - proj_div_start);
 
-			ProjectionParams ProjectionData_projdiv(ProjectionData,proj_div_start,proj_div_end); //set this _projdiv to start and stop in the specified region of _all
+			// use "slice" constructor to slice out betwen start and stop in the specified region of thisClassProjectionData
+			ProjectionParams ProjectionData_projdiv(thisClassProjectionData,proj_div_start,proj_div_end);
 
 			CUDA_CPU_TOC("BP-ProjectionDivision");
 
 			/*======================================================
 								 PROJECTIONS
 			======================================================*/
-
-			// Since we will need the euler matrices for all projections in the data_collect stage,
-			// we might as well make it wider in scope and retain it on the GPU until then. When we
-			// switch from pair to bool, there won't be any need to remake it every class, but for
-			// now we create only those matrices corresponding to significant orientations, which IS  * class-specific *
-
 
 			CUDA_CPU_TIC("generateEulerMatrices");
 			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
@@ -1508,10 +1509,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			/*======================================================
 								BACKPROJECTION
 			======================================================*/
-
+		  cudaError_t error = cudaGetLastError();
+		  if(error != cudaSuccess)
+		  {
+			// print the CUDA error message and exit
+			printf("CUDA error: %s\n", cudaGetErrorString(error));
+			exit(-1);
+		  }
 			CUDA_CPU_TIC("backprojection");
 
-			CudaGlobalPtr<FLOAT> bp_eulers(9 * orientation_num);
+			CudaGlobalPtr<FLOAT> bp_eulers(9*orientation_num);
 
 			FLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
 
@@ -1520,7 +1527,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					ProjectionData_projdiv,
 					bp_eulers,
 					IS_NOT_INV);
-
+			HANDLE_ERROR(cudaDeviceSynchronize());
 			bp_eulers.device_alloc();
 			bp_eulers.cp_to_device();
 			bp_eulers.free_host();
