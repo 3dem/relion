@@ -428,9 +428,9 @@ public:
 
 	__host__ void pushBackAll(long unsigned iclass, double NEWrot,double NEWtilt ,double NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
 	{
-		if ( iclass==(class_idx.size()+1)) // if iclass would refer to one beyond the last element, add new element
+		if ( iclass==(class_idx.size())) // if iclass would refer to one beyond the last element, add new element
 		{
-			class_idx.push_back(rots.size()+1); // set index to the new element being set
+			class_idx.push_back(rots.size());   // set index to the new element being set
 			class_entries.push_back(0);			// set number of entries in the new class to 0
 		}
 		else if (iclass>class_idx.size())

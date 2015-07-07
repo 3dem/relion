@@ -306,10 +306,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 		ProjectionParams thisClassProjectionData(	FineProjectionData,
-													FineProjectionData.class_idx[sp.iclass_max-sp.iclass_min],
-													FineProjectionData.class_idx[sp.iclass_max-sp.iclass_min]+FineProjectionData.class_entries[sp.iclass_max-sp.iclass_min]);
+													FineProjectionData.class_idx[exp_iclass-sp.iclass_min],
+													FineProjectionData.class_idx[exp_iclass-sp.iclass_min]+FineProjectionData.class_entries[exp_iclass-sp.iclass_min]);
 		// since we retrieved the ProjectionParams for *the whole* class the orientation_num is also equal.
-		thisClassProjectionData.orientation_num[0] = FineProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
+		thisClassProjectionData.orientation_num[0] = FineProjectionData.orientation_num[exp_iclass-sp.iclass_min];
 		long unsigned orientation_num  = thisClassProjectionData.orientation_num[0];
 
 
@@ -664,7 +664,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CudaGlobalPtr<FLOAT > thisparticle_sumweight;
 				long int block_num;
 
-				if(exp_ipass==0)  //use Mweight for now
+				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
 
 					CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
@@ -964,7 +964,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// wsum_sigma2_offset is just a double
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
-	unsigned proj_div_max_count(32*2);
+	unsigned proj_div_max_count(4096*2);
 
 	CUDA_CPU_TOC("store_init");
 
