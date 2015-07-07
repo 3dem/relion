@@ -1044,7 +1044,7 @@ public:
             wmChar = "w";
             break;
         case WRITE_APPEND:
-            if (_exists = exists(fileName))
+            if (_exists == exists(fileName))
                 wmChar = "r+";
             else
                 wmChar = "w+";
