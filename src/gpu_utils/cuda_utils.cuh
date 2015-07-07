@@ -409,11 +409,11 @@ public:
 	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
 	inline
 	__host__ ProjectionParams(ProjectionParams &parent, unsigned long start, unsigned long end):
-		rots(			&(parent.rots[start]),  			&(parent.rots[end])),
-		tilts(			&(parent.tilts[start]), 			&(parent.tilts[end])),
-		psis(			&(parent.psis[start]),  			&(parent.psis[end])),
-		iorientclasses( &(parent.iorientclasses[start]),  	&(parent.iorientclasses[end])),
-		iover_rots(		&(parent.iover_rots[start]),  		&(parent.iover_rots[end])),
+		rots(			&parent.rots[start],  			&parent.rots[end]),
+		tilts(			&parent.tilts[start], 			&parent.tilts[end]),
+		psis(			&parent.psis[start],  			&parent.psis[end]),
+		iorientclasses( &parent.iorientclasses[start],  &parent.iorientclasses[end]),
+		iover_rots(		&parent.iover_rots[start],  	&parent.iover_rots[end]),
 		orientation_num(1),
 		class_entries(1,end-start),
 		class_idx(1,0) // NOTE: this is NOT the class, but rather where in these partial PrjParams to start, which is @ 0.

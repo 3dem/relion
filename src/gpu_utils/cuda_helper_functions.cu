@@ -28,34 +28,34 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 										  std::vector< long unsigned > &iover_transes,
 										  std::vector< long unsigned > &ihiddens,
 										  long int nr_over_orient, long int nr_over_trans, int ipart,
-										  IndexedDataArray &FinePassWeights)
+										  IndexedDataArray &FPW) // FPW=FinePassWeights
 {
 	//NOT WORKING
-//	FinePassWeights.setIndexSize(orientation_num*translation_num);
-//	FinePassWeights.setJobNum(orientation_num*translation_num);
-	FinePassWeights.rot_id.size=		orientation_num*translation_num;
-	FinePassWeights.rot_idx.size=		orientation_num*translation_num;
-	FinePassWeights.trans_idx.size=		orientation_num*translation_num;
-	FinePassWeights.ihidden_overs.size=	orientation_num*translation_num;
-	FinePassWeights.job_idx.size=		orientation_num*translation_num;
-	FinePassWeights.job_num.size=		orientation_num*translation_num;
+//	FPW.setIndexSize(orientation_num*translation_num);
+//	FPW.setJobNum(orientation_num*translation_num);
+	FPW.rot_id.size=		orientation_num*translation_num;
+	FPW.rot_idx.size=		orientation_num*translation_num;
+	FPW.trans_idx.size=		orientation_num*translation_num;
+	FPW.ihidden_overs.size=	orientation_num*translation_num;
+	FPW.job_idx.size=		orientation_num*translation_num;
+	FPW.job_num.size=		orientation_num*translation_num;
 
 	//NOT WORKING
-//	FinePassWeights.host_alloc_all_indices();
-	FinePassWeights.rot_id.host_alloc();
-	FinePassWeights.rot_idx.host_alloc();
-	FinePassWeights.trans_idx.host_alloc();
-	FinePassWeights.ihidden_overs.host_alloc();
-	FinePassWeights.job_idx.host_alloc();
-	FinePassWeights.job_num.host_alloc();
+//	FPW.host_alloc_all_indices();
+	FPW.rot_id.host_alloc();
+	FPW.rot_idx.host_alloc();
+	FPW.trans_idx.host_alloc();
+	FPW.ihidden_overs.host_alloc();
+	FPW.job_idx.host_alloc();
+	FPW.job_num.host_alloc();
 
 
 	long int significant_num(0), k(0);
 
-	FinePassWeights.job_idx[k]=0;
+	FPW.job_idx[k]=0;
 	for (long unsigned i = 0; i < orientation_num; i++)
 	{
-		FinePassWeights.job_num[k]=0;
+		FPW.job_num[k]=0;
 		int tk=0;
 		long int iover_rot = FineProjectionData.iover_rots[i];
 		for (long unsigned j = 0; j < translation_num; j++)
@@ -65,47 +65,49 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 
 			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 			{
-				FinePassWeights.rot_id[significant_num] = FineProjectionData.iorientclasses[i]; 	// where to look for priors etc
-				FinePassWeights.rot_idx[significant_num] = i;					// which rot for this significant task
-				FinePassWeights.trans_idx[significant_num] = j;					// which trans       - || -
-				FinePassWeights.ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
+				FPW.rot_id[significant_num] = FineProjectionData.iorientclasses[i]; 	// where to look for priors etc
+				FPW.rot_idx[significant_num] = i;					// which rot for this significant task
+				FPW.trans_idx[significant_num] = j;					// which trans       - || -
+				FPW.ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
 				if(tk>=PROJDIFF_CHUNK_SIZE)
 				{
 					tk=0;             // reset counter
 					k++;              // use new element
-					FinePassWeights.job_idx[k]=significant_num;
-					FinePassWeights.job_num[k]=0;   // prepare next element for ++ incrementing
+					FPW.job_idx[k]=significant_num;
+					FPW.job_num[k]=0;   // prepare next element for ++ incrementing
 				}
 				tk++;                 // increment limit
-				FinePassWeights.job_num[k]++;       // increment number of transes this ProjDiff-block
+				FPW.job_num[k]++;       // increment number of transes this ProjDiff-block
 				significant_num++;
 			}
 			else if(tk!=0) // start a new one with the same rotidx - we expect transes to be sequential.
 			{
 				tk=0;             // reset counter
 				k++;              // use new element
-				FinePassWeights.job_idx[k]=significant_num;
-				FinePassWeights.job_num[k]=0;   // prepare next element for ++ incrementing
+				FPW.job_idx[k]=significant_num;
+				FPW.job_num[k]=0;   // prepare next element for ++ incrementing
 			}
 		}
 		if(tk>0) // use new element (if tk==0) then we are currently on an element with no signif, so we should continue using this element
 		{
 			k++;
-			FinePassWeights.job_idx[k]=significant_num;
-			FinePassWeights.job_num[k]=0;
+			FPW.job_idx[k]=significant_num;
+			FPW.job_num[k]=0;
 		}
 	}
+	if(FPW.job_num[k]!=0) // if we started putting somehting in last element, then the count is one higher than the index
+		k+=1;
 
 	//NOT WORKING
-//	FinePassWeights.setIndexSize(significant_num);
-//	FinePassWeights.setJobNum(k);
-	FinePassWeights.job_num.size		=k;
-	FinePassWeights.job_idx.size		=k;
-	FinePassWeights.rot_id.size 		=significant_num;
-	FinePassWeights.rot_idx.size		=significant_num;
-	FinePassWeights.trans_idx.size		=significant_num;
-	FinePassWeights.ihidden_overs.size  =significant_num;
+//	FPW.setIndexSize(significant_num);
+//	FPW.setJobNum(k);
+	FPW.job_num.size		=k;
+	FPW.job_idx.size		=k;
+	FPW.rot_id.size 		=significant_num;
+	FPW.rot_idx.size		=significant_num;
+	FPW.trans_idx.size		=significant_num;
+	FPW.ihidden_overs.size  =significant_num;
 
 	return(significant_num);
 }
@@ -158,7 +160,10 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
  * Maps weights to a decoupled indexing of translations and orientations
  */
 inline
-void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, unsigned translation_num,
+void mapWeights(unsigned long orientation_start,
+		CudaGlobalPtr<FLOAT> &mapped_weights,
+		unsigned orientation_num, unsigned long idxArr_start, unsigned long idxArr_end,
+		unsigned translation_num,
 		CudaGlobalPtr <FLOAT> &weights,
 		CudaGlobalPtr <long unsigned> &rot_idx,
 		CudaGlobalPtr <long unsigned> &trans_idx,
@@ -176,9 +181,9 @@ void mapWeights(CudaGlobalPtr<FLOAT> &mapped_weights, unsigned orientation_num, 
 		mapped_weights[i] = -999.;
 	}
 
-	for (long unsigned i = 0; i < trans_idx.size; i++)
+	for (long unsigned i = idxArr_start; i < idxArr_end; i++)
 	{
-		mapped_weights[ rot_idx[i] * translation_num + trans_idx[i] ]= weights[i];
+		mapped_weights[ (rot_idx[i]-orientation_start) * translation_num + trans_idx[i] ]= weights[i];
 	}
 }
 

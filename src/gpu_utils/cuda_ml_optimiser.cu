@@ -482,8 +482,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 					CUDA_GPU_TIC("diff2sMemCp");
 					FinePassWeights.weights.cp_to_host();
 					CUDA_GPU_TAC("diff2sMemCp");
-					for (long unsigned k = 0; k<significant_num; k++)
-					DIRECT_A2D_ELEM(op.Mweight, ipart, FinePassWeights.ihidden_overs[k]) = FinePassWeights.weights[k];
+//					for (long unsigned k = 0; k<significant_num; k++)
+//						DIRECT_A2D_ELEM(op.Mweight, ipart, FinePassWeights.ihidden_overs[k]) = FinePassWeights.weights[k];
 				}
 				CUDA_CPU_TOC("collect_data_1");
 			} // end loop ipart
@@ -1065,8 +1065,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					crot=FinePassWeights.rot_idx[n];
 				}
 			}
-			FinePassWeights.job_idx.size=jobid;
-			FinePassWeights.job_num.size=jobid;
+			FinePassWeights.job_idx.size=jobid+1; // beacuase max index is one less than size
+			FinePassWeights.job_num.size=jobid+1;
 			FinePassWeights.job_idx.cp_to_device();
 			FinePassWeights.job_num.cp_to_device();
 
@@ -1222,8 +1222,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
 
+		unsigned long idxArrPos_start(0),idxArrPos_end(0);
 		for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 		{
+
 			CUDA_CPU_TIC("BP-ProjectionDivision");
 			unsigned long proj_div_start(proj_div_max_count * iproj_div),
 					proj_div_end;
@@ -1237,6 +1239,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			// use "slice" constructor to slice out betwen start and stop in the specified region of thisClassProjectionData
 			ProjectionParams ProjectionData_projdiv(thisClassProjectionData,proj_div_start,proj_div_end);
+			idxArrPos_start=idxArrPos_end;
+			while((FinePassWeights.rot_idx[idxArrPos_end]-FinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < FinePassWeights.rot_idx.size))
+				idxArrPos_end++;
 
 			CUDA_CPU_TOC("BP-ProjectionDivision");
 
@@ -1376,8 +1381,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CudaGlobalPtr<FLOAT> sorted_weights(orientation_num * translation_num);
 
 				mapWeights(
+						proj_div_start,
 						sorted_weights,
-						orientation_num,
+						orientation_num,idxArrPos_start,idxArrPos_end,
 						translation_num,
 						FinePassWeights.weights,
 						FinePassWeights.rot_idx,
