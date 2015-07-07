@@ -92,12 +92,6 @@ class MlOptimiser
 {
 public:
 
-	//The CUDA accelerated projector set
-	std::vector< Cuda3DProjector > cudaProjectors;
-
-	//The CUDA accelerated back-projector set
-	std::vector< Cuda3DBackprojector > cudaBackprojectors;
-
 	// I/O Parser
 	IOParser parser;
 
@@ -437,6 +431,12 @@ public:
 	*/
 	//TMP DEBUGGING
 	MultidimArray<double> DEBUGGING_COPY_exp_Mweight;
+
+	//The CUDA accelerated projector set
+	std::vector< Cuda3DProjector > cudaProjectors;
+
+	//The CUDA accelerated back-projector set
+	std::vector< Cuda3DBackprojector > cudaBackprojectors;
 
 #ifdef TIMING
     Timer timer;

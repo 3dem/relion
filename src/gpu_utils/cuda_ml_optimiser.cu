@@ -344,6 +344,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 			{
+				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
+				long int group_id = baseMLO->mydata.getGroupId(part_id);
+
 				/*====================================
 				        Generate Translations
 				======================================*/
@@ -353,7 +356,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CudaGlobalPtr<FLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
 				CudaGlobalPtr<FLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans);
 
-				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 				long unsigned translation_num(0), ihidden(0);
 				std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
