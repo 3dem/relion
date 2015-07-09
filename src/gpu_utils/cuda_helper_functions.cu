@@ -28,34 +28,21 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 										  std::vector< long unsigned > &iover_transes,
 										  std::vector< long unsigned > &ihiddens,
 										  long int nr_over_orient, long int nr_over_trans, int ipart,
-										  IndexedDataArray &FPW) // FPW=FinePassWeights
+										  IndexedDataArray &FPW, // FPW=FinePassWeights
+										  IndexedDataArrayMask &dataMask)
 {
-	//NOT WORKING
-//	FPW.setIndexSize(orientation_num*translation_num);
-//	FPW.setJobNum(orientation_num*translation_num);
-	FPW.rot_id.size=		orientation_num*translation_num;
-	FPW.rot_idx.size=		orientation_num*translation_num;
-	FPW.trans_idx.size=		orientation_num*translation_num;
-	FPW.ihidden_overs.size=	orientation_num*translation_num;
-	FPW.job_idx.size=		orientation_num*translation_num;
-	FPW.job_num.size=		orientation_num*translation_num;
-
-	//NOT WORKING
-//	FPW.host_alloc_all_indices();
-	FPW.rot_id.host_alloc();
-	FPW.rot_idx.host_alloc();
-	FPW.trans_idx.host_alloc();
-	FPW.ihidden_overs.host_alloc();
-	FPW.job_idx.host_alloc();
-	FPW.job_num.host_alloc();
-
+	// be on the safe side with the jobArrays: make them as large as they could possibly be
+	dataMask.jobOrigin.size = orientation_num*translation_num;
+	dataMask.jobExtent.size = orientation_num*translation_num;
+	dataMask.jobOrigin.host_alloc();
+	dataMask.jobExtent.host_alloc();
 
 	long int significant_num(0), k(0);
 
-	FPW.job_idx[k]=0;
+	dataMask.jobOrigin[k]=0;
 	for (long unsigned i = 0; i < orientation_num; i++)
 	{
-		FPW.job_num[k]=0;
+		dataMask.jobExtent[k]=0;
 		int tk=0;
 		long int iover_rot = FineProjectionData.iover_rots[i];
 		for (long unsigned j = 0; j < translation_num; j++)
@@ -74,40 +61,35 @@ long int divideOrientationsIntoBlockjobs( OptimisationParamters &op,  SamplingPa
 				{
 					tk=0;             // reset counter
 					k++;              // use new element
-					FPW.job_idx[k]=significant_num;
-					FPW.job_num[k]=0;   // prepare next element for ++ incrementing
+					dataMask.jobOrigin[k]=significant_num;
+					dataMask.jobExtent[k]=0;   // prepare next element for ++ incrementing
 				}
-				tk++;                 // increment limit
-				FPW.job_num[k]++;       // increment number of transes this ProjDiff-block
+				tk++;                 		   // increment limit-checker
+				dataMask.jobExtent[k]++;       // increment number of transes this job
 				significant_num++;
 			}
-			else if(tk!=0) // start a new one with the same rotidx - we expect transes to be sequential.
+			else if(tk!=0) 		  // start a new one with the same rotidx - we expect transes to be sequential.
 			{
 				tk=0;             // reset counter
 				k++;              // use new element
-				FPW.job_idx[k]=significant_num;
-				FPW.job_num[k]=0;   // prepare next element for ++ incrementing
+				dataMask.jobOrigin[k]=significant_num;
+				dataMask.jobExtent[k]=0;   // prepare next element for ++ incrementing
 			}
 		}
 		if(tk>0) // use new element (if tk==0) then we are currently on an element with no signif, so we should continue using this element
 		{
 			k++;
-			FPW.job_idx[k]=significant_num;
-			FPW.job_num[k]=0;
+			dataMask.jobOrigin[k]=significant_num;
+			dataMask.jobExtent[k]=0;
 		}
 	}
-	if(FPW.job_num[k]!=0) // if we started putting somehting in last element, then the count is one higher than the index
+	if(dataMask.jobExtent[k]!=0) // if we started putting somehting in last element, then the count is one higher than the index
 		k+=1;
 
-	//NOT WORKING
-//	FPW.setIndexSize(significant_num);
-//	FPW.setJobNum(k);
-	FPW.job_num.size		=k;
-	FPW.job_idx.size		=k;
-	FPW.rot_id.size 		=significant_num;
-	FPW.rot_idx.size		=significant_num;
-	FPW.trans_idx.size		=significant_num;
-	FPW.ihidden_overs.size  =significant_num;
+	dataMask.setNumberOfJobs(k);
+	dataMask.setNumberOfWeights(significant_num);
+	dataMask.jobOrigin.device_alloc();
+	dataMask.jobExtent.device_alloc();
 
 	return(significant_num);
 }
@@ -539,13 +521,14 @@ void runDiff2KernelFine(
 	Fimgs_imag.put_on_device(translation_num * image_size);
 	CUDA_GPU_TAC("imagMemCp");
 
-	CUDA_GPU_TIC("pairListMemCp");
-	rot_id.put_on_device(significant_num); //FIXME this is not used
-	rot_idx.put_on_device(significant_num);
-	trans_idx.put_on_device(significant_num);
-	job_idx.put_on_device(block_num);
-	job_num.put_on_device(block_num);
-	CUDA_GPU_TAC("pairListMemCp");
+	CUDA_GPU_TIC("IndexedArrayMemCp");
+	diff2s.cp_to_device();
+	rot_id.cp_to_device(); //FIXME this is not used
+	rot_idx.cp_to_device();
+	trans_idx.cp_to_device();
+	job_idx.cp_to_device();
+	job_num.cp_to_device();
+	CUDA_GPU_TAC("IndexedArrayMemCp");
 
 	CUDA_CPU_TOC("kernel_init_1");
 

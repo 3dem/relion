@@ -97,13 +97,18 @@ public:
 	{};
 
 	inline
+	__host__ CudaGlobalPtr<T>(size_t size):
+		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true), d_do_free(false)
+	{};
+
+	inline
 	__host__ CudaGlobalPtr<T>(T * h_start, size_t size):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false), d_do_free(false)
 	{};
 
 	inline
-	__host__ CudaGlobalPtr<T>(size_t size):
-		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true), d_do_free(false)
+	__host__ CudaGlobalPtr<T>(T * h_start, T * d_start, size_t size):
+		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false), d_do_free(false)
 	{};
 
 	/**
@@ -299,6 +304,49 @@ public:
 	}
 };
 
+class IndexedDataArrayMask
+{
+public:
+	// indexes of job partition
+	//   every element in jobOrigin    is a reference to point to a position in a IndexedDataArray.weights array where that job starts RELATIVE to firstPos
+	//   every element in jobExtent    specifies the number of weights for that job
+	CudaGlobalPtr<long unsigned> jobOrigin, jobExtent;
+
+	long unsigned firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
+	long unsigned weightNum, jobNum; // number of weights and jobs this class
+
+	inline
+	__host__  IndexedDataArrayMask():
+	jobOrigin(),
+	jobExtent(),
+	firstPos(),
+	lastPos(),
+	weightNum(),
+	jobNum()
+	{};
+
+public:
+
+	__host__ void setNumberOfJobs(long int newSize)
+	{
+		jobNum=newSize;
+		jobOrigin.size=newSize;
+		jobExtent.size=jobNum;
+	}
+
+	__host__ void setNumberOfWeights(long int newSize)
+	{
+		weightNum=newSize;
+	}
+
+	inline
+	__host__  ~IndexedDataArrayMask()
+	{
+//		jobOrigin.free_host();
+//		jobExtent.free_host();
+	};
+};
+
 class IndexedDataArray
 {
 public:
@@ -315,11 +363,6 @@ public:
 	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
 	CudaGlobalPtr<long unsigned> rot_id, rot_idx, trans_idx, ihidden_overs, class_id;
 
-	// indexes of job partition length ( length is thechnically only subject to being <=data size, but typically much less )
-	//   every element in job_idx  is a reference to point       in the above arrays for that job
-	//   every element in job_num  gives the number of elements  in the above arrays for that job
-	CudaGlobalPtr<long unsigned> job_idx, job_num;
-
 	inline
 	__host__  IndexedDataArray():
 		weights(),
@@ -327,39 +370,64 @@ public:
 		rot_idx(),
 		trans_idx(),
 		ihidden_overs(),
-		class_id(),
-		job_idx(),
-		job_num()
+		class_id()
 	{};
 
-	//NOT WORKING
-//public:
-//
-//	__host__ void setIndexSize(long int newSize)
-//	{
-//		rot_id.size=newSize;
-//		rot_idx.size=newSize;
-//		trans_idx.size=newSize;
-//		ihidden_overs.size=newSize;
-//		class_id.size=newSize;
-//	}
-//
-//	__host__ void setJobNum(long int newSize)
-//	{
-//		job_idx.size=newSize;
-//		job_idx.size=newSize;
-//	}
-//
-//	__host__ void host_alloc_all_indices()
-//	{
-//		rot_id.host_alloc();
-//		rot_idx.host_alloc();
-//		trans_idx.host_alloc();
-//		ihidden_overs.host_alloc();
-//		job_idx.host_alloc();
-//		job_num.host_alloc();
-//	}
+	// constructor which takes a parent IndexedDataArray and a mask to create a child
+	inline
+	__host__  IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask):
+		weights(		&(parent.weights.h_ptr[mask.firstPos])		,&(parent.weights.d_ptr[mask.firstPos])			,mask.weightNum),
+		rot_id(			&(parent.rot_id.h_ptr[mask.firstPos])		,&(parent.rot_id.d_ptr[mask.firstPos])			,mask.weightNum),
+		rot_idx(		&(parent.rot_idx.h_ptr[mask.firstPos])		,&(parent.rot_idx.d_ptr[mask.firstPos])			,mask.weightNum),
+		trans_idx(		&(parent.trans_idx.h_ptr[mask.firstPos])	,&(parent.trans_idx.d_ptr[mask.firstPos])		,mask.weightNum),
+		ihidden_overs(	&(parent.ihidden_overs.h_ptr[mask.firstPos]),&(parent.ihidden_overs.d_ptr[mask.firstPos])	,mask.weightNum),
+		class_id(		&(parent.class_id.h_ptr[mask.firstPos])		,&(parent.class_id.d_ptr[mask.firstPos])		,mask.weightNum)
+	{
+		weights.d_do_free=false;
+		rot_id.d_do_free=false;
+		rot_idx.d_do_free=false;
+		trans_idx.d_do_free=false;
+		ihidden_overs.d_do_free=false;
+		class_id.d_do_free=false;
+
+		weights.h_do_free=false;
+		rot_id.h_do_free=false;
+		rot_idx.h_do_free=false;
+		trans_idx.h_do_free=false;
+		ihidden_overs.h_do_free=false;
+		class_id.h_do_free=false;
+	};
+
+public:
+
+	__host__ void setDataSize(long int newSize)
+	{
+		weights.size=newSize;
+		rot_id.size=newSize;
+		rot_idx.size=newSize;
+		trans_idx.size=newSize;
+		ihidden_overs.size=newSize;
+		class_id.size=newSize;
+	}
+
+	__host__ void dual_alloc_all()
+	{
+		weights.host_alloc();
+		rot_id.host_alloc();
+		rot_idx.host_alloc();
+		trans_idx.host_alloc();
+		ihidden_overs.host_alloc();
+		class_id.host_alloc();
+		//-----------------------
+		weights.device_alloc();
+		rot_id.device_alloc();
+		rot_idx.device_alloc();
+		trans_idx.device_alloc();
+		ihidden_overs.device_alloc();
+		class_id.device_alloc();
+	}
 };
+
 
 class ProjectionParams
 {
