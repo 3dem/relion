@@ -433,13 +433,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				FPCMasks[exp_iclass-sp.iclass_min].firstPos = FinePassWeights.weights.size;
 
 				// Do more significance checks on translations and create jobDivision
-				significant_num = divideOrientationsIntoBlockjobs(	op,	sp,												// alot of different type inputs...
-																	orientation_num, translation_num,
-																	thisClassProjectionData,
-																	iover_transes, ihiddens,
-																	nr_over_orient, nr_over_trans, ipart,
-																	FinePassWeights,
-																	FPCMasks[exp_iclass-sp.iclass_min]);                // ..and output into index-arrays mask
+				significant_num = makeJobsForDiff2Fine(	op,	sp,												// alot of different type inputs...
+														orientation_num, translation_num,
+														thisClassProjectionData,
+														iover_transes, ihiddens,
+														nr_over_orient, nr_over_trans, ipart,
+														FinePassWeights,
+														FPCMasks[exp_iclass-sp.iclass_min]);                // ..and output into index-arrays mask
+
 				// extend size by number of significants found this class
 				FinePassWeights.setDataSize( FinePassWeights.weights.size + significant_num );
 
@@ -522,7 +523,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
-			std::cerr << "the gpu inplementation cannot handle the new dense arraysbut instead needs the old Mweight. Go maketh if thous needeth it." << std::endl;
+			std::cerr << "the gpu inplementation cannot handle the new dense arrays but instead needs the old Mweight. Go maketh if thous needeth it." << std::endl;
 			exit(1);
 			// Binarize the squared differences array to skip marginalisation
 			double mymindiff2 = 99.e10;
@@ -1061,47 +1062,24 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 			}
-			long int jobid=0;
-			FPCMasks[sp.iclass_max-exp_iclass].jobOrigin[jobid]=0;
-			FPCMasks[sp.iclass_max-exp_iclass].jobExtent[jobid]=1;
-			long int crot =FinePassWeights.rot_idx[jobid]; // set current rot
-			for(long int n=1; n<FinePassWeights.rot_idx.size; n++)
-			{
-				if(FinePassWeights.rot_idx[n]==crot)
-				{
-					FPCMasks[sp.iclass_max-exp_iclass].jobExtent[jobid]++;
-				}
-				else
-				{
-					jobid++;
-					FPCMasks[sp.iclass_max-exp_iclass].jobExtent[jobid]=1;
-					FPCMasks[sp.iclass_max-exp_iclass].jobOrigin[jobid]=n;
-					crot=FinePassWeights.rot_idx[n];
-				}
-			}
-			FPCMasks[sp.iclass_max-exp_iclass].jobOrigin.size=jobid+1; // beacuase max index is one less than size
-			FPCMasks[sp.iclass_max-exp_iclass].jobExtent.size=jobid+1;
-			FPCMasks[sp.iclass_max-exp_iclass].jobOrigin.cp_to_device();
-			FPCMasks[sp.iclass_max-exp_iclass].jobExtent.cp_to_device();
+			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
+			int block_num = makeJobsForCollect(FinePassWeights, FPCMasks[sp.iclass_max-exp_iclass]);
 
 			oo_otrans_x.put_on_device();
 			oo_otrans_y.put_on_device();
 			myp_oo_otrans_x2y2z2.put_on_device();
-
-			int block_num = FPCMasks[sp.iclass_max-exp_iclass].jobOrigin.size;
 
 			std::cerr << "block_num = " << block_num << std::endl;
 			CudaGlobalPtr<FLOAT>                      p_weights(block_num);
 			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_num);
 			CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_num);
 			CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_num);
+
 			unsigned long coarse_nr = sp.nr_dir*sp.nr_psi;
 			p_weights.device_alloc();
 			p_thr_wsum_prior_offsetx_class.device_alloc();
 			p_thr_wsum_prior_offsety_class.device_alloc();
 			p_thr_wsum_sigma2_offset.device_alloc();
-//			FinePassWeights.weights.device_alloc();
-//			FinePassWeights.weights.cp_to_device();
 
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 			CUDA_GPU_TIC("collect2-kernel");
