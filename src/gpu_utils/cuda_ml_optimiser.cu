@@ -43,8 +43,8 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	// Make a ProjectionParams with space for all classes
-	ProjectionParams CoarseProjectionData(sp.iclass_max-sp.iclass_min+1);
+	// Make a ProjectionParams with space for one class, the below construction will append new ones as needed
+	ProjectionParams CoarseProjectionData(1);
 	// And build it
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
@@ -707,7 +707,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[exp_iclass-sp.iclass_min].weightNum > 0) )
 				{
 					// Use the constructed mask to construct a partial class-specific input
-
+					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
 					IndexedDataArray thisClassPassWeights(PassWeights,FPCMasks[exp_iclass-sp.iclass_min]);
 //					thisClassPassWeights.weights.cp_to_device();
 //					thisClassPassWeights.weights.d_ptr = &PassWeights.weights.d_ptr[FPCMasks[exp_iclass-sp.iclass_min].firstPos];
