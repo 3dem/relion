@@ -52,7 +52,7 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 
 			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 			{
-				FPW.rot_id[significant_num] = FineProjectionData.iorientclasses[i]; 	// where to look for priors etc
+				FPW.rot_id[significant_num] = FineProjectionData.iorientclasses[i] % (sp.nr_dir*sp.nr_psi); 	// where to look for priors etc
 				FPW.rot_idx[significant_num] = i;					// which rot for this significant task
 				FPW.trans_idx[significant_num] = j;					// which trans       - || -
 				FPW.ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
@@ -373,7 +373,7 @@ long unsigned generateProjectionSetup(
 				// Loop over all oversampled orientations (only a single one in the first pass)
 				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++, ipart++)
 				{
-					ProjectionData.pushBackAll(	(long unsigned)iclass,
+					ProjectionData.pushBackAll(	(long unsigned)iclass-sp.iclass_min,
 												oversampled_rot[iover_rot],
 											    oversampled_tilt[iover_rot],
 											    oversampled_psi[iover_rot],
