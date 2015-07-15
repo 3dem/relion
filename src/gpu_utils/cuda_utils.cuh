@@ -331,7 +331,7 @@ public:
 	{
 		jobNum=newSize;
 		jobOrigin.size=newSize;
-		jobExtent.size=jobNum;
+		jobExtent.size=newSize;
 	}
 
 	__host__ void setNumberOfWeights(long int newSize)
@@ -471,7 +471,10 @@ public:
 		class_idx(classes),
 		orientation_num(classes),
 		orientationNumAllClasses(0)
-	{};
+	{
+		class_idx[0]=0;
+		class_entries[0]=0;
+	};
 
 
 	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
@@ -496,16 +499,6 @@ public:
 
 	__host__ void pushBackAll(long unsigned iclass, double NEWrot,double NEWtilt ,double NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
 	{
-		if ( iclass==(class_idx.size())) // if iclass would refer to one beyond the last element, add new element
-		{
-			class_idx.push_back(rots.size());   // set index to the new element being set
-			class_entries.push_back(0);			// set number of entries in the new class to 0
-		}
-		else if (iclass>class_idx.size())
-		{
-			printf("WARNING: trying to write parameters for a class not expected (yet).\n");
-//	        exit( EXIT_FAILURE );
-		}
 		// incremement the counter for this class
 		class_entries[iclass]++;
 		// and push a new entry

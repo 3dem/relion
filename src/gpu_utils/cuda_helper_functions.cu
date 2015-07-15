@@ -31,13 +31,14 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 										  IndexedDataArray &FPW, // FPW=FinePassWeights
 										  IndexedDataArrayMask &dataMask)
 {
-	// be on the safe side with the jobArrays: make them as large as they could possibly be
-	dataMask.jobOrigin.size = orientation_num*translation_num;
-	dataMask.jobExtent.size = orientation_num*translation_num;
+	long int w_base = dataMask.firstPos;
+	// be on the safe side with the jobArrays: make them as large as they could possibly be (this will be reduced at exit of this function)
+	dataMask.setNumberOfJobs(orientation_num*translation_num);
+	dataMask.setNumberOfWeights(orientation_num*translation_num);
 	dataMask.jobOrigin.host_alloc();
 	dataMask.jobExtent.host_alloc();
 
-	long int significant_num(0), k(0);
+	long int w(0), k(0);
 
 	dataMask.jobOrigin[k]=0;
 	for (long unsigned i = 0; i < orientation_num; i++)
@@ -52,34 +53,34 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 
 			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden)==1)
 			{
-				FPW.rot_id[significant_num] = FineProjectionData.iorientclasses[i] % (sp.nr_dir*sp.nr_psi); 	// where to look for priors etc
-				FPW.rot_idx[significant_num] = i;					// which rot for this significant task
-				FPW.trans_idx[significant_num] = j;					// which trans       - || -
-				FPW.ihidden_overs[significant_num]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
+				FPW.rot_id[w_base+w] = FineProjectionData.iorientclasses[i] % (sp.nr_dir*sp.nr_psi); 	// where to look for priors etc
+				FPW.rot_idx[w_base+w] = i;					// which rot for this significant task
+				FPW.trans_idx[w_base+w] = j;					// which trans       - || -
+				FPW.ihidden_overs[w_base+w]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
 				if(tk>=PROJDIFF_CHUNK_SIZE)
 				{
 					tk=0;             // reset counter
 					k++;              // use new element
-					dataMask.jobOrigin[k]=significant_num;
+					dataMask.jobOrigin[k]=w;
 					dataMask.jobExtent[k]=0;   // prepare next element for ++ incrementing
 				}
 				tk++;                 		   // increment limit-checker
 				dataMask.jobExtent[k]++;       // increment number of transes this job
-				significant_num++;
+				w++;
 			}
 			else if(tk!=0) 		  // start a new one with the same rotidx - we expect transes to be sequential.
 			{
 				tk=0;             // reset counter
 				k++;              // use new element
-				dataMask.jobOrigin[k]=significant_num;
+				dataMask.jobOrigin[k]=w;
 				dataMask.jobExtent[k]=0;   // prepare next element for ++ incrementing
 			}
 		}
 		if(tk>0) // use new element (if tk==0) then we are currently on an element with no signif, so we should continue using this element
 		{
 			k++;
-			dataMask.jobOrigin[k]=significant_num;
+			dataMask.jobOrigin[k]=w;
 			dataMask.jobExtent[k]=0;
 		}
 	}
@@ -87,11 +88,13 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 		k+=1;
 
 	dataMask.setNumberOfJobs(k);
-	dataMask.setNumberOfWeights(significant_num);
-	dataMask.jobOrigin.device_alloc();
-	dataMask.jobExtent.device_alloc();
-
-	return(significant_num);
+	dataMask.setNumberOfWeights(w);
+	if(dataMask.weightNum>0)
+	{
+		dataMask.jobOrigin.device_alloc();
+		dataMask.jobExtent.device_alloc();
+	}
+	return(w);
 }
 
 int  makeJobsForCollect(IndexedDataArray &FPWeights, IndexedDataArrayMask &FPCMask)
@@ -373,7 +376,7 @@ long unsigned generateProjectionSetup(
 				// Loop over all oversampled orientations (only a single one in the first pass)
 				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++, ipart++)
 				{
-					ProjectionData.pushBackAll(	(long unsigned)iclass-sp.iclass_min,
+					ProjectionData.pushBackAll(	(long unsigned)iclass,
 												oversampled_rot[iover_rot],
 											    oversampled_tilt[iover_rot],
 											    oversampled_psi[iover_rot],

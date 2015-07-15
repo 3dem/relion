@@ -48,10 +48,14 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 	// And build it
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
+		if(exp_iclass>0)
+			CoarseProjectionData.class_idx[exp_iclass]=CoarseProjectionData.rots.size();
+
+        CoarseProjectionData.class_entries[exp_iclass]=0;
 		if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
 		{
 			CUDA_CPU_TIC("generateProjectionSetupCoarse"); //FIXME Move to RANK level (construct once for all particles)
-			CoarseProjectionData.orientation_num[exp_iclass-sp.iclass_min] = generateProjectionSetup(
+			CoarseProjectionData.orientation_num[exp_iclass] = generateProjectionSetup(
 					op,
 					sp,
 					baseMLO,
@@ -67,7 +71,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
-		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (CoarseProjectionData.orientation_num[exp_iclass-sp.iclass_min] > 0) )
+		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (CoarseProjectionData.class_entries[exp_iclass] > 0) )
 		{
 			// Local variables
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
@@ -76,10 +80,10 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
 			ProjectionParams thisClassProjectionData(	CoarseProjectionData,
-														CoarseProjectionData.class_idx[exp_iclass-sp.iclass_min],
-														CoarseProjectionData.class_idx[exp_iclass-sp.iclass_min]+CoarseProjectionData.class_entries[exp_iclass-sp.iclass_min]);
+														CoarseProjectionData.class_idx[exp_iclass],
+														CoarseProjectionData.class_idx[exp_iclass]+CoarseProjectionData.class_entries[exp_iclass]);
 
-			thisClassProjectionData.orientation_num[0] = CoarseProjectionData.orientation_num[exp_iclass-sp.iclass_min];
+			thisClassProjectionData.orientation_num[0] = CoarseProjectionData.class_entries[exp_iclass];
 			orientation_num = thisClassProjectionData.orientation_num[0];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
@@ -309,16 +313,22 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
-		// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
-		ProjectionParams thisClassProjectionData(	FineProjectionData,
-													FineProjectionData.class_idx[exp_iclass-sp.iclass_min],
-													FineProjectionData.class_idx[exp_iclass-sp.iclass_min]+FineProjectionData.class_entries[exp_iclass-sp.iclass_min]);
-		// since we retrieved the ProjectionParams for *the whole* class the orientation_num is also equal.
-		thisClassProjectionData.orientation_num[0] = FineProjectionData.orientation_num[exp_iclass-sp.iclass_min];
-		long unsigned orientation_num  = thisClassProjectionData.orientation_num[0];
+		FPCMasks[exp_iclass].weightNum=0;
 
-		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FineProjectionData.orientation_num[exp_iclass-sp.iclass_min] > 0) )
+		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FineProjectionData.class_entries[exp_iclass] > 0) )
 		{
+			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
+			ProjectionParams thisClassProjectionData(	FineProjectionData,
+														FineProjectionData.class_idx[exp_iclass],
+														FineProjectionData.class_idx[exp_iclass]+FineProjectionData.class_entries[exp_iclass]);
+			// since we retrieved the ProjectionParams for *the whole* class the orientation_num is also equal.
+
+			thisClassProjectionData.orientation_num[0] = FineProjectionData.class_entries[exp_iclass];
+			long unsigned orientation_num  = thisClassProjectionData.orientation_num[0];
+
+			if(orientation_num==0)
+				continue;
+
 			// Local variables
 			std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 			std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
@@ -430,7 +440,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				long int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 
 				// Prepare the mask of the weight-array for this class
-				FPCMasks[exp_iclass-sp.iclass_min].firstPos = FinePassWeights.weights.size;
+				if (FPCMasks[exp_iclass].weightNum==0)
+					FPCMasks[exp_iclass].firstPos = FinePassWeights.weights.size;
 
 				// Do more significance checks on translations and create jobDivision
 				significant_num = makeJobsForDiff2Fine(	op,	sp,												// alot of different type inputs...
@@ -439,16 +450,18 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 														iover_transes, ihiddens,
 														nr_over_orient, nr_over_trans, ipart,
 														FinePassWeights,
-														FPCMasks[exp_iclass-sp.iclass_min]);                // ..and output into index-arrays mask
+														FPCMasks[exp_iclass]);                // ..and output into index-arrays mask
 
 				// extend size by number of significants found this class
 				FinePassWeights.setDataSize( FinePassWeights.weights.size + significant_num );
+				FPCMasks[exp_iclass].weightNum = significant_num;
+				FPCMasks[exp_iclass].lastPos = FPCMasks[exp_iclass].firstPos + significant_num;
 
-				FPCMasks[exp_iclass-sp.iclass_min].weightNum = significant_num;
-				FPCMasks[exp_iclass-sp.iclass_min].lastPos = FinePassWeights.weights.size;
+				if(significant_num==0)
+					continue;
 
 				// Use the constructed mask to construct a partial class-specific input
-				IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass-sp.iclass_min]);
+				IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
 
 				CUDA_CPU_TOC("pair_list_1");
 				CUDA_CPU_TIC("Diff2MakeKernel");
@@ -468,8 +481,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						thisClassFinePassWeights.rot_id,
 						thisClassFinePassWeights.rot_idx,
 						thisClassFinePassWeights.trans_idx,
-						FPCMasks[exp_iclass-sp.iclass_min].jobOrigin,
-						FPCMasks[exp_iclass-sp.iclass_min].jobExtent,
+						FPCMasks[exp_iclass].jobOrigin,
+						FPCMasks[exp_iclass].jobExtent,
 						thisClassFinePassWeights.weights,
 						op,
 						baseMLO,
@@ -674,9 +687,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
 
-					CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim])+
-							exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans,
-												sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
+					CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim+
+					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans]),
+													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
 					Mweight.device_alloc();
 					Mweight.cp_to_device();
 					block_num = sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE;
@@ -704,17 +717,17 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
 					thisparticle_sumweight.free_device();
 				}
-				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[exp_iclass-sp.iclass_min].weightNum > 0) )
+				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[exp_iclass].weightNum > 0) )
 				{
 					// Use the constructed mask to construct a partial class-specific input
 					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
-					IndexedDataArray thisClassPassWeights(PassWeights,FPCMasks[exp_iclass-sp.iclass_min]);
+					IndexedDataArray thisClassPassWeights(PassWeights,FPCMasks[exp_iclass]);
 //					thisClassPassWeights.weights.cp_to_device();
-//					thisClassPassWeights.weights.d_ptr = &PassWeights.weights.d_ptr[FPCMasks[exp_iclass-sp.iclass_min].firstPos];
-//					thisClassPassWeights.rot_id.put_on_device(FPCMasks[exp_iclass-sp.iclass_min].jobNum);
-//					thisClassPassWeights.trans_idx.put_on_device(FPCMasks[exp_iclass-sp.iclass_min].jobNum);
+//					thisClassPassWeights.weights.d_ptr = &PassWeights.weights.d_ptr[FPCMasks[exp_iclass].firstPos];
+//					thisClassPassWeights.rot_id.put_on_device(FPCMasks[exp_iclass].jobNum);
+//					thisClassPassWeights.trans_idx.put_on_device(FPCMasks[exp_iclass].jobNum);
 
-					block_num = ceil((float)FPCMasks[exp_iclass-sp.iclass_min].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
+					block_num = ceil((float)FPCMasks[exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 					thisparticle_sumweight.size=block_num;
 					thisparticle_sumweight.host_alloc();
@@ -730,9 +743,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    sp.nr_oversampled_trans,
 																			    ~thisClassPassWeights.rot_id,
 																			    ~thisClassPassWeights.trans_idx,
-																				~FPCMasks[exp_iclass-sp.iclass_min].jobOrigin,
-																			 	~FPCMasks[exp_iclass-sp.iclass_min].jobExtent,
-																			 	FPCMasks[exp_iclass-sp.iclass_min].jobNum);
+																				~FPCMasks[exp_iclass].jobOrigin,
+																			 	~FPCMasks[exp_iclass].jobExtent,
+																			 	FPCMasks[exp_iclass].jobNum);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					CUDA_GPU_TIC("sumweightMemCp2");
 					thisparticle_sumweight.cp_to_host();
@@ -992,15 +1005,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
-		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (ProjectionData.orientation_num[exp_iclass-sp.iclass_min] > 0) )
+		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (ProjectionData.class_entries[exp_iclass] > 0) )
 		{
 			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 			ProjectionParams thisClassProjectionData(	ProjectionData,
-														ProjectionData.class_idx[sp.iclass_max-sp.iclass_min],
-														ProjectionData.class_idx[sp.iclass_max-sp.iclass_min]+ProjectionData.class_entries[sp.iclass_max-sp.iclass_min]);
+														ProjectionData.class_idx[exp_iclass],
+														ProjectionData.class_idx[exp_iclass]+ProjectionData.class_entries[exp_iclass]);
 
-			thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[sp.iclass_max-sp.iclass_min];
+			thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[exp_iclass];
 
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
@@ -1073,7 +1086,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 				// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
-				int block_num = makeJobsForCollect(FinePassWeights, FPCMasks[exp_iclass-sp.iclass_min]);
+				int block_num = makeJobsForCollect(FinePassWeights, FPCMasks[exp_iclass]);
 
 				oo_otrans_x.put_on_device();
 				oo_otrans_y.put_on_device();
@@ -1113,8 +1126,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~p_thr_wsum_sigma2_offset,
 						~FinePassWeights.rot_idx,
 						~FinePassWeights.trans_idx,
-						~FPCMasks[exp_iclass-sp.iclass_min].jobOrigin,
-						~FPCMasks[exp_iclass-sp.iclass_min].jobExtent
+						~FPCMasks[exp_iclass].jobOrigin,
+						~FPCMasks[exp_iclass].jobExtent
 							);
 				CUDA_GPU_TAC("collect2-kernel");
 
@@ -1133,7 +1146,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int iorient = 0;
 				for (long int n = 0; n < block_num; n++)
 				{
-					iorient= FinePassWeights.rot_id[FPCMasks[exp_iclass-sp.iclass_min].jobOrigin[n]];
+					iorient= FinePassWeights.rot_id[FPCMasks[exp_iclass].jobOrigin[n]];
 					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
 					// Only proceed if any of the particles had any significant coarsely sampled translation
 
@@ -1785,12 +1798,12 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			// -- These are dense data-arrays which are replacements to using Mweight in the sparse (Fine-sampled) pass
 			IndexedDataArray CoarsePassWeights,FinePassWeights;
 			// -- This is a class-indexed vector of masks for each class in FinePassWeights
-			std::vector< IndexedDataArrayMask > FinePassClassMasks(sp.iclass_max-sp.iclass_min+1);
+			std::vector< IndexedDataArrayMask > FinePassClassMasks(baseMLO->mymodel.nr_classes);
 
 			// -- These are collected data used in the projection-operations *after* the coarse pass,
 			// -- declared here to keep scope to storeWS
 			// ( apparently min = max @ one class (it makes sense, it's just a bit impractical) )
-			ProjectionParams FineProjectionData(sp.iclass_max-sp.iclass_min+1);
+			ProjectionParams FineProjectionData(baseMLO->mymodel.nr_classes);
 
 			for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 			{
@@ -1828,11 +1841,15 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 //					// -- go through all classes and generate projectionsetups for all classes - to be used in getASDF and storeWS below --
 //					// the reason to do this globally is subtle - we want the orientation_num of all classes to estimate a largest possible
 //					// weight-array, which would be insanely much larger than necessary if we had to assume the worst.
-					long int orientationNumAllClasses(0);
+					FineProjectionData.orientationNumAllClasses = 0;
 					for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 					{
+						if(exp_iclass>0)
+							FineProjectionData.class_idx[exp_iclass]=FineProjectionData.rots.size();
+						FineProjectionData.class_entries[exp_iclass]=0;
+
 						CUDA_CPU_TIC("generateProjectionSetup");
-						FineProjectionData.orientation_num[exp_iclass-sp.iclass_min] = generateProjectionSetup(
+						FineProjectionData.orientation_num[exp_iclass] = generateProjectionSetup(
 								op,
 								sp,
 								baseMLO,
@@ -1840,7 +1857,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 								exp_iclass,
 								FineProjectionData);
 						CUDA_CPU_TOC("generateProjectionSetup");
-						FineProjectionData.orientationNumAllClasses += FineProjectionData.orientation_num[exp_iclass-sp.iclass_min];
+						FineProjectionData.orientationNumAllClasses += FineProjectionData.orientation_num[exp_iclass];
 					}
 					FinePassWeights.setDataSize(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans); //set a maximum possible size for all weights (to be reduced by significance-checks)
 					FinePassWeights.dual_alloc_all();
@@ -1866,10 +1883,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			CUDA_CPU_TOC("oneParticle");
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
-				FinePassClassMasks[exp_iclass-sp.iclass_min].jobOrigin.d_do_free=false;
-				FinePassClassMasks[exp_iclass-sp.iclass_min].jobOrigin.h_do_free=false;
-				FinePassClassMasks[exp_iclass-sp.iclass_min].jobExtent.d_do_free=false;
-				FinePassClassMasks[exp_iclass-sp.iclass_min].jobExtent.h_do_free=false;
+				FinePassClassMasks[exp_iclass].jobOrigin.d_do_free=false;
+				FinePassClassMasks[exp_iclass].jobOrigin.h_do_free=false;
+				FinePassClassMasks[exp_iclass].jobExtent.d_do_free=false;
+				FinePassClassMasks[exp_iclass].jobExtent.h_do_free=false;
 			}
 		}
 	}
