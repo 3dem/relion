@@ -99,30 +99,37 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 
 int  makeJobsForCollect(IndexedDataArray &FPWeights, IndexedDataArrayMask &FPCMask)
 {
-			long int jobid=0;
-			FPCMask.jobOrigin[jobid]=0;
-			FPCMask.jobExtent[jobid]=1;
-			long int crot =FPWeights.rot_idx[jobid]; // set current rot
-			for(long int n=1; n<FPWeights.rot_idx.size; n++)
-			{
-				if(FPWeights.rot_idx[n]==crot)
-				{
-					FPCMask.jobExtent[jobid]++;
-				}
-				else
-				{
-					jobid++;
-					FPCMask.jobExtent[jobid]=1;
-					FPCMask.jobOrigin[jobid]=n;
-					crot=FPWeights.rot_idx[n];
-				}
-			}
-			FPCMask.jobOrigin.size=jobid+1; // beacuase max index is one less than size
-			FPCMask.jobExtent.size=jobid+1;
-			FPCMask.jobOrigin.cp_to_device();
-			FPCMask.jobExtent.cp_to_device();
+	FPCMask.jobOrigin.free_host();
+    FPCMask.jobOrigin.free_device();
+    FPCMask.jobExtent.free_host();
+    FPCMask.jobExtent.free_device();
+    FPCMask.setNumberOfJobs(FPCMask.weightNum); //FPCMask.weightNum
+    FPCMask.jobOrigin.host_alloc();
+    FPCMask.jobExtent.host_alloc();
 
-			return (jobid+1);
+	long int jobid=0;
+	FPCMask.jobOrigin[jobid]=0;
+	FPCMask.jobExtent[jobid]=1;
+	long int crot =FPWeights.rot_idx[jobid]; // set current rot
+	for(long int n=1; n<FPWeights.rot_idx.size; n++)
+	{
+		if(FPWeights.rot_idx[n]==crot)
+		{
+			FPCMask.jobExtent[jobid]++;
+		}
+		else
+		{
+			jobid++;
+			FPCMask.jobExtent[jobid]=1;
+			FPCMask.jobOrigin[jobid]=n;
+			crot=FPWeights.rot_idx[n];
+		}
+	}
+	FPCMask.setNumberOfJobs(jobid+1); // because max index is one less than size
+	FPCMask.jobOrigin.put_on_device();
+	FPCMask.jobExtent.put_on_device();
+
+	return (jobid+1);
 }
 
 /*

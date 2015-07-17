@@ -1007,6 +1007,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	{
 		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (ProjectionData.class_entries[exp_iclass] > 0) )
 		{
+			// Use the constructed mask to construct a partial class-specific input
+			IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
+
 			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 			ProjectionParams thisClassProjectionData(	ProjectionData,
@@ -1086,7 +1089,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 				// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
-				int block_num = makeJobsForCollect(FinePassWeights, FPCMasks[exp_iclass]);
+				int block_num = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass]);
 
 				oo_otrans_x.put_on_device();
 				oo_otrans_y.put_on_device();
@@ -1112,7 +1115,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~oo_otrans_x,          // otrans-size -> make const
 						~oo_otrans_y,          // otrans-size -> make const
 						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-						~FinePassWeights.weights,
+						~thisClassFinePassWeights.weights,
 						(FLOAT)op.significant_weight[ipart],
 						(FLOAT)op.sum_weight[ipart],
 						sp.nr_trans,
@@ -1124,8 +1127,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~p_thr_wsum_prior_offsetx_class,
 						~p_thr_wsum_prior_offsety_class,
 						~p_thr_wsum_sigma2_offset,
-						~FinePassWeights.rot_idx,
-						~FinePassWeights.trans_idx,
+						~thisClassFinePassWeights.rot_idx,
+						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[exp_iclass].jobOrigin,
 						~FPCMasks[exp_iclass].jobExtent
 							);
@@ -1146,7 +1149,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int iorient = 0;
 				for (long int n = 0; n < block_num; n++)
 				{
-					iorient= FinePassWeights.rot_id[FPCMasks[exp_iclass].jobOrigin[n]];
+					iorient= thisClassFinePassWeights.rot_id[FPCMasks[exp_iclass].jobOrigin[n]];
 					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
 					// Only proceed if any of the particles had any significant coarsely sampled translation
 
@@ -1189,40 +1192,45 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				CUDA_CPU_TIC("max"); //Get index of max element using GPU-tool thrust
 				Indices max_index;
-				thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~FinePassWeights.weights);
-				thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + FinePassWeights.weights.size);
+				thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~thisClassFinePassWeights.weights);
+				thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + thisClassFinePassWeights.weights.size);
 				unsigned int pos_idx = thrust::distance(dp, pos);
-
-				FLOAT max_val;
-				HANDLE_ERROR(cudaMemcpy(&max_val, &FinePassWeights.weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
-				op.max_weight[ipart] = max_val;
-				max_index.fineIdx = FinePassWeights.ihidden_overs[pos_idx];
-
-				//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
-				//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-				max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 				CUDA_CPU_TOC("max");
 
-				CUDA_CPU_TIC("sample");
-				baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
-						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
-				baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-				CUDA_CPU_TOC("sample");
+				FLOAT max_val;
+				HANDLE_ERROR(cudaMemcpy(&max_val, &thisClassFinePassWeights.weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
 
-				CUDA_CPU_TIC("assign");
-				double rot = oversampled_rot[max_index.ioverrot];
-				double tilt = oversampled_tilt[max_index.ioverrot];
-				double psi = oversampled_psi[max_index.ioverrot];
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
-				if (baseMLO->mymodel.data_dim == 3)
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+				if(max_val>op.max_weight[ipart])
+				{
+					op.max_weight[ipart] = max_val;
+					max_index.fineIdx =thisClassFinePassWeights.ihidden_overs[pos_idx];
+
+					//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
+					//std::cerr << "max index = " << max_index.fineIdx << std::endl;
+					max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+
+
+					CUDA_CPU_TIC("sample");
+					baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
+							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+					baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+							op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+					CUDA_CPU_TOC("sample");
+
+					CUDA_CPU_TIC("assign");
+					double rot = oversampled_rot[max_index.ioverrot];
+					double tilt = oversampled_tilt[max_index.ioverrot];
+					double psi = oversampled_psi[max_index.ioverrot];
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+					if (baseMLO->mymodel.data_dim == 3)
+						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+				}
 				CUDA_CPU_TOC("assign");
 
 				CUDA_CPU_TOC("setMetadata");
@@ -1255,7 +1263,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				// use "slice" constructor to slice out betwen start and stop in the specified region of thisClassProjectionData
 				ProjectionParams ProjectionData_projdiv(thisClassProjectionData,proj_div_start,proj_div_end);
 				idxArrPos_start=idxArrPos_end;
-				while((FinePassWeights.rot_idx[idxArrPos_end]-FinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < FinePassWeights.rot_idx.size))
+				while((thisClassFinePassWeights.rot_idx[idxArrPos_end]-thisClassFinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < thisClassFinePassWeights.rot_idx.size))
 					idxArrPos_end++;
 
 				CUDA_CPU_TOC("BP-ProjectionDivision");
@@ -1400,9 +1408,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 							sorted_weights,
 							orientation_num,idxArrPos_start,idxArrPos_end,
 							translation_num,
-							FinePassWeights.weights,
-							FinePassWeights.rot_idx,
-							FinePassWeights.trans_idx,
+							thisClassFinePassWeights.weights,
+							thisClassFinePassWeights.rot_idx,
+							thisClassFinePassWeights.trans_idx,
 							baseMLO->sampling,
 							ipart,
 							iover_transes,
@@ -1593,6 +1601,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Also extend the weighted sum of the norm_correction
 			exp_wsum_norm_correction[ipart] += DIRECT_A1D_ELEM(op.power_imgs[ipart], ires);
 		}
+		std::cout << " READOUT: exp_wsum_norm_correction = "<< exp_wsum_norm_correction[ipart] << std::endl;
 
 		// Store norm_correction
 		// Multiply by old value because the old norm_correction term was already applied to the image
