@@ -278,19 +278,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 	CUDA_CPU_TIC("diff_pre_gpu");
 
-	//for scale_correction
-	int group_id;
-
-	//printf("sp.nr_oversampled_rot=%d\n", (unsigned)sp.nr_oversampled_rot);
-//	CUDA_CPU_TIC("resizeMweight");
-//	CUDA_CPU_TIC("resize");
-//	op.Mweight.resize(sp.nr_particles, baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
-//	CUDA_CPU_TOC("resize");
-//	CUDA_CPU_TIC("set");
-//	op.Mweight.initConstant(-999.);
-//	CUDA_CPU_TOC("set");
-//	CUDA_CPU_TOC("resizeMweight");
-
 	op.min_diff2.clear();
 	op.min_diff2.resize(sp.nr_particles, 99.e99);
 	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
@@ -435,7 +422,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				//		the significance has never been set
 
 				CUDA_CPU_TIC("pair_list_1");
-				long unsigned coarse_num = sp.nr_dir*sp.nr_psi*sp.nr_trans, significant_num(0), k=0;
+				long unsigned significant_num(0);
 				long int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				long int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 
@@ -517,7 +504,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											SamplingParameters &sp,
 											MlOptimiser *baseMLO,
 					 	 	 	 	 	 	IndexedDataArray &PassWeights,
-					 	 	 	 	 	 	std::vector< IndexedDataArrayMask > &FPCMasks)
+					 	 	 	 	 	 	std::vector< IndexedDataArrayMask > &FPCMasks) // FPCMasks = Fine-Pass Class-Masks
 {
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
@@ -669,7 +656,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				/*================================================
 					 Sumweights - exponentiation and reduction
 				==================================================*/
-				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 
 				CUDA_CPU_TIC("sumweight1");
 				CUDA_GPU_TIC("sumweightMemCp1");
@@ -719,13 +705,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[exp_iclass].weightNum > 0) )
 				{
-					// Use the constructed mask to construct a partial class-specific input
+					// Use the constructed mask to build a partial (class-specific) input
 					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
 					IndexedDataArray thisClassPassWeights(PassWeights,FPCMasks[exp_iclass]);
-//					thisClassPassWeights.weights.cp_to_device();
-//					thisClassPassWeights.weights.d_ptr = &PassWeights.weights.d_ptr[FPCMasks[exp_iclass].firstPos];
-//					thisClassPassWeights.rot_id.put_on_device(FPCMasks[exp_iclass].jobNum);
-//					thisClassPassWeights.trans_idx.put_on_device(FPCMasks[exp_iclass].jobNum);
 
 					block_num = ceil((float)FPCMasks[exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
@@ -747,14 +729,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			 	~FPCMasks[exp_iclass].jobExtent,
 																			 	FPCMasks[exp_iclass].jobNum);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
+
 					CUDA_GPU_TIC("sumweightMemCp2");
 					thisparticle_sumweight.cp_to_host();
 					thisClassPassWeights.weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
-					//weights.free_device();
 					CUDA_GPU_TAC("sumweightMemCp2");
-
-//					for (long unsigned k = 0; k< weights.size; k++)
-//						DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden_overs[k]) = weights[k];
 
 					thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
 					exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
@@ -819,17 +798,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else
 		{
-
 			// Get the relevant row for this particle
-
 			CUDA_CPU_TIC("getRow");
 			op.Mweight.getRow(ipart, sorted_weight);
 			CUDA_CPU_TOC("getRow");
 
-
-			CUDA_CPU_TIC("nonZero");
 			// Only select non-zero probabilities to speed up sorting // TODO Remove when mapping is eliminated
-
+			CUDA_CPU_TIC("nonZero");
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
 			{
 				if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) > 0.)
@@ -844,7 +819,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			// Sort from low to high values
 			CUDA_CPU_TIC("sort");
-
 //			std::cerr << "sort on " << sorted_weight.xdim << " which should have np = " << np << std::endl;
 #if  defined(USE_THRUST) && !defined(CUDA_DOUBLE_PRECISION) // Thrust seems incredibly slow in debug build this is clearly a FIXME
 			thrust::sort(sorted_weight.data, sorted_weight.data + np );
@@ -1017,7 +991,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 														ProjectionData.class_idx[exp_iclass]+ProjectionData.class_entries[exp_iclass]);
 
 			thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[exp_iclass];
-
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
 			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
@@ -1101,7 +1074,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_num);
 				CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_num);
 
-				unsigned long coarse_nr = sp.nr_dir*sp.nr_psi;
 				p_weights.device_alloc();
 				p_thr_wsum_prior_offsetx_class.device_alloc();
 				p_thr_wsum_prior_offsety_class.device_alloc();
@@ -1174,7 +1146,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						}
 					}
 				}
-				//Mweight.free_device();
 				p_weights.free();
 				p_thr_wsum_sigma2_offset.free();
 				p_thr_wsum_prior_offsetx_class.free();
@@ -1204,11 +1175,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					op.max_weight[ipart] = max_val;
 					max_index.fineIdx =thisClassFinePassWeights.ihidden_overs[pos_idx];
-
 					//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
 					//std::cerr << "max index = " << max_index.fineIdx << std::endl;
 					max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
-
 
 					CUDA_CPU_TIC("sample");
 					baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
@@ -1230,8 +1199,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
 					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
 					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+					CUDA_CPU_TOC("assign");
 				}
-				CUDA_CPU_TOC("assign");
 
 				CUDA_CPU_TOC("setMetadata");
 
@@ -1601,7 +1570,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Also extend the weighted sum of the norm_correction
 			exp_wsum_norm_correction[ipart] += DIRECT_A1D_ELEM(op.power_imgs[ipart], ires);
 		}
-		std::cout << " READOUT: exp_wsum_norm_correction = "<< exp_wsum_norm_correction[ipart] << std::endl;
 
 		// Store norm_correction
 		// Multiply by old value because the old norm_correction term was already applied to the image
@@ -1858,7 +1826,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 						FineProjectionData.class_entries[exp_iclass]=0;
 
 						CUDA_CPU_TIC("generateProjectionSetup");
-						FineProjectionData.orientation_num[exp_iclass] = generateProjectionSetup(
+						FineProjectionData.orientationNumAllClasses += generateProjectionSetup(
 								op,
 								sp,
 								baseMLO,
@@ -1866,9 +1834,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 								exp_iclass,
 								FineProjectionData);
 						CUDA_CPU_TOC("generateProjectionSetup");
-						FineProjectionData.orientationNumAllClasses += FineProjectionData.orientation_num[exp_iclass];
+
 					}
-					FinePassWeights.setDataSize(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans); //set a maximum possible size for all weights (to be reduced by significance-checks)
+					//set a maximum possible size for all weights (to be reduced by significance-checks)
+					FinePassWeights.setDataSize(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
 					FinePassWeights.dual_alloc_all();
 
 					CUDA_CPU_TIC("getAllSquaredDifferencesFine");

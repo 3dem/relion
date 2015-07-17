@@ -427,7 +427,7 @@ public:
                 {
                     std::cerr<<"Datatype= "<<datatype<<std::endl;
                     REPORT_ERROR(" ERROR: cannot cast datatype to T");
-                    break;
+                    //break;
                 }
             }
 
@@ -500,7 +500,7 @@ public:
                 {
                     std::cerr<<"outputDatatype= "<<datatype<<std::endl;
                     REPORT_ERROR(" ERROR: cannot cast T to outputDatatype");
-                    break;
+                    //break;
                 }
             }
     }
@@ -520,7 +520,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case SChar:
             {
@@ -528,7 +528,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case UShort:
             {
@@ -536,7 +536,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case Short:
             {
@@ -544,7 +544,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case UInt:
             {
@@ -552,7 +552,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case Int:
             {
@@ -560,7 +560,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case Long:
             {
@@ -568,7 +568,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case Float:
             {
@@ -576,7 +576,7 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         case Double:
             {
@@ -584,13 +584,13 @@ public:
                     return 1;
                 else
                     return 0;
-                break;
+                //break;
             }
         default:
             {
                 std::cerr<<"Datatype= "<<datatype<<std::endl;
                 REPORT_ERROR(" ERROR: cannot cast datatype to T");
-                break;
+                //break;
             }
         }
         //               int * iTemp = (int*) map;

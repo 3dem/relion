@@ -118,11 +118,11 @@ int  readIMAGIC(long int img_select)
 
     // Determine byte order and swap bytes if from little-endian machine
     char*   b = (char *) header;
-    int    swap = 0;
+    //int    swap = 0;
     long int extent = IMAGICSIZE - 916;  // exclude char bytes from swapping
     if ( ( abs(header->nyear) > SWAPTRIG ) || ( header->ixlp > SWAPTRIG ) )
     {
-        swap = 1;
+    	//swap = 1;
         for ( i=0; i<extent; i+=4 )
             if ( i != 56 )          // exclude type string
                 swapbytes(b+i, 4);
@@ -185,7 +185,7 @@ int  readIMAGIC(long int img_select)
 
     offset = 0;   // separate header file
 
-    unsigned long   Ndim = _nDim, j = 0;
+    // unsigned long   Ndim = _nDim, j = 0;
     if (dataflag<0)   // Don't read the individual header and the data if not necessary
     {
     	delete header;
@@ -193,7 +193,7 @@ int  readIMAGIC(long int img_select)
     }
 
     // View   view;
-    char*   hend;
+    // char*   hend;
 
    // Get the header information
     int error_fseek;
@@ -226,7 +226,7 @@ int  readIMAGIC(long int img_select)
 /** Imagic Writer
   * @ingroup Imagic
 */
-int  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
+void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
 {
     //    if ( p->transform != NoTransform )
     //        img_convert_fourier(p, Centered);
@@ -256,11 +256,11 @@ int  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
     header->nminut = t->tm_min;
     header->nsec = t->tm_sec;
 
-    long int  imgStart=0;
-    if (img_select != -1)
-        imgStart=img_select;
-    if (mode == WRITE_APPEND)
-        imgStart=0;
+//    long int  imgStart=0;
+//    if (img_select != -1)
+//        imgStart=img_select;
+//    if (mode == WRITE_APPEND)
+//        imgStart=0;
 
     // Convert T to datatype
     if ( typeid(T) == typeid(double) ||
@@ -337,7 +337,7 @@ int  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
 
     delete header;
 
-    return(0);
+    //return(0);
 }
 
 #endif /* RWIMAGIC_H_ */

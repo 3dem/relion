@@ -114,14 +114,14 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 		long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
 		long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
 
-		int c_iorient, f_iorient, c_itrans, f_itrans, iorient = bid*SUM_BLOCK_SIZE+tid;
+		int c_itrans;//, iorient = bid*SUM_BLOCK_SIZE+tid; //, f_itrans;
 
 		// Bacause the partion of work is so arbitrarily divided in this kernel,
 		// we need to do some brute idex work to get the correct indices.
 		for (int itrans=0; itrans < in; itrans++, iy++)
 		{
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-			f_itrans = iy % oversamples_trans;
+//			f_itrans = iy % oversamples_trans;
 
 			FLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
 			FLOAT diff2 = g_weights[pos+itrans] - min_diff2;								// Different for all threads

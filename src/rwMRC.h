@@ -205,13 +205,13 @@ int readMRC(long int img_select, bool isStack=false)
         _nDim = 1;
 
     data.setDimensions(_xDim, _yDim, _zDim, _nDim);
-    long int imgStart=0;
-    long int imgEnd =_nDim;
-    if (img_select != -1)
-    {
-        imgStart=img_select;
-        imgEnd=img_select+1;
-    }
+//    long int imgStart=0;
+//    long int imgEnd =_nDim;
+//    if (img_select != -1)
+//    {
+//        imgStart=img_select;
+//        imgEnd=img_select+1;
+//    }
 
     DataType datatype;
     switch ( header->mode%5 )
@@ -227,10 +227,10 @@ int readMRC(long int img_select, bool isStack=false)
         break;
     case 3:
     	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-    	break;
+    	//break;
     case 4:
     	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-        break;
+        //break;
     default:
         datatype = UChar;
         break;
@@ -293,7 +293,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 			break;
 		case UNKNOWN_SYSTEM:
 			REPORT_ERROR("Unkown system type in writeMRC machine stamp determination.");
-			break;
+			//break;
 		default:
 			break;
 	}

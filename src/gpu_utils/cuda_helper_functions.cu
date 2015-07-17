@@ -21,7 +21,14 @@
 #include <thrust/extrema.h>
 #include <signal.h>
 
-
+/*
+ * This assisting function goes over the orientations determined as significant for this image, and checks
+ * which translations should be included in the list of those which differences will be calculated for.
+ *
+ * Any contiguous translations with a shared orientation are grouped together into a "job" which is supplied
+ * to the difference kernel. If there are more contiguous translations than the specified PROJDIFF_CHUNK_SIZE,
+ * these are split into separate jobs, to increase paralllelism at the cost of redundant memory reads.
+ */
 long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &sp,
 										  long int orientation_num, long int translation_num,
 					 	 	 	 	 	  ProjectionParams &FineProjectionData,
@@ -31,14 +38,13 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 										  IndexedDataArray &FPW, // FPW=FinePassWeights
 										  IndexedDataArrayMask &dataMask)
 {
-	long int w_base = dataMask.firstPos;
-	// be on the safe side with the jobArrays: make them as large as they could possibly be (this will be reduced at exit of this function)
+	long int w_base = dataMask.firstPos, w(0), k(0);
+	// be on the safe side with the jobArrays: make them as large as they could possibly be
+	// (this will be reduced at exit of this function)
 	dataMask.setNumberOfJobs(orientation_num*translation_num);
 	dataMask.setNumberOfWeights(orientation_num*translation_num);
 	dataMask.jobOrigin.host_alloc();
 	dataMask.jobExtent.host_alloc();
-
-	long int w(0), k(0);
 
 	dataMask.jobOrigin[k]=0;
 	for (long unsigned i = 0; i < orientation_num; i++)
@@ -97,37 +103,43 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 	return(w);
 }
 
-int  makeJobsForCollect(IndexedDataArray &FPWeights, IndexedDataArrayMask &FPCMask)
+/*
+ * This assisting function goes over the weight-array and groups all weights with shared
+ * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
+ * with computed differences into a reduced object to be back-projected.
+ */
+int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask) // FPW=FinePassWeights
 {
-	FPCMask.jobOrigin.free_host();
-    FPCMask.jobOrigin.free_device();
-    FPCMask.jobExtent.free_host();
-    FPCMask.jobExtent.free_device();
-    FPCMask.setNumberOfJobs(FPCMask.weightNum); //FPCMask.weightNum
-    FPCMask.jobOrigin.host_alloc();
-    FPCMask.jobExtent.host_alloc();
+	// reset the old (diff2Fine) job-definitions
+	dataMask.jobOrigin.free_host();
+    dataMask.jobOrigin.free_device();
+    dataMask.jobExtent.free_host();
+    dataMask.jobExtent.free_device();
+    dataMask.setNumberOfJobs(dataMask.weightNum);
+    dataMask.jobOrigin.host_alloc();
+    dataMask.jobExtent.host_alloc();
 
 	long int jobid=0;
-	FPCMask.jobOrigin[jobid]=0;
-	FPCMask.jobExtent[jobid]=1;
-	long int crot =FPWeights.rot_idx[jobid]; // set current rot
-	for(long int n=1; n<FPWeights.rot_idx.size; n++)
+	dataMask.jobOrigin[jobid]=0;
+	dataMask.jobExtent[jobid]=1;
+	long int crot =FPW.rot_idx[jobid]; // set current rot
+	for(long int n=1; n<FPW.rot_idx.size; n++)
 	{
-		if(FPWeights.rot_idx[n]==crot)
+		if(FPW.rot_idx[n]==crot)
 		{
-			FPCMask.jobExtent[jobid]++;
+			dataMask.jobExtent[jobid]++;
 		}
 		else
 		{
 			jobid++;
-			FPCMask.jobExtent[jobid]=1;
-			FPCMask.jobOrigin[jobid]=n;
-			crot=FPWeights.rot_idx[n];
+			dataMask.jobExtent[jobid]=1;
+			dataMask.jobOrigin[jobid]=n;
+			crot=FPW.rot_idx[n];
 		}
 	}
-	FPCMask.setNumberOfJobs(jobid+1); // because max index is one less than size
-	FPCMask.jobOrigin.put_on_device();
-	FPCMask.jobExtent.put_on_device();
+	dataMask.setNumberOfJobs(jobid+1); // because max index is one less than size
+	dataMask.jobOrigin.put_on_device();
+	dataMask.jobExtent.put_on_device();
 
 	return (jobid+1);
 }
@@ -394,7 +406,7 @@ long unsigned generateProjectionSetup(
 			}
 		}
 	}
-
+	ProjectionData.orientation_num[iclass]=orientation_num;
 	return orientation_num;
 }
 

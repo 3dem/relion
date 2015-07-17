@@ -8,7 +8,7 @@
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_DEBUG "-O0" CACHE STRING "")
-set(RELION_NVCC_FLAGS_DEBUG "-lineinfo -G -arch=sm_35" CACHE STRING "")
+set(RELION_NVCC_FLAGS_DEBUG "-lineinfo -G -arch=sm_35 --disable-warnings" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_DEBUG  " ")
 
@@ -41,7 +41,7 @@ message(STATUS "CMAKE_CXX_FLAGS_DEBUG : ${CMAKE_CXX_FLAGS_DEBUG}")
 #   -pg		gprof profiling output (needs linker flag)
 #
 set(RELION_FLAGS_RELEASE "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_RELEASE "-arch=sm_35 --default-stream per-thread" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELEASE "-arch=sm_35 --default-stream per-thread --disable-warnings" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_RELEASE  "")
 
@@ -75,7 +75,7 @@ message(STATUS "CMAKE_CXX_FLAGS_PROFILING : ${CMAKE_CXX_FLAGS_PROFILING}")
 #   -pg		gprof profiling output (needs linker flag)
 #
 set(RELION_FLAGS_PROFILING "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_PROFILING "-lineinfo -arch=sm_35" CACHE STRING "")
+set(RELION_NVCC_FLAGS_PROFILING "-lineinfo -arch=sm_52 --disable-warnings" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_PROFILING  "")
 

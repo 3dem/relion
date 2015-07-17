@@ -202,8 +202,8 @@ int  readSPIDER(long int img_select)
     	return 0;
     }
 
-    size_t header_size = offset;
-    size_t image_size  = header_size + ZYXSIZE(data)*sizeof(float);
+//    size_t header_size = offset;
+//    size_t image_size  = header_size + ZYXSIZE(data)*sizeof(float);
     size_t pad         = 0;
 //    long int imgStart=0;
 //    long int imgEnd =_nDim;
@@ -234,7 +234,8 @@ int  readSPIDER(long int img_select)
     delete header;
 
 #ifdef DEBUG
-
+    size_t header_size = offset;
+    size_t image_size  = header_size + ZYXSIZE(data)*sizeof(float);
     std::cerr<<"DEBUG readSPIDER: header_size = "<<header_size<<" image_size = "<<image_size<<std::endl;
     std::cerr<<"DEBUG readSPIDER: img_select= "<<img_select<<" n= "<<Ndim<<" pad = "<<pad<<std::endl;
 #endif
@@ -293,11 +294,11 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
     header->nrow   = Ydim;
     header->nslice = Zdim;
 
-    long int  imgStart=0;
-    if (select_img != -1)
-        imgStart=select_img;
-    if (mode == WRITE_APPEND)
-        imgStart=0;
+//    long int  imgStart=0;
+//    if (select_img != -1)
+//        imgStart=select_img;
+//    if (mode == WRITE_APPEND)
+//        imgStart=0;
 
 #ifdef DEBUG
     printf("DEBUG writeSPIDER: Size: %g %g %g\n", header->nsam, header->nrow, header->nslice);
@@ -308,7 +309,7 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
     else
     	header->iform = 3;     // 3D volume
     double aux;
-    bool baux;
+//    bool baux;
     header->imami = 0;//never trust max/min
 
     if (!MDMainHeader.isEmpty())
@@ -404,11 +405,11 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
         // Let's just rais an error an go out...
         REPORT_ERROR("writeSPIDER append/replace writing of SPIDER stacks not implemented yet....");
         //for ( size_t i=0; i<Ndim; i++ )
-        size_t i =imgStart;
-        //do not need to unlock because we are in the overwrite case
-        fwrite( header, offset, 1, fimg );
-        castPage2Datatype(MULTIDIM_ARRAY(data) + i*datasize_n, fdata, Float, datasize_n);
-        fwrite( fdata, datasize, 1, fimg );
+//        size_t i =imgStart;
+//        //do not need to unlock because we are in the overwrite case
+//        fwrite( header, offset, 1, fimg );
+//        castPage2Datatype(MULTIDIM_ARRAY(data) + i*datasize_n, fdata, Float, datasize_n);
+//        fwrite( fdata, datasize, 1, fimg );
     }
     //I guess I do not need to unlock since we are going to close the file
     fl.l_type   = F_UNLCK;

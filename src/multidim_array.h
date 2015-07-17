@@ -1576,6 +1576,8 @@ public:
             return A2D_ELEM((*this), ROUND(YY(v)), ROUND(XX(v)));
         case 3:
             return A3D_ELEM((*this), ROUND(ZZ(v)), ROUND(YY(v)), ROUND(XX(v)));
+        default:
+        	REPORT_ERROR("Matrix dimensions must be 1, 2, or 3");
         }
     }
 
@@ -1591,6 +1593,8 @@ public:
             return A2D_ELEM((*this), YY(v), XX(v));
         case 3:
             return A3D_ELEM((*this), ZZ(v), YY(v), XX(v));
+        default:
+            REPORT_ERROR("Matrix dimensions must be 1, 2, or 3");
         }
     }
 

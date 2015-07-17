@@ -101,7 +101,7 @@ public:
 	{
 		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
 		int t_idx = fineIdx;
-		iclass = floor( t_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples )); //FIXME check correct index extraction for iclass when several classes are used
+		iclass = floor( t_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples ));
 		t_idx   -= iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
 		idir   = floor( t_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));
 		t_idx   -= idir       * ( sp.nr_psi * sp.nr_trans * oversamples );
@@ -131,7 +131,6 @@ public:
 
 	void coarseIndexToCoarseIndices(SamplingParameters sp) // converts an "ihidden" (coarsely sampled) index to coarse partial indices // FIXME Untested
 	{
-		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
 		int t_idx = coarseIdx;
 		idir   = floor( t_idx / ( sp.nr_psi * sp.nr_trans ));
 		t_idx   -= idir       * ( sp.nr_psi * sp.nr_trans  );
@@ -142,7 +141,6 @@ public:
 
 	void coarseIndicesToCoarseIndex(SamplingParameters sp) // converts coarse partial indices to an "ihidden" (coarsely sampled) index // FIXME Untested
 	{
-		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
 		int idx = 0;
 		idx += idir     * sp.nr_psi * sp.nr_trans;
 		idx += ipsi     * sp.nr_trans;
