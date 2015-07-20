@@ -34,7 +34,6 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
-#include "gpu_utils/cuda_projector.h"
 #include "gpu_utils/cuda_ml_optimiser.h"
 
 #define NR_CLASS_MUTEXES 5
@@ -1520,6 +1519,11 @@ void MlOptimiser::expectation()
 		cudaProjectors.resize(mymodel.nr_classes);
 		cudaBackprojectors.resize(mymodel.nr_classes);
 
+		cudaCoarseProjectionPlans.clear();
+
+		if (!do_skip_align && !do_skip_rotate && !do_auto_refine && mymodel.orientational_prior_mode == NOPRIOR)
+			cudaCoarseProjectionPlans.resize(mymodel.nr_classes);
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			cudaProjectors[iclass].setMdlDim(
@@ -1543,6 +1547,80 @@ void MlOptimiser::expectation()
 					wsum_model.BPref[iclass].padding_factor);
 
 			cudaBackprojectors[iclass].initMdl();
+
+
+
+
+			if (mymodel.pdf_class[iclass] > 0. && cudaCoarseProjectionPlans.size() > 0)
+			{
+				printf("Generating predefined projection plan.\n");
+
+				std::vector<int> exp_pointer_dir_nonzeroprior;
+				std::vector<int> exp_pointer_psi_nonzeroprior;
+				std::vector<double> exp_directions_prior;
+				std::vector<double> exp_psi_prior;
+
+//				if (mymodel.orientational_prior_mode != NOPRIOR)
+//				{
+//					// First try if there are some fixed prior angles
+//					double prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
+//					double prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
+//					double prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
+//
+//					// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
+//					if (prior_rot > 998.99 && prior_rot < 999.01)
+//						prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
+//					if (prior_tilt > 998.99 && prior_tilt < 999.01)
+//						prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+//					if (prior_psi > 998.99 && prior_psi < 999.01)
+//						prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+//
+//					sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
+//							sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
+//							exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
+//
+//					long int nr_orients = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) * sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
+//					if (nr_orients == 0)
+//					{
+//						std::cerr << " sampling.NrDirections()= " << sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior)
+//								<< " sampling.NrPsiSamplings()= " << sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
+//						REPORT_ERROR("Zero orientations fall within the local angular search. Increase the sigma-value(s) on the orientations!");
+//					}
+//				}
+
+				long unsigned itrans_max = sampling.NrTranslationalSamplings() - 1;
+				long unsigned idir_max = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) - 1;
+				long unsigned ipsi_max = sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior ) - 1;
+
+				cudaCoarseProjectionPlans[iclass].setup(
+						sampling,
+						exp_directions_prior,
+						exp_psi_prior,
+						exp_pointer_dir_nonzeroprior,
+						exp_pointer_psi_nonzeroprior,
+						NULL, //Mcoarse_significant
+						mymodel.pdf_class,
+						mymodel.pdf_direction,
+						idir_max, //nr_dir
+						ipsi_max, //nr_psi
+						0, //idir_min
+						idir_max,
+						0, //ipsi_min
+						ipsi_max,
+						0, //itrans_min
+						itrans_max,
+						0, //current_oversampling
+						1, //nr_oversampled_rot
+						iclass,
+						true, //coarse
+						!IS_NOT_INV,
+						do_skip_align,
+						do_skip_rotate,
+						mymodel.orientational_prior_mode
+						);
+			}
+			else
+				printf("Generating projection plan on the fly.\n");
 		}
 	}
 
@@ -2912,6 +2990,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 			double prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
 			double prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
 
+			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
+
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
@@ -2919,6 +2999,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+
+			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
 			////////// TODO TODO TODO
 			////////// How does this work now: each particle has a different sampling object?!!!

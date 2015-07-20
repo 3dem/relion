@@ -478,7 +478,7 @@ void runDiff2KernelCoarse(
 		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		CudaGlobalPtr<FLOAT> &eulers,
+		FLOAT* &d_eulers,
 		CudaGlobalPtr<FLOAT> &diff2s,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
@@ -493,7 +493,7 @@ void runDiff2KernelCoarse(
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
 	cuda_kernel_diff2_course<<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
-			~eulers,
+			d_eulers,
 			~Fimgs_real,
 			~Fimgs_imag,
 			projector,

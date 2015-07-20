@@ -6,6 +6,7 @@
 #include <iostream>
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
+#include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
@@ -22,7 +23,7 @@
 #include <thrust/extrema.h>
 #include <signal.h>
 
-void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp, MlOptimiser *baseMLO)
+void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp, MlOptimiser *baseMLO, std::vector<Cuda3DProjectorPlan> &projectorPlans)
 {
 
 	CUDA_CPU_TIC("diff_pre_gpu");
@@ -43,65 +44,18 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	// Make a ProjectionParams with space for one class, the below construction will append new ones as needed
-	ProjectionParams CoarseProjectionData(1);
-	// And build it
-	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-	{
-		if(exp_iclass>0)
-			CoarseProjectionData.class_idx[exp_iclass]=CoarseProjectionData.rots.size();
-
-        CoarseProjectionData.class_entries[exp_iclass]=0;
-		if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
-		{
-			CUDA_CPU_TIC("generateProjectionSetupCoarse"); //FIXME Move to RANK level (construct once for all particles)
-			CoarseProjectionData.orientation_num[exp_iclass] = generateProjectionSetup(
-					op,
-					sp,
-					baseMLO,
-					exp_ipass == 0, //coarse
-					exp_iclass,
-					CoarseProjectionData);
-			CUDA_CPU_TOC("generateProjectionSetupCoarse");
-		}
-	}
-
 	CUDA_CPU_TOC("diff_pre_gpu");
-	long unsigned orientation_num;
+
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
-		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (CoarseProjectionData.class_entries[exp_iclass] > 0) )
+		Cuda3DProjectorPlan *projectorPlan = &projectorPlans[exp_iclass];
+
+		if ( projectorPlan->orientation_num > 0 )
 		{
 			// Local variables
 			CudaGlobalPtr<FLOAT> gpuMinvsigma2(image_size);
 			gpuMinvsigma2.device_alloc();
-
-			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
-			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
-			ProjectionParams thisClassProjectionData(	CoarseProjectionData,
-														CoarseProjectionData.class_idx[exp_iclass],
-														CoarseProjectionData.class_idx[exp_iclass]+CoarseProjectionData.class_entries[exp_iclass]);
-
-			thisClassProjectionData.orientation_num[0] = CoarseProjectionData.class_entries[exp_iclass];
-			orientation_num = thisClassProjectionData.orientation_num[0];
-			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
-
-			CUDA_CPU_TIC("generateEulerMatricesCoarse");
-			CudaGlobalPtr<FLOAT> eulers(9 * orientation_num);
-
-			generateEulerMatrices(
-					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
-					thisClassProjectionData,
-					eulers,
-					!IS_NOT_INV);
-
-			CUDA_CPU_TOC("generateEulerMatricesCoarse");
-
-			CUDA_GPU_TIC("eulersMemCpCoarse");
-			eulers.device_alloc();
-			eulers.cp_to_device();
-			CUDA_GPU_TAC("eulersMemCpCoarse");
 
 			/*=======================================================================================
 			                                  	  Particle Iteration
@@ -213,7 +167,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 
 				gpuMinvsigma2.cp_to_device();
 
-				CudaGlobalPtr<FLOAT> diff2s(orientation_num*translation_num);
+				CudaGlobalPtr<FLOAT> diff2s(projectorPlan->orientation_num*translation_num);
 				diff2s.device_alloc();
 
 				/*====================================
@@ -231,11 +185,11 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 						gpuMinvsigma2,
 						Fimgs_real,
 						Fimgs_imag,
-						eulers,
+						projectorPlan->d_eulers,
 						diff2s,
 						op,
 						baseMLO,
-						orientation_num,
+						projectorPlan->orientation_num,
 						translation_num,
 						image_size,
 						ipart,
@@ -246,7 +200,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 				    	   Retrieve Results
 				======================================*/
 
-				op.min_diff2[ipart] = std::min((FLOAT)op.min_diff2[ipart],(FLOAT)thrustGetMinVal(diff2s)); // klass
+				op.min_diff2[ipart] = std::min((FLOAT)op.min_diff2[ipart], (FLOAT)thrustGetMinVal(diff2s)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -256,9 +210,9 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 				HANDLE_ERROR(cudaDeviceSynchronize());
 				CUDA_GPU_TOC();
 
-				for (unsigned i = 0; i < orientation_num; i ++)
+				for (unsigned i = 0; i < projectorPlan->orientation_num; i ++)
 				{
-					unsigned iorientclass = thisClassProjectionData.iorientclasses[i];
+					unsigned iorientclass = projectorPlan->iorientclasses[i];
 					for (unsigned j = 0; j < translation_num; j ++)
 						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = diff2s[i * translation_num + j];
 				}
@@ -1806,8 +1760,54 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 				if (ipass == 0)
 				{
+					std::vector< Cuda3DProjectorPlan > coarseProjectionPlans;
+
+					 //If particle specific sampling setup required
+					if (baseMLO->cudaCoarseProjectionPlans.size() == 0)
+					{
+						CUDA_CPU_TIC("generateProjectionSetupCoarse");
+
+						coarseProjectionPlans.resize(baseMLO->mymodel.nr_classes);
+
+						for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+						{
+							if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
+							{
+								coarseProjectionPlans[exp_iclass].setup(
+										baseMLO->sampling,
+										op.directions_prior,
+										op.psi_prior,
+										op.pointer_dir_nonzeroprior,
+										op.pointer_psi_nonzeroprior,
+										NULL, //Mcoarse_significant
+										baseMLO->mymodel.pdf_class,
+										baseMLO->mymodel.pdf_direction,
+										sp.nr_dir,
+										sp.nr_psi,
+										sp.idir_min,
+										sp.idir_max,
+										sp.ipsi_min,
+										sp.ipsi_max,
+										sp.itrans_min,
+										sp.itrans_max,
+										0, //current_oversampling
+										1, //nr_oversampled_rot
+										exp_iclass,
+										true, //coarse
+										!IS_NOT_INV,
+										baseMLO->do_skip_align,
+										baseMLO->do_skip_rotate,
+										baseMLO->mymodel.orientational_prior_mode
+										);
+							}
+						}
+						CUDA_CPU_TOC("generateProjectionSetupCoarse");
+					}
+					else //Otherwise use precalculated
+						coarseProjectionPlans = baseMLO->cudaCoarseProjectionPlans;
+
 					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
-					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO);
+					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, coarseProjectionPlans);
 					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
 					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsCoarse");
 					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, CoarsePassWeights, FinePassClassMasks);

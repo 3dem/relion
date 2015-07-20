@@ -10,7 +10,8 @@
 
 class Cuda3DProjector
 {
-public:
+	friend class Cuda3DProjectorKernel;
+
 	int mdlX, mdlY, mdlZ, mdlXYZ, mdlMaxR,
 	    mdlInitY, mdlInitZ,
 	    padding_factor;
@@ -21,6 +22,7 @@ public:
 	void *texArrayReal, *texArrayImag; //cudaArray_t
 #endif
 
+public:
 	Cuda3DProjector():
 			mdlX(0), mdlY(0), mdlZ(0),
 			mdlXYZ(0), mdlMaxR(0),

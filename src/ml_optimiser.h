@@ -29,6 +29,8 @@
 #include "src/time.h"
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
+
+#include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
 
@@ -437,6 +439,9 @@ public:
 
 	//The CUDA accelerated back-projector set
 	std::vector< Cuda3DBackprojector > cudaBackprojectors;
+
+	//Used for precalculations of projection setup
+	std::vector< Cuda3DProjectorPlan > cudaCoarseProjectionPlans;
 
 #ifdef TIMING
     Timer timer;
