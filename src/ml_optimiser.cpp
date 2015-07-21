@@ -1589,8 +1589,8 @@ void MlOptimiser::expectation()
 //				}
 
 				long unsigned itrans_max = sampling.NrTranslationalSamplings() - 1;
-				long unsigned idir_max = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) - 1;
-				long unsigned ipsi_max = sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior ) - 1;
+				long unsigned nr_idir = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
+				long unsigned nr_ipsi = sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
 
 				cudaCoarseProjectionPlans[iclass].setup(
 						sampling,
@@ -1601,12 +1601,12 @@ void MlOptimiser::expectation()
 						NULL, //Mcoarse_significant
 						mymodel.pdf_class,
 						mymodel.pdf_direction,
-						idir_max, //nr_dir
-						ipsi_max, //nr_psi
+						nr_idir,
+						nr_ipsi,
 						0, //idir_min
-						idir_max,
+						nr_idir - 1, //idir_max
 						0, //ipsi_min
-						ipsi_max,
+						nr_ipsi - 1, //ipsi_max
 						0, //itrans_min
 						itrans_max,
 						0, //current_oversampling

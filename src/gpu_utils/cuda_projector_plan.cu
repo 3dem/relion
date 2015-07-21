@@ -28,6 +28,8 @@ void Cuda3DProjectorPlan::setup(
 		bool do_skip_rotate,
 		int orientational_prior_mode)
 {
+	printf("nr_dir=%d nr_psi=%d\n", nr_dir, nr_psi);
+
 	std::vector< double > rots, tilts, psis;
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 
@@ -156,6 +158,28 @@ void Cuda3DProjectorPlan::setup(
 	HANDLE_ERROR(cudaMalloc( (void**) &d_eulers, 9 * orientation_num * sizeof(FLOAT)));
 	HANDLE_ERROR(cudaMemcpy( d_eulers, e, 9 * orientation_num * sizeof(FLOAT), cudaMemcpyHostToDevice));
 	free_device = true;
+
+	delete [] e;
+}
+
+void Cuda3DProjectorPlan::printTo(std::ostream &os) // print
+{
+	os << "orientation_num = " << orientation_num << std::endl;
+	os << "free_device = " << free_device << std::endl;
+	os << "iorientclasses.size = " << iorientclasses.size() << std::endl;
+	os << "iover_rots.size = " << iover_rots.size() << std::endl;
+
+	FLOAT *e = new FLOAT[9 * orientation_num];
+	HANDLE_ERROR(cudaMemcpy( e, d_eulers, 9 * orientation_num * sizeof(FLOAT), cudaMemcpyDeviceToHost));
+
+	os << std::endl << "iorientclasses\tiover_rots\teulers" << std::endl;
+	for (int i = 0; i < iorientclasses.size(); i ++)
+	{
+		os << iorientclasses[i] << "\t\t" << iover_rots[i] << "\t";
+		for (int j = 0; j < 9; j++)
+			os << e[i * 9 + j] << "\t";
+		os << std::endl;
+	}
 
 	delete [] e;
 }

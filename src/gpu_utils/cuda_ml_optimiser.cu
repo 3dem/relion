@@ -469,6 +469,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		double exp_thisparticle_sumweight = 0.;
 
+		if (part_id == 41)
+			printf("Hej\n");
+
 		double old_offset_z;
 		double old_offset_x = XX(op.old_offset[ipart]);
 		double old_offset_y = YY(op.old_offset[ipart]);
@@ -1762,7 +1765,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 				{
 					std::vector< Cuda3DProjectorPlan > coarseProjectionPlans;
 
-					 //If particle specific sampling setup required
+					 //If particle specific sampling plan required
 					if (baseMLO->cudaCoarseProjectionPlans.size() == 0)
 					{
 						CUDA_CPU_TIC("generateProjectionSetupCoarse");
@@ -1803,7 +1806,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 						}
 						CUDA_CPU_TOC("generateProjectionSetupCoarse");
 					}
-					else //Otherwise use precalculated
+					else //Otherwise use precalculated plan
 						coarseProjectionPlans = baseMLO->cudaCoarseProjectionPlans;
 
 					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
@@ -1830,7 +1833,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 								op,
 								sp,
 								baseMLO,
-								ipass == 0, //coarse
+								false, //not coarse
 								exp_iclass,
 								FineProjectionData);
 						CUDA_CPU_TOC("generateProjectionSetup");

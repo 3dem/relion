@@ -4,6 +4,8 @@
 #include <vector>
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/healpix_sampling.h"
+#include <iostream>
+#include <fstream>
 
 class Cuda3DProjectorPlan
 {
@@ -54,6 +56,8 @@ public:
 			bool do_skip_align,
 			bool do_skip_rotate,
 			int orientational_prior_mode);
+
+	void printTo(std::ostream &os); // print
 
 	~Cuda3DProjectorPlan();
 };
