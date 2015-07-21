@@ -20,7 +20,7 @@
 //
 //   FIXME: All should be available with suffix _CC  (cross-correlation algorithm)
 
-__global__ void cuda_kernel_diff2_course(
+__global__ void cuda_kernel_diff2_coarse(
 		FLOAT *g_eulers,
 		FLOAT *g_imgs_real,
 		FLOAT *g_imgs_imag,

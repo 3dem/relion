@@ -492,7 +492,7 @@ void runDiff2KernelCoarse(
 
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
-	cuda_kernel_diff2_course<<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
+	cuda_kernel_diff2_coarse<<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
 			d_eulers,
 			~Fimgs_real,
 			~Fimgs_imag,

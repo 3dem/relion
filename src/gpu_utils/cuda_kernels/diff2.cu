@@ -2,7 +2,7 @@
 #include <vector>
 #include <iostream>
 
-__global__ void cuda_kernel_diff2_course(
+__global__ void cuda_kernel_diff2_coarse(
 		FLOAT *g_eulers,
 		FLOAT *g_imgs_real,
 		FLOAT *g_imgs_imag,
@@ -56,21 +56,21 @@ __global__ void cuda_kernel_diff2_course(
 				s_cuda_kernel_diff2s[translation_num * tid + itrans] += diff2;
 			}
 		}
+	}
 
-		__syncthreads();
+	__syncthreads();
 
-		unsigned trans_pass_num( ceilf( (float)translation_num / (float)BLOCK_SIZE ) );
-		for (unsigned pass = 0; pass < trans_pass_num; pass++)
+	unsigned trans_pass_num( ceilf( (float)translation_num / (float)BLOCK_SIZE ) );
+	for (unsigned pass = 0; pass < trans_pass_num; pass++)
+	{
+		unsigned itrans = (pass * BLOCK_SIZE) + tid;
+		if (itrans < translation_num)
 		{
-			unsigned itrans = (pass * BLOCK_SIZE) + tid;
-			if (itrans < translation_num)
-			{
-				FLOAT sum(sum_init);
-				for (unsigned i = 0; i < BLOCK_SIZE; i++)
-					sum += s_cuda_kernel_diff2s[i * translation_num + itrans];
+			FLOAT sum(sum_init);
+			for (unsigned i = 0; i < BLOCK_SIZE; i++)
+				sum += s_cuda_kernel_diff2s[i * translation_num + itrans];
 
-				g_diff2s[bid * translation_num + itrans] = sum;
-			}
+			g_diff2s[bid * translation_num + itrans] = sum;
 		}
 	}
 }
