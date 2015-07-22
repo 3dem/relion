@@ -11,28 +11,45 @@
 # PRECISION OPTION
 if(SINGLE_RELION)
 	# set fftw lib to use single (f=float) precision
-	set(fftw "fftw3f")
+	set(fft "fftw3f")
 else(SINGLE_RELION)
 	# set fftw lib to use double precision
-	set(fftw "fftw3")
+	set(fft "fftw3")
 endif(SINGLE_RELION)	
 
-find_library(FFTW_LIBRARIES  NAMES "${fftw}"  PATHS $ENV{FFTW_LIB})
 
-# PARALLELISM OPTIONS
-if(NOT NOTHREAD_RELION)
-    find_library(FFTW_THREAD_LIBS  NAMES "fftw3_threads"  PATHS $ENV{FFTW_LIB})	
-	list(APPEND FFTW_LIBRARIES ${FFTW_THREAD_LIBS} )
-endif(NOT NOTHREAD_RELION)
+#set(USE_CUFFT FALSE)
+if(CUFFT)
+    set(LIB_PATHFFT $ENV{CUDA_HOME}/lib64)
+    set(INC_PATHFFT $ENV{CUDA_HOME}/include)
+    find_library(FFTW_LIBRARIES  NAMES cufftw PATHS ${LIB_PATHFFT})
+    find_library(FFT_LIBRARIES   NAMES cufft  PATHS ${LIB_PATHFFT})
+    list(APPEND FFTW_LIBRARIES ${FFT_LIBRARIES} )
+    set(fft "cufft")
+    
+else(CUFFT)
+    set(LIB_PATHFFT $ENV{FFTW_LIB})
+    set(INC_PATHFFT $ENV{FFTW_INCLUDE})
+ 
+    find_library(FFTW_LIBRARIES  NAMES "${fft}"  PATHS ${LIB_PATHFFT})  
+    # PARALLELISM OPTIONS
 
-message(STATUS "Looking for ${fftw}.h ...")
+    if(NOT NOTHREAD_RELION)
+        find_library(FFTW_THREAD_LIBS  NAMES "fftw3_threads"  PATHS $ENV{FFTW_LIB})	
+    	list(APPEND FFTW_LIBRARIES ${FFTW_THREAD_LIBS} )
+    endif(NOT NOTHREAD_RELION)
+   
+endif(CUFFT)    
+
+message(STATUS "Looking for ${fft}.h ...")
 if(DEFINED ENV{FFTW_INCLUDE})
-    find_path(FFTW_PATH     NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
-    find_path(FFTW_INCLUDES NAMES ${fftw}.h  PATHS $ENV{FFTW_INCLUDE} NO_DEFAULT_PATH)
+    find_path(FFTW_PATH     NAMES ${fft}.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
+    find_path(FFTW_INCLUDES NAMES ${fft}.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
 else()
-    find_path(FFTW_PATH     NAMES ${fftw}.h )
-    find_path(FFTW_INCLUDES     NAMES ${fftw}.h )
+    find_path(FFTW_PATH         NAMES ${fft}.h )
+    find_path(FFTW_INCLUDES     NAMES ${fft}.h )
 endif()
+    
 
 #find_library(FFTW_LIBRARIES /opt/tcbsys/fftw/3.3.4-sse2-avx/lib )
 
