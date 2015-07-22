@@ -949,6 +949,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[exp_iclass];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
+			/*=======================================================================================
+                                            COLLECT 2 AND SET METADATA
+			=======================================================================================*/
+
+
 			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 			{
 				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -975,9 +980,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 
-				/*=======================================================================================
-													   COLLECT 2
-				=======================================================================================*/
+				/*======================================================
+									COLLECT 2
+				======================================================*/
 
 
 				CUDA_CPU_TIC("collect_data_2");
@@ -1111,9 +1116,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				myp_oo_otrans_x2y2z2.free();
 				CUDA_CPU_TOC("collect_data_2_post_kernel");
 
-				/*=======================================================================================
-													  SET META DATA
-				=======================================================================================*/
+				/*======================================================
+                                    SET METADATA
+				======================================================*/
 
 				CUDA_CPU_TIC("setMetadata");
 
@@ -1164,9 +1169,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			}
 
+
 			/*=======================================================================================
 												  MAXIMIZATION
 			=======================================================================================*/
+
+			CUDA_CPU_TIC("maximization");
 
 			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
 
@@ -1412,6 +1420,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					Minvsigma2s.free_device();
 					CUDA_CPU_TOC("MemFrees");
 					CUDA_CPU_TOC("WavgWrapper");
+
 					/*======================================================
 										REDUCE WDIFF2S
 					======================================================*/
@@ -1470,7 +1479,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				printf("CUDA error: %s\n", cudaGetErrorString(error));
 				exit(-1);
 			  }
-				CUDA_CPU_TIC("backprojection");
 
 				CudaGlobalPtr<FLOAT> bp_eulers(9*orientation_num);
 
@@ -1482,12 +1490,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						bp_eulers,
 						IS_NOT_INV);
 
-				HANDLE_ERROR(cudaDeviceSynchronize());
 				bp_eulers.device_alloc();
 				bp_eulers.cp_to_device();
-				bp_eulers.free_host();
 
-				CUDA_CPU_TIC("cuda_kernels_backproject");
+				CUDA_GPU_TIC("cuda_kernels_backproject");
 				baseMLO->cudaBackprojectors[exp_iclass].backproject(
 						~wavgs_real,
 						~wavgs_imag,
@@ -1496,12 +1502,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						orientation_num);
-				CUDA_CPU_TOC("cuda_kernels_backproject");
+				CUDA_GPU_TAC("cuda_kernels_backproject");
+
+				bp_eulers.free_host();
 
 
 
-				CUDA_CPU_TOC("backprojection");
 			}
+
+			CUDA_CPU_TOC("maximization");
+
 		}
 	} // end loop iclass
 

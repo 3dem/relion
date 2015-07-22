@@ -1,6 +1,5 @@
 #include "src/gpu_utils/cuda_backprojector.h"
 #include "src/gpu_utils/cuda_utils.cuh"
-#include <cuda_runtime.h>
 #include <signal.h>
 
 
@@ -19,55 +18,44 @@ void Cuda3DBackprojector::initMdl()
 	}
 #endif
 
-	CudaGlobalPtr<int> *xs = new CudaGlobalPtr<int>(mdlXYZ);
-	CudaGlobalPtr<int> *ys = new CudaGlobalPtr<int>(mdlXYZ);
-	CudaGlobalPtr<int> *zs = new CudaGlobalPtr<int>(mdlXYZ);
+	h_voxelX = new int[mdlXYZ];
+	h_voxelY = new int[mdlXYZ];
+	h_voxelZ = new int[mdlXYZ];
 
 	for (int x = 0; x < mdlX; x ++)
 	{
-		for (int y = mdlInitY; y < mdlY; y++)
+		for (int y = mdlInitY; y < mdlY + mdlInitY; y++)
 		{
-			for (int z = mdlInitZ; z < mdlZ; z++)
+			for (int z = mdlInitZ; z < mdlZ + mdlInitZ; z++)
 			{
 				if (x*x + y*y + z*z <= maxR2 * padding_factor * padding_factor * 1.2f)
 				{
-					(*xs)[voxelCount] = x;
-					(*ys)[voxelCount] = y;
-					(*zs)[voxelCount] = z;
+					h_voxelX[voxelCount] = x;
+					h_voxelY[voxelCount] = y;
+					h_voxelZ[voxelCount] = z;
 					voxelCount ++;
 				}
 			}
 		}
 	}
 
-	xs->put_on_device(voxelCount);
-	ys->put_on_device(voxelCount);
-	zs->put_on_device(voxelCount);
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(FLOAT)));
 
-	xs->free_host();
-	ys->free_host();
-	zs->free_host();
+	HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(FLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(FLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(FLOAT), cudaMemcpyHostToDevice));
 
-	voxelX = (void*) xs;
-	voxelY = (void*) ys;
-	voxelZ = (void*) zs;
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, voxelCount * sizeof(FLOAT)));
 
+	HANDLE_ERROR(cudaMemset( d_mdlReal, 0, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlImag, 0, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, voxelCount * sizeof(FLOAT)));
 
-	CudaGlobalPtr<FLOAT> *r = new CudaGlobalPtr<FLOAT>;
-	CudaGlobalPtr<FLOAT> *i = new CudaGlobalPtr<FLOAT>;
-	CudaGlobalPtr<FLOAT> *w = new CudaGlobalPtr<FLOAT>;
-
-	r->device_alloc(mdlXYZ);
-	i->device_alloc(mdlXYZ);
-	w->device_alloc(mdlXYZ);
-
-	r->device_init(0);
-	i->device_init(0);
-	w->device_init(0);
-
-	mdlReal = (void*) r;
-	mdlImag = (void*) i;
-	mdlWeight = (void*) w;
+	HANDLE_ERROR(cudaStreamCreate(&stream));
 }
 
 __global__ void cuda_kernel_backproject(
@@ -83,13 +71,19 @@ __global__ void cuda_kernel_backproject(
 		FLOAT *g_eulers,
 		int max_r2,
 		FLOAT scale2,
-		unsigned img_x, unsigned img_y, unsigned img_xy, unsigned long img_count,
-		unsigned mdl_x, unsigned mdl_y, int mdl_inity, int mdl_initz,
+		unsigned img_x,
+		unsigned img_y,
+		unsigned img_xy,
+		unsigned long img_count,
+		unsigned mdl_x,
+		unsigned mdl_y,
+		int mdl_inity,
+		int mdl_initz,
 		int N)
 {
-	unsigned gid = threadIdx.x / 4; //Group id
-	unsigned mid = threadIdx.x % 4; //Member id
-	unsigned gm = gid * 4 + mid; //TODO this should be just threadIdx.x
+	unsigned tid = threadIdx.x;
+	unsigned gid = tid / 4; //Group id
+	unsigned mid = tid % 4; //Member id
 	unsigned pit = (gid * 4 + mid)*BACKPROJECTION4_FETCH_COUNT;
 	unsigned global_idx = blockIdx.x * BACKPROJECTION4_GROUP_SIZE + gid;
 
@@ -127,9 +121,9 @@ __global__ void cuda_kernel_backproject(
 	__shared__ FLOAT s_value_real[BACKPROJECTION4_GROUP_SIZE*4];
 	__shared__ FLOAT s_value_imag[BACKPROJECTION4_GROUP_SIZE*4];
 
-	s_weight[gm] = 0.0f;
-	s_value_real[gm] = 0.0f;
-	s_value_imag[gm] = 0.0f;
+	s_weight[tid] = 0.0f;
+	s_value_real[tid] = 0.0f;
+	s_value_imag[tid] = 0.0f;
 
 	for (int img = 0, b = BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT; img < img_count; img ++, b += 9)
 	{
@@ -204,10 +198,10 @@ __global__ void cuda_kernel_backproject(
 			{
 				d = (1.0f - xp) * (1.0f - yp) * (1.0f - zp);
 
-				s_weight[gm] += w * d;
-				s_value_real[gm] += g_wavgs_real[idx] * d;
-				if (is_neg_x) s_value_imag[gm] -= g_wavgs_imag[idx] * d;
-				else          s_value_imag[gm] += g_wavgs_imag[idx] * d;
+				s_weight[tid] += w * d;
+				s_value_real[tid] += g_wavgs_real[idx] * d;
+				if (is_neg_x) s_value_imag[tid] -= g_wavgs_imag[idx] * d;
+				else          s_value_imag[tid] += g_wavgs_imag[idx] * d;
 			}
 		}
 	}
@@ -218,19 +212,19 @@ __global__ void cuda_kernel_backproject(
 	{
 		FLOAT sum = s_weight[gid*4 + 0] + s_weight[gid*4 + 1] + s_weight[gid*4 + 2] + s_weight[gid*4 + 3];
 		if (sum != 0.0f)
-			g_weight[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] += sum;
+			g_weight[global_idx] += sum;
 	}
 	else if (mid == 1)
 	{
 		FLOAT sum = s_value_real[gid*4 + 0] + s_value_real[gid*4 + 1] + s_value_real[gid*4 + 2] + s_value_real[gid*4 + 3];
 		if (sum != 0.0f)
-			g_model_real[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] += sum;
+			g_model_real[global_idx] += sum;
 	}
 	else if (mid == 2)
 	{
 		FLOAT sum = s_value_imag[gid*4 + 0] + s_value_imag[gid*4 + 1] + s_value_imag[gid*4 + 2] + s_value_imag[gid*4 + 3];
 		if (sum != 0.0f)
-			g_model_imag[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] += sum;
+			g_model_imag[global_idx] += sum;
 	}
 }
 
@@ -246,13 +240,13 @@ void Cuda3DBackprojector::backproject(
 	int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
 	dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
 
-	cuda_kernel_backproject<<<grid_dim,block_dim>>>(
-			~*((CudaGlobalPtr<int>*) voxelX),
-			~*((CudaGlobalPtr<int>*) voxelY),
-			~*((CudaGlobalPtr<int>*) voxelZ),
-			~*((CudaGlobalPtr<FLOAT>*) mdlReal),
-			~*((CudaGlobalPtr<FLOAT>*) mdlImag),
-			~*((CudaGlobalPtr<FLOAT>*) mdlWeight),
+	cuda_kernel_backproject<<<grid_dim,block_dim,0,stream>>>(
+			d_voxelX,
+			d_voxelY,
+			d_voxelZ,
+			d_mdlReal,
+			d_mdlImag,
+			d_mdlWeight,
 			d_real,
 			d_imag,
 			d_weight,
@@ -271,15 +265,37 @@ void Cuda3DBackprojector::backproject(
 }
 
 
-void Cuda3DBackprojector::getMdlData(FLOAT *real, FLOAT *imag, FLOAT * weights)
+void Cuda3DBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT * implicitW)
 {
-	((CudaGlobalPtr<FLOAT>*) mdlReal)->h_ptr = real;
-	((CudaGlobalPtr<FLOAT>*) mdlImag)->h_ptr = imag;
-	((CudaGlobalPtr<FLOAT>*) mdlWeight)->h_ptr = weights;
+	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Make sure to wait for remaining kernel executions
 
-	((CudaGlobalPtr<FLOAT>*) mdlReal)->cp_to_host();
-	((CudaGlobalPtr<FLOAT>*) mdlImag)->cp_to_host();
-	((CudaGlobalPtr<FLOAT>*) mdlWeight)->cp_to_host();
+	FLOAT *explicitR = new FLOAT[voxelCount];
+	FLOAT *explicitI = new FLOAT[voxelCount];
+	FLOAT *explicitW = new FLOAT[voxelCount];
+
+	for (unsigned long i = 0; i < mdlXYZ; i ++)
+	{
+		implicitR[i] = 0.;
+		implicitI[i] = 0.;
+		implicitW[i] = 0.;
+	}
+
+	HANDLE_ERROR(cudaMemcpy( explicitR, d_mdlReal, voxelCount * sizeof(FLOAT), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaMemcpy( explicitI, d_mdlImag, voxelCount * sizeof(FLOAT), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaMemcpy( explicitW, d_mdlWeight, voxelCount * sizeof(FLOAT), cudaMemcpyDeviceToHost));
+
+	for (unsigned long i = 0; i < voxelCount; i ++)
+	{
+		unsigned long j = (h_voxelZ[i]-mdlInitZ)*mdlX*mdlY + (h_voxelY[i]-mdlInitY)*mdlX + h_voxelX[i];
+
+		implicitR[j] = explicitR[i];
+		implicitI[j] = explicitI[i];
+		implicitW[j] = explicitW[i];
+	}
+
+	delete [] explicitR;
+	delete [] explicitI;
+	delete [] explicitW;
 }
 
 
@@ -308,16 +324,26 @@ Cuda3DBackprojector::~Cuda3DBackprojector()
 {
 	if (voxelCount != 0)
 	{
-		delete (CudaGlobalPtr<int>*) voxelX;
-		delete (CudaGlobalPtr<int>*) voxelY;
-		delete (CudaGlobalPtr<int>*) voxelZ;
+		HANDLE_ERROR(cudaFree(d_voxelX));
+		HANDLE_ERROR(cudaFree(d_voxelY));
+		HANDLE_ERROR(cudaFree(d_voxelZ));
 
-		delete (CudaGlobalPtr<FLOAT>*) mdlReal;
-		delete (CudaGlobalPtr<FLOAT>*) mdlImag;
-		delete (CudaGlobalPtr<FLOAT>*) mdlWeight;
+		d_voxelX = d_voxelY = d_voxelZ = 0;
+
+		delete [] h_voxelX;
+		delete [] h_voxelY;
+		delete [] h_voxelZ;
+
+		h_voxelX = h_voxelY = h_voxelZ = 0;
+
+		HANDLE_ERROR(cudaFree(d_mdlReal));
+		HANDLE_ERROR(cudaFree(d_mdlImag));
+		HANDLE_ERROR(cudaFree(d_mdlWeight));
+
+		d_mdlReal = d_mdlImag = d_mdlWeight = 0;
+
+		HANDLE_ERROR(cudaStreamDestroy(stream));
+
+		stream = 0;
 	}
 }
-
-
-
-
