@@ -23,6 +23,8 @@
 #include <thrust/extrema.h>
 #include <signal.h>
 
+static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp, MlOptimiser *baseMLO, std::vector<Cuda3DProjectorPlan> &projectorPlans)
 {
 
@@ -468,9 +470,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		double exp_thisparticle_sumweight = 0.;
-
-		if (part_id == 41)
-			printf("Hej\n");
 
 		double old_offset_z;
 		double old_offset_x = XX(op.old_offset[ipart]);
@@ -1482,13 +1481,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						ProjectionData_projdiv,
 						bp_eulers,
 						IS_NOT_INV);
+
 				HANDLE_ERROR(cudaDeviceSynchronize());
 				bp_eulers.device_alloc();
 				bp_eulers.cp_to_device();
 				bp_eulers.free_host();
 
-				int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
-				pthread_mutex_lock(&global_mutex2[my_mutex]);
 				CUDA_CPU_TIC("cuda_kernels_backproject");
 				baseMLO->cudaBackprojectors[exp_iclass].backproject(
 						~wavgs_real,
@@ -1499,7 +1497,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						op.local_Minvsigma2s[0].ydim,
 						orientation_num);
 				CUDA_CPU_TOC("cuda_kernels_backproject");
-				pthread_mutex_unlock(&global_mutex2[my_mutex]);
 
 
 

@@ -158,10 +158,6 @@ FLOAT thrustGetMinVal(CudaGlobalPtr<FLOAT> &diff2s)
 	return(min_val);
 }
 
-
-static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
-static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 /*
  * Splits a designated number of blocks to be run
  * in a cuda-kernel into two components of a dim3.

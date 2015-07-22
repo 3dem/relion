@@ -29,31 +29,6 @@ __device__ inline void cuda_atomic_add(float* address, float value)
 }
 #endif
 
-
-class CudaComplex
-{
-public:
-	FLOAT real, imag;
-
-	__device__ __host__ CudaComplex(): real(), imag() {};
-	__device__ __host__ CudaComplex(FLOAT real, FLOAT imag): real(real), imag(imag) {};
-
-public:
-	__device__ CudaComplex operator-(CudaComplex a)  {
-	     return CudaComplex(real-a.real,imag-a.imag);
-	   }
-	__device__ CudaComplex operator+(CudaComplex a)  {
-	     return CudaComplex(real+a.real,imag+a.imag);
-	   }
-	__device__ CudaComplex operator*(FLOAT s)  {
-	     return CudaComplex(real*s,imag*s);
-	   }
-	__device__ void operator +=(CudaComplex s)  {
-	     real+=s.real;imag+=s.imag;
-	   }
-
-};
-
 #ifdef DEBUG_CUDA
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 #else
