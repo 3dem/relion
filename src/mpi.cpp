@@ -53,7 +53,8 @@ MpiNode::MpiNode(int &argc, char ** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     // Handle errors
-    MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+    //MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN); //deprecated after MPI-2.0
 }
 
 MpiNode::~MpiNode()

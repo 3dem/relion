@@ -99,8 +99,8 @@ template<typename T> inline T sign (const T& signvalue)
 template<typename I> inline unsigned int isqrt (I arg)
   {
   using namespace std;
-  if (sizeof(I)<=4)
-    return unsigned (sqrt(arg+0.5));
+//  if (sizeof(I)<=4)
+//    return unsigned (sqrt(arg+0.5));
   return unsigned (sqrt(arg+0.5));
   }
 

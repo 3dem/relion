@@ -154,7 +154,7 @@ class MlOptimiserCuda
 {
 
 public:
-	std::vector<CudaDevicePtr<FLOAT> > maximization_eulers;
+	std::vector<CudaDevicePtr<FLOAT> > wavg_eulers;
 
 	std::vector<CudaDevicePtr<FLOAT> > wavgs_real;
 	std::vector<CudaDevicePtr<FLOAT> > wavgs_imag;
@@ -173,13 +173,15 @@ public:
 
 	std::vector<CudaDevicePtr<FLOAT> > wdiff2s_parts;
 
+	std::vector<CudaDevicePtr<FLOAT> > bp_eulers;
+
 	MlOptimiser *baseMLO;
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser) : baseMLO(baseMLOptimiser)
 	{
 		unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
 
-		maximization_eulers.resize(nr_classes);
+		wavg_eulers.resize(nr_classes);
 
 		wavgs_real.resize(nr_classes);
 		wavgs_imag.resize(nr_classes);
@@ -197,6 +199,8 @@ public:
 		Minvsigma2s.resize(nr_classes);
 
 		wdiff2s_parts.resize(nr_classes);
+
+		bp_eulers.resize(nr_classes);
 	};
 
 	void doThreadExpectationSomeParticles(unsigned thread_id);

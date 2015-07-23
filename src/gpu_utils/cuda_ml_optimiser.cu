@@ -1000,10 +1000,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				cudaStream_t currentBPStream = baseMLO->cudaBackprojectors[exp_iclass].getStream();
 
-				HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
+				HANDLE_ERROR(cudaDeviceSynchronize());
 
-				cudaMLO->maximization_eulers[exp_iclass].resize(9 * orientation_num);
-				cudaMLO->maximization_eulers[exp_iclass].toDevice(eulers, currentBPStream);
+				cudaMLO->wavg_eulers[exp_iclass].resize(9 * orientation_num);
+				cudaMLO->wavg_eulers[exp_iclass].toDevice(eulers, currentBPStream);
 
 				cudaMLO->wavgs_real[exp_iclass].resize(image_size * orientation_num);
 				cudaMLO->wavgs_real[exp_iclass].init(0,currentBPStream);
@@ -1172,7 +1172,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					CUDA_CPU_TIC("wavgCALL");
 					runWavgKernel(
 							projKernel,
-							cudaMLO->maximization_eulers[exp_iclass],
+							cudaMLO->wavg_eulers[exp_iclass],
 							cudaMLO->Fimgs_real[exp_iclass],
 							cudaMLO->Fimgs_imag[exp_iclass],
 							cudaMLO->Fimgs_nomask_real[exp_iclass],
@@ -1224,7 +1224,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					cudaMLO->wdiff2s_parts[exp_iclass].resize(image_size);
 					cudaMLO->wdiff2s_parts[exp_iclass].toHost(wdiff2s_parts, currentBPStream);
 
-					HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
+					HANDLE_ERROR(cudaDeviceSynchronize());
 
 					CUDA_GPU_TOC();
 
@@ -1245,13 +1245,33 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				/*======================================================
 									BACKPROJECTION
 				======================================================*/
+			  cudaError_t error = cudaGetLastError();
+			  if(error != cudaSuccess)
+			  {
+				// print the CUDA error message and exit
+				printf("CUDA error: %s\n", cudaGetErrorString(error));
+				exit(-1);
+			  }
+
+				std::vector<FLOAT> bp_eulers(9*orientation_num);
+
+				FLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
+
+				generateEulerMatrices(
+						1/padding_factor, //Why squared scale factor is given in backprojection
+						ProjectionData_projdiv,
+						&bp_eulers[0],
+						IS_NOT_INV);
+
+				cudaMLO->bp_eulers[exp_iclass].resize(9*orientation_num);
+				cudaMLO->bp_eulers[exp_iclass].toDevice(bp_eulers, currentBPStream);
 
 				CUDA_GPU_TIC("cuda_kernels_backproject");
 				baseMLO->cudaBackprojectors[exp_iclass].backproject(
 						cudaMLO->wavgs_real[exp_iclass],
 						cudaMLO->wavgs_imag[exp_iclass],
 						cudaMLO->wavgs_weight[exp_iclass],
-						cudaMLO->maximization_eulers[exp_iclass],
+						cudaMLO->bp_eulers[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						orientation_num);
