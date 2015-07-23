@@ -46,7 +46,11 @@
 #ifndef __XmippFFTW_H
 #define __XmippFFTW_H
 
+#ifdef USE_CUFFT
+#include <cufftw.h>
+#else
 #include <fftw3.h>
+#endif
 #include "src/multidim_array.h"
 #include "src/funcs.h"
 #include "src/tabfuncs.h"

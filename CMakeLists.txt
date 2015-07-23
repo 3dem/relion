@@ -20,6 +20,12 @@ if(CudaDouble)
     message(STATUS "Building cuda files with double precision.")
 endif(CudaDouble)
 
+option(CUFFT "CUFFT" OFF)
+if(CUFFT)
+    add_definitions(-DUSE_CUFFT)
+    message(STATUS "Using cuda-based fftw libraries and functions")
+endif(CUFFT)
+
 project(Relion)
 include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER project()
 
