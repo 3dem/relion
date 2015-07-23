@@ -37,7 +37,7 @@ public:
 			voxelCount(0),
 			d_mdlReal(0), d_mdlImag(0), d_mdlWeight(0),
 			stream(0)
-	{};
+	{}
 
 	Cuda3DBackprojector(
 			int xdim, int ydim, int zdim,
@@ -53,7 +53,7 @@ public:
 			voxelCount(0),
 			d_mdlReal(0), d_mdlImag(0), d_mdlWeight(0),
 			stream(0)
-	{};
+	{}
 
 	void setMdlDim(
 			int xdim, int ydim, int zdim,
@@ -83,6 +83,8 @@ public:
 
 	void getMdlData(FLOAT *real, FLOAT *imag, FLOAT * weights);
 	void getMdlData(Complex *data, double * weights);
+
+	cudaStream_t getStream() { return stream; }
 
 	~Cuda3DBackprojector();
 

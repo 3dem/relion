@@ -949,9 +949,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[exp_iclass];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
-
-
-
 			/*=======================================================================================
 												  MAXIMIZATION
 			=======================================================================================*/
@@ -995,8 +992,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						ProjectionData_projdiv,
 						eulers,
 						!IS_NOT_INV);
-
-
 
 				eulers.device_alloc();
 				eulers.cp_to_device();
@@ -1254,39 +1249,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				/*======================================================
 									BACKPROJECTION
 				======================================================*/
-			  cudaError_t error = cudaGetLastError();
-			  if(error != cudaSuccess)
-			  {
-				// print the CUDA error message and exit
-				printf("CUDA error: %s\n", cudaGetErrorString(error));
-				exit(-1);
-			  }
-
-				CudaGlobalPtr<FLOAT> bp_eulers(9*orientation_num);
-
-				FLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
-
-				generateEulerMatrices(
-						1/padding_factor, //Why squared scale factor is given in backprojection
-						ProjectionData_projdiv,
-						bp_eulers,
-						IS_NOT_INV);
-
-				bp_eulers.device_alloc();
-				bp_eulers.cp_to_device();
 
 				CUDA_GPU_TIC("cuda_kernels_backproject");
 				baseMLO->cudaBackprojectors[exp_iclass].backproject(
 						~wavgs_real,
 						~wavgs_imag,
 						~Fweights,
-						~bp_eulers,
+						~eulers,
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						orientation_num);
 				CUDA_GPU_TAC("cuda_kernels_backproject");
-
-				bp_eulers.free_host();
 
 
 

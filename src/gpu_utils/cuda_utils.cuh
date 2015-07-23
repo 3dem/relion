@@ -45,27 +45,33 @@ static void HandleError( cudaError_t err, const char *file, int line )
 }
 
 template< typename T>
-static inline void cudaCpyHostToDevice( T* h_ptr, T* d_ptr, size_t size)
+static inline void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size)
 {
 	HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
 };
 
 template< typename T>
-static inline void cudaCpyHostToDevice( T* h_ptr, T* d_ptr, size_t size, cudaStream_t stream)
+static inline void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size, cudaStream_t stream)
 {
 	HANDLE_ERROR(cudaMemcpyAsync( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
 };
 
 template< typename T>
-static inline void cudaCpyDeviceToHost( T* d_ptr, T* h_ptr, size_t size)
+static inline void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size)
 {
 	HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost));
 };
 
 template< typename T>
-static inline void cudaCpyDeviceToHost( T* d_ptr, T* h_ptr, size_t size, cudaStream_t stream)
+static inline void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size, cudaStream_t stream)
 {
 	HANDLE_ERROR(cudaMemcpyAsync( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
+};
+
+template< typename T>
+static inline void cudaMalloc( T *d_ptr, size_t size)
+{
+	HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 };
 
 /**
@@ -244,7 +250,7 @@ public:
 	 * Device pointer quick access
 	 */
 	inline
-	__host__ T* operator~() {
+	__host__ T *operator~() {
 #ifdef DEBUG_CUDA
 		if (d_ptr == 0)
 			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
