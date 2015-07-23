@@ -28,7 +28,7 @@ void Cuda3DProjectorPlan::setup(
 		bool do_skip_rotate,
 		int orientational_prior_mode)
 {
-	printf("nr_dir=%d nr_psi=%d\n", nr_dir, nr_psi);
+	printf("nr_dir=%lu nr_psi=%lu\n", nr_dir, nr_psi);
 
 	std::vector< double > rots, tilts, psis;
 	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
