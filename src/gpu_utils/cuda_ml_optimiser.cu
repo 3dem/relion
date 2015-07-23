@@ -949,225 +949,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[exp_iclass];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
-			/*=======================================================================================
-                                            COLLECT 2 AND SET METADATA
-			=======================================================================================*/
 
-
-			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
-			{
-				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
-				int group_id = baseMLO->mydata.getGroupId(part_id);
-
-				double myprior_x, myprior_y, myprior_z;
-				double old_offset_x = XX(op.old_offset[ipart]);
-				double old_offset_y = YY(op.old_offset[ipart]);
-				double old_offset_z;
-
-				if (baseMLO->mymodel.ref_dim == 2)
-				{
-					myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
-					myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);
-				}
-				else
-				{
-					myprior_x = XX(op.prior[ipart]);
-					myprior_y = YY(op.prior[ipart]);
-					if (baseMLO->mymodel.data_dim == 3)
-					{
-						myprior_z = ZZ(op.prior[ipart]);
-						old_offset_z = ZZ(op.old_offset[ipart]);
-					}
-				}
-
-				/*======================================================
-									COLLECT 2
-				======================================================*/
-
-
-				CUDA_CPU_TIC("collect_data_2");
-
-				CUDA_CPU_TIC("collect_data_2_pre_kernel");
-				//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
-
-				std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
-
-				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
-//				CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
-//												sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
-				int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
-				CudaGlobalPtr<FLOAT>     oo_otrans_x(nr_transes); // old_offset_oversampled_trans_x
-				CudaGlobalPtr<FLOAT>     oo_otrans_y(nr_transes);
-				CudaGlobalPtr<FLOAT> myp_oo_otrans_x2y2z2(nr_transes); // my_prior_old_offs....x^2*y^2*z^2
-
-				//Pregenerate oversampled translation objects for kernel-call
-				for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
-				{
-					baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
-							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
-					for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
-					{
-						oo_otrans_x[iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
-						oo_otrans_y[iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
-						double diffx = myprior_x - oo_otrans_x[iitrans];
-						double diffy = myprior_y - oo_otrans_y[iitrans];
-						if (baseMLO->mymodel.data_dim == 3)
-						{
-							double diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
-							myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
-						}
-						else
-						{
-							myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy ;
-						}
-					}
-				}
-				// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
-				int block_num = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass]);
-
-				oo_otrans_x.put_on_device();
-				oo_otrans_y.put_on_device();
-				myp_oo_otrans_x2y2z2.put_on_device();
-
-				std::cerr << "block_num = " << block_num << std::endl;
-				CudaGlobalPtr<FLOAT>                      p_weights(block_num);
-				CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_num);
-				CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_num);
-				CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_num);
-
-				p_weights.device_alloc();
-				p_thr_wsum_prior_offsetx_class.device_alloc();
-				p_thr_wsum_prior_offsety_class.device_alloc();
-				p_thr_wsum_sigma2_offset.device_alloc();
-
-				CUDA_CPU_TOC("collect_data_2_pre_kernel");
-				CUDA_GPU_TIC("collect2-kernel");
-
-				dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
-				cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-						~oo_otrans_x,          // otrans-size -> make const
-						~oo_otrans_y,          // otrans-size -> make const
-						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
-						~thisClassFinePassWeights.weights,
-						(FLOAT)op.significant_weight[ipart],
-						(FLOAT)op.sum_weight[ipart],
-						sp.nr_trans,
-						sp.nr_oversampled_trans,
-						sp.nr_oversampled_rot,
-						oversamples,
-						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-						~p_weights,
-						~p_thr_wsum_prior_offsetx_class,
-						~p_thr_wsum_prior_offsety_class,
-						~p_thr_wsum_sigma2_offset,
-						~thisClassFinePassWeights.rot_idx,
-						~thisClassFinePassWeights.trans_idx,
-						~FPCMasks[exp_iclass].jobOrigin,
-						~FPCMasks[exp_iclass].jobExtent
-							);
-				CUDA_GPU_TAC("collect2-kernel");
-
-				CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
-				// TODO further reduce the below 4 arrays while data is still on gpu
-				p_weights.cp_to_host();
-				p_thr_wsum_prior_offsetx_class.cp_to_host();
-				p_thr_wsum_prior_offsety_class.cp_to_host();
-				p_thr_wsum_sigma2_offset.cp_to_host();
-				CUDA_GPU_TAC("cuda_kernel_collect2_memcpy2");
-
-				CUDA_CPU_TIC("collect_data_2_post_kernel");
-				HANDLE_ERROR(cudaDeviceSynchronize());
-				CUDA_GPU_TOC();
-				thr_wsum_sigma2_offset = 0.0;
-				int iorient = 0;
-				for (long int n = 0; n < block_num; n++)
-				{
-					iorient= thisClassFinePassWeights.rot_id[FPCMasks[exp_iclass].jobOrigin[n]];
-					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-					// Only proceed if any of the particles had any significant coarsely sampled translation
-
-					if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
-					{
-						long int mydir, idir=floor(iorient/sp.nr_psi);
-						if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-							mydir = idir;
-						else
-							mydir = op.pointer_dir_nonzeroprior[idir];
-
-						// store partials according to indices of the relevant dimension
-						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
-						thr_sumw_group[group_id]                 						+= p_weights[n];
-						thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
-						thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
-
-						if (baseMLO->mymodel.ref_dim == 2)
-						{
-							thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
-							thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
-						}
-					}
-				}
-				p_weights.free();
-				p_thr_wsum_sigma2_offset.free();
-				p_thr_wsum_prior_offsetx_class.free();
-				p_thr_wsum_prior_offsety_class.free();
-				oo_otrans_y.free();
-				oo_otrans_x.free();
-				myp_oo_otrans_x2y2z2.free();
-				CUDA_CPU_TOC("collect_data_2_post_kernel");
-
-				/*======================================================
-                                    SET METADATA
-				======================================================*/
-
-				CUDA_CPU_TIC("setMetadata");
-
-				CUDA_CPU_TIC("max"); //Get index of max element using GPU-tool thrust
-				Indices max_index;
-				thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~thisClassFinePassWeights.weights);
-				thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + thisClassFinePassWeights.weights.size);
-				unsigned int pos_idx = thrust::distance(dp, pos);
-				CUDA_CPU_TOC("max");
-
-				FLOAT max_val;
-				HANDLE_ERROR(cudaMemcpy(&max_val, &thisClassFinePassWeights.weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
-
-				if(max_val>op.max_weight[ipart])
-				{
-					op.max_weight[ipart] = max_val;
-					max_index.fineIdx =thisClassFinePassWeights.ihidden_overs[pos_idx];
-					//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
-					//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-					max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
-
-					CUDA_CPU_TIC("sample");
-					baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
-							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
-					baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-							op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-					CUDA_CPU_TOC("sample");
-
-					CUDA_CPU_TIC("assign");
-					double rot = oversampled_rot[max_index.ioverrot];
-					double tilt = oversampled_tilt[max_index.ioverrot];
-					double psi = oversampled_psi[max_index.ioverrot];
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
-					if (baseMLO->mymodel.data_dim == 3)
-						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
-					CUDA_CPU_TOC("assign");
-				}
-
-				CUDA_CPU_TOC("setMetadata");
-
-				CUDA_CPU_TOC("collect_data_2");
-
-			}
 
 
 			/*=======================================================================================
@@ -1511,6 +1293,226 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 
 			CUDA_CPU_TOC("maximization");
+
+			/*=======================================================================================
+                                            COLLECT 2 AND SET METADATA
+			=======================================================================================*/
+
+
+			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
+			{
+				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
+				int group_id = baseMLO->mydata.getGroupId(part_id);
+
+				double myprior_x, myprior_y, myprior_z;
+				double old_offset_x = XX(op.old_offset[ipart]);
+				double old_offset_y = YY(op.old_offset[ipart]);
+				double old_offset_z;
+
+				if (baseMLO->mymodel.ref_dim == 2)
+				{
+					myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
+					myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);
+				}
+				else
+				{
+					myprior_x = XX(op.prior[ipart]);
+					myprior_y = YY(op.prior[ipart]);
+					if (baseMLO->mymodel.data_dim == 3)
+					{
+						myprior_z = ZZ(op.prior[ipart]);
+						old_offset_z = ZZ(op.old_offset[ipart]);
+					}
+				}
+
+				/*======================================================
+									COLLECT 2
+				======================================================*/
+
+
+				CUDA_CPU_TIC("collect_data_2");
+
+				CUDA_CPU_TIC("collect_data_2_pre_kernel");
+				//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
+
+				std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
+
+				int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
+//				CudaGlobalPtr<FLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
+//												sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
+				int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
+				CudaGlobalPtr<FLOAT>     oo_otrans_x(nr_transes); // old_offset_oversampled_trans_x
+				CudaGlobalPtr<FLOAT>     oo_otrans_y(nr_transes);
+				CudaGlobalPtr<FLOAT> myp_oo_otrans_x2y2z2(nr_transes); // my_prior_old_offs....x^2*y^2*z^2
+
+				//Pregenerate oversampled translation objects for kernel-call
+				for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
+				{
+					baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
+							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+					for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
+					{
+						oo_otrans_x[iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
+						oo_otrans_y[iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
+						double diffx = myprior_x - oo_otrans_x[iitrans];
+						double diffy = myprior_y - oo_otrans_y[iitrans];
+						if (baseMLO->mymodel.data_dim == 3)
+						{
+							double diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
+							myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
+						}
+						else
+						{
+							myp_oo_otrans_x2y2z2[iitrans] = diffx*diffx + diffy*diffy ;
+						}
+					}
+				}
+				// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
+				int block_num = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass]);
+
+				oo_otrans_x.put_on_device();
+				oo_otrans_y.put_on_device();
+				myp_oo_otrans_x2y2z2.put_on_device();
+
+				std::cerr << "block_num = " << block_num << std::endl;
+				CudaGlobalPtr<FLOAT>                      p_weights(block_num);
+				CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsetx_class(block_num);
+				CudaGlobalPtr<FLOAT> p_thr_wsum_prior_offsety_class(block_num);
+				CudaGlobalPtr<FLOAT>       p_thr_wsum_sigma2_offset(block_num);
+
+				p_weights.device_alloc();
+				p_thr_wsum_prior_offsetx_class.device_alloc();
+				p_thr_wsum_prior_offsety_class.device_alloc();
+				p_thr_wsum_sigma2_offset.device_alloc();
+
+				CUDA_CPU_TOC("collect_data_2_pre_kernel");
+				CUDA_GPU_TIC("collect2-kernel");
+
+				dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
+				cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+						~oo_otrans_x,          // otrans-size -> make const
+						~oo_otrans_y,          // otrans-size -> make const
+						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						~thisClassFinePassWeights.weights,
+						(FLOAT)op.significant_weight[ipart],
+						(FLOAT)op.sum_weight[ipart],
+						sp.nr_trans,
+						sp.nr_oversampled_trans,
+						sp.nr_oversampled_rot,
+						oversamples,
+						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+						~p_weights,
+						~p_thr_wsum_prior_offsetx_class,
+						~p_thr_wsum_prior_offsety_class,
+						~p_thr_wsum_sigma2_offset,
+						~thisClassFinePassWeights.rot_idx,
+						~thisClassFinePassWeights.trans_idx,
+						~FPCMasks[exp_iclass].jobOrigin,
+						~FPCMasks[exp_iclass].jobExtent
+							);
+				CUDA_GPU_TAC("collect2-kernel");
+
+				CUDA_GPU_TIC("cuda_kernel_collect2_memcpy2");
+				// TODO further reduce the below 4 arrays while data is still on gpu
+				p_weights.cp_to_host();
+				p_thr_wsum_prior_offsetx_class.cp_to_host();
+				p_thr_wsum_prior_offsety_class.cp_to_host();
+				p_thr_wsum_sigma2_offset.cp_to_host();
+				CUDA_GPU_TAC("cuda_kernel_collect2_memcpy2");
+
+				CUDA_CPU_TIC("collect_data_2_post_kernel");
+				HANDLE_ERROR(cudaDeviceSynchronize());
+				CUDA_GPU_TOC();
+				thr_wsum_sigma2_offset = 0.0;
+				int iorient = 0;
+				for (long int n = 0; n < block_num; n++)
+				{
+					iorient= thisClassFinePassWeights.rot_id[FPCMasks[exp_iclass].jobOrigin[n]];
+					long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
+					// Only proceed if any of the particles had any significant coarsely sampled translation
+
+					if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+					{
+						long int mydir, idir=floor(iorient/sp.nr_psi);
+						if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+							mydir = idir;
+						else
+							mydir = op.pointer_dir_nonzeroprior[idir];
+
+						// store partials according to indices of the relevant dimension
+						DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
+						thr_sumw_group[group_id]                 						+= p_weights[n];
+						thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
+						thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
+
+						if (baseMLO->mymodel.ref_dim == 2)
+						{
+							thr_wsum_prior_offsetx_class[exp_iclass] 	+= p_thr_wsum_prior_offsetx_class[iorient];
+							thr_wsum_prior_offsety_class[exp_iclass] 	+= p_thr_wsum_prior_offsety_class[iorient];
+						}
+					}
+				}
+				p_weights.free();
+				p_thr_wsum_sigma2_offset.free();
+				p_thr_wsum_prior_offsetx_class.free();
+				p_thr_wsum_prior_offsety_class.free();
+				oo_otrans_y.free();
+				oo_otrans_x.free();
+				myp_oo_otrans_x2y2z2.free();
+				CUDA_CPU_TOC("collect_data_2_post_kernel");
+
+				/*======================================================
+                                    SET METADATA
+				======================================================*/
+
+				CUDA_CPU_TIC("setMetadata");
+
+				CUDA_CPU_TIC("max"); //Get index of max element using GPU-tool thrust
+				Indices max_index;
+				thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~thisClassFinePassWeights.weights);
+				thrust::device_ptr<FLOAT> pos = thrust::max_element(dp, dp + thisClassFinePassWeights.weights.size);
+				unsigned int pos_idx = thrust::distance(dp, pos);
+				CUDA_CPU_TOC("max");
+
+				FLOAT max_val;
+				HANDLE_ERROR(cudaMemcpy(&max_val, &thisClassFinePassWeights.weights.d_ptr[pos_idx], sizeof(FLOAT), cudaMemcpyDeviceToHost));
+
+				if(max_val>op.max_weight[ipart])
+				{
+					op.max_weight[ipart] = max_val;
+					max_index.fineIdx =thisClassFinePassWeights.ihidden_overs[pos_idx];
+					//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
+					//std::cerr << "max index = " << max_index.fineIdx << std::endl;
+					max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+
+					CUDA_CPU_TIC("sample");
+					baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
+							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+					baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+							op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+					CUDA_CPU_TOC("sample");
+
+					CUDA_CPU_TIC("assign");
+					double rot = oversampled_rot[max_index.ioverrot];
+					double tilt = oversampled_tilt[max_index.ioverrot];
+					double psi = oversampled_psi[max_index.ioverrot];
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+					if (baseMLO->mymodel.data_dim == 3)
+						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+					CUDA_CPU_TOC("assign");
+				}
+
+				CUDA_CPU_TOC("setMetadata");
+
+				CUDA_CPU_TOC("collect_data_2");
+
+			}
 
 		}
 	} // end loop iclass
