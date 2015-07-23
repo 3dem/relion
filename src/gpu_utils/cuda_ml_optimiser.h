@@ -2,6 +2,7 @@
 #define CUDA_ML_OPTIMISER_H_
 
 #include "src/ml_optimiser.h"
+#include "src/gpu_utils/cuda_device_ptr.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
@@ -151,10 +152,52 @@ public:
 
 class MlOptimiserCuda
 {
+
 public:
+	std::vector<CudaDevicePtr<FLOAT> > maximization_eulers;
+
+	std::vector<CudaDevicePtr<FLOAT> > wavgs_real;
+	std::vector<CudaDevicePtr<FLOAT> > wavgs_imag;
+	std::vector<CudaDevicePtr<FLOAT> > wavgs_weight;
+
+	std::vector<CudaDevicePtr<FLOAT> > Fimgs_real;
+	std::vector<CudaDevicePtr<FLOAT> > Fimgs_imag;
+	std::vector<CudaDevicePtr<FLOAT> > Fimgs_nomask_real;
+	std::vector<CudaDevicePtr<FLOAT> > Fimgs_nomask_imag;
+
+	std::vector<CudaDevicePtr<FLOAT> > ctfs;
+
+	std::vector<CudaDevicePtr<FLOAT> > sorted_weights;
+
+	std::vector<CudaDevicePtr<FLOAT> > Minvsigma2s;
+
+	std::vector<CudaDevicePtr<FLOAT> > wdiff2s_parts;
+
 	MlOptimiser *baseMLO;
 
-	MlOptimiserCuda(MlOptimiser *baseMLOptimiser) : baseMLO(baseMLOptimiser) {};
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser) : baseMLO(baseMLOptimiser)
+	{
+		unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
+
+		maximization_eulers.resize(nr_classes);
+
+		wavgs_real.resize(nr_classes);
+		wavgs_imag.resize(nr_classes);
+		wavgs_weight.resize(nr_classes);
+
+		Fimgs_real.resize(nr_classes);
+		Fimgs_imag.resize(nr_classes);
+		Fimgs_nomask_real.resize(nr_classes);
+		Fimgs_nomask_imag.resize(nr_classes);
+
+		ctfs.resize(nr_classes);
+
+		sorted_weights.resize(nr_classes);
+
+		Minvsigma2s.resize(nr_classes);
+
+		wdiff2s_parts.resize(nr_classes);
+	};
 
 	void doThreadExpectationSomeParticles(unsigned thread_id);
 

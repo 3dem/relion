@@ -185,17 +185,24 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
  * Maps weights to a decoupled indexing of translations and orientations
  */
 inline
-void mapWeights(unsigned long orientation_start,
-		CudaGlobalPtr<FLOAT> &mapped_weights,
-		unsigned orientation_num, unsigned long idxArr_start, unsigned long idxArr_end,
+void mapWeights(
+		unsigned long orientation_start,
+		std::vector<FLOAT> &mapped_weights,
+		unsigned orientation_num,
+		unsigned long idxArr_start,
+		unsigned long idxArr_end,
 		unsigned translation_num,
-		CudaGlobalPtr <FLOAT> &weights,
-		CudaGlobalPtr <long unsigned> &rot_idx,
-		CudaGlobalPtr <long unsigned> &trans_idx,
+		CudaGlobalPtr<FLOAT> &weights,
+		CudaGlobalPtr<long unsigned> &rot_idx,
+		CudaGlobalPtr<long unsigned> &trans_idx,
 		HealpixSampling &sampling, long int ipart,
-		std::vector< long unsigned > &iover_transes, std::vector< long unsigned > &ihiddens,
-		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
-		MultidimArray<FLOAT> &Mweight, unsigned long current_oversampling, unsigned long nr_trans)
+		std::vector< long unsigned > &iover_transes,
+		std::vector< long unsigned > &ihiddens,
+		std::vector< long unsigned > &iorientclasses,
+		std::vector< long unsigned > &iover_rots,
+		MultidimArray<FLOAT> &Mweight,
+		unsigned long current_oversampling,
+		unsigned long nr_trans)
 {
 
 	int nr_over_orient = sampling.oversamplingFactorOrientations(current_oversampling);
@@ -214,13 +221,25 @@ void mapWeights(unsigned long orientation_start,
 
 inline
 long unsigned imageTranslation(
-		CudaGlobalPtr<FLOAT> &Fimgs_real, CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		CudaGlobalPtr<FLOAT> &Fimgs_nomask_real, CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
-		long int itrans_min, long int itrans_max, int adaptive_oversampling , HealpixSampling &sampling,
-		std::vector<double> &oversampled_translations_x, std::vector<double> &oversampled_translations_y, std::vector<double> &oversampled_translations_z,
-		unsigned long nr_oversampled_trans, std::vector<MultidimArray<Complex> > &global_fftshifts_ab_current, std::vector<MultidimArray<Complex> > &global_fftshifts_ab2_current,
-		MultidimArray<Complex > &local_Fimgs_shifted, MultidimArray<Complex > &local_Fimgs_shifted_nomask,
-		std::vector< long unsigned > &iover_transes, std::vector< long unsigned > &itranses, std::vector< long unsigned > &ihiddens,
+		std::vector<FLOAT> &Fimgs_real,
+		std::vector<FLOAT> &Fimgs_imag,
+		std::vector<FLOAT> &Fimgs_nomask_real,
+		std::vector<FLOAT> &Fimgs_nomask_imag,
+		long int itrans_min,
+		long int itrans_max,
+		int adaptive_oversampling ,
+		HealpixSampling &sampling,
+		std::vector<double> &oversampled_translations_x,
+		std::vector<double> &oversampled_translations_y,
+		std::vector<double> &oversampled_translations_z,
+		unsigned long nr_oversampled_trans,
+		std::vector<MultidimArray<Complex> > &global_fftshifts_ab_current,
+		std::vector<MultidimArray<Complex> > &global_fftshifts_ab2_current,
+		MultidimArray<Complex > &local_Fimgs_shifted,
+		MultidimArray<Complex > &local_Fimgs_shifted_nomask,
+		std::vector< long unsigned > &iover_transes,
+		std::vector< long unsigned > &itranses,
+		std::vector< long unsigned > &ihiddens,
 		unsigned image_size)
 {
 
@@ -247,16 +266,16 @@ long unsigned imageTranslation(
 						- b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag;
 				FLOAT imag = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag
 						+ b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).real;
-				Fimgs_real[translation_num * image_size + n] = real;
-				Fimgs_imag[translation_num * image_size + n] = imag;
+				Fimgs_real.push_back(real);
+				Fimgs_imag.push_back(imag);
 
 				// Fimg_shift_nomask
 				real = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).real
 						- b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).imag;
 				imag = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).imag
 						+ b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).real;
-				Fimgs_nomask_real[translation_num * image_size + n] = real;
-				Fimgs_nomask_imag[translation_num * image_size + n] = imag;
+				Fimgs_nomask_real.push_back(real);
+				Fimgs_nomask_imag.push_back(imag);
 			}
 
 			translation_num ++;
@@ -267,20 +286,14 @@ long unsigned imageTranslation(
 		}
 	}
 
-	Fimgs_real.size = translation_num * image_size;
-	Fimgs_imag.size = translation_num * image_size;
-
-	Fimgs_nomask_real.size = translation_num * image_size;
-	Fimgs_nomask_imag.size = translation_num * image_size;
-
 	return translation_num;
 }
 
 
 void generateEulerMatrices(
 		FLOAT padding_factor,
-		ProjectionParams ProjectionData,
-		CudaGlobalPtr<FLOAT> &eulers,
+		ProjectionParams &ProjectionData,
+		FLOAT *eulers,
 		bool inverse)
 {
 	double alpha, beta, gamma;
@@ -330,6 +343,20 @@ void generateEulerMatrices(
 		    eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
 		}
 	}
+}
+
+
+void generateEulerMatrices(
+		FLOAT padding_factor,
+		ProjectionParams ProjectionData,
+		CudaGlobalPtr<FLOAT> &eulers,
+		bool inverse)
+{
+	generateEulerMatrices(
+			padding_factor,
+			ProjectionData,
+			eulers.h_ptr,
+			inverse);
 }
 
 
@@ -409,26 +436,27 @@ long unsigned generateProjectionSetup(
 inline
 void runWavgKernel(
 		Cuda3DProjectorKernel &projector,
-		CudaGlobalPtr<FLOAT> &eulers,
-		CudaGlobalPtr<FLOAT> &Fimgs_real,
-	    CudaGlobalPtr<FLOAT> &Fimgs_imag,
-	    CudaGlobalPtr<FLOAT> &Fimgs_nomask_real,
- 	    CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
- 	    CudaGlobalPtr<FLOAT> &sorted_weights,
- 	    CudaGlobalPtr<FLOAT> &ctfs,
- 	    CudaGlobalPtr<FLOAT> &Minvsigma2s,
- 	    CudaGlobalPtr<FLOAT> &wdiff2s_parts,
- 	    CudaGlobalPtr<FLOAT> &wavgs_real,
-	    CudaGlobalPtr<FLOAT> &wavgs_imag,
-	    CudaGlobalPtr<FLOAT> &Fweights,
-	    OptimisationParamters &op,
-	    MlOptimiser *baseMLO,
-	    long unsigned orientation_num,
-	    long unsigned translation_num,
-	    unsigned image_size,
-	    long int ipart,
-	    int group_id,
-	    int exp_iclass)
+		FLOAT *eulers,
+		FLOAT *Fimgs_real,
+		FLOAT *Fimgs_imag,
+		FLOAT *Fimgs_nomask_real,
+		FLOAT *Fimgs_nomask_imag,
+		FLOAT *sorted_weights,
+		FLOAT *ctfs,
+		FLOAT *Minvsigma2s,
+		FLOAT *wdiff2s_parts,
+		FLOAT *wavgs_real,
+		FLOAT *wavgs_imag,
+		FLOAT *Fweights,
+		OptimisationParamters &op,
+		MlOptimiser *baseMLO,
+		long unsigned orientation_num,
+		long unsigned translation_num,
+		unsigned image_size,
+		long int ipart,
+		int group_id,
+		int exp_iclass,
+		cudaStream_t stream)
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
@@ -441,29 +469,28 @@ void runWavgKernel(
 	CUDA_GPU_TIC("cuda_kernel_wavg");
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
-	cuda_kernel_wavg<<<block_dim,BLOCK_SIZE>>>(
-			~eulers,
+	cuda_kernel_wavg<<<block_dim,BLOCK_SIZE,0,stream>>>(
+			eulers,
 			projector,
 			image_size,
 			orientation_num,
-			~Fimgs_real, ~Fimgs_imag,
-			~Fimgs_nomask_real, ~Fimgs_nomask_imag,
-			~sorted_weights, ~ctfs, ~Minvsigma2s,
-			~wdiff2s_parts,
-			~wavgs_real,
-			~wavgs_imag,
-			~Fweights,
+			Fimgs_real,
+			Fimgs_imag,
+			Fimgs_nomask_real,
+			Fimgs_nomask_imag,
+			sorted_weights,
+			ctfs,
+			Minvsigma2s,
+			wdiff2s_parts,
+			wavgs_real,
+			wavgs_imag,
+			Fweights,
 			translation_num,
 			(FLOAT) op.sum_weight[ipart],
 			(FLOAT) op.significant_weight[ipart],
 			baseMLO->refs_are_ctf_corrected
 			);
 
-	size_t avail;
-	size_t total;
-	cudaMemGetInfo( &avail, &total );
-	float used = 100*((float)(total - avail)/(float)total);
-	std::cerr << "Device memory used @ wavg: " << used << "%" << std::endl;
 	CUDA_GPU_TAC("cuda_kernel_wavg");
 	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
