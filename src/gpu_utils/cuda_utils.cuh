@@ -44,6 +44,30 @@ static void HandleError( cudaError_t err, const char *file, int line )
     }
 }
 
+template< typename T>
+static inline void cudaCpyHostToDevice( T* h_ptr, T* d_ptr, size_t size)
+{
+	HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
+};
+
+template< typename T>
+static inline void cudaCpyHostToDevice( T* h_ptr, T* d_ptr, size_t size, cudaStream_t stream)
+{
+	HANDLE_ERROR(cudaMemcpyAsync( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
+};
+
+template< typename T>
+static inline void cudaCpyDeviceToHost( T* d_ptr, T* h_ptr, size_t size)
+{
+	HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost));
+};
+
+template< typename T>
+static inline void cudaCpyDeviceToHost( T* d_ptr, T* h_ptr, size_t size, cudaStream_t stream)
+{
+	HANDLE_ERROR(cudaMemcpyAsync( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
+};
+
 /**
  * Print cuda device memory info
  */
@@ -149,7 +173,7 @@ public:
 		if (h_ptr == 0)
 			printf("DEBUG_WARNING: NULL host pointer in cp_to_device().\n");
 #endif
-		HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
+		cudaCpyHostToDevice<T>(h_ptr, d_ptr, size);
 	}
 
 	/**
@@ -200,7 +224,7 @@ public:
 		if (h_ptr == 0)
 			printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
 #endif
-		HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost ));
+		cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size);
 	}
 
 	/**
