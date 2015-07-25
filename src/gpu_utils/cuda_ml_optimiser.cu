@@ -29,6 +29,11 @@ static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp, MlOptimiser *baseMLO, std::vector<Cuda3DProjectorPlan> &projectorPlans)
 {
 
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF1);
+#endif
+
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	op.Mweight.resize(sp.nr_particles, baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
@@ -222,6 +227,10 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 			} // end loop ipart
 		} // end if class significant
 	} // end loop iclass
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF1);
+#endif
 }
 
 void getAllSquaredDifferencesFine(unsigned exp_ipass,
@@ -232,7 +241,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  std::vector< IndexedDataArrayMask > &FPCMasks,
 			 	 	 	 	 	  ProjectionParams &FineProjectionData)
 {
-
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2);
+#endif
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	op.min_diff2.clear();
@@ -453,6 +465,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			} // end loop ipart
 		} // end if class significant
 	} // end loop iclass
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2);
+#endif
 }
 
 
@@ -463,6 +479,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					 	 	 	 	 	 	IndexedDataArray &PassWeights,
 					 	 	 	 	 	 	std::vector< IndexedDataArrayMask > &FPCMasks) // FPCMasks = Fine-Pass Class-Masks
 {
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+	{
+		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
+		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
+	}
+#endif
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
@@ -839,7 +862,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	} // end loop ipart
 	CUDA_CPU_TOC("convertPostKernel");
-
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+	{
+		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
+		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
+	}
+#endif
 }
 
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
@@ -849,6 +878,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
  	 	 	 	 	 	ProjectionParams &ProjectionData,
  	 	 	 	 	 	std::vector< IndexedDataArrayMask > FPCMasks)
 {
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_WSUM);
+#endif
 	CUDA_CPU_TIC("store_init");
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
@@ -1266,6 +1299,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				cudaMLO->bp_eulers[exp_iclass].resize(9*orientation_num);
 				cudaMLO->bp_eulers[exp_iclass].toDevice(bp_eulers, currentBPStream);
 
+#ifdef TIMING
+				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
+#endif
 				CUDA_GPU_TIC("cuda_kernels_backproject");
 				baseMLO->cudaBackprojectors[exp_iclass].backproject(
 						cudaMLO->wavgs_real[exp_iclass],
@@ -1276,7 +1313,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						op.local_Minvsigma2s[0].ydim,
 						orientation_num);
 				CUDA_GPU_TAC("cuda_kernels_backproject");
-
+#ifdef TIMING
+				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+					baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
+#endif
 			}
 
 			CUDA_CPU_TOC("maximization");
@@ -1632,6 +1672,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	} // end if !do_skip_maximization
 
 	CUDA_CPU_TOC("store_post_gpu");
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_WSUM);
+#endif
 }
 
 

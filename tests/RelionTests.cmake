@@ -98,7 +98,7 @@ add_test(NAME GPU-3Dc_noCTF_tut
 add_test(NAME GPU-3Dc_10P-ryr_K1
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
         COMMAND refine --o test_output/gpu3Dc_ryr
-        --i "${RELION_INPUT_DIR_RYR}/benchmark_ryr_10.star" 
+        --i "${RELION_INPUT_DIR_RYR}/benchmark_ryr_10_local.star" 
         --j 1 
         --particle_diameter 400 
         --angpix 1.34 
@@ -126,7 +126,7 @@ add_test(NAME GPU-3Dc_10P-ryr_K1
 add_test(NAME GPU-3Dc_2kP-ryr_K3
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
         COMMAND refine --o test_output/gpu3Dc_ryr
-        --i "${RELION_INPUT_DIR_RYR}/benchmark_ryr_500.star" 
+        --i "${RELION_INPUT_DIR_RYR}/benchmark_ryr_2k_local.star" 
         --j 1 
         --particle_diameter 400 
         --angpix 1.34 
