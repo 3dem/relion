@@ -2,7 +2,7 @@
 #include "src/gpu_utils/cuda_utils.cuh"
 #include <cuda_runtime.h>
 
-void Cuda3DProjectorPlan::setup(
+void CudaProjectorPlan::setup(
 		HealpixSampling &sampling,
 		std::vector<double> &directions_prior,
 		std::vector<double> &psi_prior,
@@ -160,7 +160,7 @@ void Cuda3DProjectorPlan::setup(
 	delete [] e;
 }
 
-void Cuda3DProjectorPlan::printTo(std::ostream &os) // print
+void CudaProjectorPlan::printTo(std::ostream &os) // print
 {
 	os << "orientation_num = " << orientation_num << std::endl;
 	os << "free_device = " << free_device << std::endl;
@@ -182,7 +182,7 @@ void Cuda3DProjectorPlan::printTo(std::ostream &os) // print
 	delete [] e;
 }
 
-Cuda3DProjectorPlan::~Cuda3DProjectorPlan()
+CudaProjectorPlan::~CudaProjectorPlan()
 {
 	if(free_device)
 		HANDLE_ERROR(cudaFree(d_eulers));

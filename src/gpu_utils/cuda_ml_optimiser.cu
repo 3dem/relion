@@ -26,7 +26,7 @@
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp, MlOptimiser *baseMLO, std::vector<Cuda3DProjectorPlan> &projectorPlans)
+void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &op, SamplingParameters &sp, MlOptimiser *baseMLO, std::vector<CudaProjectorPlan> &projectorPlans)
 {
 
 #ifdef TIMING
@@ -57,7 +57,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
-		Cuda3DProjectorPlan *projectorPlan = &projectorPlans[exp_iclass];
+		CudaProjectorPlan *projectorPlan = &projectorPlans[exp_iclass];
 
 		if ( projectorPlan->orientation_num > 0 )
 		{
@@ -182,7 +182,7 @@ void getAllSquaredDifferencesCoarse(unsigned exp_ipass, OptimisationParamters &o
 				    	   Kernel Call
 				======================================*/
 
-				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
+				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 						baseMLO->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
@@ -421,7 +421,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				CUDA_CPU_TOC("pair_list_1");
 				CUDA_CPU_TIC("Diff2MakeKernel");
-				Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
+				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 						baseMLO->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
@@ -1196,7 +1196,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					CUDA_CPU_TOC("minvsigma_wavg");
 
 					CUDA_CPU_TIC("ProjMakeKernel");
-					Cuda3DProjectorKernel projKernel = Cuda3DProjectorKernel::makeKernel(
+					CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 							baseMLO->cudaProjectors[exp_iclass],
 							op.local_Minvsigma2s[0].xdim,
 							op.local_Minvsigma2s[0].ydim,
@@ -1803,7 +1803,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 				if (ipass == 0)
 				{
-					std::vector< Cuda3DProjectorPlan > coarseProjectionPlans;
+					std::vector< CudaProjectorPlan > coarseProjectionPlans;
 
 					 //If particle specific sampling plan required
 					if (baseMLO->cudaCoarseProjectionPlans.size() == 0)

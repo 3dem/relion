@@ -435,7 +435,7 @@ long unsigned generateProjectionSetup(
 
 inline
 void runWavgKernel(
-		Cuda3DProjectorKernel &projector,
+		CudaProjectorKernel &projector,
 		FLOAT *eulers,
 		FLOAT *Fimgs_real,
 		FLOAT *Fimgs_imag,
@@ -497,7 +497,7 @@ void runWavgKernel(
 
 
 void runDiff2KernelCoarse(
-		Cuda3DProjectorKernel &projector,
+		CudaProjectorKernel &projector,
 		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
@@ -532,7 +532,7 @@ void runDiff2KernelCoarse(
 
 
 void runDiff2KernelFine(
-		Cuda3DProjectorKernel &projector,
+		CudaProjectorKernel &projector,
 		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,

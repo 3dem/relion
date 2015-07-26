@@ -6,7 +6,7 @@
 
 __global__ void cuda_kernel_wavg(
 		FLOAT *g_eulers,
-		Cuda3DProjectorKernel projector,
+		CudaProjectorKernel projector,
 		unsigned image_size,
 		unsigned long orientation_num,
 		FLOAT *g_imgs_real,

@@ -7,7 +7,7 @@
 #include <iostream>
 #include <fstream>
 
-class Cuda3DProjectorPlan
+class CudaProjectorPlan
 {
 public:
 	std::vector< long unsigned > iorientclasses, iover_rots;
@@ -16,7 +16,7 @@ public:
 	bool free_device;
 
 	//Copy constructor
-	Cuda3DProjectorPlan( const Cuda3DProjectorPlan& other ):
+	CudaProjectorPlan( const CudaProjectorPlan& other ):
 		iorientclasses(other.iorientclasses),
 		iover_rots(other.iover_rots),
 		orientation_num(other.orientation_num),
@@ -24,7 +24,7 @@ public:
 		free_device(false)
 	{};
 
-	Cuda3DProjectorPlan():
+	CudaProjectorPlan():
 		orientation_num(0), d_eulers(0), free_device(false)
 	{
 		iorientclasses.reserve(0);
@@ -59,7 +59,7 @@ public:
 
 	void printTo(std::ostream &os); // print
 
-	~Cuda3DProjectorPlan();
+	~CudaProjectorPlan();
 };
 
 #endif

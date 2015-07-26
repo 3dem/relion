@@ -15,7 +15,7 @@
 #endif
 #endif
 
-class Cuda3DProjectorKernel
+class CudaProjectorKernel
 {
 
 public:
@@ -28,7 +28,7 @@ public:
 	PROJECTOR_SRC_TYPE mdlReal;
 	PROJECTOR_SRC_TYPE mdlImag;
 
-	Cuda3DProjectorKernel(
+	CudaProjectorKernel(
 			int mdlX, int mdlY,
 			int imgX, int imgY,
 			int mdlInitY, int mdlInitZ,
@@ -265,11 +265,11 @@ public:
 		}
 
 
-	static Cuda3DProjectorKernel makeKernel(Cuda3DProjector &p, int imgX, int imgY, int imgMaxR)
+	static CudaProjectorKernel makeKernel(CudaProjector &p, int imgX, int imgY, int imgMaxR)
 	{
 		int maxR = p.mdlMaxR >= imgMaxR ? imgMaxR : p.mdlMaxR;
 
-		Cuda3DProjectorKernel k(
+		CudaProjectorKernel k(
 				p.mdlX, p.mdlY,
 		        imgX, imgY,
 		        p.mdlInitY, p.mdlInitZ,

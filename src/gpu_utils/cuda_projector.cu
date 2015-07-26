@@ -5,7 +5,7 @@
 
 #ifndef CUDA_DOUBLE_PRECISION
 
-void Cuda3DProjector::setMdlData(float *real, float *imag)
+void CudaProjector::setMdlData(float *real, float *imag)
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -80,7 +80,7 @@ void Cuda3DProjector::setMdlData(float *real, float *imag)
 
 #else
 
-void Cuda3DProjector::setMdlData(double *real, double *imag)
+void CudaProjector::setMdlData(double *real, double *imag)
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -118,7 +118,7 @@ void Cuda3DProjector::setMdlData(double *real, double *imag)
 #endif
 
 
-void Cuda3DProjector::setMdlData(Complex *data)
+void CudaProjector::setMdlData(Complex *data)
 {
 	FLOAT *tmpReal = new FLOAT[mdlXYZ];
 	FLOAT *tmpImag = new FLOAT[mdlXYZ];
@@ -136,7 +136,7 @@ void Cuda3DProjector::setMdlData(Complex *data)
 }
 
 
-Cuda3DProjector::~Cuda3DProjector()
+CudaProjector::~CudaProjector()
 {
 	if (mdlReal != 0)
 	{

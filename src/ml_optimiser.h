@@ -435,13 +435,13 @@ public:
 	MultidimArray<double> DEBUGGING_COPY_exp_Mweight;
 
 	//The CUDA accelerated projector set
-	std::vector< Cuda3DProjector > cudaProjectors;
+	std::vector< CudaProjector > cudaProjectors;
 
 	//The CUDA accelerated back-projector set
-	std::vector< Cuda3DBackprojector > cudaBackprojectors;
+	std::vector< CudaBackprojector > cudaBackprojectors;
 
 	//Used for precalculations of projection setup
-	std::vector< Cuda3DProjectorPlan > cudaCoarseProjectionPlans;
+	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
 
 #ifdef TIMING
     Timer timer;

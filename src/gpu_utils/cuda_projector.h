@@ -8,9 +8,9 @@
 #include <cuda_runtime.h>
 #endif
 
-class Cuda3DProjector
+class CudaProjector
 {
-	friend class Cuda3DProjectorKernel;
+	friend class CudaProjectorKernel;
 
 	int mdlX, mdlY, mdlZ, mdlXYZ, mdlMaxR,
 	    mdlInitY, mdlInitZ,
@@ -23,7 +23,7 @@ class Cuda3DProjector
 #endif
 
 public:
-	Cuda3DProjector():
+	CudaProjector():
 			mdlX(0), mdlY(0), mdlZ(0),
 			mdlXYZ(0), mdlMaxR(0),
 			mdlInitY(0), mdlInitZ(0),
@@ -36,7 +36,7 @@ public:
 #endif
 	};
 
-	Cuda3DProjector(
+	CudaProjector(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, int padding_factor):
@@ -71,7 +71,7 @@ public:
 	void setMdlData(FLOAT *real, FLOAT *imag);
 	void setMdlData(Complex *data);
 
-	~Cuda3DProjector();
+	~CudaProjector();
 
 };
 

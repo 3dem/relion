@@ -9,7 +9,7 @@
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_FETCH_COUNT 4
 
-class Cuda3DBackprojector
+class CudaBackprojector
 {
 	int mdlX, mdlY, mdlZ, mdlXYZ,
 	    mdlInitY, mdlInitZ,
@@ -27,7 +27,7 @@ class Cuda3DBackprojector
 
 public:
 
-	Cuda3DBackprojector():
+	CudaBackprojector():
 			mdlX(0), mdlY(0), mdlZ(0), mdlXYZ(0),
 			mdlInitY(0), mdlInitZ(0),
 			maxR2(0),
@@ -39,7 +39,7 @@ public:
 			stream(0)
 	{}
 
-	Cuda3DBackprojector(
+	CudaBackprojector(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, int padding_factor):
@@ -86,7 +86,7 @@ public:
 
 	cudaStream_t getStream() { return stream; }
 
-	~Cuda3DBackprojector();
+	~CudaBackprojector();
 
 };
 

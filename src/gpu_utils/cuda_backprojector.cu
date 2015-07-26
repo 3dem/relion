@@ -3,7 +3,7 @@
 #include <signal.h>
 
 
-void Cuda3DBackprojector::initMdl()
+void CudaBackprojector::initMdl()
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -57,8 +57,33 @@ void Cuda3DBackprojector::initMdl()
 
 	HANDLE_ERROR(cudaStreamCreate(&stream));
 }
+__global__ void cuda_kernel_backproject2D(
+		int *g_xs,
+		int *g_ys,
+		int *g_zs,
+		FLOAT *g_model_real,
+		FLOAT *g_model_imag,
+		FLOAT *g_weight,
+		FLOAT *g_wavgs_real,
+		FLOAT *g_wavgs_imag,
+		FLOAT *g_Fweights,
+		FLOAT *g_eulers,
+		int max_r2,
+		FLOAT scale2,
+		unsigned img_x,
+		unsigned img_y,
+		unsigned img_xy,
+		unsigned long img_count,
+		unsigned mdl_x,
+		unsigned mdl_y,
+		int mdl_inity,
+		int mdl_initz,
+		int N)
+{
+	printf("ERROR : No 2D model support yet");
+}
 
-__global__ void cuda_kernel_backproject(
+__global__ void cuda_kernel_backproject3D(
 		int *g_xs,
 		int *g_ys,
 		int *g_zs,
@@ -228,7 +253,7 @@ __global__ void cuda_kernel_backproject(
 	}
 }
 
-void Cuda3DBackprojector::backproject(
+void CudaBackprojector::backproject(
 		FLOAT *d_real,
 		FLOAT *d_imag,
 		FLOAT *d_weight,
@@ -240,7 +265,31 @@ void Cuda3DBackprojector::backproject(
 	int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
 	dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
 
-	cuda_kernel_backproject<<<grid_dim,block_dim,0,stream>>>(
+	if(mdlZ==0)
+		cuda_kernel_backproject2D<<<grid_dim,block_dim,0,stream>>>(
+			d_voxelX,
+			d_voxelY,
+			d_voxelZ,
+			d_mdlReal,
+			d_mdlImag,
+			d_mdlWeight,
+			d_real,
+			d_imag,
+			d_weight,
+			d_eulers,
+			maxR2,
+			padding_factor,
+			imgX,
+			imgY,
+			imgX*imgY,
+			imageCount,
+			mdlX,
+			mdlY,
+			mdlInitY,
+			mdlInitZ,
+			voxelCount);
+	else
+		cuda_kernel_backproject3D<<<grid_dim,block_dim,0,stream>>>(
 			d_voxelX,
 			d_voxelY,
 			d_voxelZ,
@@ -265,7 +314,7 @@ void Cuda3DBackprojector::backproject(
 }
 
 
-void Cuda3DBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT * implicitW)
+void CudaBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT * implicitW)
 {
 	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Make sure to wait for remaining kernel executions
 
@@ -299,7 +348,7 @@ void Cuda3DBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT *
 }
 
 
-void Cuda3DBackprojector::getMdlData(Complex *data, double * weights)
+void CudaBackprojector::getMdlData(Complex *data, double * weights)
 {
 	FLOAT *r = new FLOAT[mdlXYZ];
 	FLOAT *i = new FLOAT[mdlXYZ];
@@ -320,7 +369,7 @@ void Cuda3DBackprojector::getMdlData(Complex *data, double * weights)
 }
 
 
-Cuda3DBackprojector::~Cuda3DBackprojector()
+CudaBackprojector::~CudaBackprojector()
 {
 	if (voxelCount != 0)
 	{
