@@ -40,7 +40,7 @@ __global__ void cuda_kernel_diff2_coarse(
 
 		if(pixel < image_size)
 		{
-			projector.project(
+			projector.project3Dmodel(
 					pixel,
 					e0,e1,e3,e4,e6,e7,
 					ref_real, ref_imag);
@@ -126,7 +126,7 @@ __global__ void cuda_kernel_diff2_fine(
 
 			if(pixel < image_size)
 			{
-				projector.project(
+				projector.project3Dmodel(
 						pixel,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),

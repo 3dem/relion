@@ -51,7 +51,7 @@ __global__ void cuda_kernel_wavg(
 			{
 				unsigned long ref_pixel = bid * image_size + pixel;
 
-				projector.project(
+				projector.project3Dmodel(
 						pixel,
 						__ldg(&g_eulers[bid*9  ]), __ldg(&g_eulers[bid*9+1]),
 						__ldg(&g_eulers[bid*9+3]), __ldg(&g_eulers[bid*9+4]),

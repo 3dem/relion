@@ -44,7 +44,7 @@ public:
 			mdlReal(mdlReal), mdlImag(mdlImag)
 		{};
 
-	__device__ __forceinline__ void project(
+	__device__ __forceinline__ void project3Dmodel(
 			int pixel,
 			FLOAT e0,
 			FLOAT e1,
@@ -168,7 +168,101 @@ public:
 		}
 	}
 
+	__device__ __forceinline__ void project2Dmodel(
+				int pixel,
+				FLOAT e0,
+				FLOAT e1,
+				FLOAT e3,
+				FLOAT e4,
+				FLOAT e6,
+				FLOAT e7,
+				FLOAT &real,
+				FLOAT &imag)
+		{
+			bool is_neg_x;
+			int r2;
 
+			int x = pixel % imgX;
+			int y = (int)floorf( (float)pixel / (float)imgX);
+
+			// Dont search beyond square with side max_r
+			if (y > maxR)
+			{
+				if (y >= imgY - maxR)
+					y = y - imgY;
+				else
+					x = maxR;
+			}
+
+			r2 = x*x + y*y;
+			if (r2 <= maxR2)
+			{
+				FLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+				FLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+
+				// Only asymmetric half is stored
+				if (xp < 0)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					xp = -xp;
+					yp = -yp;
+					is_neg_x = true;
+				}
+				else
+				{
+					is_neg_x = false;
+				}
+
+	#ifndef CUDA_DOUBLE_PRECISION
+
+				yp -= mdlInitY;
+
+				real = tex2D<FLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
+				imag = tex2D<FLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
+
+	#else
+				int x0 = floorf(xp);
+				FLOAT fx = xp - x0;
+				int x1 = x0 + 1;
+
+				int y0 = floorf(yp);
+				FLOAT fy = yp - y0;
+				y0 -= mdlInitY;
+				int y1 = y0 + 1;
+				//-----------------------------
+				FLOAT d00_real = mdlReal[y0*mdlX+x0];
+				FLOAT d01_real = mdlReal[y0*mdlX+x1];
+				FLOAT d10_real = mdlReal[y1*mdlX+x0];
+				FLOAT d11_real = mdlReal[y1*mdlX+x1];
+
+				FLOAT d00_imag = mdlImag[y0*mdlX+x0];
+				FLOAT d01_imag = mdlImag[y0*mdlX+x1];
+				FLOAT d10_imag = mdlImag[y1*mdlX+x0];
+				FLOAT d11_imag = mdlImag[y1*mdlX+x1];
+				//-----------------------------
+				// Set the interpolated value in the 2D output array
+				FLOAT dx0_real = d00_real + (d01_real - d00_real)*fx;
+				FLOAT dx1_real = d10_real + (d11_real - d10_real)*fx;
+
+				FLOAT dx0_imag = d00_imag + (d01_imag - d00_imag)*fx;
+				FLOAT dx1_imag = d10_imag + (d11_imag - d10_imag)*fx;
+				//-----------------------------
+				real = dx0_real + (dx1_real - dx0_real)*fy;
+				imag = dx0_imag + (dx1_imag - dx0_imag)*fy;
+				//-----------------------------
+	#endif
+
+				if (is_neg_x)
+				{
+					imag = -imag;
+				}
+			}
+			else
+			{
+				real = 0.0f;
+				imag = 0.0f;
+			}
+		}
 
 
 	static Cuda3DProjectorKernel makeKernel(Cuda3DProjector &p, int imgX, int imgY, int imgMaxR)
