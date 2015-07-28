@@ -515,7 +515,8 @@ void runDiff2KernelCoarse(
 
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
-	cuda_kernel_diff2_coarse<<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
+	if(projector.mdlZ!=0)
+		cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
 			d_eulers,
 			~Fimgs_real,
 			~Fimgs_imag,
@@ -525,7 +526,17 @@ void runDiff2KernelCoarse(
 			translation_num,
 			image_size,
 			op.highres_Xi2_imgs[ipart] / 2.);
-
+	else
+		cuda_kernel_diff2_coarse<false><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
+			d_eulers,
+			~Fimgs_real,
+			~Fimgs_imag,
+			projector,
+			~gpuMinvsigma2,
+			~diff2s,
+			translation_num,
+			image_size,
+			op.highres_Xi2_imgs[ipart] / 2.);
 
 	CUDA_GPU_TAC("runProjAndDifferenceKernelCoarse");
 }
@@ -616,7 +627,25 @@ void runDiff2KernelFine(
 		printf("Cross correlation is not supported yet.");
 		exit(0);
 	}
-	cuda_kernel_diff2_fine<<<block_dim,BLOCK_SIZE>>>(
+	if(projector.mdlZ!=0)
+		cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE>>>(
+			~eulers,
+			~Fimgs_real,
+			~Fimgs_imag,
+			projector,
+			~gpuMinvsigma2,
+			~diff2s,
+			image_size,
+			op.highres_Xi2_imgs[ipart] / 2.,
+			orientation_num,
+			translation_num,
+			block_num, //significant_num,
+			~rot_idx,
+			~trans_idx,
+			~job_idx,
+			~job_num);
+	else
+		cuda_kernel_diff2_fine<false><<<block_dim,BLOCK_SIZE>>>(
 			~eulers,
 			~Fimgs_real,
 			~Fimgs_imag,

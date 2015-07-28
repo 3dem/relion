@@ -19,7 +19,7 @@ class CudaProjectorKernel
 {
 
 public:
-	int mdlX, mdlXY,
+	int mdlX, mdlXY, mdlZ,
 		imgX, imgY,
 		mdlInitY, mdlInitZ,
 		padding_factor,
@@ -29,14 +29,14 @@ public:
 	PROJECTOR_SRC_TYPE mdlImag;
 
 	CudaProjectorKernel(
-			int mdlX, int mdlY,
+			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY,
 			int mdlInitY, int mdlInitZ,
 			int padding_factor,
 			int maxR,
 			PROJECTOR_SRC_TYPE mdlReal, PROJECTOR_SRC_TYPE mdlImag
 			):
-			mdlX(mdlX), mdlXY(mdlX*mdlY),
+			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
 			imgX(imgX), imgY(imgY),
 			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
 			padding_factor(padding_factor),
@@ -270,7 +270,7 @@ public:
 		int maxR = p.mdlMaxR >= imgMaxR ? imgMaxR : p.mdlMaxR;
 
 		CudaProjectorKernel k(
-				p.mdlX, p.mdlY,
+				p.mdlX, p.mdlY, p.mdlZ,
 		        imgX, imgY,
 		        p.mdlInitY, p.mdlInitZ,
 			    p.padding_factor,
