@@ -469,7 +469,31 @@ void runWavgKernel(
 	CUDA_GPU_TIC("cuda_kernel_wavg");
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
-	cuda_kernel_wavg<<<block_dim,BLOCK_SIZE,0,stream>>>(
+
+	if(projector.mdlZ!=0)
+		cuda_kernel_wavg<true><<<block_dim,BLOCK_SIZE,0,stream>>>(
+			eulers,
+			projector,
+			image_size,
+			orientation_num,
+			Fimgs_real,
+			Fimgs_imag,
+			Fimgs_nomask_real,
+			Fimgs_nomask_imag,
+			sorted_weights,
+			ctfs,
+			Minvsigma2s,
+			wdiff2s_parts,
+			wavgs_real,
+			wavgs_imag,
+			Fweights,
+			translation_num,
+			(FLOAT) op.sum_weight[ipart],
+			(FLOAT) op.significant_weight[ipart],
+			baseMLO->refs_are_ctf_corrected
+			);
+	else
+		cuda_kernel_wavg<false><<<block_dim,BLOCK_SIZE,0,stream>>>(
 			eulers,
 			projector,
 			image_size,
