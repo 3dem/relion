@@ -1278,53 +1278,70 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 					CUDA_CPU_TOC("reduce_wdiff2s");
 
+
+
+					/*======================================================
+										BACKPROJECTION
+					======================================================*/
+					cudaError_t error = cudaGetLastError();
+					if(error != cudaSuccess)
+					{
+						// print the CUDA error message and exit
+						printf("CUDA error: %s\n", cudaGetErrorString(error));
+						exit(-1);
+					}
+
+					std::vector<FLOAT> bp_eulers(9*orientation_num);
+
+					FLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
+
+					generateEulerMatrices(
+							1/padding_factor, //Why squared scale factor is given in backprojection
+							ProjectionData_projdiv,
+							&bp_eulers[0],
+							IS_NOT_INV);
+
+					cudaMLO->bp_eulers[exp_iclass].resize(9*orientation_num);
+					cudaMLO->bp_eulers[exp_iclass].toDevice(bp_eulers, currentBPStream);
+
+#ifdef TIMING
+					if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+						baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
+#endif
+					CUDA_GPU_TIC("cuda_kernels_backproject");
+					baseMLO->cudaBackprojectors[exp_iclass].backproject(
+							cudaMLO->wavgs_real[exp_iclass],
+							cudaMLO->wavgs_imag[exp_iclass],
+							cudaMLO->wavgs_weight[exp_iclass],
+							cudaMLO->bp_eulers[exp_iclass],
+							op.local_Minvsigma2s[0].xdim,
+							op.local_Minvsigma2s[0].ydim,
+							orientation_num);
+					CUDA_GPU_TAC("cuda_kernels_backproject");
+#ifdef TIMING
+					if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+						baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
+#endif
 				} // end loop ipart
-
-				/*======================================================
-									BACKPROJECTION
-				======================================================*/
-			  cudaError_t error = cudaGetLastError();
-			  if(error != cudaSuccess)
-			  {
-				// print the CUDA error message and exit
-				printf("CUDA error: %s\n", cudaGetErrorString(error));
-				exit(-1);
-			  }
-
-				std::vector<FLOAT> bp_eulers(9*orientation_num);
-
-				FLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
-
-				generateEulerMatrices(
-						1/padding_factor, //Why squared scale factor is given in backprojection
-						ProjectionData_projdiv,
-						&bp_eulers[0],
-						IS_NOT_INV);
-
-				cudaMLO->bp_eulers[exp_iclass].resize(9*orientation_num);
-				cudaMLO->bp_eulers[exp_iclass].toDevice(bp_eulers, currentBPStream);
-
-#ifdef TIMING
-				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
-					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
-#endif
-				CUDA_GPU_TIC("cuda_kernels_backproject");
-				baseMLO->cudaBackprojectors[exp_iclass].backproject(
-						cudaMLO->wavgs_real[exp_iclass],
-						cudaMLO->wavgs_imag[exp_iclass],
-						cudaMLO->wavgs_weight[exp_iclass],
-						cudaMLO->bp_eulers[exp_iclass],
-						op.local_Minvsigma2s[0].xdim,
-						op.local_Minvsigma2s[0].ydim,
-						orientation_num);
-				CUDA_GPU_TAC("cuda_kernels_backproject");
-#ifdef TIMING
-				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
-					baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
-#endif
 			}
+		}
+	}
+	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+	{
+		// Use the constructed mask to construct a partial class-specific input
+		IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
 
-			CUDA_CPU_TOC("maximization");
+		CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
+		// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
+		ProjectionParams thisClassProjectionData(	ProjectionData,
+													ProjectionData.class_idx[exp_iclass],
+													ProjectionData.class_idx[exp_iclass]+ProjectionData.class_entries[exp_iclass]);
+
+		thisClassProjectionData.orientation_num[0] = ProjectionData.orientation_num[exp_iclass];
+		CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
+		if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (ProjectionData.class_entries[exp_iclass] > 0) )
+		{
+				CUDA_CPU_TOC("maximization");
 
 			/*=======================================================================================
                                             COLLECT 2 AND SET METADATA
