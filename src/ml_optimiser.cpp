@@ -34,7 +34,7 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
-#include "gpu_utils/cuda_ml_optimiser.h"
+#include "src/gpu_utils/cuda_ml_optimiser.h"
 
 #define NR_CLASS_MUTEXES 5
 
@@ -51,10 +51,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
 	if (MLO->do_gpu)
-	{
-		MlOptimiserCuda cuda_optimiser(MLO);
-		cuda_optimiser.doThreadExpectationSomeParticles(thArg.thread_id);
-	}
+		((MlOptimiserCuda*) MLO->cudaMlOptimiser)->doThreadExpectationSomeParticles(thArg.thread_id);
 	else
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
@@ -1510,118 +1507,9 @@ void MlOptimiser::expectation()
 	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
-
-
-
-
 	if (do_gpu)
 	{
-		cudaProjectors.resize(mymodel.nr_classes);
-		cudaBackprojectors.resize(mymodel.nr_classes);
-
-		cudaCoarseProjectionPlans.clear();
-
-		if (!do_skip_align && !do_skip_rotate && !do_auto_refine && mymodel.orientational_prior_mode == NOPRIOR)
-			cudaCoarseProjectionPlans.resize(mymodel.nr_classes);
-
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			cudaProjectors[iclass].setMdlDim(
-					mymodel.PPref[iclass].data.xdim,
-					mymodel.PPref[iclass].data.ydim,
-					mymodel.PPref[iclass].data.zdim,
-					mymodel.PPref[iclass].data.yinit,
-					mymodel.PPref[iclass].data.zinit,
-					mymodel.PPref[iclass].r_max,
-					mymodel.PPref[iclass].padding_factor);
-
-			cudaProjectors[iclass].setMdlData(mymodel.PPref[iclass].data.data);
-
-			cudaBackprojectors[iclass].setMdlDim(
-					wsum_model.BPref[iclass].data.xdim,
-					wsum_model.BPref[iclass].data.ydim,
-					wsum_model.BPref[iclass].data.zdim,
-					wsum_model.BPref[iclass].data.yinit,
-					wsum_model.BPref[iclass].data.zinit,
-					wsum_model.BPref[iclass].r_max,
-					wsum_model.BPref[iclass].padding_factor);
-
-			cudaBackprojectors[iclass].initMdl();
-
-
-
-
-			if (mymodel.pdf_class[iclass] > 0. && cudaCoarseProjectionPlans.size() > 0)
-			{
-				printf("Generating predefined projection plan.\n");
-
-				std::vector<int> exp_pointer_dir_nonzeroprior;
-				std::vector<int> exp_pointer_psi_nonzeroprior;
-				std::vector<double> exp_directions_prior;
-				std::vector<double> exp_psi_prior;
-
-//				if (mymodel.orientational_prior_mode != NOPRIOR)
-//				{
-//					// First try if there are some fixed prior angles
-//					double prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
-//					double prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
-//					double prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
-//
-//					// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
-//					if (prior_rot > 998.99 && prior_rot < 999.01)
-//						prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
-//					if (prior_tilt > 998.99 && prior_tilt < 999.01)
-//						prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-//					if (prior_psi > 998.99 && prior_psi < 999.01)
-//						prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
-//
-//					sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
-//							sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
-//							exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
-//
-//					long int nr_orients = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) * sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
-//					if (nr_orients == 0)
-//					{
-//						std::cerr << " sampling.NrDirections()= " << sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior)
-//								<< " sampling.NrPsiSamplings()= " << sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
-//						REPORT_ERROR("Zero orientations fall within the local angular search. Increase the sigma-value(s) on the orientations!");
-//					}
-//				}
-
-				long unsigned itrans_max = sampling.NrTranslationalSamplings() - 1;
-				long unsigned nr_idir = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
-				long unsigned nr_ipsi = sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
-
-				cudaCoarseProjectionPlans[iclass].setup(
-						sampling,
-						exp_directions_prior,
-						exp_psi_prior,
-						exp_pointer_dir_nonzeroprior,
-						exp_pointer_psi_nonzeroprior,
-						NULL, //Mcoarse_significant
-						mymodel.pdf_class,
-						mymodel.pdf_direction,
-						nr_idir,
-						nr_ipsi,
-						0, //idir_min
-						nr_idir - 1, //idir_max
-						0, //ipsi_min
-						nr_ipsi - 1, //ipsi_max
-						0, //itrans_min
-						itrans_max,
-						0, //current_oversampling
-						1, //nr_oversampled_rot
-						iclass,
-						true, //coarse
-						!IS_NOT_INV,
-						do_skip_align,
-						do_skip_rotate,
-						mymodel.orientational_prior_mode
-						);
-			}
-			else
-				printf("Generating projection plan on the fly.\n");
-		}
+		cudaMlOptimiser = (void*) new MlOptimiserCuda(this);
 	}
 
 	// Now perform real expectation over all particles
@@ -1682,18 +1570,8 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		cudaProjectors.clear();
-
-		//Get backproject data from gpu
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			cudaBackprojectors[iclass].getMdlData(
-					wsum_model.BPref[iclass].data.data,
-					wsum_model.BPref[iclass].weight.data
-					);
-		}
-
-		cudaBackprojectors.clear();
+		((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
+		delete ((MlOptimiserCuda*) cudaMlOptimiser);
 	}
 
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)

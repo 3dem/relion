@@ -3,6 +3,9 @@
 
 #include "src/ml_optimiser.h"
 #include "src/gpu_utils/cuda_device_ptr.h"
+#include "src/gpu_utils/cuda_projector_plan.h"
+#include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_backprojector.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FLOAT double
@@ -152,8 +155,19 @@ public:
 
 class MlOptimiserCuda
 {
-
 public:
+
+	//The CUDA accelerated projector set
+	std::vector< CudaProjector > cudaProjectors;
+
+	//The CUDA accelerated back-projector set
+	std::vector< CudaBackprojector > cudaBackprojectors;
+
+	//Used for precalculations of projection setup
+	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
+
+	std::vector<CudaDevicePtr<FLOAT> > onTheFlyProjectionSetup;
+
 	std::vector<CudaDevicePtr<FLOAT> > wavg_eulers;
 
 	std::vector<CudaDevicePtr<FLOAT> > wavgs_real;
@@ -175,11 +189,26 @@ public:
 
 	std::vector<CudaDevicePtr<FLOAT> > bp_eulers;
 
+	std::vector<CudaDevicePtr<FLOAT> >     oo_otrans_x;
+	std::vector<CudaDevicePtr<FLOAT> >     oo_otrans_y;
+	std::vector<CudaDevicePtr<FLOAT> > myp_oo_otrans_x2y2z2;
+
+	std::vector<CudaDevicePtr<FLOAT> >                      p_weights;
+	std::vector<CudaDevicePtr<FLOAT> > p_thr_wsum_prior_offsetx_class;
+	std::vector<CudaDevicePtr<FLOAT> > p_thr_wsum_prior_offsety_class;
+	std::vector<CudaDevicePtr<FLOAT> >       p_thr_wsum_sigma2_offset;
+
 	MlOptimiser *baseMLO;
+
+	bool generateProjectionPlanOnTheFly;
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser) : baseMLO(baseMLOptimiser)
 	{
 		unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
+
+		/*======================================================
+                         DEVICE MEM OBJ SETUP
+		======================================================*/
 
 		wavg_eulers.resize(nr_classes);
 
@@ -201,9 +230,111 @@ public:
 		wdiff2s_parts.resize(nr_classes);
 
 		bp_eulers.resize(nr_classes);
+
+		oo_otrans_x.resize(nr_classes);
+		oo_otrans_y.resize(nr_classes);
+		myp_oo_otrans_x2y2z2.resize(nr_classes);
+
+		p_weights.resize(nr_classes);
+		p_thr_wsum_prior_offsetx_class.resize(nr_classes);
+		p_thr_wsum_prior_offsety_class.resize(nr_classes);
+		p_thr_wsum_sigma2_offset.resize(nr_classes);
+
+		/*======================================================
+            PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
+		======================================================*/
+
+		cudaProjectors.resize(nr_classes);
+		cudaBackprojectors.resize(nr_classes);
+
+		//Can we pre-generate projector plan and corresponding euler matrices for all particles
+		if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
+			generateProjectionPlanOnTheFly = true;
+		else
+		{
+			generateProjectionPlanOnTheFly = false;
+			cudaCoarseProjectionPlans.resize(nr_classes);
+		}
+
+		//Loop over classes
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			cudaProjectors[iclass].setMdlDim(
+					baseMLO->mymodel.PPref[iclass].data.xdim,
+					baseMLO->mymodel.PPref[iclass].data.ydim,
+					baseMLO->mymodel.PPref[iclass].data.zdim,
+					baseMLO->mymodel.PPref[iclass].data.yinit,
+					baseMLO->mymodel.PPref[iclass].data.zinit,
+					baseMLO->mymodel.PPref[iclass].r_max,
+					baseMLO->mymodel.PPref[iclass].padding_factor);
+
+			cudaProjectors[iclass].setMdlData(baseMLO->mymodel.PPref[iclass].data.data);
+
+			cudaBackprojectors[iclass].setMdlDim(
+					baseMLO->wsum_model.BPref[iclass].data.xdim,
+					baseMLO->wsum_model.BPref[iclass].data.ydim,
+					baseMLO->wsum_model.BPref[iclass].data.zdim,
+					baseMLO->wsum_model.BPref[iclass].data.yinit,
+					baseMLO->wsum_model.BPref[iclass].data.zinit,
+					baseMLO->wsum_model.BPref[iclass].r_max,
+					baseMLO->wsum_model.BPref[iclass].padding_factor);
+
+			cudaBackprojectors[iclass].initMdl();
+
+			//If doing predefined projector plan at all and is this class significant
+			if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)
+			{
+				std::vector<int> exp_pointer_dir_nonzeroprior;
+				std::vector<int> exp_pointer_psi_nonzeroprior;
+				std::vector<double> exp_directions_prior;
+				std::vector<double> exp_psi_prior;
+
+				long unsigned itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
+				long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
+				long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
+
+				cudaCoarseProjectionPlans[iclass].setup(
+						baseMLO->sampling,
+						exp_directions_prior,
+						exp_psi_prior,
+						exp_pointer_dir_nonzeroprior,
+						exp_pointer_psi_nonzeroprior,
+						NULL, //Mcoarse_significant
+						baseMLO->mymodel.pdf_class,
+						baseMLO->mymodel.pdf_direction,
+						nr_idir,
+						nr_ipsi,
+						0, //idir_min
+						nr_idir - 1, //idir_max
+						0, //ipsi_min
+						nr_ipsi - 1, //ipsi_max
+						0, //itrans_min
+						itrans_max,
+						0, //current_oversampling
+						1, //nr_oversampled_rot
+						iclass,
+						true, //coarse
+						!IS_NOT_INV,
+						baseMLO->do_skip_align,
+						baseMLO->do_skip_rotate,
+						baseMLO->mymodel.orientational_prior_mode
+						);
+			}
+		}
 	};
 
 	void doThreadExpectationSomeParticles(unsigned thread_id);
+
+	void storeBpMdlData()
+	{
+		for (int iclass = 0; iclass < baseMLO->mymodel.nr_classes; iclass++)
+		{
+			cudaBackprojectors[iclass].getMdlData(
+					baseMLO->wsum_model.BPref[iclass].data.data,
+					baseMLO->wsum_model.BPref[iclass].weight.data
+					);
+		}
+	}
 
 };
 

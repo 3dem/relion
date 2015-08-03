@@ -30,10 +30,6 @@
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
 
-#include "src/gpu_utils/cuda_projector_plan.h"
-#include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_backprojector.h"
-
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
 
@@ -93,6 +89,9 @@ class MlOptimiser;
 class MlOptimiser
 {
 public:
+
+	//TODO Fix void pointer
+	void *cudaMlOptimiser; //CudaMlOptimiser
 
 	// I/O Parser
 	IOParser parser;
@@ -433,15 +432,6 @@ public:
 	*/
 	//TMP DEBUGGING
 	MultidimArray<double> DEBUGGING_COPY_exp_Mweight;
-
-	//The CUDA accelerated projector set
-	std::vector< CudaProjector > cudaProjectors;
-
-	//The CUDA accelerated back-projector set
-	std::vector< CudaBackprojector > cudaBackprojectors;
-
-	//Used for precalculations of projection setup
-	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
 
 #ifdef TIMING
     Timer timer;

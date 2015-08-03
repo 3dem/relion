@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "src/gpu_utils/cuda_settings.h"
+#include "src/gpu_utils/cuda_device_ptr.h"
 #include "src/healpix_sampling.h"
 #include <iostream>
 #include <fstream>
@@ -12,7 +13,7 @@ class CudaProjectorPlan
 public:
 	std::vector< long unsigned > iorientclasses, iover_rots;
 	long unsigned orientation_num;
-	FLOAT *d_eulers;
+	CudaDevicePtr<FLOAT> *d_eulers;
 	bool free_device;
 
 	//Copy constructor
@@ -26,6 +27,13 @@ public:
 
 	CudaProjectorPlan():
 		orientation_num(0), d_eulers(0), free_device(false)
+	{
+		iorientclasses.reserve(0);
+		iover_rots.reserve(0);
+	};
+
+	CudaProjectorPlan(CudaDevicePtr<FLOAT> *d_eulers):
+		orientation_num(0), d_eulers(d_eulers), free_device(false)
 	{
 		iorientclasses.reserve(0);
 		iover_rots.reserve(0);

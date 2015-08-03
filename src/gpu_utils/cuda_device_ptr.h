@@ -4,6 +4,7 @@
 #include "src/gpu_utils/cuda_settings.h"
 #include <cuda_runtime.h>
 #include <signal.h>
+#include <fstream>
 
 #ifdef DEBUG_CUDA
 #define HANDLE_ERROR2( err ) (HandleError2( err, __FILE__, __LINE__ ))
@@ -50,6 +51,9 @@ public:
 	operator T*() { return ptr; }
 
 	inline
+	T* getPtr() { return ptr; }
+
+	inline
 	void resize(size_t newSize)
 	{
 		if (newSize > allocSize)
@@ -76,52 +80,56 @@ public:
 	};
 
 	inline
-	void toDevice(T *h_ptr)
+	void set(T *h_ptr)
 	{
 		HANDLE_ERROR2(cudaMemcpy( ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
 	};
 
 	inline
-	void toDevice(std::vector<T> &h_ptr)
+	void set(std::vector<T> &h_ptr)
 	{
-		toDevice(&h_ptr[0]);
+		resize(h_ptr.size());
+		set(&h_ptr[0]);
 	};
 
 	inline
-	void toDevice(T *h_ptr, cudaStream_t stream)
+	void set(T *h_ptr, cudaStream_t stream)
 	{
 		HANDLE_ERROR2(cudaMemcpyAsync( ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
 	};
 
 	inline
-	void toDevice(std::vector<T> &h_ptr, cudaStream_t stream)
+	void set(std::vector<T> &h_ptr, cudaStream_t stream)
 	{
-		toDevice(&h_ptr[0], stream);
+		resize(h_ptr.size());
+		set(&h_ptr[0], stream);
 	};
 
 
 	inline
-	void toHost(T *h_ptr)
+	void get(T *h_ptr)
 	{
 		HANDLE_ERROR2(cudaMemcpy( h_ptr, ptr, size * sizeof(T), cudaMemcpyDeviceToHost));
 	};
 
 	inline
-	void toHost(std::vector<T> &h_ptr)
+	void get(std::vector<T> &h_ptr)
 	{
-		toHost(&h_ptr[0]);
+		resize(h_ptr.size());
+		get(&h_ptr[0]);
 	};
 
 	inline
-	void toHost(T *h_ptr, cudaStream_t stream)
+	void get(T *h_ptr, cudaStream_t stream)
 	{
 		HANDLE_ERROR2(cudaMemcpyAsync( h_ptr, ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
 	};
 
 	inline
-	void toHost(std::vector<T> &h_ptr, cudaStream_t stream)
+	void get(std::vector<T> &h_ptr, cudaStream_t stream)
 	{
-		toHost(&h_ptr[0], stream);
+		resize(h_ptr.size());
+		get(&h_ptr[0], stream);
 	};
 
 	~CudaDevicePtr()

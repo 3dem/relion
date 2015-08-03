@@ -110,7 +110,7 @@ void CudaProjectorPlan::setup(
 	double ca, sa, cb, sb, cg, sg;
 	double cc, cs, sc, ss;
 
-	FLOAT *e = new FLOAT[9 * orientation_num];
+	std::vector<FLOAT> e(9 * orientation_num);
 
 	for (long int i = 0; i < rots.size(); i++)
 	{
@@ -153,11 +153,13 @@ void CudaProjectorPlan::setup(
 		}
 	}
 
-	HANDLE_ERROR(cudaMalloc( (void**) &d_eulers, 9 * orientation_num * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMemcpy( d_eulers, e, 9 * orientation_num * sizeof(FLOAT), cudaMemcpyHostToDevice));
-	free_device = true;
+	if (d_eulers == NULL)
+	{
+		d_eulers = new CudaDevicePtr<FLOAT>();
+		free_device = true;
+	}
 
-	delete [] e;
+	d_eulers->set(e);
 }
 
 void CudaProjectorPlan::printTo(std::ostream &os) // print
@@ -167,8 +169,8 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 	os << "iorientclasses.size = " << iorientclasses.size() << std::endl;
 	os << "iover_rots.size = " << iover_rots.size() << std::endl;
 
-	FLOAT *e = new FLOAT[9 * orientation_num];
-	HANDLE_ERROR(cudaMemcpy( e, d_eulers, 9 * orientation_num * sizeof(FLOAT), cudaMemcpyDeviceToHost));
+	std::vector<FLOAT> e(9 * orientation_num);
+	d_eulers->get(e);
 
 	os << std::endl << "iorientclasses\tiover_rots\teulers" << std::endl;
 	for (int i = 0; i < iorientclasses.size(); i ++)
@@ -178,12 +180,10 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 			os << e[i * 9 + j] << "\t";
 		os << std::endl;
 	}
-
-	delete [] e;
 }
 
 CudaProjectorPlan::~CudaProjectorPlan()
 {
 	if(free_device)
-		HANDLE_ERROR(cudaFree(d_eulers));
+		delete d_eulers;
 }

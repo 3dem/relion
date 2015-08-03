@@ -525,7 +525,7 @@ void runDiff2KernelCoarse(
 		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
 		CudaGlobalPtr<FLOAT> &Fimgs_real,
 		CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		FLOAT* &d_eulers,
+		FLOAT *d_eulers,
 		CudaGlobalPtr<FLOAT> &diff2s,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
