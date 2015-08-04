@@ -319,6 +319,22 @@ public:
 						baseMLO->do_skip_rotate,
 						baseMLO->mymodel.orientational_prior_mode
 						);
+
+				cudaStream_t s = cudaBackprojectors[iclass].getStream();
+
+				wavg_eulers[iclass].setStream(s);
+				wavgs_real[iclass].setStream(s);
+				wavgs_imag[iclass].setStream(s);
+				wavgs_weight[iclass].setStream(s);
+				Fimgs_real[iclass].setStream(s);
+				Fimgs_imag[iclass].setStream(s);
+				Fimgs_nomask_real[iclass].setStream(s);
+				Fimgs_nomask_imag[iclass].setStream(s);
+				ctfs[iclass].setStream(s);
+				sorted_weights[iclass].setStream(s);
+				Minvsigma2s[iclass].setStream(s);
+				wdiff2s_parts[iclass].setStream(s);
+				bp_eulers[iclass].setStream(s);
 			}
 		}
 	};
