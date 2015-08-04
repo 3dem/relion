@@ -13,6 +13,7 @@ file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" 
 file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.h")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 
+
 #--Apps using X11--
 if(BUILD_GUI_TARGETS)
     file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine.cpp" "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
@@ -29,6 +30,10 @@ endif(BUILD_GUI_TARGETS)
 if (CUDA_FOUND)
     file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu" "${CMAKE_SOURCE_DIR}/src/gpu_utils/cuda_kernels/*.cu")
     cuda_add_library(gpu_util STATIC ${REL_CUDA_SRC})
+    if (${CMAKE_BUILD_TYPE} STREQUAL "profiling")
+        file(GLOB EXTRA_LIBS "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnvToolsExt.so")
+        message(STATUS "Adding extra library for NVIDIA profiling: ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnvToolsExt.so")
+    endif(${CMAKE_BUILD_TYPE} STREQUAL "profiling")
 endif(CUDA_FOUND)
 
 add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
@@ -38,9 +43,9 @@ foreach (_target ${RELION_TARGETS})
     add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
 	
 	if(BUILD_GUI_TARGETS)
-	    target_link_libraries(${_target} ${FLTK_LIBRARIES} gpu_util ${FFTW_LIBRARIES} ${X11} ${relion_lib} )
+	    target_link_libraries(${_target} ${FLTK_LIBRARIES} gpu_util ${FFTW_LIBRARIES} ${X11} ${relion_lib} ${EXTRA_LIBS})
 	else(BUILD_GUI_TARGETS)
-	    target_link_libraries(${_target} gpu_util ${FFTW_LIBRARIES} ${relion_lib} )
+	    target_link_libraries(${_target} gpu_util ${FFTW_LIBRARIES} ${relion_lib} ${EXTRA_LIBS})
 	endif(BUILD_GUI_TARGETS)
 	
 	message(STATUS "added ${_target}...")

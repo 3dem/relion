@@ -84,9 +84,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_REL
 
 
 
+
 # ---------------------------------- 
-#       Profiling BUILD 
-#  (Release with profiling output) 
+#       NVIDIA Profiling BUILD 
+#        (Release for nvprof) 
 # ----------------------------------
 # ** NOTE: this will not have overall Release perf. **
 
@@ -104,16 +105,42 @@ set(RELION_NVCC_FLAGS_PROFILING "${CUDARCH} --disable-warnings -lineinfo" CACHE 
 set(RELION_LINKER_FLAGS_PROFILING  "")
 
 # -- Append compiler and linker flags -------------------------------
-#message(STATUS "CCF_RELEASE :         ${CMAKE_CXX_FLAGS_RELEASE}")
-set(CMAKE_CXX_FLAGS_PROFILING        "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_FLAGS_PROFILING}"        CACHE STRING "")
-set(CMAKE_C_FLAGS_PROFILING          "${CMAKE_C_FLAGS_RELEASE} ${RELION_FLAGS_PROFILING}"        CACHE STRING "")
-set(CMAKE_EXE_LINKER_FLAGS_PROFILING "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${RELION_LINKER_FLAGS_PROFILING}" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_PROFILING        "${CMAKE_CXX_FLAGS_PROFILING} ${RELION_FLAGS_PROFILING}"               CACHE STRING "")
+set(CMAKE_C_FLAGS_PROFILING          "${CMAKE_C_FLAGS_PROFILING} ${RELION_FLAGS_PROFILING}"                 CACHE STRING "")
+set(CMAKE_EXE_LINKER_FLAGS_PROFILING "${CMAKE_EXE_LINKER_FLAGS_PROFILING} ${RELION_LINKER_FLAGS_PROFILING}" CACHE STRING "")
 set(CUDA_NVCC_FLAGS_PROFILING        "${RELION_NVCC_FLAGS_PROFILING}"                                     CACHE STRING "")
 
 # -- Add preprocessor defintions ------------------------------------
-set(RELION_DEFINITIONS_PROFILING "-DCUDA_BENCHMARK -DTIMING -DUSE_THRUST")
+set(RELION_DEFINITIONS_PROFILING "-DCUDA_PROFILING -DUSE_THRUST")
 set(CMAKE_CXX_FLAGS_PROFILING "${CMAKE_CXX_FLAGS_PROFILING} ${RELION_DEFINITIONS_PROFILING}")
 
 #message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
 #message(STATUS "CMAKE_CXX_FLAGS_PROFILING : ${CMAKE_CXX_FLAGS_PROFILING}")
+#--------------------------------------------------------------------
+
+
+
+
+
+
+
+# ---------------------------------- 
+#       Benchmarking BUILD 
+#  (Release with profiling output) 
+# ----------------------------------
+# -- Compiler flags -------------------------------------------------
+set(RELION_FLAGS_BENCHMARKING "" CACHE STRING "")
+set(RELION_NVCC_FLAGS_BENCHMARKING "${CUDARCH} --disable-warnings" CACHE STRING "")
+# -- Linker flags ---------------------------------------------------
+set(RELION_LINKER_FLAGS_BENCHMARKING  "")
+
+# -- Append compiler and linker flags -------------------------------
+set(CMAKE_CXX_FLAGS_BENCHMARKING        "${CMAKE_CXX_FLAGS_BENCHMARKING} ${RELION_FLAGS_BENCHMARKING}"               CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS_BENCHMARKING          "${CMAKE_C_FLAGS_BENCHMARKING} ${RELION_FLAGS_BENCHMARKING}"                 CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_BENCHMARKING "${CMAKE_EXE_LINKER_FLAGS_BENCHMARKING} ${RELION_LINKER_FLAGS_BENCHMARKING}" CACHE STRING "" FORCE)
+set(CUDA_NVCC_FLAGS_BENCHMARKING        "${RELION_NVCC_FLAGS_BENCHMARKING}"                                       CACHE STRING "" FORCE)
+
+# -- Add preprocessor defintions ------------------------------------
+set(RELION_DEFINITIONS_BENCHMARKING "-DCUDA_BENCHMARK -DTIMING -DUSE_THRUST")
+set(CMAKE_CXX_FLAGS_BENCHMARKING "${CMAKE_CXX_FLAGS_BENCHMARKING} ${RELION_DEFINITIONS_BENCHMARKING}")
 #--------------------------------------------------------------------

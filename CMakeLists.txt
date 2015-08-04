@@ -1,39 +1,25 @@
 cmake_minimum_required(VERSION 2.8.8)
 set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 
-# Set the build type
-if(DEFINED CMAKE_BUILD_TYPE)
-   SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
-build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug
-Release RelWithDebInfo MinSizeRel.")
-else()
-   SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build,
-options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release
-RelWithDebInfo MinSizeRel.")
-endif()
-
-message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
-
-option(CudaDouble "CudaDouble" OFF)
-if(CudaDouble)
-    add_definitions(-DCUDA_DOUBLE_PRECISION)
-    message(STATUS "Building cuda files with double precision.")
-endif(CudaDouble)
-
-option(CUFFT "CUFFT" OFF)
-if(CUFFT)
-    add_definitions(-DUSE_CUFFT)
-    message(STATUS "Using cuda-based fftw libraries and functions")
-endif(CUFFT)
-
-project(Relion)
-include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER project()
-
 set(PROJECT_VERSION "1.4.0")
 
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+# Set the build type
+if(DEFINED CMAKE_BUILD_TYPE)
+   SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
+build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling Benchmarking.")
+else()
+   SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build,
+options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling Benchmarking.")
+endif()
+
+message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
+
+project(Relion)
+include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER project()
 
 # Uncomment following line to build relion without thread-support
 # ( this will only build binareis not relying on thread-mpi support )
@@ -50,12 +36,28 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # Skip FLTK/X11-dependent binaries or not
 set(OMIT_GUI_TARGETS TRUE)
 
-find_package(CUDA)  # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
+FIND_PACKAGE(CUDA)  # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
+
+option(CudaDouble "CudaDouble" OFF)
+if(CudaDouble)
+    add_definitions(-DCUDA_DOUBLE_PRECISION)
+    message(STATUS "Building cuda files with double precision.")
+endif(CudaDouble)
+
+option(CUFFT "CUFFT" OFF)
+if(CUFFT)
+    if (NOT CUDA_FOUND)
+        message(FATAL_ERROR "CUFFT required, but cuda was not found.")
+    endif(NOT CUDA_FOUND)
+    add_definitions(-DUSE_CUFFT)
+    message(STATUS "Using cuda-based fftw libraries and functions")
+endif(CUFFT)
+
 SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

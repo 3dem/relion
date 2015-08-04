@@ -9,7 +9,7 @@
 #include "src/gpu_utils/cuda_utils.cuh"
 
 //Non-concurrent benchmarking tools (only for Linux)
-#ifdef CUDA_BENCHMARK
+#if defined CUDA_BENCHMARK
 #include <vector>
 #include <time.h>
 #include <string>
@@ -131,6 +131,14 @@ static void cuda_gpu_toc()
 		cuda_gpu_benchmark_stop_times.clear();
 	}
 }
+#elif defined CUDA_PROFILING
+#include <nvToolsExt.h>
+
+#define CUDA_CPU_TIC(ID) (nvtxRangePush(ID))
+#define CUDA_CPU_TOC(ID) (nvtxRangePop())
+#define CUDA_GPU_TIC(ID)
+#define CUDA_GPU_TAC(ID)
+#define CUDA_GPU_TOC(ID)
 #else
 #define CUDA_CPU_TIC(ID)
 #define CUDA_CPU_TOC(ID)
