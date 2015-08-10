@@ -106,10 +106,15 @@ void FourierTransformer::cleanup()
     clear();
     // Then clean up all the junk fftw keeps lying around
     // SOMEHOW THE FOLLOWING IS NOT ALLOWED WHEN USING MULTPLE TRANSFORMER OBJECTS....
-	if (threadsSetOn)
+#ifndef USE_CUFFT
+    if(threadsSetOn)
     	fftw_cleanup_threads();
     else
     	fftw_cleanup();
+#else
+    fftw_cleanup();
+#endif
+
 #ifdef DEBUG_PLANS
     std::cerr << "CLEANED-UP this= "<<this<< std::endl;
 #endif
@@ -146,9 +151,13 @@ void FourierTransformer::setThreadsNumber(int tNumber)
         threadsSetOn=true;
         nthreads = tNumber;
         pthread_mutex_lock(&fftw_plan_mutex);
+#ifndef USE_CUFFT
         if(fftw_init_threads()==0)
             REPORT_ERROR("FFTW cannot init threads (setThreadsNumber)");
         fftw_plan_with_nthreads(nthreads);
+#else
+        fftw_plan();
+#endif
         pthread_mutex_unlock(&fftw_plan_mutex);
     }
 }
