@@ -9,9 +9,9 @@
 
 #ifndef PROJECTOR_SRC_TYPE
 #ifndef CUDA_DOUBLE_PRECISION
-#define PROJECTOR_SRC_TYPE cudaTextureObject_t
+#define PROJECTOR_PTR_TYPE cudaTextureObject_t
 #else
-#define PROJECTOR_SRC_TYPE double *
+#define PROJECTOR_PTR_TYPE double *
 #endif
 #endif
 
@@ -25,8 +25,8 @@ public:
 		padding_factor,
 		maxR, maxR2;
 
-	PROJECTOR_SRC_TYPE mdlReal;
-	PROJECTOR_SRC_TYPE mdlImag;
+	PROJECTOR_PTR_TYPE mdlReal;
+	PROJECTOR_PTR_TYPE mdlImag;
 
 	CudaProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
@@ -34,7 +34,7 @@ public:
 			int mdlInitY, int mdlInitZ,
 			int padding_factor,
 			int maxR,
-			PROJECTOR_SRC_TYPE mdlReal, PROJECTOR_SRC_TYPE mdlImag
+			PROJECTOR_PTR_TYPE mdlReal, PROJECTOR_PTR_TYPE mdlImag
 			):
 			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
 			imgX(imgX), imgY(imgY),
@@ -277,11 +277,11 @@ public:
 			    maxR,
 
 #ifndef CUDA_DOUBLE_PRECISION
-			    *(cudaTextureObject_t*) p.mdlReal,
-			    *(cudaTextureObject_t*) p.mdlImag
+			    *p.mdlReal,
+			    *p.mdlImag
 #else
-				~(*(CudaGlobalPtr<double>*) p.mdlReal),
-				~(*(CudaGlobalPtr<double>*) p.mdlImag)
+				p.mdlReal,
+				p.mdlImag
 #endif
 
 				);
