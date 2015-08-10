@@ -2,16 +2,16 @@
 #include <vector>
 #include <iostream>
 
-__global__ void cuda_kernel_sumweightCoarse(  FLOAT *g_pdf_orientation,
-									     	  FLOAT *g_pdf_offset,
-									     	  FLOAT *g_Mweight,
-									     	  FLOAT *g_thisparticle_sumweight,
-									     	  FLOAT min_diff2,
+__global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
+									     	  XFLOAT *g_pdf_offset,
+									     	  XFLOAT *g_Mweight,
+									     	  XFLOAT *g_thisparticle_sumweight,
+									     	  XFLOAT min_diff2,
 									     	  int oversamples_orient,
 									     	  int oversamples_trans,
 									     	  int coarse_trans)
 {
-	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_sumweight[SUM_BLOCK_SIZE];
 	// blockid
 	int bid  = blockIdx.x;
 	//threadid
@@ -33,14 +33,14 @@ __global__ void cuda_kernel_sumweightCoarse(  FLOAT *g_pdf_orientation,
 		pos += c_itrans * (oversamples_orient*oversamples_trans);
 		pos += f_iorient*( oversamples_trans ) + f_itrans;
 
-		if( g_Mweight[pos] < (FLOAT)0.0 ) //TODO Might be slow (divergent threads)
+		if( g_Mweight[pos] < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
 		{
-			g_Mweight[pos] = (FLOAT)0.0;
+			g_Mweight[pos] = (XFLOAT)0.0;
 		}
 		else
 		{
-			FLOAT weight = g_pdf_orientation[c_iorient] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-			FLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
+			XFLOAT weight = g_pdf_orientation[c_iorient] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+			XFLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
 			// next line because of numerical precision of exp-function
 #if defined(CUDA_DOUBLE_PRECISION)
 				if (diff2 > 700.)
@@ -81,11 +81,11 @@ __global__ void cuda_kernel_sumweightCoarse(  FLOAT *g_pdf_orientation,
  * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.
  *
  */
-__global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
-									     	  FLOAT *g_pdf_offset,
-									     	  FLOAT *g_weights,
-									     	  FLOAT *g_thisparticle_sumweight,
-									     	  FLOAT min_diff2,
+__global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
+									     	  XFLOAT *g_pdf_offset,
+									     	  XFLOAT *g_weights,
+									     	  XFLOAT *g_thisparticle_sumweight,
+									     	  XFLOAT min_diff2,
 									     	  int oversamples_orient,
 									     	  int oversamples_trans,
 									     	  unsigned long *d_rot_id,
@@ -94,8 +94,8 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 									     	  unsigned long *d_job_num,
 									     	  long int job_num)
 {
-	__shared__ FLOAT s_sumweight[SUM_BLOCK_SIZE];
-	__shared__ FLOAT s_weights[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_sumweight[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_weights[SUM_BLOCK_SIZE];
 
 	// blockid
 	int bid  = blockIdx.x;
@@ -123,8 +123,8 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
 //			f_itrans = iy % oversamples_trans;
 
-			FLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-			FLOAT diff2 = g_weights[pos+itrans] - min_diff2;								// Different for all threads
+			XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+			XFLOAT diff2 = g_weights[pos+itrans] - min_diff2;								// Different for all threads
 			// next line because of numerical precision of exp-function
 	#if defined(CUDA_DOUBLE_PRECISION)
 				if (diff2 > 700.)
@@ -163,21 +163,21 @@ __global__ void cuda_kernel_sumweightFine(    FLOAT *g_pdf_orientation,
 	g_thisparticle_sumweight[bid]=s_sumweight[0];
 }
 
-__global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
-										FLOAT *g_oo_otrans_y,          // otrans-size -> make const
-										FLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
-										FLOAT *g_Mweight,
-										FLOAT op_significant_weight,    // TODO Put in const
-										FLOAT op_sum_weight,            // TODO Put in const
+__global__ void cuda_kernel_collect2(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
+										XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
+										XFLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
+										XFLOAT *g_Mweight,
+										XFLOAT op_significant_weight,    // TODO Put in const
+										XFLOAT op_sum_weight,            // TODO Put in const
 										int   coarse_trans,
 										int   oversamples_trans,
 										int   oversamples_orient,
 										int   oversamples,
 										bool  do_ignore_pdf_direction,
-										FLOAT *g_weights,
-										FLOAT *g_thr_wsum_prior_offsetx_class,
-										FLOAT *g_thr_wsum_prior_offsety_class,
-										FLOAT *g_thr_wsum_sigma2_offset
+										XFLOAT *g_weights,
+										XFLOAT *g_thr_wsum_prior_offsetx_class,
+										XFLOAT *g_thr_wsum_prior_offsety_class,
+										XFLOAT *g_thr_wsum_sigma2_offset
 										)
 {
 	// objects reduced in this kernel, which need to be further reduced for all blocks
@@ -185,10 +185,10 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-s
 	// a block can treat all fine samples in a coarse orientation and output a single
 	// floating point value for each reduction. We do however list the dimension of
 	// post-kernel reduction for all reductions here:
-	__shared__ FLOAT                      s_weights[SUM_BLOCK_SIZE];
-	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE];
-	__shared__ FLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE];
-	__shared__ FLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT                      s_weights[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE];
 
 	int ex  = blockIdx.x * gridDim.y + blockIdx.y;            // coarse orientation
 	int tid = threadIdx.x;
@@ -210,7 +210,7 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-s
 		int pos = ref_Mweight_idx + itrans*oversamples + iover_rot*oversamples_trans + iover_trans;
 		for (int pass = 0; pass < pass_num; pass++, pos+=SUM_BLOCK_SIZE)
 		{
-			FLOAT weight = g_Mweight[pos];
+			XFLOAT weight = g_Mweight[pos];
 			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
 				weight /= op_sum_weight;
 			else
@@ -241,21 +241,21 @@ __global__ void cuda_kernel_collect2(	FLOAT *g_oo_otrans_x,          // otrans-s
 	g_thr_wsum_sigma2_offset[ex]       = s_thr_wsum_sigma2_offset[0];
 }
 
-__global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otrans-size -> make const
-										FLOAT *g_oo_otrans_y,          // otrans-size -> make const
-										FLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
-										FLOAT *g_i_weights,
-										FLOAT op_significant_weight,    // TODO Put in const
-										FLOAT op_sum_weight,            // TODO Put in const
+__global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
+										XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
+										XFLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
+										XFLOAT *g_i_weights,
+										XFLOAT op_significant_weight,    // TODO Put in const
+										XFLOAT op_sum_weight,            // TODO Put in const
 										int   coarse_trans,
 										int   oversamples_trans,
 										int   oversamples_orient,
 										int   oversamples,
 										bool  do_ignore_pdf_direction,
-										FLOAT *g_o_weights,
-										FLOAT *g_thr_wsum_prior_offsetx_class,
-										FLOAT *g_thr_wsum_prior_offsety_class,
-										FLOAT *g_thr_wsum_sigma2_offset,
+										XFLOAT *g_o_weights,
+										XFLOAT *g_thr_wsum_prior_offsetx_class,
+										XFLOAT *g_thr_wsum_prior_offsety_class,
+										XFLOAT *g_thr_wsum_sigma2_offset,
 								     	unsigned long *d_rot_idx,
 								     	unsigned long *d_trans_idx,
 								     	unsigned long *d_job_idx,
@@ -267,14 +267,14 @@ __global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otra
 	//threadid
 	int tid = threadIdx.x;
 
-	__shared__ FLOAT                    s_o_weights[SUM_BLOCK_SIZE];
-	__shared__ FLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE];
-	__shared__ FLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE];
-	__shared__ FLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE];
-	s_o_weights[tid]                    = (FLOAT)0.0;
-	s_thr_wsum_prior_offsetx_class[tid] = (FLOAT)0.0;
-	s_thr_wsum_prior_offsety_class[tid] = (FLOAT)0.0;
-	s_thr_wsum_sigma2_offset[tid]       = (FLOAT)0.0;
+	__shared__ XFLOAT                    s_o_weights[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_thr_wsum_prior_offsetx_class[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT s_thr_wsum_prior_offsety_class[SUM_BLOCK_SIZE];
+	__shared__ XFLOAT       s_thr_wsum_sigma2_offset[SUM_BLOCK_SIZE];
+	s_o_weights[tid]                    = (XFLOAT)0.0;
+	s_thr_wsum_prior_offsetx_class[tid] = (XFLOAT)0.0;
+	s_thr_wsum_prior_offsety_class[tid] = (XFLOAT)0.0;
+	s_thr_wsum_sigma2_offset[tid]       = (XFLOAT)0.0;
 
 	long int pos = d_job_idx[bid];
     int job_size = d_job_num[bid];
@@ -288,7 +288,7 @@ __global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otra
 			// index of comparison
 			long int iy = d_trans_idx[pos];              // ...and its own trans...
 
-			FLOAT weight = g_i_weights[pos];
+			XFLOAT weight = g_i_weights[pos];
 			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
 				weight /= op_sum_weight;
 			else
@@ -319,7 +319,7 @@ __global__ void cuda_kernel_collect2jobs(	FLOAT *g_oo_otrans_x,          // otra
 }
 
 
-__global__ void cuda_kernel_reduce_wdiff2s(FLOAT *g_wdiff2s_parts,
+__global__ void cuda_kernel_reduce_wdiff2s(XFLOAT *g_wdiff2s_parts,
 										   long int orientation_num,
 										   int image_size,
 										   int current_block_num)

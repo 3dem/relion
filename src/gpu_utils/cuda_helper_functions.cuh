@@ -24,7 +24,7 @@ long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &s
 
 int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask);
 
-FLOAT thrustGetMinVal(CudaGlobalPtr<FLOAT> &diff2s);
+XFLOAT thrustGetMinVal(CudaGlobalPtr<XFLOAT> &diff2s);
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -33,22 +33,22 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven);
 
 
 void mapWeights(unsigned long orientation_start,
-		CudaGlobalPtr<FLOAT> &mapped_weights,
+		CudaGlobalPtr<XFLOAT> &mapped_weights,
 		unsigned orientation_num, unsigned long idxArr_start, unsigned long idxArr_end,
 		unsigned translation_num,
-		CudaGlobalPtr <FLOAT> &weights,
+		CudaGlobalPtr <XFLOAT> &weights,
 		CudaGlobalPtr <long unsigned> &rot_idx,
 		CudaGlobalPtr <long unsigned> &trans_idx,
 		HealpixSampling &sampling, long int ipart,
 		std::vector< long unsigned > &iover_transes, std::vector< long unsigned > &ihiddens,
 		std::vector< long unsigned > &iorientclasses, std::vector< long unsigned > &iover_rots,
-		MultidimArray<FLOAT> &Mweight, unsigned long current_oversampling, unsigned long nr_trans);
+		MultidimArray<XFLOAT> &Mweight, unsigned long current_oversampling, unsigned long nr_trans);
 
 
 
 long unsigned imageTranslation(
-		CudaGlobalPtr<FLOAT> &Fimgs_real, CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		CudaGlobalPtr<FLOAT> &Fimgs_nomask_real, CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
+		CudaGlobalPtr<XFLOAT> &Fimgs_real, CudaGlobalPtr<XFLOAT> &Fimgs_imag,
+		CudaGlobalPtr<XFLOAT> &Fimgs_nomask_real, CudaGlobalPtr<XFLOAT> &Fimgs_nomask_imag,
 		long int itrans_min, long int itrans_max, int adaptive_oversampling , HealpixSampling &sampling,
 		std::vector<double> &oversampled_translations_x, std::vector<double> &oversampled_translations_y, std::vector<double> &oversampled_translations_z,
 		unsigned long nr_oversampled_trans, std::vector<MultidimArray<Complex> > &global_fftshifts_ab_current, std::vector<MultidimArray<Complex> > &global_fftshifts_ab2_current,
@@ -58,9 +58,9 @@ long unsigned imageTranslation(
 
 
 void generateEulerMatrices(
-		FLOAT padding_factor,
+		XFLOAT padding_factor,
 		ProjectionParams ProjectionData,
-		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<XFLOAT> &eulers,
 		bool inverse);
 
 long unsigned generateProjectionSetup(
@@ -74,18 +74,18 @@ long unsigned generateProjectionSetup(
 
 void runWavgKernel(
 		CudaProjectorKernel &projector,
-		CudaGlobalPtr<FLOAT> &eulers,
-		CudaGlobalPtr<FLOAT> &Fimgs_real,
-	    CudaGlobalPtr<FLOAT> &Fimgs_imag,
-	    CudaGlobalPtr<FLOAT> &Fimgs_nomask_real,
- 	    CudaGlobalPtr<FLOAT> &Fimgs_nomask_imag,
- 	    CudaGlobalPtr<FLOAT> &sorted_weights,
- 	    CudaGlobalPtr<FLOAT> &ctfs,
- 	    CudaGlobalPtr<FLOAT> &Minvsigma2s,
- 	    CudaGlobalPtr<FLOAT> &wdiff2s_parts,
- 	    CudaGlobalPtr<FLOAT> &wavgs_real,
-	    CudaGlobalPtr<FLOAT> &wavgs_imag,
-	    CudaGlobalPtr<FLOAT> &Fweights,
+		CudaGlobalPtr<XFLOAT> &eulers,
+		CudaGlobalPtr<XFLOAT> &Fimgs_real,
+	    CudaGlobalPtr<XFLOAT> &Fimgs_imag,
+	    CudaGlobalPtr<XFLOAT> &Fimgs_nomask_real,
+ 	    CudaGlobalPtr<XFLOAT> &Fimgs_nomask_imag,
+ 	    CudaGlobalPtr<XFLOAT> &sorted_weights,
+ 	    CudaGlobalPtr<XFLOAT> &ctfs,
+ 	    CudaGlobalPtr<XFLOAT> &Minvsigma2s,
+ 	    CudaGlobalPtr<XFLOAT> &wdiff2s_parts,
+ 	    CudaGlobalPtr<XFLOAT> &wavgs_real,
+	    CudaGlobalPtr<XFLOAT> &wavgs_imag,
+	    CudaGlobalPtr<XFLOAT> &Fweights,
 	    OptimisationParamters &op,
 	    MlOptimiser *baseMLO,
 	    long unsigned orientation_num,
@@ -97,11 +97,11 @@ void runWavgKernel(
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
-		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
-		CudaGlobalPtr<FLOAT> &Fimgs_real,
-		CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		CudaGlobalPtr<FLOAT> &eulers,
-		CudaGlobalPtr<FLOAT> &diff2s,
+		CudaGlobalPtr<XFLOAT > &gpuMinvsigma2,
+		CudaGlobalPtr<XFLOAT> &Fimgs_real,
+		CudaGlobalPtr<XFLOAT> &Fimgs_imag,
+		CudaGlobalPtr<XFLOAT> &eulers,
+		CudaGlobalPtr<XFLOAT> &diff2s,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
@@ -113,16 +113,16 @@ void runDiff2KernelCoarse(
 
 void runDiff2KernelFine(
 		CudaProjectorKernel &projector,
-		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
-		CudaGlobalPtr<FLOAT> &Fimgs_real,
-		CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<XFLOAT > &gpuMinvsigma2,
+		CudaGlobalPtr<XFLOAT> &Fimgs_real,
+		CudaGlobalPtr<XFLOAT> &Fimgs_imag,
+		CudaGlobalPtr<XFLOAT> &eulers,
 		CudaGlobalPtr<long unsigned> &rot_id,
 		CudaGlobalPtr<long unsigned> &rot_idx,
 		CudaGlobalPtr<long unsigned> &trans_idx,
 		CudaGlobalPtr<long unsigned> &job_idx,
 		CudaGlobalPtr<long unsigned> &job_num,
-		CudaGlobalPtr<FLOAT> &diff2s,
+		CudaGlobalPtr<XFLOAT> &diff2s,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,

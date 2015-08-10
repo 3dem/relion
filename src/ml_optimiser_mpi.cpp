@@ -17,12 +17,18 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <mpi.h>
+
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
+
+#ifdef TIMING
+	int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
+	int TIMING_MPISLAVEWAIT1, TIMING_MPISLAVEWAIT2, TIMING_MPISLAVEWAIT3;
+#endif
+
 void MlOptimiserMpi::read(int argc, char **argv)
 {
 #ifdef DEBUG

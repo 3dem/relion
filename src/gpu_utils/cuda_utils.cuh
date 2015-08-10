@@ -8,8 +8,8 @@
 #include <vector>
 
 #ifdef CUDA_DOUBLE_PRECISION
-#define FLOAT double
-__device__ inline FLOAT cuda_atomic_add(double* address, double val)
+#define XFLOAT double
+__device__ inline XFLOAT cuda_atomic_add(double* address, double val)
 {
 	unsigned long long int* address_as_ull = (unsigned long long int*)address;
 	unsigned long long int old = *address_as_ull, assumed;
@@ -22,7 +22,7 @@ __device__ inline FLOAT cuda_atomic_add(double* address, double val)
 	return __longlong_as_double(old);
 }
 #else
-#define FLOAT float
+#define XFLOAT float
 __device__ inline void cuda_atomic_add(float* address, float value)
 {
   atomicAdd(address,value);
@@ -356,7 +356,7 @@ class IndexedDataArray
 {
 public:
 	//actual data
-	CudaGlobalPtr<FLOAT> weights;
+	CudaGlobalPtr<XFLOAT> weights;
 
 	// indexes with same length as data
 	// -- basic indices ---------------------------------

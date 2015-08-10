@@ -1,6 +1,6 @@
 #ifndef CUDA_ML_OPTIMISER_H_
 #define CUDA_ML_OPTIMISER_H_
-
+#include "src/mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/gpu_utils/cuda_device_ptr.h"
 #include "src/gpu_utils/cuda_projector_plan.h"
@@ -8,9 +8,9 @@
 #include "src/gpu_utils/cuda_backprojector.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
-#define FLOAT double
+#define XFLOAT double
 #else
-#define FLOAT float
+#define XFLOAT float
 #endif
 
 class OptimisationParamters
@@ -30,7 +30,7 @@ public:
 	std::vector<double> sum_weight, significant_weight, max_weight;
 	std::vector<Matrix1D<double> > old_offset, prior;
 	std::vector<MultidimArray<double> > power_imgs;
-	MultidimArray<FLOAT> Mweight;
+	MultidimArray<XFLOAT> Mweight;
 
 	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
 		metadata_offset(0),
@@ -166,37 +166,37 @@ public:
 	//Used for precalculations of projection setup
 	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
 
-	std::vector<CudaDevicePtr<FLOAT> > onTheFlyProjectionSetup;
+	std::vector<CudaDevicePtr<XFLOAT> > onTheFlyProjectionSetup;
 
-	std::vector<CudaDevicePtr<FLOAT> > wavg_eulers;
+	std::vector<CudaDevicePtr<XFLOAT> > wavg_eulers;
 
-	std::vector<CudaDevicePtr<FLOAT> > wavgs_real;
-	std::vector<CudaDevicePtr<FLOAT> > wavgs_imag;
-	std::vector<CudaDevicePtr<FLOAT> > wavgs_weight;
+	std::vector<CudaDevicePtr<XFLOAT> > wavgs_real;
+	std::vector<CudaDevicePtr<XFLOAT> > wavgs_imag;
+	std::vector<CudaDevicePtr<XFLOAT> > wavgs_weight;
 
-	std::vector<CudaDevicePtr<FLOAT> > Fimgs_real;
-	std::vector<CudaDevicePtr<FLOAT> > Fimgs_imag;
-	std::vector<CudaDevicePtr<FLOAT> > Fimgs_nomask_real;
-	std::vector<CudaDevicePtr<FLOAT> > Fimgs_nomask_imag;
+	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_real;
+	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_imag;
+	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_nomask_real;
+	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_nomask_imag;
 
-	std::vector<CudaDevicePtr<FLOAT> > ctfs;
+	std::vector<CudaDevicePtr<XFLOAT> > ctfs;
 
-	std::vector<CudaDevicePtr<FLOAT> > sorted_weights;
+	std::vector<CudaDevicePtr<XFLOAT> > sorted_weights;
 
-	std::vector<CudaDevicePtr<FLOAT> > Minvsigma2s;
+	std::vector<CudaDevicePtr<XFLOAT> > Minvsigma2s;
 
-	std::vector<CudaDevicePtr<FLOAT> > wdiff2s_parts;
+	std::vector<CudaDevicePtr<XFLOAT> > wdiff2s_parts;
 
-	std::vector<CudaDevicePtr<FLOAT> > bp_eulers;
+	std::vector<CudaDevicePtr<XFLOAT> > bp_eulers;
 
-	std::vector<CudaDevicePtr<FLOAT> >     oo_otrans_x;
-	std::vector<CudaDevicePtr<FLOAT> >     oo_otrans_y;
-	std::vector<CudaDevicePtr<FLOAT> > myp_oo_otrans_x2y2z2;
+	std::vector<CudaDevicePtr<XFLOAT> >     oo_otrans_x;
+	std::vector<CudaDevicePtr<XFLOAT> >     oo_otrans_y;
+	std::vector<CudaDevicePtr<XFLOAT> > myp_oo_otrans_x2y2z2;
 
-	std::vector<CudaDevicePtr<FLOAT> >                      p_weights;
-	std::vector<CudaDevicePtr<FLOAT> > p_thr_wsum_prior_offsetx_class;
-	std::vector<CudaDevicePtr<FLOAT> > p_thr_wsum_prior_offsety_class;
-	std::vector<CudaDevicePtr<FLOAT> >       p_thr_wsum_sigma2_offset;
+	std::vector<CudaDevicePtr<XFLOAT> >                      p_weights;
+	std::vector<CudaDevicePtr<XFLOAT> > p_thr_wsum_prior_offsetx_class;
+	std::vector<CudaDevicePtr<XFLOAT> > p_thr_wsum_prior_offsety_class;
+	std::vector<CudaDevicePtr<XFLOAT> >       p_thr_wsum_sigma2_offset;
 
 	MlOptimiser *baseMLO;
 

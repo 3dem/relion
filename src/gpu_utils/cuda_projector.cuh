@@ -46,14 +46,14 @@ public:
 
 	__device__ __forceinline__ void project3Dmodel(
 			int pixel,
-			FLOAT e0,
-			FLOAT e1,
-			FLOAT e3,
-			FLOAT e4,
-			FLOAT e6,
-			FLOAT e7,
-			FLOAT &real,
-			FLOAT &imag)
+			XFLOAT e0,
+			XFLOAT e1,
+			XFLOAT e3,
+			XFLOAT e4,
+			XFLOAT e6,
+			XFLOAT e7,
+			XFLOAT &real,
+			XFLOAT &imag)
 	{
 		bool is_neg_x;
 		int r2;
@@ -73,9 +73,9 @@ public:
 		r2 = x*x + y*y;
 		if (r2 <= maxR2)
 		{
-			FLOAT xp = (e0 * x + e1 * y ) * padding_factor;
-			FLOAT yp = (e3 * x + e4 * y ) * padding_factor;
-			FLOAT zp = (e6 * x + e7 * y ) * padding_factor;
+			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+			XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
 			// Only asymmetric half is stored
 			if (xp < 0)
@@ -96,59 +96,59 @@ public:
 			yp -= mdlInitY;
 			zp -= mdlInitZ;
 
-			real = tex3D<FLOAT>(mdlReal, xp + 0.5f, yp + 0.5f, zp + 0.5f);
-			imag = tex3D<FLOAT>(mdlImag, xp + 0.5f, yp + 0.5f, zp + 0.5f);
+			real = tex3D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f, zp + 0.5f);
+			imag = tex3D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f, zp + 0.5f);
 
 #else
 
 			int x0 = floorf(xp);
-			FLOAT fx = xp - x0;
+			XFLOAT fx = xp - x0;
 			int x1 = x0 + 1;
 
 			int y0 = floorf(yp);
-			FLOAT fy = yp - y0;
+			XFLOAT fy = yp - y0;
 			y0 -= mdlInitY;
 			int y1 = y0 + 1;
 
 			int z0 = floorf(zp);
-			FLOAT fz = zp - z0;
+			XFLOAT fz = zp - z0;
 			z0 -= mdlInitZ;
 			int z1 = z0 + 1;
 
-			FLOAT d000_real = mdlReal[z0*mdlXY+y0*mdlX+x0];
-			FLOAT d001_real = mdlReal[z0*mdlXY+y0*mdlX+x1];
-			FLOAT d010_real = mdlReal[z0*mdlXY+y1*mdlX+x0];
-			FLOAT d011_real = mdlReal[z0*mdlXY+y1*mdlX+x1];
-			FLOAT d100_real = mdlReal[z1*mdlXY+y0*mdlX+x0];
-			FLOAT d101_real = mdlReal[z1*mdlXY+y0*mdlX+x1];
-			FLOAT d110_real = mdlReal[z1*mdlXY+y1*mdlX+x0];
-			FLOAT d111_real = mdlReal[z1*mdlXY+y1*mdlX+x1];
+			XFLOAT d000_real = mdlReal[z0*mdlXY+y0*mdlX+x0];
+			XFLOAT d001_real = mdlReal[z0*mdlXY+y0*mdlX+x1];
+			XFLOAT d010_real = mdlReal[z0*mdlXY+y1*mdlX+x0];
+			XFLOAT d011_real = mdlReal[z0*mdlXY+y1*mdlX+x1];
+			XFLOAT d100_real = mdlReal[z1*mdlXY+y0*mdlX+x0];
+			XFLOAT d101_real = mdlReal[z1*mdlXY+y0*mdlX+x1];
+			XFLOAT d110_real = mdlReal[z1*mdlXY+y1*mdlX+x0];
+			XFLOAT d111_real = mdlReal[z1*mdlXY+y1*mdlX+x1];
 
-			FLOAT d000_imag = mdlImag[z0*mdlXY+y0*mdlX+x0];
-			FLOAT d001_imag = mdlImag[z0*mdlXY+y0*mdlX+x1];
-			FLOAT d010_imag = mdlImag[z0*mdlXY+y1*mdlX+x0];
-			FLOAT d011_imag = mdlImag[z0*mdlXY+y1*mdlX+x1];
-			FLOAT d100_imag = mdlImag[z1*mdlXY+y0*mdlX+x0];
-			FLOAT d101_imag = mdlImag[z1*mdlXY+y0*mdlX+x1];
-			FLOAT d110_imag = mdlImag[z1*mdlXY+y1*mdlX+x0];
-			FLOAT d111_imag = mdlImag[z1*mdlXY+y1*mdlX+x1];
+			XFLOAT d000_imag = mdlImag[z0*mdlXY+y0*mdlX+x0];
+			XFLOAT d001_imag = mdlImag[z0*mdlXY+y0*mdlX+x1];
+			XFLOAT d010_imag = mdlImag[z0*mdlXY+y1*mdlX+x0];
+			XFLOAT d011_imag = mdlImag[z0*mdlXY+y1*mdlX+x1];
+			XFLOAT d100_imag = mdlImag[z1*mdlXY+y0*mdlX+x0];
+			XFLOAT d101_imag = mdlImag[z1*mdlXY+y0*mdlX+x1];
+			XFLOAT d110_imag = mdlImag[z1*mdlXY+y1*mdlX+x0];
+			XFLOAT d111_imag = mdlImag[z1*mdlXY+y1*mdlX+x1];
 
 			// Set the interpolated value in the 2D output array
-			FLOAT dx00_real = d000_real + (d001_real - d000_real)*fx;
-			FLOAT dx01_real = d100_real + (d101_real - d100_real)*fx;
-			FLOAT dx10_real = d010_real + (d011_real - d010_real)*fx;
-			FLOAT dx11_real = d110_real + (d111_real - d110_real)*fx;
+			XFLOAT dx00_real = d000_real + (d001_real - d000_real)*fx;
+			XFLOAT dx01_real = d100_real + (d101_real - d100_real)*fx;
+			XFLOAT dx10_real = d010_real + (d011_real - d010_real)*fx;
+			XFLOAT dx11_real = d110_real + (d111_real - d110_real)*fx;
 
-			FLOAT dx00_imag = d000_imag + (d001_imag - d000_imag)*fx;
-			FLOAT dx01_imag = d100_imag + (d101_imag - d100_imag)*fx;
-			FLOAT dx10_imag = d010_imag + (d011_imag - d010_imag)*fx;
-			FLOAT dx11_imag = d110_imag + (d111_imag - d110_imag)*fx;
+			XFLOAT dx00_imag = d000_imag + (d001_imag - d000_imag)*fx;
+			XFLOAT dx01_imag = d100_imag + (d101_imag - d100_imag)*fx;
+			XFLOAT dx10_imag = d010_imag + (d011_imag - d010_imag)*fx;
+			XFLOAT dx11_imag = d110_imag + (d111_imag - d110_imag)*fx;
 			//-----------------------------
-			FLOAT dxy0_real = dx00_real + (dx10_real - dx00_real)*fy;
-			FLOAT dxy1_real = dx01_real + (dx11_real - dx01_real)*fy;
+			XFLOAT dxy0_real = dx00_real + (dx10_real - dx00_real)*fy;
+			XFLOAT dxy1_real = dx01_real + (dx11_real - dx01_real)*fy;
 
-			FLOAT dxy0_imag = dx00_imag + (dx10_imag - dx00_imag)*fy;
-			FLOAT dxy1_imag = dx01_imag + (dx11_imag - dx01_imag)*fy;
+			XFLOAT dxy0_imag = dx00_imag + (dx10_imag - dx00_imag)*fy;
+			XFLOAT dxy1_imag = dx01_imag + (dx11_imag - dx01_imag)*fy;
 			//-----------------------------
 			real = dxy0_real + (dxy1_real - dxy0_real)*fz;
 			imag = dxy0_imag + (dxy1_imag - dxy0_imag)*fz;
@@ -170,14 +170,14 @@ public:
 
 	__device__ __forceinline__ void project2Dmodel(
 				int pixel,
-				FLOAT e0,
-				FLOAT e1,
-				FLOAT e3,
-				FLOAT e4,
-				FLOAT e6,
-				FLOAT e7,
-				FLOAT &real,
-				FLOAT &imag)
+				XFLOAT e0,
+				XFLOAT e1,
+				XFLOAT e3,
+				XFLOAT e4,
+				XFLOAT e6,
+				XFLOAT e7,
+				XFLOAT &real,
+				XFLOAT &imag)
 		{
 			bool is_neg_x;
 			int r2;
@@ -197,8 +197,8 @@ public:
 			r2 = x*x + y*y;
 			if (r2 <= maxR2)
 			{
-				FLOAT xp = (e0 * x + e1 * y ) * padding_factor;
-				FLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+				XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+				XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 
 				// Only asymmetric half is stored
 				if (xp < 0)
@@ -217,35 +217,35 @@ public:
 
 				yp -= mdlInitY;
 
-				real = tex2D<FLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
-				imag = tex2D<FLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
+				real = tex2D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
+				imag = tex2D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
 
 	#else
 				int x0 = floorf(xp);
-				FLOAT fx = xp - x0;
+				XFLOAT fx = xp - x0;
 				int x1 = x0 + 1;
 
 				int y0 = floorf(yp);
-				FLOAT fy = yp - y0;
+				XFLOAT fy = yp - y0;
 				y0 -= mdlInitY;
 				int y1 = y0 + 1;
 				//-----------------------------
-				FLOAT d00_real = mdlReal[y0*mdlX+x0];
-				FLOAT d01_real = mdlReal[y0*mdlX+x1];
-				FLOAT d10_real = mdlReal[y1*mdlX+x0];
-				FLOAT d11_real = mdlReal[y1*mdlX+x1];
+				XFLOAT d00_real = mdlReal[y0*mdlX+x0];
+				XFLOAT d01_real = mdlReal[y0*mdlX+x1];
+				XFLOAT d10_real = mdlReal[y1*mdlX+x0];
+				XFLOAT d11_real = mdlReal[y1*mdlX+x1];
 
-				FLOAT d00_imag = mdlImag[y0*mdlX+x0];
-				FLOAT d01_imag = mdlImag[y0*mdlX+x1];
-				FLOAT d10_imag = mdlImag[y1*mdlX+x0];
-				FLOAT d11_imag = mdlImag[y1*mdlX+x1];
+				XFLOAT d00_imag = mdlImag[y0*mdlX+x0];
+				XFLOAT d01_imag = mdlImag[y0*mdlX+x1];
+				XFLOAT d10_imag = mdlImag[y1*mdlX+x0];
+				XFLOAT d11_imag = mdlImag[y1*mdlX+x1];
 				//-----------------------------
 				// Set the interpolated value in the 2D output array
-				FLOAT dx0_real = d00_real + (d01_real - d00_real)*fx;
-				FLOAT dx1_real = d10_real + (d11_real - d10_real)*fx;
+				XFLOAT dx0_real = d00_real + (d01_real - d00_real)*fx;
+				XFLOAT dx1_real = d10_real + (d11_real - d10_real)*fx;
 
-				FLOAT dx0_imag = d00_imag + (d01_imag - d00_imag)*fx;
-				FLOAT dx1_imag = d10_imag + (d11_imag - d10_imag)*fx;
+				XFLOAT dx0_imag = d00_imag + (d01_imag - d00_imag)*fx;
+				XFLOAT dx1_imag = d10_imag + (d11_imag - d10_imag)*fx;
 				//-----------------------------
 				real = dx0_real + (dx1_real - dx0_real)*fy;
 				imag = dx0_imag + (dx1_imag - dx0_imag)*fy;
