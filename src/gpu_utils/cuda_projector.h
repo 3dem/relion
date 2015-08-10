@@ -3,10 +3,7 @@
 
 #include "src/complex.h"
 #include "src/gpu_utils/cuda_settings.h"
-
-#ifdef __CUDACC__
 #include <cuda_runtime.h>
-#endif
 
 class CudaProjector
 {
@@ -16,10 +13,11 @@ class CudaProjector
 	    mdlInitY, mdlInitZ,
 	    padding_factor;
 
-	void *mdlReal, *mdlImag; //cudaTextureObject_t or CudaGlobalPtr<double>
-
 #ifndef CUDA_DOUBLE_PRECISION
-	void *texArrayReal, *texArrayImag; //cudaArray_t
+	cudaArray_t *texArrayReal, *texArrayImag;
+	cudaTextureObject_t *mdlReal, *mdlImag;
+#else
+	double *mdlReal, *mdlImag;
 #endif
 
 public:

@@ -1,6 +1,5 @@
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_utils.cuh"
-#include <cuda_runtime.h>
 #include <signal.h>
 
 #ifndef CUDA_DOUBLE_PRECISION
@@ -19,10 +18,10 @@ void CudaProjector::setMdlData(float *real, float *imag)
 		raise(SIGSEGV);
 	}
 #endif
-    mdlReal = (void*) new cudaTextureObject_t();
-    mdlImag = (void*) new cudaTextureObject_t();
-	texArrayReal = (void*) new cudaArray_t();
-	texArrayImag = (void*) new cudaArray_t();
+    mdlReal = new cudaTextureObject_t();
+    mdlImag = new cudaTextureObject_t();
+	texArrayReal = new cudaArray_t();
+	texArrayImag = new cudaArray_t();
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
@@ -32,14 +31,14 @@ void CudaProjector::setMdlData(float *real, float *imag)
 	struct cudaTextureDesc texDesc_real, texDesc_imag;
 
 	cudaMemcpy3DParms copyParams = {0};
-	copyParams.extent   = volumeSize;
-	copyParams.kind     = cudaMemcpyHostToDevice;
+	copyParams.extent = volumeSize;
+	copyParams.kind   = cudaMemcpyHostToDevice;
 
 
-	HANDLE_ERROR(cudaMalloc3DArray((cudaArray_t*)texArrayReal, &desc, volumeSize));
+	HANDLE_ERROR(cudaMalloc3DArray(texArrayReal, &desc, volumeSize));
 
-	copyParams.dstArray = *((cudaArray_t*)texArrayReal);
-	copyParams.srcPtr   = make_cudaPitchedPtr((void*)real,mdlX*sizeof(float), mdlY, mdlZ);
+	copyParams.dstArray = *texArrayReal;
+	copyParams.srcPtr   = make_cudaPitchedPtr(real,mdlX*sizeof(float), mdlY, mdlZ);
 	HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 
 	memset(&resDesc_real, 0, sizeof(cudaResourceDesc));
@@ -53,15 +52,15 @@ void CudaProjector::setMdlData(float *real, float *imag)
     for(int n=0; n<3; n++)
     	texDesc_real.addressMode[n]=cudaAddressModeClamp;
 
-	HANDLE_ERROR(cudaCreateTextureObject((cudaTextureObject_t*)mdlReal, &resDesc_real, &texDesc_real, NULL));
+	HANDLE_ERROR(cudaCreateTextureObject(mdlReal, &resDesc_real, &texDesc_real, NULL));
 
 
 
 
-	HANDLE_ERROR(cudaMalloc3DArray((cudaArray_t*)texArrayImag, &desc, volumeSize));
+	HANDLE_ERROR(cudaMalloc3DArray(texArrayImag, &desc, volumeSize));
 
-	copyParams.dstArray = *((cudaArray_t*)texArrayImag);
-	copyParams.srcPtr   = make_cudaPitchedPtr((void*)imag,mdlX*sizeof(float), mdlY, mdlZ);
+	copyParams.dstArray = *texArrayImag;
+	copyParams.srcPtr   = make_cudaPitchedPtr(imag,mdlX*sizeof(float), mdlY, mdlZ);
 	HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 
 	memset(&resDesc_imag, 0, sizeof(cudaResourceDesc));
@@ -75,7 +74,7 @@ void CudaProjector::setMdlData(float *real, float *imag)
     for(int n=0; n<3; n++)
     	texDesc_imag.addressMode[n]=cudaAddressModeClamp;
 
-	HANDLE_ERROR(cudaCreateTextureObject((cudaTextureObject_t*)mdlImag, &resDesc_imag, &texDesc_imag, NULL));
+	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc_imag, NULL));
 }
 
 #else
@@ -94,26 +93,13 @@ void CudaProjector::setMdlData(double *real, double *imag)
 		raise(SIGSEGV);
 	}
 #endif
-	CudaGlobalPtr<double> *r = new CudaGlobalPtr<double>();
-	CudaGlobalPtr<double> *i = new CudaGlobalPtr<double>();
 
-	r->h_ptr = real;
-	i->h_ptr = imag;
+	HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(double)));
+	HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(double)));
 
-	r->size = mdlXYZ;
-	i->size = mdlXYZ;
+	HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(FLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(FLOAT), cudaMemcpyHostToDevice));
 
-	r->device_alloc();
-	i->device_alloc();
-
-	r->cp_to_device();
-	i->cp_to_device();
-
-	r->h_ptr = 0;
-	i->h_ptr = 0;
-
-	mdlReal = (void*) r;
-	mdlImag = (void*) i;
 }
 #endif
 
@@ -141,18 +127,18 @@ CudaProjector::~CudaProjector()
 	if (mdlReal != 0)
 	{
 #ifdef CUDA_DOUBLE_PRECISION
-		delete (CudaGlobalPtr<double>*) mdlReal;
-		delete (CudaGlobalPtr<double>*) mdlImag;
+		cudaFree(mdlReal);
+		cudaFree(mdlImag);
 #else
-		cudaDestroyTextureObject(*(cudaTextureObject_t*) mdlReal);
-		cudaDestroyTextureObject(*(cudaTextureObject_t*) mdlImag);
-		delete (cudaTextureObject_t*) mdlReal;
-		delete (cudaTextureObject_t*) mdlImag;
+		cudaDestroyTextureObject(*mdlReal);
+		cudaDestroyTextureObject(*mdlImag);
+		delete mdlReal;
+		delete mdlImag;
 
-		cudaFreeArray(*((cudaArray_t*) texArrayReal));
-		cudaFreeArray(*((cudaArray_t*) texArrayImag));
-		delete (cudaArray_t*) texArrayReal;
-		delete (cudaArray_t*) texArrayImag;
+		cudaFreeArray(*texArrayReal);
+		cudaFreeArray(*texArrayImag);
+		delete texArrayReal;
+		delete texArrayImag;
 		texArrayReal = 0;
 		texArrayImag = 0;
 #endif
