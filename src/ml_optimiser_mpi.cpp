@@ -20,6 +20,7 @@
 
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
+#include "src/gpu_utils/cuda_ml_optimiser.h"
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
@@ -626,7 +627,14 @@ void MlOptimiserMpi::expectation()
     	try
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
-
+    		if (do_gpu)
+    		{
+    			cudaMlOptimiser = (void*) new MlOptimiserCuda(this);
+    			int dev_id;
+    			MPI_Comm_rank(MPI_COMM_WORLD, &dev_id);
+    			std::cerr << " setting device to " << dev_id - 1  << std::endl;
+    			((MlOptimiserCuda*) cudaMlOptimiser)->device_id = dev_id-1;
+    		}
 			// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -751,6 +759,12 @@ void MlOptimiserMpi::expectation()
 				}
 
 			}
+			if (do_gpu)
+			{
+				((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
+				delete ((MlOptimiserCuda*) cudaMlOptimiser);
+			}
+
     	}
         catch (RelionError XE)
         {

@@ -1653,14 +1653,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
 
 //	CUDA_CPU_TOC("interParticle");
-//	int device_id(0);
-//#ifdef MPI_COMM_WORLD
-//	MPI_Comm_rank(MPI_COMM_WORLD, &device_id);
-//	std::cerr << " setting device to " << device_id - 1  << std::endl;
-//#endif
-//	cudaSetDevice(device_id - 1);
-	cudaSetDevice(thread_id);
-	std::cerr << " calling on device " << thread_id << std::endl;
+
+	cudaSetDevice(device_id);
+
+	std::cerr << " calling on device " << device_id << std::endl;
 	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;
 	while (baseMLO->exp_ipart_ThreadTaskDistributor->getTasks(first_ipart, last_ipart))

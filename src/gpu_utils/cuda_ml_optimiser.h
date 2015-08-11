@@ -198,9 +198,12 @@ public:
 	std::vector<CudaDevicePtr<XFLOAT> > p_thr_wsum_prior_offsety_class;
 	std::vector<CudaDevicePtr<XFLOAT> >       p_thr_wsum_sigma2_offset;
 
+
 	MlOptimiser *baseMLO;
 
 	bool generateProjectionPlanOnTheFly;
+
+	int device_id;
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser) : baseMLO(baseMLOptimiser)
 	{
@@ -239,6 +242,8 @@ public:
 		p_thr_wsum_prior_offsetx_class.resize(nr_classes);
 		p_thr_wsum_prior_offsety_class.resize(nr_classes);
 		p_thr_wsum_sigma2_offset.resize(nr_classes);
+
+		device_id=0;
 
 		/*======================================================
             PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
