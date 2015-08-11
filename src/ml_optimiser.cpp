@@ -1509,7 +1509,7 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		cudaMlOptimiser = (void*) new MlOptimiserCuda(this);
+		cudaMlOptimiser = (void*) new MlOptimiserCuda(this, 0);
 	}
 
 	// Now perform real expectation over all particles

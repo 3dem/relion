@@ -629,11 +629,12 @@ void MlOptimiserMpi::expectation()
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
     		if (do_gpu)
     		{
-    			cudaMlOptimiser = (void*) new MlOptimiserCuda(this);
-    			int dev_id;
-    			MPI_Comm_rank(MPI_COMM_WORLD, &dev_id);
-    			std::cerr << " setting device to " << dev_id - 1  << std::endl;
-    			((MlOptimiserCuda*) cudaMlOptimiser)->device_id = dev_id-1;
+    			int dev_id, rank;
+				MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+				dev_id = rank-1;
+				std::cerr << " using device " << dev_id  << " on MPI rank " << rank << std::endl;
+
+    			cudaMlOptimiser = (void*) new MlOptimiserCuda(this, dev_id);
     		}
 			// Start off with an empty job request
 			JOB_FIRST = 0;
