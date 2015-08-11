@@ -18,8 +18,8 @@ void CudaProjector::setMdlData(float *real, float *imag)
 		raise(SIGSEGV);
 	}
 #endif
-    mdlReal = new cudaTextureObject_t();
-    mdlImag = new cudaTextureObject_t();
+	mdlReal = new cudaTextureObject_t();
+	mdlImag = new cudaTextureObject_t();
 	texArrayReal = new cudaArray_t();
 	texArrayImag = new cudaArray_t();
 
@@ -42,15 +42,15 @@ void CudaProjector::setMdlData(float *real, float *imag)
 	HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 
 	memset(&resDesc_real, 0, sizeof(cudaResourceDesc));
-    resDesc_real.resType = cudaResourceTypeArray;
-    resDesc_real.res.array.array = copyParams.dstArray;
+	resDesc_real.resType = cudaResourceTypeArray;
+	resDesc_real.res.array.array = copyParams.dstArray;
 
-    memset(&texDesc_real, 0, sizeof(cudaTextureDesc));
-    texDesc_real.filterMode       = cudaFilterModeLinear;
-    texDesc_real.readMode         = cudaReadModeElementType;
-    texDesc_real.normalizedCoords = false;
-    for(int n=0; n<3; n++)
-    	texDesc_real.addressMode[n]=cudaAddressModeClamp;
+	memset(&texDesc_real, 0, sizeof(cudaTextureDesc));
+	texDesc_real.filterMode       = cudaFilterModeLinear;
+	texDesc_real.readMode         = cudaReadModeElementType;
+	texDesc_real.normalizedCoords = false;
+	for(int n=0; n<3; n++)
+		texDesc_real.addressMode[n]=cudaAddressModeClamp;
 
 	HANDLE_ERROR(cudaCreateTextureObject(mdlReal, &resDesc_real, &texDesc_real, NULL));
 
@@ -64,15 +64,15 @@ void CudaProjector::setMdlData(float *real, float *imag)
 	HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 
 	memset(&resDesc_imag, 0, sizeof(cudaResourceDesc));
-    resDesc_imag.resType = cudaResourceTypeArray;
-    resDesc_imag.res.array.array = copyParams.dstArray;
+	resDesc_imag.resType = cudaResourceTypeArray;
+	resDesc_imag.res.array.array = copyParams.dstArray;
 
-    memset(&texDesc_imag, 0, sizeof(cudaTextureDesc));
-    texDesc_imag.filterMode       = cudaFilterModeLinear;
-    texDesc_imag.readMode         = cudaReadModeElementType;
-    texDesc_imag.normalizedCoords = false;
-    for(int n=0; n<3; n++)
-    	texDesc_imag.addressMode[n]=cudaAddressModeClamp;
+	memset(&texDesc_imag, 0, sizeof(cudaTextureDesc));
+	texDesc_imag.filterMode       = cudaFilterModeLinear;
+	texDesc_imag.readMode         = cudaReadModeElementType;
+	texDesc_imag.normalizedCoords = false;
+	for(int n=0; n<3; n++)
+		texDesc_imag.addressMode[n]=cudaAddressModeClamp;
 
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc_imag, NULL));
 }

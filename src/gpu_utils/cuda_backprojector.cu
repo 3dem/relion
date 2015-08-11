@@ -39,13 +39,13 @@ void CudaBackprojector::initMdl()
 		}
 	}
 
-	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(int)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(int)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(int)));
 
-	HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(FLOAT), cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(FLOAT), cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(FLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
 
 	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, voxelCount * sizeof(FLOAT)));
 	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, voxelCount * sizeof(FLOAT)));

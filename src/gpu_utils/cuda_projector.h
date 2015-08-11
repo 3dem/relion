@@ -25,12 +25,16 @@ public:
 			mdlX(0), mdlY(0), mdlZ(0),
 			mdlXYZ(0), mdlMaxR(0),
 			mdlInitY(0), mdlInitZ(0),
-			padding_factor(0),
-			mdlReal(0), mdlImag(0)
+			padding_factor(0)
 	{
 #ifndef CUDA_DOUBLE_PRECISION
 		texArrayReal = 0;
 		texArrayImag = 0;
+		mdlReal = 0;
+		mdlImag = 0;
+#else
+		mdlReal = 0;
+		mdlImag = 0;
 #endif
 	};
 
@@ -41,12 +45,16 @@ public:
 			mdlX(xdim), mdlY(ydim), mdlZ(zdim),
 			mdlXYZ(xdim*ydim*zdim), mdlMaxR(max_r),
 			mdlInitY(inity), mdlInitZ(initz),
-			padding_factor(padding_factor),
-			mdlReal(0), mdlImag(0)
+			padding_factor(padding_factor)
 	{
 #ifndef CUDA_DOUBLE_PRECISION
 		texArrayReal = 0;
 		texArrayImag = 0;
+		mdlReal = 0;
+		mdlImag = 0;
+#else
+		mdlReal = 0;
+		mdlImag = 0;
 #endif
 	};
 
