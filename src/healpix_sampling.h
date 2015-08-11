@@ -98,7 +98,20 @@ public:
 public:
 
     // Empty constructor
-    HealpixSampling() {}
+    HealpixSampling():
+    	offset_range(0),
+		offset_step(0),
+		is_3d_trans(false),
+		pgGroup(0),
+		perturbation_factor(0),
+		is_3D(false),
+		random_perturbation(0),
+		orientational_prior_mode(0),
+		psi_step(0),
+		limit_tilt(0),
+		healpix_order(0),
+		pgOrder(0)
+    {}
 
     // Destructor
     ~HealpixSampling()

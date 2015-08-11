@@ -1042,7 +1042,7 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 		{
 			if (is_3D)
 			{
-				Matrix2D<double> A, R;
+				Matrix2D<double> A(3,3), R(3,3);
 				Euler_angles2matrix(my_rot[iover],
 									my_tilt[iover],
 									my_psi[iover],

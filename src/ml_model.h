@@ -152,7 +152,28 @@ public:
 public:
 
 	// Constructor
-	MlModel()
+	MlModel():
+		ref_dim(0),
+		data_dim(0),
+		ori_size(0),
+		pixel_size(0),
+		current_size(0),
+		current_resolution(0),
+		nr_classes(0),
+		nr_groups(0),
+		nr_directions(0),
+		LL(0),
+		padding_factor(0),
+		interpolator(0),
+		r_min_nn(0),
+		ave_Pmax(0),
+		avg_norm_correction(0),
+		sigma2_offset(0),
+		tau2_fudge_factor(0),
+		orientational_prior_mode(0),
+		sigma2_rot(0),
+		sigma2_tilt(0),
+		sigma2_psi(0)
 	{
 		clear();
 	}

@@ -106,9 +106,9 @@ void CudaProjectorPlan::setup(
 	}
 
 
-	double alpha, beta, gamma;
-	double ca, sa, cb, sb, cg, sg;
-	double cc, cs, sc, ss;
+	double alpha(.0), beta(.0), gamma(.0);
+	double ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
+	double cc(.0), cs(.0), sc(.0), ss(.0);
 
 	std::vector<FLOAT> e(9 * orientation_num);
 
