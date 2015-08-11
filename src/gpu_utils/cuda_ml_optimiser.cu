@@ -214,7 +214,7 @@ void getAllSquaredDifferencesCoarse(
 				    	   Retrieve Results
 				======================================*/
 
-				op.min_diff2[ipart] = std::min((FLOAT)op.min_diff2[ipart], (FLOAT)thrustGetMinVal(diff2s)); // class
+				op.min_diff2[ipart] = std::min((FLOAT)op.min_diff2[ipart], (FLOAT)thrustGetMinVal(diff2s, diff2s.size)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -276,7 +276,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	{
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
-		FinePassWeights[ipart].setDataSize(0);
+		unsigned long newDataSize(0);
 
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		long int group_id = baseMLO->mydata.getGroupId(part_id);
@@ -401,7 +401,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				// Prepare the mask of the weight-array for this class
 				if (FPCMasks[ipart][exp_iclass].weightNum==0)
-					FPCMasks[ipart][exp_iclass].firstPos = FinePassWeights[ipart].weights.size;
+					FPCMasks[ipart][exp_iclass].firstPos = newDataSize;
 
 				// Do more significance checks on translations and create jobDivision
 				significant_num = makeJobsForDiff2Fine(	op,	sp,												// alot of different type inputs...
@@ -413,7 +413,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 														FPCMasks[ipart][exp_iclass]);                // ..and output into index-arrays mask
 
 				// extend size by number of significants found this class
-				FinePassWeights[ipart].setDataSize( FinePassWeights[ipart].weights.size + significant_num );
+				newDataSize += significant_num;
 				FPCMasks[ipart][exp_iclass].weightNum = significant_num;
 				FPCMasks[ipart][exp_iclass].lastPos = FPCMasks[ipart][exp_iclass].firstPos + significant_num;
 
@@ -464,10 +464,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				======================================*/
 
 				CUDA_CPU_TIC("collect_data_1");
-				op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(FinePassWeights[ipart].weights));
+				op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(FinePassWeights[ipart].weights, newDataSize));
 				CUDA_CPU_TOC("collect_data_1");
 			} // end if class significant
 		} // end loop iclass
+		FinePassWeights[ipart].setDataSize( newDataSize );
+
 	}// end loop ipart
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1001,6 +1003,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
 			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
+			unsigned long idxArrPos_start(0),idxArrPos_end(0);
+
 			/// Now that reference projection has been made loop over all particles inside this ori_particle
 			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 			{
@@ -1008,7 +1012,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CUDA_CPU_TIC("BP-ProjectionDivision");
 				unsigned long proj_div_start(proj_div_max_count * iproj_div),
 						proj_div_end;
-				unsigned long idxArrPos_start(0),idxArrPos_end(0);
+
 				if (iproj_div < proj_div_nr - 1)
 					proj_div_end = proj_div_start + proj_div_max_count;
 				else

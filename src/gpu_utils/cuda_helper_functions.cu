@@ -148,10 +148,10 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask) /
  * Return the minimum value of a device-allocated CudaGlobalPtr-array
  */
 
-FLOAT thrustGetMinVal(CudaGlobalPtr<FLOAT> &diff2s)
+FLOAT thrustGetMinVal(CudaGlobalPtr<FLOAT> &diff2s, unsigned size)
 {
 	thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~diff2s);
-	thrust::device_ptr<FLOAT> pos = thrust::min_element(dp, dp + diff2s.size);
+	thrust::device_ptr<FLOAT> pos = thrust::min_element(dp, dp + size);
 	unsigned int pos_index = thrust::distance(dp, pos);
 	FLOAT min_val;
 	HANDLE_ERROR(cudaMemcpy(&min_val, &diff2s.d_ptr[pos_index], sizeof(FLOAT), cudaMemcpyDeviceToHost));
