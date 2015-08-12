@@ -148,13 +148,13 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask) /
  * Return the minimum value of a device-allocated CudaGlobalPtr-array
  */
 
-FLOAT thrustGetMinVal(CudaGlobalPtr<FLOAT> &diff2s, unsigned size)
+XFLOAT thrustGetMinVal(CudaGlobalPtr<XFLOAT> &diff2s, unsigned size)
 {
-	thrust::device_ptr<FLOAT> dp = thrust::device_pointer_cast(~diff2s);
-	thrust::device_ptr<FLOAT> pos = thrust::min_element(dp, dp + size);
+	thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~diff2s);
+	thrust::device_ptr<XFLOAT> pos = thrust::min_element(dp, dp + size);
 	unsigned int pos_index = thrust::distance(dp, pos);
-	FLOAT min_val;
-	HANDLE_ERROR(cudaMemcpy(&min_val, &diff2s.d_ptr[pos_index], sizeof(FLOAT), cudaMemcpyDeviceToHost));
+	XFLOAT min_val;
+	HANDLE_ERROR(cudaMemcpy(&min_val, &diff2s.d_ptr[pos_index], sizeof(XFLOAT), cudaMemcpyDeviceToHost));
 	return(min_val);
 }
 
@@ -187,12 +187,12 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
 inline
 void mapWeights(
 		unsigned long orientation_start,
-		std::vector<FLOAT> &mapped_weights,
+		std::vector<XFLOAT> &mapped_weights,
 		unsigned orientation_num,
 		unsigned long idxArr_start,
 		unsigned long idxArr_end,
 		unsigned translation_num,
-		CudaGlobalPtr<FLOAT> &weights,
+		CudaGlobalPtr<XFLOAT> &weights,
 		CudaGlobalPtr<long unsigned> &rot_idx,
 		CudaGlobalPtr<long unsigned> &trans_idx,
 		HealpixSampling &sampling, long int ipart,
@@ -200,7 +200,7 @@ void mapWeights(
 		std::vector< long unsigned > &ihiddens,
 		std::vector< long unsigned > &iorientclasses,
 		std::vector< long unsigned > &iover_rots,
-		MultidimArray<FLOAT> &Mweight,
+		MultidimArray<XFLOAT> &Mweight,
 		unsigned long current_oversampling,
 		unsigned long nr_trans)
 {
@@ -221,10 +221,10 @@ void mapWeights(
 
 inline
 long unsigned imageTranslation(
-		std::vector<FLOAT> &Fimgs_real,
-		std::vector<FLOAT> &Fimgs_imag,
-		std::vector<FLOAT> &Fimgs_nomask_real,
-		std::vector<FLOAT> &Fimgs_nomask_imag,
+		std::vector<XFLOAT> &Fimgs_real,
+		std::vector<XFLOAT> &Fimgs_imag,
+		std::vector<XFLOAT> &Fimgs_nomask_real,
+		std::vector<XFLOAT> &Fimgs_nomask_imag,
 		long int itrans_min,
 		long int itrans_max,
 		int adaptive_oversampling ,
@@ -258,13 +258,13 @@ long unsigned imageTranslation(
 
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(local_Fimgs_shifted)
 			{
-				FLOAT a = (*(myAB + n)).real;
-				FLOAT b = (*(myAB + n)).imag;
+				XFLOAT a = (*(myAB + n)).real;
+				XFLOAT b = (*(myAB + n)).imag;
 
 				// Fimg_shift
-				FLOAT real = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).real
+				XFLOAT real = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).real
 						- b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag;
-				FLOAT imag = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag
+				XFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag
 						+ b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).real;
 				Fimgs_real.push_back(real);
 				Fimgs_imag.push_back(imag);
@@ -291,9 +291,9 @@ long unsigned imageTranslation(
 
 
 void generateEulerMatrices(
-		FLOAT padding_factor,
+		XFLOAT padding_factor,
 		ProjectionParams &ProjectionData,
-		FLOAT *eulers,
+		XFLOAT *eulers,
 		bool inverse)
 {
 	double alpha, beta, gamma;
@@ -347,9 +347,9 @@ void generateEulerMatrices(
 
 
 void generateEulerMatrices(
-		FLOAT padding_factor,
+		XFLOAT padding_factor,
 		ProjectionParams ProjectionData,
-		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<XFLOAT> &eulers,
 		bool inverse)
 {
 	generateEulerMatrices(
@@ -436,18 +436,18 @@ long unsigned generateProjectionSetup(
 inline
 void runWavgKernel(
 		CudaProjectorKernel &projector,
-		FLOAT *eulers,
-		FLOAT *Fimgs_real,
-		FLOAT *Fimgs_imag,
-		FLOAT *Fimgs_nomask_real,
-		FLOAT *Fimgs_nomask_imag,
-		FLOAT *sorted_weights,
-		FLOAT *ctfs,
-		FLOAT *Minvsigma2s,
-		FLOAT *wdiff2s_parts,
-		FLOAT *wavgs_real,
-		FLOAT *wavgs_imag,
-		FLOAT *Fweights,
+		XFLOAT *eulers,
+		XFLOAT *Fimgs_real,
+		XFLOAT *Fimgs_imag,
+		XFLOAT *Fimgs_nomask_real,
+		XFLOAT *Fimgs_nomask_imag,
+		XFLOAT *sorted_weights,
+		XFLOAT *ctfs,
+		XFLOAT *Minvsigma2s,
+		XFLOAT *wdiff2s_parts,
+		XFLOAT *wavgs_real,
+		XFLOAT *wavgs_imag,
+		XFLOAT *Fweights,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
@@ -488,8 +488,8 @@ void runWavgKernel(
 			wavgs_imag,
 			Fweights,
 			translation_num,
-			(FLOAT) op.sum_weight[ipart],
-			(FLOAT) op.significant_weight[ipart],
+			(XFLOAT) op.sum_weight[ipart],
+			(XFLOAT) op.significant_weight[ipart],
 			baseMLO->refs_are_ctf_corrected
 			);
 	else
@@ -510,8 +510,8 @@ void runWavgKernel(
 			wavgs_imag,
 			Fweights,
 			translation_num,
-			(FLOAT) op.sum_weight[ipart],
-			(FLOAT) op.significant_weight[ipart],
+			(XFLOAT) op.sum_weight[ipart],
+			(XFLOAT) op.significant_weight[ipart],
 			baseMLO->refs_are_ctf_corrected
 			);
 
@@ -522,11 +522,11 @@ void runWavgKernel(
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
-		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
-		CudaGlobalPtr<FLOAT> &Fimgs_real,
-		CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		FLOAT *d_eulers,
-		CudaGlobalPtr<FLOAT> &diff2s,
+		CudaGlobalPtr<XFLOAT > &gpuMinvsigma2,
+		CudaGlobalPtr<XFLOAT> &Fimgs_real,
+		CudaGlobalPtr<XFLOAT> &Fimgs_imag,
+		XFLOAT *d_eulers,
+		CudaGlobalPtr<XFLOAT> &diff2s,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
@@ -540,7 +540,7 @@ void runDiff2KernelCoarse(
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
 	if(projector.mdlZ!=0)
-		cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
+		cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
 			d_eulers,
 			~Fimgs_real,
 			~Fimgs_imag,
@@ -551,7 +551,7 @@ void runDiff2KernelCoarse(
 			image_size,
 			op.highres_Xi2_imgs[ipart] / 2.);
 	else
-		cuda_kernel_diff2_coarse<false><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(FLOAT)>>>(
+		cuda_kernel_diff2_coarse<false><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
 			d_eulers,
 			~Fimgs_real,
 			~Fimgs_imag,
@@ -568,16 +568,16 @@ void runDiff2KernelCoarse(
 
 void runDiff2KernelFine(
 		CudaProjectorKernel &projector,
-		CudaGlobalPtr<FLOAT > &gpuMinvsigma2,
-		CudaGlobalPtr<FLOAT> &Fimgs_real,
-		CudaGlobalPtr<FLOAT> &Fimgs_imag,
-		CudaGlobalPtr<FLOAT> &eulers,
+		CudaGlobalPtr<XFLOAT > &gpuMinvsigma2,
+		CudaGlobalPtr<XFLOAT> &Fimgs_real,
+		CudaGlobalPtr<XFLOAT> &Fimgs_imag,
+		CudaGlobalPtr<XFLOAT> &eulers,
 		CudaGlobalPtr<long unsigned> &rot_id,
 		CudaGlobalPtr<long unsigned> &rot_idx,
 		CudaGlobalPtr<long unsigned> &trans_idx,
 		CudaGlobalPtr<long unsigned> &job_idx,
 		CudaGlobalPtr<long unsigned> &job_num,
-		CudaGlobalPtr<FLOAT> &diff2s,
+		CudaGlobalPtr<XFLOAT> &diff2s,
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
@@ -611,7 +611,7 @@ void runDiff2KernelFine(
 	//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
 	if (baseMLO->do_scale_correction)
 	{
-		FLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+		XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
 		{
 			gpuMinvsigma2[n] *= (myscale*myscale);

@@ -110,7 +110,7 @@ void CudaProjectorPlan::setup(
 	double ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
 	double cc(.0), cs(.0), sc(.0), ss(.0);
 
-	std::vector<FLOAT> e(9 * orientation_num);
+	std::vector<XFLOAT> e(9 * orientation_num);
 
 	for (long int i = 0; i < rots.size(); i++)
 	{
@@ -155,7 +155,7 @@ void CudaProjectorPlan::setup(
 
 	if (d_eulers == NULL)
 	{
-		d_eulers = new CudaDevicePtr<FLOAT>();
+		d_eulers = new CudaDevicePtr<XFLOAT>();
 		free_device = true;
 	}
 
@@ -169,7 +169,7 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 	os << "iorientclasses.size = " << iorientclasses.size() << std::endl;
 	os << "iover_rots.size = " << iover_rots.size() << std::endl;
 
-	std::vector<FLOAT> e(9 * orientation_num);
+	std::vector<XFLOAT> e(9 * orientation_num);
 	d_eulers->get(e);
 
 	os << std::endl << "iorientclasses\tiover_rots\teulers" << std::endl;

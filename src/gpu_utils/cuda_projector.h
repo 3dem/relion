@@ -74,7 +74,7 @@ public:
 		padding_factor = paddingFactor;
 	}
 
-	void setMdlData(FLOAT *real, FLOAT *imag);
+	void setMdlData(XFLOAT *real, XFLOAT *imag);
 	void setMdlData(Complex *data);
 
 	~CudaProjector();

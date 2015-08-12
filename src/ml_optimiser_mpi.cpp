@@ -17,12 +17,19 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <mpi.h>
+
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
+#include "src/gpu_utils/cuda_ml_optimiser.h"
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
+
+#ifdef TIMING
+	int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
+	int TIMING_MPISLAVEWAIT1, TIMING_MPISLAVEWAIT2, TIMING_MPISLAVEWAIT3;
+#endif
+
 void MlOptimiserMpi::read(int argc, char **argv)
 {
 #ifdef DEBUG
@@ -620,7 +627,15 @@ void MlOptimiserMpi::expectation()
     	try
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
+    		if (do_gpu)
+    		{
+    			int dev_id, rank;
+				MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+				dev_id = rank-1;
+				std::cerr << " using device " << dev_id  << " on MPI rank " << rank << std::endl;
 
+    			cudaMlOptimiser = (void*) new MlOptimiserCuda(this, dev_id);
+    		}
 			// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -745,6 +760,12 @@ void MlOptimiserMpi::expectation()
 				}
 
 			}
+			if (do_gpu)
+			{
+				((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
+				delete ((MlOptimiserCuda*) cudaMlOptimiser);
+			}
+
     	}
         catch (RelionError XE)
         {

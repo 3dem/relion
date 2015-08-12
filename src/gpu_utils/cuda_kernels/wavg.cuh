@@ -11,38 +11,38 @@
 
 template<bool do_3DProjection>
 __global__ void cuda_kernel_wavg(
-		FLOAT *g_eulers,
+		XFLOAT *g_eulers,
 		CudaProjectorKernel projector,
 		unsigned image_size,
 		unsigned long orientation_num,
-		FLOAT *g_imgs_real,
-		FLOAT *g_imgs_imag,
-		FLOAT *g_imgs_nomask_real,
-		FLOAT *g_imgs_nomask_imag,
-		FLOAT* g_weights,
-		FLOAT* g_ctfs,
-		FLOAT* g_Minvsigma2s,
-		FLOAT *g_wdiff2s_parts,
-		FLOAT *g_wavgs_real,
-		FLOAT *g_wavgs_imag,
-		FLOAT* g_Fweights,
+		XFLOAT *g_imgs_real,
+		XFLOAT *g_imgs_imag,
+		XFLOAT *g_imgs_nomask_real,
+		XFLOAT *g_imgs_nomask_imag,
+		XFLOAT* g_weights,
+		XFLOAT* g_ctfs,
+		XFLOAT* g_Minvsigma2s,
+		XFLOAT *g_wdiff2s_parts,
+		XFLOAT *g_wavgs_real,
+		XFLOAT *g_wavgs_imag,
+		XFLOAT* g_Fweights,
 		unsigned long translation_num,
-		FLOAT weight_norm,
-		FLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT significant_weight,
 		bool refs_are_ctf_corrected)
 {
-	FLOAT ref_real, ref_imag;
+	XFLOAT ref_real, ref_imag;
 	int bid = blockIdx.y * gridDim.x + blockIdx.x; //block ID
 	int tid = threadIdx.x;
 	// inside the padded 2D orientation grid
 //	if( bid < orientation_num )
 //	{
 		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  )),pixel;
-		FLOAT Fweight;
-		__shared__ FLOAT s_wavgs_real[BLOCK_SIZE];
-		__shared__ FLOAT s_wavgs_imag[BLOCK_SIZE];
-		__shared__ FLOAT s_wdiff2s_parts[BLOCK_SIZE];
-		__shared__ FLOAT s_Minvsigma2s[BLOCK_SIZE];
+		XFLOAT Fweight;
+		__shared__ XFLOAT s_wavgs_real[BLOCK_SIZE];
+		__shared__ XFLOAT s_wavgs_imag[BLOCK_SIZE];
+		__shared__ XFLOAT s_wdiff2s_parts[BLOCK_SIZE];
+		__shared__ XFLOAT s_Minvsigma2s[BLOCK_SIZE];
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 		{
 			s_wavgs_real[tid]  = 0.0f;
@@ -79,7 +79,7 @@ __global__ void cuda_kernel_wavg(
 
 				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 				{
-					FLOAT weight = __ldg(&g_weights[bid * translation_num + itrans]);
+					XFLOAT weight = __ldg(&g_weights[bid * translation_num + itrans]);
 
 					if (weight >= significant_weight)
 					{
@@ -87,12 +87,12 @@ __global__ void cuda_kernel_wavg(
 
 						unsigned long img_pixel_idx = itrans * image_size + pixel;
 
-						FLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-						FLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
+						XFLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
+						XFLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
 
 						s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-						FLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
+						XFLOAT weightxinvsigma2 = weight * __ldg(&g_ctfs[pixel]) * s_Minvsigma2s[tid];
 
 						s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
 						s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;

@@ -39,21 +39,21 @@ void CudaBackprojector::initMdl()
 		}
 	}
 
-	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(int)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(int)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(int)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(XFLOAT)));
 
-	HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 
-	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, voxelCount * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, voxelCount * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, voxelCount * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, voxelCount * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, voxelCount * sizeof(XFLOAT)));
 
-	HANDLE_ERROR(cudaMemset( d_mdlReal, 0, voxelCount * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMemset( d_mdlImag, 0, voxelCount * sizeof(FLOAT)));
-	HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, voxelCount * sizeof(FLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlReal, 0, voxelCount * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlImag, 0, voxelCount * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, voxelCount * sizeof(XFLOAT)));
 
 	HANDLE_ERROR(cudaStreamCreate(&stream));
 }
@@ -61,15 +61,15 @@ __global__ void cuda_kernel_backproject2D(
 		int *g_xs,
 		int *g_ys,
 		int *g_zs,
-		FLOAT *g_model_real,
-		FLOAT *g_model_imag,
-		FLOAT *g_weight,
-		FLOAT *g_wavgs_real,
-		FLOAT *g_wavgs_imag,
-		FLOAT *g_Fweights,
-		FLOAT *g_eulers,
+		XFLOAT *g_model_real,
+		XFLOAT *g_model_imag,
+		XFLOAT *g_weight,
+		XFLOAT *g_wavgs_real,
+		XFLOAT *g_wavgs_imag,
+		XFLOAT *g_Fweights,
+		XFLOAT *g_eulers,
 		int max_r2,
-		FLOAT scale2,
+		XFLOAT scale2,
 		unsigned img_x,
 		unsigned img_y,
 		unsigned img_xy,
@@ -87,15 +87,15 @@ __global__ void cuda_kernel_backproject3D(
 		int *g_xs,
 		int *g_ys,
 		int *g_zs,
-		FLOAT *g_model_real,
-		FLOAT *g_model_imag,
-		FLOAT *g_weight,
-		FLOAT *g_wavgs_real,
-		FLOAT *g_wavgs_imag,
-		FLOAT *g_Fweights,
-		FLOAT *g_eulers,
+		XFLOAT *g_model_real,
+		XFLOAT *g_model_imag,
+		XFLOAT *g_weight,
+		XFLOAT *g_wavgs_real,
+		XFLOAT *g_wavgs_imag,
+		XFLOAT *g_Fweights,
+		XFLOAT *g_eulers,
 		int max_r2,
-		FLOAT scale2,
+		XFLOAT scale2,
 		unsigned img_x,
 		unsigned img_y,
 		unsigned img_xy,
@@ -136,15 +136,15 @@ __global__ void cuda_kernel_backproject3D(
 	}
 
 	bool  is_neg_x;
-	FLOAT d, w;
-	FLOAT xp,yp,zp;
+	XFLOAT d, w;
+	XFLOAT xp,yp,zp;
 	int x,y,idx;
 
-	__shared__ FLOAT s_e[BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT];
+	__shared__ XFLOAT s_e[BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_FETCH_COUNT];
 
-	__shared__ FLOAT s_weight[BACKPROJECTION4_GROUP_SIZE*4];
-	__shared__ FLOAT s_value_real[BACKPROJECTION4_GROUP_SIZE*4];
-	__shared__ FLOAT s_value_imag[BACKPROJECTION4_GROUP_SIZE*4];
+	__shared__ XFLOAT s_weight[BACKPROJECTION4_GROUP_SIZE*4];
+	__shared__ XFLOAT s_value_real[BACKPROJECTION4_GROUP_SIZE*4];
+	__shared__ XFLOAT s_value_imag[BACKPROJECTION4_GROUP_SIZE*4];
 
 	s_weight[tid] = 0.0f;
 	s_value_real[tid] = 0.0f;
@@ -235,29 +235,29 @@ __global__ void cuda_kernel_backproject3D(
 
 	if (mid == 0)
 	{
-		FLOAT sum = s_weight[gid*4 + 0] + s_weight[gid*4 + 1] + s_weight[gid*4 + 2] + s_weight[gid*4 + 3];
+		XFLOAT sum = s_weight[gid*4 + 0] + s_weight[gid*4 + 1] + s_weight[gid*4 + 2] + s_weight[gid*4 + 3];
 		if (sum != 0.0f)
 			g_weight[global_idx] += sum;
 	}
 	else if (mid == 1)
 	{
-		FLOAT sum = s_value_real[gid*4 + 0] + s_value_real[gid*4 + 1] + s_value_real[gid*4 + 2] + s_value_real[gid*4 + 3];
+		XFLOAT sum = s_value_real[gid*4 + 0] + s_value_real[gid*4 + 1] + s_value_real[gid*4 + 2] + s_value_real[gid*4 + 3];
 		if (sum != 0.0f)
 			g_model_real[global_idx] += sum;
 	}
 	else if (mid == 2)
 	{
-		FLOAT sum = s_value_imag[gid*4 + 0] + s_value_imag[gid*4 + 1] + s_value_imag[gid*4 + 2] + s_value_imag[gid*4 + 3];
+		XFLOAT sum = s_value_imag[gid*4 + 0] + s_value_imag[gid*4 + 1] + s_value_imag[gid*4 + 2] + s_value_imag[gid*4 + 3];
 		if (sum != 0.0f)
 			g_model_imag[global_idx] += sum;
 	}
 }
 
 void CudaBackprojector::backproject(
-		FLOAT *d_real,
-		FLOAT *d_imag,
-		FLOAT *d_weight,
-		FLOAT *d_eulers,
+		XFLOAT *d_real,
+		XFLOAT *d_imag,
+		XFLOAT *d_weight,
+		XFLOAT *d_eulers,
 		int imgX,
 		int imgY,
 		unsigned long imageCount)
@@ -314,13 +314,13 @@ void CudaBackprojector::backproject(
 }
 
 
-void CudaBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT * implicitW)
+void CudaBackprojector::getMdlData(XFLOAT *implicitR, XFLOAT *implicitI, XFLOAT * implicitW)
 {
 	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Make sure to wait for remaining kernel executions
 
-	FLOAT *explicitR = new FLOAT[voxelCount];
-	FLOAT *explicitI = new FLOAT[voxelCount];
-	FLOAT *explicitW = new FLOAT[voxelCount];
+	XFLOAT *explicitR = new XFLOAT[voxelCount];
+	XFLOAT *explicitI = new XFLOAT[voxelCount];
+	XFLOAT *explicitW = new XFLOAT[voxelCount];
 
 	for (unsigned long i = 0; i < mdlXYZ; i ++)
 	{
@@ -329,9 +329,9 @@ void CudaBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT * i
 		implicitW[i] = 0.;
 	}
 
-	HANDLE_ERROR(cudaMemcpy( explicitR, d_mdlReal, voxelCount * sizeof(FLOAT), cudaMemcpyDeviceToHost));
-	HANDLE_ERROR(cudaMemcpy( explicitI, d_mdlImag, voxelCount * sizeof(FLOAT), cudaMemcpyDeviceToHost));
-	HANDLE_ERROR(cudaMemcpy( explicitW, d_mdlWeight, voxelCount * sizeof(FLOAT), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaMemcpy( explicitR, d_mdlReal, voxelCount * sizeof(XFLOAT), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaMemcpy( explicitI, d_mdlImag, voxelCount * sizeof(XFLOAT), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaMemcpy( explicitW, d_mdlWeight, voxelCount * sizeof(XFLOAT), cudaMemcpyDeviceToHost));
 
 	for (unsigned long i = 0; i < voxelCount; i ++)
 	{
@@ -350,9 +350,9 @@ void CudaBackprojector::getMdlData(FLOAT *implicitR, FLOAT *implicitI, FLOAT * i
 
 void CudaBackprojector::getMdlData(Complex *data, double * weights)
 {
-	FLOAT *r = new FLOAT[mdlXYZ];
-	FLOAT *i = new FLOAT[mdlXYZ];
-	FLOAT *w = new FLOAT[mdlXYZ];
+	XFLOAT *r = new XFLOAT[mdlXYZ];
+	XFLOAT *i = new XFLOAT[mdlXYZ];
+	XFLOAT *w = new XFLOAT[mdlXYZ];
 
 	getMdlData(r, i, w);
 

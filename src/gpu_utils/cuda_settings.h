@@ -2,9 +2,9 @@
 #define CUDA_SETTINGS_H_
 
 #ifdef CUDA_DOUBLE_PRECISION
-#define FLOAT double
+#define XFLOAT double
 #else
-#define FLOAT float
+#define XFLOAT float
 #endif
 
 #define MAX_RESOL_SHARED_MEM 32
@@ -19,7 +19,7 @@
 									// This applies to wavg and reduces global memory
 									// accesses roughly proportionally, but scales shared
 									// memory usage by allocating
-									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE FLOATS. // DEPRECATED
+									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE XFLOATS. // DEPRECATED
 
 #define NR_CLASS_MUTEXES 5
 

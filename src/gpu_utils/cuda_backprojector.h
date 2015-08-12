@@ -19,7 +19,7 @@ class CudaBackprojector
 	int *h_voxelX, *h_voxelY, *h_voxelZ;
 
 	int *d_voxelX, *d_voxelY, *d_voxelZ;
-	FLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
+	XFLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
 
 	unsigned long voxelCount;
 
@@ -73,15 +73,15 @@ public:
 	void initMdl();
 
 	void backproject(
-			FLOAT *d_real,
-			FLOAT *d_imag,
-			FLOAT *d_weight,
-			FLOAT *d_eulers,
+			XFLOAT *d_real,
+			XFLOAT *d_imag,
+			XFLOAT *d_weight,
+			XFLOAT *d_eulers,
 			int imgX,
 			int imgY,
 			unsigned long imageCount);
 
-	void getMdlData(FLOAT *real, FLOAT *imag, FLOAT * weights);
+	void getMdlData(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
 	void getMdlData(Complex *data, double * weights);
 
 	cudaStream_t getStream() { return stream; }

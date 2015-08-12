@@ -13,7 +13,7 @@ class CudaProjectorPlan
 public:
 	std::vector< long unsigned > iorientclasses, iover_rots;
 	long unsigned orientation_num;
-	CudaDevicePtr<FLOAT> *d_eulers;
+	CudaDevicePtr<XFLOAT> *d_eulers;
 	bool free_device;
 
 	//Copy constructor
@@ -32,7 +32,7 @@ public:
 		iover_rots.reserve(0);
 	};
 
-	CudaProjectorPlan(CudaDevicePtr<FLOAT> *d_eulers):
+	CudaProjectorPlan(CudaDevicePtr<XFLOAT> *d_eulers):
 		orientation_num(0), d_eulers(d_eulers), free_device(false)
 	{
 		iorientclasses.reserve(0);

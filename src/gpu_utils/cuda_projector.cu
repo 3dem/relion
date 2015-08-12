@@ -106,13 +106,13 @@ void CudaProjector::setMdlData(double *real, double *imag)
 
 void CudaProjector::setMdlData(Complex *data)
 {
-	FLOAT *tmpReal = new FLOAT[mdlXYZ];
-	FLOAT *tmpImag = new FLOAT[mdlXYZ];
+	XFLOAT *tmpReal = new XFLOAT[mdlXYZ];
+	XFLOAT *tmpImag = new XFLOAT[mdlXYZ];
 
 	for (unsigned long i = 0; i < mdlXYZ; i ++)
 	{
-		tmpReal[i] = (FLOAT) data[i].real;
-		tmpImag[i] = (FLOAT) data[i].imag;
+		tmpReal[i] = (XFLOAT) data[i].real;
+		tmpImag[i] = (XFLOAT) data[i].imag;
 	}
 
 	setMdlData(tmpReal, tmpImag);
