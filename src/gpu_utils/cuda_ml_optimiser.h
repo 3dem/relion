@@ -201,6 +201,8 @@ public:
 
 	MlOptimiser *baseMLO;
 
+	bool refIs3D;
+
 	bool generateProjectionPlanOnTheFly;
 
 	int device_id;

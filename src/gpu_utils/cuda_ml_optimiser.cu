@@ -24,6 +24,7 @@
 #include <thrust/extrema.h>
 #include <signal.h>
 
+static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void getAllSquaredDifferencesCoarse(
@@ -928,23 +929,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 
 	std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-	Matrix2D<double> A;
-	MultidimArray<XFLOAT > Fimg_real, Fimg_imag;
-	MultidimArray<Complex > Fimg, Fimg_otfshift_nomask;  //TODO remove, currently needed for Fourier stuff, which is based on the complex class
-	MultidimArray<double> Fweight, Minvsigma2, Mctf;
 	bool have_warned_small_scale = false;
-
-	Fimg_real.resize(op.Fimgs[0]);
-	Fimg_imag.resize(op.Fimgs[0]);
-	Fimg.resize(op.Fimgs[0]);
-	Fweight.resize(op.Fimgs[0]);
-
-	// Initialise Mctf to all-1 for if !do_ctf_corection
-	Mctf.resize(op.Fimgs[0]);
-	Mctf.initConstant(1.);
-	// Initialise Minvsigma2 to all-1 for if !do_map
-	Minvsigma2.resize(op.Fimgs[0]);
-	Minvsigma2.initConstant(1.);
 
 	// Make local copies of weighted sums (except BPrefs, which are too big)
 	// so that there are not too many mutex locks below
@@ -1268,32 +1253,68 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 									BACKPROJECTION
 				======================================================*/
 
-				std::vector<XFLOAT> bp_eulers(9*orientation_num);
+				std::vector<XFLOAT> h_bp_eulers(9*orientation_num);
 
 				XFLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
 
 				generateEulerMatrices(
 						1/padding_factor, //Why squared scale factor is given in backprojection
 						ProjectionData_projdiv,
-						&bp_eulers[0],
+						&h_bp_eulers[0],
 						IS_NOT_INV);
 
-				cudaMLO->bp_eulers[exp_iclass].set(bp_eulers);
+				cudaMLO->bp_eulers[exp_iclass].set(h_bp_eulers);
 
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
-				CUDA_GPU_TIC("cuda_kernels_backproject");
-				cudaMLO->cudaBackprojectors[exp_iclass].backproject(
-						cudaMLO->wavgs_real[exp_iclass],
-						cudaMLO->wavgs_imag[exp_iclass],
-						cudaMLO->wavgs_weight[exp_iclass],
-						cudaMLO->bp_eulers[exp_iclass],
-						op.local_Minvsigma2s[0].xdim,
-						op.local_Minvsigma2s[0].ydim,
-						orientation_num);
-				CUDA_GPU_TAC("cuda_kernels_backproject");
+
+				if (cudaMLO->refIs3D)
+				{
+					CUDA_GPU_TIC("cuda_kernels_backproject");
+					cudaMLO->cudaBackprojectors[exp_iclass].backproject(
+							cudaMLO->wavgs_real[exp_iclass],
+							cudaMLO->wavgs_imag[exp_iclass],
+							cudaMLO->wavgs_weight[exp_iclass],
+							cudaMLO->bp_eulers[exp_iclass],
+							op.local_Minvsigma2s[0].xdim,
+							op.local_Minvsigma2s[0].ydim,
+							orientation_num);
+					CUDA_GPU_TAC("cuda_kernels_backproject");
+				}
+				else
+				{
+					std::vector<XFLOAT> h_wavgs_real, h_wavgs_imag, h_wavgs_weight;
+					cudaMLO->wavgs_real[exp_iclass].get(h_wavgs_real);
+					cudaMLO->wavgs_weight[exp_iclass].get(h_wavgs_imag);
+					cudaMLO->wavgs_weight[exp_iclass].get(h_wavgs_weight);
+
+					MultidimArray<Complex > Fimg;
+					MultidimArray<double > Fweight;
+					Fimg.resize(op.Fimgs[0]);
+					Fweight.resize(op.Fimgs[0]);
+					Matrix2D<double> A(3,3);
+
+					int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
+					pthread_mutex_lock(&global_mutex2[my_mutex]);
+					for (int i = 0; i < orientation_num; i ++)
+					{
+						for (int j = 0; j < image_size; j ++)
+						{
+							Fimg.data[j].real = (double) h_wavgs_real[i * image_size + j];
+							Fimg.data[j].imag = (double) h_wavgs_imag[i * image_size + j];
+							Fweight.data[j]   = (double) h_wavgs_weight[i * image_size + j];
+						}
+
+						for (int j = 0; j < 9; j ++)
+							A.mdata[j] = h_bp_eulers[i * 9 + j];
+
+						baseMLO->wsum_model.BPref[exp_iclass].backrotate2D(Fimg, A, IS_NOT_INV, &Fweight);
+					}
+					pthread_mutex_unlock(&global_mutex2[my_mutex]);
+				}
+
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 					baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
@@ -1702,6 +1723,8 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	p_thr_wsum_prior_offsety_class.resize(nr_classes);
 	p_thr_wsum_sigma2_offset.resize(nr_classes);
 
+	refIs3D = baseMLO->mymodel.ref_dim == 3;
+	
 	/*======================================================
 	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
 	======================================================*/

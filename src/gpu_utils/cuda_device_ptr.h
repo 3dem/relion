@@ -91,32 +91,60 @@ public:
 	inline
 	void init(int value)
 	{
+#ifdef DEBUG_CUDA
+		if (size == 0)
+		{
+			printf("DEBUG_ERROR: init-function of zero sized device pointer called.\n");
+			raise(SIGSEGV);
+		}
+#endif
 		HANDLE_ERROR2(cudaMemsetAsync(ptr, value, size * sizeof(T), stream));
 	};
 	inline
 	void set(T *h_ptr)
 	{
+#ifdef DEBUG_CUDA
+		if (size == 0)
+		{
+			printf("DEBUG_ERROR: set-function of zero sized device pointer called.\n");
+			raise(SIGSEGV);
+		}
+#endif
 		HANDLE_ERROR2(cudaMemcpyAsync( ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
 	};
 
 	inline
-	void set(std::vector<T> &h_ptr)
+	void set(std::vector<T> &vector)
 	{
-		resize(h_ptr.size());
-		set(&h_ptr[0]);
+#ifdef DEBUG_CUDA
+		if (vector.size() == 0)
+		{
+			printf("DEBUG_ERROR: device pointer set-function called with zero sized vector.\n");
+			raise(SIGSEGV);
+		}
+#endif
+		resize(vector.size());
+		set(&vector[0]);
 	};
 
 	inline
 	void get(T *h_ptr)
 	{
+#ifdef DEBUG_CUDA
+		if (size == 0)
+		{
+			printf("DEBUG_ERROR: get-function of zero sized device pointer called.\n");
+			raise(SIGSEGV);
+		}
+#endif
 		HANDLE_ERROR2(cudaMemcpyAsync( h_ptr, ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
 	};
 
 	inline
-	void get(std::vector<T> &h_ptr)
+	void get(std::vector<T> &vector)
 	{
-		resize(h_ptr.size());
-		get(&h_ptr[0]);
+		vector.resize(size);
+		get(&vector[0]);
 	};
 
 	inline
