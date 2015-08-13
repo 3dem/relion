@@ -120,6 +120,10 @@ public:
 		if (curL->size == size)
 		{
 			curL->free = false;
+
+//			printf("ALLOC: ");
+//			printState();
+
 			return curL;
 		}
 		else
@@ -143,6 +147,9 @@ public:
 			newL->prev = curL->prev;
 			newL->next = curL;
 			curL->prev = newL;
+
+//			printf("ALLOC: ");
+//			printState();
 
 			return newL;
 		}
@@ -171,7 +178,7 @@ public:
 	{
 		curL->free = true;
 
-		//Previous neighbor is free
+		//Previous neighbor is free, concatenate
 		if ( curL->prev != NULL && curL->prev->free)
 		{
 			//Resize and set pointer
@@ -182,13 +189,15 @@ public:
 			Link *ppL = curL->prev->prev;
 
 			//Remove primary neighbor
+			if (ppL != NULL)
+				ppL->next = curL;
 			delete curL->prev;
 
 			//Attach secondary neighbor
 			curL->prev = ppL;
 		}
 
-		//Next neighbor is free
+		//Next neighbor is free, concatenate
 		if ( curL->next != NULL && curL->next->free)
 		{
 			//Resize and set pointer
@@ -198,12 +207,33 @@ public:
 			Link *nnL = curL->next->next;
 
 			//Remove primary neighbor
+			if (nnL != NULL)
+				nnL->prev = curL;
 			delete curL->next;
 
 			//Attach secondary neighbor
 			curL->next = nnL;
 		}
+
+//		printf("FREE: ");
+//		printState();
 	};
+
+	void printState()
+	{
+		Link *curL = first;
+
+		while (curL != NULL)
+		{
+			if (curL->free)
+				printf("[%lu,%lu] ", (unsigned long) curL->size, (unsigned long) curL->ptr);
+			else
+				printf("(%lu,%lu) ", (unsigned long) curL->size, (unsigned long) curL->ptr);
+
+			curL = curL->next;
+		}
+		printf("\n");
+	}
 
 	~CudaCustomAllocator()
 	{
