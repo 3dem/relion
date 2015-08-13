@@ -1,17 +1,17 @@
+#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_projector.cuh"
+#include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_kernels/helper.cuh"
+#include "src/gpu_utils/cuda_kernels/diff2.cuh"
+#include "src/gpu_utils/cuda_kernels/wavg.cuh"
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
 #include <ctime>
 #include <iostream>
-#include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_benchmark_utils.cuh"
-#include "src/gpu_utils/cuda_ml_optimiser.h"
-#include "src/gpu_utils/cuda_kernels/helper.cuh"
-#include "src/gpu_utils/cuda_kernels/diff2.cuh"
-#include "src/gpu_utils/cuda_kernels/wavg.cuh"
-#include "src/gpu_utils/cuda_utils.cuh"
 #include "src/complex.h"
 #include <fstream>
 #include <cuda_runtime.h>
@@ -29,14 +29,15 @@
  * to the difference kernel. If there are more contiguous translations than the specified PROJDIFF_CHUNK_SIZE,
  * these are split into separate jobs, to increase paralllelism at the cost of redundant memory reads.
  */
-long int makeJobsForDiff2Fine( OptimisationParamters &op,  SamplingParameters &sp,
-										  long int orientation_num, long int translation_num,
-					 	 	 	 	 	  ProjectionParams &FineProjectionData,
-										  std::vector< long unsigned > &iover_transes,
-										  std::vector< long unsigned > &ihiddens,
-										  long int nr_over_orient, long int nr_over_trans, int ipart,
-										  IndexedDataArray &FPW, // FPW=FinePassWeights
-										  IndexedDataArrayMask &dataMask)
+long int makeJobsForDiff2Fine(
+		OptimisationParamters &op,  SamplingParameters &sp,
+		long int orientation_num, long int translation_num,
+		ProjectionParams &FineProjectionData,
+		std::vector< long unsigned > &iover_transes,
+		std::vector< long unsigned > &ihiddens,
+		long int nr_over_orient, long int nr_over_trans, int ipart,
+		IndexedDataArray &FPW, // FPW=FinePassWeights
+		IndexedDataArrayMask &dataMask)
 {
 	long int w_base = dataMask.firstPos, w(0), k(0);
 	// be on the safe side with the jobArrays: make them as large as they could possibly be
@@ -184,10 +185,9 @@ dim3 splitCudaBlocks(long int block_num, bool doForceEven)
 /*
  * Maps weights to a decoupled indexing of translations and orientations
  */
-inline
 void mapWeights(
 		unsigned long orientation_start,
-		std::vector<XFLOAT> &mapped_weights,
+		CudaGlobalPtr<XFLOAT> &mapped_weights,
 		unsigned orientation_num,
 		unsigned long idxArr_start,
 		unsigned long idxArr_end,
@@ -219,12 +219,11 @@ void mapWeights(
 	}
 }
 
-inline
 long unsigned imageTranslation(
-		std::vector<XFLOAT> &Fimgs_real,
-		std::vector<XFLOAT> &Fimgs_imag,
-		std::vector<XFLOAT> &Fimgs_nomask_real,
-		std::vector<XFLOAT> &Fimgs_nomask_imag,
+		XFLOAT *Fimgs_real,
+		XFLOAT *Fimgs_imag,
+		XFLOAT *Fimgs_nomask_real,
+		XFLOAT *Fimgs_nomask_imag,
 		long int itrans_min,
 		long int itrans_max,
 		int adaptive_oversampling ,
@@ -266,16 +265,16 @@ long unsigned imageTranslation(
 						- b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag;
 				XFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).imag
 						+ b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted, n)).real;
-				Fimgs_real.push_back(real);
-				Fimgs_imag.push_back(imag);
+				Fimgs_real[translation_num * image_size + n] = real;
+								Fimgs_imag[translation_num * image_size + n] = imag;
 
 				// Fimg_shift_nomask
 				real = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).real
 						- b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).imag;
 				imag = a * (DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).imag
 						+ b *(DIRECT_MULTIDIM_ELEM(local_Fimgs_shifted_nomask, n)).real;
-				Fimgs_nomask_real.push_back(real);
-				Fimgs_nomask_imag.push_back(imag);
+				Fimgs_nomask_real[translation_num * image_size + n] = real;
+				Fimgs_nomask_imag[translation_num * image_size + n] = imag;
 			}
 
 			translation_num ++;
@@ -433,7 +432,6 @@ long unsigned generateProjectionSetup(
 	return orientation_num;
 }
 
-inline
 void runWavgKernel(
 		CudaProjectorKernel &projector,
 		XFLOAT *eulers,
