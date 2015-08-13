@@ -262,6 +262,56 @@ public:
 	T *h_ptr, *d_ptr; //Host and device pointers
 	bool h_do_free, d_do_free; //True if host or device needs to be freed
 
+	/*======================================================
+				CONSTRUCTORS WITH ALLOCATORS
+	======================================================*/
+
+	inline
+	CudaGlobalPtr(CudaCustomAllocator *allocator):
+		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
+		d_do_free(false), allocator(allocator), link(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(size_t size, CudaCustomAllocator *allocator):
+		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
+		d_do_free(false), allocator(allocator), link(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
+		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
+		d_do_free(false), allocator(allocator), link(0), stream(stream)
+	{};
+
+	inline
+	CudaGlobalPtr(T * h_start, size_t size, CudaCustomAllocator *allocator):
+		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
+		d_do_free(false), allocator(allocator), link(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
+		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
+		d_do_free(false), allocator(allocator), link(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(T * h_start, T * d_start, size_t size, CudaCustomAllocator *allocator):
+		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
+		d_do_free(false), allocator(allocator), link(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(T * h_start, T * d_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
+		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
+		d_do_free(false), allocator(allocator), link(0), stream(stream)
+	{};
+
+	/*======================================================
+	           CONSTRUCTORS WITHOUT ALLOCATORS
+	======================================================*/
+
 	inline
 	CudaGlobalPtr():
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
@@ -281,19 +331,13 @@ public:
 	{};
 
 	inline
-	CudaGlobalPtr(size_t size, CudaCustomAllocator *allocator):
-		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(allocator), link(0), stream(0)
-	{};
-
-	inline
-	CudaGlobalPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(allocator), link(0), stream(stream)
-	{};
-
-	inline
 	CudaGlobalPtr(T * h_start, size_t size):
+		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
+		d_do_free(false), allocator(0), link(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
 		d_do_free(false), allocator(0), link(0), stream(0)
 	{};
@@ -303,6 +347,16 @@ public:
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
 		d_do_free(false), allocator(0), link(0), stream(0)
 	{};
+
+	inline
+	CudaGlobalPtr(T * h_start, T * d_start, size_t size, cudaStream_t stream):
+		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
+		d_do_free(false), allocator(0), link(0), stream(stream)
+	{};
+
+	/*======================================================
+	                    OTHER STUFF
+	======================================================*/
 
 	/**
 	 * Allocate memory on device
@@ -315,13 +369,20 @@ public:
 			printf("DEBUG_WARNING: Device double allocation.\n");
 #endif
 		d_do_free = true;
+
+		HANDLE_ERROR(cudaDeviceSynchronize());
+
 		if (CustomAlloc)
 		{
+//			HANDLE_ERROR(cudaDeviceSynchronize());
 			link = allocator->allocLink(size * sizeof(T));
+//			HANDLE_ERROR(cudaDeviceSynchronize());
 			d_ptr = (T*) link->ptr;
 		}
 		else
 			HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
+
+		HANDLE_ERROR(cudaDeviceSynchronize());
 	}
 
 	/**
@@ -463,8 +524,13 @@ public:
 			printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
 #endif
 		d_do_free = false;
+
 		if (CustomAlloc)
+		{
+//			HANDLE_ERROR(cudaDeviceSynchronize());
 			allocator->freeLink(link);
+//			HANDLE_ERROR(cudaDeviceSynchronize());
+		}
 		else
 			HANDLE_ERROR(cudaFree(d_ptr));
 		d_ptr = 0;
