@@ -121,8 +121,8 @@ public:
 		{
 			curL->free = false;
 
-//			printf("ALLOC: ");
-//			printState();
+			printf("ALLOC: ");
+			printState();
 
 			return curL;
 		}
@@ -167,6 +167,7 @@ public:
 		if (curL == NULL)
 		{
 			printf("ERROR: CudaFixedMalloc could not find provided pointer in list (possible double free).");
+			fflush(stdout);
 			raise(SIGSEGV);
 		}
 
@@ -189,8 +190,11 @@ public:
 			Link *ppL = curL->prev->prev;
 
 			//Remove primary neighbor
-			if (ppL != NULL)
+			if (ppL == NULL) //If the previous is first in chain
+				first = curL;
+			else
 				ppL->next = curL;
+
 			delete curL->prev;
 
 			//Attach secondary neighbor
@@ -233,6 +237,7 @@ public:
 			curL = curL->next;
 		}
 		printf("\n");
+		fflush(stdout);
 	}
 
 	~CudaCustomAllocator()
@@ -251,7 +256,7 @@ public:
 };
 
 
-template <typename T, bool CustomAlloc=false>
+template <typename T, bool CustomAlloc=true>
 class CudaGlobalPtr
 {
 	CudaCustomAllocator *allocator;

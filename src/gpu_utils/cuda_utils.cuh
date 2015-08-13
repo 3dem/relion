@@ -43,9 +43,9 @@ public:
 	long unsigned weightNum, jobNum; // number of weights and jobs this class
 
 	inline
-	__host__  IndexedDataArrayMask():
-	jobOrigin(),
-	jobExtent(),
+	__host__  IndexedDataArrayMask(CudaCustomAllocator *allocator):
+	jobOrigin(allocator),
+	jobExtent(allocator),
 	firstPos(),
 	lastPos(),
 	weightNum(),
@@ -91,24 +91,24 @@ public:
 	CudaGlobalPtr<long unsigned> rot_id, rot_idx, trans_idx, ihidden_overs, class_id;
 
 	inline
-	__host__  IndexedDataArray():
-		weights(),
-		rot_id(),
-		rot_idx(),
-		trans_idx(),
-		ihidden_overs(),
-		class_id()
+	__host__  IndexedDataArray(CudaCustomAllocator *allocator):
+		weights(allocator),
+		rot_id(allocator),
+		rot_idx(allocator),
+		trans_idx(allocator),
+		ihidden_overs(allocator),
+		class_id(allocator)
 	{};
 
 	// constructor which takes a parent IndexedDataArray and a mask to create a child
 	inline
-	__host__  IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask):
-		weights(		&(parent.weights.h_ptr[mask.firstPos])		,&(parent.weights.d_ptr[mask.firstPos])			,mask.weightNum),
-		rot_id(			&(parent.rot_id.h_ptr[mask.firstPos])		,&(parent.rot_id.d_ptr[mask.firstPos])			,mask.weightNum),
-		rot_idx(		&(parent.rot_idx.h_ptr[mask.firstPos])		,&(parent.rot_idx.d_ptr[mask.firstPos])			,mask.weightNum),
-		trans_idx(		&(parent.trans_idx.h_ptr[mask.firstPos])	,&(parent.trans_idx.d_ptr[mask.firstPos])		,mask.weightNum),
-		ihidden_overs(	&(parent.ihidden_overs.h_ptr[mask.firstPos]),&(parent.ihidden_overs.d_ptr[mask.firstPos])	,mask.weightNum),
-		class_id(		&(parent.class_id.h_ptr[mask.firstPos])		,&(parent.class_id.d_ptr[mask.firstPos])		,mask.weightNum)
+	__host__  IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask, CudaCustomAllocator *allocator):
+		weights(		&(parent.weights.h_ptr[mask.firstPos])		,&(parent.weights.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
+		rot_id(			&(parent.rot_id.h_ptr[mask.firstPos])		,&(parent.rot_id.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
+		rot_idx(		&(parent.rot_idx.h_ptr[mask.firstPos])		,&(parent.rot_idx.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
+		trans_idx(		&(parent.trans_idx.h_ptr[mask.firstPos])	,&(parent.trans_idx.d_ptr[mask.firstPos])		,mask.weightNum, allocator),
+		ihidden_overs(	&(parent.ihidden_overs.h_ptr[mask.firstPos]),&(parent.ihidden_overs.d_ptr[mask.firstPos])	,mask.weightNum, allocator),
+		class_id(		&(parent.class_id.h_ptr[mask.firstPos])		,&(parent.class_id.d_ptr[mask.firstPos])		,mask.weightNum, allocator)
 	{
 		weights.d_do_free=false;
 		rot_id.d_do_free=false;

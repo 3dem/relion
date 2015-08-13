@@ -112,7 +112,7 @@ void CudaProjectorPlan::setup(
 
 	if (eulers == NULL)
 	{
-		eulers = new CudaGlobalPtr<XFLOAT>(9*orientation_num);
+		eulers = new CudaGlobalPtr<XFLOAT,false>(9*orientation_num);
 		eulers->device_alloc();
 		free_device = true;
 	}
