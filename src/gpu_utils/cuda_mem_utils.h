@@ -223,6 +223,14 @@ public:
 //		printState();
 	};
 
+	size_t getFreeSpace()
+	{
+		Link *cL = first;
+		while (cL->next != NULL) //Get last
+			cL = cL->next;
+		return cL->size;
+	}
+
 	void printState()
 	{
 		Link *curL = first;

@@ -1025,16 +1025,104 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	CUDA_CPU_TOC("store_init");
 	CUDA_CPU_TIC("maximization");
 
-	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
+	/*=======================================================================================
+	                                   MAXIMIZATION
+	=======================================================================================*/
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 
-		/*=======================================================================================
-											  MAXIMIZATION
-		=======================================================================================*/
+		/*======================================================
+		                     TRANSLATIONS
+		======================================================*/
 
+		CUDA_CPU_TIC("translation_2");
+
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(Fimgs_real.size, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(Fimgs_real.size, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(Fimgs_real.size, cudaMLO->allocator);
+
+		std::vector< long unsigned > iover_transes, itranses, ihiddens;
+
+		long unsigned translation_num = imageTranslation(
+				Fimgs_real.h_ptr,
+				Fimgs_imag.h_ptr,
+				Fimgs_nomask_real.h_ptr,
+				Fimgs_nomask_imag.h_ptr,
+				sp.itrans_min,
+				sp.itrans_max,
+				baseMLO->adaptive_oversampling,
+				baseMLO->sampling,
+				oversampled_translations_x,
+				oversampled_translations_y,
+				oversampled_translations_z,
+				sp.nr_oversampled_trans,
+				baseMLO->global_fftshifts_ab_current,
+				baseMLO->global_fftshifts_ab2_current,
+				op.local_Fimgs_shifted[ipart],
+				op.local_Fimgs_shifted_nomask[ipart],
+				iover_transes,
+				itranses,
+				ihiddens,
+				image_size);
+
+
+		Fimgs_real.put_on_device(translation_num * image_size);
+		Fimgs_imag.put_on_device(Fimgs_real.size);
+		Fimgs_nomask_real.put_on_device(Fimgs_real.size);
+		Fimgs_nomask_imag.put_on_device(Fimgs_real.size);
+
+		CUDA_CPU_TOC("translation_2");
+
+
+		/*======================================================
+		                       SCALE
+		======================================================*/
+
+		XFLOAT part_scale(1.);
+
+		if (baseMLO->do_scale_correction)
+		{
+			part_scale = baseMLO->mymodel.scale_correction[group_id];
+			if (part_scale > 10000.)
+			{
+				std::cerr << " rlnMicrographScaleCorrection= " << part_scale << " group= " << group_id + 1 << std::endl;
+				REPORT_ERROR("ERROR: rlnMicrographScaleCorrection is very high. Did you normalize your data?");
+			}
+			else if (part_scale < 0.001)
+			{
+				if (!have_warned_small_scale)
+				{
+					std::cout << " WARNING: ignoring group " << group_id + 1 << " with very small or negative scale (" << part_scale <<
+							"); Use larger groups for more stable scale estimates." << std::endl;
+					have_warned_small_scale = true;
+				}
+				part_scale = 0.001;
+			}
+		}
+
+		CudaGlobalPtr<XFLOAT> ctfs(image_size, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
+
+		if (baseMLO->do_ctf_correction)
+		{
+			for (unsigned i = 0; i < image_size; i++)
+				ctfs[i] = (XFLOAT) op.local_Fctfs[ipart].data[i] * part_scale;
+		}
+		else //TODO should be handled by memset
+			for (unsigned i = 0; i < image_size; i++)
+				ctfs[i] = part_scale;
+
+		ctfs.put_on_device();
+
+		/*======================================================
+		                      CLASS LOOP
+		======================================================*/
+
+
+		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
@@ -1058,10 +1146,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			/// Now that reference projection has been made loop over all particles inside this ori_particle
 			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 			{
-
 				CUDA_CPU_TIC("BP-ProjectionDivision");
-				unsigned long proj_div_start(proj_div_max_count * iproj_div),
-						proj_div_end;
+				unsigned long proj_div_start(proj_div_max_count * iproj_div), proj_div_end;
 
 				if (iproj_div < proj_div_nr - 1)
 					proj_div_end = proj_div_start + proj_div_max_count;
@@ -1079,7 +1165,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CUDA_CPU_TOC("BP-ProjectionDivision");
 
 				/*======================================================
-									 PROJECTIONS
+				                    PROJECTIONS
 				======================================================*/
 
 				cudaStream_t currentBPStream = cudaMLO->cudaBackprojectors[exp_iclass].getStream();
@@ -1096,6 +1182,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				eulers.put_on_device();
 
 				CUDA_CPU_TOC("generateEulerMatrices");
+
 				CudaGlobalPtr<XFLOAT> wavgs_real(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
 				wavgs_real.device_alloc();
 				wavgs_real.device_init(0);
@@ -1106,92 +1193,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				Fweights.device_alloc();
 				Fweights.device_init(0);
 
-				/*======================================================
-									 TRANSLATIONS
-				======================================================*/
-
-				CUDA_CPU_TIC("translation_2");
-
-				CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, currentBPStream, cudaMLO->allocator);
-				CudaGlobalPtr<XFLOAT> Fimgs_imag(Fimgs_real.size, currentBPStream, cudaMLO->allocator);
-				CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(Fimgs_real.size, currentBPStream, cudaMLO->allocator);
-				CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(Fimgs_real.size, currentBPStream, cudaMLO->allocator);
-
-				std::vector< long unsigned > iover_transes, itranses, ihiddens;
-
-				long unsigned translation_num = imageTranslation(
-						Fimgs_real.h_ptr,
-						Fimgs_imag.h_ptr,
-						Fimgs_nomask_real.h_ptr,
-						Fimgs_nomask_imag.h_ptr,
-						sp.itrans_min,
-						sp.itrans_max,
-						baseMLO->adaptive_oversampling,
-						baseMLO->sampling,
-						oversampled_translations_x,
-						oversampled_translations_y,
-						oversampled_translations_z,
-						sp.nr_oversampled_trans,
-						baseMLO->global_fftshifts_ab_current,
-						baseMLO->global_fftshifts_ab2_current,
-						op.local_Fimgs_shifted[ipart],
-						op.local_Fimgs_shifted_nomask[ipart],
-						iover_transes,
-						itranses,
-						ihiddens,
-						image_size);
-
-
-				Fimgs_real.put_on_device(translation_num * image_size);
-				Fimgs_imag.put_on_device(Fimgs_real.size);
-				Fimgs_nomask_real.put_on_device(Fimgs_real.size);
-				Fimgs_nomask_imag.put_on_device(Fimgs_real.size);
-
-				CUDA_CPU_TOC("translation_2");
-
 
 				/*======================================================
-										SCALE
-				======================================================*/
-
-				XFLOAT part_scale(1.);
-
-				if (baseMLO->do_scale_correction)
-				{
-					part_scale = baseMLO->mymodel.scale_correction[group_id];
-					if (part_scale > 10000.)
-					{
-						std::cerr << " rlnMicrographScaleCorrection= " << part_scale << " group= " << group_id + 1 << std::endl;
-						REPORT_ERROR("ERROR: rlnMicrographScaleCorrection is very high. Did you normalize your data?");
-					}
-					else if (part_scale < 0.001)
-					{
-						if (!have_warned_small_scale)
-						{
-							std::cout << " WARNING: ignoring group " << group_id + 1 << " with very small or negative scale (" << part_scale <<
-									"); Use larger groups for more stable scale estimates." << std::endl;
-							have_warned_small_scale = true;
-						}
-						part_scale = 0.001;
-					}
-				}
-
-				CudaGlobalPtr<XFLOAT> ctfs(image_size, currentBPStream, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
-
-				if (baseMLO->do_ctf_correction)
-				{
-					for (unsigned i = 0; i < image_size; i++)
-						ctfs[i] = (XFLOAT) op.local_Fctfs[ipart].data[i] * part_scale;
-				}
-				else //TODO should be handled by memset
-					for (unsigned i = 0; i < image_size; i++)
-						ctfs[i] = part_scale;
-
-				ctfs.put_on_device();
-
-
-				/*======================================================
-									MAP WEIGHTS
+				                     MAP WEIGHTS
 				======================================================*/
 
 				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, currentBPStream, cudaMLO->allocator);
@@ -1219,7 +1223,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				sorted_weights.put_on_device();
 
 				/*======================================================
-									KERNEL CALL
+				                     KERNEL CALL
 				======================================================*/
 
 				CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, currentBPStream, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
@@ -1275,7 +1279,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				Minvsigma2s.free_device();
 
 				/*======================================================
-									REDUCE WDIFF2S
+				                   REDUCE WDIFF2S
 				======================================================*/
 
 				CUDA_CPU_TIC("reduce_wdiff2s");
@@ -1325,7 +1329,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CUDA_CPU_TOC("reduce_wdiff2s");
 
 				/*======================================================
-									BACKPROJECTION
+				                    BACKPROJECTION
 				======================================================*/
 
 				CudaGlobalPtr<XFLOAT> bp_eulers(9*orientation_num, currentBPStream, cudaMLO->allocator);
@@ -1404,7 +1408,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
 		/*=======================================================================================
-										COLLECT 2 AND SET METADATA
+		                           COLLECT 2 AND SET METADATA
 		=======================================================================================*/
 		for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 		{
