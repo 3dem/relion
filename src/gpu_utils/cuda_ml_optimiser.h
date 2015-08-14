@@ -2,7 +2,6 @@
 #define CUDA_ML_OPTIMISER_H_
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
-#include "src/gpu_utils/cuda_device_ptr.h"
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
@@ -166,38 +165,8 @@ public:
 	//Used for precalculations of projection setup
 	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
 
-	std::vector<CudaDevicePtr<XFLOAT> > onTheFlyProjectionSetup;
-
-	std::vector<CudaDevicePtr<XFLOAT> > wavg_eulers;
-
-	std::vector<CudaDevicePtr<XFLOAT> > wavgs_real;
-	std::vector<CudaDevicePtr<XFLOAT> > wavgs_imag;
-	std::vector<CudaDevicePtr<XFLOAT> > wavgs_weight;
-
-	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_real;
-	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_imag;
-	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_nomask_real;
-	std::vector<CudaDevicePtr<XFLOAT> > Fimgs_nomask_imag;
-
-	std::vector<CudaDevicePtr<XFLOAT> > ctfs;
-
-	std::vector<CudaDevicePtr<XFLOAT> > sorted_weights;
-
-	std::vector<CudaDevicePtr<XFLOAT> > Minvsigma2s;
-
-	std::vector<CudaDevicePtr<XFLOAT> > wdiff2s_parts;
-
-	std::vector<CudaDevicePtr<XFLOAT> > bp_eulers;
-
-	std::vector<CudaDevicePtr<XFLOAT> >     oo_otrans_x;
-	std::vector<CudaDevicePtr<XFLOAT> >     oo_otrans_y;
-	std::vector<CudaDevicePtr<XFLOAT> > myp_oo_otrans_x2y2z2;
-
-	std::vector<CudaDevicePtr<XFLOAT> >                      p_weights;
-	std::vector<CudaDevicePtr<XFLOAT> > p_thr_wsum_prior_offsetx_class;
-	std::vector<CudaDevicePtr<XFLOAT> > p_thr_wsum_prior_offsety_class;
-	std::vector<CudaDevicePtr<XFLOAT> >       p_thr_wsum_sigma2_offset;
-
+	//Used for precalculations of projection setup
+	CudaCustomAllocator *allocator;
 
 	MlOptimiser *baseMLO;
 

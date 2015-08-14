@@ -59,7 +59,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}"
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_RELEASE "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_RELEASE "${CUDARCH} --disable-warnings --default-stream per-thread" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELEASE "${CUDARCH} --disable-warnings" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_RELEASE  "")
 

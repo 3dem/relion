@@ -14,7 +14,7 @@
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
 #include "src/gpu_utils/cuda_utils.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cu"
-#include "src/gpu_utils/cuda_device_ptr.h"
+#include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
 #include <fstream>
 #include <cuda_runtime.h>
@@ -69,7 +69,7 @@ void getAllSquaredDifferencesCoarse(
 		if ( projectorPlan.orientation_num > 0 )
 		{
 			// Local variables
-			CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size);
+			CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
 			gpuMinvsigma2.device_alloc();
 
 			/*=======================================================================================
@@ -87,8 +87,8 @@ void getAllSquaredDifferencesCoarse(
 
 				CUDA_CPU_TIC("translation_1");
 
-				CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
-				CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+				CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
 
 				std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 				long unsigned translation_num(0), ihidden(0);
@@ -182,7 +182,7 @@ void getAllSquaredDifferencesCoarse(
 
 				gpuMinvsigma2.cp_to_device();
 
-				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num);
+				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num, cudaMLO->allocator);
 				diff2s.device_alloc();
 
 				/*====================================
@@ -197,11 +197,11 @@ void getAllSquaredDifferencesCoarse(
 
 				runDiff2KernelCoarse(
 						projKernel,
-						gpuMinvsigma2,
-						Fimgs_real,
-						Fimgs_imag,
-						*projectorPlan.d_eulers,
-						diff2s,
+						~gpuMinvsigma2,
+						~Fimgs_real,
+						~Fimgs_imag,
+						~(*projectorPlan.eulers),
+						~diff2s,
 						op,
 						baseMLO,
 						projectorPlan.orientation_num,
@@ -215,7 +215,7 @@ void getAllSquaredDifferencesCoarse(
 				    	   Retrieve Results
 				======================================*/
 
-				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], (XFLOAT)thrustGetMinVal(diff2s, diff2s.size)); // class
+				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], (XFLOAT)thrustGetMinVal(~diff2s, diff2s.size)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -288,8 +288,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CUDA_CPU_TIC("translation_1");
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans);
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
 
 		long unsigned translation_num(0), ihidden(0);
 		std::vector< long unsigned > iover_transes, itranses, ihiddens;
@@ -369,16 +369,16 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				// Local variables
 				std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
 
-				CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size);
+				CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
 				gpuMinvsigma2.device_alloc();
 
 				CUDA_CPU_TIC("generateEulerMatrices");
-				CudaGlobalPtr<XFLOAT> eulers(9 * orientation_num);
+				CudaGlobalPtr<XFLOAT> eulers(9 * orientation_num, cudaMLO->allocator);
 
 				generateEulerMatrices(
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
 						thisClassProjectionData,
-						eulers,
+						&eulers[0],
 						!IS_NOT_INV);
 
 				CUDA_CPU_TOC("generateEulerMatrices");
@@ -422,7 +422,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 					continue;
 
 				// Use the constructed mask to construct a partial class-specific input
-				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
 
 				CUDA_CPU_TOC("pair_list_1");
 				CUDA_CPU_TIC("Diff2MakeKernel");
@@ -433,18 +433,83 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						op.local_Minvsigma2s[0].xdim-1);
 				CUDA_CPU_TOC("Diff2MakeKernel");
 				CUDA_CPU_TIC("Diff2CALL");
+
+
+				CUDA_CPU_TIC("kernel_init_1");
+
+				// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
+				// we need to make a modified copy, since the global object shouldn't be
+				// changed
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+				{
+					gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
+				}
+
+				if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+					{
+						gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
+					}
+				}
+
+				// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
+				//           + Make setting of myscale robust between here and above.
+				//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
+				//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
+				if (baseMLO->do_scale_correction)
+				{
+					XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+					{
+						gpuMinvsigma2[n] *= (myscale*myscale);
+					}
+				}
+
+				CUDA_GPU_TIC("imagMemCp");
+				gpuMinvsigma2.cp_to_device();
+				Fimgs_real.put_on_device(translation_num * image_size);
+				Fimgs_imag.put_on_device(translation_num * image_size);
+				CUDA_GPU_TAC("imagMemCp");
+
+				CUDA_GPU_TIC("IndexedArrayMemCp");
+				thisClassFinePassWeights.weights.cp_to_device();
+				thisClassFinePassWeights.rot_id.cp_to_device(); //FIXME this is not used
+				thisClassFinePassWeights.rot_idx.cp_to_device();
+				thisClassFinePassWeights.trans_idx.cp_to_device();
+				FPCMasks[ipart][exp_iclass].jobOrigin.cp_to_device();
+				FPCMasks[ipart][exp_iclass].jobExtent.cp_to_device();
+				CUDA_GPU_TAC("IndexedArrayMemCp");
+
+				CUDA_CPU_TOC("kernel_init_1");
+
+				CUDA_GPU_TIC("kernel_diff_proj");
+
+
+				// Could be used to automate __ldg() fallback runtime within cuda_kernel_diff2.
+				//				cudaDeviceProp dP;
+				//				cudaGetDeviceProperties(&dP, 0);
+				//				printf("-arch=sm_%d%d\n", dP.major, dP.minor);
+
+				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
+				{
+					// FIXME  make _CC
+					printf("Cross correlation is not supported yet.");
+					exit(0);
+				}
+
 				runDiff2KernelFine(
 						projKernel,
-						gpuMinvsigma2,
-						Fimgs_real,
-						Fimgs_imag,
-						eulers,
-						thisClassFinePassWeights.rot_id,
-						thisClassFinePassWeights.rot_idx,
-						thisClassFinePassWeights.trans_idx,
-						FPCMasks[ipart][exp_iclass].jobOrigin,
-						FPCMasks[ipart][exp_iclass].jobExtent,
-						thisClassFinePassWeights.weights,
+						~gpuMinvsigma2,
+						~Fimgs_real,
+						~Fimgs_imag,
+						~eulers,
+						~thisClassFinePassWeights.rot_id,
+						~thisClassFinePassWeights.rot_idx,
+						~thisClassFinePassWeights.trans_idx,
+						~FPCMasks[ipart][exp_iclass].jobOrigin,
+						~FPCMasks[ipart][exp_iclass].jobExtent,
+						~thisClassFinePassWeights.weights,
 						op,
 						baseMLO,
 						orientation_num,
@@ -452,9 +517,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						significant_num,
 						image_size,
 						ipart,
-						group_id,
-						exp_iclass
+						FPCMasks[ipart][exp_iclass].jobOrigin.size
 						);
+
 				eulers.free_device();
 
 				HANDLE_ERROR(cudaDeviceSynchronize());
@@ -465,7 +530,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				======================================*/
 
 				CUDA_CPU_TIC("collect_data_1");
-				op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(FinePassWeights[ipart].weights, newDataSize));
+				op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(~FinePassWeights[ipart].weights, newDataSize));
 				CUDA_CPU_TOC("collect_data_1");
 			} // end if class significant
 		} // end loop iclass
@@ -549,7 +614,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				/*=========================================
 						Fetch+generate Orientation data
 				===========================================*/
-				CudaGlobalPtr<XFLOAT >  pdf_orientation(sp.nr_dir * sp.nr_psi);
+				CudaGlobalPtr<XFLOAT>  pdf_orientation(sp.nr_dir * sp.nr_psi, cudaMLO->allocator);
 				pdf_orientation.size = sp.nr_dir * sp.nr_psi;
 				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 				{
@@ -581,7 +646,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				/*=========================================
 						Fetch+generate Translation data
 				===========================================*/
-				CudaGlobalPtr<XFLOAT >  pdf_offset(sp.nr_trans);
+				CudaGlobalPtr<XFLOAT>  pdf_offset(sp.nr_trans, cudaMLO->allocator);
 				double myprior_x, myprior_y, myprior_z;
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
@@ -655,15 +720,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CUDA_GPU_TAC("sumweightMemCp1");
 				CUDA_GPU_TOC();
 
-				CudaGlobalPtr<XFLOAT > thisparticle_sumweight;
+				CudaGlobalPtr<XFLOAT> thisparticle_sumweight(cudaMLO->allocator);
 				long int block_num;
 
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
 
-					CudaGlobalPtr<XFLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim+
+					CudaGlobalPtr<XFLOAT>  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim+
 					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans]),
-													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
+													  sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
 					Mweight.device_alloc();
 					Mweight.cp_to_device();
 					block_num = sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE;
@@ -695,7 +760,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				{
 					// Use the constructed mask to build a partial (class-specific) input
 					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
-					IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+					IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
@@ -757,8 +822,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
-		MultidimArray<XFLOAT > sorted_weight;
-		CudaGlobalPtr<XFLOAT > sorted_weight_new;  // make new sorted weights
+		MultidimArray<XFLOAT> sorted_weight;
+		CudaGlobalPtr<XFLOAT> sorted_weight_new(cudaMLO->allocator);  // make new sorted weights
 		double frac_weight = 0.;
 		double my_significant_weight;
 		long int my_nr_significant_coarse_samples = 0;
@@ -960,23 +1025,111 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	CUDA_CPU_TOC("store_init");
 	CUDA_CPU_TIC("maximization");
 
-	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
+	/*=======================================================================================
+	                                   MAXIMIZATION
+	=======================================================================================*/
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 
-		/*=======================================================================================
-											  MAXIMIZATION
-		=======================================================================================*/
+		/*======================================================
+		                     TRANSLATIONS
+		======================================================*/
 
+		CUDA_CPU_TIC("translation_2");
+
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(Fimgs_real.size, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(Fimgs_real.size, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(Fimgs_real.size, cudaMLO->allocator);
+
+		std::vector< long unsigned > iover_transes, itranses, ihiddens;
+
+		long unsigned translation_num = imageTranslation(
+				Fimgs_real.h_ptr,
+				Fimgs_imag.h_ptr,
+				Fimgs_nomask_real.h_ptr,
+				Fimgs_nomask_imag.h_ptr,
+				sp.itrans_min,
+				sp.itrans_max,
+				baseMLO->adaptive_oversampling,
+				baseMLO->sampling,
+				oversampled_translations_x,
+				oversampled_translations_y,
+				oversampled_translations_z,
+				sp.nr_oversampled_trans,
+				baseMLO->global_fftshifts_ab_current,
+				baseMLO->global_fftshifts_ab2_current,
+				op.local_Fimgs_shifted[ipart],
+				op.local_Fimgs_shifted_nomask[ipart],
+				iover_transes,
+				itranses,
+				ihiddens,
+				image_size);
+
+
+		Fimgs_real.put_on_device(translation_num * image_size);
+		Fimgs_imag.put_on_device(Fimgs_real.size);
+		Fimgs_nomask_real.put_on_device(Fimgs_real.size);
+		Fimgs_nomask_imag.put_on_device(Fimgs_real.size);
+
+		CUDA_CPU_TOC("translation_2");
+
+
+		/*======================================================
+		                       SCALE
+		======================================================*/
+
+		XFLOAT part_scale(1.);
+
+		if (baseMLO->do_scale_correction)
+		{
+			part_scale = baseMLO->mymodel.scale_correction[group_id];
+			if (part_scale > 10000.)
+			{
+				std::cerr << " rlnMicrographScaleCorrection= " << part_scale << " group= " << group_id + 1 << std::endl;
+				REPORT_ERROR("ERROR: rlnMicrographScaleCorrection is very high. Did you normalize your data?");
+			}
+			else if (part_scale < 0.001)
+			{
+				if (!have_warned_small_scale)
+				{
+					std::cout << " WARNING: ignoring group " << group_id + 1 << " with very small or negative scale (" << part_scale <<
+							"); Use larger groups for more stable scale estimates." << std::endl;
+					have_warned_small_scale = true;
+				}
+				part_scale = 0.001;
+			}
+		}
+
+		CudaGlobalPtr<XFLOAT> ctfs(image_size, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
+
+		if (baseMLO->do_ctf_correction)
+		{
+			for (unsigned i = 0; i < image_size; i++)
+				ctfs[i] = (XFLOAT) op.local_Fctfs[ipart].data[i] * part_scale;
+		}
+		else //TODO should be handled by memset
+			for (unsigned i = 0; i < image_size; i++)
+				ctfs[i] = part_scale;
+
+		ctfs.put_on_device();
+
+		/*======================================================
+		                      CLASS LOOP
+		======================================================*/
+
+
+		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
 
 			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
@@ -993,10 +1146,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			/// Now that reference projection has been made loop over all particles inside this ori_particle
 			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 			{
-
 				CUDA_CPU_TIC("BP-ProjectionDivision");
-				unsigned long proj_div_start(proj_div_max_count * iproj_div),
-						proj_div_end;
+				unsigned long proj_div_start(proj_div_max_count * iproj_div), proj_div_end;
 
 				if (iproj_div < proj_div_nr - 1)
 					proj_div_end = proj_div_start + proj_div_max_count;
@@ -1014,12 +1165,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CUDA_CPU_TOC("BP-ProjectionDivision");
 
 				/*======================================================
-									 PROJECTIONS
+				                    PROJECTIONS
 				======================================================*/
 
-				CUDA_CPU_TIC("generateEulerMatrices");
+				cudaStream_t currentBPStream = cudaMLO->cudaBackprojectors[exp_iclass].getStream();
 
-				std::vector<XFLOAT> eulers(9 * orientation_num);
+				CUDA_CPU_TIC("generateEulerMatrices");
+				CudaGlobalPtr<XFLOAT> eulers(9 * orientation_num, currentBPStream, cudaMLO->allocator);
 
 				generateEulerMatrices(
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
@@ -1027,123 +1179,37 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						&eulers[0],
 						!IS_NOT_INV);
 
+				eulers.put_on_device();
+
 				CUDA_CPU_TOC("generateEulerMatrices");
 
-				cudaStream_t currentBPStream = cudaMLO->cudaBackprojectors[exp_iclass].getStream();
-
-				HANDLE_ERROR(cudaDeviceSynchronize());
-
-				cudaMLO->wavg_eulers[exp_iclass].set(eulers);
-
-				cudaMLO->wavgs_real[exp_iclass].resize(image_size * orientation_num);
-				cudaMLO->wavgs_real[exp_iclass].init(0);
-
-				cudaMLO->wavgs_imag[exp_iclass].resize(image_size * orientation_num);
-				cudaMLO->wavgs_imag[exp_iclass].init(0);
-
-				cudaMLO->wavgs_weight[exp_iclass].resize(image_size * orientation_num);
-				cudaMLO->wavgs_weight[exp_iclass].init(0);
-
-				/*======================================================
-									 TRANSLATIONS
-				======================================================*/
-
-				CUDA_CPU_TIC("translation_2");
-
-				std::vector<XFLOAT> Fimgs_real;
-				std::vector<XFLOAT> Fimgs_imag;
-				std::vector<XFLOAT> Fimgs_nomask_real;
-				std::vector<XFLOAT> Fimgs_nomask_imag;
-
-				std::vector< long unsigned > iover_transes, itranses, ihiddens;
-
-				long unsigned translation_num = imageTranslation(
-						Fimgs_real,
-						Fimgs_imag,
-						Fimgs_nomask_real,
-						Fimgs_nomask_imag,
-						sp.itrans_min,
-						sp.itrans_max,
-						baseMLO->adaptive_oversampling,
-						baseMLO->sampling,
-						oversampled_translations_x,
-						oversampled_translations_y,
-						oversampled_translations_z,
-						sp.nr_oversampled_trans,
-						baseMLO->global_fftshifts_ab_current,
-						baseMLO->global_fftshifts_ab2_current,
-						op.local_Fimgs_shifted[ipart],
-						op.local_Fimgs_shifted_nomask[ipart],
-						iover_transes,
-						itranses,
-						ihiddens,
-						image_size);
-
-				cudaMLO->Fimgs_real[exp_iclass].set(Fimgs_real);
-				cudaMLO->Fimgs_imag[exp_iclass].set(Fimgs_imag);
-
-				cudaMLO->Fimgs_nomask_real[exp_iclass].set(Fimgs_nomask_real);
-				cudaMLO->Fimgs_nomask_imag[exp_iclass].set(Fimgs_nomask_imag);
-
-				CUDA_CPU_TOC("translation_2");
+				CudaGlobalPtr<XFLOAT> wavgs_real(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
+				wavgs_real.device_alloc();
+				wavgs_real.device_init(0);
+				CudaGlobalPtr<XFLOAT> wavgs_imag(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
+				wavgs_imag.device_alloc();
+				wavgs_imag.device_init(0);
+				CudaGlobalPtr<XFLOAT> Fweights(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
+				Fweights.device_alloc();
+				Fweights.device_init(0);
 
 
 				/*======================================================
-										SCALE
+				                     MAP WEIGHTS
 				======================================================*/
 
-				XFLOAT part_scale(1.);
-
-				if (baseMLO->do_scale_correction)
-				{
-					part_scale = baseMLO->mymodel.scale_correction[group_id];
-					if (part_scale > 10000.)
-					{
-						std::cerr << " rlnMicrographScaleCorrection= " << part_scale << " group= " << group_id + 1 << std::endl;
-						REPORT_ERROR("ERROR: rlnMicrographScaleCorrection is very high. Did you normalize your data?");
-					}
-					else if (part_scale < 0.001)
-					{
-						if (!have_warned_small_scale)
-						{
-							std::cout << " WARNING: ignoring group " << group_id + 1 << " with very small or negative scale (" << part_scale <<
-									"); Use larger groups for more stable scale estimates." << std::endl;
-							have_warned_small_scale = true;
-						}
-						part_scale = 0.001;
-					}
-				}
-
-				std::vector<XFLOAT> ctfs(image_size);
-
-				if (baseMLO->do_ctf_correction)
-				{
-					for (unsigned i = 0; i < image_size; i++)
-						ctfs[i] = (XFLOAT) op.local_Fctfs[ipart].data[i] * part_scale;
-				}
-				else //TODO should be handled by memset
-					for (unsigned i = 0; i < image_size; i++)
-						ctfs[i] = part_scale;
-
-				cudaMLO->ctfs[exp_iclass].set(ctfs);
-
-
-				/*======================================================
-									MAP WEIGHTS
-				======================================================*/
-
-				std::vector<XFLOAT> sorted_weights(orientation_num * translation_num);
+				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, currentBPStream, cudaMLO->allocator);
 
 				mapWeights(
 						proj_div_start,
-						sorted_weights,
+						&sorted_weights[0],
 						orientation_num,
 						idxArrPos_start,
 						idxArrPos_end,
 						translation_num,
-						thisClassFinePassWeights.weights,
-						thisClassFinePassWeights.rot_idx,
-						thisClassFinePassWeights.trans_idx,
+						&thisClassFinePassWeights.weights[0],
+						&thisClassFinePassWeights.rot_idx[0],
+						&thisClassFinePassWeights.trans_idx[0],
 						baseMLO->sampling,
 						ipart,
 						iover_transes,
@@ -1154,15 +1220,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						sp.current_oversampling,
 						sp.nr_trans);
 
-				cudaMLO->sorted_weights[exp_iclass].set(sorted_weights);
+				sorted_weights.put_on_device();
 
 				/*======================================================
-									KERNEL CALL
+				                     KERNEL CALL
 				======================================================*/
 
-				std::vector<XFLOAT> Minvsigma2s(image_size);
-
-				cudaMLO->wdiff2s_parts[exp_iclass].resize(orientation_num * image_size);
+				CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, currentBPStream, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
+				Minvsigma2s.device_alloc();
+				CudaGlobalPtr<XFLOAT> wdiff2s_parts(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
+				wdiff2s_parts.device_alloc();
 
 				if (baseMLO->do_map)
 					for (unsigned i = 0; i < image_size; i++)
@@ -1170,7 +1237,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				else //TODO should be handled by memset
 					for (unsigned i = 0; i < image_size; i++)
 						Minvsigma2s[i] = 1;
-				cudaMLO->Minvsigma2s[exp_iclass].set(Minvsigma2s);
+				Minvsigma2s.cp_to_device();
 
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 						cudaMLO->cudaProjectors[exp_iclass],
@@ -1180,18 +1247,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				runWavgKernel(
 						projKernel,
-						cudaMLO->wavg_eulers[exp_iclass],
-						cudaMLO->Fimgs_real[exp_iclass],
-						cudaMLO->Fimgs_imag[exp_iclass],
-						cudaMLO->Fimgs_nomask_real[exp_iclass],
-						cudaMLO->Fimgs_nomask_imag[exp_iclass],
-						cudaMLO->sorted_weights[exp_iclass],
-						cudaMLO->ctfs[exp_iclass],
-						cudaMLO->Minvsigma2s[exp_iclass],
-						cudaMLO->wdiff2s_parts[exp_iclass],
-						cudaMLO->wavgs_real[exp_iclass],
-						cudaMLO->wavgs_imag[exp_iclass],
-						cudaMLO->wavgs_weight[exp_iclass],
+						~eulers,
+						~Fimgs_real,
+						~Fimgs_imag,
+						~Fimgs_nomask_real,
+						~Fimgs_nomask_imag,
+						~sorted_weights,
+						~ctfs,
+						~Minvsigma2s,
+						~wdiff2s_parts,
+						~wavgs_real,
+						~wavgs_imag,
+						~Fweights,
 						op,
 						baseMLO,
 						orientation_num,
@@ -1202,8 +1269,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						exp_iclass,
 						currentBPStream);
 
+				Fimgs_real.free_device();
+				Fimgs_imag.free_device();
+				Fimgs_nomask_real.free_device();
+				Fimgs_nomask_imag.free_device();
+
+				sorted_weights.free_device();
+				ctfs.free_device();
+				Minvsigma2s.free_device();
+
 				/*======================================================
-									REDUCE WDIFF2S
+				                   REDUCE WDIFF2S
 				======================================================*/
 
 				CUDA_CPU_TIC("reduce_wdiff2s");
@@ -1222,7 +1298,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 					// TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very inefficient amount of loads per store
 					cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE,0,currentBPStream>>>(
-							cudaMLO->wdiff2s_parts[exp_iclass],
+							~wdiff2s_parts,
 							orientation_num,
 							image_size,
 							k);
@@ -1230,8 +1306,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				CUDA_GPU_TAC("cuda_kernels_reduce_wdiff2s");
 
-				std::vector<XFLOAT> wdiff2s_parts(image_size);
-				cudaMLO->wdiff2s_parts[exp_iclass].get(wdiff2s_parts);
+				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
+				wdiff2s_parts.cp_to_host();
+				wdiff2s_parts.size = orientation_num * image_size;
+				wdiff2s_parts.free_device();
 
 				HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
 
@@ -1246,24 +1324,26 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j]; //TODO could be thrust-reduced
 					}
 				}
+				wdiff2s_parts.free_host();
 
 				CUDA_CPU_TOC("reduce_wdiff2s");
 
 				/*======================================================
-									BACKPROJECTION
+				                    BACKPROJECTION
 				======================================================*/
 
-				std::vector<XFLOAT> h_bp_eulers(9*orientation_num);
+				CudaGlobalPtr<XFLOAT> bp_eulers(9*orientation_num, currentBPStream, cudaMLO->allocator);
 
 				XFLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
 
 				generateEulerMatrices(
 						1/padding_factor, //Why squared scale factor is given in backprojection
 						ProjectionData_projdiv,
-						&h_bp_eulers[0],
+						&bp_eulers[0],
 						IS_NOT_INV);
 
-				cudaMLO->bp_eulers[exp_iclass].set(h_bp_eulers);
+				bp_eulers.device_alloc();
+				bp_eulers.cp_to_device();
 
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1274,21 +1354,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					CUDA_GPU_TIC("cuda_kernels_backproject");
 					cudaMLO->cudaBackprojectors[exp_iclass].backproject(
-							cudaMLO->wavgs_real[exp_iclass],
-							cudaMLO->wavgs_imag[exp_iclass],
-							cudaMLO->wavgs_weight[exp_iclass],
-							cudaMLO->bp_eulers[exp_iclass],
+						~wavgs_real,
+						~wavgs_imag,
+						~Fweights,
+						~bp_eulers,
 							op.local_Minvsigma2s[0].xdim,
 							op.local_Minvsigma2s[0].ydim,
 							orientation_num);
+
+					HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
 					CUDA_GPU_TAC("cuda_kernels_backproject");
 				}
 				else
 				{
-					std::vector<XFLOAT> h_wavgs_real, h_wavgs_imag, h_wavgs_weight;
-					cudaMLO->wavgs_real[exp_iclass].get(h_wavgs_real);
-					cudaMLO->wavgs_weight[exp_iclass].get(h_wavgs_imag);
-					cudaMLO->wavgs_weight[exp_iclass].get(h_wavgs_weight);
+					wavgs_real.cp_to_host();
+					wavgs_imag.cp_to_host();
+					Fweights.cp_to_host();
 
 					MultidimArray<Complex > Fimg;
 					MultidimArray<double > Fweight;
@@ -1302,13 +1383,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					{
 						for (int j = 0; j < image_size; j ++)
 						{
-							Fimg.data[j].real = (double) h_wavgs_real[i * image_size + j];
-							Fimg.data[j].imag = (double) h_wavgs_imag[i * image_size + j];
-							Fweight.data[j]   = (double) h_wavgs_weight[i * image_size + j];
+							Fimg.data[j].real = (double) wavgs_real[i * image_size + j];
+							Fimg.data[j].imag = (double) wavgs_imag[i * image_size + j];
+							Fweight.data[j]   = (double) Fweights[i * image_size + j];
 						}
 
 						for (int j = 0; j < 9; j ++)
-							A.mdata[j] = h_bp_eulers[i * 9 + j];
+							A.mdata[j] = bp_eulers[i * 9 + j];
 
 						baseMLO->wsum_model.BPref[exp_iclass].backrotate2D(Fimg, A, IS_NOT_INV, &Fweight);
 					}
@@ -1327,14 +1408,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 	{
 		/*=======================================================================================
-										COLLECT 2 AND SET METADATA
+		                           COLLECT 2 AND SET METADATA
 		=======================================================================================*/
 		for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 		{
 			if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0) )
 				continue;
 			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
 
 			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
@@ -1381,9 +1462,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 //				CudaGlobalPtr<XFLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
 //												sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples);
 			int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
-			std::vector<XFLOAT>     oo_otrans_x(nr_transes); // old_offset_oversampled_trans_x
-			std::vector<XFLOAT>     oo_otrans_y(nr_transes);
-			std::vector<XFLOAT> myp_oo_otrans_x2y2z2(nr_transes); // my_prior_old_offs....x^2*y^2*z^2
+				CudaGlobalPtr<XFLOAT>     oo_otrans_x(nr_transes, cudaMLO->allocator); // old_offset_oversampled_trans_x
+				CudaGlobalPtr<XFLOAT>     oo_otrans_y(nr_transes, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT> myp_oo_otrans_x2y2z2(nr_transes, cudaMLO->allocator); // my_prior_old_offs....x^2*y^2*z^2
 
 			//Pregenerate oversampled translation objects for kernel-call
 			for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
@@ -1410,25 +1491,29 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
 			int block_num = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[ipart][exp_iclass]);
 
-			cudaMLO->oo_otrans_x[exp_iclass].set(oo_otrans_x);
-			cudaMLO->oo_otrans_y[exp_iclass].set(oo_otrans_y);
-			cudaMLO->myp_oo_otrans_x2y2z2[exp_iclass].set(myp_oo_otrans_x2y2z2);
+				oo_otrans_x.put_on_device();
+				oo_otrans_y.put_on_device();
+				myp_oo_otrans_x2y2z2.put_on_device();
 
-			std::cerr << "block_num = " << block_num << std::endl;
+				std::cerr << "block_num = " << block_num << std::endl;
+				CudaGlobalPtr<XFLOAT>                      p_weights(block_num, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetx_class(block_num, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsety_class(block_num, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT>       p_thr_wsum_sigma2_offset(block_num, cudaMLO->allocator);
 
-			cudaMLO->p_weights[exp_iclass].resize(block_num);
-			cudaMLO->p_thr_wsum_prior_offsetx_class[exp_iclass].resize(block_num);
-			cudaMLO->p_thr_wsum_prior_offsety_class[exp_iclass].resize(block_num);
-			cudaMLO->p_thr_wsum_sigma2_offset[exp_iclass].resize(block_num);
+				p_weights.device_alloc();
+				p_thr_wsum_prior_offsetx_class.device_alloc();
+				p_thr_wsum_prior_offsety_class.device_alloc();
+				p_thr_wsum_sigma2_offset.device_alloc();
 			CUDA_CPU_TOC("collect_data_2_pre_kernel");
 
 			CUDA_GPU_TIC("collect2-kernel");
 			dim3 grid_dim_collect2 = splitCudaBlocks(block_num,false);
 			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-					cudaMLO->oo_otrans_x[exp_iclass],          // otrans-size -> make const
-					cudaMLO->oo_otrans_y[exp_iclass],          // otrans-size -> make const
-					cudaMLO->myp_oo_otrans_x2y2z2[exp_iclass], // otrans-size -> make const
-					~thisClassFinePassWeights.weights,
+						~oo_otrans_x,          // otrans-size -> make const
+						~oo_otrans_y,          // otrans-size -> make const
+						~myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						~thisClassFinePassWeights.weights,
 					(XFLOAT)op.significant_weight[ipart],
 					(XFLOAT)op.sum_weight[ipart],
 					sp.nr_trans,
@@ -1436,10 +1521,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					sp.nr_oversampled_rot,
 					oversamples,
 					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-					cudaMLO->p_weights[exp_iclass],
-					cudaMLO->p_thr_wsum_prior_offsetx_class[exp_iclass],
-					cudaMLO->p_thr_wsum_prior_offsety_class[exp_iclass],
-					cudaMLO->p_thr_wsum_sigma2_offset[exp_iclass],
+						~p_weights,
+						~p_thr_wsum_prior_offsetx_class,
+						~p_thr_wsum_prior_offsety_class,
+						~p_thr_wsum_sigma2_offset,
 					~thisClassFinePassWeights.rot_idx,
 					~thisClassFinePassWeights.trans_idx,
 					~FPCMasks[ipart][exp_iclass].jobOrigin,
@@ -1448,16 +1533,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_GPU_TAC("collect2-kernel");
 
 			CUDA_CPU_TIC("collect_data_2_post_kernel");
-			std::vector<XFLOAT>                      p_weights(block_num);
-			std::vector<XFLOAT> p_thr_wsum_prior_offsetx_class(block_num);
-			std::vector<XFLOAT> p_thr_wsum_prior_offsety_class(block_num);
-			std::vector<XFLOAT>       p_thr_wsum_sigma2_offset(block_num);
-
 			// TODO further reduce the below 4 arrays while data is still on gpu
-			cudaMLO->p_weights[exp_iclass].get(p_weights);
-			cudaMLO->p_thr_wsum_prior_offsetx_class[exp_iclass].get(p_thr_wsum_prior_offsetx_class);
-			cudaMLO->p_thr_wsum_prior_offsety_class[exp_iclass].get(p_thr_wsum_prior_offsetx_class);
-			cudaMLO->p_thr_wsum_sigma2_offset[exp_iclass].get(p_thr_wsum_sigma2_offset);
+				p_weights.cp_to_host();
+				p_thr_wsum_prior_offsetx_class.cp_to_host();
+				p_thr_wsum_prior_offsety_class.cp_to_host();
+				p_thr_wsum_sigma2_offset.cp_to_host();
 
 			HANDLE_ERROR(cudaStreamSynchronize(0));
 			CUDA_GPU_TOC();
@@ -1491,6 +1571,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 			}
+				p_weights.free();
+				p_thr_wsum_sigma2_offset.free();
+				p_thr_wsum_prior_offsetx_class.free();
+				p_thr_wsum_prior_offsety_class.free();
+				oo_otrans_y.free();
+				oo_otrans_x.free();
+				myp_oo_otrans_x2y2z2.free();
 			CUDA_CPU_TOC("collect_data_2_post_kernel");
 
 			CUDA_CPU_TIC("setMetadata");
@@ -1693,41 +1780,13 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 		cudaSetDevice(dev_id);
 	}
 
-	wavg_eulers.resize(nr_classes);
-
-	wavgs_real.resize(nr_classes);
-	wavgs_imag.resize(nr_classes);
-	wavgs_weight.resize(nr_classes);
-
-	Fimgs_real.resize(nr_classes);
-	Fimgs_imag.resize(nr_classes);
-	Fimgs_nomask_real.resize(nr_classes);
-	Fimgs_nomask_imag.resize(nr_classes);
-
-	ctfs.resize(nr_classes);
-
-	sorted_weights.resize(nr_classes);
-
-	Minvsigma2s.resize(nr_classes);
-
-	wdiff2s_parts.resize(nr_classes);
-
-	bp_eulers.resize(nr_classes);
-
-	oo_otrans_x.resize(nr_classes);
-	oo_otrans_y.resize(nr_classes);
-	myp_oo_otrans_x2y2z2.resize(nr_classes);
-
-	p_weights.resize(nr_classes);
-	p_thr_wsum_prior_offsetx_class.resize(nr_classes);
-	p_thr_wsum_prior_offsety_class.resize(nr_classes);
-	p_thr_wsum_sigma2_offset.resize(nr_classes);
-
-	refIs3D = baseMLO->mymodel.ref_dim == 3;
+	allocator = new CudaCustomAllocator(1024*1024*200);
 	
 	/*======================================================
 	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
 	======================================================*/
+
+	refIs3D = baseMLO->mymodel.ref_dim == 3;
 
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
@@ -1804,22 +1863,6 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 					baseMLO->do_skip_rotate,
 					baseMLO->mymodel.orientational_prior_mode
 					);
-
-			cudaStream_t s = cudaBackprojectors[iclass].getStream();
-
-			wavg_eulers[iclass].setStream(s);
-			wavgs_real[iclass].setStream(s);
-			wavgs_imag[iclass].setStream(s);
-			wavgs_weight[iclass].setStream(s);
-			Fimgs_real[iclass].setStream(s);
-			Fimgs_imag[iclass].setStream(s);
-			Fimgs_nomask_real[iclass].setStream(s);
-			Fimgs_nomask_imag[iclass].setStream(s);
-			ctfs[iclass].setStream(s);
-			sorted_weights[iclass].setStream(s);
-			Minvsigma2s[iclass].setStream(s);
-			wdiff2s_parts[iclass].setStream(s);
-			bp_eulers[iclass].setStream(s);
 		}
 	}
 };
@@ -1918,10 +1961,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 			/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
 			//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
-			std::vector <IndexedDataArray> CoarsePassWeights(1) ,FinePassWeights(sp.nr_particles);
+			std::vector <IndexedDataArray> CoarsePassWeights(1, allocator) ,FinePassWeights(sp.nr_particles, allocator);
 			// -- This is a iframe-indexed vector, each entry of which is a class-indexed vector of masks, one for each
 			//    class in FinePassWeights
-			std::vector < std::vector <IndexedDataArrayMask> > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask>(baseMLO->mymodel.nr_classes));
+			std::vector < std::vector <IndexedDataArrayMask> > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask>(baseMLO->mymodel.nr_classes, allocator));
 			// -- This is a iframe-indexed vector, each entry of which is parameters used in the projection-operations *after* the
 			//    coarse pass, declared here to keep scope to storeWS
 			std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
@@ -1964,8 +2007,6 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 						{
 							if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
 							{
-								coarseProjectionPlans[exp_iclass].d_eulers = &onTheFlyProjectionSetup[exp_iclass];
-
 								coarseProjectionPlans[exp_iclass].setup(
 										baseMLO->sampling,
 										op.directions_prior,

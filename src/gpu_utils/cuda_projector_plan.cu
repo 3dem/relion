@@ -110,7 +110,12 @@ void CudaProjectorPlan::setup(
 	double ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
 	double cc(.0), cs(.0), sc(.0), ss(.0);
 
-	std::vector<XFLOAT> e(9 * orientation_num);
+	if (eulers == NULL)
+	{
+		eulers = new CudaGlobalPtr<XFLOAT,false>(9*orientation_num);
+		eulers->device_alloc();
+		free_device = true;
+	}
 
 	for (long int i = 0; i < rots.size(); i++)
 	{
@@ -129,37 +134,31 @@ void CudaProjectorPlan::setup(
 
 		if(inverseMatrix)
 		{
-			e[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
-			e[9 * i + 1] = (-sg * cc - cg * sa) ;// * padding_factor; //10
-			e[9 * i + 2] = ( sc )               ;// * padding_factor; //20
-			e[9 * i + 3] = ( cg * cs + sg * ca) ;// * padding_factor; //01
-			e[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
-			e[9 * i + 5] = ( ss )               ;// * padding_factor; //21
-			e[9 * i + 6] = (-cg * sb )          ;// * padding_factor; //02
-			e[9 * i + 7] = ( sg * sb )          ;// * padding_factor; //12
-			e[9 * i + 8] = ( cb )               ;// * padding_factor; //22
+			(*eulers)[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
+			(*eulers)[9 * i + 1] = (-sg * cc - cg * sa) ;// * padding_factor; //10
+			(*eulers)[9 * i + 2] = ( sc )               ;// * padding_factor; //20
+			(*eulers)[9 * i + 3] = ( cg * cs + sg * ca) ;// * padding_factor; //01
+			(*eulers)[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
+			(*eulers)[9 * i + 5] = ( ss )               ;// * padding_factor; //21
+			(*eulers)[9 * i + 6] = (-cg * sb )          ;// * padding_factor; //02
+			(*eulers)[9 * i + 7] = ( sg * sb )          ;// * padding_factor; //12
+			(*eulers)[9 * i + 8] = ( cb )               ;// * padding_factor; //22
 		}
 		else
 		{
-			e[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
-			e[9 * i + 1] = ( cg * cs + sg * ca) ;// * padding_factor; //01
-			e[9 * i + 2] = (-cg * sb )          ;// * padding_factor; //02
-			e[9 * i + 3] = (-sg * cc - cg * sa) ;// * padding_factor; //10
-			e[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
-			e[9 * i + 5] = ( sg * sb )          ;// * padding_factor; //12
-			e[9 * i + 6] = ( sc )               ;// * padding_factor; //20
-			e[9 * i + 7] = ( ss )               ;// * padding_factor; //21
-			e[9 * i + 8] = ( cb )               ;// * padding_factor; //22
+			(*eulers)[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
+			(*eulers)[9 * i + 1] = ( cg * cs + sg * ca) ;// * padding_factor; //01
+			(*eulers)[9 * i + 2] = (-cg * sb )          ;// * padding_factor; //02
+			(*eulers)[9 * i + 3] = (-sg * cc - cg * sa) ;// * padding_factor; //10
+			(*eulers)[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
+			(*eulers)[9 * i + 5] = ( sg * sb )          ;// * padding_factor; //12
+			(*eulers)[9 * i + 6] = ( sc )               ;// * padding_factor; //20
+			(*eulers)[9 * i + 7] = ( ss )               ;// * padding_factor; //21
+			(*eulers)[9 * i + 8] = ( cb )               ;// * padding_factor; //22
 		}
 	}
 
-	if (d_eulers == NULL)
-	{
-		d_eulers = new CudaDevicePtr<XFLOAT>();
-		free_device = true;
-	}
-
-	d_eulers->set(e);
+	eulers->cp_to_device();
 }
 
 void CudaProjectorPlan::printTo(std::ostream &os) // print
@@ -168,16 +167,13 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 	os << "free_device = " << free_device << std::endl;
 	os << "iorientclasses.size = " << iorientclasses.size() << std::endl;
 	os << "iover_rots.size = " << iover_rots.size() << std::endl;
-
-	std::vector<XFLOAT> e(9 * orientation_num);
-	d_eulers->get(e);
-
 	os << std::endl << "iorientclasses\tiover_rots\teulers" << std::endl;
+
 	for (int i = 0; i < iorientclasses.size(); i ++)
 	{
 		os << iorientclasses[i] << "\t\t" << iover_rots[i] << "\t";
 		for (int j = 0; j < 9; j++)
-			os << e[i * 9 + j] << "\t";
+			os << (*eulers)[i * 9 + j] << "\t";
 		os << std::endl;
 	}
 }
@@ -185,5 +181,5 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 CudaProjectorPlan::~CudaProjectorPlan()
 {
 	if(free_device)
-		delete d_eulers;
+		delete eulers;
 }
