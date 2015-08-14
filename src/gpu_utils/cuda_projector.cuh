@@ -252,6 +252,7 @@ public:
 				//-----------------------------
 	#endif
 
+//				printf("%f, %f",real,imag);
 				if (is_neg_x)
 				{
 					imag = -imag;

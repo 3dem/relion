@@ -25,56 +25,80 @@ void CudaProjector::setMdlData(float *real, float *imag)
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-	cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
 
 	struct cudaResourceDesc resDesc_real, resDesc_imag;
-	struct cudaTextureDesc texDesc_real, texDesc_imag;
-
-	cudaMemcpy3DParms copyParams = {0};
-	copyParams.extent = volumeSize;
-	copyParams.kind   = cudaMemcpyHostToDevice;
-
-
-	HANDLE_ERROR(cudaMalloc3DArray(texArrayReal, &desc, volumeSize));
-
-	copyParams.dstArray = *texArrayReal;
-	copyParams.srcPtr   = make_cudaPitchedPtr(real,mdlX*sizeof(float), mdlY, mdlZ);
-	HANDLE_ERROR(cudaMemcpy3D(&copyParams));
-
+	struct cudaTextureDesc  texDesc;
+	// -- Zero all data in objects handlers
 	memset(&resDesc_real, 0, sizeof(cudaResourceDesc));
-	resDesc_real.resType = cudaResourceTypeArray;
-	resDesc_real.res.array.array = copyParams.dstArray;
-
-	memset(&texDesc_real, 0, sizeof(cudaTextureDesc));
-	texDesc_real.filterMode       = cudaFilterModeLinear;
-	texDesc_real.readMode         = cudaReadModeElementType;
-	texDesc_real.normalizedCoords = false;
-	for(int n=0; n<3; n++)
-		texDesc_real.addressMode[n]=cudaAddressModeClamp;
-
-	HANDLE_ERROR(cudaCreateTextureObject(mdlReal, &resDesc_real, &texDesc_real, NULL));
-
-
-
-
-	HANDLE_ERROR(cudaMalloc3DArray(texArrayImag, &desc, volumeSize));
-
-	copyParams.dstArray = *texArrayImag;
-	copyParams.srcPtr   = make_cudaPitchedPtr(imag,mdlX*sizeof(float), mdlY, mdlZ);
-	HANDLE_ERROR(cudaMemcpy3D(&copyParams));
-
 	memset(&resDesc_imag, 0, sizeof(cudaResourceDesc));
-	resDesc_imag.resType = cudaResourceTypeArray;
-	resDesc_imag.res.array.array = copyParams.dstArray;
+	memset(&texDesc, 0, sizeof(cudaTextureDesc));
 
-	memset(&texDesc_imag, 0, sizeof(cudaTextureDesc));
-	texDesc_imag.filterMode       = cudaFilterModeLinear;
-	texDesc_imag.readMode         = cudaReadModeElementType;
-	texDesc_imag.normalizedCoords = false;
+	//
+	if(mdlZ!=0)  // then we are using a 3D reference
+	{
+		// -- make extents for automatic pitch:ing (aligment) of allocated 3D arrays
+		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
+		cudaMemcpy3DParms copyParams_real = {0}, copyParams_imag = {0};
+		copyParams_real.extent = volumeSize;
+		copyParams_real.kind   = cudaMemcpyHostToDevice;
+		copyParams_imag.extent = volumeSize;
+		copyParams_imag.kind   = cudaMemcpyHostToDevice;
+
+		// -- Allocate and copy data using very celver CUDA memcpy-functions
+		HANDLE_ERROR(cudaMalloc3DArray(texArrayReal, &desc, volumeSize));
+		copyParams_real.dstArray = *texArrayReal;
+		copyParams_real.srcPtr   = make_cudaPitchedPtr(real,mdlX*sizeof(float), mdlY, mdlZ);
+		HANDLE_ERROR(cudaMemcpy3D(&copyParams_real));
+		// ------------------------------------------
+		HANDLE_ERROR(cudaMalloc3DArray(texArrayImag, &desc, volumeSize));
+		copyParams_imag.dstArray = *texArrayImag;
+		copyParams_imag.srcPtr   = make_cudaPitchedPtr(imag,mdlX*sizeof(float), mdlY, mdlZ);
+		HANDLE_ERROR(cudaMemcpy3D(&copyParams_imag));
+
+		// -- Descriptors of the channel(s) in the texture(s)
+		resDesc_real.res.array.array = copyParams_real.dstArray;
+		resDesc_imag.res.array.array = copyParams_imag.dstArray;
+		resDesc_real.resType = cudaResourceTypeArray;
+		resDesc_imag.resType = cudaResourceTypeArray;
+	}
+	else // then we are using a 2D reference
+	{
+		size_t pitch;
+
+		// -- allocate pitched  (aligned) memory positions, and copy data into them
+		HANDLE_ERROR(cudaMallocPitch(&texArrayReal, &pitch, sizeof(float)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMemcpy2D(texArrayReal, pitch, real, sizeof(float)*mdlX, sizeof(float)*mdlX, mdlY, cudaMemcpyHostToDevice));
+		// ------------------------------------------------
+		HANDLE_ERROR(cudaMallocPitch(&texArrayImag, &pitch, sizeof(float)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMemcpy2D(texArrayImag, pitch, imag, sizeof(float)*mdlX, sizeof(float)*mdlX, mdlY, cudaMemcpyHostToDevice));
+
+
+		// -- Descriptors of the channel(s) in the texture(s)
+		resDesc_real.resType = cudaResourceTypePitch2D;
+		resDesc_real.res.pitch2D.devPtr = texArrayReal;
+		resDesc_real.res.pitch2D.pitchInBytes =  pitch;
+		resDesc_real.res.pitch2D.width = mdlX;
+		resDesc_real.res.pitch2D.height = mdlY;
+		resDesc_real.res.pitch2D.desc = desc;
+		// -------------------------------------------------
+		resDesc_imag.resType = cudaResourceTypePitch2D;
+		resDesc_imag.res.pitch2D.devPtr = texArrayImag;
+		resDesc_imag.res.pitch2D.pitchInBytes =  pitch;
+		resDesc_imag.res.pitch2D.width = mdlX;
+		resDesc_imag.res.pitch2D.height = mdlY;
+	    resDesc_imag.res.pitch2D.desc = desc;
+	}
+
+	// -- Decriptors of the texture(s) and methods used for reading it(them) --
+	texDesc.filterMode       = cudaFilterModeLinear;
+	texDesc.readMode         = cudaReadModeElementType;
+	texDesc.normalizedCoords = false;
 	for(int n=0; n<3; n++)
-		texDesc_imag.addressMode[n]=cudaAddressModeClamp;
+		texDesc.addressMode[n]=cudaAddressModeClamp;
 
-	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc_imag, NULL));
+	// -- Create texture object(s)
+	HANDLE_ERROR(cudaCreateTextureObject(mdlReal, &resDesc_real, &texDesc, NULL));
+	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
 }
 
 #else
@@ -97,8 +121,8 @@ void CudaProjector::setMdlData(double *real, double *imag)
 	HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(double)));
 	HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(double)));
 
-	HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(FLOAT), cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(FLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 
 }
 #endif

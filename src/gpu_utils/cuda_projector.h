@@ -56,6 +56,8 @@ public:
 		mdlReal = 0;
 		mdlImag = 0;
 #endif
+		if(zdim==1)
+			mdlZ=0;
 	};
 
 	inline
@@ -66,7 +68,10 @@ public:
 	{
 		mdlX = xdim;
 		mdlY = ydim;
-		mdlZ = zdim;
+		if(zdim==1)
+			mdlZ=0;
+		else
+			mdlZ = zdim;
 		mdlXYZ = xdim*ydim*zdim;
 		mdlInitY = inity;
 		mdlInitZ = initz;
