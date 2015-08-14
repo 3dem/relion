@@ -347,7 +347,45 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			}
 		}
 		CUDA_CPU_TOC("translation_1");
+		CUDA_CPU_TIC("kernel_init_1");
 
+		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
+		gpuMinvsigma2.device_alloc();
+		// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
+		// we need to make a modified copy, since the global object shouldn't be
+		// changed
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+		{
+			gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
+		}
+
+		if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			{
+				gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
+			}
+		}
+
+		// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
+		//           + Make setting of myscale robust between here and above.
+		//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
+		//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
+		if (baseMLO->do_scale_correction)
+		{
+			XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			{
+				gpuMinvsigma2[n] *= (myscale*myscale);
+			}
+		}
+
+		CUDA_GPU_TIC("imagMemCp");
+		gpuMinvsigma2.cp_to_device();
+		Fimgs_real.put_on_device(translation_num * image_size);
+		Fimgs_imag.put_on_device(translation_num * image_size);
+		CUDA_GPU_TAC("imagMemCp");
+		CUDA_CPU_TOC("kernel_init_1");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			FPCMasks[ipart][exp_iclass].weightNum=0;
@@ -368,9 +406,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				// Local variables
 				std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
-
-				CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
-				gpuMinvsigma2.device_alloc();
 
 				CUDA_CPU_TIC("generateEulerMatrices");
 				CudaGlobalPtr<XFLOAT> eulers(9 * orientation_num, cudaMLO->allocator);
@@ -434,44 +469,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CUDA_CPU_TOC("Diff2MakeKernel");
 				CUDA_CPU_TIC("Diff2CALL");
 
-
-				CUDA_CPU_TIC("kernel_init_1");
-
-				// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
-				// we need to make a modified copy, since the global object shouldn't be
-				// changed
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-				{
-					gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
-				}
-
-				if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-					{
-						gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
-					}
-				}
-
-				// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
-				//           + Make setting of myscale robust between here and above.
-				//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
-				//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
-				if (baseMLO->do_scale_correction)
-				{
-					XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-					{
-						gpuMinvsigma2[n] *= (myscale*myscale);
-					}
-				}
-
-				CUDA_GPU_TIC("imagMemCp");
-				gpuMinvsigma2.cp_to_device();
-				Fimgs_real.put_on_device(translation_num * image_size);
-				Fimgs_imag.put_on_device(translation_num * image_size);
-				CUDA_GPU_TAC("imagMemCp");
-
 				CUDA_GPU_TIC("IndexedArrayMemCp");
 				thisClassFinePassWeights.weights.cp_to_device();
 				thisClassFinePassWeights.rot_id.cp_to_device(); //FIXME this is not used
@@ -481,7 +478,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				FPCMasks[ipart][exp_iclass].jobExtent.cp_to_device();
 				CUDA_GPU_TAC("IndexedArrayMemCp");
 
-				CUDA_CPU_TOC("kernel_init_1");
 
 				CUDA_GPU_TIC("kernel_diff_proj");
 
@@ -1495,7 +1491,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				oo_otrans_y.put_on_device();
 				myp_oo_otrans_x2y2z2.put_on_device();
 
-				std::cerr << "block_num = " << block_num << std::endl;
+//				std::cerr << "block_num = " << block_num << std::endl;
 				CudaGlobalPtr<XFLOAT>                      p_weights(block_num, cudaMLO->allocator);
 				CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetx_class(block_num, cudaMLO->allocator);
 				CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsety_class(block_num, cudaMLO->allocator);
