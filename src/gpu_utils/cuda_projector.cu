@@ -159,10 +159,18 @@ CudaProjector::~CudaProjector()
 		delete mdlReal;
 		delete mdlImag;
 
-		cudaFreeArray(*texArrayReal);
-		cudaFreeArray(*texArrayImag);
-		delete texArrayReal;
-		delete texArrayImag;
+		if(mdlZ!=0)
+		{
+			cudaFreeArray(*texArrayReal);
+			cudaFreeArray(*texArrayImag);
+			delete texArrayReal;
+			delete texArrayImag;
+		}
+		else
+		{
+			cudaFree(texArrayReal);
+			cudaFree(texArrayImag);
+		}
 		texArrayReal = 0;
 		texArrayImag = 0;
 #endif

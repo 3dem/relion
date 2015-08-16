@@ -113,7 +113,8 @@ public:
 
 		if (curL == NULL)
 		{
-			printf("ERROR: CudaFixedMalloc out of memory.");
+			printf("ERROR: CudaCustomAllocator out of memory.");
+			fflush(stdout);
 			raise(SIGSEGV);
 		}
 
@@ -383,8 +384,6 @@ public:
 #endif
 		d_do_free = true;
 
-		HANDLE_ERROR(cudaDeviceSynchronize());
-
 		if (CustomAlloc)
 		{
 //			HANDLE_ERROR(cudaDeviceSynchronize());
@@ -394,8 +393,6 @@ public:
 		}
 		else
 			HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
-
-		HANDLE_ERROR(cudaDeviceSynchronize());
 	}
 
 	/**
@@ -432,7 +429,7 @@ public:
 		if (d_ptr == 0)
 			printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
 #endif
-		HANDLE_ERROR(cudaMemset( d_ptr, value, size * sizeof(T)));
+		HANDLE_ERROR(cudaMemsetAsync( d_ptr, value, size * sizeof(T), stream));
 	}
 
 	/**
@@ -447,7 +444,7 @@ public:
 		if (h_ptr == 0)
 			printf("DEBUG_WARNING: NULL host pointer in cp_to_device().\n");
 #endif
-		cudaCpyHostToDevice<T>(h_ptr, d_ptr, size);
+		cudaCpyHostToDevice<T>(h_ptr, d_ptr, size, stream);
 	}
 
 	/**
@@ -498,7 +495,7 @@ public:
 		if (h_ptr == 0)
 			printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
 #endif
-		cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size);
+		cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size, stream);
 	}
 
 	/**

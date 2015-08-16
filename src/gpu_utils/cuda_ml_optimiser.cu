@@ -215,14 +215,15 @@ void getAllSquaredDifferencesCoarse(
 				    	   Retrieve Results
 				======================================*/
 
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+
 				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], (XFLOAT)thrustGetMinVal(~diff2s, diff2s.size)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
-				diff2s.free_device();
 				CUDA_GPU_TAC("diff2sMemCpCoarse");
 
-				HANDLE_ERROR(cudaDeviceSynchronize());
+				HANDLE_ERROR(cudaStreamSynchronize(0));
 				CUDA_GPU_TOC();
 
 				for (unsigned i = 0; i < projectorPlan.orientation_num; i ++)
@@ -516,9 +517,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						FPCMasks[ipart][exp_iclass].jobOrigin.size
 						);
 
-				eulers.free_device();
-
-				HANDLE_ERROR(cudaDeviceSynchronize());
+				HANDLE_ERROR(cudaStreamSynchronize(0));
 				CUDA_GPU_TOC();
 				CUDA_CPU_TOC("Diff2CALL");
 				/*====================================
@@ -725,8 +724,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CudaGlobalPtr<XFLOAT>  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim+
 					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans]),
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
-					Mweight.device_alloc();
-					Mweight.cp_to_device();
+					Mweight.put_on_device();
 					block_num = sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE;
 
 					dim3 block_dim(block_num);
@@ -745,12 +743,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					CUDA_GPU_TIC("sumweightMemCp2");
 					Mweight.cp_to_host();  //FIXME remove when mapping is eliminated
-					Mweight.free_device();
+					HANDLE_ERROR(cudaStreamSynchronize(0));
 					CUDA_GPU_TAC("sumweightMemCp2");
 
 					thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
 					exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
-					thisparticle_sumweight.free_device();
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
 				{
@@ -782,11 +779,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CUDA_GPU_TIC("sumweightMemCp2");
 					thisparticle_sumweight.cp_to_host();
 					thisClassPassWeights.weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
+					HANDLE_ERROR(cudaStreamSynchronize(0));
 					CUDA_GPU_TAC("sumweightMemCp2");
 
 					thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
 					exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
-					thisparticle_sumweight.free_device();
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
@@ -1114,6 +1111,21 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		ctfs.put_on_device();
 
 		/*======================================================
+		                       MINVSIGMA
+		======================================================*/
+
+		CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
+
+		if (baseMLO->do_map)
+			for (unsigned i = 0; i < image_size; i++)
+				Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
+		else
+			for (unsigned i = 0; i < image_size; i++)
+				Minvsigma2s[i] = 1;
+
+		Minvsigma2s.put_on_device();
+
+		/*======================================================
 		                      CLASS LOOP
 		======================================================*/
 
@@ -1222,18 +1234,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				                     KERNEL CALL
 				======================================================*/
 
-				CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, currentBPStream, cudaMLO->allocator); //TODO Same size for all iparts, should be allocated once
-				Minvsigma2s.device_alloc();
 				CudaGlobalPtr<XFLOAT> wdiff2s_parts(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
 				wdiff2s_parts.device_alloc();
-
-				if (baseMLO->do_map)
-					for (unsigned i = 0; i < image_size; i++)
-						Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
-				else //TODO should be handled by memset
-					for (unsigned i = 0; i < image_size; i++)
-						Minvsigma2s[i] = 1;
-				Minvsigma2s.cp_to_device();
 
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 						cudaMLO->cudaProjectors[exp_iclass],
@@ -1264,15 +1266,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						group_id,
 						exp_iclass,
 						currentBPStream);
-
-				Fimgs_real.free_device();
-				Fimgs_imag.free_device();
-				Fimgs_nomask_real.free_device();
-				Fimgs_nomask_imag.free_device();
-
-				sorted_weights.free_device();
-				ctfs.free_device();
-				Minvsigma2s.free_device();
 
 				/*======================================================
 				                   REDUCE WDIFF2S
@@ -1305,7 +1298,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
 				wdiff2s_parts.cp_to_host();
 				wdiff2s_parts.size = orientation_num * image_size;
-				wdiff2s_parts.free_device();
 
 				HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
 
@@ -1338,9 +1330,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						&bp_eulers[0],
 						IS_NOT_INV);
 
-				bp_eulers.device_alloc();
-				bp_eulers.cp_to_device();
-
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
@@ -1348,6 +1337,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				if (cudaMLO->refIs3D)
 				{
+					bp_eulers.device_alloc();
+					bp_eulers.cp_to_device();
+
 					CUDA_GPU_TIC("cuda_kernels_backproject");
 					cudaMLO->cudaBackprojectors[exp_iclass].backproject(
 						~wavgs_real,
@@ -1776,7 +1768,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 		cudaSetDevice(dev_id);
 	}
 
-	allocator = new CudaCustomAllocator(1024*1024*200);
+	allocator = new CudaCustomAllocator(1024*1024*512);
 	
 	/*======================================================
 	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
