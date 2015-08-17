@@ -1554,8 +1554,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 					if (baseMLO->mymodel.ref_dim == 2)
 					{
-						thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[iorient];
-						thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[iorient];
+						thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[n];
+						thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[n];
 					}
 				}
 			}

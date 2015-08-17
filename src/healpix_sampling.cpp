@@ -1099,6 +1099,8 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 			double overpsi = psi_angles[ipsi] - 0.5 * psi_step + (0.5 + ipsi_over) * psi_step / nr_ipsi_over;
 			oversampled_rot.push_back(rot);
 			oversampled_tilt.push_back(tilt);
+			if (!is_3D && overpsi>180.)
+				overpsi-=360.;
 			oversampled_psi.push_back(overpsi);
 		}
 	}
