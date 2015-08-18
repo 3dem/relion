@@ -520,17 +520,13 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				HANDLE_ERROR(cudaStreamSynchronize(0));
 				CUDA_GPU_TOC();
 				CUDA_CPU_TOC("Diff2CALL");
-				/*====================================
-						Write To Destination
-				======================================*/
 
-				CUDA_CPU_TIC("collect_data_1");
-				op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(~FinePassWeights[ipart].weights, newDataSize));
-				CUDA_CPU_TOC("collect_data_1");
 			} // end if class significant
 		} // end loop iclass
 		FinePassWeights[ipart].setDataSize( newDataSize );
-
+		CUDA_CPU_TIC("collect_data_1");
+		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(~FinePassWeights[ipart].weights, newDataSize));
+		CUDA_CPU_TOC("collect_data_1");
 	}// end loop ipart
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -708,7 +704,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CUDA_CPU_TIC("sumweight1");
 				CUDA_GPU_TIC("sumweightMemCp1");
 
-				std::cerr << "summing weights on GPU... " << std::endl;
+				//std::cerr << "summing weights on GPU... " << std::endl;
 				pdf_orientation.put_on_device();
 				pdf_offset.put_on_device();
 
@@ -791,7 +787,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
-		std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
+		//std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
 		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
@@ -1355,6 +1351,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				}
 				else
 				{
+					CUDA_CPU_TIC("cpu_backproject");
+
 					wavgs_real.cp_to_host();
 					wavgs_imag.cp_to_host();
 					Fweights.cp_to_host();
@@ -1382,6 +1380,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						baseMLO->wsum_model.BPref[exp_iclass].backrotate2D(Fimg, A, IS_NOT_INV, &Fweight);
 					}
 					pthread_mutex_unlock(&global_mutex2[my_mutex]);
+					CUDA_CPU_TOC("cpu_backproject");
 				}
 
 #ifdef TIMING
@@ -1443,8 +1442,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUDA_CPU_TIC("collect_data_2_pre_kernel");
 			//TODO should be replaced with loop over pairs of projections and translations (like in the getAllSquaredDifferences-function)
-
-			std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
 
 			int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 //				CudaGlobalPtr<XFLOAT >  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim]),
@@ -1567,52 +1564,56 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				oo_otrans_x.free();
 				myp_oo_otrans_x2y2z2.free();
 			CUDA_CPU_TOC("collect_data_2_post_kernel");
-
-			CUDA_CPU_TIC("setMetadata");
-			/*======================================================
-								SET METADATA
-			======================================================*/
-
-			//Get index of max element using GPU-tool thrust
-			Indices max_index;
-			thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisClassFinePassWeights.weights);
-			thrust::device_ptr<XFLOAT> pos = thrust::max_element(dp, dp + thisClassFinePassWeights.weights.size);
-			unsigned int pos_idx = thrust::distance(dp, pos);
-
-			XFLOAT max_val;
-			HANDLE_ERROR(cudaMemcpyAsync(&max_val, &thisClassFinePassWeights.weights.d_ptr[pos_idx], sizeof(XFLOAT), cudaMemcpyDeviceToHost, 0));
-
-			if(max_val>op.max_weight[ipart])
-			{
-				op.max_weight[ipart] = max_val;
-				max_index.fineIdx =thisClassFinePassWeights.ihidden_overs[pos_idx];
-				//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
-				//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-				max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
-
-				baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
-						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
-
-				//TODO We already have rot, tilt and psi don't calculated them again
-				baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-
-				double rot = oversampled_rot[max_index.ioverrot];
-				double tilt = oversampled_tilt[max_index.ioverrot];
-				double psi = oversampled_psi[max_index.ioverrot];
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
-				if (baseMLO->mymodel.data_dim == 3)
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
-			}
-			CUDA_CPU_TOC("setMetadata");
 		}
 	} // end loop iclass
+
+	std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
+	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
+	{
+		CUDA_CPU_TIC("setMetadata");
+		/*======================================================
+							SET METADATA
+		======================================================*/
+
+		//Get index of max element using GPU-tool thrust
+		Indices max_index;
+		thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~FinePassWeights[ipart].weights);
+		thrust::device_ptr<XFLOAT> pos = thrust::max_element(dp, dp + FinePassWeights[ipart].weights.size);
+		unsigned int pos_idx = thrust::distance(dp, pos);
+
+		XFLOAT max_val;
+		HANDLE_ERROR(cudaMemcpyAsync(&max_val, &FinePassWeights[ipart].weights.d_ptr[pos_idx], sizeof(XFLOAT), cudaMemcpyDeviceToHost, 0));
+
+		if(max_val>op.max_weight[ipart])
+		{
+			op.max_weight[ipart] = max_val;
+			max_index.fineIdx =FinePassWeights[ipart].ihidden_overs[pos_idx];
+			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
+			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
+			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+
+			baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
+					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+
+			//TODO We already have rot, tilt and psi don't calculated them again
+			baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+
+			double rot = oversampled_rot[max_index.ioverrot];
+			double tilt = oversampled_tilt[max_index.ioverrot];
+			double psi = oversampled_psi[max_index.ioverrot];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+			if (baseMLO->mymodel.data_dim == 3)
+				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+		}
+		CUDA_CPU_TOC("setMetadata");
+	}
 	CUDA_CPU_TOC("collect_data_2");
 	CUDA_CPU_TIC("store_post_gpu");
 
@@ -1859,11 +1860,12 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 {
 
 //	CUDA_CPU_TOC("interParticle");
-
+	CUDA_CPU_TIC("oneTask");
 	cudaSetDevice(device_id);
 	//std::cerr << " calling on device " << device_id << std::endl;
 	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;
+
 	while (baseMLO->exp_ipart_ThreadTaskDistributor->getTasks(first_ipart, last_ipart))
 	{
 		for (long unsigned ipart = first_ipart; ipart <= last_ipart; ipart++)
@@ -2082,7 +2084,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			storeWeightedSums(op, sp, baseMLO, this, FinePassWeights, FineProjectionData, FinePassClassMasks);
 			CUDA_CPU_TOC("storeWeightedSums");
 
-			CUDA_CPU_TOC("oneParticle");
+			CUDA_CPU_TIC("Freefalse");
 			for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
 			{
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2093,9 +2095,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 					FinePassClassMasks[iframe][exp_iclass].jobExtent.h_do_free=false;
 				}
 			}
+			CUDA_CPU_TOC("Freefalse");
+			CUDA_CPU_TOC("oneParticle");
 		}
 	}
-
+	CUDA_CPU_TOC("oneTask");
 //	CUDA_CPU_TIC("interParticle");
 //	exit(0);
 }
