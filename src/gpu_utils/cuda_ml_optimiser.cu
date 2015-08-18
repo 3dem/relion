@@ -8,7 +8,6 @@
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
-#include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
@@ -23,6 +22,8 @@
 #include <thrust/device_ptr.h>
 #include <thrust/extrema.h>
 #include <signal.h>
+#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include <thrust/execution_policy.h>
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1022,6 +1023,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	                                   MAXIMIZATION
 	=======================================================================================*/
 
+
+	cudaMLO->clearBackprojectDataBundle();
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -1176,37 +1180,39 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				                    PROJECTIONS
 				======================================================*/
 
-				cudaStream_t currentBPStream = cudaMLO->cudaBackprojectors[exp_iclass].getStream();
+				BackprojectDataBundle *dataBundle = new BackprojectDataBundle(
+						orientation_num * image_size,
+						orientation_num * 9,
+						0,
+						cudaMLO->allocator);
 
-				CUDA_CPU_TIC("generateEulerMatrices");
-				CudaGlobalPtr<XFLOAT> eulers(9 * orientation_num, currentBPStream, cudaMLO->allocator);
+				CUDA_CPU_TIC("generateEulerMatricesProjector");
 
 				generateEulerMatrices(
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
 						ProjectionData_projdiv,
-						&eulers[0],
+						&dataBundle->eulers[0],
 						!IS_NOT_INV);
 
-				eulers.put_on_device();
+				dataBundle->eulers.put_on_device();
 
-				CUDA_CPU_TOC("generateEulerMatrices");
+				CUDA_CPU_TOC("generateEulerMatricesProjector");
 
-				CudaGlobalPtr<XFLOAT> wavgs_real(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
-				wavgs_real.device_alloc();
-				wavgs_real.device_init(0);
-				CudaGlobalPtr<XFLOAT> wavgs_imag(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
-				wavgs_imag.device_alloc();
-				wavgs_imag.device_init(0);
-				CudaGlobalPtr<XFLOAT> Fweights(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
-				Fweights.device_alloc();
-				Fweights.device_init(0);
+				dataBundle->reals.device_alloc();
+				dataBundle->reals.device_init(0);
+
+				dataBundle->imags.device_alloc();
+				dataBundle->imags.device_init(0);
+
+				dataBundle->weights.device_alloc();
+				dataBundle->weights.device_init(0);
 
 
 				/*======================================================
 				                     MAP WEIGHTS
 				======================================================*/
 
-				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, currentBPStream, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, 0, cudaMLO->allocator);
 
 				mapWeights(
 						proj_div_start,
@@ -1234,7 +1240,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				                     KERNEL CALL
 				======================================================*/
 
-				CudaGlobalPtr<XFLOAT> wdiff2s_parts(orientation_num * image_size, currentBPStream, cudaMLO->allocator);
+				CudaGlobalPtr<XFLOAT> wdiff2s_parts(orientation_num * image_size, 0, cudaMLO->allocator);
 				wdiff2s_parts.device_alloc();
 
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
@@ -1245,7 +1251,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				runWavgKernel(
 						projKernel,
-						~eulers,
+						~dataBundle->eulers,
 						~Fimgs_real,
 						~Fimgs_imag,
 						~Fimgs_nomask_real,
@@ -1254,9 +1260,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~ctfs,
 						~Minvsigma2s,
 						~wdiff2s_parts,
-						~wavgs_real,
-						~wavgs_imag,
-						~Fweights,
+						~dataBundle->reals,
+						~dataBundle->imags,
+						~dataBundle->weights,
 						op,
 						baseMLO,
 						orientation_num,
@@ -1265,7 +1271,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						ipart,
 						group_id,
 						exp_iclass,
-						currentBPStream);
+						0);
 
 				/*======================================================
 				                   REDUCE WDIFF2S
@@ -1286,7 +1292,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					dim3 block_dim_wd = splitCudaBlocks(k,true);
 
 					// TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very inefficient amount of loads per store
-					cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE,0,currentBPStream>>>(
+					cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE,0,0>>>(
 							~wdiff2s_parts,
 							orientation_num,
 							image_size,
@@ -1299,7 +1305,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				wdiff2s_parts.cp_to_host();
 				wdiff2s_parts.size = orientation_num * image_size;
 
-				HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
+				HANDLE_ERROR(cudaStreamSynchronize(0));
 
 				CUDA_GPU_TOC();
 
@@ -1320,44 +1326,50 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				                    BACKPROJECTION
 				======================================================*/
 
-				CudaGlobalPtr<XFLOAT> bp_eulers(9*orientation_num, currentBPStream, cudaMLO->allocator);
-
 				XFLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
+
+				CUDA_CPU_TIC("generateEulerMatricesBackprojector");
 
 				generateEulerMatrices(
 						1/padding_factor, //Why squared scale factor is given in backprojection
 						ProjectionData_projdiv,
-						&bp_eulers[0],
+						&dataBundle->eulers[0],
 						IS_NOT_INV);
+
+				CUDA_CPU_TOC("generateEulerMatricesBackprojector");
 
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 
+				CUDA_CPU_TIC("backproject");
+
 				if (cudaMLO->refIs3D)
 				{
-					bp_eulers.device_alloc();
-					bp_eulers.cp_to_device();
+					dataBundle->eulers.cp_to_device();
 
 					CUDA_GPU_TIC("cuda_kernels_backproject");
 					cudaMLO->cudaBackprojectors[exp_iclass].backproject(
-						~wavgs_real,
-						~wavgs_imag,
-						~Fweights,
-						~bp_eulers,
+						~dataBundle->reals,
+						~dataBundle->imags,
+						~dataBundle->weights,
+						~dataBundle->eulers,
 							op.local_Minvsigma2s[0].xdim,
 							op.local_Minvsigma2s[0].ydim,
 							orientation_num);
 
-					HANDLE_ERROR(cudaStreamSynchronize(currentBPStream));
+					cudaMLO->backprojectDataBundles.push_back(dataBundle);
+
+//					cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
+
 					CUDA_GPU_TAC("cuda_kernels_backproject");
 				}
 				else
 				{
-					wavgs_real.cp_to_host();
-					wavgs_imag.cp_to_host();
-					Fweights.cp_to_host();
+					dataBundle->reals.cp_to_host();
+					dataBundle->imags.cp_to_host();
+					dataBundle->weights.cp_to_host();
 
 					MultidimArray<Complex > Fimg;
 					MultidimArray<double > Fweight;
@@ -1371,18 +1383,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					{
 						for (int j = 0; j < image_size; j ++)
 						{
-							Fimg.data[j].real = (double) wavgs_real[i * image_size + j];
-							Fimg.data[j].imag = (double) wavgs_imag[i * image_size + j];
-							Fweight.data[j]   = (double) Fweights[i * image_size + j];
+							Fimg.data[j].real = (double) dataBundle->reals[i * image_size + j];
+							Fimg.data[j].imag = (double) dataBundle->imags[i * image_size + j];
+							Fweight.data[j]   = (double) dataBundle->weights[i * image_size + j];
 						}
 
 						for (int j = 0; j < 9; j ++)
-							A.mdata[j] = bp_eulers[i * 9 + j];
+							A.mdata[j] = dataBundle->eulers[i * 9 + j];
 
 						baseMLO->wsum_model.BPref[exp_iclass].backrotate2D(Fimg, A, IS_NOT_INV, &Fweight);
 					}
 					pthread_mutex_unlock(&global_mutex2[my_mutex]);
+
+					delete dataBundle;
 				}
+
+				CUDA_CPU_TOC("backproject");
 
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1559,13 +1575,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 				}
 			}
-				p_weights.free();
-				p_thr_wsum_sigma2_offset.free();
-				p_thr_wsum_prior_offsetx_class.free();
-				p_thr_wsum_prior_offsety_class.free();
-				oo_otrans_y.free();
-				oo_otrans_x.free();
-				myp_oo_otrans_x2y2z2.free();
+
+			p_weights.free();
+			p_thr_wsum_sigma2_offset.free();
+			p_thr_wsum_prior_offsetx_class.free();
+			p_thr_wsum_prior_offsety_class.free();
+			oo_otrans_y.free();
+			oo_otrans_x.free();
+			myp_oo_otrans_x2y2z2.free();
+
 			CUDA_CPU_TOC("collect_data_2_post_kernel");
 
 			CUDA_CPU_TIC("setMetadata");
@@ -1769,7 +1787,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	}
 
 	allocator = new CudaCustomAllocator(1024*1024*512);
-	
+
 	/*======================================================
 	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
 	======================================================*/
@@ -1811,7 +1829,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 				baseMLO->wsum_model.BPref[iclass].r_max,
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
 
-		cudaBackprojectors[iclass].initMdl();
+		cudaBackprojectors[iclass].initMdl(1);
 
 		//If doing predefined projector plan at all and is this class significant
 		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)

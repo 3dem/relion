@@ -3,7 +3,7 @@
 #include <signal.h>
 
 
-void CudaBackprojector::initMdl()
+void CudaBackprojector::initMdl(int streamPriority)
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -55,7 +55,7 @@ void CudaBackprojector::initMdl()
 	HANDLE_ERROR(cudaMemset( d_mdlImag, 0, voxelCount * sizeof(XFLOAT)));
 	HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, voxelCount * sizeof(XFLOAT)));
 
-	HANDLE_ERROR(cudaStreamCreate(&stream));
+	HANDLE_ERROR(cudaStreamCreateWithPriority(&stream, cudaStreamNonBlocking, streamPriority));
 }
 __global__ void cuda_kernel_backproject2D(
 		int *g_xs,

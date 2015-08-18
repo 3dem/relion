@@ -3,28 +3,15 @@
 
 #include "src/complex.h"
 #include "src/gpu_utils/cuda_settings.h"
+#include "src/gpu_utils/cuda_mem_utils.h"
 #include <cuda_runtime.h>
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_FETCH_COUNT 4
 
-//class BackprojectDataBundle
-//{
-//	CudaGlobalPtr<XFLOAT> reals;
-//	CudaGlobalPtr<XFLOAT> imags;
-//	CudaGlobalPtr<XFLOAT> weights;
-//	CudaGlobalPtr<XFLOAT> eulers;
-//
-//	BackprojectDataBundle(size_t img_data_size, size_t euler_data_size, CudaCustomAllocator alloc):
-//		reals(img_data_size, alloc), imags(img_data_size, alloc), weights(img_data_size, alloc), eulers(euler_data_size, alloc)
-//	{};
-//};
-
 class CudaBackprojector
 {
-//	std::vector< BackprojectDataBundle *> backprojectDataBundles;
-
 	int mdlX, mdlY, mdlZ, mdlXYZ,
 	    mdlInitY, mdlInitZ,
 	    maxR2,
@@ -84,7 +71,12 @@ public:
 		padding_factor = paddingFactor;
 	}
 
-	void initMdl();
+	void syncStream()
+	{
+		HANDLE_ERROR(cudaStreamSynchronize(stream));
+	}
+
+	void initMdl(int streamPriority);
 
 	void backproject(
 			XFLOAT *d_real,

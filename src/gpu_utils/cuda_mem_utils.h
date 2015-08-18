@@ -45,7 +45,7 @@ void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size)
 
 template< typename T>
 static inline
-void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size, cudaStream_t stream)
+void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size, cudaStream_t &stream)
 {
 	HANDLE_ERROR(cudaMemcpyAsync( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
 };
@@ -59,32 +59,53 @@ void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size)
 
 template< typename T>
 static inline
-void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size, cudaStream_t stream)
+void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size, cudaStream_t &stream)
 {
 	HANDLE_ERROR(cudaMemcpyAsync( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
+};
+
+class OutOfMemoryHandler
+{
+public:
+	//Returns true if any memory was freed
+	virtual void handleOutOfMemory() {};
 };
 
 class CudaCustomAllocator
 {
 	typedef unsigned char BYTE;
 	size_t totalSize;
+	OutOfMemoryHandler *outOfMemoryHandler;
 
 public:
-	struct Link
+	class Alloc
 	{
-		Link *prev, *next;
+		friend class CudaCustomAllocator;
+
+	private:
+		Alloc *prev, *next;
 		BYTE *ptr;
 		size_t size;
 		bool free;
+
+	public:
+		inline
+		BYTE *getPtr() { return ptr; }
+
+		inline
+		size_t getSize() { return size; }
+
+		inline
+		bool isFree() { return free; }
 	};
 private:
-	Link *first;
+	Alloc *first;
 public:
 
 	CudaCustomAllocator(size_t size):
-		totalSize(size)
+		totalSize(size),outOfMemoryHandler(NULL)
 	{
-		first = new Link();
+		first = new Alloc();
 
 		first->prev = NULL;
 		first->next = NULL;
@@ -94,28 +115,38 @@ public:
 		HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), size));
 	}
 
-	inline
-	void* alloc(size_t size)
-	{
-		Link *link = allocLink(size);
-		return (void *) link->ptr;
-	};
 
 	inline
-	Link* allocLink(size_t size)
+	Alloc* alloc(size_t size)
 	{
-		Link *curL = first;
+		Alloc *curL = first;
 
 		//Look for the first suited link
 		//If not the last and too small or not free go to next link
 		while (curL != NULL && ( curL->size <= size || ! curL->free ) )
 			curL = curL->next;
 
+		//If out of memory
 		if (curL == NULL)
 		{
-			printf("ERROR: CudaCustomAllocator out of memory.");
-			fflush(stdout);
-			raise(SIGSEGV);
+			if (outOfMemoryHandler != NULL) //Is there a handler
+			{
+				outOfMemoryHandler->handleOutOfMemory(); //Try to handle
+
+				//Is there space now?
+				curL = first;
+				while (curL != NULL && ( curL->size <= size || ! curL->free ) )
+					curL = curL->next;
+			}
+
+			//Did we manage to recover?
+			if (curL == NULL)
+			{
+				//Nope... OK I'm out
+				printf("ERROR: CudaCustomAllocator out of memory.");
+				fflush(stdout);
+				raise(SIGSEGV);
+			}
 		}
 
 		if (curL->size == size)
@@ -130,7 +161,7 @@ public:
 		else
 		{
 			//Setup new pointer
-			Link *newL = new Link();
+			Alloc *newL = new Alloc();
 			newL->next = curL;
 			newL->ptr = curL->ptr;
 			newL->size = size;
@@ -156,27 +187,9 @@ public:
 		}
 	};
 
-	inline
-	void free(void* ptr)
-	{
-		Link *curL = first;
-
-		//Find the link holding the pointer
-		while (curL != NULL && curL->ptr != ptr )
-			curL = curL->next;
-
-		if (curL == NULL)
-		{
-			printf("ERROR: CudaFixedMalloc could not find provided pointer in list (possible double free).");
-			fflush(stdout);
-			raise(SIGSEGV);
-		}
-
-		freeLink(curL);
-	};
 
 	inline
-	void freeLink(Link* curL)
+	void free(Alloc* curL)
 	{
 		curL->free = true;
 
@@ -188,7 +201,7 @@ public:
 			curL->ptr = curL->prev->ptr;
 
 			//Fetch secondary neighbor
-			Link *ppL = curL->prev->prev;
+			Alloc *ppL = curL->prev->prev;
 
 			//Remove primary neighbor
 			if (ppL == NULL) //If the previous is first in chain
@@ -209,7 +222,7 @@ public:
 			curL->size += curL->next->size;
 
 			//Fetch secondary neighbor
-			Link *nnL = curL->next->next;
+			Alloc *nnL = curL->next->next;
 
 			//Remove primary neighbor
 			if (nnL != NULL)
@@ -226,7 +239,7 @@ public:
 
 	size_t getFreeSpace()
 	{
-		Link *cL = first;
+		Alloc *cL = first;
 		while (cL->next != NULL) //Get last
 			cL = cL->next;
 		return cL->size;
@@ -234,7 +247,7 @@ public:
 
 	void printState()
 	{
-		Link *curL = first;
+		Alloc *curL = first;
 
 		while (curL != NULL)
 		{
@@ -249,11 +262,14 @@ public:
 		fflush(stdout);
 	}
 
+	void setOutOfMemoryHandler(OutOfMemoryHandler *handler)
+	{ outOfMemoryHandler = handler; }
+
 	~CudaCustomAllocator()
 	{
 		HANDLE_ERROR(cudaFree( first->ptr ));
 
-		Link *cL = first, *nL;
+		Alloc *cL = first, *nL;
 
 		while (cL != NULL)
 		{
@@ -264,12 +280,11 @@ public:
 	}
 };
 
-
 template <typename T, bool CustomAlloc=true>
 class CudaGlobalPtr
 {
 	CudaCustomAllocator *allocator;
-	CudaCustomAllocator::Link *link;
+	CudaCustomAllocator::Alloc *alloc;
 	cudaStream_t stream;
 public:
 	size_t size; //Size used when copying data from and to device
@@ -283,43 +298,43 @@ public:
 	inline
 	CudaGlobalPtr(CudaCustomAllocator *allocator):
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), link(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(allocator), link(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(allocator), link(0), stream(stream)
+		d_do_free(false), allocator(allocator), alloc(0), stream(stream)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), link(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), link(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(allocator), link(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(allocator), link(0), stream(stream)
+		d_do_free(false), allocator(allocator), alloc(0), stream(stream)
 	{};
 
 	/*======================================================
@@ -329,48 +344,51 @@ public:
 	inline
 	CudaGlobalPtr():
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), link(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(size_t size):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(0), link(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(size_t size, cudaStream_t stream):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(0), link(0), stream(stream)
+		d_do_free(false), allocator(0), alloc(0), stream(stream)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, size_t size):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), link(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), link(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(0), link(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(0)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size, cudaStream_t stream):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(0), link(0), stream(stream)
+		d_do_free(false), allocator(0), alloc(0), stream(stream)
 	{};
 
 	/*======================================================
 	                    OTHER STUFF
 	======================================================*/
+
+	CudaCustomAllocator *getAllocator() {return allocator; };
+	cudaStream_t &getStream() {return stream; };
 
 	/**
 	 * Allocate memory on device
@@ -387,9 +405,9 @@ public:
 		if (CustomAlloc)
 		{
 //			HANDLE_ERROR(cudaDeviceSynchronize());
-			link = allocator->allocLink(size * sizeof(T));
+			alloc = allocator->alloc(size * sizeof(T));
 //			HANDLE_ERROR(cudaDeviceSynchronize());
-			d_ptr = (T*) link->ptr;
+			d_ptr = (T*) alloc->getPtr();
 		}
 		else
 			HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
@@ -538,7 +556,7 @@ public:
 		if (CustomAlloc)
 		{
 //			HANDLE_ERROR(cudaDeviceSynchronize());
-			allocator->freeLink(link);
+			allocator->free(alloc);
 //			HANDLE_ERROR(cudaDeviceSynchronize());
 		}
 		else
