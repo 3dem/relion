@@ -14,7 +14,8 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT min_diff2,
 									    	  int oversamples_orient,
 									    	  int oversamples_trans,
-									    	  int coarse_trans);
+									    	  int coarse_trans,
+									     	  long int sumweight_pos);
 
 __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 											  XFLOAT *g_pdf_offset,
@@ -27,7 +28,8 @@ __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 											  unsigned long *d_trans_idx,
 											  unsigned long *d_job_idx,
 											  unsigned long *d_job_num,
-									     	  long int job_num);
+									     	  long int job_num,
+									     	  long int sumweight_pos);
 
 __global__ void cuda_kernel_collect2(	XFLOAT *g_oo_otrans_x,
 										XFLOAT *g_oo_otrans_y,

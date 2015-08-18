@@ -598,6 +598,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else
 		{
+			long int sumRedSize=0;
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				sumRedSize+= (exp_ipass==0) ? sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE);
+
+			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
+			thisparticle_sumweight.host_alloc();
+			thisparticle_sumweight.device_alloc();
+
+			long int sumweight_pos=0;
+
 			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
@@ -711,12 +721,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CUDA_GPU_TAC("sumweightMemCp1");
 				CUDA_GPU_TOC();
 
-				CudaGlobalPtr<XFLOAT> thisparticle_sumweight(cudaMLO->allocator);
 				long int block_num;
 
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
-
 					CudaGlobalPtr<XFLOAT>  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim+
 					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans]),
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
@@ -724,9 +732,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					block_num = sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE;
 
 					dim3 block_dim(block_num);
-					thisparticle_sumweight.size=block_num;
-					thisparticle_sumweight.host_alloc();
-					thisparticle_sumweight.device_alloc();
 					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightCoarse<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
 																			    ~pdf_offset,
@@ -735,15 +740,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    (XFLOAT)op.min_diff2[ipart],
 																			    sp.nr_oversampled_rot,
 																			    sp.nr_oversampled_trans,
-																			    sp.nr_trans );
+																			    sp.nr_trans,
+																			    sumweight_pos);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					CUDA_GPU_TIC("sumweightMemCp2");
 					Mweight.cp_to_host();  //FIXME remove when mapping is eliminated
 					HANDLE_ERROR(cudaStreamSynchronize(0));
 					CUDA_GPU_TAC("sumweightMemCp2");
-
-					thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
-					exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
+					sumweight_pos+=block_num;
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
 				{
@@ -753,9 +757,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
-					thisparticle_sumweight.size=block_num;
-					thisparticle_sumweight.host_alloc();
-					thisparticle_sumweight.device_alloc();
 					thisClassPassWeights.weights.cp_to_host();
 					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
@@ -769,7 +770,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    ~thisClassPassWeights.trans_idx,
 																				~FPCMasks[ipart][exp_iclass].jobOrigin,
 																			 	~FPCMasks[ipart][exp_iclass].jobExtent,
-																			 	FPCMasks[ipart][exp_iclass].jobNum);
+																			 	FPCMasks[ipart][exp_iclass].jobNum,
+																			 	sumweight_pos);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
 
 					CUDA_GPU_TIC("sumweightMemCp2");
@@ -777,12 +779,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					thisClassPassWeights.weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
 					HANDLE_ERROR(cudaStreamSynchronize(0));
 					CUDA_GPU_TAC("sumweightMemCp2");
-
-					thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
-					exp_thisparticle_sumweight += thrust::reduce(dp, dp + block_num);
+					sumweight_pos+=block_num;
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
+			thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
+			exp_thisparticle_sumweight += thrust::reduce(dp, dp + sumweight_pos);
 		} // end if iter==1
 
 		//Store parameters for this particle
