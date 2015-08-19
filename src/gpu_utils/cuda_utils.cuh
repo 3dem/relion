@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <vector>
+#include <src/gpu_utils/cub/cub.cuh>
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define XFLOAT double
@@ -29,6 +30,27 @@ __device__ inline void cuda_atomic_add(float* address, float value)
   atomicAdd(address,value);
 }
 #endif
+
+template <typename T>
+inline static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
+{
+	CudaGlobalPtr<cub::KeyValuePair<int, T> >  max_pair(1, ptr.getAllocator());
+	max_pair.device_alloc();
+	size_t temp_storage_size = 0;
+
+	cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size);
+
+	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
+
+	cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size);
+
+	max_pair.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+
+	ptr.getAllocator()->free(alloc);
+
+	return max_pair[0];
+}
 
 
 class IndexedDataArrayMask

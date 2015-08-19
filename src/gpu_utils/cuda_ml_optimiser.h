@@ -2,6 +2,7 @@
 #define CUDA_ML_OPTIMISER_H_
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
+#include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
@@ -152,7 +153,23 @@ public:
 	}
 };
 
-class MlOptimiserCuda
+class BackprojectDataBundle
+{
+public:
+	CudaGlobalPtr<XFLOAT> reals;
+	CudaGlobalPtr<XFLOAT> imags;
+	CudaGlobalPtr<XFLOAT> weights;
+	CudaGlobalPtr<XFLOAT> eulers;
+
+	BackprojectDataBundle(size_t img_data_size, size_t euler_data_size, cudaStream_t stream, CudaCustomAllocator *alloc):
+		reals(img_data_size, stream, alloc),
+		imags(img_data_size, stream, alloc),
+		weights(img_data_size, stream, alloc),
+		eulers(euler_data_size, stream, alloc)
+	{};
+};
+
+class MlOptimiserCuda : OutOfMemoryHandler
 {
 public:
 
@@ -161,6 +178,7 @@ public:
 
 	//The CUDA accelerated back-projector set
 	std::vector< CudaBackprojector > cudaBackprojectors;
+	std::vector< BackprojectDataBundle *> backprojectDataBundles;
 
 	//Used for precalculations of projection setup
 	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
@@ -189,6 +207,37 @@ public:
 					baseMLO->wsum_model.BPref[iclass].weight.data
 					);
 		}
+	}
+
+	void clearBackprojectDataBundle()
+	{
+		//TODO mutex lock backprojectDataBundles
+		//TODO switch to cuda event synchronization instead of stream
+		for (int i = 0; i < cudaBackprojectors.size(); i ++)
+			cudaBackprojectors[i].syncStream();
+
+		for (int i = 0; i < backprojectDataBundles.size(); i ++)
+			delete backprojectDataBundles[i];
+
+		backprojectDataBundles.clear();
+	}
+
+	void handleOutOfMemory()
+	{
+#ifdef DEBUG_CUDA
+		int spaceDiff = allocator->getFreeSpace();
+#endif
+		clearBackprojectDataBundle();
+#ifdef DEBUG_CUDA
+		spaceDiff = ( (int) allocator->getFreeSpace() ) - spaceDiff;
+		printf("DEBUG_INFO: MlOptimiserCuda::handleOutOfMemory called and %dB was freed.\n", spaceDiff);
+#endif
+	}
+
+	~MlOptimiserCuda()
+	{
+		clearBackprojectDataBundle();
+		delete allocator;
 	}
 
 };
