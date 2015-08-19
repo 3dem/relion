@@ -59,128 +59,130 @@ void getAllSquaredDifferencesCoarse(
 	CUDA_CPU_TOC("diff_pre_gpu");
 
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
+	CudaGlobalPtr<XFLOAT> allWeights(cudaMLO->allocator);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		allWeights.size+=projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles;
+	allWeights.device_alloc();
+
+	long int allWeights_pos=0;
+	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
-		CudaProjectorPlan projectorPlan = projectorPlans[exp_iclass];
+		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
+		long int group_id = baseMLO->mydata.getGroupId(part_id);
 
-		if ( projectorPlan.orientation_num > 0 )
+		/*====================================
+				Generate Translations
+		======================================*/
+
+		CUDA_CPU_TIC("translation_1");
+
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
+		gpuMinvsigma2.device_alloc();
+
+		std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+		long unsigned translation_num(0), ihidden(0);
+		std::vector< long unsigned > iover_transes, itranses, ihiddens;
+
+		for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
 		{
-			// Local variables
-			CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
-			gpuMinvsigma2.device_alloc();
+			baseMLO->sampling.getTranslations(itrans, sp.current_oversampling,
+					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
 
-			/*=======================================================================================
-			                                  	  Particle Iteration
-			=========================================================================================*/
-
-			for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
+			for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
 			{
-				long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
-				long int group_id = baseMLO->mydata.getGroupId(part_id);
-
-				/*====================================
-				        Generate Translations
-				======================================*/
-
-				CUDA_CPU_TIC("translation_1");
-
-				CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
-				CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
-
-				std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-				long unsigned translation_num(0), ihidden(0);
-				std::vector< long unsigned > iover_transes, itranses, ihiddens;
-
-				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
+				/// Now get the shifted image
+				// Use a pointer to avoid copying the entire array again in this highly expensive loop
+				Complex *myAB;
+				if (sp.current_oversampling == 0)
 				{
-					baseMLO->sampling.getTranslations(itrans, sp.current_oversampling,
-							oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
-
-					for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
-					{
-						/// Now get the shifted image
-						// Use a pointer to avoid copying the entire array again in this highly expensive loop
-						Complex *myAB;
-						if (sp.current_oversampling == 0)
-						{
-							myAB = (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size) ? baseMLO->global_fftshifts_ab_coarse[itrans].data
-									: baseMLO->global_fftshifts_ab_current[itrans].data;
-						}
-						else
-						{
-							int iitrans = itrans * sp.nr_oversampled_trans +  iover_trans;
-							myAB = (baseMLO->strict_highres_exp > 0.) ? baseMLO->global_fftshifts_ab2_coarse[iitrans].data
-									: baseMLO->global_fftshifts_ab2_current[iitrans].data;
-						}
-
-
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-						{
-							XFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real
-									- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag;
-							XFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag
-									+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real;
-
-							//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
-							if (baseMLO->do_scale_correction)
-							{
-								XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-								real /= myscale;
-								imag /= myscale;
-							}
-							if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-							{
-								real /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-								imag /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-							}
-							Fimgs_real[translation_num * image_size + n] = real;
-							Fimgs_imag[translation_num * image_size + n] = imag;
-						}
-
-						translation_num ++;
-
-						ihiddens.push_back(ihidden);
-						itranses.push_back(itrans);
-						iover_transes.push_back(iover_trans);
-					}
+					myAB = (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size) ? baseMLO->global_fftshifts_ab_coarse[itrans].data
+							: baseMLO->global_fftshifts_ab_current[itrans].data;
+				}
+				else
+				{
+					int iitrans = itrans * sp.nr_oversampled_trans +  iover_trans;
+					myAB = (baseMLO->strict_highres_exp > 0.) ? baseMLO->global_fftshifts_ab2_coarse[iitrans].data
+							: baseMLO->global_fftshifts_ab2_current[iitrans].data;
 				}
 
-				Fimgs_real.size = translation_num * image_size;
-				Fimgs_imag.size = translation_num * image_size;
-
-				Fimgs_real.device_alloc();
-				Fimgs_imag.device_alloc();
-
-				Fimgs_real.cp_to_device();
-				Fimgs_imag.cp_to_device();
-
-				CUDA_CPU_TOC("translation_1");
 
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
 				{
-					gpuMinvsigma2[n] = op.local_Minvsigma2s[ipart].data[n];
-				}
+					XFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real
+							- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag;
+					XFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag
+							+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real;
 
-				if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+					//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
+					if (baseMLO->do_scale_correction)
 					{
-						gpuMinvsigma2[n] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
+						XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+						real /= myscale;
+						imag /= myscale;
 					}
-				}
-				if (baseMLO->do_scale_correction)
-				{
-					XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+					if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
 					{
-						gpuMinvsigma2[n] *= myscale * myscale;
+						real /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
+						imag /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
 					}
+					Fimgs_real[translation_num * image_size + n] = real;
+					Fimgs_imag[translation_num * image_size + n] = imag;
 				}
 
-				gpuMinvsigma2.cp_to_device();
+				translation_num ++;
 
-				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num, cudaMLO->allocator);
-				diff2s.device_alloc();
+				ihiddens.push_back(ihidden);
+				itranses.push_back(itrans);
+				iover_transes.push_back(iover_trans);
+			}
+		}
+
+		Fimgs_real.size = translation_num * image_size;
+		Fimgs_imag.size = translation_num * image_size;
+
+		Fimgs_real.device_alloc();
+		Fimgs_imag.device_alloc();
+
+		Fimgs_real.cp_to_device();
+		Fimgs_imag.cp_to_device();
+
+		CUDA_CPU_TOC("translation_1");
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+		{
+			gpuMinvsigma2[n] = op.local_Minvsigma2s[ipart].data[n];
+		}
+
+		if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			{
+				gpuMinvsigma2[n] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
+			}
+		}
+		if (baseMLO->do_scale_correction)
+		{
+			XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			{
+				gpuMinvsigma2[n] *= myscale * myscale;
+			}
+		}
+		gpuMinvsigma2.cp_to_device();
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		{
+			CudaProjectorPlan projectorPlan = projectorPlans[exp_iclass];
+
+			if ( projectorPlan.orientation_num > 0 )
+			{
+				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num,cudaMLO->allocator);
+//				diff2s.h_ptr = &allWeights.h_ptr[allWeights_pos];
+				diff2s.d_ptr = &allWeights.d_ptr[allWeights_pos];
+				diff2s.h_do_free=false;
+				diff2s.d_do_free=false;
+
 
 				/*====================================
 				    	   Kernel Call
@@ -211,10 +213,8 @@ void getAllSquaredDifferencesCoarse(
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
-
+				allWeights_pos+=projectorPlan.orientation_num*translation_num;
 				HANDLE_ERROR(cudaStreamSynchronize(0));
-
-				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], getMinOnDevice(diff2s)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -229,9 +229,10 @@ void getAllSquaredDifferencesCoarse(
 					for (unsigned j = 0; j < translation_num; j ++)
 						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = diff2s[i * translation_num + j];
 				}
-			} // end loop ipart
-		} // end if class significant
-	} // end loop iclass
+			} // end if class significant
+		} // end loop iclass
+		op.min_diff2[ipart] = getMinOnDevice(allWeights); // class
+	} // end loop ipart
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF1);
@@ -603,7 +604,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sumRedSize+= (exp_ipass==0) ? sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE);
 
 			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
-//			thisparticle_sumweight.host_alloc();
 			thisparticle_sumweight.device_alloc();
 
 			long int sumweight_pos=0;
