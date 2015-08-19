@@ -7,7 +7,8 @@
 #include <stdio.h>
 #include <signal.h>
 #include <vector>
-#include <src/gpu_utils/cub/cub.cuh>
+#include "src/gpu_utils/cub/device/device_radix_sort.cuh"
+#include "src/gpu_utils/cub/device/device_reduce.cuh"
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define XFLOAT double
@@ -50,6 +51,62 @@ inline static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 	ptr.getAllocator()->free(alloc);
 
 	return max_pair[0];
+}
+
+template <typename T>
+inline static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
+{
+	CudaGlobalPtr<T >  min_val(1, ptr.getAllocator());
+	min_val.device_alloc();
+	size_t temp_storage_size = 0;
+
+	cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size);
+
+	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
+
+	cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size);
+
+	min_val.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+
+	ptr.getAllocator()->free(alloc);
+
+	return min_val[0];
+}
+
+template <typename T>
+inline static T getSumOnDevice(CudaGlobalPtr<T> &ptr)
+{
+	CudaGlobalPtr<T >  val(1, ptr.getAllocator());
+	val.device_alloc();
+	size_t temp_storage_size = 0;
+
+	cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size);
+
+	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
+
+	cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size);
+
+	val.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+
+	ptr.getAllocator()->free(alloc);
+
+	return val[0];
+}
+
+template <typename T>
+inline static void sortOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out)
+{
+	size_t temp_storage_size = 0;
+
+	cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size);
+
+	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
+
+	cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size);
+
+	in.getAllocator()->free(alloc);
 }
 
 
