@@ -19,9 +19,6 @@
 #include <fstream>
 #include <cuda_runtime.h>
 #include "src/parallel.h"
-#include <thrust/sort.h>
-#include <thrust/device_ptr.h>
-#include <thrust/extrema.h>
 #include <signal.h>
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
@@ -217,7 +214,7 @@ void getAllSquaredDifferencesCoarse(
 
 				HANDLE_ERROR(cudaStreamSynchronize(0));
 
-				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], (XFLOAT)thrustGetMinVal(~diff2s, diff2s.size)); // class
+				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], getMinOnDevice(diff2s)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -523,10 +520,13 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
+
 		FinePassWeights[ipart].setDataSize( newDataSize );
+
 		CUDA_CPU_TIC("collect_data_1");
-		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)thrustGetMinVal(~FinePassWeights[ipart].weights, newDataSize));
+		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)getMinOnDevice(FinePassWeights[ipart].weights));
 		CUDA_CPU_TOC("collect_data_1");
+
 	}// end loop ipart
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -603,7 +603,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sumRedSize+= (exp_ipass==0) ? sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE);
 
 			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
-			thisparticle_sumweight.host_alloc();
+//			thisparticle_sumweight.host_alloc();
 			thisparticle_sumweight.device_alloc();
 
 			long int sumweight_pos=0;
@@ -783,9 +783,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
-			thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
-			exp_thisparticle_sumweight += thrust::reduce(dp, dp + sumweight_pos);
-		} // end if iter==1
+
+			thisparticle_sumweight.size = sumweight_pos;
+			exp_thisparticle_sumweight += getSumOnDevice(thisparticle_sumweight);
+		}
 
 		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
@@ -807,28 +808,23 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	CUDA_CPU_TIC("convertPostKernel");
 	// Now, for each particle,  find the exp_significant_weight that encompasses adaptive_fraction of op.sum_weight
-	op.significant_weight.clear();
-	op.significant_weight.resize(sp.nr_particles, 0.);
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
-		MultidimArray<XFLOAT> sorted_weight;
-		CudaGlobalPtr<XFLOAT> sorted_weight_new(cudaMLO->allocator);  // make new sorted weights
 		double frac_weight = 0.;
 		double my_significant_weight;
-		long int my_nr_significant_coarse_samples = 0;
-		long int np = 0;
+
 		if (exp_ipass!=0)
 		{
 			CUDA_CPU_TIC("sort");
-			sorted_weight_new.size = PassWeights[ipart].weights.size;
-			sorted_weight_new.host_alloc();
-			sorted_weight_new.d_ptr = PassWeights[ipart].weights.d_ptr;			    // set pointer to weights
+			CudaGlobalPtr<XFLOAT> sorted_weight_new(PassWeights[ipart].weights.size, cudaMLO->allocator);  // make new sorted weights
+			sorted_weight_new.device_alloc();
+			sortOnDevice(PassWeights[ipart].weights, sorted_weight_new);
 			sorted_weight_new.cp_to_host();							// make host-copy
-			sorted_weight_new.d_do_free = false;
+			HANDLE_ERROR(cudaStreamSynchronize(0));
 
-			thrust::sort(sorted_weight_new.h_ptr, sorted_weight_new.h_ptr + sorted_weight_new.size );
 			CUDA_CPU_TOC("sort");
 			for (long int i=sorted_weight_new.size-1; i>=0; i--)
 			{
@@ -842,6 +838,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else
 		{
+			MultidimArray<XFLOAT> sorted_weight;
+			long int my_nr_significant_coarse_samples = 0;
+			long int np = 0;
+
 			// Get the relevant row for this particle
 			CUDA_CPU_TIC("getRow");
 			op.Mweight.getRow(ipart, sorted_weight);
@@ -861,15 +861,17 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			sorted_weight.resize(np);
 			CUDA_CPU_TOC("nonZero");
 
-			// Sort from low to high values
-			CUDA_CPU_TIC("sort");
-//			std::cerr << "sort on " << sorted_weight.xdim << " which should have np = " << np << std::endl;
-#if  defined(USE_THRUST) && !defined(CUDA_DOUBLE_PRECISION) // Thrust seems incredibly slow in debug build this is clearly a FIXME
-			thrust::sort(sorted_weight.data, sorted_weight.data + np );
-#else
-			sorted_weight.sort();
-#endif
-			CUDA_CPU_TOC("sort");
+			//Do the sorting
+			CudaGlobalPtr<XFLOAT> sorted_weight_ptr(sorted_weight.data, np, cudaMLO->allocator);
+			CudaGlobalPtr<XFLOAT> sorted_weight_ptr_sorted(sorted_weight.data, np, cudaMLO->allocator);
+
+			sorted_weight_ptr.put_on_device();
+			sorted_weight_ptr_sorted.device_alloc();
+
+			sortOnDevice(sorted_weight_ptr, sorted_weight_ptr_sorted);
+
+			sorted_weight_ptr_sorted.cp_to_host();
+			HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			for (long int i = XSIZE(sorted_weight) - 1; i >= 0; i--)
 			{
@@ -880,35 +882,30 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (frac_weight > baseMLO->adaptive_fraction * op.sum_weight[ipart])
 					break;
 			}
-		}
 
-
-
-		if (exp_ipass==0 && my_nr_significant_coarse_samples == 0)
-		{
-			std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-			std::cerr << " frac-weight= " << frac_weight << std::endl;
-			std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
-			Image<XFLOAT> It;
-			std::cerr << " XSIZE(op.Mweight)= " << XSIZE(op.Mweight) << std::endl;
-			It()=op.Mweight;
-			It() *= 10000;
-			It.write("Mweight2.spi");
-			std::cerr << "written Mweight2.spi" << std::endl;
-			std::cerr << " np= " << np << std::endl;
-			It()=sorted_weight;
-			It() *= 10000;
-			std::cerr << " XSIZE(sorted_weight)= " << XSIZE(sorted_weight) << std::endl;
-			if (XSIZE(sorted_weight) > 0)
+			if (my_nr_significant_coarse_samples == 0)
 			{
-				It.write("sorted_weight.spi");
-				std::cerr << "written sorted_weight.spi" << std::endl;
+				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+				std::cerr << " frac-weight= " << frac_weight << std::endl;
+				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+				Image<XFLOAT> It;
+				std::cerr << " XSIZE(op.Mweight)= " << XSIZE(op.Mweight) << std::endl;
+				It()=op.Mweight;
+				It() *= 10000;
+				It.write("Mweight2.spi");
+				std::cerr << "written Mweight2.spi" << std::endl;
+				std::cerr << " np= " << np << std::endl;
+				It()=sorted_weight;
+				It() *= 10000;
+				std::cerr << " XSIZE(sorted_weight)= " << XSIZE(sorted_weight) << std::endl;
+				if (XSIZE(sorted_weight) > 0)
+				{
+					It.write("sorted_weight.spi");
+					std::cerr << "written sorted_weight.spi" << std::endl;
+				}
+				REPORT_ERROR("my_nr_significant_coarse_samples == 0");
 			}
-			REPORT_ERROR("my_nr_significant_coarse_samples == 0");
-		}
 
-		if (exp_ipass==0)
-		{
 			// Store nr_significant_coarse_samples for this particle
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (double)my_nr_significant_coarse_samples;
 
@@ -921,6 +918,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
 			}
 		}
+
+		op.significant_weight.clear();
+		op.significant_weight.resize(sp.nr_particles, 0.);
 		op.significant_weight[ipart] = my_significant_weight;
 		//std::cerr << "@sort op.significant_weight[ipart]= " << (XFLOAT)op.significant_weight[ipart] << std::endl;
 
@@ -1312,7 +1312,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					if (ires > -1)
 					{
 						thr_wsum_sigma2_noise[group_id].data[ires] += (double) wdiff2s_parts[j];
-						exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j]; //TODO could be thrust-reduced
+						exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j]; //TODO could be gpu-reduced
 					}
 				}
 				wdiff2s_parts.free_host();

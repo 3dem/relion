@@ -16,9 +16,6 @@
 #include <fstream>
 #include <cuda_runtime.h>
 #include "src/parallel.h"
-#include <thrust/sort.h>
-#include <thrust/device_ptr.h>
-#include <thrust/extrema.h>
 #include <signal.h>
 
 /*
@@ -143,20 +140,6 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask) /
 	dataMask.jobExtent.put_on_device();
 
 	return (jobid+1);
-}
-
-/*
- * Return the minimum value of a device-allocated CudaGlobalPtr-array
- */
-
-XFLOAT thrustGetMinVal(XFLOAT *diff2s, unsigned size)
-{
-	thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(diff2s);
-	thrust::device_ptr<XFLOAT> pos = thrust::min_element(dp, dp + size);
-	unsigned int pos_index = thrust::distance(dp, pos);
-	XFLOAT min_val;
-	HANDLE_ERROR(cudaMemcpy(&min_val, &diff2s[pos_index], sizeof(XFLOAT), cudaMemcpyDeviceToHost));
-	return(min_val);
 }
 
 /*
