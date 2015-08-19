@@ -1589,19 +1589,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                     SET METADATA
 		======================================================*/
 
-		//Get index of max element using GPU-tool thrust
+		cub::KeyValuePair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
+
 		Indices max_index;
-		thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~FinePassWeights[ipart].weights);
-		thrust::device_ptr<XFLOAT> pos = thrust::max_element(dp, dp + FinePassWeights[ipart].weights.size);
-		unsigned int pos_idx = thrust::distance(dp, pos);
-
-		XFLOAT max_val;
-		HANDLE_ERROR(cudaMemcpyAsync(&max_val, &FinePassWeights[ipart].weights.d_ptr[pos_idx], sizeof(XFLOAT), cudaMemcpyDeviceToHost, 0));
-
-		if(max_val>op.max_weight[ipart])
+		if(max_pair.value > op.max_weight[ipart])
 		{
-			op.max_weight[ipart] = max_val;
-			max_index.fineIdx =FinePassWeights[ipart].ihidden_overs[pos_idx];
+			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.key];
+			op.max_weight[ipart] = max_pair.value;
+
 			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
 			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
 			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
