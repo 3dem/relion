@@ -472,7 +472,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CUDA_CPU_TIC("Diff2CALL");
 
 				CUDA_GPU_TIC("IndexedArrayMemCp");
-				thisClassFinePassWeights.weights.cp_to_device();
 				thisClassFinePassWeights.rot_id.cp_to_device(); //FIXME this is not used
 				thisClassFinePassWeights.rot_idx.cp_to_device();
 				thisClassFinePassWeights.trans_idx.cp_to_device();
@@ -554,6 +553,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
+
+	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[0]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
+	if(exp_ipass==0) // send all the weights in one go, rather than mess about with sending each weight on it's own -- we'll make a new device pointer for each class instead, which is (almost) free
+	{
+		allMweight.device_alloc();
+		allMweight.cp_to_device();
+	}
+
+	CudaGlobalPtr<XFLOAT>  pdf_orientation(sp.nr_dir * sp.nr_psi, cudaMLO->allocator);
+	CudaGlobalPtr<XFLOAT>  pdf_offset(sp.nr_trans, cudaMLO->allocator);
+	pdf_orientation.device_alloc();
+	pdf_offset.device_alloc();
+
 	// loop over all particles inside this ori_particle
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
@@ -604,7 +616,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sumRedSize+= (exp_ipass==0) ? sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE);
 
 			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
-			thisparticle_sumweight.host_alloc();
+//			thisparticle_sumweight.host_alloc();
 			thisparticle_sumweight.device_alloc();
 
 			long int sumweight_pos=0;
@@ -616,8 +628,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				/*=========================================
 						Fetch+generate Orientation data
 				===========================================*/
-				CudaGlobalPtr<XFLOAT>  pdf_orientation(sp.nr_dir * sp.nr_psi, cudaMLO->allocator);
-				pdf_orientation.size = sp.nr_dir * sp.nr_psi;
 				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 				{
 					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
@@ -648,7 +658,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				/*=========================================
 						Fetch+generate Translation data
 				===========================================*/
-				CudaGlobalPtr<XFLOAT>  pdf_offset(sp.nr_trans, cudaMLO->allocator);
 				double myprior_x, myprior_y, myprior_z;
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
@@ -715,9 +724,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CUDA_CPU_TIC("sumweight1");
 				CUDA_GPU_TIC("sumweightMemCp1");
 
-				//std::cerr << "summing weights on GPU... " << std::endl;
-				pdf_orientation.put_on_device();
-				pdf_offset.put_on_device();
+				pdf_orientation.cp_to_device();
+				pdf_offset.cp_to_device();
 
 				CUDA_GPU_TAC("sumweightMemCp1");
 				CUDA_GPU_TOC();
@@ -726,10 +734,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
-					CudaGlobalPtr<XFLOAT>  Mweight( &(op.Mweight.data[(ipart)*(op.Mweight).xdim+
-					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans]),
-													  sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
-					Mweight.put_on_device();
+					CudaGlobalPtr<XFLOAT>  Mweight( &allMweight.h_ptr[(ipart)*(op.Mweight).xdim+
+					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+													&allMweight.d_ptr[(ipart)*(op.Mweight).xdim+
+												      exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
+
 					block_num = sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE;
 
 					dim3 block_dim(block_num);
@@ -744,10 +754,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    sp.nr_trans,
 																			    sumweight_pos);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
-					CUDA_GPU_TIC("sumweightMemCp2");
-					Mweight.cp_to_host();  //FIXME remove when mapping is eliminated
-					HANDLE_ERROR(cudaStreamSynchronize(0));
-					CUDA_GPU_TAC("sumweightMemCp2");
 					sumweight_pos+=block_num;
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -758,7 +764,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
-					thisClassPassWeights.weights.cp_to_host();
+//					thisClassPassWeights.weights.cp_to_host();
 					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
 																			    ~pdf_offset,
@@ -774,21 +780,21 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			 	FPCMasks[ipart][exp_iclass].jobNum,
 																			 	sumweight_pos);
 					CUDA_GPU_TAC("cuda_kernel_sumweight");
-
-					CUDA_GPU_TIC("sumweightMemCp2");
-					thisparticle_sumweight.cp_to_host();
-					thisClassPassWeights.weights.cp_to_host();  //FIXME remove when mapping is eliminated - NOTE ALOT OF MWEIGHT-DEPS  BELOW
-					HANDLE_ERROR(cudaStreamSynchronize(0));
-					CUDA_GPU_TAC("sumweightMemCp2");
+//					thisparticle_sumweight.cp_to_host();
 					sumweight_pos+=block_num;
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
+
+			if(exp_ipass==0)
+				allMweight.cp_to_host();
+			else
+				PassWeights[ipart].weights.cp_to_host();
 			thrust::device_ptr<XFLOAT> dp = thrust::device_pointer_cast(~thisparticle_sumweight);
 			exp_thisparticle_sumweight += thrust::reduce(dp, dp + sumweight_pos);
+
 		} // end if iter==1
 
-		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
 		//std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
