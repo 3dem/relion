@@ -9,7 +9,8 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 									     	  XFLOAT min_diff2,
 									     	  int oversamples_orient,
 									     	  int oversamples_trans,
-									     	  int coarse_trans)
+									     	  int coarse_trans,
+									     	  long int sumweight_pos)
 {
 	__shared__ XFLOAT s_sumweight[SUM_BLOCK_SIZE];
 	// blockid
@@ -73,7 +74,7 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 		}
 	}
 	__syncthreads();
-	g_thisparticle_sumweight[bid]=s_sumweight[0];
+	g_thisparticle_sumweight[bid+sumweight_pos]=s_sumweight[0];
 }
 
 
@@ -92,7 +93,8 @@ __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 									     	  unsigned long *d_trans_idx,
 									     	  unsigned long *d_job_idx,
 									     	  unsigned long *d_job_num,
-									     	  long int job_num)
+									     	  long int job_num,
+									     	  long int sumweight_pos)
 {
 	__shared__ XFLOAT s_sumweight[SUM_BLOCK_SIZE];
 	__shared__ XFLOAT s_weights[SUM_BLOCK_SIZE];
@@ -160,7 +162,7 @@ __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 			s_sumweight[tid] += s_sumweight[tid+j];
 	}
 	__syncthreads();
-	g_thisparticle_sumweight[bid]=s_sumweight[0];
+	g_thisparticle_sumweight[bid+sumweight_pos]=s_sumweight[0];
 }
 
 __global__ void cuda_kernel_collect2(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
