@@ -62,7 +62,12 @@ void getAllSquaredDifferencesCoarse(
 	CUDA_CPU_TOC("diff_pre_gpu");
 
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
+	CudaGlobalPtr<XFLOAT> allWeights(cudaMLO->allocator);
+	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		allWeights.size+=projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles;
+	allWeights.device_alloc();
 
+	long int allWeights_pos=0;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -175,8 +180,12 @@ void getAllSquaredDifferencesCoarse(
 
 			if ( projectorPlan.orientation_num > 0 )
 			{
-				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num, cudaMLO->allocator);
-				diff2s.device_alloc();
+				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num,cudaMLO->allocator);
+//				diff2s.h_ptr = &allWeights.h_ptr[allWeights_pos];
+				diff2s.d_ptr = &allWeights.d_ptr[allWeights_pos];
+				diff2s.h_do_free=false;
+				diff2s.d_do_free=false;
+
 
 				/*====================================
 				    	   Kernel Call
@@ -207,10 +216,8 @@ void getAllSquaredDifferencesCoarse(
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
-
+				allWeights_pos+=projectorPlan.orientation_num*translation_num;
 				HANDLE_ERROR(cudaStreamSynchronize(0));
-
-				op.min_diff2[ipart] = std::min((XFLOAT)op.min_diff2[ipart], (XFLOAT)thrustGetMinVal(~diff2s, diff2s.size)); // class
 
 				CUDA_GPU_TIC("diff2sMemCpCoarse");
 				diff2s.cp_to_host();
@@ -227,6 +234,7 @@ void getAllSquaredDifferencesCoarse(
 				}
 			} // end if class significant
 		} // end loop iclass
+		op.min_diff2[ipart] = thrustGetMinVal(~allWeights, allWeights.size); // class
 	} // end loop ipart
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
