@@ -219,7 +219,7 @@ void getAllSquaredDifferencesCoarse(
 			} // end if class significant
 		} // end loop iclass
 		allWeights.cp_to_host();
-		HANDLE_ERROR(cudaStreamSynchronize(0));
+		op.min_diff2[ipart] = getMinOnDevice(allWeights); //  (include steamsynchronize)
 		allWeights_pos=0;
 		CUDA_CPU_TIC("diff_coarse_map");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -231,12 +231,11 @@ void getAllSquaredDifferencesCoarse(
 				{
 					unsigned iorientclass = projectorPlan.iorientclasses[i];
 					for (unsigned j = 0; j < translation_num; j ++)
-						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = diff2s[i * translation_num + j];
+						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = allWeights[i * translation_num + j];
 				}
 				allWeights_pos+=projectorPlan.orientation_num*translation_num;
 			}
 		}
-		op.min_diff2[ipart] = thrustGetMinVal(~allWeights, allWeights.size); // class
 		CUDA_CPU_TOC("diff_coarse_map");
 	} // end loop ipart
 #ifdef TIMING
