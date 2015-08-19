@@ -66,7 +66,7 @@ void getAllSquaredDifferencesCoarse(
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		allWeights.size+=projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles;
 	allWeights.device_alloc();
-
+	allWeights.host_alloc();
 	long int allWeights_pos=0;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
@@ -217,24 +217,36 @@ void getAllSquaredDifferencesCoarse(
 				    	   Retrieve Results
 				======================================*/
 				allWeights_pos+=projectorPlan.orientation_num*translation_num;
-				HANDLE_ERROR(cudaStreamSynchronize(0));
-
-				CUDA_GPU_TIC("diff2sMemCpCoarse");
-				diff2s.cp_to_host();
-				CUDA_GPU_TAC("diff2sMemCpCoarse");
-
-				HANDLE_ERROR(cudaStreamSynchronize(0));
+//				HANDLE_ERROR(cudaStreamSynchronize(0));
+//
+////				CUDA_GPU_TIC("diff2sMemCpCoarse");
+////				diff2s.cp_to_host();
+////				CUDA_GPU_TAC("diff2sMemCpCoarse");
+//
+//				HANDLE_ERROR(cudaStreamSynchronize(0));
 				CUDA_GPU_TOC();
 
+			} // end if class significant
+		} // end loop iclass
+		allWeights.cp_to_host();
+		allWeights_pos=0;
+		CUDA_CPU_TIC("diff_coarse_map");
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		{
+			CudaProjectorPlan projectorPlan = projectorPlans[exp_iclass];
+			if ( projectorPlan.orientation_num > 0 )
+			{
 				for (unsigned i = 0; i < projectorPlan.orientation_num; i ++)
 				{
 					unsigned iorientclass = projectorPlan.iorientclasses[i];
 					for (unsigned j = 0; j < translation_num; j ++)
-						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = diff2s[i * translation_num + j];
+						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = allWeights[i * translation_num + j + allWeights_pos];
 				}
-			} // end if class significant
-		} // end loop iclass
+				allWeights_pos+=projectorPlan.orientation_num*translation_num;
+			}
+		}
 		op.min_diff2[ipart] = thrustGetMinVal(~allWeights, allWeights.size); // class
+		CUDA_CPU_TOC("diff_coarse_map");
 	} // end loop ipart
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1215,7 +1227,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				/*======================================================
 				                     MAP WEIGHTS
 				======================================================*/
-
+				CUDA_CPU_TIC("pre_wavg_map");
 				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, 0, cudaMLO->allocator);
 
 				mapWeights(
@@ -1239,7 +1251,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						sp.nr_trans);
 
 				sorted_weights.put_on_device();
-
+				CUDA_CPU_TOC("pre_wavg_map");
 				/*======================================================
 				                     KERNEL CALL
 				======================================================*/
@@ -1371,6 +1383,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				}
 				else
 				{
+					CUDA_CPU_TIC("cpu_backproject");
 					dataBundle->reals.cp_to_host();
 					dataBundle->imags.cp_to_host();
 					dataBundle->weights.cp_to_host();
@@ -1400,6 +1413,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					pthread_mutex_unlock(&global_mutex2[my_mutex]);
 
 					delete dataBundle;
+					CUDA_CPU_TOC("cpu_backproject");
 				}
 
 				CUDA_CPU_TOC("backproject");
