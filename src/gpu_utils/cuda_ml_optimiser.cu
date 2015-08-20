@@ -233,7 +233,7 @@ void getAllSquaredDifferencesCoarse(
 				{
 					unsigned iorientclass = projectorPlan.iorientclasses[i];
 					for (unsigned j = 0; j < translation_num; j ++)
-						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = allWeights[i * translation_num + j];
+						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = allWeights[i * translation_num + j + allWeights_pos];
 				}
 				allWeights_pos+=projectorPlan.orientation_num*translation_num;
 			}
@@ -561,7 +561,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
-
 	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[0]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
 	if(exp_ipass==0) // send all the weights in one go, rather than mess about with sending each weight on it's own -- we'll make a new device pointer for each class instead, which is (almost) free
 	{
@@ -569,10 +568,25 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		allMweight.cp_to_device();
 	}
 
-	CudaGlobalPtr<XFLOAT>  pdf_orientation(sp.nr_dir * sp.nr_psi, cudaMLO->allocator);
-	CudaGlobalPtr<XFLOAT>  pdf_offset(sp.nr_trans, cudaMLO->allocator);
+	// Ready the "prior-containers" for all classes (remake every ipart)
+	CudaGlobalPtr<XFLOAT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, cudaMLO->allocator);
+	CudaGlobalPtr<XFLOAT>  pdf_offset((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans, cudaMLO->allocator);
 	pdf_orientation.device_alloc();
 	pdf_offset.device_alloc();
+
+	// pdf_orientation is ipart-independent, so we keep it above ipart scope
+	CUDA_CPU_TIC("get_orient_priors");
+	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (long int idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
+			for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
+				if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
+					pdf_orientation[iorientclass] = baseMLO->mymodel.pdf_class[exp_iclass];
+				else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+					pdf_orientation[iorientclass] = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
+				else
+					pdf_orientation[iorientclass] = op.directions_prior[idir] * op.psi_prior[ipsi];
+	pdf_orientation.cp_to_device();
+	CUDA_CPU_TOC("get_orient_priors");
 
 	// loop over all particles inside this ori_particle
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
@@ -588,7 +602,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
-			std::cerr << "the gpu inplementation cannot handle the new dense arrays but instead needs the old Mweight. Go maketh if thous needeth it." << std::endl;
+			std::cerr << "the gpu inplementation cannot handle the new dense arrays but instead needs the old Mweight. Go maketh if thou needeth it." << std::endl;
 			exit(1);
 			// Binarize the squared differences array to skip marginalisation
 			double mymindiff2 = 99.e10;
@@ -625,43 +639,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
 			thisparticle_sumweight.device_alloc();
-
 			long int sumweight_pos=0;
 
-			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
+			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
+			CUDA_CPU_TIC("get_offset_priors");
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
-				// TODO Move to RANK LEVEL
-				/*=========================================
-						Fetch+generate Orientation data
-				===========================================*/
-				for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
-				{
-					for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
-					{
-						//std::cerr << "orient "  << idir << "," << iorient <<  std::endl;
-						// Get prior for this direction
-						if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
-						{
-							pdf_orientation[iorient] = baseMLO->mymodel.pdf_class[exp_iclass];
-						}
-						else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-						{
-							pdf_orientation[iorient] = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
-						}
-						else
-						{
-							// P(orientation) = P(idir|dir_prior) * P(ipsi|psi_prior)
-							// This is the probability of the orientation, given the gathered
-							// statistics of all assigned orientations of the dataset, since we
-							// are assigning a gaussian prior to all parameters.
-							pdf_orientation[iorient] = op.directions_prior[idir] * op.psi_prior[ipsi];
-						}
-					}
-				}
-
-				// TODO Move to EXPECTATION-LEVEL ( potentially depenends on priors from getFourierTransformsAndCtfs() )
-				// TODO Also hide under GetAllSq... at later stage (if neccessary)
 				/*=========================================
 						Fetch+generate Translation data
 				===========================================*/
@@ -681,9 +664,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
-					//std::cerr << "trans " << itrans << "," << jtrans <<  std::endl;
-			        // To speed things up, only calculate pdf_offset at the coarse sampling.
-					// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
 					double offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
 					double offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
 					double tdiff2 = (offset_x - myprior_x) * (offset_x - myprior_x) + (offset_y - myprior_y) * (offset_y - myprior_y);
@@ -695,48 +675,17 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
 					if (baseMLO->mymodel.sigma2_offset < 0.0001)
-						pdf_offset[itrans] = ( tdiff2 > 0.) ? 0. : 1.;
+						pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = ( tdiff2 > 0.) ? 0. : 1.;
 					else
-						pdf_offset[itrans] = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
+						pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
 				}
+			}
+			pdf_offset.cp_to_device();
+			CUDA_CPU_TOC("get_offset_priors");
 
-// TODO : Put back when  convertAllSquaredDifferencesToWeights is GPU-parallel.
-//				// TMP DEBUGGING
-//				if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && (pdf_offset==0. || pdf_orientation==0.))
-//				{
-//					pthread_mutex_lock(&global_mutex);
-//					std::cerr << " pdf_offset= " << pdf_offset << " pdf_orientation= " << pdf_orientation << std::endl;
-//					std::cerr << " ipart= " << ipart << " part_id= " << part_id << std::endl;
-//					std::cerr << " iorient= " << iorient << " idir= " << idir << " ipsi= " << ipsi << std::endl;
-//					//std::cerr << " sp.nr_psi= " << sp.nr_psi << " exp_nr_dir= " << exp_nr_dir << " sp.nr_trans= " << sp.nr_trans << std::endl;
-//					for (long int i = 0; i < op.directions_prior.size(); i++)
-//						std::cerr << " op.directions_prior["<<i<<"]= " << op.directions_prior[i] << std::endl;
-//					for (long int i = 0; i < op.psi_prior.size(); i++)
-//						std::cerr << " op.psi_prior["<<i<<"]= " << op.psi_prior[i] << std::endl;
-//					REPORT_ERROR("ERROR! pdf_offset==0.|| pdf_orientation==0.");
-//					//pthread_mutex_unlock(&global_mutex);
-//				}
-//				if (sp.nr_oversampled_rot == 0)
-//					REPORT_ERROR("sp.nr_oversampled_rot == 0");
-//				if (sp.nr_oversampled_trans == 0)
-//					REPORT_ERROR("sp.nr_oversampled_trans == 0");
-
-				// Now first loop over iover_rot, because that is the order in op.Mweight as well
-//				long int ihidden_over = ihidden * sp.nr_oversampled_rot * sp.nr_oversampled_trans;
-
-				/*================================================
-					 Sumweights - exponentiation and reduction
-				==================================================*/
-
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			{
 				CUDA_CPU_TIC("sumweight1");
-				CUDA_GPU_TIC("sumweightMemCp1");
-
-				pdf_orientation.cp_to_device();
-				pdf_offset.cp_to_device();
-
-				CUDA_GPU_TAC("sumweightMemCp1");
-				CUDA_GPU_TOC();
-
 				long int block_num;
 
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
@@ -746,13 +695,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 													&allMweight.d_ptr[(ipart)*(op.Mweight).xdim+
 												      exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
+					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
+					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
 
-					block_num = sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE;
-
+					block_num = sp.nr_dir*sp.nr_psi/SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightCoarse<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
-																			    ~pdf_offset,
+					cuda_kernel_sumweightCoarse<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
+																			    ~pdf_offset_class,
 																			    ~Mweight,
 																			    ~thisparticle_sumweight,
 																			    (XFLOAT)op.min_diff2[ipart],
@@ -768,12 +718,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					// Use the constructed mask to build a partial (class-specific) input
 					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
 					IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
+					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
+					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation,
-																			    ~pdf_offset,
+					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
+																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
 																			    ~thisparticle_sumweight,
 																			    (XFLOAT)op.min_diff2[ipart],
