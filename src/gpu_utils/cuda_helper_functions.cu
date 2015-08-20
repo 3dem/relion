@@ -591,11 +591,4 @@ void runDiff2KernelFine(
 			trans_idx,
 			job_idx,
 			job_num);
-
-	size_t avail;
-	size_t total;
-	cudaMemGetInfo( &avail, &total );
-	float used = 100*((float)(total - avail)/(float)total);
-	std::cerr << "Device memory used @ diff2: " << used << "%" << std::endl;
-	CUDA_GPU_TAC("kernel_diff_proj");
 }

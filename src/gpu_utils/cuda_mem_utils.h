@@ -143,7 +143,8 @@ public:
 			if (curL == NULL)
 			{
 				//Nope... OK I'm out
-				printf("ERROR: CudaCustomAllocator out of memory.");
+				printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace: %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace: %lu B]\n",
+						(unsigned long) size, (unsigned long) getLargestContinuousFreeSpace(), (unsigned long) getTotalFreeSpace());
 				fflush(stdout);
 				raise(SIGSEGV);
 			}
@@ -237,28 +238,64 @@ public:
 //		printState();
 	};
 
-	size_t getFreeSpace()
+	size_t getTotalFreeSpace()
 	{
+		size_t total = 0;
 		Alloc *cL = first;
-		while (cL->next != NULL) //Get last
+
+		while (cL != NULL) //Get last
+		{
+			if (cL->free)
+				total += cL->size;
 			cL = cL->next;
-		return cL->size;
+		}
+		return total;
+	}
+
+	size_t getTotalUsedSpace()
+	{
+		size_t total = 0;
+		Alloc *cL = first;
+
+		while (cL != NULL) //Get last
+		{
+			if (!cL->free)
+				total += cL->size;
+			cL = cL->next;
+		}
+		return total;
+	}
+
+	size_t getLargestContinuousFreeSpace()
+	{
+		size_t largest = 0;
+		Alloc *cL = first;
+
+		while (cL != NULL) //Get last
+		{
+			if (cL->free && cL->size > largest)
+				largest = cL->size;
+			cL = cL->next;
+		}
+		return largest;
 	}
 
 	void printState()
 	{
 		Alloc *curL = first;
+		size_t total = 0;
 
 		while (curL != NULL)
 		{
+			total += curL->size;
 			if (curL->free)
-				printf("[%lu,%lu] ", (unsigned long) curL->size, (unsigned long) curL->ptr);
+				printf("[%luB] ", (unsigned long) curL->size);
 			else
-				printf("(%lu,%lu) ", (unsigned long) curL->size, (unsigned long) curL->ptr);
+				printf("(%luB) ", (unsigned long) curL->size);
 
 			curL = curL->next;
 		}
-		printf("\n");
+		printf("= (%luB)\n", (unsigned long) total);
 		fflush(stdout);
 	}
 
@@ -389,6 +426,7 @@ public:
 
 	CudaCustomAllocator *getAllocator() {return allocator; };
 	cudaStream_t &getStream() {return stream; };
+	void setStream(cudaStream_t s) { stream = s; };
 
 	/**
 	 * Allocate memory on device

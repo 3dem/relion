@@ -225,12 +225,14 @@ public:
 	void handleOutOfMemory()
 	{
 #ifdef DEBUG_CUDA
-		int spaceDiff = allocator->getFreeSpace();
+		int spaceDiff = allocator->getTotalFreeSpace();
+		allocator->printState();
 #endif
 		clearBackprojectDataBundle();
 #ifdef DEBUG_CUDA
-		spaceDiff = ( (int) allocator->getFreeSpace() ) - spaceDiff;
-		printf("DEBUG_INFO: MlOptimiserCuda::handleOutOfMemory called and %dB was freed.\n", spaceDiff);
+		spaceDiff = ( (int) allocator->getTotalFreeSpace() ) - spaceDiff;
+		printf("DEBUG_INFO: MlOptimiserCuda::handleOutOfMemory called and %d B was freed.\n", spaceDiff);
+		allocator->printState();
 #endif
 	}
 
