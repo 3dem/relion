@@ -33,17 +33,17 @@ __device__ inline void cuda_atomic_add(float* address, float value)
 #endif
 
 template <typename T>
-inline static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
+static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 {
 	CudaGlobalPtr<cub::KeyValuePair<int, T> >  max_pair(1, ptr.getAllocator());
 	max_pair.device_alloc();
 	size_t temp_storage_size = 0;
 
-	cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size);
+	HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size);
+	HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size));
 
 	max_pair.cp_to_host();
 	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
@@ -54,17 +54,17 @@ inline static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 }
 
 template <typename T>
-inline static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
+static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
 {
 	CudaGlobalPtr<T >  min_val(1, ptr.getAllocator());
 	min_val.device_alloc();
 	size_t temp_storage_size = 0;
 
-	cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size);
+	HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size);
+	HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size));
 
 	min_val.cp_to_host();
 	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
@@ -75,17 +75,17 @@ inline static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
 }
 
 template <typename T>
-inline static T getSumOnDevice(CudaGlobalPtr<T> &ptr)
+static T getSumOnDevice(CudaGlobalPtr<T> &ptr)
 {
 	CudaGlobalPtr<T >  val(1, ptr.getAllocator());
 	val.device_alloc();
 	size_t temp_storage_size = 0;
 
-	cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size);
+	HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size);
+	HANDLE_ERROR(cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size));
 
 	val.cp_to_host();
 	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
@@ -96,15 +96,15 @@ inline static T getSumOnDevice(CudaGlobalPtr<T> &ptr)
 }
 
 template <typename T>
-inline static void sortOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out)
+static void sortOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out)
 {
 	size_t temp_storage_size = 0;
 
-	cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size);
+	HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size));
 
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
-	cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size);
+	HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size));
 
 	in.getAllocator()->free(alloc);
 }
