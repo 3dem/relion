@@ -123,6 +123,8 @@ public:
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		Alloc *nAlloc = new Alloc();
+		nAlloc->size = size;
+		nAlloc->free = false;
 		HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
 		return nAlloc;
 #else
@@ -202,6 +204,7 @@ public:
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		HANDLE_ERROR(cudaFree( curL->ptr ));
+		curL->free = true;
 #else
 		curL->free = true;
 

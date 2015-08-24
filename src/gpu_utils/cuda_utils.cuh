@@ -35,6 +35,14 @@ __device__ inline void cuda_atomic_add(float* address, float value)
 template <typename T>
 static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 {
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_WARNING: getArgMaxOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_WARNING: getArgMaxOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_WARNING: getArgMaxOnDevice called with null allocator.\n");
+#endif
 	CudaGlobalPtr<cub::KeyValuePair<int, T> >  max_pair(1, ptr.getAllocator());
 	max_pair.device_alloc();
 	size_t temp_storage_size = 0;
@@ -56,6 +64,14 @@ static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 template <typename T>
 static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
 {
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_ERROR: getMinOnDevice called with null allocator.\n");
+#endif
 	CudaGlobalPtr<T >  min_val(1, ptr.getAllocator());
 	min_val.device_alloc();
 	size_t temp_storage_size = 0;
@@ -77,6 +93,14 @@ static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
 template <typename T>
 static T getSumOnDevice(CudaGlobalPtr<T> &ptr)
 {
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_ERROR: getSumOnDevice called with null allocator.\n");
+#endif
 	CudaGlobalPtr<T >  val(1, ptr.getAllocator());
 	val.device_alloc();
 	size_t temp_storage_size = 0;
@@ -98,6 +122,14 @@ static T getSumOnDevice(CudaGlobalPtr<T> &ptr)
 template <typename T>
 static void sortOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out)
 {
+#ifdef DEBUG_CUDA
+if (in.size == 0 || out.size == 0)
+	printf("DEBUG_ERROR: sortOnDevice called with pointer of zero size.\n");
+if (in.d_ptr == NULL || out.d_ptr == NULL)
+	printf("DEBUG_ERROR: sortOnDevice called with null device pointer.\n");
+if (in.getAllocator() == NULL)
+	printf("DEBUG_ERROR: sortOnDevice called with null allocator.\n");
+#endif
 	size_t temp_storage_size = 0;
 
 	HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size));
