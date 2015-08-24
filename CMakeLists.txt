@@ -49,6 +49,12 @@ if(CudaDouble)
     message(STATUS "Building cuda files with double precision.")
 endif(CudaDouble)
 
+option(CustomAlloc "CustomAlloc" ON)
+if(NOT CustomAlloc)
+    add_definitions(-DCUDA_NO_CUSTOM_ALLOCATION)
+    message(STATUS "Custom allocator is disabled.")
+endif(NOT CustomAlloc)
+
 option(CUFFT "CUFFT" OFF)
 if(CUFFT)
     if (NOT CUDA_FOUND)

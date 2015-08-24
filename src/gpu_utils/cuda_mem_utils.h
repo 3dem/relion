@@ -103,8 +103,9 @@ private:
 public:
 
 	CudaCustomAllocator(size_t size):
-		totalSize(size),outOfMemoryHandler(NULL)
+		totalSize(size),outOfMemoryHandler(NULL), first(0)
 	{
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		first = new Alloc();
 
 		first->prev = NULL;
@@ -113,12 +114,18 @@ public:
 		first->free = true;
 
 		HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), size));
+#endif
 	}
 
 
 	inline
 	Alloc* alloc(size_t size)
 	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		Alloc *nAlloc = new Alloc();
+		HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
+		return nAlloc;
+#else
 		Alloc *curL = first;
 
 		//Look for the first suited link
@@ -186,12 +193,16 @@ public:
 
 			return newL;
 		}
+#endif
 	};
 
 
 	inline
 	void free(Alloc* curL)
 	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		HANDLE_ERROR(cudaFree( curL->ptr ));
+#else
 		curL->free = true;
 
 		//Previous neighbor is free, concatenate
@@ -236,10 +247,16 @@ public:
 
 //		printf("FREE: ");
 //		printState();
+#endif
 	};
 
 	size_t getTotalFreeSpace()
 	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		size_t free, total;
+		HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+		return free;
+#else
 		size_t total = 0;
 		Alloc *cL = first;
 
@@ -250,10 +267,16 @@ public:
 			cL = cL->next;
 		}
 		return total;
+#endif
 	}
 
 	size_t getTotalUsedSpace()
 	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		size_t free, total;
+		HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+		return total - free;
+#else
 		size_t total = 0;
 		Alloc *cL = first;
 
@@ -264,10 +287,14 @@ public:
 			cL = cL->next;
 		}
 		return total;
+#endif
 	}
 
 	size_t getLargestContinuousFreeSpace()
 	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		return getTotalFreeSpace();
+#else
 		size_t largest = 0;
 		Alloc *cL = first;
 
@@ -278,10 +305,14 @@ public:
 			cL = cL->next;
 		}
 		return largest;
+#endif
 	}
 
 	void printState()
 	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		printf("Custom allocation is disabled.\n");
+#else
 		Alloc *curL = first;
 		size_t total = 0;
 
@@ -296,6 +327,7 @@ public:
 			curL = curL->next;
 		}
 		printf("= (%luB)\n", (unsigned long) total);
+#endif
 		fflush(stdout);
 	}
 

@@ -1,6 +1,6 @@
 # Extra flags defined on each build type (this file is all optional to include)
 #
-set(CUDARCH "-arch=sm_52")
+set(CUDARCH "-arch=sm_35")
 
 
 

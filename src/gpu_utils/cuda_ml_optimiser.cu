@@ -1844,6 +1844,10 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 		}
 	}
 
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+	printf("Custom allocator is disabled.\n");
+	allocator = new CudaCustomAllocator(0);
+#else
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 	size_t allocationSize = (float)free * .9; //Lets leave some for other processes for now
@@ -1852,6 +1856,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 
 	allocator = new CudaCustomAllocator(allocationSize);
 	allocator->setOutOfMemoryHandler(this);
+#endif
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
