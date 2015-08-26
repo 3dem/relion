@@ -363,9 +363,9 @@ void CudaBackprojector::getMdlData(Complex *data, double * weights)
 		weights[n] = (double) w[n];
 	}
 
-	delete r;
-	delete i;
-	delete w;
+	delete [] r;
+	delete [] i;
+	delete [] w;
 }
 
 
