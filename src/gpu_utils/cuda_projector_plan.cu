@@ -1,5 +1,5 @@
 #include "src/gpu_utils/cuda_projector_plan.h"
-#include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_utils_stl.cuh"
 #include <cuda_runtime.h>
 
 void CudaProjectorPlan::setup(

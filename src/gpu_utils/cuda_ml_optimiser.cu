@@ -12,7 +12,7 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
-#include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_utils_stl.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cu"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
@@ -220,6 +220,7 @@ void getAllSquaredDifferencesCoarse(
 		} // end loop iclass
 
 		allWeights.cp_to_host();
+		HANDLE_ERROR(cudaStreamSynchronize(0));
 		op.min_diff2[ipart] = getMinOnDevice(allWeights); // Implicit cudaStreamSynchronize(0)
 		allWeights_pos=0;
 
@@ -530,7 +531,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		} // end loop iclass
 
 		FinePassWeights[ipart].setDataSize( newDataSize );
+		FinePassWeights[ipart].weights.cp_to_host();
 
+		HANDLE_ERROR(cudaStreamSynchronize(0));
 		CUDA_CPU_TIC("collect_data_1");
 		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)getMinOnDevice(FinePassWeights[ipart].weights));
 		CUDA_CPU_TOC("collect_data_1");
@@ -561,7 +564,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
-	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[0]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
+	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[sp.iclass_min*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
 	if(exp_ipass==0) // send all the weights in one go, rather than mess about with sending each weight on it's own -- we'll make a new device pointer for each class instead, which is (almost) free
 	{
 		allMweight.device_alloc();
@@ -691,16 +694,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
 					CudaGlobalPtr<XFLOAT>  Mweight( &allMweight.h_ptr[(ipart)*(op.Mweight).xdim+
-					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+					                                  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
 													&allMweight.d_ptr[(ipart)*(op.Mweight).xdim+
-												      exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+													  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
 					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
 					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
 
 					block_num = sp.nr_dir*sp.nr_psi/SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
-					CUDA_GPU_TIC("cuda_kernel_sumweight");
+//					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightCoarse<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~Mweight,
@@ -710,7 +713,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    sp.nr_oversampled_trans,
 																			    sp.nr_trans,
 																			    sumweight_pos);
-					CUDA_GPU_TAC("cuda_kernel_sumweight");
+//					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					sumweight_pos+=block_num;
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -723,7 +726,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
-					CUDA_GPU_TIC("cuda_kernel_sumweight");
+//					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
@@ -737,7 +740,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			 	~FPCMasks[ipart][exp_iclass].jobExtent,
 																			 	FPCMasks[ipart][exp_iclass].jobNum,
 																			 	sumweight_pos);
-					CUDA_GPU_TAC("cuda_kernel_sumweight");
+//					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					sumweight_pos+=block_num;
 				}
 				CUDA_CPU_TOC("sumweight1");
@@ -748,12 +751,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			else
 				PassWeights[ipart].weights.cp_to_host();
 			thisparticle_sumweight.size = sumweight_pos;
+			thisparticle_sumweight.cp_to_host();
+			HANDLE_ERROR(cudaStreamSynchronize(0));
+
 			exp_thisparticle_sumweight += getSumOnDevice(thisparticle_sumweight);
+			HANDLE_ERROR(cudaStreamSynchronize(0));
 		}
 
 		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
-		//std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
+//		std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
 		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
@@ -1172,15 +1179,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		======================================================*/
 
 		CUDA_CPU_TIC("getArgMaxOnDevice");
-		cub::KeyValuePair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
+		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
 		CUDA_CPU_TOC("getArgMaxOnDevice");
 
 		CUDA_CPU_TIC("setMetadata");
 		Indices max_index;
-		if(max_pair.value > op.max_weight[ipart])
+		if(max_pair.second > op.max_weight[ipart])
 		{
-			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.key];
-			op.max_weight[ipart] = max_pair.value;
+			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
+			op.max_weight[ipart] = max_pair.second;
 
 			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
 			//std::cerr << "max index = " << max_index.fineIdx << std::endl;

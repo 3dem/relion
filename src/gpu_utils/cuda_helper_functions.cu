@@ -1,5 +1,5 @@
 #include "src/gpu_utils/cuda_ml_optimiser.h"
-#include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_utils_stl.cuh"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"

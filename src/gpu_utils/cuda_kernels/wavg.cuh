@@ -5,7 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_utils_stl.cuh"
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_settings.h"
 
