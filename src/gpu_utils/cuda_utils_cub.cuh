@@ -1,5 +1,5 @@
-#ifndef CUDA_UTILS_CUH_
-#define CUDA_UTILS_CUH_
+#ifndef CUDA_UTILS_CUB_CUH_
+#define CUDA_UTILS_CUB_CUH_
 
 #include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_settings.h"
@@ -10,30 +10,8 @@
 #include "src/gpu_utils/cub/device/device_radix_sort.cuh"
 #include "src/gpu_utils/cub/device/device_reduce.cuh"
 
-#ifdef CUDA_DOUBLE_PRECISION
-#define XFLOAT double
-__device__ inline XFLOAT cuda_atomic_add(double* address, double val)
-{
-	unsigned long long int* address_as_ull = (unsigned long long int*)address;
-	unsigned long long int old = *address_as_ull, assumed;
-	do
-	{
-		assumed = old;
-		old = atomicCAS(address_as_ull, assumed, __double_as_longlong(val + __longlong_as_double(assumed)));
-	}
-	while (assumed != old); // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-	return __longlong_as_double(old);
-}
-#else
-#define XFLOAT float
-__device__ inline void cuda_atomic_add(float* address, float value)
-{
-  atomicAdd(address,value);
-}
-#endif
-
 template <typename T>
-static cub::KeyValuePair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
+static std::pair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
@@ -58,7 +36,11 @@ if (ptr.getAllocator() == NULL)
 
 	ptr.getAllocator()->free(alloc);
 
-	return max_pair[0];
+	std::pair<int, T> pair;
+	pair.first = max_pair[0].key;
+	pair.second = max_pair[0].value;
+
+	return pair;
 }
 
 template <typename T>

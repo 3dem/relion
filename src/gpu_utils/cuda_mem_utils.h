@@ -339,6 +339,7 @@ public:
 
 	~CudaCustomAllocator()
 	{
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		HANDLE_ERROR(cudaFree( first->ptr ));
 
 		Alloc *cL = first, *nL;
@@ -349,6 +350,7 @@ public:
 			delete cL;
 			cL = nL;
 		}
+#endif
 	}
 };
 

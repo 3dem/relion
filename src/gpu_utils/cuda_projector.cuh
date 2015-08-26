@@ -1,7 +1,6 @@
 #ifndef CUDA_PROJECTOR_CUH_
 #define CUDA_PROJECTOR_CUH_
 
-#include "src/gpu_utils/cuda_utils.cuh"
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include <cuda_runtime.h>

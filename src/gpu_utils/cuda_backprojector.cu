@@ -1,5 +1,4 @@
 #include "src/gpu_utils/cuda_backprojector.h"
-#include "src/gpu_utils/cuda_utils.cuh"
 #include <signal.h>
 
 

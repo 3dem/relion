@@ -12,7 +12,7 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
-#include "src/gpu_utils/cuda_utils.cuh"
+#include "src/gpu_utils/cuda_utils_thrust.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cu"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
@@ -20,6 +20,7 @@
 #include <cuda_runtime.h>
 #include "src/parallel.h"
 #include <signal.h>
+#include <map>
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -976,7 +977,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// wsum_sigma2_offset is just a double
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
-	unsigned proj_div_max_count(4096*2);
+//	unsigned proj_div_max_count(4096*2);
 
 	CUDA_CPU_TOC("store_init");
 
@@ -1172,15 +1173,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		======================================================*/
 
 		CUDA_CPU_TIC("getArgMaxOnDevice");
-		cub::KeyValuePair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
+		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
 		CUDA_CPU_TOC("getArgMaxOnDevice");
 
 		CUDA_CPU_TIC("setMetadata");
 		Indices max_index;
-		if(max_pair.value > op.max_weight[ipart])
+		if(max_pair.second > op.max_weight[ipart])
 		{
-			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.key];
-			op.max_weight[ipart] = max_pair.value;
+			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
+			op.max_weight[ipart] = max_pair.second;
 
 			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
 			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
@@ -1344,27 +1345,29 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			thisClassProjectionData.orientation_num[0] = ProjectionData[ipart].orientation_num[exp_iclass];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
-			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
+//			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
 			unsigned long idxArrPos_start(0),idxArrPos_end(0);
 
 			/// Now that reference projection has been made loop over all particles inside this ori_particle
-			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
+//			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 			{
 				CUDA_CPU_TIC("BP-ProjectionDivision");
-				unsigned long proj_div_start(proj_div_max_count * iproj_div), proj_div_end;
+				unsigned long proj_div_start(0), proj_div_end;
 
-				if (iproj_div < proj_div_nr - 1)
-					proj_div_end = proj_div_start + proj_div_max_count;
-				else
+//				if (iproj_div < proj_div_nr - 1)
+//					proj_div_end = proj_div_start + proj_div_max_count;
+//				else
 					proj_div_end = thisClassProjectionData.orientation_num[0];
 
 				long unsigned orientation_num(proj_div_end - proj_div_start);
 
 				// use "slice" constructor to slice out betwen start and stop in the specified region of thisClassProjectionData
 				ProjectionParams ProjectionData_projdiv(thisClassProjectionData,proj_div_start,proj_div_end);
-				idxArrPos_start=idxArrPos_end;
-				while((thisClassFinePassWeights.rot_idx[idxArrPos_end]-thisClassFinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < thisClassFinePassWeights.rot_idx.size))
-					idxArrPos_end++;
+//				idxArrPos_start=idxArrPos_end;
+//				while((thisClassFinePassWeights.rot_idx[idxArrPos_end]-thisClassFinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < thisClassFinePassWeights.rot_idx.size))
+//					idxArrPos_end++;
+
+				idxArrPos_end = thisClassFinePassWeights.weights.size;
 
 				CUDA_CPU_TOC("BP-ProjectionDivision");
 

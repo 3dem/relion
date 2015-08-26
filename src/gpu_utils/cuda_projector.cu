@@ -1,5 +1,4 @@
 #include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_utils.cuh"
 #include <signal.h>
 
 #ifndef CUDA_DOUBLE_PRECISION
