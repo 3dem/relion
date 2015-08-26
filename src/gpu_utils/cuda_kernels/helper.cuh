@@ -5,7 +5,8 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/gpu_utils/cuda_settings.h"
+
 
 __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,

@@ -221,7 +221,8 @@ void getAllSquaredDifferencesCoarse(
 		} // end loop iclass
 
 		allWeights.cp_to_host();
-		op.min_diff2[ipart] = getMinOnDevice(allWeights); // Implicit cudaStreamSynchronize(0)
+		HANDLE_ERROR(cudaStreamSynchronize(0));
+		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		allWeights_pos=0;
 
 		CUDA_CPU_TIC("diff_coarse_map");
@@ -562,7 +563,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
-	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[0]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
+	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[sp.iclass_min*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
 	if(exp_ipass==0) // send all the weights in one go, rather than mess about with sending each weight on it's own -- we'll make a new device pointer for each class instead, which is (almost) free
 	{
 		allMweight.device_alloc();
@@ -692,16 +693,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
 					CudaGlobalPtr<XFLOAT>  Mweight( &allMweight.h_ptr[(ipart)*(op.Mweight).xdim+
-					                                  exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+					                                  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
 													&allMweight.d_ptr[(ipart)*(op.Mweight).xdim+
-												      exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+													  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
 					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
 					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
 
 					block_num = sp.nr_dir*sp.nr_psi/SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
-					CUDA_GPU_TIC("cuda_kernel_sumweight");
+//					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightCoarse<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~Mweight,
@@ -711,7 +712,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    sp.nr_oversampled_trans,
 																			    sp.nr_trans,
 																			    sumweight_pos);
-					CUDA_GPU_TAC("cuda_kernel_sumweight");
+//					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					sumweight_pos+=block_num;
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -724,7 +725,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
-					CUDA_GPU_TIC("cuda_kernel_sumweight");
+//					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
@@ -738,7 +739,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			 	~FPCMasks[ipart][exp_iclass].jobExtent,
 																			 	FPCMasks[ipart][exp_iclass].jobNum,
 																			 	sumweight_pos);
-					CUDA_GPU_TAC("cuda_kernel_sumweight");
+//					CUDA_GPU_TAC("cuda_kernel_sumweight");
 					sumweight_pos+=block_num;
 				}
 				CUDA_CPU_TOC("sumweight1");
@@ -754,7 +755,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		//Store parameters for this particle
 		op.sum_weight[ipart] = exp_thisparticle_sumweight;
-		//std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
+//		std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
 		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
@@ -977,7 +978,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// wsum_sigma2_offset is just a double
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
-//	unsigned proj_div_max_count(4096*2);
+	unsigned proj_div_max_count(4096*2);
 
 	CUDA_CPU_TOC("store_init");
 
@@ -1345,29 +1346,27 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			thisClassProjectionData.orientation_num[0] = ProjectionData[ipart].orientation_num[exp_iclass];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
-//			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
+			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
 			unsigned long idxArrPos_start(0),idxArrPos_end(0);
 
 			/// Now that reference projection has been made loop over all particles inside this ori_particle
-//			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
+			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
 			{
 				CUDA_CPU_TIC("BP-ProjectionDivision");
-				unsigned long proj_div_start(0), proj_div_end;
+				unsigned long proj_div_start(proj_div_max_count * iproj_div), proj_div_end;
 
-//				if (iproj_div < proj_div_nr - 1)
-//					proj_div_end = proj_div_start + proj_div_max_count;
-//				else
+				if (iproj_div < proj_div_nr - 1)
+					proj_div_end = proj_div_start + proj_div_max_count;
+				else
 					proj_div_end = thisClassProjectionData.orientation_num[0];
 
 				long unsigned orientation_num(proj_div_end - proj_div_start);
 
 				// use "slice" constructor to slice out betwen start and stop in the specified region of thisClassProjectionData
 				ProjectionParams ProjectionData_projdiv(thisClassProjectionData,proj_div_start,proj_div_end);
-//				idxArrPos_start=idxArrPos_end;
-//				while((thisClassFinePassWeights.rot_idx[idxArrPos_end]-thisClassFinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < thisClassFinePassWeights.rot_idx.size))
-//					idxArrPos_end++;
-
-				idxArrPos_end = thisClassFinePassWeights.weights.size;
+				idxArrPos_start=idxArrPos_end;
+				while((thisClassFinePassWeights.rot_idx[idxArrPos_end]-thisClassFinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < thisClassFinePassWeights.rot_idx.size))
+					idxArrPos_end++;
 
 				CUDA_CPU_TOC("BP-ProjectionDivision");
 

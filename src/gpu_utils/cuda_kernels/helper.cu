@@ -1,6 +1,4 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
-#include <vector>
-#include <iostream>
 
 __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 									     	  XFLOAT *g_pdf_offset,
