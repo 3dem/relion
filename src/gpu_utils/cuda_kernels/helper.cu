@@ -339,3 +339,16 @@ __global__ void cuda_kernel_reduce_wdiff2s(XFLOAT *g_wdiff2s_parts,
 		}
 	}
 }
+
+__global__ void cuda_kernel_wdparts_to_wdsum(XFLOAT *g_wdiff2s_parts, XFLOAT *g_wdiff2s_sum, unsigned long image_size)
+{
+	unsigned long bid = blockIdx.y*gridDim.x + blockIdx.x;
+	unsigned tid = threadIdx.x;
+	unsigned pass_num(ceilf((float)image_size/(float)BLOCK_SIZE)),pixel;
+	for (unsigned pass = 0; pass < pass_num; pass++)
+	{
+		pixel = pass * BLOCK_SIZE + tid;
+		if(pixel<image_size)
+			g_wdiff2s_sum[bid*image_size+pixel] += g_wdiff2s_parts[bid*image_size+pixel];
+	}
+}

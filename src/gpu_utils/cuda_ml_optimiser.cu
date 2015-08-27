@@ -1332,7 +1332,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                      CLASS LOOP
 		======================================================*/
 
-
+		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->allocator);
+		wdiff2s_sum.device_alloc();
+		wdiff2s_sum.device_init(0.f);
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1484,10 +1486,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					reduction_block_num /= 2;
 
 				CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
-
+//				std::cerr << "reduction_block_num = "  << reduction_block_num <<  std::endl;
 				for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
 				{
-
+//					std::cerr << "k = "  << k <<  std::endl;
 					dim3 block_dim_wd = splitCudaBlocks(k,true);
 
 					// TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very inefficient amount of loads per store
@@ -1497,27 +1499,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 							image_size,
 							k);
 				}
-
+				cuda_kernel_wdparts_to_wdsum<<<1,BLOCK_SIZE,0,0>>>(~wdiff2s_parts, ~wdiff2s_sum, image_size);
 				CUDA_GPU_TAC("cuda_kernels_reduce_wdiff2s");
 
-				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
-				wdiff2s_parts.cp_to_host();
-				wdiff2s_parts.size = orientation_num * image_size;
+//				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
+//				wdiff2s_parts.cp_to_host();
+//				wdiff2s_parts.size = orientation_num * image_size;
 
-				HANDLE_ERROR(cudaStreamSynchronize(0));
+
 
 				CUDA_GPU_TOC();
-
-				for (long int j = 0; j < image_size; j++)
-				{
-					int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
-					if (ires > -1)
-					{
-						thr_wsum_sigma2_noise[group_id].data[ires] += (double) wdiff2s_parts[j];
-						exp_wsum_norm_correction[ipart] += (double) wdiff2s_parts[j]; //TODO could be gpu-reduced
-					}
-				}
-				wdiff2s_parts.free_host();
+//				wdiff2s_parts.free_host();
 
 				CUDA_CPU_TOC("reduce_wdiff2s");
 
@@ -1607,6 +1599,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 			} // end loop proj_div
 		} // end loop iclass
+		wdiff2s_sum.cp_to_host();
+		HANDLE_ERROR(cudaStreamSynchronize(0));
+		for (long int j = 0; j < image_size; j++)
+		{
+			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
+			if (ires > -1)
+			{
+				thr_wsum_sigma2_noise[group_id].data[ires] += (double) wdiff2s_sum[j];
+				exp_wsum_norm_correction[ipart] += (double) wdiff2s_sum[j]; //TODO could be gpu-reduced
+			}
+		}
 	} // end loop ipart
 	CUDA_CPU_TOC("maximization");
 
