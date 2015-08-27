@@ -1220,6 +1220,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	                                   MAXIMIZATION
 	=======================================================================================*/
 
+	cudaMLO->clearBackprojectDataBundle();
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -1388,17 +1390,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						&dataBundle->eulers[0],
 						!IS_NOT_INV);
 
-				dataBundle->eulers.put_on_device();
-
 				CUDA_CPU_TOC("generateEulerMatricesProjector");
 
-				dataBundle->reals.device_alloc();
+				dataBundle->eulers.device_alloc_end();
+				dataBundle->reals.device_alloc_end();
+				dataBundle->imags.device_alloc_end();
+				dataBundle->weights.device_alloc_end();
+
+				dataBundle->eulers.cp_to_device();
 				dataBundle->reals.device_init(0);
-
-				dataBundle->imags.device_alloc();
 				dataBundle->imags.device_init(0);
-
-				dataBundle->weights.device_alloc();
 				dataBundle->weights.device_init(0);
 
 
@@ -1553,7 +1554,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 							op.local_Minvsigma2s[0].ydim,
 							orientation_num);
 
-					cudaMLO->backprojectDataBundles.push_back(dataBundle);
+					cudaMLO->backprojectDataBundleStack.push(dataBundle);
 
 //					cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
 
@@ -1988,8 +1989,6 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 				if (ipass == 0)
 				{
-					clearBackprojectDataBundle();
-
 					std::vector< CudaProjectorPlan > coarseProjectionPlans;
 
 					 //If particle specific sampling plan required
