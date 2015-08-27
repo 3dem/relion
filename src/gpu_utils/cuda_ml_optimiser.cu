@@ -1173,41 +1173,41 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                     SET METADATA
 		======================================================*/
 
+		CUDA_CPU_TIC("setMetadata");
+
 		CUDA_CPU_TIC("getArgMaxOnDevice");
 		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
 		CUDA_CPU_TOC("getArgMaxOnDevice");
 
-		CUDA_CPU_TIC("setMetadata");
 		Indices max_index;
-		if(max_pair.second > op.max_weight[ipart])
-		{
-			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
-			op.max_weight[ipart] = max_pair.second;
+		max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
+		op.max_weight[ipart] = max_pair.second;
 
-			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
-			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+		//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
+		//std::cerr << "max index = " << max_index.fineIdx << std::endl;
+		max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 
-			baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
-					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+		baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
+				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 
-			//TODO We already have rot, tilt and psi don't calculated them again
-			baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+		//TODO We already have rot, tilt and psi don't calculated them again
+		baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+				op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
-			double rot = oversampled_rot[max_index.ioverrot];
-			double tilt = oversampled_tilt[max_index.ioverrot];
-			double psi = oversampled_psi[max_index.ioverrot];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
-			if (baseMLO->mymodel.data_dim == 3)
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
+		double rot = oversampled_rot[max_index.ioverrot];
+		double tilt = oversampled_tilt[max_index.ioverrot];
+		double psi = oversampled_psi[max_index.ioverrot];
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+
+		if (baseMLO->mymodel.data_dim == 3)
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
-		}
+
 		CUDA_CPU_TOC("setMetadata");
 	}
 	CUDA_CPU_TOC("collect_data_2");
