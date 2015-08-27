@@ -274,8 +274,8 @@ public:
 			curAlloc->next = newAlloc;
 
 			return newAlloc;
-#endif
 		}
+#endif
 	};
 
 
