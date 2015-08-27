@@ -749,7 +749,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				allMweight.cp_to_host();
 			else
 				PassWeights[ipart].weights.cp_to_host();
-			thisparticle_sumweight.size = sumweight_pos;
+
 			exp_thisparticle_sumweight += getSumOnDevice(thisparticle_sumweight);
 		}
 
