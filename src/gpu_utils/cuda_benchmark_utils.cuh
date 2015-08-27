@@ -6,7 +6,6 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/gpu_utils/cuda_utils_stl.cuh"
 
 //Non-concurrent benchmarking tools (only for Linux)
 #if defined CUDA_BENCHMARK

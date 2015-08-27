@@ -12,7 +12,7 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
-#include "src/gpu_utils/cuda_utils_stl.cuh"
+#include "src/gpu_utils/cuda_utils_thrust.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cu"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
@@ -20,6 +20,7 @@
 #include <cuda_runtime.h>
 #include "src/parallel.h"
 #include <signal.h>
+#include <map>
 
 static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -221,7 +222,7 @@ void getAllSquaredDifferencesCoarse(
 
 		allWeights.cp_to_host();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
-		op.min_diff2[ipart] = getMinOnDevice(allWeights); // Implicit cudaStreamSynchronize(0)
+		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		allWeights_pos=0;
 
 		CUDA_CPU_TIC("diff_coarse_map");
@@ -531,9 +532,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		} // end loop iclass
 
 		FinePassWeights[ipart].setDataSize( newDataSize );
-		FinePassWeights[ipart].weights.cp_to_host();
 
-		HANDLE_ERROR(cudaStreamSynchronize(0));
 		CUDA_CPU_TIC("collect_data_1");
 		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)getMinOnDevice(FinePassWeights[ipart].weights));
 		CUDA_CPU_TOC("collect_data_1");
@@ -751,11 +750,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			else
 				PassWeights[ipart].weights.cp_to_host();
 			thisparticle_sumweight.size = sumweight_pos;
-			thisparticle_sumweight.cp_to_host();
-			HANDLE_ERROR(cudaStreamSynchronize(0));
-
 			exp_thisparticle_sumweight += getSumOnDevice(thisparticle_sumweight);
-			HANDLE_ERROR(cudaStreamSynchronize(0));
 		}
 
 		//Store parameters for this particle

@@ -1,5 +1,4 @@
 #include "src/gpu_utils/cuda_backprojector.h"
-#include "src/gpu_utils/cuda_utils_stl.cuh"
 #include <signal.h>
 
 
@@ -363,9 +362,9 @@ void CudaBackprojector::getMdlData(Complex *data, double * weights)
 		weights[n] = (double) w[n];
 	}
 
-	delete r;
-	delete i;
-	delete w;
+	delete [] r;
+	delete [] i;
+	delete [] w;
 }
 
 

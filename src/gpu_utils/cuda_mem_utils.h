@@ -458,6 +458,18 @@ public:
 	{};
 
 	/*======================================================
+	       CONSTRUCTORS WITH OTHER GLOBAL POINTERS
+	======================================================*/
+
+	inline
+	CudaGlobalPtr(CudaGlobalPtr<T> &ptr, unsigned long start_idx, size_t size):
+		size(size), h_ptr(&ptr.h_ptr[start_idx]), d_ptr(&ptr.d_ptr[start_idx]), h_do_free(false),
+		d_do_free(false), allocator(ptr.allocator), alloc(0), stream(ptr.stream)
+	{};
+
+
+
+	/*======================================================
 	                    OTHER STUFF
 	======================================================*/
 
