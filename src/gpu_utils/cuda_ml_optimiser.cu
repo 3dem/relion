@@ -1173,41 +1173,41 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                     SET METADATA
 		======================================================*/
 
+		CUDA_CPU_TIC("setMetadata");
+
 		CUDA_CPU_TIC("getArgMaxOnDevice");
 		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
 		CUDA_CPU_TOC("getArgMaxOnDevice");
 
-		CUDA_CPU_TIC("setMetadata");
 		Indices max_index;
-		if(max_pair.second > op.max_weight[ipart])
-		{
-			max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
-			op.max_weight[ipart] = max_pair.second;
+		max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
+		op.max_weight[ipart] = max_pair.second;
 
-			//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
-			//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-			max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+		//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
+		//std::cerr << "max index = " << max_index.fineIdx << std::endl;
+		max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 
-			baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
-					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+		baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
+				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 
-			//TODO We already have rot, tilt and psi don't calculated them again
-			baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
-					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+		//TODO We already have rot, tilt and psi don't calculated them again
+		baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+				op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
-			double rot = oversampled_rot[max_index.ioverrot];
-			double tilt = oversampled_tilt[max_index.ioverrot];
-			double psi = oversampled_psi[max_index.ioverrot];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
-			if (baseMLO->mymodel.data_dim == 3)
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
+		double rot = oversampled_rot[max_index.ioverrot];
+		double tilt = oversampled_tilt[max_index.ioverrot];
+		double psi = oversampled_psi[max_index.ioverrot];
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+
+		if (baseMLO->mymodel.data_dim == 3)
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
-		}
+
 		CUDA_CPU_TOC("setMetadata");
 	}
 	CUDA_CPU_TOC("collect_data_2");
@@ -1219,6 +1219,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	/*=======================================================================================
 	                                   MAXIMIZATION
 	=======================================================================================*/
+
+	cudaMLO->clearBackprojectDataBundle();
 
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
@@ -1390,17 +1392,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						&dataBundle->eulers[0],
 						!IS_NOT_INV);
 
-				dataBundle->eulers.put_on_device();
-
 				CUDA_CPU_TOC("generateEulerMatricesProjector");
 
-				dataBundle->reals.device_alloc();
+				dataBundle->eulers.device_alloc_end();
+				dataBundle->reals.device_alloc_end();
+				dataBundle->imags.device_alloc_end();
+				dataBundle->weights.device_alloc_end();
+
+				dataBundle->eulers.cp_to_device();
 				dataBundle->reals.device_init(0);
-
-				dataBundle->imags.device_alloc();
 				dataBundle->imags.device_init(0);
-
-				dataBundle->weights.device_alloc();
 				dataBundle->weights.device_init(0);
 
 
@@ -1545,7 +1546,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 							op.local_Minvsigma2s[0].ydim,
 							orientation_num);
 
-					cudaMLO->backprojectDataBundles.push_back(dataBundle);
+					cudaMLO->backprojectDataBundleStack.push(dataBundle);
 
 //					cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
 
@@ -1991,8 +1992,6 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 
 				if (ipass == 0)
 				{
-					clearBackprojectDataBundle();
-
 					std::vector< CudaProjectorPlan > coarseProjectionPlans;
 
 					 //If particle specific sampling plan required

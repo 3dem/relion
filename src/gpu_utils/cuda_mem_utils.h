@@ -100,13 +100,45 @@ public:
 	};
 private:
 	Alloc *first;
+	Alloc *last;
+
+	//Look for the first suited space
+	inline Alloc *getFirstSuitedFree(size_t size)
+	{
+		Alloc *curAlloc = first;
+		//If not the last and too small or not free go to next allocation region
+		while (curAlloc != NULL && ( curAlloc->size <= size || ! curAlloc->free ) )
+			curAlloc = curAlloc->next;
+
+		return curAlloc;
+	}
+
+	//Look for the first suited space
+	inline Alloc *getLastSuitedFree(size_t size)
+	{
+		Alloc *curAlloc = last;
+		//If not the last and too small or not free go to next allocation region
+		while (curAlloc != NULL && ( curAlloc->size <= size || ! curAlloc->free ) )
+			curAlloc = curAlloc->prev;
+
+		return curAlloc;
+	}
+
+	void raiseOutOfMemoryError(size_t size)
+	{
+		printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace: %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace: %lu B]\n",
+				(unsigned long) size, (unsigned long) getLargestContinuousFreeSpace(), (unsigned long) getTotalFreeSpace());
+		fflush(stdout);
+		raise(SIGSEGV);
+	}
+
 public:
 
 	CudaCustomAllocator(size_t size):
 		totalSize(size),outOfMemoryHandler(NULL), first(0)
 	{
 #ifndef CUDA_NO_CUSTOM_ALLOCATION
-		first = new Alloc();
+		first = last = new Alloc();
 
 		first->prev = NULL;
 		first->next = NULL;
@@ -128,74 +160,122 @@ public:
 		HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
 		return nAlloc;
 #else
-		Alloc *curL = first;
-
-		//Look for the first suited link
-		//If not the last and too small or not free go to next link
-		while (curL != NULL && ( curL->size <= size || ! curL->free ) )
-			curL = curL->next;
+		
+		Alloc *curAlloc = getFirstSuitedFree(size);
 
 		//If out of memory
-		if (curL == NULL)
+		if (curAlloc == NULL)
 		{
 			if (outOfMemoryHandler != NULL) //Is there a handler
 			{
 				outOfMemoryHandler->handleOutOfMemory(); //Try to handle
-
-				//Is there space now?
-				curL = first;
-				while (curL != NULL && ( curL->size <= size || ! curL->free ) )
-					curL = curL->next;
+				curAlloc = getFirstSuitedFree(size); //Is there space now?
 			}
 
 			//Did we manage to recover?
-			if (curL == NULL)
-			{
-				//Nope... OK I'm out
-				printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace: %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace: %lu B]\n",
-						(unsigned long) size, (unsigned long) getLargestContinuousFreeSpace(), (unsigned long) getTotalFreeSpace());
-				fflush(stdout);
-				raise(SIGSEGV);
-			}
+			if (curAlloc == NULL)
+				raiseOutOfMemoryError(size);
 		}
 
-		if (curL->size == size)
+		if (curAlloc->size == size)
 		{
-			curL->free = false;
+			curAlloc->free = false;
 
 			printf("ALLOC: ");
 			printState();
 
-			return curL;
+			return curAlloc;
 		}
 		else
 		{
 			//Setup new pointer
-			Alloc *newL = new Alloc();
-			newL->next = curL;
-			newL->ptr = curL->ptr;
-			newL->size = size;
-			newL->free = false;
+			Alloc *newAlloc = new Alloc();
+			newAlloc->next = curAlloc;
+			newAlloc->ptr = curAlloc->ptr;
+			newAlloc->size = size;
+			newAlloc->free = false;
 
 			//Modify old pointer
-			curL->ptr = &(curL->ptr[size]);
-			curL->size -= size;
+			curAlloc->ptr = &(curAlloc->ptr[size]);
+			curAlloc->size -= size;
 
-			//Insert new link into chain
-			if(curL->prev == NULL) //If the first link
-				first = newL;
+			//Insert new allocation region into chain
+			if(curAlloc->prev == NULL) //If the first allocation region
+				first = newAlloc;
 			else
-				curL->prev->next = newL;
-			newL->prev = curL->prev;
-			newL->next = curL;
-			curL->prev = newL;
+				curAlloc->prev->next = newAlloc;
+			newAlloc->prev = curAlloc->prev;
+			newAlloc->next = curAlloc;
+			curAlloc->prev = newAlloc;
 
 //			printf("ALLOC: ");
 //			printState();
 
-			return newL;
+			return newAlloc;
 		}
 #endif
+	};
+
+	inline
+	Alloc* allocEnd(size_t size)
+	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		Alloc *nAlloc = new Alloc();
+		nAlloc->size = size;
+		nAlloc->free = false;
+		HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
+		return nAlloc;
+#else
+		Alloc *curAlloc = getLastSuitedFree(size);
+
+		//If out of memory
+		if (curAlloc == NULL)
+		{
+			if (outOfMemoryHandler != NULL) //Is there a handler
+			{
+				outOfMemoryHandler->handleOutOfMemory(); //Try to handle
+				curAlloc = getLastSuitedFree(size);//Is there space now?
+			}
+
+			//Did we manage to recover?
+			if (curAlloc == NULL)
+				raiseOutOfMemoryError(size);
+		}
+
+		if (curAlloc->size == size)
+		{
+			curAlloc->free = false;
+
+			printf("ALLOC: ");
+			printState();
+
+			return curAlloc;
+		}
+		else
+		{
+			//Setup new pointer
+			Alloc *newAlloc = new Alloc();
+			newAlloc->prev = curAlloc;
+			newAlloc->ptr = curAlloc->ptr;
+			newAlloc->size = size;
+			newAlloc->free = false;
+
+			//Modify old pointer
+			curAlloc->ptr = &(curAlloc->ptr[size]);
+			curAlloc->size -= size;
+
+			//Insert new allocation region into chain
+			if(curAlloc->next == NULL) //If the first allocation region
+				last = newAlloc;
+			else
+				curAlloc->next->prev = newAlloc;
+			newAlloc->next = curAlloc->next;
+			newAlloc->prev = curAlloc;
+			curAlloc->next = newAlloc;
+
+			return newAlloc;
+#endif
+		}
 	};
 
 
@@ -491,9 +571,28 @@ public:
 
 		if (CustomAlloc)
 		{
-//			HANDLE_ERROR(cudaDeviceSynchronize());
 			alloc = allocator->alloc(size * sizeof(T));
-//			HANDLE_ERROR(cudaDeviceSynchronize());
+			d_ptr = (T*) alloc->getPtr();
+		}
+		else
+			HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
+	}
+
+	/**
+	 * Allocate memory on device at the end of the custom allocation (if custome allocator provided)
+	 */
+	inline
+	void device_alloc_end()
+	{
+#ifdef DEBUG_CUDA
+		if (d_do_free)
+			printf("DEBUG_WARNING: Device double allocation.\n");
+#endif
+		d_do_free = true;
+
+		if (CustomAlloc)
+		{
+			alloc = allocator->alloc(size * sizeof(T));
 			d_ptr = (T*) alloc->getPtr();
 		}
 		else

@@ -6,6 +6,7 @@
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
+#include <stack>
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define XFLOAT double
@@ -390,7 +391,7 @@ public:
 
 	//The CUDA accelerated back-projector set
 	std::vector< CudaBackprojector > cudaBackprojectors;
-	std::vector< BackprojectDataBundle *> backprojectDataBundles;
+	std::stack< BackprojectDataBundle *> backprojectDataBundleStack;
 
 	//Used for precalculations of projection setup
 	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
@@ -428,10 +429,11 @@ public:
 		for (int i = 0; i < cudaBackprojectors.size(); i ++)
 			cudaBackprojectors[i].syncStream();
 
-		for (int i = 0; i < backprojectDataBundles.size(); i ++)
-			delete backprojectDataBundles[i];
-
-		backprojectDataBundles.clear();
+		while (!backprojectDataBundleStack.empty())
+		{
+			delete backprojectDataBundleStack.top();
+			backprojectDataBundleStack.pop();
+		}
 	}
 
 	void handleOutOfMemory()
