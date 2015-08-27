@@ -82,6 +82,8 @@ __global__ void cuda_kernel_backproject2D(
 	printf("ERROR : No 2D model support yet");
 }
 
+#define BACKPROJECTION4_FETCH_COUNT 3
+
 __global__ void cuda_kernel_backproject3D(
 		int *g_xs,
 		int *g_ys,
@@ -108,7 +110,7 @@ __global__ void cuda_kernel_backproject3D(
 	unsigned tid = threadIdx.x;
 	unsigned gid = tid / 4; //Group id
 	unsigned mid = tid % 4; //Member id
-	unsigned pit = (gid * 4 + mid)*BACKPROJECTION4_FETCH_COUNT;
+	unsigned pit = tid * BACKPROJECTION4_FETCH_COUNT;
 	unsigned global_idx = blockIdx.x * BACKPROJECTION4_GROUP_SIZE + gid;
 
 	int X(0),Y(0),Z(0);
@@ -158,10 +160,9 @@ __global__ void cuda_kernel_backproject3D(
 			int img_9 = img*9+pit;
 			if (img_9 < img_count*9)
 			{
-				s_e[pit+0] = g_eulers[img_9+0];
-				s_e[pit+1] = g_eulers[img_9+1];
-				s_e[pit+2] = g_eulers[img_9+2];
-				s_e[pit+3] = g_eulers[img_9+3];
+				s_e[pit+0] = __ldg(&g_eulers[img_9+0]);
+				s_e[pit+1] = __ldg(&g_eulers[img_9+1]);
+				s_e[pit+2] = __ldg(&g_eulers[img_9+2]);
 			}
 
 			__syncthreads();
