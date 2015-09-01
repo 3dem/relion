@@ -77,4 +77,6 @@ __global__ void cuda_kernel_reduce_wdiff2s(XFLOAT *g_wdiff2s_parts,
 										   int image_size,
 										   int current_block_num);
 
+__global__ void cuda_kernel_wdparts_to_wdsum(XFLOAT *g_wdiff2s_parts, XFLOAT *g_wdiff2s_sum, unsigned long image_size);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
