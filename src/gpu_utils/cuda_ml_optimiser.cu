@@ -1544,60 +1544,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				CUDA_CPU_TIC("backproject");
 
-				if (cudaMLO->refIs3D)
-				{
-					dataBundle->eulers.cp_to_device();
+				dataBundle->eulers.cp_to_device();
+				HANDLE_ERROR(cudaDeviceSynchronize());
 
-					CUDA_GPU_TIC("cuda_kernels_backproject");
-					cudaMLO->cudaBackprojectors[exp_iclass].backproject(
-						~dataBundle->reals,
-						~dataBundle->imags,
-						~dataBundle->weights,
-						~dataBundle->eulers,
-							op.local_Minvsigma2s[0].xdim,
-							op.local_Minvsigma2s[0].ydim,
-							orientation_num);
+				CUDA_GPU_TIC("cuda_kernels_backproject");
+				cudaMLO->cudaBackprojectors[exp_iclass].backproject(
+					~dataBundle->reals,
+					~dataBundle->imags,
+					~dataBundle->weights,
+					~dataBundle->eulers,
+					op.local_Minvsigma2s[0].xdim,
+					op.local_Minvsigma2s[0].ydim,
+					orientation_num);
 
-					cudaMLO->backprojectDataBundleStack.push(dataBundle);
+				cudaMLO->backprojectDataBundleStack.push(dataBundle);
 
-//					cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
-
-					CUDA_GPU_TAC("cuda_kernels_backproject");
-				}
-				else
-				{
-					CUDA_CPU_TIC("cpu_backproject");
-					dataBundle->reals.cp_to_host();
-					dataBundle->imags.cp_to_host();
-					dataBundle->weights.cp_to_host();
-
-					MultidimArray<Complex > Fimg;
-					MultidimArray<double > Fweight;
-					Fimg.resize(op.Fimgs[0]);
-					Fweight.resize(op.Fimgs[0]);
-					Matrix2D<double> A(3,3);
-
-					int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
-					pthread_mutex_lock(&global_mutex2[my_mutex]);
-					for (int i = 0; i < orientation_num; i ++)
-					{
-						for (int j = 0; j < image_size; j ++)
-						{
-							Fimg.data[j].real = (double) dataBundle->reals[i * image_size + j];
-							Fimg.data[j].imag = (double) dataBundle->imags[i * image_size + j];
-							Fweight.data[j]   = (double) dataBundle->weights[i * image_size + j];
-						}
-
-						for (int j = 0; j < 9; j ++)
-							A.mdata[j] = dataBundle->eulers[i * 9 + j];
-
-						baseMLO->wsum_model.BPref[exp_iclass].backrotate2D(Fimg, A, IS_NOT_INV, &Fweight);
-					}
-					pthread_mutex_unlock(&global_mutex2[my_mutex]);
-
-					delete dataBundle;
-					CUDA_CPU_TOC("cpu_backproject");
-				}
+//				cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
 
 				CUDA_CPU_TOC("backproject");
 
@@ -1868,7 +1830,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 #else
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-	size_t allocationSize = (float)free * .9; //Lets leave some for other processes for now
+	size_t allocationSize = (float)free * .2; //Lets leave some for other processes for now
 
 	printf("Custom allocator assigned %.2f MiB of device memory.\n", (float)allocationSize/(1024.*1024.));
 

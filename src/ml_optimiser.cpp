@@ -1570,8 +1570,7 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		if(mymodel.ref_dim==3)
-			((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
+		((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
 		delete ((MlOptimiserCuda*) cudaMlOptimiser);
 	}
 

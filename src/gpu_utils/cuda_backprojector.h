@@ -6,15 +6,11 @@
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include <cuda_runtime.h>
 
-#define BACKPROJECTION4_BLOCK_SIZE 64
-#define BACKPROJECTION4_GROUP_SIZE 16
-#define BACKPROJECTION4_FETCH_COUNT 4
-
 class CudaBackprojector
 {
 	int mdlX, mdlY, mdlZ, mdlXYZ,
 	    mdlInitY, mdlInitZ,
-	    maxR2,
+	    maxR, maxR2,
 	    padding_factor;
 
 	int *h_voxelX, *h_voxelY, *h_voxelZ;
@@ -31,7 +27,7 @@ public:
 	CudaBackprojector():
 			mdlX(0), mdlY(0), mdlZ(0), mdlXYZ(0),
 			mdlInitY(0), mdlInitZ(0),
-			maxR2(0),
+			maxR(0), maxR2(0),
 			padding_factor(0),
 			h_voxelX(0), h_voxelY(0), h_voxelZ(0),
 			d_voxelX(0), d_voxelY(0), d_voxelZ(0),
@@ -44,17 +40,18 @@ public:
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, int padding_factor):
-			mdlX(xdim), mdlY(ydim), mdlZ(zdim),
-			mdlXYZ(xdim*ydim*zdim),
-			mdlInitY(inity), mdlInitZ(initz),
-			maxR2(max_r*max_r),
-			padding_factor(padding_factor),
-			h_voxelX(0), h_voxelY(0), h_voxelZ(0),
-			d_voxelX(0), d_voxelY(0), d_voxelZ(0),
-			voxelCount(0),
-			d_mdlReal(0), d_mdlImag(0), d_mdlWeight(0),
-			stream(0)
-	{}
+				mdlX(0), mdlY(0), mdlZ(0), mdlXYZ(0),
+				mdlInitY(0), mdlInitZ(0),
+				maxR(0), maxR2(0),
+				padding_factor(0),
+				h_voxelX(0), h_voxelY(0), h_voxelZ(0),
+				d_voxelX(0), d_voxelY(0), d_voxelZ(0),
+				voxelCount(0),
+				d_mdlReal(0), d_mdlImag(0), d_mdlWeight(0),
+				stream(0)
+	{
+		setMdlDim(xdim, ydim, zdim, inity, initz, max_r, padding_factor);
+	}
 
 	void setMdlDim(
 			int xdim, int ydim, int zdim,
@@ -64,9 +61,11 @@ public:
 		mdlX = xdim;
 		mdlY = ydim;
 		mdlZ = zdim;
+		if (mdlZ < 1) mdlZ = 1;
 		mdlXYZ = xdim*ydim*zdim;
 		mdlInitY = inity;
 		mdlInitZ = initz;
+		maxR = max_r;
 		maxR2 = max_r*max_r;
 		padding_factor = paddingFactor;
 	}
