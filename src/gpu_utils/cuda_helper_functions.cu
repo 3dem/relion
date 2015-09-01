@@ -92,11 +92,11 @@ long int makeJobsForDiff2Fine(
 
 	dataMask.setNumberOfJobs(k);
 	dataMask.setNumberOfWeights(w);
-	if(dataMask.weightNum>0)
-	{
-		dataMask.jobOrigin.device_alloc();
-		dataMask.jobExtent.device_alloc();
-	}
+//	if(dataMask.weightNum>0)
+//	{
+//		dataMask.jobOrigin.device_alloc();
+//		dataMask.jobExtent.device_alloc();
+//	}
 	return(w);
 }
 
@@ -105,16 +105,16 @@ long int makeJobsForDiff2Fine(
  * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
  * with computed differences into a reduced object to be back-projected.
  */
-int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask) // FPW=FinePassWeights
+int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, unsigned long NewJobNum) // FPW=FinePassWeights
 {
 	// reset the old (diff2Fine) job-definitions
-	dataMask.jobOrigin.free_host();
-    dataMask.jobOrigin.free_device();
-    dataMask.jobExtent.free_host();
-    dataMask.jobExtent.free_device();
-    dataMask.setNumberOfJobs(dataMask.weightNum);
-    dataMask.jobOrigin.host_alloc();
-    dataMask.jobExtent.host_alloc();
+//	dataMask.jobOrigin.free_host();
+//    dataMask.jobOrigin.free_device();
+//    dataMask.jobExtent.free_host();
+//    dataMask.jobExtent.free_device();
+    dataMask.setNumberOfJobs(NewJobNum);
+//    dataMask.jobOrigin.host_alloc();
+//    dataMask.jobExtent.host_alloc();
 
 	long int jobid=0;
 	dataMask.jobOrigin[jobid]=0;
@@ -135,8 +135,8 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask) /
 		}
 	}
 	dataMask.setNumberOfJobs(jobid+1); // because max index is one less than size
-	dataMask.jobOrigin.put_on_device();
-	dataMask.jobExtent.put_on_device();
+//	dataMask.jobOrigin.put_on_device();
+//	dataMask.jobExtent.put_on_device();
 
 	return (jobid+1);
 }
