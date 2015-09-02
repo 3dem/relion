@@ -1830,7 +1830,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 #else
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-	size_t allocationSize = (float)free * .2; //Lets leave some for other processes for now
+	size_t allocationSize = (float)free * .8; //Lets leave some for other processes for now
 
 	printf("Custom allocator assigned %.2f MiB of device memory.\n", (float)allocationSize/(1024.*1024.));
 
@@ -2083,13 +2083,13 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
 			CUDA_CPU_TOC("storeWeightedSums");
 
 
-			CUDA_CPU_TIC("Freefalse");
-			for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
-			{
-				stagerD2[iframe].AllData.h_do_free=false;
-				stagerD2[iframe].AllData.d_do_free=false;
-			}
-			CUDA_CPU_TOC("Freefalse");
+//			CUDA_CPU_TIC("Freefalse");
+//			for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
+//			{
+//				stagerD2[iframe].AllData.h_do_free=false;
+//				stagerD2[iframe].AllData.d_do_free=false;
+//			}
+//			CUDA_CPU_TOC("Freefalse");
 			CUDA_CPU_TOC("oneParticle");
 		}
 	}
