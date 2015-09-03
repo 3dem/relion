@@ -1145,10 +1145,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 
 			thr_wsum_sigma2_offset = 0.0;
-			for (long int n = partial_pos; n < block_num; n++)
+			for (long int n = partial_pos; n < partial_pos+block_num; n++)
 			{
 
-				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n]];
+				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n-partial_pos]];
 				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
 				// Only proceed if any of the particles had any significant coarsely sampled translation
 
