@@ -1818,7 +1818,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 #else
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-	size_t allocationSize = (float)free * .2; //Lets leave some for other processes for now
+	size_t allocationSize = (float)free * .5; //Lets leave some for other processes for now
 
 	printf("Custom allocator assigned %.2f MiB of device memory.\n", (float)allocationSize/(1024.*1024.));
 
