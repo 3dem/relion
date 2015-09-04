@@ -550,50 +550,50 @@ void CudaBackprojector::backproject(
 	}
 	else
 	{
-		int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
-		dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
+//		int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
+//		dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
+//
+//		cuda_kernel_backproject3D_gather<<<grid_dim,block_dim,0,stream>>>(
+//			d_voxelX,
+//			d_voxelY,
+//			d_voxelZ,
+//			d_mdlReal,
+//			d_mdlImag,
+//			d_mdlWeight,
+//			d_real,
+//			d_imag,
+//			d_weight,
+//			d_eulers,
+//			maxR2,
+//			padding_factor,
+//			imgX,
+//			imgY,
+//			imgX*imgY,
+//			imageCount,
+//			mdlX,
+//			mdlY,
+//			mdlInitY,
+//			mdlInitZ,
+//			voxelCount);
 
-		cuda_kernel_backproject3D_gather<<<grid_dim,block_dim,0,stream>>>(
-			d_voxelX,
-			d_voxelY,
-			d_voxelZ,
-			d_mdlReal,
-			d_mdlImag,
-			d_mdlWeight,
-			d_real,
-			d_imag,
-			d_weight,
-			d_eulers,
-			maxR2,
-			padding_factor,
-			imgX,
-			imgY,
-			imgX*imgY,
-			imageCount,
-			mdlX,
-			mdlY,
-			mdlInitY,
-			mdlInitZ,
-			voxelCount);
-
-//		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,stream>>>(
-//				d_mdlReal,
-//				d_mdlImag,
-//				d_mdlWeight,
-//				d_real,
-//				d_imag,
-//				d_weight,
-//				d_eulers,
-//				maxR,
-//				maxR2,
-//				padding_factor,
-//				imgX,
-//				imgY,
-//				imgX*imgY,
-//				mdlX,
-//				mdlY,
-//				mdlInitY,
-//				mdlInitZ);
+		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,stream>>>(
+				d_mdlReal,
+				d_mdlImag,
+				d_mdlWeight,
+				d_real,
+				d_imag,
+				d_weight,
+				d_eulers,
+				maxR,
+				maxR2,
+				padding_factor,
+				imgX,
+				imgY,
+				imgX*imgY,
+				mdlX,
+				mdlY,
+				mdlInitY,
+				mdlInitZ);
 	}
 }
 
