@@ -201,7 +201,7 @@ __global__ void cuda_kernel_backproject2D(
 	}
 }
 
-__global__ void cuda_kernel_backproject3D(
+__global__ void cuda_kernel_backproject3D_gather(
 		int *g_xs,
 		int *g_ys,
 		int *g_zs,
@@ -396,14 +396,18 @@ __global__ void cuda_kernel_backproject3D_scatter(
 
 	__shared__ XFLOAT s_eulers[9];
 
-	if (tid < 9) s_eulers[tid] = g_eulers[img*9+tid];
+	if (tid < 9)
+		s_eulers[tid] = g_eulers[img*9+tid];
 
 	__syncthreads();
 
-	int pixel_pass_num(ceilf((float)img_xy/(float)BLOCK_SIZE));
+	int pixel_pass_num(ceilf((float)img_xy/(float)BP_2D_BLOCK_SIZE));
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
     {
-		unsigned pixel = (pass * BLOCK_SIZE) + tid;
+		unsigned pixel = (pass * BP_2D_BLOCK_SIZE) + tid;
+
+		if (pixel >= img_xy)
+			continue;
 
 		int x = pixel % img_x;
 		int y = (int)floorf( (float)pixel / (float)img_x);
@@ -414,12 +418,11 @@ __global__ void cuda_kernel_backproject3D_scatter(
 		if (y > max_r)
 		{
 			if (y >= img_y - max_r)
-				y = y - img_y;
-			else
-				x = max_r;
+				y -= img_y;
 		}
 
-		if (x * x + y * y > max_r2) continue;
+		if (x * x + y * y > max_r2)
+			continue;
 
 		// Get the weight
 		XFLOAT Fweights = g_Fweights[pixel];
@@ -431,12 +434,12 @@ __global__ void cuda_kernel_backproject3D_scatter(
 			XFLOAT imag = g_wavgs_imag[pixel];
 
 			// Get logical coordinates in the 3D map
-			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-			XFLOAT yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
-			XFLOAT zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
+			XFLOAT xp = (s_eulers[0] * x + s_eulers[3] * y ) * padding_factor;
+			XFLOAT yp = (s_eulers[1] * x + s_eulers[4] * y ) * padding_factor;
+			XFLOAT zp = (s_eulers[2] * x + s_eulers[5] * y ) * padding_factor;
 
 			// Only asymmetric half is stored
-			if (xp < 0)
+			if (xp < 0.f)
 			{
 				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;
@@ -464,41 +467,48 @@ __global__ void cuda_kernel_backproject3D_scatter(
 			XFLOAT mfz = 1.f - fz;
 
 			XFLOAT dd000 = mfz * mfy * mfx;
-			XFLOAT dd001 = mfz * mfy *  fx;
-			XFLOAT dd010 = mfz *  fy * mfx;
-			XFLOAT dd011 = mfz *  fy *  fx;
-			XFLOAT dd100 =  fz * mfy * mfx;
-			XFLOAT dd101 =  fz * mfy *  fx;
-			XFLOAT dd110 =  fz *  fy * mfx;
-			XFLOAT dd111 =  fz *  fy *  fx;
 
 			cuda_atomic_add(&g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0], dd000 * real);
 			cuda_atomic_add(&g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0], dd000 * imag);
 			cuda_atomic_add(&g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0], dd000 * Fweights);
 
+			XFLOAT dd001 = mfz * mfy *  fx;
+
 			cuda_atomic_add(&g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1], dd001 * real);
 			cuda_atomic_add(&g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1], dd001 * imag);
 			cuda_atomic_add(&g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1], dd001 * Fweights);
+
+			XFLOAT dd010 = mfz *  fy * mfx;
 
 			cuda_atomic_add(&g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0], dd010 * real);
 			cuda_atomic_add(&g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0], dd010 * imag);
 			cuda_atomic_add(&g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0], dd010 * Fweights);
 
-			cuda_atomic_add(&g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0], dd100 * real);
-			cuda_atomic_add(&g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0], dd100 * imag);
-			cuda_atomic_add(&g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0], dd100 * Fweights);
+			XFLOAT dd011 = mfz *  fy *  fx;
 
 			cuda_atomic_add(&g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1], dd011 * real);
 			cuda_atomic_add(&g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1], dd011 * imag);
 			cuda_atomic_add(&g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1], dd011 * Fweights);
 
-			cuda_atomic_add(&g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0], dd101 * real);
-			cuda_atomic_add(&g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0], dd101 * imag);
-			cuda_atomic_add(&g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0], dd101 * Fweights);
+			XFLOAT dd100 =  fz * mfy * mfx;
+
+			cuda_atomic_add(&g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0], dd100 * real);
+			cuda_atomic_add(&g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0], dd100 * imag);
+			cuda_atomic_add(&g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0], dd100 * Fweights);
+
+			XFLOAT dd101 =  fz * mfy *  fx;
+
+			cuda_atomic_add(&g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1], dd101 * real);
+			cuda_atomic_add(&g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1], dd101 * imag);
+			cuda_atomic_add(&g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1], dd101 * Fweights);
+
+			XFLOAT dd110 =  fz *  fy * mfx;
 
 			cuda_atomic_add(&g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0], dd110 * real);
 			cuda_atomic_add(&g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0], dd110 * imag);
 			cuda_atomic_add(&g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0], dd110 * Fweights);
+
+			XFLOAT dd111 =  fz *  fy *  fx;
 
 			cuda_atomic_add(&g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1], dd111 * real);
 			cuda_atomic_add(&g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1], dd111 * imag);
@@ -540,31 +550,50 @@ void CudaBackprojector::backproject(
 	}
 	else
 	{
-		int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
-		dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
+//		int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
+//		dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
+//
+//		cuda_kernel_backproject3D_gather<<<grid_dim,block_dim,0,stream>>>(
+//			d_voxelX,
+//			d_voxelY,
+//			d_voxelZ,
+//			d_mdlReal,
+//			d_mdlImag,
+//			d_mdlWeight,
+//			d_real,
+//			d_imag,
+//			d_weight,
+//			d_eulers,
+//			maxR2,
+//			padding_factor,
+//			imgX,
+//			imgY,
+//			imgX*imgY,
+//			imageCount,
+//			mdlX,
+//			mdlY,
+//			mdlInitY,
+//			mdlInitZ,
+//			voxelCount);
 
-		cuda_kernel_backproject3D<<<grid_dim,block_dim,0,stream>>>(
-			d_voxelX,
-			d_voxelY,
-			d_voxelZ,
-			d_mdlReal,
-			d_mdlImag,
-			d_mdlWeight,
-			d_real,
-			d_imag,
-			d_weight,
-			d_eulers,
-			maxR2,
-			padding_factor,
-			imgX,
-			imgY,
-			imgX*imgY,
-			imageCount,
-			mdlX,
-			mdlY,
-			mdlInitY,
-			mdlInitZ,
-			voxelCount);
+		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,stream>>>(
+				d_mdlReal,
+				d_mdlImag,
+				d_mdlWeight,
+				d_real,
+				d_imag,
+				d_weight,
+				d_eulers,
+				maxR,
+				maxR2,
+				padding_factor,
+				imgX,
+				imgY,
+				imgX*imgY,
+				mdlX,
+				mdlY,
+				mdlInitY,
+				mdlInitZ);
 	}
 }
 
