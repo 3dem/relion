@@ -1345,7 +1345,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                      CLASS LOOP
 		======================================================*/
 
+		CudaGlobalPtr<XFLOAT> wdiff2s_AA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> wdiff2s_XA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->allocator);
+		wdiff2s_AA.device_alloc();
+		wdiff2s_XA.device_alloc();
+		unsigned long AAXA_pos=0;
+
 		wdiff2s_sum.device_alloc();
 		wdiff2s_sum.device_init(0.f);
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
@@ -1473,6 +1479,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~ctfs,
 						~Minvsigma2s,
 						~wdiff2s_parts,
+						&wdiff2s_AA.d_ptr[AAXA_pos],
+						&wdiff2s_XA.d_ptr[AAXA_pos],
 						~dataBundle->reals,
 						~dataBundle->imags,
 						~dataBundle->weights,
@@ -1507,6 +1515,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					// TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very inefficient amount of loads per store
 					cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE,0,0>>>(
 							~wdiff2s_parts,
+							&wdiff2s_AA.d_ptr[AAXA_pos],
+							&wdiff2s_XA.d_ptr[AAXA_pos],
 							orientation_num,
 							image_size,
 							k);
@@ -1565,8 +1575,20 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 //				cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
 
+				wdiff2s_AA.cp_to_host();
+				wdiff2s_XA.cp_to_host();
+				HANDLE_ERROR(cudaStreamSynchronize(0));
 				CUDA_CPU_TOC("backproject");
-
+				for (long int j = 0; j < image_size; j++)
+				{
+					int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
+					if (baseMLO->do_scale_correction && DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
+					{
+						DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += wdiff2s_AA[AAXA_pos+j];
+						DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
+					}
+				}
+				AAXA_pos+=orientation_num*image_size;
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 					baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);

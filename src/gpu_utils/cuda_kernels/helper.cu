@@ -320,6 +320,8 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 
 
 __global__ void cuda_kernel_reduce_wdiff2s(XFLOAT *g_wdiff2s_parts,
+										   XFLOAT *g_wdiff2s_AA,
+										   XFLOAT *g_wdiff2s_XA,
 										   long int orientation_num,
 										   int image_size,
 										   int current_block_num)
@@ -333,7 +335,11 @@ __global__ void cuda_kernel_reduce_wdiff2s(XFLOAT *g_wdiff2s_parts,
 		{
 			pixel = pass * BLOCK_SIZE + tid;
 			if(pixel<image_size)
+			{
 				g_wdiff2s_parts[bid*image_size+pixel] += g_wdiff2s_parts[(current_block_num+bid)*image_size+pixel];
+				g_wdiff2s_AA[bid*image_size+pixel]    += g_wdiff2s_AA[(current_block_num+bid)*image_size+pixel];
+				g_wdiff2s_XA[bid*image_size+pixel]    += g_wdiff2s_XA[(current_block_num+bid)*image_size+pixel];
+			}
 		}
 	}
 }

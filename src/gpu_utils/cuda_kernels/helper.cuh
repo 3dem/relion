@@ -73,6 +73,8 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 // Stacks images in place, reducing at most 2*gridDim.x images down to gridDim.x images.
 // Ex; 19 -> 16 or 32 -> 16,
 __global__ void cuda_kernel_reduce_wdiff2s(XFLOAT *g_wdiff2s_parts,
+										   XFLOAT *g_wdiff2s_AA,
+										   XFLOAT *g_wdiff2s_XA,
 										   long int orientation_num,
 										   int image_size,
 										   int current_block_num);
