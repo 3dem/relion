@@ -1144,33 +1144,26 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 
-			thr_wsum_sigma2_offset = 0.0;
 			for (long int n = partial_pos; n < partial_pos+block_num; n++)
 			{
-
 				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n-partial_pos]];
-				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-				// Only proceed if any of the particles had any significant coarsely sampled translation
 
-				if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+				long int mydir, idir=floor(iorient/sp.nr_psi);
+				if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+					mydir = idir;
+				else
+					mydir = op.pointer_dir_nonzeroprior[idir];
+
+				// store partials according to indices of the relevant dimension
+				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
+				thr_sumw_group[group_id]                 						+= p_weights[n];
+				thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
+				thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
+
+				if (baseMLO->mymodel.ref_dim == 2)
 				{
-					long int mydir, idir=floor(iorient/sp.nr_psi);
-					if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-						mydir = idir;
-					else
-						mydir = op.pointer_dir_nonzeroprior[idir];
-
-					// store partials according to indices of the relevant dimension
-					DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
-					thr_sumw_group[group_id]                 						+= p_weights[n];
-					thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
-					thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
-
-					if (baseMLO->mymodel.ref_dim == 2)
-					{
-						thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[n];
-						thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[n];
-					}
+					thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[n];
+					thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[n];
 				}
 			}
 			partial_pos+=block_num;
