@@ -1485,6 +1485,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						ipart,
 						group_id,
 						exp_iclass,
+						part_scale,
 						0);
 
 				/*======================================================
