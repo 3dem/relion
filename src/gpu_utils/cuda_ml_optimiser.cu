@@ -1569,19 +1569,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 //				cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
 
-				wdiff2s_AA.cp_to_host();
-				wdiff2s_XA.cp_to_host();
-				HANDLE_ERROR(cudaStreamSynchronize(0));
+
 				CUDA_CPU_TOC("backproject");
-				for (long int j = 0; j < image_size; j++)
-				{
-					int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
-					if (baseMLO->do_scale_correction && DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
-					{
-						DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += wdiff2s_AA[AAXA_pos+j];
-						DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
-					}
-				}
 				AAXA_pos+=orientation_num*image_size;
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1589,8 +1578,24 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 			} // end loop proj_div
 		} // end loop iclass
+		wdiff2s_AA.cp_to_host();
+		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
+		AAXA_pos=0;
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		{
+			for (long int j = 0; j < image_size; j++)
+			{
+				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
+				if (baseMLO->do_scale_correction && DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
+				{
+					DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += wdiff2s_AA[AAXA_pos+j];
+					DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
+				}
+			}
+			AAXA_pos+=ProjectionData[ipart].orientation_num[exp_iclass]*image_size;
+		} // end loop iclass
 		for (long int j = 0; j < image_size; j++)
 		{
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
