@@ -78,79 +78,60 @@ void getAllSquaredDifferencesCoarse(
 
 		CUDA_CPU_TIC("translation_1");
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
-		gpuMinvsigma2.device_alloc();
+		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-		long unsigned translation_num(0), ihidden(0);
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * translation_num, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * translation_num, cudaMLO->allocator);
+
+		std::vector< MultidimArray<Complex> > *fftshifts;
+
+		if (sp.current_oversampling == 0)
+		{
+			fftshifts = (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size) ? &baseMLO->global_fftshifts_ab_coarse
+					: &baseMLO->global_fftshifts_ab_current;
+		}
+		else
+		{
+			fftshifts = (baseMLO->strict_highres_exp > 0.) ? &baseMLO->global_fftshifts_ab2_coarse
+					: &baseMLO->global_fftshifts_ab2_current;
+		}
+
+		Fimgs_real.device_alloc();
+		Fimgs_imag.device_alloc();
+
+		doTranslationsGpu(
+				baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL,
+				op.local_Fimgs_shifted[ipart].data,
+				Fimgs_real,
+				Fimgs_imag,
+				*fftshifts,
+				sp.itrans_min * sp.nr_oversampled_trans,
+				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
+				image_size,
+				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				cudaMLO->allocator,
+				0
+				);
+
+		long unsigned ihidden(0);
 		std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
 		for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
 		{
-			baseMLO->sampling.getTranslations(itrans, sp.current_oversampling,
-					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
-
 			for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
 			{
-				/// Now get the shifted image
-				// Use a pointer to avoid copying the entire array again in this highly expensive loop
-				Complex *myAB;
-				if (sp.current_oversampling == 0)
-				{
-					myAB = (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size) ? baseMLO->global_fftshifts_ab_coarse[itrans].data
-							: baseMLO->global_fftshifts_ab_current[itrans].data;
-				}
-				else
-				{
-					int iitrans = itrans * sp.nr_oversampled_trans +  iover_trans;
-					myAB = (baseMLO->strict_highres_exp > 0.) ? baseMLO->global_fftshifts_ab2_coarse[iitrans].data
-							: baseMLO->global_fftshifts_ab2_current[iitrans].data;
-				}
-
-
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-				{
-					XFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real
-							- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag;
-					XFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag
-							+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real;
-
-					//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
-					if (baseMLO->do_scale_correction)
-					{
-						XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-						real /= myscale;
-						imag /= myscale;
-					}
-					if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-					{
-						real /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-						imag /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-					}
-					Fimgs_real[translation_num * image_size + n] = real;
-					Fimgs_imag[translation_num * image_size + n] = imag;
-				}
-
-				translation_num ++;
-
 				ihiddens.push_back(ihidden);
 				itranses.push_back(itrans);
 				iover_transes.push_back(iover_trans);
 			}
 		}
 
-		Fimgs_real.size = translation_num * image_size;
-		Fimgs_imag.size = translation_num * image_size;
-
-		Fimgs_real.device_alloc();
-		Fimgs_imag.device_alloc();
-
-		Fimgs_real.cp_to_device();
-		Fimgs_imag.cp_to_device();
-
 		CUDA_CPU_TOC("translation_1");
+
+
+
+		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
+		gpuMinvsigma2.device_alloc();
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
 		{
@@ -292,72 +273,63 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		long int group_id = baseMLO->mydata.getGroupId(part_id);
-		std::vector< double > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+
 		/*====================================
 				Generate Translations
 		======================================*/
 
 		CUDA_CPU_TIC("translation_1");
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		long unsigned translation_num(0), ihidden(0);
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * translation_num, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * translation_num, cudaMLO->allocator);
+
+		std::vector< MultidimArray<Complex> > *fftshifts;
+
+		if (sp.current_oversampling == 0)
+		{
+			fftshifts = (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size) ? &baseMLO->global_fftshifts_ab_coarse
+					: &baseMLO->global_fftshifts_ab_current;
+		}
+		else
+		{
+			fftshifts = (baseMLO->strict_highres_exp > 0.) ? &baseMLO->global_fftshifts_ab2_coarse
+					: &baseMLO->global_fftshifts_ab2_current;
+		}
+
+		Fimgs_real.device_alloc();
+		Fimgs_imag.device_alloc();
+
+		doTranslationsGpu(
+				baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL,
+				op.local_Fimgs_shifted[ipart].data,
+				Fimgs_real,
+				Fimgs_imag,
+				*fftshifts,
+				sp.itrans_min * sp.nr_oversampled_trans,
+				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
+				image_size,
+				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				cudaMLO->allocator,
+				0
+				);
+
+		long unsigned ihidden(0);
 		std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
 		for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
 		{
-			baseMLO->sampling.getTranslations(itrans, sp.current_oversampling,
-					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
-
 			for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
 			{
-				/// Now get the shifted image
-				// Use a pointer to avoid copying the entire array again in this highly expensive loop
-				Complex *myAB;
-				if (sp.current_oversampling == 0)
-				{
-					myAB = (Fref.ydim == baseMLO->coarse_size) ? baseMLO->global_fftshifts_ab_coarse[itrans].data
-							: baseMLO->global_fftshifts_ab_current[itrans].data;
-				}
-				else
-				{
-					int iitrans = itrans * sp.nr_oversampled_trans +  iover_trans;
-					myAB = (baseMLO->strict_highres_exp > 0.) ? baseMLO->global_fftshifts_ab2_coarse[iitrans].data
-							: baseMLO->global_fftshifts_ab2_current[iitrans].data;
-				}
-
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-				{
-					XFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real
-							- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag;
-					XFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).imag
-							+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(op.local_Fimgs_shifted[ipart], n)).real;
-
-					//When on gpu, it makes more sense to ctf-correct translated images, rather than anti-ctf-correct ref-projections
-					if (baseMLO->do_scale_correction)
-					{
-						//group_id = baseMLO->mydata.getGroupId(part_id);
-						XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-						real /= myscale;
-						imag /= myscale;
-					}
-					if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-					{
-						real /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-						imag /= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-					}
-					Fimgs_real[translation_num * image_size + n] = real;
-					Fimgs_imag[translation_num * image_size + n] = imag;
-				}
-				translation_num ++;
-
 				ihiddens.push_back(ihidden);
 				itranses.push_back(itrans);
 				iover_transes.push_back(iover_trans);
 			}
 		}
+
 		CUDA_CPU_TOC("translation_1");
+
 		CUDA_CPU_TIC("kernel_init_1");
 
 		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
@@ -393,8 +365,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CUDA_GPU_TIC("imagMemCp");
 		gpuMinvsigma2.cp_to_device();
-		Fimgs_real.put_on_device(translation_num * image_size);
-		Fimgs_imag.put_on_device(translation_num * image_size);
 		CUDA_GPU_TAC("imagMemCp");
 
 		CUDA_CPU_TOC("kernel_init_1");
@@ -1249,43 +1219,60 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUDA_CPU_TIC("translation_2");
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * sp.nr_trans * sp.nr_oversampled_trans, cudaMLO->allocator);
+		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * translation_num, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> Fimgs_imag(Fimgs_real.size, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(Fimgs_real.size, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(Fimgs_real.size, cudaMLO->allocator);
 
+		Fimgs_real.device_alloc();
+		Fimgs_imag.device_alloc();
+		Fimgs_nomask_real.device_alloc();
+		Fimgs_nomask_imag.device_alloc();
+
+		doTranslationsGpu(
+				NULL,
+				op.local_Fimgs_shifted[ipart].data,
+				Fimgs_real,
+				Fimgs_imag,
+				(baseMLO->adaptive_oversampling == 0 ) ? baseMLO->global_fftshifts_ab_current : baseMLO->global_fftshifts_ab2_current,
+				sp.itrans_min * sp.nr_oversampled_trans,
+				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
+				image_size,
+				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				cudaMLO->allocator,
+				0
+				);
+
+		doTranslationsGpu(
+				NULL,
+				op.local_Fimgs_shifted_nomask[ipart].data,
+				Fimgs_nomask_real,
+				Fimgs_nomask_imag,
+				(baseMLO->adaptive_oversampling == 0 ) ? baseMLO->global_fftshifts_ab_current : baseMLO->global_fftshifts_ab2_current,
+				sp.itrans_min * sp.nr_oversampled_trans,
+				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
+				image_size,
+				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				cudaMLO->allocator,
+				0
+				);
+
+		long unsigned ihidden(0);
 		std::vector< long unsigned > iover_transes, itranses, ihiddens;
 
-		long unsigned translation_num = imageTranslation(
-				Fimgs_real.h_ptr,
-				Fimgs_imag.h_ptr,
-				Fimgs_nomask_real.h_ptr,
-				Fimgs_nomask_imag.h_ptr,
-				sp.itrans_min,
-				sp.itrans_max,
-				baseMLO->adaptive_oversampling,
-				baseMLO->sampling,
-				oversampled_translations_x,
-				oversampled_translations_y,
-				oversampled_translations_z,
-				sp.nr_oversampled_trans,
-				baseMLO->global_fftshifts_ab_current,
-				baseMLO->global_fftshifts_ab2_current,
-				op.local_Fimgs_shifted[ipart],
-				op.local_Fimgs_shifted_nomask[ipart],
-				iover_transes,
-				itranses,
-				ihiddens,
-				image_size);
-
-
-		Fimgs_real.put_on_device(translation_num * image_size);
-		Fimgs_imag.put_on_device(Fimgs_real.size);
-		Fimgs_nomask_real.put_on_device(Fimgs_real.size);
-		Fimgs_nomask_imag.put_on_device(Fimgs_real.size);
+		for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
+		{
+			for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
+			{
+				ihiddens.push_back(ihidden);
+				itranses.push_back(itrans);
+				iover_transes.push_back(iover_trans);
+			}
+		}
 
 		CUDA_CPU_TOC("translation_2");
-
 
 		/*======================================================
 		                       SCALE
@@ -1856,7 +1843,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 #else
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-	size_t allocationSize = (float)free * .8; //Lets leave some for other processes for now
+	size_t allocationSize = (float)free * .7; //Lets leave some for other processes for now
 
 	printf("Custom allocator assigned %.2f MiB of device memory.\n", (float)allocationSize/(1024.*1024.));
 

@@ -202,6 +202,308 @@ void mapWeights(
 	}
 }
 
+
+
+template<bool do_ctf_correction, bool do_scale_correction>
+void translationKernelCPU(
+		double *ctfs,
+		Complex *Fimgs_shifted,
+		XFLOAT *Fimgs_real,
+		XFLOAT *Fimgs_imag,
+		std::vector< MultidimArray<Complex> > &fftshifts,
+		unsigned long itrans_min,
+		unsigned long itrans_max,
+		unsigned long image_size,
+		double scale_correction)
+{
+	Complex *myAB;
+	XFLOAT real, imag;
+
+	for (long int i = itrans_min; i < itrans_max; i++)
+	{
+		myAB = fftshifts[i].data;
+
+		for (unsigned n = 0; n < image_size; n ++)
+		{
+			real = myAB[n].real * (*(Fimgs_shifted + n)).real
+					- myAB[n].imag * (*(Fimgs_shifted + n)).imag;
+			imag = myAB[n].real * (*(Fimgs_shifted + n)).imag
+					+ myAB[n].imag * (*(Fimgs_shifted + n)).real;
+
+			if (do_scale_correction)
+			{
+				real *= scale_correction;
+				imag *= scale_correction;
+			}
+
+			if (do_ctf_correction)
+			{
+				real /= ctfs[n];
+				imag /= ctfs[n];
+			}
+
+			Fimgs_real[i * image_size + n] = real;
+			Fimgs_imag[i * image_size + n] = imag;
+		}
+	}
+}
+
+
+void doTranslations(
+		double *ctfs,
+		Complex *Fimgs_shifted,
+		XFLOAT *Fimgs_real,
+		XFLOAT *Fimgs_imag,
+		std::vector< MultidimArray<Complex> > &fftshifts,
+		unsigned long itrans_min,
+		unsigned long itrans_max,
+		unsigned long image_size,
+		double scale_correction)
+{
+	bool do_ctf = ctfs != NULL;
+	bool do_scale = scale_correction != 1.;
+
+	if (do_ctf && do_scale)
+		translationKernelCPU<true,true>(
+				ctfs,
+				Fimgs_shifted,
+				Fimgs_real,
+				Fimgs_imag,
+				fftshifts,
+				itrans_min,
+				itrans_max,
+				image_size,
+				1/scale_correction
+				);
+	else if (do_ctf)
+		translationKernelCPU<true,false>(
+				ctfs,
+				Fimgs_shifted,
+				Fimgs_real,
+				Fimgs_imag,
+				fftshifts,
+				itrans_min,
+				itrans_max,
+				image_size,
+				1
+				);
+	else if (do_scale)
+		translationKernelCPU<false,true>(
+				NULL,
+				Fimgs_shifted,
+				Fimgs_real,
+				Fimgs_imag,
+				fftshifts,
+				itrans_min,
+				itrans_max,
+				image_size,
+				1/scale_correction
+				);
+	else
+		translationKernelCPU<false,false>(
+				NULL,
+				Fimgs_shifted,
+				Fimgs_real,
+				Fimgs_imag,
+				fftshifts,
+				itrans_min,
+				itrans_max,
+				image_size,
+				1
+				);
+}
+
+
+
+#define TRANS_BLOCK_SIZE 128
+
+template<bool do_ctf_correction, bool do_scale_correction>
+__global__ void cuda_translation_kernel(
+		XFLOAT *g_ctfs,
+		XFLOAT *g_Fimgs_real,
+		XFLOAT *g_Fimgs_imag,
+		XFLOAT *g_Fimgs_shifted_real,
+		XFLOAT *g_Fimgs_shifted_imag,
+		XFLOAT *g_fftshifts_real,
+		XFLOAT *g_fftshifts_imag,
+		unsigned long image_size,
+		unsigned long image_idx_offset,
+		double scale_correction)
+{
+	int img_idx = blockIdx.x + image_idx_offset;
+	int tid = threadIdx.x;
+
+	XFLOAT real, imag;
+
+	unsigned pixel_pass_num( ceilf( (float)image_size / (float)TRANS_BLOCK_SIZE ) );
+
+	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
+	{
+		unsigned local_pixel = (pass * TRANS_BLOCK_SIZE) + tid;
+
+		if(local_pixel >= image_size)
+			break;
+
+		unsigned global_pixel = img_idx * image_size + local_pixel;
+
+		real = g_fftshifts_real[global_pixel] * g_Fimgs_real[local_pixel]
+		     - g_fftshifts_imag[global_pixel] * g_Fimgs_imag[local_pixel];
+
+		imag = g_fftshifts_real[global_pixel] * g_Fimgs_imag[local_pixel]
+		     + g_fftshifts_imag[global_pixel] * g_Fimgs_real[local_pixel];
+
+		if (do_scale_correction)
+		{
+			real *= scale_correction;
+			imag *= scale_correction;
+		}
+
+		if (do_ctf_correction)
+		{
+			real /= g_ctfs[local_pixel];
+			imag /= g_ctfs[local_pixel];
+		}
+
+		g_Fimgs_shifted_real[global_pixel] = real;
+		g_Fimgs_shifted_imag[global_pixel] = imag;
+	}
+}
+
+
+
+void doTranslationsGpu(
+		double *h_ctf,
+		Complex *h_Fimgs,
+		CudaGlobalPtr<XFLOAT> &Fimgs_shifted_real,
+		CudaGlobalPtr<XFLOAT> &Fimgs_shifted_imag,
+		std::vector< MultidimArray<Complex> > &h_fftshifts,
+		unsigned long itrans_min,
+		unsigned long itrans_max,
+		unsigned long image_size,
+		double scale_correction,
+		CudaCustomAllocator * allocator,
+		cudaStream_t stream)
+{
+
+
+
+
+//	doTranslations(
+//			h_ctf,
+//			h_Fimgs,
+//			Fimgs_shifted_real.h_ptr,
+//			Fimgs_shifted_imag.h_ptr,
+//			h_fftshifts,
+//			itrans_min,
+//			itrans_max,
+//			image_size,
+//			scale_correction
+//			);
+//
+//	Fimgs_shifted_real.cp_to_device();
+//	Fimgs_shifted_imag.cp_to_device();
+
+
+
+
+
+	bool do_ctf = h_ctf != NULL;
+	bool do_scale = scale_correction != 1.;
+
+	unsigned img_count = itrans_max - itrans_min;
+
+	CudaGlobalPtr<XFLOAT> ctf(allocator),
+			Fimgs_real(image_size, allocator),
+			Fimgs_imag(image_size, allocator),
+			fftshifts_real(img_count * image_size, allocator),
+			fftshifts_imag(img_count * image_size, allocator);
+
+	for (int i = 0; i < image_size; i ++)
+	{
+		Fimgs_real[i] = (XFLOAT) h_Fimgs[i].real;
+		Fimgs_imag[i] = (XFLOAT) h_Fimgs[i].imag;
+	}
+
+	Fimgs_real.put_on_device();
+	Fimgs_imag.put_on_device();
+
+	if (do_ctf)
+	{
+		ctf.size = image_size;
+		ctf.host_alloc();
+
+		for (int i = 0; i < image_size; i ++)
+			ctf[i] = (XFLOAT) h_ctf[i];
+
+		ctf.put_on_device();
+	}
+
+	for (int i = 0; i < img_count; i ++)
+	{
+		for (int j = 0; j < image_size; j ++)
+		{
+			fftshifts_real[i * image_size + j] = (XFLOAT) h_fftshifts[i].data[j].real;
+			fftshifts_imag[i * image_size + j] = (XFLOAT) h_fftshifts[i].data[j].imag;
+		}
+	}
+
+	fftshifts_real.put_on_device();
+	fftshifts_imag.put_on_device();
+
+	if (do_ctf && do_scale)
+		cuda_translation_kernel<true,true><<<img_count,TRANS_BLOCK_SIZE,0,stream>>>(
+				~ctf,
+				~Fimgs_real,
+				~Fimgs_imag,
+				~Fimgs_shifted_real,
+				~Fimgs_shifted_imag,
+				~fftshifts_real,
+				~fftshifts_imag,
+				image_size,
+				itrans_min,
+				1/scale_correction
+				);
+	else if (do_ctf)
+		cuda_translation_kernel<true,false><<<img_count,TRANS_BLOCK_SIZE,0,stream>>>(
+				~ctf,
+				~Fimgs_real,
+				~Fimgs_imag,
+				~Fimgs_shifted_real,
+				~Fimgs_shifted_imag,
+				~fftshifts_real,
+				~fftshifts_imag,
+				image_size,
+				itrans_min,
+				1
+				);
+	else if (do_scale)
+		cuda_translation_kernel<false,true><<<img_count,TRANS_BLOCK_SIZE,0,stream>>>(
+				NULL,
+				~Fimgs_real,
+				~Fimgs_imag,
+				~Fimgs_shifted_real,
+				~Fimgs_shifted_imag,
+				~fftshifts_real,
+				~fftshifts_imag,
+				image_size,
+				itrans_min,
+				1/scale_correction
+				);
+	else
+		cuda_translation_kernel<false,false><<<img_count,TRANS_BLOCK_SIZE,0,stream>>>(
+				NULL,
+				~Fimgs_real,
+				~Fimgs_imag,
+				~Fimgs_shifted_real,
+				~Fimgs_shifted_imag,
+				~fftshifts_real,
+				~fftshifts_imag,
+				image_size,
+				itrans_min,
+				1
+				);
+}
+
 long unsigned imageTranslation(
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
