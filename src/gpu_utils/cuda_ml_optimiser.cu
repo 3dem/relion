@@ -1114,33 +1114,26 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 
-			thr_wsum_sigma2_offset = 0.0;
 			for (long int n = partial_pos; n < partial_pos+block_num; n++)
 			{
-
 				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n-partial_pos]];
-				long int iorientclass = exp_iclass * sp.nr_dir * sp.nr_psi + iorient;
-				// Only proceed if any of the particles had any significant coarsely sampled translation
 
-				if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+				long int mydir, idir=floor(iorient/sp.nr_psi);
+				if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+					mydir = idir;
+				else
+					mydir = op.pointer_dir_nonzeroprior[idir];
+
+				// store partials according to indices of the relevant dimension
+				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
+				thr_sumw_group[group_id]                 						+= p_weights[n];
+				thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
+				thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
+
+				if (baseMLO->mymodel.ref_dim == 2)
 				{
-					long int mydir, idir=floor(iorient/sp.nr_psi);
-					if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-						mydir = idir;
-					else
-						mydir = op.pointer_dir_nonzeroprior[idir];
-
-					// store partials according to indices of the relevant dimension
-					DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
-					thr_sumw_group[group_id]                 						+= p_weights[n];
-					thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
-					thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
-
-					if (baseMLO->mymodel.ref_dim == 2)
-					{
-						thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[n];
-						thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[n];
-					}
+					thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[n];
+					thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[n];
 				}
 			}
 			partial_pos+=block_num;
@@ -1240,7 +1233,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				sp.itrans_min * sp.nr_oversampled_trans,
 				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
 				image_size,
-				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				1,
 				cudaMLO->allocator,
 				0
 				);
@@ -1254,7 +1247,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				sp.itrans_min * sp.nr_oversampled_trans,
 				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
 				image_size,
-				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				1,
 				cudaMLO->allocator,
 				0
 				);
@@ -1479,6 +1472,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						ipart,
 						group_id,
 						exp_iclass,
+						part_scale,
 						0);
 
 				/*======================================================
@@ -1562,19 +1556,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 //				cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
 
-				wdiff2s_AA.cp_to_host();
-				wdiff2s_XA.cp_to_host();
-				HANDLE_ERROR(cudaStreamSynchronize(0));
+
 				CUDA_CPU_TOC("backproject");
-				for (long int j = 0; j < image_size; j++)
-				{
-					int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
-					if (baseMLO->do_scale_correction && DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
-					{
-						DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += wdiff2s_AA[AAXA_pos+j];
-						DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
-					}
-				}
 				AAXA_pos+=orientation_num*image_size;
 #ifdef TIMING
 				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1582,8 +1565,24 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 			} // end loop proj_div
 		} // end loop iclass
+		wdiff2s_AA.cp_to_host();
+		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
+		AAXA_pos=0;
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		{
+			for (long int j = 0; j < image_size; j++)
+			{
+				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
+				if (baseMLO->do_scale_correction && DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
+				{
+					DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += wdiff2s_AA[AAXA_pos+j];
+					DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
+				}
+			}
+			AAXA_pos+=ProjectionData[ipart].orientation_num[exp_iclass]*image_size;
+		} // end loop iclass
 		for (long int j = 0; j < image_size; j++)
 		{
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);

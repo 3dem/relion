@@ -30,7 +30,8 @@ __global__ void cuda_kernel_wavg(
 		unsigned long translation_num,
 		XFLOAT weight_norm,
 		XFLOAT significant_weight,
-		bool refs_are_ctf_corrected)
+		bool refs_are_ctf_corrected,
+		XFLOAT part_scale)
 {
 	XFLOAT ref_real, ref_imag;
 
@@ -81,6 +82,11 @@ __global__ void cuda_kernel_wavg(
 				{
 					ref_real *= __ldg(&g_ctfs[pixel]);
 					ref_imag *= __ldg(&g_ctfs[pixel]);
+				}
+				else
+				{
+					ref_real *= part_scale;
+					ref_imag *= part_scale;
 				}
 
 				for (unsigned long itrans = 0; itrans < translation_num; itrans++)

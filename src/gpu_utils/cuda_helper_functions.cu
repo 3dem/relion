@@ -727,6 +727,7 @@ void runWavgKernel(
 		long int ipart,
 		int group_id,
 		int exp_iclass,
+		XFLOAT part_scale,
 		cudaStream_t stream)
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
@@ -763,7 +764,8 @@ void runWavgKernel(
 			translation_num,
 			(XFLOAT) op.sum_weight[ipart],
 			(XFLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected
+			baseMLO->refs_are_ctf_corrected,
+			part_scale
 			);
 	else
 		cuda_kernel_wavg<false><<<block_dim,BLOCK_SIZE,0,stream>>>(
@@ -787,7 +789,8 @@ void runWavgKernel(
 			translation_num,
 			(XFLOAT) op.sum_weight[ipart],
 			(XFLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected
+			baseMLO->refs_are_ctf_corrected,
+			part_scale
 			);
 
 	CUDA_GPU_TAC("cuda_kernel_wavg");
