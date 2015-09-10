@@ -210,7 +210,8 @@ void getAllSquaredDifferencesCoarse(
 						image_size,
 						ipart,
 						group_id,
-						exp_iclass);
+						exp_iclass,
+						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc));
 
 				/*====================================
 				    	   Retrieve Results
@@ -496,14 +497,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				// Use the constructed mask to construct a partial class-specific input
 				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
-
-				CUDA_GPU_TIC("kernel_diff_proj");
-				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
-				{
-					// FIXME  make _CC
-					printf("Cross correlation is not supported yet.");
-					exit(0);
-				}
 				runDiff2KernelFine(
 						projKernel,
 						~gpuMinvsigma2,
@@ -523,11 +516,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						significant_num,
 						image_size,
 						ipart,
-						FPCMasks[ipart][exp_iclass].jobOrigin.size
+						FPCMasks[ipart][exp_iclass].jobOrigin.size,
+						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
 
 //				HANDLE_ERROR(cudaStreamSynchronize(0));
-				CUDA_GPU_TOC();
+//				CUDA_GPU_TOC();
 				CUDA_CPU_TOC("Diff2CALL");
 
 			} // end if class significant
@@ -608,32 +602,39 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
-			std::cerr << "the gpu inplementation cannot handle the new dense arrays but instead needs the old Mweight. Go maketh if thou needeth it." << std::endl;
-			exit(1);
-			// Binarize the squared differences array to skip marginalisation
-			double mymindiff2 = 99.e10;
-			long int myminidx = -1;
-			// Find the smallest element in this row of op.Mweight
-			for (long int i = 0; i < XSIZE(op.Mweight); i++)
-			{
+//			std::cerr << "the gpu inplementation cannot handle the new dense arrays but instead needs the old Mweight. Go maketh if thou needeth it." << std::endl;
+//			exit(1);
 
-				double cc = DIRECT_A2D_ELEM(op.Mweight, ipart, i);
-				// ignore non-determined cc
-				if (cc == -999.)
-					continue;
+			std::pair<int, XFLOAT> min_pair=getArgMinOnDevice(PassWeights[ipart].weights);
 
-				// just search for the maximum
-				if (cc < mymindiff2)
-				{
-					mymindiff2 = cc;
-					myminidx = i;
-				}
-			}
-			// Set all except for the best hidden variable to zero and the smallest element to 1
-			for (long int i = 0; i < XSIZE(op.Mweight); i++)
-				DIRECT_A2D_ELEM(op.Mweight, ipart, i)= 0.;
+			//Set all device-located weights to zero, and only the smallest one to 1.
+			HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[ipart].weights), 0.f, PassWeights[ipart].weights.size));
+			HANDLE_ERROR(cudaMemsetAsync(&(PassWeights[ipart].weights.d_ptr[min_pair.first]), 1.f, 1));
 
-			DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
+//			// Binarize the squared differences array to skip marginalisation
+//			double mymindiff2 = 99.e10;
+//			long int myminidx = -1;
+//			// Find the smallest element in this row of op.Mweight
+//			for (long int i = 0; i < XSIZE(op.Mweight); i++)
+//			{
+//
+//				double cc = DIRECT_A2D_ELEM(op.Mweight, ipart, i);
+//				// ignore non-determined cc
+//				if (cc == -999.)
+//					continue;
+//
+//				// just search for the maximum
+//				if (cc < mymindiff2)
+//				{
+//					mymindiff2 = cc;
+//					myminidx = i;
+//				}
+//			}
+//			// Set all except for the best hidden variable to zero and the smallest element to 1
+//			for (long int i = 0; i < XSIZE(op.Mweight); i++)
+//				DIRECT_A2D_ELEM(op.Mweight, ipart, i)= 0.;
+//
+//			DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
 			exp_thisparticle_sumweight += 1.;
 
 		}
@@ -1585,6 +1586,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		AAXA_pos=0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
+
 			for (long int j = 0; j < image_size; j++)
 			{
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);

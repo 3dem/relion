@@ -510,12 +510,13 @@ void runDiff2KernelCoarse(
 		unsigned image_size,
 		int ipart,
 		int group_id,
-		int exp_iclass)
+		int exp_iclass,
+		bool do_CC)
 {
 
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
-	if(do_firstiter_cc || do_always_cc)
+	if(do_CC)
 	{
 		if(projector.mdlZ!=0)
 				cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
@@ -588,10 +589,12 @@ void runDiff2KernelFine(
 		long unsigned significant_num,
 		unsigned image_size,
 		int ipart,
-		long unsigned job_num_count)
+		long unsigned job_num_count,
+		bool do_CC)
 {
     dim3 block_dim = splitCudaBlocks(job_num_count,false);
-    if(do_firstiter_cc || do_always_cc)
+
+    if(do_CC)
     {
 		if(projector.mdlZ!=0)
 			cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE>>>(

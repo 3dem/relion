@@ -265,7 +265,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 				XFLOAT diff2 = (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_Minvsigma2[pixel]);
 
 				s_cuda_kernel_diff2s[translation_num * tid + itrans] += diff2;
-				s_cuda_kernel_diff2s[translation_num * tid + itrans + shared_mid_size] += ref_real*ref_real + ref_imag*ref_imag
+				s_cuda_kernel_diff2s[translation_num * tid + itrans + shared_mid_size] += ref_real*ref_real + ref_imag*ref_imag;
 			}
 		}
 	}
@@ -290,7 +290,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 	}
 }
 
-//template<bool do_3DProjection>
+template<bool do_3DProjection>
 __global__ void cuda_kernel_diff2_CC_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
