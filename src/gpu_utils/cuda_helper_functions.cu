@@ -515,29 +515,56 @@ void runDiff2KernelCoarse(
 
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
-	if(projector.mdlZ!=0)
-		cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
-			d_eulers,
-			Fimgs_real,
-			Fimgs_imag,
-			projector,
-			gpuMinvsigma2,
-			diff2s,
-			translation_num,
-			image_size,
-			op.highres_Xi2_imgs[ipart] / 2.);
+	if(do_firstiter_cc || do_always_cc)
+	{
+		if(projector.mdlZ!=0)
+				cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+					d_eulers,
+					Fimgs_real,
+					Fimgs_imag,
+					projector,
+					gpuMinvsigma2,
+					diff2s,
+					translation_num,
+					image_size,
+					op.highres_Xi2_imgs[ipart] / 2.);
+			else
+				cuda_kernel_diff2_coarse<false><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+					d_eulers,
+					Fimgs_real,
+					Fimgs_imag,
+					projector,
+					gpuMinvsigma2,
+					diff2s,
+					translation_num,
+					image_size,
+					op.highres_Xi2_imgs[ipart] / 2.);
+	}
 	else
-		cuda_kernel_diff2_coarse<false><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
-			d_eulers,
-			Fimgs_real,
-			Fimgs_imag,
-			projector,
-			gpuMinvsigma2,
-			diff2s,
-			translation_num,
-			image_size,
-			op.highres_Xi2_imgs[ipart] / 2.);
-
+	{
+		if(projector.mdlZ!=0)
+			cuda_kernel_diff2_CC_coarse<true><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+				d_eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				gpuMinvsigma2,
+				diff2s,
+				translation_num,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.);
+		else
+			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+				d_eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				gpuMinvsigma2,
+				diff2s,
+				translation_num,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.);
+	}
 	CUDA_GPU_TAC("runProjAndDifferenceKernelCoarse");
 }
 
@@ -564,39 +591,78 @@ void runDiff2KernelFine(
 		long unsigned job_num_count)
 {
     dim3 block_dim = splitCudaBlocks(job_num_count,false);
-
-	if(projector.mdlZ!=0)
-		cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE>>>(
-			eulers,
-			Fimgs_real,
-			Fimgs_imag,
-			projector,
-			gpuMinvsigma2,
-			diff2s,
-			image_size,
-			op.highres_Xi2_imgs[ipart] / 2.,
-			orientation_num,
-			translation_num,
-			job_num_count, //significant_num,
-			rot_idx,
-			trans_idx,
-			job_idx,
-			job_num);
-	else
-		cuda_kernel_diff2_fine<false><<<block_dim,BLOCK_SIZE>>>(
-			eulers,
-			Fimgs_real,
-			Fimgs_imag,
-			projector,
-			gpuMinvsigma2,
-			diff2s,
-			image_size,
-			op.highres_Xi2_imgs[ipart] / 2.,
-			orientation_num,
-			translation_num,
-			job_num_count, //significant_num,
-			rot_idx,
-			trans_idx,
-			job_idx,
-			job_num);
+    if(do_firstiter_cc || do_always_cc)
+    {
+		if(projector.mdlZ!=0)
+			cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE>>>(
+				eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				gpuMinvsigma2,
+				diff2s,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.,
+				orientation_num,
+				translation_num,
+				job_num_count, //significant_num,
+				rot_idx,
+				trans_idx,
+				job_idx,
+				job_num);
+		else
+			cuda_kernel_diff2_fine<false><<<block_dim,BLOCK_SIZE>>>(
+				eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				gpuMinvsigma2,
+				diff2s,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.,
+				orientation_num,
+				translation_num,
+				job_num_count, //significant_num,
+				rot_idx,
+				trans_idx,
+				job_idx,
+				job_num);
+    }
+    else
+    {
+		if(projector.mdlZ!=0)
+			cuda_kernel_diff2_CC_fine<true><<<block_dim,BLOCK_SIZE>>>(
+				eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				gpuMinvsigma2,
+				diff2s,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.,
+				orientation_num,
+				translation_num,
+				job_num_count, //significant_num,
+				rot_idx,
+				trans_idx,
+				job_idx,
+				job_num);
+		else
+			cuda_kernel_diff2_CC_fine<false><<<block_dim,BLOCK_SIZE>>>(
+				eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				gpuMinvsigma2,
+				diff2s,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.,
+				orientation_num,
+				translation_num,
+				job_num_count, //significant_num,
+				rot_idx,
+				trans_idx,
+				job_idx,
+				job_num);
+    }
 }
