@@ -891,7 +891,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		thr_wsum_reference_power_spectra.resize(baseMLO->mymodel.nr_groups, aux);
 	}
 
-
 	std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	bool have_warned_small_scale = false;
 
@@ -1107,13 +1106,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CUDA_CPU_TOC("collect_data_2_post_kernel");
 	} // end loop ipart
 
+	/*======================================================
+	                     SET METADATA
+	======================================================*/
+
 	std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
-		/*======================================================
-		                     SET METADATA
-		======================================================*/
-
 		CUDA_CPU_TIC("setMetadata");
 
 		CUDA_CPU_TIC("getArgMaxOnDevice");
@@ -1155,15 +1154,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUDA_CPU_TOC("setMetadata");
 	}
+
 	CUDA_CPU_TOC("collect_data_2");
 
 
 
-	CUDA_CPU_TIC("maximization");
+
 
 	/*=======================================================================================
 	                                   MAXIMIZATION
 	=======================================================================================*/
+
+	CUDA_CPU_TIC("maximization");
 
 	cudaMLO->clearBackprojectDataBundle();
 
@@ -1283,12 +1285,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CudaGlobalPtr<XFLOAT> wdiff2s_AA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_XA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->allocator);
+
 		wdiff2s_AA.device_alloc();
 		wdiff2s_XA.device_alloc();
 		unsigned long AAXA_pos=0;
 
 		wdiff2s_sum.device_alloc();
 		wdiff2s_sum.device_init(0.f);
+
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1368,18 +1372,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CUDA_CPU_TIC("pre_wavg_map");
 				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, 0, cudaMLO->allocator);
 
-				long unsigned ihidden(0);
-				std::vector< long unsigned > iover_transes, ihiddens;
-
-				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
-				{
-					for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
-					{
-						ihiddens.push_back(ihidden);
-						iover_transes.push_back(iover_trans);
-					}
-				}
-
 				mapWeights(
 						proj_div_start,
 						&sorted_weights[0],
@@ -1390,15 +1382,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						&thisClassFinePassWeights.weights[0],
 						&thisClassFinePassWeights.rot_idx[0],
 						&thisClassFinePassWeights.trans_idx[0],
-						baseMLO->sampling,
-						ipart,
-						iover_transes,
-						ihiddens,
-						ProjectionData_projdiv.iorientclasses,
-						ProjectionData_projdiv.iover_rots,
-						op.Mweight,
-						sp.current_oversampling,
-						sp.nr_trans);
+						sp.current_oversampling);
 
 				sorted_weights.put_on_device();
 				CUDA_CPU_TOC("pre_wavg_map");
