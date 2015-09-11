@@ -61,14 +61,14 @@ void CudaBackprojector::initMdl(int streamPriority)
 		}
 
 		//Allocate space for indices
-		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(XFLOAT)));
+		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(int)));
+		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(int)));
+		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(int)));
 
 		//Send over indices
-		HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(XFLOAT), cudaMemcpyHostToDevice));
-		HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(XFLOAT), cudaMemcpyHostToDevice));
-		HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
 
 		//Allocate space for model
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, mdlXYZ * sizeof(XFLOAT)));
