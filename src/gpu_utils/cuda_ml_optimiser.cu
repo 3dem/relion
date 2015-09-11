@@ -114,30 +114,15 @@ void getAllSquaredDifferencesCoarse(
 
 		CUDA_CPU_TOC("translation_1");
 
-		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
-		gpuMinvsigma2.device_alloc();
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-		{
-			gpuMinvsigma2[n] = op.local_Minvsigma2s[ipart].data[n];
-		}
+		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
+		CudaGlobalPtr<XFLOAT> corr_img(image_size, cudaMLO->allocator);
+		corr_img.device_alloc();
 
-		if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			{
-				gpuMinvsigma2[n] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
-			}
-		}
-		if (baseMLO->do_scale_correction)
-		{
-			XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			{
-				gpuMinvsigma2[n] *= myscale * myscale;
-			}
-		}
-		gpuMinvsigma2.cp_to_device();
+		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
+		corr_img.cp_to_device();
+
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			CudaProjectorPlan projectorPlan = projectorPlans[exp_iclass];
@@ -163,7 +148,7 @@ void getAllSquaredDifferencesCoarse(
 
 				runDiff2KernelCoarse(
 						projKernel,
-						~gpuMinvsigma2,
+						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
 						~(*projectorPlan.eulers),
@@ -175,7 +160,8 @@ void getAllSquaredDifferencesCoarse(
 						image_size,
 						ipart,
 						group_id,
-						exp_iclass);
+						exp_iclass,
+						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc));
 
 				/*====================================
 				    	   Retrieve Results
@@ -314,39 +300,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CUDA_CPU_TIC("kernel_init_1");
 
-		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
-		gpuMinvsigma2.device_alloc();
-		// Since we hijack Minvsigma to carry a bit more info into the GPU-kernel
-		// we need to make a modified copy, since the global object shouldn't be
-		// changed
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-		{
-			gpuMinvsigma2[n] = *(op.local_Minvsigma2s[ipart].data + n );
-		}
-
-		if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			{
-				gpuMinvsigma2[n] *= (DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n));
-			}
-		}
-
-		// TODO :    + Assure accuracy with the implemented GPU-based ctf-scaling
-		//           + Make setting of myscale robust between here and above.
-		//  (scale_correction turns off by default with only one group: ml_optimiser-line 1067,
-		//   meaning small-scale test will probably not catch this malfunctioning when/if it breaks.)
-		if (baseMLO->do_scale_correction)
-		{
-			XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			{
-				gpuMinvsigma2[n] *= (myscale*myscale);
-			}
-		}
+		CudaGlobalPtr<XFLOAT> corr_img(image_size, cudaMLO->allocator);
+		corr_img.device_alloc();
+		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 
 		CUDA_GPU_TIC("imagMemCp");
-		gpuMinvsigma2.cp_to_device();
+		corr_img.cp_to_device();
 		CUDA_GPU_TAC("imagMemCp");
 
 		CUDA_CPU_TOC("kernel_init_1");
@@ -449,16 +408,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				// Use the constructed mask to construct a partial class-specific input
 				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
 
-				CUDA_GPU_TIC("kernel_diff_proj");
-				if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) // do cross-correlation instead of diff
-				{
-					// FIXME  make _CC
-					printf("Cross correlation is not supported yet.");
-					exit(0);
-				}
 				runDiff2KernelFine(
 						projKernel,
-						~gpuMinvsigma2,
+						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
 						~(eulers[exp_iclass-sp.iclass_min]),
@@ -475,11 +427,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						significant_num,
 						image_size,
 						ipart,
-						FPCMasks[ipart][exp_iclass].jobOrigin.size
+						FPCMasks[ipart][exp_iclass].jobOrigin.size,
+						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
 
 //				HANDLE_ERROR(cudaStreamSynchronize(0));
-				CUDA_GPU_TOC();
 				CUDA_CPU_TOC("Diff2CALL");
 
 			} // end if class significant
@@ -560,32 +512,54 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
-			std::cerr << "the gpu inplementation cannot handle the new dense arrays but instead needs the old Mweight. Go maketh if thou needeth it." << std::endl;
-			exit(1);
-			// Binarize the squared differences array to skip marginalisation
-			double mymindiff2 = 99.e10;
-			long int myminidx = -1;
-			// Find the smallest element in this row of op.Mweight
-			for (long int i = 0; i < XSIZE(op.Mweight); i++)
+
+			if(exp_ipass==0)
 			{
-
-				double cc = DIRECT_A2D_ELEM(op.Mweight, ipart, i);
-				// ignore non-determined cc
-				if (cc == -999.)
-					continue;
-
-				// just search for the maximum
-				if (cc < mymindiff2)
-				{
-					mymindiff2 = cc;
-					myminidx = i;
-				}
+				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+				PassWeights[ipart].weights.d_ptr=&(allMweight.d_ptr[ipart*nr_coarse_weights]);
+				PassWeights[ipart].weights.h_ptr=&(allMweight.h_ptr[ipart*nr_coarse_weights]);
+				PassWeights[ipart].weights.size = nr_coarse_weights;
 			}
-			// Set all except for the best hidden variable to zero and the smallest element to 1
-			for (long int i = 0; i < XSIZE(op.Mweight); i++)
-				DIRECT_A2D_ELEM(op.Mweight, ipart, i)= 0.;
+			PassWeights[ipart].weights.h_do_free=false;
 
-			DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
+			std::pair<int, XFLOAT> min_pair=getArgMinOnDevice(PassWeights[ipart].weights);
+			PassWeights[ipart].weights.cp_to_host();
+			HANDLE_ERROR(cudaStreamSynchronize(0));
+
+			//Set all device-located weights to zero, and only the smallest one to 1.
+			HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[ipart].weights), 0.f, PassWeights[ipart].weights.size*sizeof(XFLOAT),0));
+
+			XFLOAT unity=1;
+			HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights[ipart].weights.d_ptr[min_pair.first]), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
+
+			PassWeights[ipart].weights.cp_to_host();
+			HANDLE_ERROR(cudaStreamSynchronize(0));
+//
+//				// Binarize the squared differences array to skip marginalisation
+//				double mymindiff2 = 99.e10;
+//				long int myminidx = -1;
+//				// Find the smallest element in this row of op.Mweight
+//				for (long int i = 0; i < XSIZE(op.Mweight); i++)
+//				{
+//
+//					double cc = DIRECT_A2D_ELEM(op.Mweight, ipart, i);
+//					// ignore non-determined cc
+//					if (cc == -999.)
+//						continue;
+//
+//					// just search for the maximum
+//					if (cc < mymindiff2)
+//					{
+//						mymindiff2 = cc;
+//						myminidx = i;
+//					}
+//				}
+//				// Set all except for the best hidden variable to zero and the smallest element to 1
+//				for (long int i = 0; i < XSIZE(op.Mweight); i++)
+//					DIRECT_A2D_ELEM(op.Mweight, ipart, i)= 0.;
+//
+//				DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
+
 			exp_thisparticle_sumweight += 1.;
 
 		}
@@ -737,7 +711,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		double frac_weight = 0.;
 		double my_significant_weight;
 
-		if (exp_ipass!=0)
+		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
+		{
+			my_significant_weight = 0.999;
+			frac_weight = 1.;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (double) 1.;
+			if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
+				for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
+					if (DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden) >= my_significant_weight)
+						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = true;
+					else
+						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
+		}
+		else if (exp_ipass!=0)
 		{
 			CUDA_CPU_TIC("sort");
 			CudaGlobalPtr<XFLOAT> sorted_weight_new(PassWeights[ipart].weights.size, cudaMLO->allocator);  // make new sorted weights
@@ -1554,6 +1540,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		AAXA_pos=0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
+			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
+				continue;
 			for (long int j = 0; j < image_size; j++)
 			{
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);

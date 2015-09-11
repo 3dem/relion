@@ -34,6 +34,22 @@ __device__ inline void cuda_atomic_add(float* address, float value)
 #endif
 
 template <typename T>
+static T getMaxOnDevice(CudaGlobalPtr<T> &ptr)
+{
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_ERROR: getMaxOnDevice called with null allocator.\n");
+#endif
+	ptr.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(0));
+	return (T)*std::max_element(ptr.h_ptr,ptr.h_ptr + ptr.size);
+}
+
+template <typename T>
 static std::pair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
@@ -67,6 +83,27 @@ if (ptr.getAllocator() == NULL)
 	ptr.cp_to_host();
 	HANDLE_ERROR(cudaStreamSynchronize(0));
 	return (T)*std::min_element(ptr.h_ptr,ptr.h_ptr + ptr.size);
+}
+
+
+template <typename T>
+static std::pair<int, T> getArgMinOnDevice(CudaGlobalPtr<T> &ptr)
+{
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_WARNING: getArgMinOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_WARNING: getArgMinOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_WARNING: getArgMinOnDevice called with null allocator.\n");
+#endif
+	std::pair<int, T> min_pair;
+	ptr.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(0));
+	min_pair.first  = std::distance(ptr.h_ptr,std::min_element(ptr.h_ptr,ptr.h_ptr + ptr.size));
+	min_pair.second = ptr.h_ptr[min_pair.first];
+
+	return min_pair;
 }
 
 template <typename T>

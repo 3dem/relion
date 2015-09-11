@@ -13,6 +13,17 @@
 #include <thrust/device_vector.h>
 
 template <typename T>
+static T getMaxOnDevice(CudaGlobalPtr<T> &ptr)
+{
+	thrust::device_ptr<T> dp = thrust::device_pointer_cast(~ptr);
+	thrust::device_ptr<T> pos = thrust::max_element(dp, dp + ptr.size);
+	unsigned int pos_index = thrust::distance(dp, pos);
+	T max_val;
+	HANDLE_ERROR(cudaMemcpy(&max_val, &ptr.d_ptr[pos_index], sizeof(T), cudaMemcpyDeviceToHost));
+	return max_val;
+}
+
+template <typename T>
 static std::pair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
 {
 	std::pair<int, T> pair;
@@ -32,6 +43,17 @@ static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
 	T min_val;
 	HANDLE_ERROR(cudaMemcpy(&min_val, &ptr.d_ptr[pos_index], sizeof(T), cudaMemcpyDeviceToHost));
 	return min_val;
+}
+
+template <typename T>
+static std::pair<int, T> getArgMinOnDevice(CudaGlobalPtr<T> &ptr)
+{
+	std::pair<int, T> pair;
+	thrust::device_ptr<T> dp = thrust::device_pointer_cast(~ptr);
+	thrust::device_ptr<T> pos = thrust::min_element(dp, dp + ptr.size);
+	pair.first = thrust::distance(dp, pos);
+	HANDLE_ERROR(cudaMemcpy( &pair.second, &ptr.d_ptr[pair.first], sizeof(T), cudaMemcpyDeviceToHost));
+	return pair;
 }
 
 template <typename T>
