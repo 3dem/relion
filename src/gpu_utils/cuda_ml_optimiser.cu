@@ -22,7 +22,6 @@
 #include <signal.h>
 #include <map>
 
-static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void getAllSquaredDifferencesCoarse(
@@ -64,9 +63,11 @@ void getAllSquaredDifferencesCoarse(
 	CudaGlobalPtr<XFLOAT> allWeights(cudaMLO->allocator);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		allWeights.size+=projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles;
+
 	allWeights.device_alloc();
 	allWeights.host_alloc();
 	long int allWeights_pos=0;
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -83,52 +84,35 @@ void getAllSquaredDifferencesCoarse(
 		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * translation_num, cudaMLO->allocator);
 		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size * translation_num, cudaMLO->allocator);
 
-		std::vector< MultidimArray<Complex> > *fftshifts;
-
-		if (sp.current_oversampling == 0)
-		{
-			fftshifts = (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size) ? &baseMLO->global_fftshifts_ab_coarse
-					: &baseMLO->global_fftshifts_ab_current;
-		}
-		else
-		{
-			fftshifts = (baseMLO->strict_highres_exp > 0.) ? &baseMLO->global_fftshifts_ab2_coarse
-					: &baseMLO->global_fftshifts_ab2_current;
-		}
-
 		Fimgs_real.device_alloc();
 		Fimgs_imag.device_alloc();
 
-		doTranslationsGpu(
-				baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL,
+		CudaTranslator::Plan transPlan(
 				op.local_Fimgs_shifted[ipart].data,
-				Fimgs_real,
-				Fimgs_imag,
-				*fftshifts,
+				image_size,
 				sp.itrans_min * sp.nr_oversampled_trans,
 				( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-				image_size,
-				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
 				cudaMLO->allocator,
-				0
-				);
+				0, //stream
+				baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+				baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
 
-		long unsigned ihidden(0);
-		std::vector< long unsigned > iover_transes, itranses, ihiddens;
-
-		for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
+		if (sp.current_oversampling == 0)
 		{
-			for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
-			{
-				ihiddens.push_back(ihidden);
-				itranses.push_back(itrans);
-				iover_transes.push_back(iover_trans);
-			}
+			if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
+				cudaMLO->translator_coarse1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+			else
+				cudaMLO->translator_current1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+		}
+		else
+		{
+			if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
+				cudaMLO->translator_coarse2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+			else
+				cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
 		}
 
 		CUDA_CPU_TOC("translation_1");
-
-
 
 		CudaGlobalPtr<XFLOAT> gpuMinvsigma2(image_size, cudaMLO->allocator);
 		gpuMinvsigma2.device_alloc();
@@ -197,7 +181,6 @@ void getAllSquaredDifferencesCoarse(
 				    	   Retrieve Results
 				======================================*/
 				allWeights_pos+=projectorPlan.orientation_num*translation_num;
-				CUDA_GPU_TOC();
 
 			} // end if class significant
 		} // end loop iclass
@@ -316,14 +299,13 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				);
 
 		long unsigned ihidden(0);
-		std::vector< long unsigned > iover_transes, itranses, ihiddens;
+		std::vector< long unsigned > iover_transes, ihiddens;
 
 		for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++, ihidden++)
 		{
 			for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++)
 			{
 				ihiddens.push_back(ihidden);
-				itranses.push_back(itrans);
 				iover_transes.push_back(iover_trans);
 			}
 		}
@@ -1835,6 +1817,18 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 					);
 		}
 	}
+
+	if (baseMLO->global_fftshifts_ab_coarse.size() > 0)
+		translator_coarse1.setShifters(baseMLO->global_fftshifts_ab_coarse);
+
+	if (baseMLO->global_fftshifts_ab2_coarse.size() > 0)
+		translator_coarse2.setShifters(baseMLO->global_fftshifts_ab2_coarse);
+
+	if (baseMLO->global_fftshifts_ab_current.size() > 0)
+		translator_current1.setShifters(baseMLO->global_fftshifts_ab_current);
+
+	if (baseMLO->global_fftshifts_ab2_current.size() > 0)
+		translator_current2.setShifters(baseMLO->global_fftshifts_ab2_current);
 
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 	printf("Custom allocator is disabled.\n");

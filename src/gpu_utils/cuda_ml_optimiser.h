@@ -6,6 +6,7 @@
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
+#include "src/gpu_utils/cuda_translator.h"
 #include <stack>
 
 #ifdef CUDA_DOUBLE_PRECISION
@@ -398,6 +399,11 @@ public:
 
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
+
+	CudaTranslator translator_coarse1;
+	CudaTranslator translator_coarse2;
+	CudaTranslator translator_current1;
+	CudaTranslator translator_current2;
 
 	MlOptimiser *baseMLO;
 

@@ -23,63 +23,15 @@ void CudaBackprojector::initMdl(int streamPriority)
 	}
 #endif
 
-	if(mdlZ==1) //2D case
-	{
-		//Allocate space for model
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
+	//Allocate space for model
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
 
-		//Initiate model with zeros
-		HANDLE_ERROR(cudaMemset( d_mdlReal, 0, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMemset( d_mdlImag, 0, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
-	}
-	else //3D case
-	{
-		// Generate explicit indicies of voxels
-
-		h_voxelX = new int[mdlXYZ];
-		h_voxelY = new int[mdlXYZ];
-		h_voxelZ = new int[mdlXYZ];
-
-		for (int x = 0; x < mdlX; x ++)
-		{
-			for (int y = mdlInitY; y < mdlY + mdlInitY; y++)
-			{
-				for (int z = mdlInitZ; z < mdlZ + mdlInitZ; z++)
-				{
-					if (x*x + y*y + z*z <= maxR2 * padding_factor * padding_factor * 1.2f)
-					{
-						h_voxelX[voxelCount] = x;
-						h_voxelY[voxelCount] = y;
-						h_voxelZ[voxelCount] = z;
-						voxelCount ++;
-					}
-				}
-			}
-		}
-
-		//Allocate space for indices
-		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelX, voxelCount * sizeof(int)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelY, voxelCount * sizeof(int)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_voxelZ, voxelCount * sizeof(int)));
-
-		//Send over indices
-		HANDLE_ERROR(cudaMemcpy( d_voxelX, h_voxelX, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
-		HANDLE_ERROR(cudaMemcpy( d_voxelY, h_voxelY, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
-		HANDLE_ERROR(cudaMemcpy( d_voxelZ, h_voxelZ, voxelCount * sizeof(int), cudaMemcpyHostToDevice));
-
-		//Allocate space for model
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
-
-		//Initiate model with zeros
-		HANDLE_ERROR(cudaMemset( d_mdlReal, 0, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMemset( d_mdlImag, 0, mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
-	}
+	//Initiate model with zeros
+	HANDLE_ERROR(cudaMemset( d_mdlReal, 0, mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlImag, 0, mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
 
 	HANDLE_ERROR(cudaStreamCreateWithPriority(&stream, cudaStreamNonBlocking, streamPriority));
 }
@@ -201,6 +153,7 @@ __global__ void cuda_kernel_backproject2D(
 	}
 }
 
+//Old 3D kernel
 __global__ void cuda_kernel_backproject3D_gather(
 		int *g_xs,
 		int *g_ys,
@@ -550,32 +503,6 @@ void CudaBackprojector::backproject(
 	}
 	else
 	{
-//		int grid_dim = ceil((float)voxelCount / BACKPROJECTION4_GROUP_SIZE);
-//		dim3 block_dim( BACKPROJECTION4_GROUP_SIZE * 4 );
-//
-//		cuda_kernel_backproject3D_gather<<<grid_dim,block_dim,0,stream>>>(
-//			d_voxelX,
-//			d_voxelY,
-//			d_voxelZ,
-//			d_mdlReal,
-//			d_mdlImag,
-//			d_mdlWeight,
-//			d_real,
-//			d_imag,
-//			d_weight,
-//			d_eulers,
-//			maxR2,
-//			padding_factor,
-//			imgX,
-//			imgY,
-//			imgX*imgY,
-//			imageCount,
-//			mdlX,
-//			mdlY,
-//			mdlInitY,
-//			mdlInitZ,
-//			voxelCount);
-
 		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,stream>>>(
 				d_mdlReal,
 				d_mdlImag,
@@ -633,20 +560,8 @@ void CudaBackprojector::getMdlData(Complex *data, double * weights)
 
 CudaBackprojector::~CudaBackprojector()
 {
-	if (voxelCount != 0)
+	if (d_mdlReal != NULL)
 	{
-		HANDLE_ERROR(cudaFree(d_voxelX));
-		HANDLE_ERROR(cudaFree(d_voxelY));
-		HANDLE_ERROR(cudaFree(d_voxelZ));
-
-		d_voxelX = d_voxelY = d_voxelZ = 0;
-
-		delete [] h_voxelX;
-		delete [] h_voxelY;
-		delete [] h_voxelZ;
-
-		h_voxelX = h_voxelY = h_voxelZ = 0;
-
 		HANDLE_ERROR(cudaFree(d_mdlReal));
 		HANDLE_ERROR(cudaFree(d_mdlImag));
 		HANDLE_ERROR(cudaFree(d_mdlWeight));
