@@ -202,6 +202,33 @@ void mapWeights(
 	}
 }
 
+void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, CudaGlobalPtr<XFLOAT> &corr_img, long int ipart, long int group_id)
+{
+	// CC or not
+	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			corr_img[n] = 1. / (op.local_sqrtXi2[ipart]*op.local_sqrtXi2[ipart]);
+	else
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			corr_img[n] = *(op.local_Minvsigma2s[ipart].data + n );
+
+	// ctf-correction or not ( NOTE this is not were the difference metric is ctf-corrected, but
+	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
+	// to the CPU method)
+	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			corr_img[n] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
+
+
+	// scale-correction or not ( NOTE this is not were the difference metric is scale-corrected, but
+	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
+	// to the CPU method)
+	XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
+	if (baseMLO->do_scale_correction)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
+			corr_img[n] *= myscale * myscale;
+}
+
 long unsigned imageTranslation(
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
@@ -498,7 +525,7 @@ void runWavgKernel(
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
-		XFLOAT *gpuMinvsigma2,
+		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
 		XFLOAT *d_eulers,
@@ -516,7 +543,7 @@ void runDiff2KernelCoarse(
 
 	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
 
-	if(do_CC)
+	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
 				cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
@@ -524,7 +551,7 @@ void runDiff2KernelCoarse(
 					Fimgs_real,
 					Fimgs_imag,
 					projector,
-					gpuMinvsigma2,
+					corr_img,
 					diff2s,
 					translation_num,
 					image_size,
@@ -535,7 +562,7 @@ void runDiff2KernelCoarse(
 					Fimgs_real,
 					Fimgs_imag,
 					projector,
-					gpuMinvsigma2,
+					corr_img,
 					diff2s,
 					translation_num,
 					image_size,
@@ -549,22 +576,24 @@ void runDiff2KernelCoarse(
 				Fimgs_real,
 				Fimgs_imag,
 				projector,
-				gpuMinvsigma2,
+				corr_img,
 				diff2s,
 				translation_num,
 				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.);
+				op.highres_Xi2_imgs[ipart] / 2.,
+				(XFLOAT) op.local_sqrtXi2[ipart]);
 		else
 			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
 				d_eulers,
 				Fimgs_real,
 				Fimgs_imag,
 				projector,
-				gpuMinvsigma2,
+				corr_img,
 				diff2s,
 				translation_num,
 				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.);
+				op.highres_Xi2_imgs[ipart] / 2.,
+				(XFLOAT) op.local_sqrtXi2[ipart]);
 	}
 	CUDA_GPU_TAC("runProjAndDifferenceKernelCoarse");
 }
@@ -572,7 +601,7 @@ void runDiff2KernelCoarse(
 
 void runDiff2KernelFine(
 		CudaProjectorKernel &projector,
-		XFLOAT *gpuMinvsigma2,
+		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
 		XFLOAT *eulers,
@@ -594,7 +623,7 @@ void runDiff2KernelFine(
 {
     dim3 block_dim = splitCudaBlocks(job_num_count,false);
 
-    if(do_CC)
+    if(!do_CC)
     {
 		if(projector.mdlZ!=0)
 			cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE>>>(
@@ -602,7 +631,7 @@ void runDiff2KernelFine(
 				Fimgs_real,
 				Fimgs_imag,
 				projector,
-				gpuMinvsigma2,
+				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 				diff2s,
 				image_size,
 				op.highres_Xi2_imgs[ipart] / 2.,
@@ -619,7 +648,7 @@ void runDiff2KernelFine(
 				Fimgs_real,
 				Fimgs_imag,
 				projector,
-				gpuMinvsigma2,
+				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 				diff2s,
 				image_size,
 				op.highres_Xi2_imgs[ipart] / 2.,
@@ -639,10 +668,11 @@ void runDiff2KernelFine(
 				Fimgs_real,
 				Fimgs_imag,
 				projector,
-				gpuMinvsigma2,
+				corr_img,
 				diff2s,
 				image_size,
 				op.highres_Xi2_imgs[ipart] / 2.,
+				(XFLOAT) op.local_sqrtXi2[ipart],
 				orientation_num,
 				translation_num,
 				job_num_count, //significant_num,
@@ -656,10 +686,11 @@ void runDiff2KernelFine(
 				Fimgs_real,
 				Fimgs_imag,
 				projector,
-				gpuMinvsigma2,
+				corr_img,
 				diff2s,
 				image_size,
 				op.highres_Xi2_imgs[ipart] / 2.,
+				(XFLOAT) op.local_sqrtXi2[ipart],
 				orientation_num,
 				translation_num,
 				job_num_count, //significant_num,

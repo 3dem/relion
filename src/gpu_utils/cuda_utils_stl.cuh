@@ -38,11 +38,11 @@ static T getMaxOnDevice(CudaGlobalPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
-	printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
+	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
-	printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
+	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
-	printf("DEBUG_ERROR: getMinOnDevice called with null allocator.\n");
+	printf("DEBUG_ERROR: getMaxOnDevice called with null allocator.\n");
 #endif
 	ptr.cp_to_host();
 	HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -91,11 +91,11 @@ static std::pair<int, T> getArgMinOnDevice(CudaGlobalPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
-	printf("DEBUG_WARNING: getArgMaxOnDevice called with pointer of zero size.\n");
+	printf("DEBUG_WARNING: getArgMinOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
-	printf("DEBUG_WARNING: getArgMaxOnDevice called with null device pointer.\n");
+	printf("DEBUG_WARNING: getArgMinOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
-	printf("DEBUG_WARNING: getArgMaxOnDevice called with null allocator.\n");
+	printf("DEBUG_WARNING: getArgMinOnDevice called with null allocator.\n");
 #endif
 	std::pair<int, T> min_pair;
 	ptr.cp_to_host();
