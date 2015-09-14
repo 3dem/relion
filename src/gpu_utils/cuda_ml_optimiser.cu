@@ -918,7 +918,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// wsum_sigma2_offset is just a double
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
-	unsigned proj_div_max_count(4096*2);
 
 	CUDA_CPU_TOC("store_init");
 
@@ -1314,174 +1313,136 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			thisClassProjectionData.orientation_num[0] = ProjectionData[ipart].orientation_num[exp_iclass];
 			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
 
-			unsigned proj_div_nr = ceil((float)thisClassProjectionData.orientation_num[0] / (float)proj_div_max_count);
-			unsigned long idxArrPos_start(0),idxArrPos_end(0);
+			long unsigned orientation_num(thisClassProjectionData.orientation_num[0]);
 
-			/// Now that reference projection has been made loop over all particles inside this ori_particle
-			for (int iproj_div = 0; iproj_div < proj_div_nr; iproj_div++)
-			{
-				CUDA_CPU_TIC("BP-ProjectionDivision");
-				unsigned long proj_div_start(proj_div_max_count * iproj_div), proj_div_end;
+			/*======================================================
+								PROJECTIONS
+			======================================================*/
 
-				if (iproj_div < proj_div_nr - 1)
-					proj_div_end = proj_div_start + proj_div_max_count;
-				else
-					proj_div_end = thisClassProjectionData.orientation_num[0];
+			BackprojectDataBundle *dataBundle = new BackprojectDataBundle(
+					orientation_num * image_size,
+					orientation_num * 9,
+					0,
+					cudaMLO->allocator);
 
-				long unsigned orientation_num(proj_div_end - proj_div_start);
+			CUDA_CPU_TIC("generateEulerMatricesProjector");
 
-				// use "slice" constructor to slice out betwen start and stop in the specified region of thisClassProjectionData
-				ProjectionParams ProjectionData_projdiv(thisClassProjectionData,proj_div_start,proj_div_end);
-				idxArrPos_start=idxArrPos_end;
-				while((thisClassFinePassWeights.rot_idx[idxArrPos_end]-thisClassFinePassWeights.rot_idx[idxArrPos_start]<orientation_num) && (idxArrPos_end < thisClassFinePassWeights.rot_idx.size))
-					idxArrPos_end++;
+			generateEulerMatrices(
+					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
+					thisClassProjectionData,
+					&dataBundle->eulers[0],
+					!IS_NOT_INV);
 
-				CUDA_CPU_TOC("BP-ProjectionDivision");
+			CUDA_CPU_TOC("generateEulerMatricesProjector");
 
-				/*======================================================
-				                    PROJECTIONS
-				======================================================*/
+			dataBundle->eulers.device_alloc_end();
+			dataBundle->reals.device_alloc_end();
+			dataBundle->imags.device_alloc_end();
+			dataBundle->weights.device_alloc_end();
 
-				BackprojectDataBundle *dataBundle = new BackprojectDataBundle(
-						orientation_num * image_size,
-						orientation_num * 9,
-						0,
-						cudaMLO->allocator);
-
-				CUDA_CPU_TIC("generateEulerMatricesProjector");
-
-				generateEulerMatrices(
-						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
-						ProjectionData_projdiv,
-						&dataBundle->eulers[0],
-						!IS_NOT_INV);
-
-				CUDA_CPU_TOC("generateEulerMatricesProjector");
-
-				dataBundle->eulers.device_alloc_end();
-				dataBundle->reals.device_alloc_end();
-				dataBundle->imags.device_alloc_end();
-				dataBundle->weights.device_alloc_end();
-
-				dataBundle->eulers.cp_to_device();
+			dataBundle->eulers.cp_to_device();
 
 
-				/*======================================================
-				                     MAP WEIGHTS
-				======================================================*/
-				CUDA_CPU_TIC("pre_wavg_map");
-				CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, 0, cudaMLO->allocator);
+			/*======================================================
+								 MAP WEIGHTS
+			======================================================*/
 
-				mapWeights(
-						proj_div_start,
-						&sorted_weights[0],
-						orientation_num,
-						idxArrPos_start,
-						idxArrPos_end,
-						translation_num,
-						&thisClassFinePassWeights.weights[0],
-						&thisClassFinePassWeights.rot_idx[0],
-						&thisClassFinePassWeights.trans_idx[0],
-						sp.current_oversampling);
+			CUDA_CPU_TIC("pre_wavg_map");
+			CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, 0, cudaMLO->allocator);
 
-				sorted_weights.put_on_device();
-				CUDA_CPU_TOC("pre_wavg_map");
-				/*======================================================
-				                     KERNEL CALL
-				======================================================*/
+			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
+				sorted_weights[i] = -999.;
 
-				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
-						cudaMLO->cudaProjectors[exp_iclass],
-						op.local_Minvsigma2s[0].xdim,
-						op.local_Minvsigma2s[0].ydim,
-						op.local_Minvsigma2s[0].xdim-1);
+			for (long unsigned i = 0; i < thisClassFinePassWeights.weights.size; i++)
+				sorted_weights[ (thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
+								= thisClassFinePassWeights.weights[i];
 
-				runWavgKernel(
-						projKernel,
-						~dataBundle->eulers,
-						~Fimgs_real,
-						~Fimgs_imag,
-						~Fimgs_nomask_real,
-						~Fimgs_nomask_imag,
-						~sorted_weights,
-						~ctfs,
-						~Minvsigma2s,
-						~wdiff2s_sum,
-						&wdiff2s_AA.d_ptr[AAXA_pos],
-						&wdiff2s_XA.d_ptr[AAXA_pos],
-						~dataBundle->reals,
-						~dataBundle->imags,
-						~dataBundle->weights,
-						op,
-						baseMLO,
-						orientation_num,
-						translation_num,
-						image_size,
-						ipart,
-						group_id,
-						exp_iclass,
-						part_scale,
-						0);
+			sorted_weights.put_on_device();
+			CUDA_CPU_TOC("pre_wavg_map");
 
+			/*======================================================
+								 KERNEL CALL
+			======================================================*/
 
-				CUDA_GPU_TOC();
+			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
+					cudaMLO->cudaProjectors[exp_iclass],
+					op.local_Minvsigma2s[0].xdim,
+					op.local_Minvsigma2s[0].ydim,
+					op.local_Minvsigma2s[0].xdim-1);
 
-				/*======================================================
-				                    BACKPROJECTION
-				======================================================*/
-
-				XFLOAT padding_factor = baseMLO->wsum_model.BPref[exp_iclass].padding_factor;
-
-				CUDA_CPU_TIC("generateEulerMatricesBackprojector");
-
-				generateEulerMatrices(
-						1/padding_factor, //Why squared scale factor is given in backprojection
-						ProjectionData_projdiv,
-						&dataBundle->eulers[0],
-						IS_NOT_INV);
-
-				CUDA_CPU_TOC("generateEulerMatricesBackprojector");
-
-#ifdef TIMING
-				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
-					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
-#endif
-
-				HANDLE_ERROR(cudaStreamSynchronize(0));
-
-				CUDA_CPU_TIC("backproject");
-
-				dataBundle->eulers.setStream(cudaMLO->cudaBackprojectors[exp_iclass].getStream());
-				dataBundle->eulers.cp_to_device();
-
-				CUDA_GPU_TIC("cuda_kernels_backproject");
-				cudaMLO->cudaBackprojectors[exp_iclass].backproject(
+			runWavgKernel(
+					projKernel,
+					~dataBundle->eulers,
+					~Fimgs_real,
+					~Fimgs_imag,
+					~Fimgs_nomask_real,
+					~Fimgs_nomask_imag,
+					~sorted_weights,
+					~ctfs,
+					~Minvsigma2s,
+					~wdiff2s_sum,
+					&wdiff2s_AA.d_ptr[AAXA_pos],
+					&wdiff2s_XA.d_ptr[AAXA_pos],
 					~dataBundle->reals,
 					~dataBundle->imags,
 					~dataBundle->weights,
-					~dataBundle->eulers,
-					op.local_Minvsigma2s[0].xdim,
-					op.local_Minvsigma2s[0].ydim,
-					orientation_num);
+					op,
+					baseMLO,
+					orientation_num,
+					translation_num,
+					image_size,
+					ipart,
+					group_id,
+					exp_iclass,
+					part_scale,
+					0);
 
-				cudaMLO->backprojectDataBundleStack.push(dataBundle);
+			AAXA_pos+=orientation_num*image_size;
 
-//				cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
+			HANDLE_ERROR(cudaStreamSynchronize(0));
 
 
-				CUDA_CPU_TOC("backproject");
-				AAXA_pos+=orientation_num*image_size;
+			CUDA_GPU_TOC();
+
+			/*======================================================
+								BACKPROJECTION
+			======================================================*/
+
 #ifdef TIMING
-				if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
-					baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
+			if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+				baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
-			} // end loop proj_div
+
+			CUDA_CPU_TIC("backproject");
+
+			CUDA_GPU_TIC("cuda_kernels_backproject");
+			cudaMLO->cudaBackprojectors[exp_iclass].backproject(
+				~dataBundle->reals,
+				~dataBundle->imags,
+				~dataBundle->weights,
+				~dataBundle->eulers,
+				op.local_Minvsigma2s[0].xdim,
+				op.local_Minvsigma2s[0].ydim,
+				orientation_num);
+
+			cudaMLO->backprojectDataBundleStack.push(dataBundle);
+//			cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
+
+			CUDA_CPU_TOC("backproject");
+
+#ifdef TIMING
+			if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+				baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
+#endif
 		} // end loop iclass
+
 		wdiff2s_AA.cp_to_host();
 		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		AAXA_pos=0;
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
