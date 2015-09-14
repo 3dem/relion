@@ -1287,7 +1287,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->allocator);
 
 		wdiff2s_AA.device_alloc();
+		wdiff2s_AA.device_init(0.f);
 		wdiff2s_XA.device_alloc();
+		wdiff2s_XA.device_init(0.f);
+
 		unsigned long AAXA_pos=0;
 
 		wdiff2s_sum.device_alloc();
@@ -1361,9 +1364,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				dataBundle->weights.device_alloc_end();
 
 				dataBundle->eulers.cp_to_device();
-				dataBundle->reals.device_init(0);
-				dataBundle->imags.device_init(0);
-				dataBundle->weights.device_init(0);
 
 
 				/*======================================================
@@ -1390,9 +1390,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				                     KERNEL CALL
 				======================================================*/
 
-				CudaGlobalPtr<XFLOAT> wdiff2s_parts(orientation_num * image_size, 0, cudaMLO->allocator);
-				wdiff2s_parts.device_alloc();
-
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 						cudaMLO->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
@@ -1409,7 +1406,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~sorted_weights,
 						~ctfs,
 						~Minvsigma2s,
-						~wdiff2s_parts,
+						~wdiff2s_sum,
 						&wdiff2s_AA.d_ptr[AAXA_pos],
 						&wdiff2s_XA.d_ptr[AAXA_pos],
 						~dataBundle->reals,
@@ -1426,46 +1423,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						part_scale,
 						0);
 
-				/*======================================================
-				                   REDUCE WDIFF2S
-				======================================================*/
-
-				CUDA_CPU_TIC("reduce_wdiff2s");
-				// reduction_block_num = the highest possible power of two that covers more than or exactly half of all images to be reduced
-				int num_reductions = (int)floor(log2((float)orientation_num));
-				int reduction_block_num = pow(2,num_reductions);
-				if(reduction_block_num==orientation_num) // (possibly) very special case where orientation_num is a power of 2
-					reduction_block_num /= 2;
-
-				CUDA_GPU_TIC("cuda_kernels_reduce_wdiff2s");
-//				std::cerr << "reduction_block_num = "  << reduction_block_num <<  std::endl;
-				for(int k=reduction_block_num; k>=1; k/=2) //invoke kernel repeatedly until all images have been stacked into the first image position
-				{
-//					std::cerr << "k = "  << k <<  std::endl;
-					dim3 block_dim_wd = splitCudaBlocks(k,true);
-
-					// TODO **OF VERY LITTLE IMPORTANCE**  One block treating just 2 images is a very inefficient amount of loads per store
-					cuda_kernel_reduce_wdiff2s<<<block_dim_wd,BLOCK_SIZE,0,0>>>(
-							~wdiff2s_parts,
-							&wdiff2s_AA.d_ptr[AAXA_pos],
-							&wdiff2s_XA.d_ptr[AAXA_pos],
-							orientation_num,
-							image_size,
-							k);
-				}
-				cuda_kernel_wdparts_to_wdsum<<<1,BLOCK_SIZE,0,0>>>(~wdiff2s_parts, ~wdiff2s_sum, image_size);
-				CUDA_GPU_TAC("cuda_kernels_reduce_wdiff2s");
-
-//				wdiff2s_parts.size = image_size; //temporarily set the size to the single image we have now reduced, to not copy more than necessary
-//				wdiff2s_parts.cp_to_host();
-//				wdiff2s_parts.size = orientation_num * image_size;
-
-
 
 				CUDA_GPU_TOC();
-//				wdiff2s_parts.free_host();
-
-				CUDA_CPU_TOC("reduce_wdiff2s");
 
 				/*======================================================
 				                    BACKPROJECTION
@@ -1488,10 +1447,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+
 				CUDA_CPU_TIC("backproject");
 
+				dataBundle->eulers.setStream(cudaMLO->cudaBackprojectors[exp_iclass].getStream());
 				dataBundle->eulers.cp_to_device();
-				HANDLE_ERROR(cudaDeviceSynchronize());
 
 				CUDA_GPU_TIC("cuda_kernels_backproject");
 				cudaMLO->cudaBackprojectors[exp_iclass].backproject(

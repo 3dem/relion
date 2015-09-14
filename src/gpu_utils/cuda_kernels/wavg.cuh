@@ -7,6 +7,7 @@
 #include <fstream>
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_settings.h"
+#include "src/gpu_utils/cuda_device_utils.cuh"
 
 template<bool do_3DProjection>
 __global__ void cuda_kernel_wavg(
@@ -115,12 +116,14 @@ __global__ void cuda_kernel_wavg(
 						Fweight += weightxinvsigma2 * __ldg(&g_ctfs[pixel]);
 					}
 				}
-				g_wavgs_real[ref_pixel] += s_wavgs_real[tid];
-				g_wavgs_imag[ref_pixel] += s_wavgs_imag[tid];
-				g_wdiff2s_parts[ref_pixel] = s_wdiff2s_parts[tid]; //TODO this could be further reduced in here
-				g_wdiff2s_XA[ref_pixel] = s_sumXA[tid];
-				g_wdiff2s_AA[ref_pixel] = s_sumA2[tid];
-				g_Fweights[ref_pixel] += Fweight; //TODO should be buffered into shared
+
+				g_wavgs_real[ref_pixel] = s_wavgs_real[tid];
+				g_wavgs_imag[ref_pixel] = s_wavgs_imag[tid];
+				g_Fweights[ref_pixel] = Fweight; //TODO should be buffered into shared
+
+				cuda_atomic_add(&g_wdiff2s_XA[pixel], s_sumXA[tid]);
+				cuda_atomic_add(&g_wdiff2s_AA[pixel], s_sumA2[tid]);
+				cuda_atomic_add(&g_wdiff2s_parts[pixel], s_wdiff2s_parts[tid]);
 			}
 		}
 //	}
