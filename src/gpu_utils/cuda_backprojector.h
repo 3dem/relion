@@ -13,12 +13,7 @@ class CudaBackprojector
 	    maxR, maxR2,
 	    padding_factor;
 
-	int *h_voxelX, *h_voxelY, *h_voxelZ;
-
-	int *d_voxelX, *d_voxelY, *d_voxelZ;
 	XFLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
-
-	unsigned long voxelCount;
 
 	cudaStream_t stream;
 
@@ -29,9 +24,6 @@ public:
 			mdlInitY(0), mdlInitZ(0),
 			maxR(0), maxR2(0),
 			padding_factor(0),
-			h_voxelX(0), h_voxelY(0), h_voxelZ(0),
-			d_voxelX(0), d_voxelY(0), d_voxelZ(0),
-			voxelCount(0),
 			d_mdlReal(0), d_mdlImag(0), d_mdlWeight(0),
 			stream(0)
 	{}
@@ -44,9 +36,6 @@ public:
 				mdlInitY(0), mdlInitZ(0),
 				maxR(0), maxR2(0),
 				padding_factor(0),
-				h_voxelX(0), h_voxelY(0), h_voxelZ(0),
-				d_voxelX(0), d_voxelY(0), d_voxelZ(0),
-				voxelCount(0),
 				d_mdlReal(0), d_mdlImag(0), d_mdlWeight(0),
 				stream(0)
 	{

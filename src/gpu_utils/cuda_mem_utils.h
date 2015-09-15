@@ -456,6 +456,12 @@ public:
 	{};
 
 	inline
+	CudaGlobalPtr(cudaStream_t stream, CudaCustomAllocator *allocator):
+		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
+		d_do_free(false), allocator(allocator), alloc(0), stream(stream)
+	{};
+
+	inline
 	CudaGlobalPtr(size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
 		d_do_free(false), allocator(allocator), alloc(0), stream(0)
@@ -499,6 +505,12 @@ public:
 	CudaGlobalPtr():
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
 		d_do_free(false), allocator(0), alloc(0), stream(0)
+	{};
+
+	inline
+	CudaGlobalPtr(cudaStream_t stream):
+		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
+		d_do_free(false), allocator(0), alloc(0), stream(stream)
 	{};
 
 	inline
