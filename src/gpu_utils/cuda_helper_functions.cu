@@ -376,7 +376,6 @@ void runWavgKernel(
 	CUDA_CPU_TOC("splitblocks");
 
 	CUDA_CPU_TIC("cuda_kernel_wavg");
-	CUDA_GPU_TIC("cuda_kernel_wavg");
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
@@ -430,8 +429,6 @@ void runWavgKernel(
 			baseMLO->refs_are_ctf_corrected,
 			part_scale
 			);
-
-	CUDA_GPU_TAC("cuda_kernel_wavg");
 	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
@@ -453,9 +450,6 @@ void runDiff2KernelCoarse(
 		int exp_iclass,
 		bool do_CC)
 {
-
-	CUDA_GPU_TIC("runProjAndDifferenceKernelCoarse");
-
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
@@ -508,7 +502,6 @@ void runDiff2KernelCoarse(
 				op.highres_Xi2_imgs[ipart] / 2.,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 	}
-	CUDA_GPU_TAC("runProjAndDifferenceKernelCoarse");
 }
 
 

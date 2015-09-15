@@ -290,9 +290,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		corr_img.device_alloc();
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 
-		CUDA_GPU_TIC("imagMemCp");
 		corr_img.cp_to_device();
-		CUDA_GPU_TAC("imagMemCp");
 
 		CUDA_CPU_TOC("kernel_init_1");
 		std::vector< CudaGlobalPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), cudaMLO->allocator);
@@ -375,12 +373,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
 
-		CUDA_GPU_TIC("IndexedArrayMemCp1");
 		FinePassWeights[ipart].rot_id.cp_to_device(); //FIXME this is not used
 		FinePassWeights[ipart].rot_idx.cp_to_device();
 		FinePassWeights[ipart].trans_idx.cp_to_device();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
-		CUDA_GPU_TAC("IndexedArrayMemCp1");
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1400,9 +1396,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			HANDLE_ERROR(cudaStreamSynchronize(0));
 
-
-			CUDA_GPU_TOC();
-
 			/*======================================================
 								BACKPROJECTION
 			======================================================*/
@@ -1414,7 +1407,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUDA_CPU_TIC("backproject");
 
-			CUDA_GPU_TIC("cuda_kernels_backproject");
 			cudaMLO->cudaBackprojectors[exp_iclass].backproject(
 				~dataBundle->reals,
 				~dataBundle->imags,

@@ -150,4 +150,27 @@ add_test(NAME GPU-3Dc_2kP-ryr_K3
         --random_seed 1 
         --onthefly_shifts 
         --gpu) 
-
+#--------------------------------------------------------------------
+add_test(NAME GPU-2Dc_100P-empiar_K10
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
+        COMMAND refine --o test_output/gpu2Dc_s_empiar_100 
+        --i /nethome/projects/RELION/refData/inputData/empiar/particles_rh15_100_L.star 
+        --particle_diameter 200 
+        --angpix 1.77 
+        --iter 3 
+        --tau2_fudge 2 
+        --K 10 
+        --ctf 
+        --flatten_solvent 
+        --zero_mask 
+        --oversampling 1 
+        --psi_step 10 
+        --offset_range 5 
+        --offset_step 2 
+        --norm 
+        --scale 
+        --j 1 
+        --onthefly_shifts 
+        --memory_per_thread 8 
+        --random_seed 1993 
+        --gpu)
