@@ -46,10 +46,10 @@ __global__ void cuda_kernel_diff2_coarse(
 	for (unsigned i = 0; i < translation_num; i++)
 		s_cuda_kernel_diff2s[translation_num * tid + i] = 0.0f;
 
-	unsigned pixel_pass_num( ceilf( (float)image_size / (float)BLOCK_SIZE ) );
+	unsigned pixel_pass_num( ceilf( (float)image_size / (float)D2C_BLOCK_SIZE ) );
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 	{
-		unsigned pixel = (pass * BLOCK_SIZE) + tid;
+		unsigned pixel = (pass * D2C_BLOCK_SIZE) + tid;
 
 		if(pixel < image_size)
 		{
@@ -79,14 +79,14 @@ __global__ void cuda_kernel_diff2_coarse(
 
 	__syncthreads();
 
-	unsigned trans_pass_num( ceilf( (float)translation_num / (float)BLOCK_SIZE ) );
+	unsigned trans_pass_num( ceilf( (float)translation_num / (float)D2C_BLOCK_SIZE ) );
 	for (unsigned pass = 0; pass < trans_pass_num; pass++)
 	{
-		unsigned itrans = (pass * BLOCK_SIZE) + tid;
+		unsigned itrans = (pass * D2C_BLOCK_SIZE) + tid;
 		if (itrans < translation_num)
 		{
 			XFLOAT sum(sum_init);
-			for (unsigned i = 0; i < BLOCK_SIZE; i++)
+			for (unsigned i = 0; i < D2C_BLOCK_SIZE; i++)
 				sum += s_cuda_kernel_diff2s[i * translation_num + itrans];
 
 			g_diff2s[bid * translation_num + itrans] = sum;

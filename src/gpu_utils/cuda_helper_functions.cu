@@ -381,7 +381,7 @@ void runWavgKernel(
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
 	if(projector.mdlZ!=0)
-		cuda_kernel_wavg<true><<<block_dim,BLOCK_SIZE,0,stream>>>(
+		cuda_kernel_wavg<true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
 			eulers,
 			projector,
 			image_size,
@@ -406,7 +406,7 @@ void runWavgKernel(
 			part_scale
 			);
 	else
-		cuda_kernel_wavg<false><<<block_dim,BLOCK_SIZE,0,stream>>>(
+		cuda_kernel_wavg<false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
 			eulers,
 			projector,
 			image_size,
@@ -459,7 +459,7 @@ void runDiff2KernelCoarse(
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
-				cuda_kernel_diff2_coarse<true><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+				cuda_kernel_diff2_coarse<true><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT)>>>(
 					d_eulers,
 					Fimgs_real,
 					Fimgs_imag,
@@ -470,7 +470,7 @@ void runDiff2KernelCoarse(
 					image_size,
 					op.highres_Xi2_imgs[ipart] / 2.);
 			else
-				cuda_kernel_diff2_coarse<false><<<orientation_num,BLOCK_SIZE,translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+				cuda_kernel_diff2_coarse<false><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT)>>>(
 					d_eulers,
 					Fimgs_real,
 					Fimgs_imag,
