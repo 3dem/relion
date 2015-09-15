@@ -55,6 +55,12 @@ if(NOT CustomAlloc)
     message(STATUS "Custom allocator is disabled.")
 endif(NOT CustomAlloc)
 
+option(CudaForceSTL "CudaForceSTL" OFF)
+if(CudaForceSTL)
+    add_definitions(-DCUDA_FORCESTL)
+    message(STATUS "Building cuda files wusing stl-libs for sort, min and max.")
+endif(CudaForceSTL)
+
 option(CUFFT "CUFFT" OFF)
 if(CUFFT)
     if (NOT CUDA_FOUND)

@@ -12,7 +12,6 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
-#include "src/gpu_utils/cuda_utils_thrust.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cu"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
@@ -21,6 +20,12 @@
 #include "src/parallel.h"
 #include <signal.h>
 #include <map>
+
+#ifdef CUDA_FORCESTL
+#include "src/gpu_utils/cuda_utils_stl.cuh"
+#else
+#include "src/gpu_utils/cuda_utils_thrust.cuh"
+#endif
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
