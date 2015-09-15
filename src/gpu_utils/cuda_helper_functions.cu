@@ -381,7 +381,7 @@ void runWavgKernel(
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
 	if(projector.mdlZ!=0)
-		cuda_kernel_wavg<true><<<block_dim,BLOCK_SIZE,0,stream>>>(
+		cuda_kernel_wavg<true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
 			eulers,
 			projector,
 			image_size,
@@ -406,7 +406,7 @@ void runWavgKernel(
 			part_scale
 			);
 	else
-		cuda_kernel_wavg<false><<<block_dim,BLOCK_SIZE,0,stream>>>(
+		cuda_kernel_wavg<false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
 			eulers,
 			projector,
 			image_size,

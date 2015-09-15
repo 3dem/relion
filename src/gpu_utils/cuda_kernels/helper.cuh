@@ -32,23 +32,6 @@ __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 									     	  long int job_num,
 									     	  long int sumweight_pos);
 
-__global__ void cuda_kernel_collect2(	XFLOAT *g_oo_otrans_x,
-										XFLOAT *g_oo_otrans_y,
-										XFLOAT *g_myp_oo_otrans_x2y2z2,
-										XFLOAT *g_Mweight,
-										XFLOAT op_significant_weight,
-										XFLOAT op_sum_weight,
-										int   coarse_trans,
-										int   oversamples_trans,
-										int   oversamples_orient,
-										int   oversamples,
-										bool  do_ignore_pdf_direction,
-										XFLOAT *g_weights,
-										XFLOAT *g_thr_wsum_prior_offsetx_class,
-										XFLOAT *g_thr_wsum_prior_offsety_class,
-										XFLOAT *g_thr_wsum_sigma2_offset
-										);
-
 __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
 										XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
 										XFLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const

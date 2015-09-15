@@ -12,7 +12,8 @@
 									// This is optimally set as big as possible without
 									// its ceil:ed multiple exceeding imagesize by too much.
 #define D2C_BLOCK_SIZE  128
-#define SUM_BLOCK_SIZE 32
+#define WAVG_BLOCK_SIZE 128
+#define SUMW_BLOCK_SIZE 32
 
 #define PROJDIFF_CHUNK_SIZE 14
 

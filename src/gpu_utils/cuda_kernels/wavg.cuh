@@ -44,15 +44,15 @@ __global__ void cuda_kernel_wavg(
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
 
-	unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  )),pixel;
+	unsigned pass_num(ceilf(   ((float)image_size) / (float)WAVG_BLOCK_SIZE  )),pixel;
 	XFLOAT Fweight;
 
-	__shared__ XFLOAT s_wavgs_real[BLOCK_SIZE];
-	__shared__ XFLOAT s_wavgs_imag[BLOCK_SIZE];
-	__shared__ XFLOAT s_wdiff2s_parts[BLOCK_SIZE];
-	__shared__ XFLOAT s_Minvsigma2s[BLOCK_SIZE];
-	__shared__ XFLOAT s_sumXA[BLOCK_SIZE];
-	__shared__ XFLOAT s_sumA2[BLOCK_SIZE];
+	__shared__ XFLOAT s_wavgs_real[WAVG_BLOCK_SIZE];
+	__shared__ XFLOAT s_wavgs_imag[WAVG_BLOCK_SIZE];
+	__shared__ XFLOAT s_wdiff2s_parts[WAVG_BLOCK_SIZE];
+	__shared__ XFLOAT s_Minvsigma2s[WAVG_BLOCK_SIZE];
+	__shared__ XFLOAT s_sumXA[WAVG_BLOCK_SIZE];
+	__shared__ XFLOAT s_sumA2[WAVG_BLOCK_SIZE];
 
 	for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 	{
@@ -63,7 +63,7 @@ __global__ void cuda_kernel_wavg(
 		s_sumA2[tid] = 0.0f;
 		Fweight = 0.0f;
 
-		pixel = pass * BLOCK_SIZE + tid;
+		pixel = pass * WAVG_BLOCK_SIZE + tid;
 		s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
 		XFLOAT ctf =  g_ctfs[pixel];
 

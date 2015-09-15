@@ -565,7 +565,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		{
 			long int sumRedSize=0;
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				sumRedSize+= (exp_ipass==0) ? sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUM_BLOCK_SIZE : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE);
+				sumRedSize+= (exp_ipass==0) ? sp.nr_dir*sp.nr_psi*sp.nr_oversampled_rot/SUMW_BLOCK_SIZE : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
 			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
 			thisparticle_sumweight.device_alloc();
@@ -628,10 +628,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
 					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
 
-					block_num = sp.nr_dir*sp.nr_psi/SUM_BLOCK_SIZE;
+					block_num = sp.nr_dir*sp.nr_psi/SUMW_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightCoarse<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~Mweight,
 																			    ~thisparticle_sumweight,
@@ -651,10 +651,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
 					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
 
-					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
+					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
 																			    ~thisparticle_sumweight,
@@ -1039,7 +1039,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int cpos=fake_class*nr_transes;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 			dim3 grid_dim_collect2 = block_num;// = splitCudaBlocks(block_num,false);
-			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
+			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUMW_BLOCK_SIZE>>>(
 						&(oo_otrans_x.d_ptr[cpos]),          // otrans-size -> make const
 						&(oo_otrans_y.d_ptr[cpos]),          // otrans-size -> make const
 						&(myp_oo_otrans_x2y2z2.d_ptr[cpos]), // otrans-size -> make const
