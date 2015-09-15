@@ -536,28 +536,6 @@ void CudaBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Wait for copy
 }
 
-
-void CudaBackprojector::getMdlData(Complex *data, double * weights)
-{
-	XFLOAT *r = new XFLOAT[mdlXYZ];
-	XFLOAT *i = new XFLOAT[mdlXYZ];
-	XFLOAT *w = new XFLOAT[mdlXYZ];
-
-	getMdlData(r, i, w);
-
-	for (unsigned long n = 0; n < mdlXYZ; n++)
-	{
-		data[n].real = (double) r[n];
-		data[n].imag = (double) i[n];
-		weights[n] = (double) w[n];
-	}
-
-	delete [] r;
-	delete [] i;
-	delete [] w;
-}
-
-
 CudaBackprojector::~CudaBackprojector()
 {
 	if (d_mdlReal != NULL)

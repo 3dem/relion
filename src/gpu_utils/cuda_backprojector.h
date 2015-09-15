@@ -76,7 +76,6 @@ public:
 			unsigned long imageCount);
 
 	void getMdlData(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
-	void getMdlData(Complex *data, double * weights);
 
 	cudaStream_t getStream() { return stream; }
 

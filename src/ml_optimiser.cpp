@@ -44,6 +44,7 @@ static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 Barrier * global_barrier;
 ThreadManager * global_ThreadManager;
 
+
 /** ========================== Threaded parallelization of expectation === */
 
 void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
@@ -51,7 +52,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
 	if (MLO->do_gpu)
-		((MlOptimiserCuda*) MLO->cudaMlOptimiser)->doThreadExpectationSomeParticles(thArg.thread_id);
+		((MlOptimiserCuda*) MLO->cudaMlOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles();
 	else
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
@@ -1509,7 +1510,8 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		cudaMlOptimiser = (void*) new MlOptimiserCuda(this, 0);
+		for (int i = 0; i < nr_threads; i ++)
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, i));
 	}
 
 	// Now perform real expectation over all particles
@@ -1570,8 +1572,12 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
-		delete ((MlOptimiserCuda*) cudaMlOptimiser);
+		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+		{
+			( (MlOptimiserCuda*) cudaMlOptimisers[i])->storeBpMdlData();
+			delete (MlOptimiserCuda*) cudaMlOptimisers[i];
+		}
+		cudaMlOptimisers.clear();
 	}
 
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)

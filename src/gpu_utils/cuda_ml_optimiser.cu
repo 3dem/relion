@@ -1738,7 +1738,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 #endif
 };
 
-void MlOptimiserCuda::doThreadExpectationSomeParticles(unsigned thread_id)
+void MlOptimiserCuda::doThreadExpectationSomeParticles()
 {
 
 //	CUDA_CPU_TOC("interParticle");
