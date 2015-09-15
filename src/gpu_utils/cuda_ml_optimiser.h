@@ -182,8 +182,8 @@ public:
 	void setNumberOfJobs(long int newSize)
 	{
 		jobNum=newSize;
-		jobOrigin.size=newSize;
-		jobExtent.size=newSize;
+		jobOrigin.setSize(newSize);
+		jobExtent.setSize(newSize);
 	}
 
 	void setNumberOfWeights(long int newSize)
@@ -254,12 +254,12 @@ public:
 
 	void setDataSize(long int newSize)
 	{
-		weights.size=newSize;
-		rot_id.size=newSize;
-		rot_idx.size=newSize;
-		trans_idx.size=newSize;
-		ihidden_overs.size=newSize;
-		class_id.size=newSize;
+		weights.setSize(newSize);
+		rot_id.setSize(newSize);
+		rot_idx.setSize(newSize);
+		trans_idx.setSize(newSize);
+		ihidden_overs.setSize(newSize);
+		class_id.setSize(newSize);
 	}
 
 	void dual_alloc_all()
