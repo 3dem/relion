@@ -13,9 +13,8 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_Mweight,
 									    	  XFLOAT *g_thisparticle_sumweight,
 									    	  XFLOAT min_diff2,
-									    	  int oversamples_orient,
-									    	  int oversamples_trans,
-									    	  int coarse_trans,
+									     	  int nr_coarse_orient,
+									     	  int nr_coarse_trans,
 									     	  long int sumweight_pos);
 
 __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,

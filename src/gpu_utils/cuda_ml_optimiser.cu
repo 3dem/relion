@@ -636,8 +636,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 																			    ~Mweight,
 																			    ~thisparticle_sumweight,
 																			    (XFLOAT)op.min_diff2[ipart],
-																			    sp.nr_oversampled_rot,
-																			    sp.nr_oversampled_trans,
+																			    sp.nr_dir*sp.nr_psi,
 																			    sp.nr_trans,
 																			    sumweight_pos);
 //					CUDA_GPU_TAC("cuda_kernel_sumweight");

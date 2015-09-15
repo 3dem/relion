@@ -5,9 +5,8 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 									     	  XFLOAT *g_Mweight,
 									     	  XFLOAT *g_thisparticle_sumweight,
 									     	  XFLOAT min_diff2,
-									     	  int oversamples_orient,
-									     	  int oversamples_trans,
-									     	  int coarse_trans,
+									     	  int nr_coarse_orient,
+									     	  int nr_coarse_trans,
 									     	  long int sumweight_pos)
 {
 	__shared__ XFLOAT s_sumweight[SUMW_BLOCK_SIZE];
@@ -17,28 +16,16 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 	int tid = threadIdx.x;
 
 	s_sumweight[tid]=0.;
-	int c_iorient, f_iorient, c_itrans, f_itrans, pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
+	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
 
-	// Bacause the partion of work is so arbitrarily divided in this kernel,
-	// we need to do some brute idex work to get the correct indices.
-	c_iorient = (iorient - (iorient % oversamples_orient)) / oversamples_orient; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-	f_iorient = iorient % oversamples_orient;
-	for (int itrans=0; itrans<(coarse_trans*oversamples_trans); itrans++)
+	for (int itrans=0; itrans<nr_coarse_trans; itrans++)
 	{
-		c_itrans = ( itrans - (itrans % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-		f_itrans = itrans % oversamples_trans;
-
-		pos = c_iorient * (coarse_trans *oversamples_orient*oversamples_trans );
-		pos += c_itrans * (oversamples_orient*oversamples_trans);
-		pos += f_iorient*( oversamples_trans ) + f_itrans;
-
+		pos = iorient * nr_coarse_trans + itrans;
 		if( g_Mweight[pos] < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
-		{
 			g_Mweight[pos] = (XFLOAT)0.0;
-		}
 		else
 		{
-			XFLOAT weight = g_pdf_orientation[c_iorient] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+			XFLOAT weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
 			XFLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
 			// next line because of numerical precision of exp-function
 #if defined(CUDA_DOUBLE_PRECISION)
@@ -65,12 +52,9 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 	__syncthreads();
 	// Further reduction of all samples in this block
 	for(int j=(SUMW_BLOCK_SIZE/2); j>0; j/=2)
-	{
 		if(tid<j)
-		{
 			s_sumweight[tid] += s_sumweight[tid+j];
-		}
-	}
+
 	__syncthreads();
 	g_thisparticle_sumweight[bid+sumweight_pos]=s_sumweight[0];
 }

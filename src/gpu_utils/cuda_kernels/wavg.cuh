@@ -43,6 +43,7 @@ __global__ void cuda_kernel_wavg(
 
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
+	__syncthreads();
 
 	unsigned pass_num(ceilf(   ((float)image_size) / (float)WAVG_BLOCK_SIZE  )),pixel;
 	XFLOAT Fweight;
