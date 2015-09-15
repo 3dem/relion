@@ -415,16 +415,29 @@ public:
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id);
 
-	void doThreadExpectationSomeParticles(unsigned thread_id);
+	void doThreadExpectationSomeParticles();
 
 	void storeBpMdlData()
 	{
 		for (int iclass = 0; iclass < baseMLO->mymodel.nr_classes; iclass++)
 		{
-			cudaBackprojectors[iclass].getMdlData(
-					baseMLO->wsum_model.BPref[iclass].data.data,
-					baseMLO->wsum_model.BPref[iclass].weight.data
-					);
+			unsigned long s = baseMLO->wsum_model.BPref[iclass].data.nzyxdim;
+			XFLOAT *r = new XFLOAT[s];
+			XFLOAT *i = new XFLOAT[s];
+			XFLOAT *w = new XFLOAT[s];
+
+			cudaBackprojectors[iclass].getMdlData(r, i, w);
+
+			for (unsigned long n = 0; n < s; n++)
+			{
+				baseMLO->wsum_model.BPref[iclass].data.data[n].real += (double) r[n];
+				baseMLO->wsum_model.BPref[iclass].data.data[n].imag += (double) i[n];
+				baseMLO->wsum_model.BPref[iclass].weight.data[n] += (double) w[n];
+			}
+
+			delete [] r;
+			delete [] i;
+			delete [] w;
 		}
 	}
 

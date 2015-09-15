@@ -629,13 +629,10 @@ void MlOptimiserMpi::expectation()
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
     		if (do_gpu)
     		{
-    			int dev_id, rank;
-				MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-				dev_id = rank-1;
-				std::cerr << " using device " << dev_id  << " on MPI rank " << rank << std::endl;
-
-    			cudaMlOptimiser = (void*) new MlOptimiserCuda(this, dev_id);
+    			for (int i = 0; i < nr_threads; i ++)
+    				cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, i));
     		}
+
 			// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -760,11 +757,17 @@ void MlOptimiserMpi::expectation()
 				}
 
 			}
+
 			if (do_gpu)
 			{
-				((MlOptimiserCuda*) cudaMlOptimiser)->storeBpMdlData();
-				delete ((MlOptimiserCuda*) cudaMlOptimiser);
+				for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+				{
+					( (MlOptimiserCuda*) cudaMlOptimisers[i])->storeBpMdlData();
+					delete (MlOptimiserCuda*) cudaMlOptimisers[i];
+				}
+				cudaMlOptimisers.clear();
 			}
+
 
     	}
         catch (RelionError XE)

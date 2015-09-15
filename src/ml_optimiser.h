@@ -90,8 +90,7 @@ class MlOptimiser
 {
 public:
 
-	//TODO Fix void pointer
-	void *cudaMlOptimiser; //CudaMlOptimiser
+	std::vector<void*> cudaMlOptimisers;
 
 	// I/O Parser
 	IOParser parser;
@@ -475,7 +474,6 @@ public:
 		do_use_reconstruct_images(0),
 		fix_sigma_noise(0),
 		current_changes_optimal_offsets(0),
-		cudaMlOptimiser(0),
 		nr_frames_per_prior(0),
 		smallest_changes_optimal_classes(0),
 		do_print_metadata_labels(0),

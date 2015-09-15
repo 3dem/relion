@@ -61,9 +61,9 @@ __global__ void cuda_kernel_backproject2D(
 	if (tid == 0)
 		s_eulers[0] = g_eulers[img*9+0] * padding_factor;
 	else if (tid == 1)
-		s_eulers[1] = g_eulers[img*9+3] * padding_factor;
+		s_eulers[1] = g_eulers[img*9+1] * padding_factor;
 	else if (tid == 2)
-		s_eulers[2] = g_eulers[img*9+1] * padding_factor;
+		s_eulers[2] = g_eulers[img*9+3] * padding_factor;
 	else if (tid == 3)
 		s_eulers[3] = g_eulers[img*9+4] * padding_factor;
 
@@ -387,9 +387,9 @@ __global__ void cuda_kernel_backproject3D_scatter(
 			XFLOAT imag = g_wavgs_imag[pixel];
 
 			// Get logical coordinates in the 3D map
-			XFLOAT xp = (s_eulers[0] * x + s_eulers[3] * y ) * padding_factor;
-			XFLOAT yp = (s_eulers[1] * x + s_eulers[4] * y ) * padding_factor;
-			XFLOAT zp = (s_eulers[2] * x + s_eulers[5] * y ) * padding_factor;
+			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+			XFLOAT yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
+			XFLOAT zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 
 			// Only asymmetric half is stored
 			if (xp < 0.f)
@@ -535,28 +535,6 @@ void CudaBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 
 	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Wait for copy
 }
-
-
-void CudaBackprojector::getMdlData(Complex *data, double * weights)
-{
-	XFLOAT *r = new XFLOAT[mdlXYZ];
-	XFLOAT *i = new XFLOAT[mdlXYZ];
-	XFLOAT *w = new XFLOAT[mdlXYZ];
-
-	getMdlData(r, i, w);
-
-	for (unsigned long n = 0; n < mdlXYZ; n++)
-	{
-		data[n].real = (double) r[n];
-		data[n].imag = (double) i[n];
-		weights[n] = (double) w[n];
-	}
-
-	delete [] r;
-	delete [] i;
-	delete [] w;
-}
-
 
 CudaBackprojector::~CudaBackprojector()
 {
