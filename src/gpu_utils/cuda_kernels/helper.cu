@@ -18,15 +18,17 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 	s_sumweight[tid]=0.;
 	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
 
+	XFLOAT weight;
 	for (int itrans=0; itrans<nr_coarse_trans; itrans++)
 	{
 		pos = iorient * nr_coarse_trans + itrans;
-		if( g_Mweight[pos] < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
-			g_Mweight[pos] = (XFLOAT)0.0;
+		XFLOAT diff2 = g_Mweight[pos] - min_diff2;
+		if( diff2 < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
+			diff2 = (XFLOAT)0.0;
 		else
 		{
-			XFLOAT weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-			XFLOAT diff2 = g_Mweight[pos] - min_diff2;								// Different for all threads
+			weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
+
 			// next line because of numerical precision of exp-function
 #if defined(CUDA_DOUBLE_PRECISION)
 				if (diff2 > 700.)
@@ -39,14 +41,15 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 				else
 					weight *= expf(-diff2);
 #endif
-				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-
-			// Store the weight
-			g_Mweight[pos] = weight; // TODO put in shared mem
-
-			// Reduce weights for sum of all weights
-			s_sumweight[tid] += weight;
+				diff2=weight;
+			// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
 		}
+
+		// Store the weight
+		g_Mweight[pos] = diff2; // TODO put in shared mem
+
+		// Reduce weights for sum of all weights
+		s_sumweight[tid] += diff2;
 	}
 
 	__syncthreads();
