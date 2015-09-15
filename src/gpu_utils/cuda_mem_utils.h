@@ -569,6 +569,27 @@ public:
 	cudaStream_t &getStream() {return stream; };
 	void setStream(cudaStream_t s) { stream = s; };
 
+	void setSize(size_t s) { size = s; };
+	size_t getSize() { return size; };
+
+	void setDevPtr(T *ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (d_do_free)
+			printf("DEBUG_WARNING: Device pointer set without freeing the old one.\n");
+#endif
+		d_ptr = ptr;
+	};
+
+	void setHstPtr(T *ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (h_do_free)
+			printf("DEBUG_WARNING: Host pointer set without freeing the old one.\n");
+#endif
+		h_ptr = ptr;
+	};
+
 	/**
 	 * Allocate memory on device
 	 */
@@ -726,6 +747,19 @@ public:
 	 */
 	inline
 	const T& operator[](size_t idx) const { return h_ptr[idx]; };
+
+	/**
+	 * Host data quick access
+	 */
+	inline
+	T& operator()(size_t idx) { return d_ptr[idx]; };
+
+
+	/**
+	 * Host data quick access
+	 */
+	inline
+	const T& operator()(size_t idx) const { return d_ptr[idx]; };
 
 	/**
 	 * Device pointer quick access

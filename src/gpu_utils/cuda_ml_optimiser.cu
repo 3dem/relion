@@ -62,7 +62,7 @@ void getAllSquaredDifferencesCoarse(
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	CudaGlobalPtr<XFLOAT> allWeights(cudaMLO->allocator);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		allWeights.size+=projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles;
+		allWeights.setSize(projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles + allWeights.getSize());
 
 	allWeights.device_alloc();
 	allWeights.host_alloc();
@@ -129,12 +129,6 @@ void getAllSquaredDifferencesCoarse(
 
 			if ( projectorPlan.orientation_num > 0 )
 			{
-				CudaGlobalPtr<XFLOAT> diff2s(projectorPlan.orientation_num*translation_num,cudaMLO->allocator);
-				diff2s.d_ptr = &allWeights.d_ptr[allWeights_pos];
-				diff2s.h_do_free=false;
-				diff2s.d_do_free=false;
-
-
 				/*====================================
 				    	   Kernel Call
 				======================================*/
@@ -151,7 +145,7 @@ void getAllSquaredDifferencesCoarse(
 						~Fimgs_real,
 						~Fimgs_imag,
 						~(*projectorPlan.eulers),
-						~diff2s,
+						&allWeights(allWeights_pos),
 						op,
 						baseMLO,
 						projectorPlan.orientation_num,
@@ -360,7 +354,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CUDA_CPU_TOC("IndexedArrayMemCp2");
 
 				CUDA_CPU_TIC("generateEulerMatrices");
-				eulers[exp_iclass-sp.iclass_min].size=9*FineProjectionData[ipart].class_entries[exp_iclass];
+				eulers[exp_iclass-sp.iclass_min].setSize(9*FineProjectionData[ipart].class_entries[exp_iclass]);
 				eulers[exp_iclass-sp.iclass_min].host_alloc();
 				generateEulerMatrices(
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
@@ -425,7 +419,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						significant_num,
 						image_size,
 						ipart,
-						FPCMasks[ipart][exp_iclass].jobOrigin.size,
+						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
 
@@ -514,9 +508,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if(exp_ipass==0)
 			{
 				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-				PassWeights[ipart].weights.d_ptr=&(allMweight.d_ptr[ipart*nr_coarse_weights]);
-				PassWeights[ipart].weights.h_ptr=&(allMweight.h_ptr[ipart*nr_coarse_weights]);
-				PassWeights[ipart].weights.size = nr_coarse_weights;
+				PassWeights[ipart].weights.setDevPtr(&allMweight(ipart*nr_coarse_weights));
+				PassWeights[ipart].weights.setHstPtr(&allMweight[ipart*nr_coarse_weights]);
+				PassWeights[ipart].weights.setSize(nr_coarse_weights);
 			}
 			PassWeights[ipart].weights.h_do_free=false;
 
@@ -525,10 +519,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			//Set all device-located weights to zero, and only the smallest one to 1.
-			HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[ipart].weights), 0.f, PassWeights[ipart].weights.size*sizeof(XFLOAT),0));
+			HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[ipart].weights), 0.f, PassWeights[ipart].weights.getSize()*sizeof(XFLOAT),0));
 
 			XFLOAT unity=1;
-			HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights[ipart].weights.d_ptr[min_pair.first]), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
+			HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights[ipart].weights(min_pair.first) ), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
 
 			PassWeights[ipart].weights.cp_to_host();
 			HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -620,13 +614,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
-					CudaGlobalPtr<XFLOAT>  Mweight( &allMweight.h_ptr[(ipart)*(op.Mweight).xdim+
+					CudaGlobalPtr<XFLOAT>  Mweight( &allMweight[(ipart)*(op.Mweight).xdim+
 					                                  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
-													&allMweight.d_ptr[(ipart)*(op.Mweight).xdim+
-													  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+													&allMweight((ipart)*(op.Mweight).xdim+
+													  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans),
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
-					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
-					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
+					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
+					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
 					block_num = sp.nr_dir*sp.nr_psi/SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
@@ -648,10 +642,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					// Use the constructed mask to build a partial (class-specific) input
 					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
 					IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->allocator);
-					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &(pdf_orientation.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), sp.nr_dir*sp.nr_psi);
-					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset.h_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &(pdf_offset.d_ptr[(exp_iclass-sp.iclass_min)*sp.nr_trans]), sp.nr_trans);
+					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
+					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
-					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.size / SUM_BLOCK_SIZE;
+					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUM_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
 					cuda_kernel_sumweightFine<<<block_dim,SUM_BLOCK_SIZE>>>(	~pdf_orientation_class,
@@ -724,14 +718,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		else if (exp_ipass!=0)
 		{
 			CUDA_CPU_TIC("sort");
-			CudaGlobalPtr<XFLOAT> sorted_weight_new(PassWeights[ipart].weights.size, cudaMLO->allocator);  // make new sorted weights
+			CudaGlobalPtr<XFLOAT> sorted_weight_new(PassWeights[ipart].weights.getSize(), cudaMLO->allocator);  // make new sorted weights
 			sorted_weight_new.device_alloc();
 			sortOnDevice(PassWeights[ipart].weights, sorted_weight_new);
 			sorted_weight_new.cp_to_host();							// make host-copy
 			HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			CUDA_CPU_TOC("sort");
-			for (long int i=sorted_weight_new.size-1; i>=0; i--)
+			for (long int i=sorted_weight_new.getSize()-1; i>=0; i--)
 			{
 //				if (exp_ipass==0) my_nr_significant_coarse_samples++;
 					my_significant_weight = sorted_weight_new[i];
@@ -1040,9 +1034,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 			dim3 grid_dim_collect2 = block_num;// = splitCudaBlocks(block_num,false);
 			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUM_BLOCK_SIZE>>>(
-						&(oo_otrans_x.d_ptr[cpos]),          // otrans-size -> make const
-						&(oo_otrans_y.d_ptr[cpos]),          // otrans-size -> make const
-						&(myp_oo_otrans_x2y2z2.d_ptr[cpos]), // otrans-size -> make const
+						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
+						&(oo_otrans_y(cpos) ),          // otrans-size -> make const
+						&(myp_oo_otrans_x2y2z2(cpos) ), // otrans-size -> make const
 						~thisClassFinePassWeights.weights,
 					(XFLOAT)op.significant_weight[ipart],
 					(XFLOAT)op.sum_weight[ipart],
@@ -1051,10 +1045,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					sp.nr_oversampled_rot,
 					oversamples,
 					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-						&p_weights.d_ptr[partial_pos],
-						&p_thr_wsum_prior_offsetx_class.d_ptr[partial_pos],
-						&p_thr_wsum_prior_offsety_class.d_ptr[partial_pos],
-						&p_thr_wsum_sigma2_offset.d_ptr[partial_pos],
+						&p_weights(partial_pos),
+						&p_thr_wsum_prior_offsetx_class(partial_pos),
+						&p_thr_wsum_prior_offsety_class(partial_pos),
+						&p_thr_wsum_sigma2_offset(partial_pos),
 					~thisClassFinePassWeights.rot_idx,
 					~thisClassFinePassWeights.trans_idx,
 					~FPCMasks[ipart][exp_iclass].jobOrigin,
@@ -1200,9 +1194,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				);
 
 		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size * translation_num, cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(Fimgs_real.size, cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(Fimgs_real.size, cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(Fimgs_real.size, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(Fimgs_real.getSize(), cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(Fimgs_real.getSize(), cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(Fimgs_real.getSize(), cudaMLO->allocator);
 
 		Fimgs_real.device_alloc();
 		Fimgs_imag.device_alloc();
@@ -1353,7 +1347,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
 				sorted_weights[i] = -999.;
 
-			for (long unsigned i = 0; i < thisClassFinePassWeights.weights.size; i++)
+			for (long unsigned i = 0; i < thisClassFinePassWeights.weights.getSize(); i++)
 				sorted_weights[ (thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
 								= thisClassFinePassWeights.weights[i];
 
@@ -1381,8 +1375,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~ctfs,
 					~Minvsigma2s,
 					~wdiff2s_sum,
-					&wdiff2s_AA.d_ptr[AAXA_pos],
-					&wdiff2s_XA.d_ptr[AAXA_pos],
+					&wdiff2s_AA(AAXA_pos),
+					&wdiff2s_XA(AAXA_pos),
 					~dataBundle->reals,
 					~dataBundle->imags,
 					~dataBundle->weights,
@@ -1427,6 +1421,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			cudaMLO->backprojectDataBundleStack.push(dataBundle);
 //			cudaMLO->cudaBackprojectors[exp_iclass].syncStream();
+//			delete dataBundle;
 
 			CUDA_CPU_TOC("backproject");
 
