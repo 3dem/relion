@@ -267,6 +267,9 @@ public:
     // Use gpu resources?
     bool do_gpu;
 
+    // Which GPU devices to use?
+    std::string gpu_ids;
+
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 

@@ -1611,7 +1611,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	if(dev_id>=devCount)
 	{
 		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		REPORT_ERROR("ERROR: Too many MPI threads using GPUs");
+		REPORT_ERROR("ERROR: Assigning a thread to a non-existent device (index likely too high)");
 	}
 	else
 	{

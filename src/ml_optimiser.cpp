@@ -26,9 +26,8 @@
 #include <time.h>
 #include <math.h>
 #include <ctime>
-#include <fstream>
 #include <iostream>
-#include <iostream>
+#include <string>
 #include <fstream>
 //#include <cuda_runtime.h>
 //#include <helper_cuda.h>
@@ -394,6 +393,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = parser.checkOption("--parallel_disc_io", "Let parallel (MPI) processes access the disc simultaneously (use on gluster or fhgfs; this may break NFS)");
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
 
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
@@ -1510,8 +1510,20 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
+		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		else if (gpu_ids.length()==1)
+			std::cout << "I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
 		for (int i = 0; i < nr_threads; i ++)
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, i));
+		{
+			int dev_id;
+			if (gpu_ids.length()==1)
+				dev_id = i;
+			else
+				dev_id = (int)(gpu_ids[i]-'0');
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+		}
 	}
 
 	// Now perform real expectation over all particles
