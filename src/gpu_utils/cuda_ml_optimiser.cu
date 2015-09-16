@@ -28,7 +28,453 @@
 #endif
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
+void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
+		std::vector<MultidimArray<Complex > > &exp_Fimgs,
+		std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
+		std::vector<MultidimArray<double> > &exp_Fctfs,
+		std::vector<Matrix1D<double> > &exp_old_offset,
+		std::vector<Matrix1D<double> > &exp_prior,
+		std::vector<MultidimArray<double> > &exp_power_imgs,
+		std::vector<double> &exp_highres_Xi2_imgs,
+		std::vector<int> &exp_pointer_dir_nonzeroprior,
+		std::vector<int> &exp_pointer_psi_nonzeroprior,
+		std::vector<double> &exp_directions_prior,
+		std::vector<double> &exp_psi_prior,
+		OptimisationParamters &op,
+		SamplingParameters &sp,
+		MlOptimiser *baseMLO
+		)
+{
 
+	FourierTransformer transformer;
+
+	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
+	{
+		CUDA_CPU_TIC("init");
+		FileName fn_img;
+		Image<double> img, rec_img;
+		MultidimArray<Complex > Fimg, Faux;
+		MultidimArray<double> Fctf;
+
+		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
+		int istop = 0;
+		for (long int ii = baseMLO->exp_my_first_ori_particle; ii < my_ori_particle; ii++)
+			istop += baseMLO->mydata.ori_particles[ii].particles_id.size();
+		istop += ipart;
+
+		// What is my particle_id?
+		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
+		// Which group do I belong?
+		int group_id =baseMLO->mydata.getGroupId(part_id);
+
+		// Get the norm_correction
+		double normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_NORM);
+
+		// Get the optimal origin offsets from the previous iteration
+		Matrix1D<double> my_old_offset(2), my_prior(2);
+		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_XOFF);
+		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_YOFF);
+		XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_XOFF_PRIOR);
+		YY(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_YOFF_PRIOR);
+		// Uninitialised priors were set to 999.
+		if (XX(my_prior) > 998.99 && XX(my_prior) < 999.01)
+			XX(my_prior) = 0.;
+		if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
+			YY(my_prior) = 0.;
+
+		if (baseMLO->mymodel.data_dim == 3)
+		{
+			my_old_offset.resize(3);
+			my_prior.resize(3);
+			ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ZOFF);
+			ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ZOFF_PRIOR);
+			// Unitialised priors were set to 999.
+			if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
+				ZZ(my_prior) = 0.;
+		}
+		CUDA_CPU_TOC("init");
+		CUDA_CPU_TIC("nonZeroProb");
+		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
+		{
+			// First try if there are some fixed prior angles
+			double prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
+			double prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
+			double prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
+
+			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
+
+			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
+			if (prior_rot > 998.99 && prior_rot < 999.01)
+				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ROT);
+			if (prior_tilt > 998.99 && prior_tilt < 999.01)
+				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_TILT);
+			if (prior_psi > 998.99 && prior_psi < 999.01)
+				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_PSI);
+
+			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
+
+			////////// TODO TODO TODO
+			////////// How does this work now: each particle has a different sampling object?!!!
+			// Select only those orientations that have non-zero prior probability
+			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
+					sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
+					exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
+
+			long int nr_orients = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) * baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
+			if (nr_orients == 0)
+			{
+				std::cerr << " sampling.NrDirections()= " << baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior)
+						<< " sampling.NrPsiSamplings()= " << baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
+				REPORT_ERROR("Zero orientations fall within the local angular search. Increase the sigma-value(s) on the orientations!");
+			}
+
+		}
+		CUDA_CPU_TOC("nonZeroProb");
+
+		// Get the image and recimg data
+		if (baseMLO->do_parallel_disc_io)
+		{
+			CUDA_CPU_TIC("setXmippOrigin");
+			// Read from disc
+			FileName fn_img;
+			std::istringstream split(baseMLO->exp_fn_img);
+			for (int i = 0; i <= istop; i++)
+				getline(split, fn_img);
+
+			img.read(fn_img);
+			img().setXmippOrigin();
+			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+			{
+				FileName fn_recimg;
+				std::istringstream split2(baseMLO->exp_fn_recimg);
+				// Get the right line in the exp_fn_img string
+				for (int i = 0; i <= istop; i++)
+					getline(split2, fn_recimg);
+				rec_img.read(fn_recimg);
+				rec_img().setXmippOrigin();
+			}
+			CUDA_CPU_TOC("setXmippOrigin");
+		}
+		else
+		{
+			CUDA_CPU_TIC("setXmippOrigin");
+			// Unpack the image from the imagedata
+			if (baseMLO->mymodel.data_dim == 3)
+			{
+				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size,baseMLO-> mymodel.ori_size);
+				// Only allow a single image per call of this function!!! nr_pool needs to be set to 1!!!!
+				// This will save memory, as we'll need to store all translated images in memory....
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
+				{
+					DIRECT_A3D_ELEM(img(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, k, i, j);
+				}
+				img().setXmippOrigin();
+
+				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+				{
+					rec_img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size,baseMLO-> mymodel.ori_size);
+					int offset = (baseMLO->do_ctf_correction) ? 2 * baseMLO->mymodel.ori_size : baseMLO->mymodel.ori_size;
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(rec_img())
+					{
+						DIRECT_A3D_ELEM(rec_img(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, offset + k, i, j);
+					}
+					rec_img().setXmippOrigin();
+
+				}
+
+			}
+			else
+			{
+				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
+				{
+					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, metadata_offset + ipart, i, j);
+				}
+				img().setXmippOrigin();
+				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+				{
+
+					////////////// TODO: think this through for no-threads here.....
+					rec_img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
+					{
+						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, baseMLO->exp_nr_images + metadata_offset + ipart, i, j);
+					}
+					rec_img().setXmippOrigin();
+				}
+			}
+			CUDA_CPU_TOC("setXmippOrigin");
+		}
+//#define DEBUG_SOFTMASK
+#ifdef DEBUG_SOFTMASK
+		Image<double> tt;
+		tt()=img();
+		tt.write("Fimg_unmasked.spi");
+		std::cerr << "written Fimg_unmasked.spi; press any key to continue..." << std::endl;
+		char c;
+		std::cin >> c;
+#endif
+		// Apply the norm_correction term
+		CUDA_CPU_TIC("normCorr");
+		if (baseMLO->do_norm_correction)
+		{
+//#define DEBUG_NORM
+#ifdef DEBUG_NORM
+			if (normcorr < 0.001 || normcorr > 1000. || mymodel.avg_norm_correction < 0.001 || mymodel.avg_norm_correction > 1000.)
+			{
+				std::cerr << " ** normcorr= " << normcorr << std::endl;
+				std::cerr << " ** mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
+				std::cerr << " ** fn_img= " << fn_img << " part_id= " << part_id << std::endl;
+				std::cerr << " ** iseries= " << iseries << " ipart= " << ipart << " part_id= " << part_id << std::endl;
+				int group_id = mydata.getGroupId(part_id);
+				std::cerr << " ml_model.sigma2_noise[group_id]= " << mymodel.sigma2_noise[group_id] << " group_id= " << group_id <<std::endl;
+				std::cerr << " part_id= " << part_id << " iseries= " << iseries << std::endl;
+				std::cerr << " img_id= " << img_id << std::endl;
+				REPORT_ERROR("Very small or very big (avg) normcorr!");
+			}
+#endif
+			img() *=baseMLO->mymodel.avg_norm_correction / normcorr;
+		}
+		CUDA_CPU_TOC("normCorr");
+		CUDA_CPU_TIC("selfTranslate");
+		// Apply (rounded) old offsets first
+		my_old_offset.selfROUND();
+		selfTranslate(img(), my_old_offset, DONT_WRAP);
+		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+
+		exp_old_offset[ipart] = my_old_offset;
+		// Also store priors on translations
+		exp_prior[ipart] = my_prior;
+		CUDA_CPU_TOC("selfTranslate");
+		CUDA_CPU_TIC("CenterFFT1");
+		// Always store FT of image without mask (to be used for the reconstruction)
+		MultidimArray<double> img_aux;
+		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
+		CenterFFT(img_aux, true);
+		CUDA_CPU_TOC("CenterFFT1");
+		CUDA_CPU_TIC("FourierTransform1");
+//		transformer.FourierTransform(img_aux, Faux);
+		CUDA_CPU_TIC("setReal");
+		transformer.setReal(img_aux);
+		CUDA_CPU_TOC("setReal");
+		CUDA_CPU_TIC("Transform");
+		transformer.Transform(FFTW_FORWARD);
+		            if (true)transformer.getFourierCopy(Faux);
+		            else  transformer.getFourierAlias(Faux);
+		CUDA_CPU_TOC("Transform");
+		CUDA_CPU_TOC("FourierTransform1");
+		CUDA_CPU_TIC("windowFourierTransform1");
+		windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		CUDA_CPU_TOC("windowFourierTransform1");
+
+		CUDA_CPU_TIC("selfApplyBeamTilt");
+		// Here apply the beamtilt correction if necessary
+		// This will only be used for reconstruction, not for alignment
+		// But beamtilt only affects very high-resolution components anyway...
+		//
+		double beamtilt_x = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_BEAMTILT_X);
+		double beamtilt_y = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_BEAMTILT_Y);
+		double Cs = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_CS);
+		double V = 1000. * DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE);
+		double lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
+		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
+			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs,baseMLO->mymodel.pixel_size, baseMLO->mymodel.ori_size);
+
+		exp_Fimgs_nomask.at(ipart) = Fimg;
+
+		CUDA_CPU_TOC("selfApplyBeamTilt");
+		CUDA_CPU_TIC("zeroMask");
+		MultidimArray<double> Mnoise;
+		if (!baseMLO->do_zero_mask)
+		{
+			// Make a noisy background image with the same spectrum as the sigma2_noise
+
+			// Different MPI-distributed subsets may otherwise have different instances of the random noise below,
+			// because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
+			// Have the seed based on the part_id, so that each particle has a different instant of the noise
+			if (baseMLO->do_realign_movies)
+				init_random_generator(baseMLO->random_seed + part_id);
+			else
+				init_random_generator(baseMLO->random_seed + my_ori_particle); // This only serves for exact reproducibility tests with 1.3-code...
+
+			// If we're doing running averages, then the sigma2_noise was already adjusted for the running averages.
+			// Undo this adjustment here in order to get the right noise in the individual frames
+			MultidimArray<double> power_noise = baseMLO->sigma2_fudge * baseMLO->mymodel.sigma2_noise[group_id];
+			if (baseMLO->do_realign_movies)
+				power_noise *= (2. * baseMLO->movie_frame_running_avg_side + 1.);
+
+			// Create noisy image for outside the mask
+			MultidimArray<Complex > Fnoise;
+			Mnoise.resize(img());
+			transformer.setReal(Mnoise);
+			transformer.getFourierAlias(Fnoise);
+			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
+			{
+				int ires = ROUND( sqrt( (double)(kp * kp + ip * ip + jp * jp) ) );
+				if (ires >= 0 && ires < XSIZE(Fnoise))
+				{
+					double sigma = sqrt(DIRECT_A1D_ELEM(power_noise, ires));
+					DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
+					DIRECT_A3D_ELEM(Fnoise, k, i, j).imag = rnd_gaus(0., sigma);
+				}
+				else
+				{
+					DIRECT_A3D_ELEM(Fnoise, k, i, j) = 0.;
+				}
+			}
+			// Back to real space Mnoise
+			transformer.inverseFourierTransform();
+			Mnoise.setXmippOrigin();
+
+			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (double)baseMLO->width_mask_edge, &Mnoise);
+
+		}
+		else
+		{
+			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size), (double)baseMLO->width_mask_edge);
+		}
+		CUDA_CPU_TOC("zeroMask");
+#ifdef DEBUG_SOFTMASK
+		tt()=img();
+		tt.write("Fimg_masked.spi");
+		std::cerr << "written Fimg_masked.spi; press any key to continue..." << std::endl;
+		std::cin >> c;
+#endif
+
+		CUDA_CPU_TIC("CenterFFT2");
+		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
+		CenterFFT(img(), true);
+		CUDA_CPU_TOC("CenterFFT2");
+		CUDA_CPU_TIC("FourierTransform2");
+		// Store the Fourier Transform of the image Fimg
+		transformer.FourierTransform(img(), Faux);
+		CUDA_CPU_TOC("FourierTransform2");
+
+		CUDA_CPU_TIC("powerClass");
+		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
+		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
+		{
+			MultidimArray<double> spectrum;
+			spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
+			double highres_Xi2 = 0.;
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+			{
+				int ires = ROUND( sqrt( (double)(kp*kp + ip*ip + jp*jp) ) );
+				// Skip Hermitian pairs in the x==0 column
+
+				if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
+				{
+					double normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
+					DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
+					// Store sumXi2 from current_size until ori_size
+					if (ires >= baseMLO->mymodel.current_size/2 + 1)
+						highres_Xi2 += normFaux;
+				}
+			}
+
+			// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
+			exp_power_imgs.at(ipart) = spectrum;
+			exp_highres_Xi2_imgs.at(ipart) = highres_Xi2;
+		}
+		else
+		{
+			exp_highres_Xi2_imgs.at(ipart) = 0.;
+		}
+		CUDA_CPU_TOC("powerClass");
+		// We never need any resolutions higher than current_size
+		// So resize the Fourier transforms
+		CUDA_CPU_TIC("windowFourierTransform2");
+		windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		CUDA_CPU_TOC("windowFourierTransform2");
+		// Also store its CTF
+		CUDA_CPU_TIC("ctfCorr");
+		Fctf.resize(Fimg);
+
+		// Now calculate the actual CTF
+		if (baseMLO->do_ctf_correction)
+		{
+			if (baseMLO->mymodel.data_dim == 3)
+			{
+				Image<double> Ictf;
+				if (baseMLO->do_parallel_disc_io)
+				{
+					// Read CTF-image from disc
+					FileName fn_ctf;
+					std::istringstream split(baseMLO->exp_fn_ctf);
+					// Get the right line in the exp_fn_img string
+					for (int i = 0; i <= istop; i++)
+						getline(split, fn_ctf);
+					Ictf.read(fn_ctf);
+				}
+				else
+				{
+					// Unpack the CTF-image from the exp_imagedata array
+					Ictf().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Ictf())
+					{
+						DIRECT_A3D_ELEM(Ictf(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, baseMLO->mymodel.ori_size + k, i, j);
+					}
+				}
+				// Set the CTF-image in Fctf
+				Ictf().setXmippOrigin();
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+				{
+					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+				}
+			}
+			else
+			{
+				CTF ctf;
+				ctf.setValues(DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_ANGLE),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_CS),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_Q0),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC));
+
+				ctf.getFftwImage(Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size,
+						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
+			}
+//#define DEBUG_CTF_FFTW_IMAGE
+#ifdef DEBUG_CTF_FFTW_IMAGE
+			Image<double> tt;
+			tt()=Fctf;
+			tt.write("relion_ctf.spi");
+			std::cerr << "Written relion_ctf.spi, now exiting..." << std::endl;
+			exit(1);
+#endif
+//#define DEBUG_GETCTF
+#ifdef DEBUG_GETCTF
+			std::cerr << " intact_ctf_first_peak= " << intact_ctf_first_peak << std::endl;
+			ctf.write(std::cerr);
+			Image<double> tmp;
+			tmp()=Fctf;
+			tmp.write("Fctf.spi");
+			tmp().resize(mymodel.ori_size, mymodel.ori_size);
+			ctf.getCenteredImage(tmp(), mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+			tmp.write("Fctf_cen.spi");
+			std::cerr << "Written Fctf.spi, Fctf_cen.spi. Press any key to continue..." << std::endl;
+			char c;
+			std::cin >> c;
+#endif
+		}
+		else
+		{
+			Fctf.initConstant(1.);
+		}
+		CUDA_CPU_TOC("ctfCorr");
+		// Store Fimg and Fctf
+		exp_Fimgs.at(ipart) = Fimg;
+		exp_Fctfs.at(ipart) = Fctf;
+
+	} // end loop ipart
+	transformer.clear();
+
+}
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
 		OptimisationParamters &op,
@@ -1783,9 +2229,9 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 				op.metadata_offset += baseMLO->mydata.ori_particles[iori].particles_id.size();
 			}
 			CUDA_CPU_TIC("getFourierTransformsAndCtfs");
-			baseMLO->getFourierTransformsAndCtfs(my_ori_particle, op.metadata_offset, op.Fimgs, op.Fimgs_nomask, op.Fctfs,
+			getFourierTransformsAndCtfs(my_ori_particle, op.metadata_offset, op.Fimgs, op.Fimgs_nomask, op.Fctfs,
 					op.old_offset, op.prior, op.power_imgs, op.highres_Xi2_imgs,
-					op.pointer_dir_nonzeroprior, op.pointer_psi_nonzeroprior, op.directions_prior, op.psi_prior);
+					op.pointer_dir_nonzeroprior, op.pointer_psi_nonzeroprior, op.directions_prior, op.psi_prior, op, sp, baseMLO);
 			CUDA_CPU_TOC("getFourierTransformsAndCtfs");
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 			{
