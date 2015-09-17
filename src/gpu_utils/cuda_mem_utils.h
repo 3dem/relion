@@ -657,6 +657,16 @@ public:
 	}
 
 	/**
+	 * Allocate memory on host with given size
+	 */
+	inline
+	void host_alloc(size_t newSize)
+	{
+		size = newSize;
+		host_alloc();
+	}
+
+	/**
 	 * Initiate device memory with provided value
 	 */
 	inline
@@ -789,6 +799,7 @@ public:
 		{
 //			HANDLE_ERROR(cudaDeviceSynchronize());
 			allocator->free(alloc);
+			alloc = NULL;
 //			HANDLE_ERROR(cudaDeviceSynchronize());
 		}
 		else
@@ -814,6 +825,20 @@ public:
 		h_ptr = 0;
 	}
 
+	inline
+	void free_host_if_set()
+	{
+		if (d_do_free)
+			free_device();
+	}
+
+	inline
+	void free_device_if_set()
+	{
+		if (h_do_free)
+			free_host();
+	}
+
 	/**
 	 * Delete both device and host data
 	 */
@@ -825,10 +850,16 @@ public:
 	}
 
 	inline
+	void free_if_set()
+	{
+		free_host_if_set();
+		free_device_if_set();
+	}
+
+	inline
 	~CudaGlobalPtr()
 	{
-		if (d_do_free) free_device();
-		if (h_do_free) free_host();
+		free_if_set();
 	}
 };
 
