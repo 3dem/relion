@@ -1586,7 +1586,29 @@ void MlOptimiser::expectation()
 	{
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 		{
-			( (MlOptimiserCuda*) cudaMlOptimisers[i])->storeBpMdlData();
+			for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
+			{
+				unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
+				XFLOAT *reals = new XFLOAT[s];
+				XFLOAT *imags = new XFLOAT[s];
+				XFLOAT *weights = new XFLOAT[s];
+
+				( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+
+				int my_mutex = iclass % NR_CLASS_MUTEXES;
+				pthread_mutex_lock(&global_mutex2[my_mutex]);
+				for (unsigned long n = 0; n < s; n++)
+				{
+					wsum_model.BPref[iclass].data.data[n].real += (double) reals[n];
+					wsum_model.BPref[iclass].data.data[n].imag += (double) imags[n];
+					wsum_model.BPref[iclass].weight.data[n] += (double) weights[n];
+				}
+				pthread_mutex_unlock(&global_mutex2[my_mutex]);
+
+				delete [] reals;
+				delete [] imags;
+				delete [] weights;
+			}
 			delete (MlOptimiserCuda*) cudaMlOptimisers[i];
 		}
 		cudaMlOptimisers.clear();

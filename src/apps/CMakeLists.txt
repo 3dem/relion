@@ -33,9 +33,13 @@ if (CUDA_FOUND)
     
     string( TOLOWER "${CMAKE_BUILD_TYPE}" btype_lower )
     if ( ${btype_lower} STREQUAL "profiling")
-        file(GLOB EXTRA_LIBS "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnvToolsExt.so" CACHE "")
+        find_library(NV_TOOLS_LIBRARIES   NAMES nvToolsExt  PATHS $ENV{CUDA_HOME}/lib64)
+        list(APPEND EXTRA_LIBS "${NV_TOOLS_LIBRARIES}")
         message(STATUS "Adding extra library for NVIDIA profiling: ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnvToolsExt.so")
     endif(${btype_lower}  STREQUAL "profiling")
+    
+    find_library(CUFFT_LIBRARIES   NAMES cufft  PATHS $ENV{CUDA_HOME}/lib64)
+    list(APPEND EXTRA_LIBS "${CUFFT_LIBRARIES}")
 endif(CUDA_FOUND)
 
 add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})

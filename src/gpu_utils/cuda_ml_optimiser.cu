@@ -28,6 +28,8 @@
 #endif
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
 void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
@@ -42,7 +44,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		std::vector<double> &exp_psi_prior,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
-		MlOptimiser *baseMLO
+		MlOptimiser *baseMLO,
+		MlOptimiserCuda *cudaMLO
 		)
 {
 
@@ -93,6 +96,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 				ZZ(my_prior) = 0.;
 		}
 		CUDA_CPU_TOC("init");
+
 		CUDA_CPU_TIC("nonZeroProb");
 		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
@@ -205,37 +209,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 			}
 			CUDA_CPU_TOC("setXmippOrigin");
 		}
-//#define DEBUG_SOFTMASK
-#ifdef DEBUG_SOFTMASK
-		Image<double> tt;
-		tt()=img();
-		tt.write("Fimg_unmasked.spi");
-		std::cerr << "written Fimg_unmasked.spi; press any key to continue..." << std::endl;
-		char c;
-		std::cin >> c;
-#endif
+
 		// Apply the norm_correction term
 		CUDA_CPU_TIC("normCorr");
 		if (baseMLO->do_norm_correction)
 		{
-//#define DEBUG_NORM
-#ifdef DEBUG_NORM
-			if (normcorr < 0.001 || normcorr > 1000. || mymodel.avg_norm_correction < 0.001 || mymodel.avg_norm_correction > 1000.)
-			{
-				std::cerr << " ** normcorr= " << normcorr << std::endl;
-				std::cerr << " ** mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
-				std::cerr << " ** fn_img= " << fn_img << " part_id= " << part_id << std::endl;
-				std::cerr << " ** iseries= " << iseries << " ipart= " << ipart << " part_id= " << part_id << std::endl;
-				int group_id = mydata.getGroupId(part_id);
-				std::cerr << " ml_model.sigma2_noise[group_id]= " << mymodel.sigma2_noise[group_id] << " group_id= " << group_id <<std::endl;
-				std::cerr << " part_id= " << part_id << " iseries= " << iseries << std::endl;
-				std::cerr << " img_id= " << img_id << std::endl;
-				REPORT_ERROR("Very small or very big (avg) normcorr!");
-			}
-#endif
 			img() *=baseMLO->mymodel.avg_norm_correction / normcorr;
 		}
 		CUDA_CPU_TOC("normCorr");
+
 		CUDA_CPU_TIC("selfTranslate");
 		// Apply (rounded) old offsets first
 		my_old_offset.selfROUND();
@@ -247,23 +229,52 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		// Also store priors on translations
 		exp_prior[ipart] = my_prior;
 		CUDA_CPU_TOC("selfTranslate");
+
 		CUDA_CPU_TIC("CenterFFT1");
 		// Always store FT of image without mask (to be used for the reconstruction)
 		MultidimArray<double> img_aux;
 		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 		CenterFFT(img_aux, true);
 		CUDA_CPU_TOC("CenterFFT1");
+
 		CUDA_CPU_TIC("FourierTransform1");
-//		transformer.FourierTransform(img_aux, Faux);
-		CUDA_CPU_TIC("setReal");
-		transformer.setReal(img_aux);
-		CUDA_CPU_TOC("setReal");
-		CUDA_CPU_TIC("Transform");
-		transformer.Transform(FFTW_FORWARD);
-		            if (true)transformer.getFourierCopy(Faux);
-		            else  transformer.getFourierAlias(Faux);
-		CUDA_CPU_TOC("Transform");
+
+
+
+		//		transformer.setReal(img_aux);
+		//		transformer.Transform(FFTW_FORWARD);
+		//		transformer.getFourierCopy(Faux);
+
+
+		cudaMLO->inputImageData->setSize(XSIZE(img_aux), YSIZE(img_aux));
+
+
+		CUDA_CPU_TIC("Memset1");
+		for (unsigned long i = 0; i < cudaMLO->inputImageData->reals.getSize(); i ++)
+			cudaMLO->inputImageData->reals[i] = (cufftReal) img_aux.data[i];
+		CUDA_CPU_TOC("Memset1");
+
+		cudaMLO->inputImageData->reals.cp_to_device();
+		cudaMLO->inputImageData->forward();
+		cudaMLO->inputImageData->fouriers.cp_to_host();
+
+		Faux.resize(ZSIZE(img_aux),YSIZE(img_aux),XSIZE(img_aux)/2+1);
+		HANDLE_ERROR(cudaStreamSynchronize(0));
+
+		CUDA_CPU_TIC("Memset2");
+		XFLOAT corrFactor = 1. / cudaMLO->inputImageData->reals.getSize();
+
+		for (unsigned long i = 0; i < cudaMLO->inputImageData->fouriers.getSize(); i ++)
+		{
+			Faux.data[i].real = (double) cudaMLO->inputImageData->fouriers[i].x * corrFactor;
+			Faux.data[i].imag = (double) cudaMLO->inputImageData->fouriers[i].y * corrFactor;
+		}
+		CUDA_CPU_TOC("Memset2");
+
+
 		CUDA_CPU_TOC("FourierTransform1");
+
+
 		CUDA_CPU_TIC("windowFourierTransform1");
 		windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
 		CUDA_CPU_TOC("windowFourierTransform1");
@@ -284,6 +295,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		exp_Fimgs_nomask.at(ipart) = Fimg;
 
 		CUDA_CPU_TOC("selfApplyBeamTilt");
+
 		CUDA_CPU_TIC("zeroMask");
 		MultidimArray<double> Mnoise;
 		if (!baseMLO->do_zero_mask)
@@ -390,12 +402,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
 		CUDA_CPU_TOC("zeroMask");
-#ifdef DEBUG_SOFTMASK
-		tt()=img();
-		tt.write("Fimg_masked.spi");
-		std::cerr << "written Fimg_masked.spi; press any key to continue..." << std::endl;
-		std::cin >> c;
-#endif
 
 		CUDA_CPU_TIC("CenterFFT2");
 		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
@@ -493,28 +499,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 				ctf.getFftwImage(Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
 			}
-//#define DEBUG_CTF_FFTW_IMAGE
-#ifdef DEBUG_CTF_FFTW_IMAGE
-			Image<double> tt;
-			tt()=Fctf;
-			tt.write("relion_ctf.spi");
-			std::cerr << "Written relion_ctf.spi, now exiting..." << std::endl;
-			exit(1);
-#endif
-//#define DEBUG_GETCTF
-#ifdef DEBUG_GETCTF
-			std::cerr << " intact_ctf_first_peak= " << intact_ctf_first_peak << std::endl;
-			ctf.write(std::cerr);
-			Image<double> tmp;
-			tmp()=Fctf;
-			tmp.write("Fctf.spi");
-			tmp().resize(mymodel.ori_size, mymodel.ori_size);
-			ctf.getCenteredImage(tmp(), mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
-			tmp.write("Fctf_cen.spi");
-			std::cerr << "Written Fctf.spi, Fctf_cen.spi. Press any key to continue..." << std::endl;
-			char c;
-			std::cin >> c;
-#endif
 		}
 		else
 		{
@@ -2227,6 +2211,8 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	allocator = new CudaCustomAllocator(allocationSize);
 	allocator->setOutOfMemoryHandler(this);
 #endif
+
+	inputImageData = new CufftBundle(0, allocator);
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles()
@@ -2285,7 +2271,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 			CUDA_CPU_TIC("getFourierTransformsAndCtfs");
 			getFourierTransformsAndCtfs(my_ori_particle, op.metadata_offset, op.Fimgs, op.Fimgs_nomask, op.Fctfs,
 					op.old_offset, op.prior, op.power_imgs, op.highres_Xi2_imgs,
-					op.pointer_dir_nonzeroprior, op.pointer_psi_nonzeroprior, op.directions_prior, op.psi_prior, op, sp, baseMLO);
+					op.pointer_dir_nonzeroprior, op.pointer_psi_nonzeroprior, op.directions_prior, op.psi_prior, op, sp, baseMLO, this);
 			CUDA_CPU_TOC("getFourierTransformsAndCtfs");
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 			{
