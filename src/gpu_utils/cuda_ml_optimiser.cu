@@ -325,15 +325,69 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 				}
 			}
 			// Back to real space Mnoise
+			CUDA_CPU_TIC("inverseFourierTransform");
 			transformer.inverseFourierTransform();
+			CUDA_CPU_TOC("inverseFourierTransform");
+
+			CUDA_CPU_TIC("setXmippOrigin");
 			Mnoise.setXmippOrigin();
+			CUDA_CPU_TOC("setXmippOrigin");
 
+			CUDA_CPU_TIC("softMaskOutsideMap");
 			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (double)baseMLO->width_mask_edge, &Mnoise);
-
+			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
 		else
 		{
-			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size), (double)baseMLO->width_mask_edge);
+			CUDA_CPU_TIC("softMaskOutsideMap");
+
+			XFLOAT cosine_width = baseMLO->width_mask_edge;
+			XFLOAT radius = (XFLOAT)((double)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
+			if (radius < 0)
+				radius = ((double)img.data.xdim)/2.;
+			XFLOAT radius_p = radius + cosine_width;
+
+
+			bool do_softmaskOnGpu = true;
+			if(do_softmaskOnGpu)
+			{
+				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
+				dev_img.device_alloc();
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+					dev_img[n]=(XFLOAT)img.data.data[n];
+
+				dev_img.cp_to_device();
+				dim3 block_dim = 1; //TODO
+				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~dev_img,
+																					img().nzyxdim,
+																					img.data.xdim,
+																					img.data.ydim,
+																					img.data.zdim,
+																					img.data.xdim/2,
+																					img.data.ydim/2,
+																					img.data.zdim/2,
+																					true,
+																					radius,
+																					radius_p,
+																					cosine_width);
+
+				dev_img.cp_to_host();
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+				{
+					img.data.data[n]=(double)dev_img[n];
+				}
+			}
+			else
+				softMaskOutsideMap(img(), radius, (double)cosine_width);
+
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+//			{
+//				std::cout << img.data.data[n] << std::endl;
+//			}
+//			exit(0);
+			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
 		CUDA_CPU_TOC("zeroMask");
 #ifdef DEBUG_SOFTMASK
