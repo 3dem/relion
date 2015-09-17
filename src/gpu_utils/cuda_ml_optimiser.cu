@@ -643,6 +643,7 @@ void getAllSquaredDifferencesCoarse(
 						ipart,
 						group_id,
 						exp_iclass,
+						cudaMLO,
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc));
 
 				/*====================================
@@ -652,7 +653,7 @@ void getAllSquaredDifferencesCoarse(
 
 			} // end if class significant
 		} // end loop iclass
-
+		cudaDeviceSynchronize();
 		allWeights.cp_to_host();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
@@ -904,6 +905,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						significant_num,
 						image_size,
 						ipart,
+						exp_iclass,
+						cudaMLO,
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
@@ -913,7 +916,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
-
+		cudaDeviceSynchronize();
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
