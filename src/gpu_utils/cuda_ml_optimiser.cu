@@ -1110,7 +1110,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					block_num = sp.nr_dir*sp.nr_psi/SUMW_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~Mweight,
 																			    ~thisparticle_sumweight,
@@ -1131,8 +1131,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
+
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
 																			    ~thisparticle_sumweight,
@@ -1150,6 +1151,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
+			cudaDeviceSynchronize();
 
 			if(exp_ipass==0)
 				allMweight.cp_to_host();
@@ -1310,6 +1312,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		//std::cerr << "@sort op.significant_weight[ipart]= " << (XFLOAT)op.significant_weight[ipart] << std::endl;
 
 	} // end loop ipart
+
 	CUDA_CPU_TOC("convertPostKernel");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -2101,6 +2104,10 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	{
 		cudaSetDevice(dev_id);
 	}
+
+	classStreams.resize(baseMLO->mymodel.nr_classes);
+	for (int i = 0; i <= baseMLO->mymodel.nr_classes; i++)
+		cudaStreamCreate(&classStreams[i]);
 
 	/*======================================================
 	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP

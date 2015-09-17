@@ -484,6 +484,9 @@ public:
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
 
+	//Class streams ( for concurrent scheduling of class-specific kernels)
+	std::vector< cudaStream_t > classStreams;
+
 	CudaTranslator translator_coarse1;
 	CudaTranslator translator_coarse2;
 	CudaTranslator translator_current1;
@@ -560,6 +563,9 @@ public:
 
 		//Delete this lastly
 		delete allocator;
+
+		for (int i = 0; i <= classStreams.size(); i++)
+			cudaStreamDestroy(classStreams[i]);
 	}
 
 };
