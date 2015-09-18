@@ -254,6 +254,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 
+	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
+
+	if (do_gpu)
+		do_shifts_onthefly = true;
+
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
 
 	int expert_section = parser.addSection("Expert options");
@@ -392,8 +398,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = parser.checkOption("--parallel_disc_io", "Let parallel (MPI) processes access the disc simultaneously (use on gluster or fhgfs; this may break NFS)");
+
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
+
+	if (do_gpu)
+		do_shifts_onthefly = true;
 
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
