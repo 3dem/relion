@@ -448,12 +448,13 @@ void runDiff2KernelCoarse(
 		int ipart,
 		int group_id,
 		int exp_iclass,
+		MlOptimiserCuda *cudaMLO,
 		bool do_CC)
 {
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
-				cuda_kernel_diff2_coarse<true><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT)>>>(
+				cuda_kernel_diff2_coarse<true><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
 					Fimgs_real,
 					Fimgs_imag,
@@ -464,7 +465,7 @@ void runDiff2KernelCoarse(
 					image_size,
 					op.highres_Xi2_imgs[ipart] / 2.);
 			else
-				cuda_kernel_diff2_coarse<false><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT)>>>(
+				cuda_kernel_diff2_coarse<false><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
 					Fimgs_real,
 					Fimgs_imag,
@@ -478,7 +479,7 @@ void runDiff2KernelCoarse(
 	else
 	{
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_coarse<true><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+			cuda_kernel_diff2_CC_coarse<true><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -490,7 +491,7 @@ void runDiff2KernelCoarse(
 				op.highres_Xi2_imgs[ipart] / 2.,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 		else
-			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT)>>>(
+			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -524,6 +525,8 @@ void runDiff2KernelFine(
 		long unsigned significant_num,
 		unsigned image_size,
 		int ipart,
+		int exp_iclass,
+		MlOptimiserCuda *cudaMLO,
 		long unsigned job_num_count,
 		bool do_CC)
 {
@@ -532,7 +535,7 @@ void runDiff2KernelFine(
     if(!do_CC)
     {
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE>>>(
+			cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -549,7 +552,7 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_fine<false><<<block_dim,BLOCK_SIZE>>>(
+			cuda_kernel_diff2_fine<false><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -569,7 +572,7 @@ void runDiff2KernelFine(
     else
     {
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_fine<true><<<block_dim,BLOCK_SIZE>>>(
+			cuda_kernel_diff2_CC_fine<true><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -587,7 +590,7 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_CC_fine<false><<<block_dim,BLOCK_SIZE>>>(
+			cuda_kernel_diff2_CC_fine<false><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,

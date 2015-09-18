@@ -337,15 +337,69 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 				}
 			}
 			// Back to real space Mnoise
+			CUDA_CPU_TIC("inverseFourierTransform");
 			transformer.inverseFourierTransform();
+			CUDA_CPU_TOC("inverseFourierTransform");
+
+			CUDA_CPU_TIC("setXmippOrigin");
 			Mnoise.setXmippOrigin();
+			CUDA_CPU_TOC("setXmippOrigin");
 
+			CUDA_CPU_TIC("softMaskOutsideMap");
 			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (double)baseMLO->width_mask_edge, &Mnoise);
-
+			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
 		else
 		{
-			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size), (double)baseMLO->width_mask_edge);
+			CUDA_CPU_TIC("softMaskOutsideMap");
+
+			XFLOAT cosine_width = baseMLO->width_mask_edge;
+			XFLOAT radius = (XFLOAT)((double)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
+			if (radius < 0)
+				radius = ((double)img.data.xdim)/2.;
+			XFLOAT radius_p = radius + cosine_width;
+
+
+			bool do_softmaskOnGpu = true;
+			if(do_softmaskOnGpu)
+			{
+				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
+				dev_img.device_alloc();
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+					dev_img[n]=(XFLOAT)img.data.data[n];
+
+				dev_img.cp_to_device();
+				dim3 block_dim = 1; //TODO
+				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~dev_img,
+																					img().nzyxdim,
+																					img.data.xdim,
+																					img.data.ydim,
+																					img.data.zdim,
+																					img.data.xdim/2,
+																					img.data.ydim/2,
+																					img.data.zdim/2,
+																					true,
+																					radius,
+																					radius_p,
+																					cosine_width);
+
+				dev_img.cp_to_host();
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+				{
+					img.data.data[n]=(double)dev_img[n];
+				}
+			}
+			else
+				softMaskOutsideMap(img(), radius, (double)cosine_width);
+
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+//			{
+//				std::cout << img.data.data[n] << std::endl;
+//			}
+//			exit(0);
+			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
 		CUDA_CPU_TOC("zeroMask");
 
@@ -589,6 +643,7 @@ void getAllSquaredDifferencesCoarse(
 						ipart,
 						group_id,
 						exp_iclass,
+						cudaMLO,
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc));
 
 				/*====================================
@@ -598,7 +653,7 @@ void getAllSquaredDifferencesCoarse(
 
 			} // end if class significant
 		} // end loop iclass
-
+		cudaDeviceSynchronize();
 		allWeights.cp_to_host();
 		HANDLE_ERROR(cudaStreamSynchronize(0));
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
@@ -850,6 +905,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						significant_num,
 						image_size,
 						ipart,
+						exp_iclass,
+						cudaMLO,
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
@@ -859,7 +916,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
-
+		cudaDeviceSynchronize();
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
@@ -1056,7 +1113,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					block_num = sp.nr_dir*sp.nr_psi/SUMW_BLOCK_SIZE;
 					dim3 block_dim(block_num);
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~Mweight,
 																			    ~thisparticle_sumweight,
@@ -1077,8 +1134,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 					dim3 block_dim(block_num);
+
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
 																			    ~thisparticle_sumweight,
@@ -1096,6 +1154,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
+			cudaDeviceSynchronize();
 
 			if(exp_ipass==0)
 				allMweight.cp_to_host();
@@ -1256,6 +1315,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		//std::cerr << "@sort op.significant_weight[ipart]= " << (XFLOAT)op.significant_weight[ipart] << std::endl;
 
 	} // end loop ipart
+
 	CUDA_CPU_TOC("convertPostKernel");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -2047,6 +2107,10 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	{
 		cudaSetDevice(dev_id);
 	}
+
+	classStreams.resize(baseMLO->mymodel.nr_classes);
+	for (int i = 0; i <= baseMLO->mymodel.nr_classes; i++)
+		cudaStreamCreate(&classStreams[i]);
 
 	/*======================================================
 	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP

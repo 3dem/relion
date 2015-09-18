@@ -226,3 +226,116 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 	g_thr_wsum_prior_offsety_class[bid] = s_thr_wsum_prior_offsety_class[0];
 	g_thr_wsum_sigma2_offset[bid]       = s_thr_wsum_sigma2_offset[0];
 }
+__global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
+												long int vol_size,
+												long int xdim,
+												long int ydim,
+												long int zdim,
+												long int xinit,
+												long int yinit,
+												long int zinit,
+												bool do_Mnoise,
+												XFLOAT radius,
+												XFLOAT radius_p,
+												XFLOAT cosine_width	)
+{
+
+		int tid = threadIdx.x;
+
+//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+		XFLOAT r, raisedcos;
+
+		__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
+		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
+		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
+
+		XFLOAT sum_total = 0.f;
+		XFLOAT sum_bg_total = 0.f;
+
+		long int texel_pass_num = ceilf((float)vol_size/(float)SOFTMASK_BLOCK_SIZE);
+		int texel = tid;
+
+		partial_sum[tid]=0.f;
+		partial_sum_bg[tid]=0.f;
+		if (do_Mnoise)
+		{
+			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+			{
+				XFLOAT x,y,z;
+				if(texel<vol_size)
+				{
+					img_pixels[tid]=__ldg(&vol[texel]);
+
+					z = 0.f;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+					y = floor( (float)(texel-z*(xdim)*(ydim)) / (float)  xdim         );
+					x = texel - z*(xdim)*(ydim) - y*xdim;
+
+	//				z-=zinit;
+					y-=yinit;
+					x-=xinit;
+
+					r = sqrt(x*x + y*y);// + z*z);
+
+					if (r < radius)
+						continue;
+					else if (r > radius_p)
+					{
+						partial_sum[tid]    += 1.f;
+						partial_sum_bg[tid] += img_pixels[tid];
+					}
+					else
+					{
+						raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+						partial_sum[tid] += raisedcos;
+						partial_sum_bg[tid] += raisedcos * img_pixels[tid];
+					}
+				}
+			}
+		}
+
+		__syncthreads();
+		for(int j=(SOFTMASK_BLOCK_SIZE/2); j>0; j/=2)
+		{
+			if(tid<j)
+			{
+				partial_sum[tid] += partial_sum[tid+j];
+				partial_sum_bg[tid] += partial_sum_bg[tid+j];
+			}
+			__syncthreads();
+		}
+
+		sum_bg_total  = partial_sum_bg[0] / partial_sum[0];
+
+
+		texel = tid;
+		for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+		{
+			XFLOAT x,y,z;
+			if(texel<vol_size)
+			{
+				img_pixels[tid]=__ldg(&vol[texel]);
+
+				z = 0.f;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+				y = floor( (float)(texel-z*(xdim)*(ydim)) / (float)  xdim         );
+				x = texel - z*(xdim)*(ydim) - y*xdim;
+
+//				z-=zinit;
+				y-=yinit;
+				x-=xinit;
+
+				r = sqrt(x*x + y*y);// + z*z);
+
+				if (r < radius)
+					continue;
+				else if (r > radius_p)
+					img_pixels[tid]=sum_bg_total;
+				else
+				{
+					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+					img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + sum_bg_total*raisedcos;
+				}
+				vol[texel]=img_pixels[tid];
+			}
+
+		}
+}

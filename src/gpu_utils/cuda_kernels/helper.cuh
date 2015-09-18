@@ -52,4 +52,16 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 								     	unsigned long *d_job_num
 								     	);
 
+__global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
+												long int vol_size,
+												long int xdim,
+												long int ydim,
+												long int zdim,
+												long int xinit,
+												long int yinit,
+												long int zinit,
+												bool do_Mnoise,
+												XFLOAT radius,
+												XFLOAT radius_p,
+												XFLOAT cosine_width	);
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
