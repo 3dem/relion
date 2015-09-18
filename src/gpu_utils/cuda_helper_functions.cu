@@ -606,3 +606,122 @@ void runDiff2KernelFine(
 				job_num);
     }
 }
+
+#define WINDOW_FT_BLOCK_SIZE 128
+template<bool check_max_r2>
+__global__ void cuda_kernel_window_fourier_transform(
+		XFLOAT *g_in_real,
+		XFLOAT *g_in_imag,
+		XFLOAT *g_out_real,
+		XFLOAT *g_out_imag,
+		unsigned iX, unsigned iY, unsigned iZ, unsigned iYX, //Input dimensions
+		unsigned oX, unsigned oY, unsigned oZ, unsigned oYX, //Output dimensions
+		unsigned max_idx,
+		unsigned max_r2 = 0
+		)
+{
+	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
+	if (n >= max_idx) return;
+
+	int k, i, kp, ip, jp;
+
+	if (check_max_r2)
+	{
+		k = n / (iX * iY);
+		i = (n % (iX * iY)) / iX;
+
+		kp = k < iX ? k : k - iZ;
+		ip = i < iX ? i : i - iY;
+		jp = n % iX;
+
+		if (kp*kp + ip*ip + jp*jp > max_r2)
+			return;
+	}
+	else
+	{
+		k = n / (oX * oY);
+		i = (n % (oX * oY)) / oX;
+
+		kp = k < oX ? k : k - oZ;
+		ip = i < oX ? i : i - oY;
+		jp = n % oX;
+	}
+
+	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp];
+	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp];
+}
+
+void windowFourierTransform2(
+		XFLOAT *d_in_real,
+		XFLOAT *d_in_imag,
+		XFLOAT *d_out_real,
+		XFLOAT *d_out_imag,
+		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
+		unsigned oX, unsigned oY, unsigned oZ  //Output dimensions
+		)
+{
+	if (iX > 1 && iY/2 + 1 != iX)
+		REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
+
+	if (oY == iX)
+		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
+
+	if (oY > iX)
+	{
+		long int max_r2 = (iX - 1) * (iX - 1);
+
+		unsigned grid_dim = ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE);
+		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE >>>(
+				d_in_real,
+				d_in_imag,
+				d_out_real,
+				d_out_imag,
+				iX, iY, iZ, iX * iY, //Input dimensions
+				oX, oY, oZ, oX * oY, //Output dimensions
+				iX*iY*iZ,
+				max_r2 );
+	}
+	else
+	{
+		unsigned grid_dim = ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE);
+		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE >>>(
+				d_in_real,
+				d_in_imag,
+				d_out_real,
+				d_out_imag,
+				iX, iY, iZ, iX * iY, //Input dimensions
+				oX, oY, oZ, oX * oY, //Output dimensions
+				oX*oY*oZ);
+	}
+}
+
+
+
+void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, double beamtilt_x, double beamtilt_y,
+		double wavelength, double Cs, double angpix, int ori_size)
+{
+	if (Fimg.getDim() != 2)
+		REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
+
+	double boxsize = angpix * ori_size;
+	double factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+
+	for (unsigned n = 0 ; n < Fimg.yxdim; n ++)
+	{
+		unsigned i = n / Fimg.xdim;
+		unsigned j = n % Fimg.xdim;
+		unsigned jp = j;
+		int ip = i < Fimg.xdim ? i : i - Fimg.ydim;
+
+		double delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
+		double realval = Fimg.data[i*Fimg.xdim+j].real;
+		double imagval = Fimg.data[i*Fimg.xdim+j].imag;
+		double mag = sqrt(realval * realval + imagval * imagval);
+		double phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+		realval = mag * cos(phas);
+		imagval = mag * sin(phas);
+		Fimg.data[i*Fimg.xdim+j] = Complex(realval, imagval);
+
+	}
+
+}

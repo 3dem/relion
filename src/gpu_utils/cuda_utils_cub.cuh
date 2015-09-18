@@ -44,6 +44,68 @@ if (ptr.getAllocator() == NULL)
 }
 
 template <typename T>
+static std::pair<int, T> getArgMinOnDevice(CudaGlobalPtr<T> &ptr)
+{
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_WARNING: getArgMinOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_WARNING: getArgMinOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_WARNING: getArgMinOnDevice called with null allocator.\n");
+#endif
+	CudaGlobalPtr<cub::KeyValuePair<int, T> >  min_pair(1, ptr.getAllocator());
+	min_pair.device_alloc();
+	size_t temp_storage_size = 0;
+
+	HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.size));
+
+	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
+
+	HANDLE_ERROR(cub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.size));
+
+	min_pair.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+
+	ptr.getAllocator()->free(alloc);
+
+	std::pair<int, T> pair;
+	pair.first = min_pair[0].key;
+	pair.second = min_pair[0].value;
+
+	return pair;
+}
+
+template <typename T>
+static T getMaxOnDevice(CudaGlobalPtr<T> &ptr)
+{
+#ifdef DEBUG_CUDA
+if (ptr.size == 0)
+	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
+if (ptr.d_ptr == NULL)
+	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
+if (ptr.getAllocator() == NULL)
+	printf("DEBUG_ERROR: getMaxOnDevice called with null allocator.\n");
+#endif
+	CudaGlobalPtr<T >  max_val(1, ptr.getAllocator());
+	max_val.device_alloc();
+	size_t temp_storage_size = 0;
+
+	HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.size));
+
+	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
+
+	HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.size));
+
+	max_val.cp_to_host();
+	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+
+	ptr.getAllocator()->free(alloc);
+
+	return max_val[0];
+}
+
+template <typename T>
 static T getMinOnDevice(CudaGlobalPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
