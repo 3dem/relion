@@ -43,77 +43,24 @@
  ***************************************************************************/
 #include "src/metadata_container.h"
 
-void MetaDataContainer::insertVoidPtr(EMDLabel name, void * value)
-{
-//     If values[name] already existed, first free that memory
-    if (values[name])
-    {
-    	if (EMDL::isDouble(name))
-            delete (double*)values[name];
-        else if (EMDL::isInt(name))
-            delete (int*)values[name];
-        else if (EMDL::isLong(name))
-            delete (long int*)values[name];
-        else if (EMDL::isBool(name))
-            delete (bool*)values[name];
-        else if (EMDL::isString(name))
-        	delete (std::string*)values[name];
-        else
-            REPORT_ERROR("Unrecognised label type in MetaDataContainer clear");
-    }
-    values[name] = value;
-}
-
-void * MetaDataContainer::getVoidPtr(EMDLabel name)
-{
-    std::map<EMDLabel, void *>::iterator element;
-    element = values.find(name);
-    if (element == values.end())
-    {
-        REPORT_ERROR((std::string) "Label " + EMDL::label2Str(name) + " not found on getVoidPtr()\n" );
-    }
-    else
-    {
-        return element->second;
-    }
-}
-
 void MetaDataContainer::copy(const MetaDataContainer &MDc)
 {
 
     clear();
 	if (this != &MDc)
     {
-        void * aux;
-        EMDLabel lCode;
-        std::map<EMDLabel, void *>::const_iterator It;
-        for (It = (MDc.values).begin(); It != (MDc.values).end(); It++)
-        {
-            aux = It->second;
-            lCode = It->first;
+		labels = MDc.labels;
 
-            if (EMDL::isDouble(lCode))
-            {
-                addValue(lCode, *((double *) aux));
-            }
-            else if (EMDL::isString(lCode))
-            {
-                addValue(lCode, *((std::string *) aux));
-            }
-            else if (EMDL::isInt(lCode))
-            {
-                addValue(lCode, *((int *) aux));
-            }
-            else if (EMDL::isLong(lCode))
-            {
-                addValue(lCode, *((long int *) aux));
-            }
-            else if (EMDL::isBool(lCode))
-            {
-                addValue(lCode, *((bool *) aux));
-            }
-
-        }
+        for (std::map<EMDLabel, double *>::const_iterator It = MDc.doubles.begin(); It != MDc.doubles.end(); It++)
+            addValue(It->first, *It->second);
+        for (std::map<EMDLabel, int *>::const_iterator It = MDc.ints.begin(); It != MDc.ints.end(); It++)
+            addValue(It->first, *It->second);
+        for (std::map<EMDLabel, long *>::const_iterator It = MDc.longs.begin(); It != MDc.longs.end(); It++)
+            addValue(It->first, *It->second);
+        for (std::map<EMDLabel, bool *>::const_iterator It = MDc.bools.begin(); It != MDc.bools.end(); It++)
+            addValue(It->first, *It->second);
+        for (std::map<EMDLabel, std::string *>::const_iterator It = MDc.strings.begin(); It != MDc.strings.end(); It++)
+            addValue(It->first, *It->second);
     }
 }
 
@@ -169,10 +116,14 @@ void MetaDataContainer::addValueFromString(const EMDLabel &lCode, const std::str
 
 void MetaDataContainer::addValue(EMDLabel name, const double &value)
 {
+	if (! valueExists(name))
+		labels.push_back(name);
+
     if (EMDL::isDouble(name))
     {
-    	void * newValue = (void *) (new double(value));
-    	insertVoidPtr(name, newValue);
+		if (doubles[name])
+			delete doubles[name];
+		doubles[name] = new double(value);
     }
     else
     	REPORT_ERROR("addValue for double: label " + EMDL::label2Str(name) + " is not of type double!");
@@ -180,10 +131,14 @@ void MetaDataContainer::addValue(EMDLabel name, const double &value)
 
 void MetaDataContainer::addValue(EMDLabel name, const int &value)
 {
+	if (! valueExists(name))
+		labels.push_back(name);
+
     if (EMDL::isInt(name))
     {
-    	void * newValue = (void *) (new int(value));
-    	insertVoidPtr(name, newValue);
+		if (ints[name])
+			delete ints[name];
+		ints[name] = new int(value);
     }
     else
     	REPORT_ERROR("addValue for int: label " + EMDL::label2Str(name) + " is not of type int!");
@@ -191,10 +146,14 @@ void MetaDataContainer::addValue(EMDLabel name, const int &value)
 
 void MetaDataContainer::addValue(EMDLabel name, const long int &value)
 {
+	if (! valueExists(name))
+		labels.push_back(name);
+
     if (EMDL::isLong(name))
     {
-    	void * newValue = (void *) (new long int(value));
-    	insertVoidPtr(name, newValue);
+		if (longs[name])
+			delete longs[name];
+		longs[name] = new long(value);
     }
     else
     	REPORT_ERROR("addValue for long: label " + EMDL::label2Str(name) + " is not of type long!");
@@ -202,10 +161,14 @@ void MetaDataContainer::addValue(EMDLabel name, const long int &value)
 
 void MetaDataContainer::addValue(EMDLabel name, const bool &value)
 {
+	if (! valueExists(name))
+		labels.push_back(name);
+
     if (EMDL::isBool(name))
     {
-    	void * newValue = (void *) (new bool(value));
-    	insertVoidPtr(name, newValue);
+		if (bools[name])
+			delete bools[name];
+		bools[name] = new bool(value);
     }
     else
     	REPORT_ERROR("addValue for bool: label " + EMDL::label2Str(name) + " is not of type bool!");
@@ -213,10 +176,14 @@ void MetaDataContainer::addValue(EMDLabel name, const bool &value)
 
 void MetaDataContainer::addValue(EMDLabel name, const std::string &value)
 {
-    if (EMDL::isString(name))
+	if (! valueExists(name))
+		labels.push_back(name);
+
+	if (EMDL::isString(name))
     {
-    	void * newValue = (void *) (new std::string(value));
-    	insertVoidPtr(name, newValue);
+		if (strings[name])
+			delete strings[name];
+		strings[name] = new std::string(value);
     }
     else
     	REPORT_ERROR("addValue for string: label " + EMDL::label2Str(name) + " is not of type string!");
@@ -225,227 +192,153 @@ void MetaDataContainer::addValue(EMDLabel name, const std::string &value)
 /** Creates a new label-value pair, with the default value for the corresponding type */
 void MetaDataContainer::addDefaultValue(EMDLabel name)
 {
-	void * newValue;
+	if (! valueExists(name))
+		labels.push_back(name);
+
 	if (EMDL::isDouble(name))
     {
-    	newValue = (void *) (new double(0.));
+		if (doubles[name])
+			delete doubles[name];
+		doubles[name] = new double(0.);
     }
-    else if (EMDL::isInt(name) || EMDL::isLong(name))
+    else if (EMDL::isInt(name))
     {
-    	newValue = (void *) (new int(0));
+		if (ints[name])
+			delete ints[name];
+		ints[name] = new int(0.);
+    }
+    else if (EMDL::isLong(name))
+    {
+		if (longs[name])
+			delete longs[name];
+		longs[name] = new long(0.);
     }
     else if (EMDL::isBool(name))
     {
-    	newValue = (void *) (new bool(false));
+		if (bools[name])
+			delete bools[name];
+		bools[name] = new bool(false);
     }
     else if (EMDL::isString(name))
     {
-    	newValue = (void *) (new std::string(""));
+		if (strings[name])
+			delete strings[name];
+		strings[name] = new std::string("");
     }
     else
     	REPORT_ERROR("MetaDataContainer::addDefaultValu: unrecognised data type for label " + EMDL::label2Str(name));
-
-    insertVoidPtr(name, newValue);
-
 }
 
 bool MetaDataContainer::getValue( const EMDLabel name, double &value)
 {
-    std::map<EMDLabel, void *>::iterator element;
-
-    element = values.find(name);
-
-    if (element == values.end())
-    {
+    std::map<EMDLabel, double *>::iterator element = doubles.find(name);
+    if (element == doubles.end())
         return false;
-    }
     else
-    {
-    	if (EMDL::isDouble(element->first))
-    		value = *((double *) element->second);
-    	else
-    		REPORT_ERROR("getValue for double: label " + EMDL::label2Str(element->first) + " is not of type double!");
-
-    	return true;
-    }
+    	value = *element->second;
+    return true;
 }
 
 bool MetaDataContainer::getValue( const EMDLabel name, int &value)
 {
-    std::map<EMDLabel, void *>::iterator element;
-
-    element = values.find(name);
-
-    if (element == values.end())
-    {
+    std::map<EMDLabel, int *>::iterator element = ints.find(name);
+    if (element == ints.end())
         return false;
-    }
     else
-    {
-    	if (EMDL::isInt(element->first))
-    		value = *((int *) element->second);
-    	else
-    		REPORT_ERROR("getValue for int: label " + EMDL::label2Str(element->first) + " is not of type int!");
-
-    	return true;
-    }
+    	value = *element->second;
+    return true;
 }
 
-bool MetaDataContainer::getValue( const EMDLabel name, long int &value)
+bool MetaDataContainer::getValue( const EMDLabel name, long &value)
 {
-    std::map<EMDLabel, void *>::iterator element;
-
-    element = values.find(name);
-
-    if (element == values.end())
-    {
+    std::map<EMDLabel, long *>::iterator element = longs.find(name);
+    if (element == longs.end())
         return false;
-    }
     else
-    {
-    	if (EMDL::isLong(element->first))
-    		value = *((long int *) element->second);
-    	else
-    		REPORT_ERROR("getValue for long int: label " + EMDL::label2Str(element->first) + " is not of type long int!");
-
-    	return true;
-    }
+    	value = *element->second;
+    return true;
 }
 
 bool MetaDataContainer::getValue( const EMDLabel name, bool &value)
 {
-    std::map<EMDLabel, void *>::iterator element;
-
-    element = values.find(name);
-
-    if (element == values.end())
-    {
+    std::map<EMDLabel, bool *>::iterator element = bools.find(name);
+    if (element == bools.end())
         return false;
-    }
     else
-    {
-    	if (EMDL::isBool(element->first))
-    		value = *((bool *) element->second);
-    	else
-    		REPORT_ERROR("getValue for bool: label " + EMDL::label2Str(element->first) + " is not of type bool!");
-
-    	return true;
-    }
+    	value = *element->second;
+    return true;
 }
 
 bool MetaDataContainer::getValue( const EMDLabel name, std::string &value)
 {
-    std::map<EMDLabel, void *>::iterator element;
-
-    element = values.find(name);
-
-    if (element == values.end())
-    {
+    std::map<EMDLabel, std::string *>::iterator element = strings.find(name);
+    if (element == strings.end())
         return false;
-    }
     else
-    {
-    	if (EMDL::isString(element->first))
-    		value = *((std::string *) element->second);
-    	else
-    		REPORT_ERROR("getValue for string: label " + EMDL::label2Str(element->first) + " is not of type string!");
-
-    	return true;
-    }
+    	value = *element->second;
+    return true;
 }
 
 bool MetaDataContainer::valueExists(EMDLabel name)
 {
-    if (values.find(name) == values.end())
-    {
-        return false;
-    }
-    else
-    {
-        return true;
-    }
-}
-//A template exists for pairexists different from string
-bool MetaDataContainer::pairExists(EMDLabel name, const std::string &value)
-{
-    // Traverse all the structure looking for objects
-    // that satisfy search criteria
-    std::map<EMDLabel, void *>::iterator It;
+	if (! EMDL::isValidLabel(name))
+		REPORT_ERROR("Unrecognised label type in MetaDataContainer valueExists");
 
-    It = values.find(name);
-
-    if (It != values.end())
-    {
-        if (*((std::string *) (It->second)) == value)
-        {
-            return true;
-        }
-    }
-
+	if (find(labels.begin(), labels.end(), name) != labels.end())
+		return true;
     return false;
 }
 
 std::vector<EMDLabel> MetaDataContainer::getLabels()
 {
-	std::vector<EMDLabel> result;
-	std::map<EMDLabel, void *>::iterator It;
-	for (It = values.begin(); It != values.end(); It++)
-		result.push_back(It->first);
-
-	return result;
+	return labels;
 }
 
-bool MetaDataContainer::writeValueToStream(std::ostream &outstream,
-        EMDLabel inputLabel)
+bool MetaDataContainer::writeValueToStream(std::ostream &outstream, EMDLabel inputLabel)
 {
 	if (valueExists(inputLabel))
     {
-#ifdef DEBUG_MDC
-		std::cerr << " EMDL::label2Str(inputLabel)= " << EMDL::label2Str(inputLabel) << std::endl;
-#endif
 		if (EMDL::isDouble(inputLabel))
         {
             double d;
-            d = *((double*) (getVoidPtr(inputLabel)));
+            if (! getValue(inputLabel, d))
+        		REPORT_ERROR("Double value not found in writeValueToStream.");
             if ((ABS(d) > 0. && ABS(d) < 0.001) || ABS(d) > 100000.)
                 outstream << std::setw(12) << std::scientific;
             else
                 outstream << std::setw(12) << std::fixed;
             outstream << d;
-#ifdef DEBUG_MDC
-            std::cerr << " d= " << d << std::endl;
-#endif
         }
         else if (EMDL::isString(inputLabel))
         {
-            outstream << *((std::string*) (getVoidPtr(inputLabel)));
-#ifdef DEBUG_MDC
-            std::cerr << " *((std::string*) (getVoidPtr(inputLabel)))= " << *((std::string*) (getVoidPtr(inputLabel))) << std::endl;
-#endif
+        	std::string s;
+        	if (! getValue(inputLabel, s))
+        		REPORT_ERROR("String value not found in writeValueToStream.");
+            outstream << s;
         }
         else if (EMDL::isInt(inputLabel))
         {
+        	int i;
+        	if (! getValue(inputLabel, i))
+    			REPORT_ERROR("Integer value not found in writeValueToStream.");
         	outstream << std::setw(12) << std::fixed;
-            outstream << *((int*) (getVoidPtr(inputLabel)));
-#ifdef DEBUG_MDC
-            std::cerr << " *((int*) (getVoidPtr(inputLabel)))= " << *((int*) (getVoidPtr(inputLabel))) << std::endl;
-#endif
+            outstream << i;
         }
         else if (EMDL::isLong(inputLabel))
         {
+        	long l;
+        	if (! getValue(inputLabel, l))
+        		REPORT_ERROR("Long value not found in writeValueToStream.");
         	outstream << std::setw(12) << std::fixed;
-            outstream << *((long int*) (getVoidPtr(inputLabel)));
-#ifdef DEBUG_MDC
-            std::cerr << " *((long int*) (getVoidPtr(inputLabel)))= " << *((long int*) (getVoidPtr(inputLabel))) << std::endl;
-#endif
+            outstream << l;
         }
         else if (EMDL::isBool(inputLabel))
         {
+        	bool b;
+        	if (! getValue(inputLabel, b))
+        		REPORT_ERROR("Boolean value not found in writeValueToStream.");
         	outstream << std::setw(12) << std::fixed;
-        	outstream << *((bool*) (getVoidPtr(inputLabel)));
-#ifdef DEBUG_MDC
-        	std::cerr << " *((bool*) (getVoidPtr(inputLabel)))= " << *((bool*) (getVoidPtr(inputLabel))) << std::endl;
-#endif
+        	outstream << b;
         }
 		return true;
     }
@@ -455,8 +348,7 @@ bool MetaDataContainer::writeValueToStream(std::ostream &outstream,
     }
 }
 
-bool MetaDataContainer::writeValueToString(std::string &outString,
-        EMDLabel inLabel)
+bool MetaDataContainer::writeValueToString(std::string &outString, EMDLabel inLabel)
 {
     std::ostringstream oss;
     bool result = writeValueToStream(oss, inLabel);

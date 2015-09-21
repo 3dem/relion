@@ -61,12 +61,15 @@
 
 class MetaDataContainer
 {
-    /** Container for attribute-value pairs.
-     * Note that void * allows to use mixed types */
-    std::map<EMDLabel, void *> values;
+	//Labels is just to keep the order of things
+	std::vector<EMDLabel> labels;
 
-    void insertVoidPtr(EMDLabel name, void * value);
-    void * getVoidPtr(EMDLabel name);
+    std::map<EMDLabel, double *> doubles;
+    std::map<EMDLabel, int *> ints;
+    std::map<EMDLabel, long *> longs;
+    std::map<EMDLabel, bool *> bools;
+    std::map<EMDLabel, std::string *> strings;
+
     void copy(const MetaDataContainer &MDc);
 
 public:
@@ -106,24 +109,21 @@ public:
      */
     void clear(void)
     {
-        // Manually delete the map of pointers!
-        for (std::map<EMDLabel, void *>::iterator it = values.begin();
-             it != values.end(); ++it)
-        {
-        	if (EMDL::isDouble(it->first))
-                delete (double*)it->second;
-            else if (EMDL::isInt(it->first))
-                delete (int*)it->second;
-            else if (EMDL::isLong(it->first))
-                delete (long int*)it->second;
-            else if (EMDL::isBool(it->first))
-                delete (bool*)it->second;
-            else if (EMDL::isString(it->first))
-                delete (std::string*)it->second;
-            else
-                REPORT_ERROR("Unrecognised label type in MetaDataContainer clear");
-        }
-    	values.clear();
+    	for (std::map<EMDLabel, double *>::iterator it = doubles.begin(); it != doubles.end(); ++it)
+    		delete it->second;
+    	doubles.clear();
+    	for (std::map<EMDLabel, int *>::iterator it = ints.begin(); it != ints.end(); ++it)
+    		delete it->second;
+    	ints.clear();
+    	for (std::map<EMDLabel, long *>::iterator it = longs.begin(); it != longs.end(); ++it)
+    		delete it->second;
+    	longs.clear();
+    	for (std::map<EMDLabel, bool *>::iterator it = bools.begin(); it != bools.end(); ++it)
+    		delete it->second;
+    	bools.clear();
+    	for (std::map<EMDLabel, std::string *>::iterator it = strings.begin(); it != strings.end(); ++it)
+    		delete it->second;
+    	strings.clear();
     }
 
     /** Get a value for a given name.
@@ -142,27 +142,48 @@ public:
     // Check whether this label is present in the container
     bool valueExists(EMDLabel name);
 
-    //string is not part of the template because - is not defined for string
-    bool pairExists(EMDLabel name, const std::string &value);
-
-    template<class T>
-    bool pairExists(EMDLabel name, const T& value)
+    bool pairExists(EMDLabel name, const double value)
     {
-        // Traverse all the structure looking for objects
-        // that satisfy search criteria
-        std::map<EMDLabel, void *>::iterator It;
-
-        It = values.find(name);
-
-        if (It != values.end())
-        {
-            if (ABS( *((T *)(It->second)) - value )
-                    < XMIPP_EQUAL_ACCURACY)
-            {
+        std::map<EMDLabel, double *>::iterator It = doubles.find(name);
+        if (It != doubles.end())
+            if (ABS( *It->second - value ) < XMIPP_EQUAL_ACCURACY)
                 return true;
-            }
-        }
+        return false;
+    }
 
+    bool pairExists(EMDLabel name, const int value)
+    {
+        std::map<EMDLabel, int *>::iterator It = ints.find(name);
+        if (It != ints.end())
+            if (*It->second == value)
+                return true;
+        return false;
+    }
+
+    bool pairExists(EMDLabel name, const long value)
+    {
+        std::map<EMDLabel, long *>::iterator It = longs.find(name);
+        if (It != longs.end())
+            if (*It->second == value)
+                return true;
+        return false;
+    }
+
+    bool pairExists(EMDLabel name, const bool value)
+    {
+        std::map<EMDLabel, bool *>::iterator It = bools.find(name);
+        if (It != bools.end())
+            if (*It->second == value)
+                return true;
+        return false;
+    }
+
+    bool pairExists(EMDLabel name, const std::string &value)
+    {
+        std::map<EMDLabel, std::string *>::iterator It = strings.find(name);
+        if (It != strings.end())
+            if (*It->second == value)
+                return true;
         return false;
     }
 
