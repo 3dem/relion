@@ -239,37 +239,35 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 
 		CUDA_CPU_TIC("FourierTransform1");
 
+		CUDA_CPU_TIC("setReal");
+		transformer.setReal(img_aux);
+		CUDA_CPU_TOC("setReal");
+		CUDA_CPU_TIC("Transform");
+		transformer.Transform(FFTW_FORWARD);
+					if (true)transformer.getFourierCopy(Faux);
+					else  transformer.getFourierAlias(Faux);
+		CUDA_CPU_TOC("Transform");
 
-
-		//		transformer.setReal(img_aux);
-		//		transformer.Transform(FFTW_FORWARD);
-		//		transformer.getFourierCopy(Faux);
-
-
-		cudaMLO->inputImageData->setSize(XSIZE(img_aux), YSIZE(img_aux));
-
-
-		CUDA_CPU_TIC("Memset1");
-		for (unsigned long i = 0; i < cudaMLO->inputImageData->reals.getSize(); i ++)
-			cudaMLO->inputImageData->reals[i] = (cufftReal) img_aux.data[i];
-		CUDA_CPU_TOC("Memset1");
-
-		cudaMLO->inputImageData->reals.cp_to_device();
-		cudaMLO->inputImageData->forward();
-		cudaMLO->inputImageData->fouriers.cp_to_host();
-
-		Faux.resize(ZSIZE(img_aux),YSIZE(img_aux),XSIZE(img_aux)/2+1);
-		HANDLE_ERROR(cudaStreamSynchronize(0));
-
-		CUDA_CPU_TIC("Memset2");
-		XFLOAT corrFactor = 1. / cudaMLO->inputImageData->reals.getSize();
-
-		for (unsigned long i = 0; i < cudaMLO->inputImageData->fouriers.getSize(); i ++)
-		{
-			Faux.data[i].real = (double) cudaMLO->inputImageData->fouriers[i].x * corrFactor;
-			Faux.data[i].imag = (double) cudaMLO->inputImageData->fouriers[i].y * corrFactor;
-		}
-		CUDA_CPU_TOC("Memset2");
+//TODO CUFFT is not working properly, waiting with this part
+//
+//		cudaMLO->inputImageData->setSize(XSIZE(img_aux), YSIZE(img_aux));
+//		CUDA_CPU_TIC("Memset1");
+//		for (unsigned long i = 0; i < cudaMLO->inputImageData->reals.getSize(); i ++)
+//			cudaMLO->inputImageData->reals[i] = (cufftReal) img_aux.data[i];
+//		CUDA_CPU_TOC("Memset1");
+//		cudaMLO->inputImageData->reals.cp_to_device();
+//		cudaMLO->inputImageData->forward();
+//		cudaMLO->inputImageData->fouriers.cp_to_host();
+//		Faux.resize(ZSIZE(img_aux),YSIZE(img_aux),XSIZE(img_aux)/2+1);
+//		HANDLE_ERROR(cudaStreamSynchronize(0));
+//		CUDA_CPU_TIC("Memset2");
+//		XFLOAT corrFactor = 1. / cudaMLO->inputImageData->reals.getSize();
+//		for (unsigned long i = 0; i < cudaMLO->inputImageData->fouriers.getSize(); i ++)
+//		{
+//			Faux.data[i].real = (double) cudaMLO->inputImageData->fouriers[i].x * corrFactor;
+//			Faux.data[i].imag = (double) cudaMLO->inputImageData->fouriers[i].y * corrFactor;
+//		}
+//		CUDA_CPU_TOC("Memset2");
 
 
 		CUDA_CPU_TOC("FourierTransform1");
@@ -2108,7 +2106,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 		cudaSetDevice(dev_id);
 	}
 
-	classStreams.resize(baseMLO->mymodel.nr_classes);
+	classStreams.resize(baseMLO->mymodel.nr_classes, 0);
 	for (int i = 0; i <= baseMLO->mymodel.nr_classes; i++)
 		cudaStreamCreate(&classStreams[i]);
 
@@ -2222,7 +2220,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	allocator->setOutOfMemoryHandler(this);
 #endif
 
-	inputImageData = new CufftBundle(0, allocator);
+	//inputImageData = new CufftBundle(0, allocator);
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles()

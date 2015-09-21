@@ -15,6 +15,7 @@ class CudaProjector
 	    padding_factor;
 
 #ifndef CUDA_DOUBLE_PRECISION
+	float *texArrayReal2D, *texArrayImag2D;
 	cudaArray_t *texArrayReal, *texArrayImag;
 	cudaTextureObject_t *mdlReal, *mdlImag;
 #else
@@ -29,6 +30,8 @@ public:
 			padding_factor(0)
 	{
 #ifndef CUDA_DOUBLE_PRECISION
+		texArrayReal2D = 0;
+		texArrayImag2D = 0;
 		texArrayReal = 0;
 		texArrayImag = 0;
 		mdlReal = 0;

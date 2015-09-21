@@ -19,8 +19,6 @@ void CudaProjector::setMdlData(float *real, float *imag)
 #endif
 	mdlReal = new cudaTextureObject_t();
 	mdlImag = new cudaTextureObject_t();
-	texArrayReal = new cudaArray_t();
-	texArrayImag = new cudaArray_t();
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
 	cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
@@ -35,6 +33,9 @@ void CudaProjector::setMdlData(float *real, float *imag)
 	//
 	if(mdlZ!=0)  // then we are using a 3D reference
 	{
+		texArrayReal = new cudaArray_t();
+		texArrayImag = new cudaArray_t();
+
 		// -- make extents for automatic pitch:ing (aligment) of allocated 3D arrays
 		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
 		cudaMemcpy3DParms copyParams_real = {0}, copyParams_imag = {0};
@@ -65,23 +66,23 @@ void CudaProjector::setMdlData(float *real, float *imag)
 		size_t pitch;
 
 		// -- allocate pitched  (aligned) memory positions, and copy data into them
-		HANDLE_ERROR(cudaMallocPitch(&texArrayReal, &pitch, sizeof(float)*mdlX,mdlY));
-		HANDLE_ERROR(cudaMemcpy2D(texArrayReal, pitch, real, sizeof(float)*mdlX, sizeof(float)*mdlX, mdlY, cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMallocPitch(&texArrayReal2D, &pitch, sizeof(float)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMemcpy2D(texArrayReal2D, pitch, real, sizeof(float)*mdlX, sizeof(float)*mdlX, mdlY, cudaMemcpyHostToDevice));
 		// ------------------------------------------------
-		HANDLE_ERROR(cudaMallocPitch(&texArrayImag, &pitch, sizeof(float)*mdlX,mdlY));
-		HANDLE_ERROR(cudaMemcpy2D(texArrayImag, pitch, imag, sizeof(float)*mdlX, sizeof(float)*mdlX, mdlY, cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMallocPitch(&texArrayImag2D, &pitch, sizeof(float)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMemcpy2D(texArrayImag2D, pitch, imag, sizeof(float)*mdlX, sizeof(float)*mdlX, mdlY, cudaMemcpyHostToDevice));
 
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_real.resType = cudaResourceTypePitch2D;
-		resDesc_real.res.pitch2D.devPtr = texArrayReal;
+		resDesc_real.res.pitch2D.devPtr = texArrayReal2D;
 		resDesc_real.res.pitch2D.pitchInBytes =  pitch;
 		resDesc_real.res.pitch2D.width = mdlX;
 		resDesc_real.res.pitch2D.height = mdlY;
 		resDesc_real.res.pitch2D.desc = desc;
 		// -------------------------------------------------
 		resDesc_imag.resType = cudaResourceTypePitch2D;
-		resDesc_imag.res.pitch2D.devPtr = texArrayImag;
+		resDesc_imag.res.pitch2D.devPtr = texArrayImag2D;
 		resDesc_imag.res.pitch2D.pitchInBytes =  pitch;
 		resDesc_imag.res.pitch2D.width = mdlX;
 		resDesc_imag.res.pitch2D.height = mdlY;
@@ -158,18 +159,19 @@ CudaProjector::~CudaProjector()
 		delete mdlReal;
 		delete mdlImag;
 
-		if(mdlZ!=0)
+		if(mdlZ!=0) //3D case
 		{
 			cudaFreeArray(*texArrayReal);
 			cudaFreeArray(*texArrayImag);
 			delete texArrayReal;
 			delete texArrayImag;
 		}
-		else
+		else //2D case
 		{
-			cudaFree(texArrayReal);
-			cudaFree(texArrayImag);
+			cudaFree(texArrayReal2D);
+			cudaFree(texArrayImag2D);
 		}
+
 		texArrayReal = 0;
 		texArrayImag = 0;
 #endif
