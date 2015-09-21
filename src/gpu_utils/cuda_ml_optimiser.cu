@@ -2210,11 +2210,18 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 	printf("Custom allocator is disabled.\n");
 	allocator = new CudaCustomAllocator(0);
 #else
+	size_t allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-	size_t allocationSize = (float)free * .7; //Lets leave some for other processes for now
 
-	printf("Custom allocator assigned %.2f MiB of device memory.\n", (float)allocationSize/(1024.*1024.));
+	if (allocationSize > free)
+	{
+		printf("WARNING: Required memory per thread, via \"--gpu_memory_per_thread\", not available on device. (Defaulting to less)\n");
+		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+	}
+
+	printf("Custom allocator assigned %.2f GB of device memory.\n", (float)allocationSize/(1000.*1000.));
 
 	allocator = new CudaCustomAllocator(allocationSize);
 	allocator->setOutOfMemoryHandler(this);

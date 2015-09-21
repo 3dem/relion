@@ -256,6 +256,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
+	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GB) assigned to custom allocator (if enabled) for each thread", "2"));
 
 	if (do_gpu)
 		do_shifts_onthefly = true;
@@ -401,6 +402,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
+	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GiB [1024 MiB]) assigned to custom allocator (if enabled) for each thread", "2"));
 
 	if (do_gpu)
 		do_shifts_onthefly = true;

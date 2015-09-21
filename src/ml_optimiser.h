@@ -254,6 +254,7 @@ public:
 
 	// Available memory (in Gigabyte)
 	double available_memory;
+	double available_gpu_memory;
 
 	// Perform combination of weight through files written on disc
 	bool combine_weights_thru_disc;
