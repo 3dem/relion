@@ -94,7 +94,8 @@ void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans)
 		int t_nr_psi = CEIL(360./psi_step);
 		if(t_nr_psi%32!=0)
 		{
-			t_nr_psi = ROUND((float)t_nr_psi / 32.0)*32;
+//			t_nr_psi = ROUND((float)t_nr_psi / 32.0)*32;
+			t_nr_psi = CEIL((float)t_nr_psi / 32.0)*32;
 			float tdiff = psi_step - 360./(double)t_nr_psi;
 			psi_step = 360./(double)t_nr_psi;
 //			std::cerr << "psi_step = " << psi_step << std::endl;
