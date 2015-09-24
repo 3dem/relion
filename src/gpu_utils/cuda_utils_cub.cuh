@@ -25,14 +25,14 @@ if (ptr.getAllocator() == NULL)
 	max_pair.device_alloc();
 	size_t temp_storage_size = 0;
 
-	HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size));
 
 	max_pair.cp_to_host();
-	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
 
 	ptr.getAllocator()->free(alloc);
 
@@ -58,14 +58,14 @@ if (ptr.getAllocator() == NULL)
 	min_pair.device_alloc();
 	size_t temp_storage_size = 0;
 
-	HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	HANDLE_ERROR(cub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.size));
 
 	min_pair.cp_to_host();
-	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
 
 	ptr.getAllocator()->free(alloc);
 
@@ -91,14 +91,14 @@ if (ptr.getAllocator() == NULL)
 	max_val.device_alloc();
 	size_t temp_storage_size = 0;
 
-	HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.size));
 
 	max_val.cp_to_host();
-	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
 
 	ptr.getAllocator()->free(alloc);
 
@@ -120,14 +120,14 @@ if (ptr.getAllocator() == NULL)
 	min_val.device_alloc();
 	size_t temp_storage_size = 0;
 
-	HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size));
 
 	min_val.cp_to_host();
-	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
 
 	ptr.getAllocator()->free(alloc);
 
@@ -149,14 +149,14 @@ if (ptr.getAllocator() == NULL)
 	val.device_alloc();
 	size_t temp_storage_size = 0;
 
-	HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size));
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	HANDLE_ERROR(cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size));
 
 	val.cp_to_host();
-	HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
 
 	ptr.getAllocator()->free(alloc);
 
@@ -176,11 +176,11 @@ if (in.getAllocator() == NULL)
 #endif
 	size_t temp_storage_size = 0;
 
-	HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size));
 
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
-	HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size));
 
 	in.getAllocator()->free(alloc);
 }

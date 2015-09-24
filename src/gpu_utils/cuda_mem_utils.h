@@ -8,17 +8,27 @@
 #include <vector>
 
 #ifdef DEBUG_CUDA
-#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
+#define DEBUG_HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 #else
-#define HANDLE_ERROR( err ) (err) //Do nothing
+#define DEBUG_HANDLE_ERROR( err ) (err) //Do nothing
 #endif
+
+#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 static void HandleError( cudaError_t err, const char *file, int line )
 {
     if (err != cudaSuccess)
     {
+#ifdef DEBUG_CUDA
         printf( "DEBUG_ERROR: %s in %s at line %d\n",
         		cudaGetErrorString( err ), file, line );
+        fflush(stdout);
 		raise(SIGSEGV);
+#else
+        printf( "ERROR: %s in %s at line %d\n",
+        		cudaGetErrorString( err ), file, line );
+        fflush(stdout);
+		raise(SIGSEGV);
+#endif
     }
 }
 
@@ -29,7 +39,7 @@ static void cudaPrintMemInfo()
 {
 	size_t free;
 	size_t total;
-	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+	DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 	float free_hr(free/(1024.*1024.));
 	float total_hr(total/(1024.*1024.));
     printf( "free %.2fMiB, total %.2fMiB, used %.2fMiB\n",
@@ -40,28 +50,28 @@ template< typename T>
 static inline
 void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size)
 {
-	HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
+	DEBUG_HANDLE_ERROR(cudaMemcpy( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice));
 };
 
 template< typename T>
 static inline
 void cudaCpyHostToDevice( T *h_ptr, T *d_ptr, size_t size, cudaStream_t &stream)
 {
-	HANDLE_ERROR(cudaMemcpyAsync( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
+	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
 };
 
 template< typename T>
 static inline
 void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size)
 {
-	HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost));
+	DEBUG_HANDLE_ERROR(cudaMemcpy( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost));
 };
 
 template< typename T>
 static inline
 void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size, cudaStream_t &stream)
 {
-	HANDLE_ERROR(cudaMemcpyAsync( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
+	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
 };
 
 class OutOfMemoryHandler
@@ -157,7 +167,7 @@ public:
 		Alloc *nAlloc = new Alloc();
 		nAlloc->size = size;
 		nAlloc->free = false;
-		HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
+		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
 		return nAlloc;
 #else
 		
@@ -223,7 +233,7 @@ public:
 		Alloc *nAlloc = new Alloc();
 		nAlloc->size = size;
 		nAlloc->free = false;
-		HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
+		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
 		return nAlloc;
 #else
 		Alloc *curAlloc = getLastSuitedFree(size);
@@ -283,7 +293,7 @@ public:
 	void free(Alloc* curL)
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
-		HANDLE_ERROR(cudaFree( curL->ptr ));
+		DEBUG_HANDLE_ERROR(cudaFree( curL->ptr ));
 		curL->free = true;
 #else
 		curL->free = true;
@@ -337,7 +347,7 @@ public:
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		size_t free, total;
-		HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 		return free;
 #else
 		size_t total = 0;
@@ -357,7 +367,7 @@ public:
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		size_t free, total;
-		HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 		return total - free;
 #else
 		size_t total = 0;
@@ -420,7 +430,7 @@ public:
 	~CudaCustomAllocator()
 	{
 #ifndef CUDA_NO_CUSTOM_ALLOCATION
-		HANDLE_ERROR(cudaFree( first->ptr ));
+		DEBUG_HANDLE_ERROR(cudaFree( first->ptr ));
 
 		Alloc *cL = first, *nL;
 
@@ -608,7 +618,7 @@ public:
 			d_ptr = (T*) alloc->getPtr();
 		}
 		else
-			HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
+			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
 	/**
@@ -629,7 +639,7 @@ public:
 			d_ptr = (T*) alloc->getPtr();
 		}
 		else
-			HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
+			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
 	/**
@@ -676,7 +686,7 @@ public:
 		if (d_ptr == 0)
 			printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
 #endif
-		HANDLE_ERROR(cudaMemsetAsync( d_ptr, value, size * sizeof(T), stream));
+		DEBUG_HANDLE_ERROR(cudaMemsetAsync( d_ptr, value, size * sizeof(T), stream));
 	}
 
 	/**
@@ -797,13 +807,13 @@ public:
 
 		if (CustomAlloc)
 		{
-//			HANDLE_ERROR(cudaDeviceSynchronize());
+//			DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 			allocator->free(alloc);
 			alloc = NULL;
-//			HANDLE_ERROR(cudaDeviceSynchronize());
+//			DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 		}
 		else
-			HANDLE_ERROR(cudaFree(d_ptr));
+			DEBUG_HANDLE_ERROR(cudaFree(d_ptr));
 		d_ptr = 0;
 	}
 

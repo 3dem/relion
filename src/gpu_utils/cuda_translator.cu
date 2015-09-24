@@ -7,16 +7,16 @@ void CudaTranslator::setShifters(XFLOAT *h_real, XFLOAT *h_imag, unsigned count,
 	img_size = img_sz;
 
 	if (d_shifter_real != NULL)
-		HANDLE_ERROR(cudaFree(d_shifter_real));
+		DEBUG_HANDLE_ERROR(cudaFree(d_shifter_real));
 
 	HANDLE_ERROR(cudaMalloc( (void**) &d_shifter_real, img_sz * count * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMemcpy( d_shifter_real, h_real, img_sz * count * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+	DEBUG_HANDLE_ERROR(cudaMemcpy( d_shifter_real, h_real, img_sz * count * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 
 	if (d_shifter_imag != NULL)
-		HANDLE_ERROR(cudaFree(d_shifter_imag));
+		DEBUG_HANDLE_ERROR(cudaFree(d_shifter_imag));
 
 	HANDLE_ERROR(cudaMalloc( (void**) &d_shifter_imag, img_sz * count * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMemcpy( d_shifter_imag, h_imag, img_sz * count * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+	DEBUG_HANDLE_ERROR(cudaMemcpy( d_shifter_imag, h_imag, img_sz * count * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 }
 
 void CudaTranslator::setShifters(std::vector<MultidimArray<Complex> >  &shifter)
@@ -162,7 +162,7 @@ void CudaTranslator::translate(Plan &plan, XFLOAT *d_imgs_shifted_real, XFLOAT *
 CudaTranslator::~CudaTranslator()
 {
 	if (d_shifter_real != NULL)
-		HANDLE_ERROR(cudaFree(d_shifter_real));
+		DEBUG_HANDLE_ERROR(cudaFree(d_shifter_real));
 	if (d_shifter_imag != NULL)
-		HANDLE_ERROR(cudaFree(d_shifter_imag));
+		DEBUG_HANDLE_ERROR(cudaFree(d_shifter_imag));
 }
