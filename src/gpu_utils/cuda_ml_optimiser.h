@@ -486,6 +486,7 @@ public:
 
 	//Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
+	std::vector< cudaStream_t > bpStreams;
 
 	CudaTranslator translator_coarse1;
 	CudaTranslator translator_coarse2;
@@ -533,7 +534,7 @@ public:
 		//TODO mutex lock backprojectDataBundles
 		//TODO switch to cuda event synchronization instead of stream
 		for (int i = 0; i < cudaBackprojectors.size(); i ++)
-			cudaBackprojectors[i].syncStream();
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
 
 		while (!backprojectDataBundleStack.empty())
 		{
@@ -565,7 +566,10 @@ public:
 		delete allocator;
 
 		for (int i = 0; i <= classStreams.size(); i++)
-			cudaStreamDestroy(classStreams[i]);
+			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
+
+		for (int i = 0; i <= bpStreams.size(); i++)
+			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
 	}
 
 };

@@ -18,6 +18,7 @@ class CudaProjector
 	float *texArrayReal2D, *texArrayImag2D;
 	cudaArray_t *texArrayReal, *texArrayImag;
 	cudaTextureObject_t *mdlReal, *mdlImag;
+	size_t pitch2D;
 #else
 	double *mdlReal, *mdlImag;
 #endif
@@ -36,57 +37,27 @@ public:
 		texArrayImag = 0;
 		mdlReal = 0;
 		mdlImag = 0;
+		pitch2D = 0;
 #else
 		mdlReal = 0;
 		mdlImag = 0;
 #endif
-	};
+	}
 
-	CudaProjector(
-			int xdim, int ydim, int zdim,
-			int inity, int initz,
-			int max_r, int padding_factor):
-			mdlX(xdim), mdlY(ydim), mdlZ(zdim),
-			mdlXYZ(xdim*ydim*zdim), mdlMaxR(max_r),
-			mdlInitY(inity), mdlInitZ(initz),
-			padding_factor(padding_factor)
-	{
-#ifndef CUDA_DOUBLE_PRECISION
-		texArrayReal = 0;
-		texArrayImag = 0;
-		mdlReal = 0;
-		mdlImag = 0;
-#else
-		mdlReal = 0;
-		mdlImag = 0;
-#endif
-		if(zdim==1)
-			mdlZ=0;
-	};
-
-	inline
 	void setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
-			int maxr, int paddingFactor)
-	{
-		mdlX = xdim;
-		mdlY = ydim;
-		if(zdim==1)
-			mdlZ=0;
-		else
-			mdlZ = zdim;
-		mdlXYZ = xdim*ydim*zdim;
-		mdlInitY = inity;
-		mdlInitZ = initz;
-		mdlMaxR = maxr;
-		padding_factor = paddingFactor;
-	}
+			int maxr, int paddingFactor);
 
 	void setMdlData(XFLOAT *real, XFLOAT *imag);
 	void setMdlData(Complex *data);
 
-	~CudaProjector();
+	void clear();
+
+	~CudaProjector()
+	{
+		clear();
+	};
 
 };
 

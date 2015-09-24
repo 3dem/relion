@@ -7,8 +7,40 @@
 #define BACKPROJECTION4_PREFETCH_COUNT 3
 #define BP_2D_BLOCK_SIZE 128
 
+void CudaBackprojector::setMdlDim(
+			int xdim, int ydim, int zdim,
+			int inity, int initz,
+			int max_r, int paddingFactor)
+{
+	if (xdim != mdlX ||
+		ydim != mdlY ||
+		zdim != mdlZ ||
+		inity != mdlInitY ||
+		initz != mdlInitZ ||
+		max_r != maxR ||
+		paddingFactor != padding_factor)
+	{
+		mdlX = xdim;
+		mdlY = ydim;
+		mdlZ = zdim;
+		if (mdlZ < 1) mdlZ = 1;
+		mdlXYZ = xdim*ydim*zdim;
+		mdlInitY = inity;
+		mdlInitZ = initz;
+		maxR = max_r;
+		maxR2 = max_r*max_r;
+		padding_factor = paddingFactor;
 
-void CudaBackprojector::initMdl(int streamPriority)
+		clear();
+
+		//Allocate space for model
+		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal,   mdlXYZ * sizeof(XFLOAT)));
+		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag,   mdlXYZ * sizeof(XFLOAT)));
+		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
+	}
+}
+
+void CudaBackprojector::initMdl()
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -23,17 +55,10 @@ void CudaBackprojector::initMdl(int streamPriority)
 	}
 #endif
 
-	//Allocate space for model
-	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal, mdlXYZ * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag, mdlXYZ * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
-
 	//Initiate model with zeros
-	HANDLE_ERROR(cudaMemset( d_mdlReal, 0, mdlXYZ * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMemset( d_mdlImag, 0, mdlXYZ * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
-
-	HANDLE_ERROR(cudaStreamCreateWithPriority(&stream, cudaStreamNonBlocking, streamPriority));
+	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlReal,   0, mdlXYZ * sizeof(XFLOAT)));
+	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlImag,   0, mdlXYZ * sizeof(XFLOAT)));
+	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
 }
 
 __global__ void cuda_kernel_backproject2D(
@@ -152,178 +177,6 @@ __global__ void cuda_kernel_backproject2D(
 		}
 	}
 }
-
-//Old 3D kernel
-__global__ void cuda_kernel_backproject3D_gather(
-		int *g_xs,
-		int *g_ys,
-		int *g_zs,
-		XFLOAT *g_model_real,
-		XFLOAT *g_model_imag,
-		XFLOAT *g_weight,
-		XFLOAT *g_wavgs_real,
-		XFLOAT *g_wavgs_imag,
-		XFLOAT *g_Fweights,
-		XFLOAT *g_eulers,
-		int max_r2,
-		XFLOAT scale2,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned img_xy,
-		unsigned long img_count,
-		unsigned mdl_x,
-		unsigned mdl_y,
-		int mdl_inity,
-		int mdl_initz,
-		int N)
-{
-	unsigned tid = threadIdx.x;
-	unsigned gid = tid / 4; //Group id
-	unsigned mid = tid % 4; //Member id
-	unsigned local_prefetch_idx = tid * BACKPROJECTION4_PREFETCH_COUNT; //Starting index of the matrix fetch
-	unsigned global_idx = blockIdx.x * BACKPROJECTION4_GROUP_SIZE + gid;
-
-	int X(0),Y(0),Z(0);
-
-	if (global_idx < N)
-	{
-		X = g_xs[global_idx];
-		Y = g_ys[global_idx];
-		Z = g_zs[global_idx];
-	}
-	else
-		X = mdl_x * 10; // Padding coordinate, place outside images
-
-	int ax(0), ay(0);
-
-	if (mid == 1)
-		ax = 1;
-	else if (mid == 2)
-		ay = 1;
-	else if (mid == 3)
-	{
-		ax = 1;
-		ay = 1;
-	}
-
-	bool  is_neg_x;
-	XFLOAT d, w;
-	XFLOAT xp,yp,zp;
-	int x,y,idx;
-
-	__shared__ XFLOAT s_e[BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_PREFETCH_COUNT];
-
-	__shared__ XFLOAT s_weight[BACKPROJECTION4_GROUP_SIZE*4];
-	__shared__ XFLOAT s_value_real[BACKPROJECTION4_GROUP_SIZE*4];
-	__shared__ XFLOAT s_value_imag[BACKPROJECTION4_GROUP_SIZE*4];
-
-	s_weight[tid] = 0.0f;
-	s_value_real[tid] = 0.0f;
-	s_value_imag[tid] = 0.0f;
-
-	for (int img = 0, b = BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_PREFETCH_COUNT; img < img_count; img ++, b += 9)
-	{
-		if (b+9 > BACKPROJECTION4_BLOCK_SIZE*BACKPROJECTION4_PREFETCH_COUNT)
-		{
-			__syncthreads();
-
-			int global_prefetch_idx = img * 9 + local_prefetch_idx;
-			if (global_prefetch_idx < img_count*9)
-			{
-				s_e[local_prefetch_idx+0] = __ldg(&g_eulers[global_prefetch_idx+0]);
-				s_e[local_prefetch_idx+1] = __ldg(&g_eulers[global_prefetch_idx+1]);
-				s_e[local_prefetch_idx+2] = __ldg(&g_eulers[global_prefetch_idx+2]);
-			}
-
-			__syncthreads();
-			b = 0;
-		}
-
-		zp = (s_e[b+6] * X + s_e[b+7] * Y + s_e[b+8] * Z) / scale2;
-
-		if (fabsf(zp) > 0.87f) continue; //Within the unit cube, sqrt(3)/2=0.866
-
-		yp = (s_e[b+3] * X + s_e[b+4] * Y + s_e[b+5] * Z) / scale2;
-		xp = (s_e[b+0] * X + s_e[b+1] * Y + s_e[b+2] * Z) / scale2;
-
-		if (xp < 0.0f)
-		{
-			yp = -yp;
-			xp = -xp;
-			is_neg_x = true;
-		}
-		else
-			is_neg_x = false;
-
-		x = (int) floorf(xp) + ax;
-		y = (int) floorf(yp) + ay;
-
-		if (x * x + y * y > max_r2) continue;
-
-		if (y < 0 && x == 0)
-		{
-			is_neg_x = !is_neg_x;
-			y = -y;
-		}
-
-		xp = (s_e[b+0] * x + s_e[b+3] * y) * scale2;
-		yp = (s_e[b+1] * x + s_e[b+4] * y) * scale2;
-		zp = (s_e[b+2] * x + s_e[b+5] * y) * scale2;
-
-		if (xp < 0.0f) //Flip sign
-		{
-			xp = fabsf(X+xp);
-			yp = fabsf(Y+yp);
-			zp = fabsf(Z+zp);
-		}
-		else
-		{
-			xp = fabsf(X-xp);
-			yp = fabsf(Y-yp);
-			zp = fabsf(Z-zp);
-		}
-
-		if (xp < 1.0f && yp < 1.0f && zp < 1.0f)
-		{
-			if (y < 0) y += img_y;
-			idx = img*img_xy + y * img_x + x;
-			w = g_Fweights[idx];
-
-			if (w > 0.0f)
-			{
-				d = (1.0f - xp) * (1.0f - yp) * (1.0f - zp);
-
-				s_weight[tid] += w * d;
-				s_value_real[tid] += g_wavgs_real[idx] * d;
-				if (is_neg_x) s_value_imag[tid] -= g_wavgs_imag[idx] * d;
-				else          s_value_imag[tid] += g_wavgs_imag[idx] * d;
-			}
-		}
-	}
-
-	__syncthreads();
-
-	if (mid == 0)
-	{
-		XFLOAT sum = s_weight[gid*4 + 0] + s_weight[gid*4 + 1] + s_weight[gid*4 + 2] + s_weight[gid*4 + 3];
-		if (sum != 0.0f)
-			g_weight[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] += sum;
-	}
-	else if (mid == 1)
-	{
-		XFLOAT sum = s_value_real[gid*4 + 0] + s_value_real[gid*4 + 1] + s_value_real[gid*4 + 2] + s_value_real[gid*4 + 3];
-		if (sum != 0.0f)
-			g_model_real[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] += sum;
-	}
-	else if (mid == 2)
-	{
-		XFLOAT sum = s_value_imag[gid*4 + 0] + s_value_imag[gid*4 + 1] + s_value_imag[gid*4 + 2] + s_value_imag[gid*4 + 3];
-		if (sum != 0.0f)
-			g_model_imag[(Z-mdl_initz)*mdl_x*mdl_y + (Y-mdl_inity)*mdl_x + X] += sum;
-	}
-}
-
-
 
 __global__ void cuda_kernel_backproject3D_scatter(
 		XFLOAT *g_model_real,
@@ -527,27 +380,28 @@ void CudaBackprojector::backproject(
 
 void CudaBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 {
-	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Make sure to wait for remaining kernel executions
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream)); //Make sure to wait for remaining kernel executions
 
-	HANDLE_ERROR(cudaMemcpyAsync( r, d_mdlReal,   mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
-	HANDLE_ERROR(cudaMemcpyAsync( i, d_mdlImag,   mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
-	HANDLE_ERROR(cudaMemcpyAsync( w, d_mdlWeight, mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
+	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( r, d_mdlReal,   mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
+	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( i, d_mdlImag,   mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
+	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( w, d_mdlWeight, mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
 
-	HANDLE_ERROR(cudaStreamSynchronize(stream)); //Wait for copy
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream)); //Wait for copy
+}
+
+void CudaBackprojector::clear()
+{
+	if (d_mdlReal != NULL)
+	{
+		DEBUG_HANDLE_ERROR(cudaFree(d_mdlReal));
+		DEBUG_HANDLE_ERROR(cudaFree(d_mdlImag));
+		DEBUG_HANDLE_ERROR(cudaFree(d_mdlWeight));
+
+		d_mdlReal = d_mdlImag = d_mdlWeight = NULL;
+	}
 }
 
 CudaBackprojector::~CudaBackprojector()
 {
-	if (d_mdlReal != NULL)
-	{
-		HANDLE_ERROR(cudaFree(d_mdlReal));
-		HANDLE_ERROR(cudaFree(d_mdlImag));
-		HANDLE_ERROR(cudaFree(d_mdlWeight));
-
-		d_mdlReal = d_mdlImag = d_mdlWeight = 0;
-
-		HANDLE_ERROR(cudaStreamDestroy(stream));
-
-		stream = 0;
-	}
+	clear();
 }
