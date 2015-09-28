@@ -2464,8 +2464,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 						for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 						{
 							if(exp_iclass>0)
-								FineProjectionData[iframe].class_idx[exp_iclass]=FineProjectionData[iframe].rots.size();
-							FineProjectionData[iframe].class_entries[exp_iclass]=0;
+								FineProjectionData[iframe].class_idx[exp_iclass] = FineProjectionData[iframe].rots.size();
+							FineProjectionData[iframe].class_entries[exp_iclass] = 0;
 
 							CUDA_CPU_TIC("generateProjectionSetup");
 							FineProjectionData[iframe].orientationNumAllClasses += generateProjectionSetup(
