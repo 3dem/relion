@@ -49,8 +49,8 @@ public:
 			int inity, int initz,
 			int maxr, int paddingFactor);
 
-	void setMdlData(XFLOAT *real, XFLOAT *imag);
-	void setMdlData(Complex *data);
+	void initMdl(XFLOAT *real, XFLOAT *imag);
+	void initMdl(Complex *data);
 
 	void clear();
 

@@ -353,7 +353,7 @@ public:
 		size_t total = 0;
 		Alloc *cL = first;
 
-		while (cL != NULL) //Get last
+		while (cL != NULL)
 		{
 			if (cL->free)
 				total += cL->size;
@@ -373,10 +373,28 @@ public:
 		size_t total = 0;
 		Alloc *cL = first;
 
-		while (cL != NULL) //Get last
+		while (cL != NULL)
 		{
 			if (!cL->free)
 				total += cL->size;
+			cL = cL->next;
+		}
+		return total;
+#endif
+	}
+
+	size_t getNumberOfAllocs()
+	{
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		return 0;
+#else
+		unsigned total = 0;
+		Alloc *cL = first;
+
+		while (cL != NULL)
+		{
+			if (!cL->free)
+				total ++;
 			cL = cL->next;
 		}
 		return total;
@@ -391,7 +409,7 @@ public:
 		size_t largest = 0;
 		Alloc *cL = first;
 
-		while (cL != NULL) //Get last
+		while (cL != NULL)
 		{
 			if (cL->free && cL->size > largest)
 				largest = cL->size;
@@ -564,7 +582,13 @@ public:
 	======================================================*/
 
 	inline
-	CudaGlobalPtr(CudaGlobalPtr<T> &ptr, unsigned long start_idx, size_t size):
+	CudaGlobalPtr(const CudaGlobalPtr<T> &ptr):
+		size(ptr.size), h_ptr(ptr.h_ptr), d_ptr(ptr.d_ptr), h_do_free(false),
+		d_do_free(false), allocator(ptr.allocator), alloc(0), stream(ptr.stream)
+	{};
+
+	inline
+	CudaGlobalPtr(const CudaGlobalPtr<T> &ptr, unsigned long start_idx, size_t size):
 		size(size), h_ptr(&ptr.h_ptr[start_idx]), d_ptr(&ptr.d_ptr[start_idx]), h_do_free(false),
 		d_do_free(false), allocator(ptr.allocator), alloc(0), stream(ptr.stream)
 	{};

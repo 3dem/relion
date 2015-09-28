@@ -83,6 +83,7 @@ public:
 
 	void translate(Plan &plan, XFLOAT *d_imgs_shifted_real, XFLOAT *d_imgs_shifted_imag);
 
+	void clear();
 	~CudaTranslator();
 
 };

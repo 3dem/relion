@@ -108,7 +108,7 @@ void CudaProjector::setMdlDim(
 #endif
 }
 
-void CudaProjector::setMdlData(XFLOAT *real, XFLOAT *imag)
+void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -127,10 +127,9 @@ void CudaProjector::setMdlData(XFLOAT *real, XFLOAT *imag)
 
 	if(mdlZ!=0)  // 3D model
 	{
-		// -- make extents for automatic pitch:ing (aligment) of allocated 3D arrays
-		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
+		// -- make extents for automatic pitching (aligment) of allocated 3D arrays
 		cudaMemcpy3DParms copyParams = {0};
-		copyParams.extent = volumeSize;
+		copyParams.extent = make_cudaExtent(mdlX, mdlY, mdlZ);
 		copyParams.kind   = cudaMemcpyHostToDevice;
 
 		// -- Copy data
@@ -157,7 +156,7 @@ void CudaProjector::setMdlData(XFLOAT *real, XFLOAT *imag)
 }
 
 
-void CudaProjector::setMdlData(Complex *data)
+void CudaProjector::initMdl(Complex *data)
 {
 	XFLOAT *tmpReal = new XFLOAT[mdlXYZ];
 	XFLOAT *tmpImag = new XFLOAT[mdlXYZ];
@@ -168,7 +167,7 @@ void CudaProjector::setMdlData(Complex *data)
 		tmpImag[i] = (XFLOAT) data[i].imag;
 	}
 
-	setMdlData(tmpReal, tmpImag);
+	initMdl(tmpReal, tmpImag);
 
 	delete [] tmpReal;
 	delete [] tmpImag;

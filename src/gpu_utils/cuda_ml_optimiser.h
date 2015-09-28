@@ -479,7 +479,7 @@ public:
 	std::stack< BackprojectDataBundle *> backprojectDataBundleStack;
 
 	//Used for precalculations of projection setup
-	std::vector< CudaProjectorPlan > cudaCoarseProjectionPlans;
+	std::vector< CudaProjectorPlan > coarseProjectionPlans;
 
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
@@ -502,6 +502,8 @@ public:
 	int device_id;
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id);
+
+	void resetData();
 
 	void doThreadExpectationSomeParticles();
 
@@ -531,7 +533,6 @@ public:
 
 	void clearBackprojectDataBundle()
 	{
-		//TODO mutex lock backprojectDataBundles
 		//TODO switch to cuda event synchronization instead of stream
 		for (int i = 0; i < cudaBackprojectors.size(); i ++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
@@ -561,6 +562,11 @@ public:
 	{
 		clearBackprojectDataBundle();
 		//delete inputImageData;
+
+		cudaProjectors.clear();
+		cudaBackprojectors.clear();
+		coarseProjectionPlans.clear();
+		cudaBackprojectors.clear();
 
 		//Delete this lastly
 		delete allocator;

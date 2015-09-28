@@ -517,7 +517,6 @@ void getAllSquaredDifferencesCoarse(
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
 		MlOptimiserCuda *cudaMLO,
-		std::vector<CudaProjectorPlan> &projectorPlans,
 	 	std::vector<cudaStager<unsigned long> > &stagerD2)
 {
 
@@ -549,7 +548,7 @@ void getAllSquaredDifferencesCoarse(
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	CudaGlobalPtr<XFLOAT> allWeights(cudaMLO->allocator);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		allWeights.setSize(projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles + allWeights.getSize());
+		allWeights.setSize(cudaMLO->coarseProjectionPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles + allWeights.getSize());
 
 	allWeights.device_alloc();
 	allWeights.host_alloc();
@@ -612,7 +611,7 @@ void getAllSquaredDifferencesCoarse(
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			CudaProjectorPlan projectorPlan = projectorPlans[exp_iclass];
+			CudaProjectorPlan projectorPlan = cudaMLO->coarseProjectionPlans[exp_iclass];
 
 			if ( projectorPlan.orientation_num > 0 )
 			{
@@ -631,7 +630,7 @@ void getAllSquaredDifferencesCoarse(
 						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
-						~(*projectorPlan.eulers),
+						~projectorPlan.eulers,
 						&allWeights(allWeights_pos),
 						op,
 						baseMLO,
@@ -660,7 +659,7 @@ void getAllSquaredDifferencesCoarse(
 		CUDA_CPU_TIC("diff_coarse_map");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			CudaProjectorPlan projectorPlan = projectorPlans[exp_iclass];
+			CudaProjectorPlan projectorPlan = cudaMLO->coarseProjectionPlans[exp_iclass];
 			if ( projectorPlan.orientation_num > 0 )
 			{
 				for (unsigned i = 0; i < projectorPlan.orientation_num; i ++)
@@ -2086,54 +2085,103 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 }
 
-MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : baseMLO(baseMLOptimiser)
+MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
+		baseMLO(baseMLOptimiser),
+		generateProjectionPlanOnTheFly(false)
 {
 	unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
 
 	/*======================================================
 					DEVICE MEM OBJ SETUP
 	======================================================*/
-	device_id=dev_id;
+
+	device_id = dev_id;
 	int devCount;
-	cudaGetDeviceCount(&devCount);
-	if(dev_id>=devCount)
+
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
+	if(dev_id >= devCount)
 	{
 		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		REPORT_ERROR("ERROR: Assigning a thread to a non-existent device (index likely too high)");
 	}
 	else
-	{
-		cudaSetDevice(dev_id);
-	}
+		HANDLE_ERROR(cudaSetDevice(dev_id));
 
-	HANDLE_ERROR(cudaDeviceSynchronize());
-
-
-	classStreams.resize(baseMLO->mymodel.nr_classes, 0);
-	for (int i = 0; i <= baseMLO->mymodel.nr_classes; i++)
+	classStreams.resize(nr_classes, 0);
+	for (int i = 0; i <= nr_classes; i++)
 		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
 
-	bpStreams.resize(baseMLO->mymodel.nr_classes, 0);
-	for (int i = 0; i <= baseMLO->mymodel.nr_classes; i++)
-		HANDLE_ERROR(cudaStreamCreateWithPriority(&bpStreams[i], cudaStreamNonBlocking, 1));//Lower priority stream (1)
-
-	/*======================================================
-	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
-	======================================================*/
+	bpStreams.resize(nr_classes, 0);
+	for (int i = 0; i <= nr_classes; i++)
+		HANDLE_ERROR(cudaStreamCreateWithPriority(&bpStreams[i], cudaStreamNonBlocking, 1)); //Lower priority stream (1)
 
 	refIs3D = baseMLO->mymodel.ref_dim == 3;
 
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
+	//Loop over classes
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+		cudaBackprojectors[iclass].setStream(bpStreams[iclass]);
+
+	/*======================================================
+	                    CUSTOM ALLOCATOR
+	======================================================*/
+
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+	printf(" Custom allocator is disabled.\n");
+	allocator = new CudaCustomAllocator(0);
+#else
+	size_t allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+
+	size_t free, total;
+	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+	if (allocationSize > free)
+	{
+		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_thread\", not available on device. (Defaulting to less)\n");
+		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+	}
+
+	printf(" Custom allocator assigned %.2f MB of device memory (on device %d).\n", (float)allocationSize/(1000.*1000.), device_id);
+
+	allocator = new CudaCustomAllocator(allocationSize);
+	allocator->setOutOfMemoryHandler(this);
+#endif
+
+	//inputImageData = new CufftBundle(0, allocator);
+};
+
+void MlOptimiserCuda::resetData()
+{
+	unsigned nr_classes = baseMLO->mymodel.nr_classes;
+
+	HANDLE_ERROR(cudaSetDevice(device_id));
+
+	/*======================================================
+	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
+	======================================================*/
+
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
 	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
 		generateProjectionPlanOnTheFly = true;
 	else
-	{
 		generateProjectionPlanOnTheFly = false;
-		cudaCoarseProjectionPlans.resize(nr_classes);
-	}
+
+	coarseProjectionPlans.clear();
+
+#ifdef DEBUG_CUDA
+		if (allocator->getNumberOfAllocs() != 0)
+		{
+			printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
+			allocator->printState();
+			fflush(stdout);
+			raise(SIGSEGV);
+		}
+#endif
+
+	coarseProjectionPlans.resize(nr_classes, allocator);
 
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -2147,7 +2195,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 				baseMLO->mymodel.PPref[iclass].r_max,
 				baseMLO->mymodel.PPref[iclass].padding_factor);
 
-		cudaProjectors[iclass].setMdlData(baseMLO->mymodel.PPref[iclass].data.data);
+		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
 
 		cudaBackprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
@@ -2157,8 +2205,6 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 				baseMLO->wsum_model.BPref[iclass].data.zinit,
 				baseMLO->wsum_model.BPref[iclass].r_max,
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
-
-		cudaBackprojectors[iclass].setStream(bpStreams[iclass]);
 
 		cudaBackprojectors[iclass].initMdl();
 
@@ -2174,7 +2220,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 			long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
 			long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
 
-			cudaCoarseProjectionPlans[iclass].setup(
+			coarseProjectionPlans[iclass].setup(
 					baseMLO->sampling,
 					exp_directions_prior,
 					exp_psi_prior,
@@ -2203,40 +2249,29 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) : bas
 		}
 	}
 
+	/*======================================================
+	                  TRANSLATIONS SETUP
+	======================================================*/
+
 	if (baseMLO->global_fftshifts_ab_coarse.size() > 0)
 		translator_coarse1.setShifters(baseMLO->global_fftshifts_ab_coarse);
+	else
+		translator_coarse1.clear();
 
 	if (baseMLO->global_fftshifts_ab2_coarse.size() > 0)
 		translator_coarse2.setShifters(baseMLO->global_fftshifts_ab2_coarse);
+	else
+		translator_coarse2.clear();
 
 	if (baseMLO->global_fftshifts_ab_current.size() > 0)
 		translator_current1.setShifters(baseMLO->global_fftshifts_ab_current);
+	else
+		translator_current1.clear();
 
 	if (baseMLO->global_fftshifts_ab2_current.size() > 0)
 		translator_current2.setShifters(baseMLO->global_fftshifts_ab2_current);
-
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-	printf("Custom allocator is disabled.\n");
-	allocator = new CudaCustomAllocator(0);
-#else
-	size_t allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
-
-	size_t free, total;
-	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-
-	if (allocationSize > free)
-	{
-		printf("WARNING: Required memory per thread, via \"--gpu_memory_per_thread\", not available on device. (Defaulting to less)\n");
-		allocationSize = (float)free * .7; //Lets leave some for other processes for now
-	}
-
-	printf("Custom allocator assigned %.2f MB of device memory.\n", (float)allocationSize/(1000.*1000.));
-
-	allocator = new CudaCustomAllocator(allocationSize);
-	allocator->setOutOfMemoryHandler(this);
-#endif
-
-	//inputImageData = new CufftBundle(0, allocator);
+	else
+		translator_current2.clear();
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles()
@@ -2244,7 +2279,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 
 //	CUDA_CPU_TOC("interParticle");
 	CUDA_CPU_TIC("oneTask");
-	cudaSetDevice(device_id);
+	DEBUG_HANDLE_ERROR(cudaSetDevice(device_id));
 	//std::cerr << " calling on device " << device_id << std::endl;
 	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;
@@ -2368,21 +2403,16 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 
 				if (ipass == 0)
 				{
-					std::vector< CudaProjectorPlan > coarseProjectionPlans;
-
 					 //If particle specific sampling plan required
 					if (generateProjectionPlanOnTheFly)
 					{
 						CUDA_CPU_TIC("generateProjectionSetupCoarse");
 
-						coarseProjectionPlans.clear();
-						coarseProjectionPlans.resize(baseMLO->mymodel.nr_classes);
-
-						for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+						for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 						{
-							if (baseMLO->mymodel.pdf_class[exp_iclass] > 0.)
+							if (baseMLO->mymodel.pdf_class[iclass] > 0.)
 							{
-								coarseProjectionPlans[exp_iclass].setup(
+								coarseProjectionPlans[iclass].setup(
 										baseMLO->sampling,
 										op.directions_prior,
 										op.psi_prior,
@@ -2401,7 +2431,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 										sp.itrans_max,
 										0, //current_oversampling
 										1, //nr_oversampled_rot
-										exp_iclass,
+										iclass,
 										true, //coarse
 										!IS_NOT_INV,
 										baseMLO->do_skip_align,
@@ -2409,14 +2439,14 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 										baseMLO->mymodel.orientational_prior_mode
 										);
 							}
+							else
+								coarseProjectionPlans[iclass].clear();
 						}
 						CUDA_CPU_TOC("generateProjectionSetupCoarse");
 					}
-					else //Otherwise use precalculated plan
-						coarseProjectionPlans = cudaCoarseProjectionPlans;
 
 					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
-					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, coarseProjectionPlans, stagerD2);
+					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, stagerD2);
 					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
 
 					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsCoarse");
