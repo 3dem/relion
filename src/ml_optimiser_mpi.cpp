@@ -166,6 +166,25 @@ void MlOptimiserMpi::initialise()
 	}
 
 
+	if (do_gpu && !node->isMaster()) //Device not initialized on master rank
+	{
+		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		else if (gpu_ids.length()==1)
+			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
+		for (int i = 0; i < nr_threads; i ++)
+		{
+			int dev_id;
+			if (gpu_ids.length()==1)
+				dev_id = i;
+			else
+				dev_id = (int)(gpu_ids[i]-'0');
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+		}
+	}
+
+
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
 #endif
@@ -628,10 +647,8 @@ void MlOptimiserMpi::expectation()
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
     		if (do_gpu)
-    		{
-    			for (int i = 0; i < nr_threads; i ++)
-    				cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, i));
-    		}
+    			for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+    				((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
 
 			// Start off with an empty job request
 			JOB_FIRST = 0;
@@ -762,10 +779,27 @@ void MlOptimiserMpi::expectation()
 			{
 				for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 				{
-					( (MlOptimiserCuda*) cudaMlOptimisers[i])->storeBpMdlData();
-					delete (MlOptimiserCuda*) cudaMlOptimisers[i];
+					for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
+					{
+						unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
+						XFLOAT *reals = new XFLOAT[s];
+						XFLOAT *imags = new XFLOAT[s];
+						XFLOAT *weights = new XFLOAT[s];
+
+						( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+
+						for (unsigned long n = 0; n < s; n++)
+						{
+							wsum_model.BPref[iclass].data.data[n].real += (double) reals[n];
+							wsum_model.BPref[iclass].data.data[n].imag += (double) imags[n];
+							wsum_model.BPref[iclass].weight.data[n] += (double) weights[n];
+						}
+
+						delete [] reals;
+						delete [] imags;
+						delete [] weights;
+					}
 				}
-				cudaMlOptimisers.clear();
 			}
 
 
