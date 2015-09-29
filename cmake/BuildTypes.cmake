@@ -16,7 +16,7 @@ set(CUDARCH "-arch=sm_35")
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_DEBUG "-O0" CACHE STRING "")
-set(RELION_NVCC_FLAGS_DEBUG "${CUDARCH} -lineinfo -G" CACHE STRING "")
+set(RELION_NVCC_FLAGS_DEBUG "${CUDARCH}" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_DEBUG  " ")
 
@@ -27,7 +27,7 @@ set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} ${RELION_LINKE
 set(CUDA_NVCC_FLAGS_DEBUG        "${RELION_NVCC_FLAGS_DEBUG}" CACHE STRING "")
 
 # -- Add preprocessor defintions ------------------------------------
-set(RELION_DEFINITIONS_DEBUG "-DDEBUG_CUDA -DTIMING -DCUDA_BENCHMARK")
+set(RELION_DEFINITIONS_DEBUG "-DDEBUG_CUDA")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}")
 
 #message(STATUS "Set the extra flags for Debug build type")

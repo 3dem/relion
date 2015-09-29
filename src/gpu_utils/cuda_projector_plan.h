@@ -13,31 +13,19 @@ class CudaProjectorPlan
 public:
 	std::vector< long unsigned > iorientclasses, iover_rots;
 	long unsigned orientation_num;
-	CudaGlobalPtr<XFLOAT,false> *eulers;
-	bool free_device;
+	CudaGlobalPtr<XFLOAT> eulers;
+
+	CudaProjectorPlan(CudaCustomAllocator *allocator):
+		orientation_num(0), eulers(allocator)
+	{};
 
 	//Copy constructor
 	CudaProjectorPlan( const CudaProjectorPlan& other ):
 		iorientclasses(other.iorientclasses),
 		iover_rots(other.iover_rots),
 		orientation_num(other.orientation_num),
-		eulers(other.eulers),
-		free_device(false)
+		eulers(other.eulers)
 	{};
-
-	CudaProjectorPlan():
-		orientation_num(0), eulers(0), free_device(false)
-	{
-		iorientclasses.reserve(0);
-		iover_rots.reserve(0);
-	};
-
-	CudaProjectorPlan(CudaGlobalPtr<XFLOAT,false> *d_eulers):
-		orientation_num(0), eulers(d_eulers), free_device(false)
-	{
-		iorientclasses.reserve(0);
-		iover_rots.reserve(0);
-	};
 
 	void setup(
 			HealpixSampling &sampling,
@@ -67,7 +55,7 @@ public:
 
 	void printTo(std::ostream &os); // print
 
-	~CudaProjectorPlan();
+	void clear();
 };
 
 #endif

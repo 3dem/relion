@@ -814,6 +814,25 @@ void MlOptimiser::initialise()
 		}
 	}
 
+
+	if (do_gpu)
+	{
+		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		else if (gpu_ids.length()==1)
+			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
+		for (int i = 0; i < nr_threads; i ++)
+		{
+			int dev_id;
+			if (gpu_ids.length()==1)
+				dev_id = i;
+			else
+				dev_id = (int)(gpu_ids[i]-'0');
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+		}
+	}
+
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Done"<<std::endl;
 #endif
@@ -1364,6 +1383,8 @@ void MlOptimiser::iterateWrapUp()
     delete global_barrier;
 	delete global_ThreadManager;
     delete exp_ipart_ThreadTaskDistributor;
+    for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+    	delete (MlOptimiserCuda *) cudaMlOptimisers[i];
 
 }
 
@@ -1521,22 +1542,8 @@ void MlOptimiser::expectation()
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 	if (do_gpu)
-	{
-		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
-			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-		else if (gpu_ids.length()==1)
-			std::cout << "I will try my best to assign gpu_ids, since you did not"<< std::endl;
-
-		for (int i = 0; i < nr_threads; i ++)
-		{
-			int dev_id;
-			if (gpu_ids.length()==1)
-				dev_id = i;
-			else
-				dev_id = (int)(gpu_ids[i]-'0');
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
-		}
-	}
+		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
@@ -1621,9 +1628,7 @@ void MlOptimiser::expectation()
 				delete [] imags;
 				delete [] weights;
 			}
-			delete (MlOptimiserCuda*) cudaMlOptimisers[i];
 		}
-		cudaMlOptimisers.clear();
 	}
 
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)

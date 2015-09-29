@@ -159,10 +159,17 @@ void CudaTranslator::translate(Plan &plan, XFLOAT *d_imgs_shifted_real, XFLOAT *
 					);
 }
 
-CudaTranslator::~CudaTranslator()
+void CudaTranslator::clear()
 {
 	if (d_shifter_real != NULL)
 		DEBUG_HANDLE_ERROR(cudaFree(d_shifter_real));
 	if (d_shifter_imag != NULL)
 		DEBUG_HANDLE_ERROR(cudaFree(d_shifter_imag));
+
+	d_shifter_real = d_shifter_imag = NULL;
+}
+
+CudaTranslator::~CudaTranslator()
+{
+	clear();
 }
