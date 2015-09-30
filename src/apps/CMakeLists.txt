@@ -47,7 +47,7 @@ add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
     add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
-	
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 	if(BUILD_GUI_TARGETS)
 	    target_link_libraries(${_target} ${FLTK_LIBRARIES} gpu_util ${FFTW_LIBRARIES} ${X11} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES})
 	else(BUILD_GUI_TARGETS)
