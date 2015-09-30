@@ -34,7 +34,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER proj
 
 
 # Skip FLTK/X11-dependent binaries or not
-set(OMIT_GUI_TARGETS TRUE)
+set(BUILD_GUI_TARGETS TRUE)
 
 FIND_PACKAGE(CUDA)  # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
 if(CUDA_FOUND)
@@ -93,7 +93,7 @@ FIND_PACKAGE(X11)
 if(X11_FOUND)
     set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
     FIND_PACKAGE(FLTK)
-    if(FLTK_FOUND AND NOT OMIT_GUI_TARGETS)
+    if(FLTK_FOUND AND BUILD_GUI_TARGETS)
         message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
     else()
         message(STATUS "FLTK not found or intentionally skipped; omitting GUI targets.")
@@ -116,5 +116,3 @@ include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
 #    message(STATUS "${_variableName}=${${_variableName}}")
 #endforeach()
 #-------------------------
-
-

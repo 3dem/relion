@@ -16,8 +16,7 @@ file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 
 #--Apps using X11--
 if(BUILD_GUI_TARGETS)
-    file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine*.cpp"  "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
-    #file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
+    file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 else(BUILD_GUI_TARGETS)
     file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/refine*.cpp")
     list(REMOVE_ITEM REL_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp")
@@ -47,12 +46,26 @@ add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
     add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
-	
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 	if(BUILD_GUI_TARGETS)
-	    target_link_libraries(${_target} ${FLTK_LIBRARIES} gpu_util ${FFTW_LIBRARIES} ${X11} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES})
+        if (CUDA_FOUND)
+            include_directories("${FLTK_INCLUDE_DIR}") 
+            target_link_libraries(${_target} gpu_util ${FFTW_LIBRARIES} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${X11} ${FLTK_LIBRARIES} ${CMAKE_DL_LIBS})
+        else(CUDA_FOUND)
+            target_link_libraries(${_target}          ${FFTW_LIBRARIES} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${X11} ${FLTK_LIBRARIES} ${CMAKE_DL_LIBS})
+	    endif(CUDA_FOUND)
 	else(BUILD_GUI_TARGETS)
-	    target_link_libraries(${_target} gpu_util ${FFTW_LIBRARIES} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES})
+        if (CUDA_FOUND)
+	       target_link_libraries(${_target} gpu_util ${FFTW_LIBRARIES} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES})
+	    else(CUDA_FOUND)
+	       target_link_libraries(${_target}          ${FFTW_LIBRARIES} ${relion_lib} ${EXTRA_LIBS} ${MPI_LIBRARIES})
+	    endif(CUDA_FOUND)
 	endif(BUILD_GUI_TARGETS)
-	
 	message(STATUS "added ${_target}...")
 endforeach()
+
+ADD_CUSTOM_COMMAND(TARGET maingui
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
+)
+
