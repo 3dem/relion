@@ -249,7 +249,6 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
 		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
 
-		XFLOAT sum_total = 0.f;
 		XFLOAT sum_bg_total = 0.f;
 
 		long int texel_pass_num = ceilf((float)vol_size/(float)SOFTMASK_BLOCK_SIZE);
