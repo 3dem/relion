@@ -34,7 +34,12 @@ include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake) #This *has* to be AFTER proj
 
 
 # Skip FLTK/X11-dependent binaries or not
-set(BUILD_GUI_TARGETS TRUE)
+option(GUI "GUI" ON)
+if(GUI)
+    set(BUILD_GUI_TARGETS TRUE)
+else(GUI)
+    message(STATUS "You want to omit GUI targets")
+endif(GUI)
 
 FIND_PACKAGE(CUDA)  # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
 if(CUDA_FOUND)
