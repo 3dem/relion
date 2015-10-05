@@ -30,7 +30,7 @@ void CudaProjector::setMdlDim(
 
 	clear();
 
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef CUDA_NO_TEXTURES
 
 	mdlReal = new cudaTextureObject_t();
 	mdlImag = new cudaTextureObject_t();
@@ -65,8 +65,8 @@ void CudaProjector::setMdlDim(
 	}
 	else // 2D model
 	{
-		HANDLE_ERROR(cudaMallocPitch(&texArrayReal2D, &pitch2D, sizeof(float)*mdlX,mdlY));
-		HANDLE_ERROR(cudaMallocPitch(&texArrayImag2D, &pitch2D, sizeof(float)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMallocPitch(&texArrayReal2D, &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMallocPitch(&texArrayImag2D, &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_real.resType = cudaResourceTypePitch2D;
@@ -98,8 +98,8 @@ void CudaProjector::setMdlDim(
 
 #else
 
-	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(double)));
-	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(double)));
+	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
+	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
 
 #endif
 }
@@ -119,7 +119,7 @@ void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	}
 #endif
 
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef CUDA_NO_TEXTURES
 
 	if(mdlZ!=0)  // 3D model
 	{
@@ -130,16 +130,16 @@ void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 
 		// -- Copy data
 		copyParams.dstArray = *texArrayReal;
-		copyParams.srcPtr   = make_cudaPitchedPtr(real, mdlX * sizeof(float), mdlY, mdlZ);
+		copyParams.srcPtr   = make_cudaPitchedPtr(real, mdlX * sizeof(XFLOAT), mdlY, mdlZ);
 		DEBUG_HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 		copyParams.dstArray = *texArrayImag;
-		copyParams.srcPtr   = make_cudaPitchedPtr(imag, mdlX * sizeof(float), mdlY, mdlZ);
+		copyParams.srcPtr   = make_cudaPitchedPtr(imag, mdlX * sizeof(XFLOAT), mdlY, mdlZ);
 		DEBUG_HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 	}
 	else // 2D model
 	{
-		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayReal2D, pitch2D, real, sizeof(float) * mdlX, sizeof(float) * mdlX, mdlY, cudaMemcpyHostToDevice));
-		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayImag2D, pitch2D, imag, sizeof(float) * mdlX, sizeof(float) * mdlX, mdlY, cudaMemcpyHostToDevice));
+		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayReal2D, pitch2D, real, sizeof(XFLOAT) * mdlX, sizeof(XFLOAT) * mdlX, mdlY, cudaMemcpyHostToDevice));
+		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayImag2D, pitch2D, imag, sizeof(XFLOAT) * mdlX, sizeof(XFLOAT) * mdlX, mdlY, cudaMemcpyHostToDevice));
 	}
 
 #else
@@ -173,10 +173,7 @@ void CudaProjector::clear()
 {
 	if (mdlReal != 0)
 	{
-#ifdef CUDA_DOUBLE_PRECISION
-		cudaFree(mdlReal);
-		cudaFree(mdlImag);
-#else
+#ifndef CUDA_NO_TEXTURES
 		cudaDestroyTextureObject(*mdlReal);
 		cudaDestroyTextureObject(*mdlImag);
 		delete mdlReal;
@@ -197,6 +194,9 @@ void CudaProjector::clear()
 
 		texArrayReal = 0;
 		texArrayImag = 0;
+#else
+		cudaFree(mdlReal);
+		cudaFree(mdlImag);
 #endif
 		mdlReal = 0;
 		mdlImag = 0;

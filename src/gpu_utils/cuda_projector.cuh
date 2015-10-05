@@ -6,12 +6,10 @@
 #include <cuda_runtime.h>
 
 
-#ifndef PROJECTOR_SRC_TYPE
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef CUDA_NO_TEXTURES
 #define PROJECTOR_PTR_TYPE cudaTextureObject_t
 #else
-#define PROJECTOR_PTR_TYPE double *
-#endif
+#define PROJECTOR_PTR_TYPE XFLOAT *
 #endif
 
 class CudaProjectorKernel
@@ -90,7 +88,7 @@ public:
 				is_neg_x = false;
 			}
 
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef CUDA_NO_TEXTURES
 
 			yp -= mdlInitY;
 			zp -= mdlInitZ;
@@ -212,7 +210,7 @@ public:
 					is_neg_x = false;
 				}
 
-	#ifndef CUDA_DOUBLE_PRECISION
+	#ifndef CUDA_NO_TEXTURES
 
 				yp -= mdlInitY;
 
@@ -276,7 +274,7 @@ public:
 			    p.padding_factor,
 			    maxR,
 
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef CUDA_NO_TEXTURES
 			    *p.mdlReal,
 			    *p.mdlImag
 #else
