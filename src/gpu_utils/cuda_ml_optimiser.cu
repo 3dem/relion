@@ -2205,10 +2205,15 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 	printf(" Custom allocator is disabled.\n");
 	allocator = new CudaCustomAllocator(0);
 #else
-	size_t allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	size_t allocationSize(0);
 
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+	if (baseMLO->available_gpu_memory > 0)
+		allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	else
+		allocationSize = (float)free * .7;
 
 	if (allocationSize > free)
 	{

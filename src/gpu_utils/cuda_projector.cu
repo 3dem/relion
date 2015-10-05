@@ -7,8 +7,6 @@ void CudaProjector::setMdlDim(
 		int inity, int initz,
 		int maxr, int paddingFactor)
 {
-	bool resizeTexure(true);
-
 	if (xdim == mdlX &&
 		ydim == mdlY &&
 		zdim == mdlZ &&
@@ -16,7 +14,7 @@ void CudaProjector::setMdlDim(
 		initz == mdlInitZ &&
 		maxr == mdlMaxR &&
 		paddingFactor == padding_factor)
-		resizeTexure = false;
+		return;
 
 	mdlX = xdim;
 	mdlY = ydim;
@@ -29,8 +27,6 @@ void CudaProjector::setMdlDim(
 	mdlInitZ = initz;
 	mdlMaxR = maxr;
 	padding_factor = paddingFactor;
-
-	if (! resizeTexure) return;
 
 	clear();
 
@@ -172,7 +168,6 @@ void CudaProjector::initMdl(Complex *data)
 	delete [] tmpReal;
 	delete [] tmpImag;
 }
-
 
 void CudaProjector::clear()
 {

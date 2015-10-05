@@ -10,34 +10,34 @@
 void CudaBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
-			int max_r, int paddingFactor)
+			int maxr, int paddingFactor)
 {
-	if (xdim != mdlX ||
-		ydim != mdlY ||
-		zdim != mdlZ ||
-		inity != mdlInitY ||
-		initz != mdlInitZ ||
-		max_r != maxR ||
-		paddingFactor != padding_factor)
-	{
-		mdlX = xdim;
-		mdlY = ydim;
-		mdlZ = zdim;
-		if (mdlZ < 1) mdlZ = 1;
-		mdlXYZ = xdim*ydim*zdim;
-		mdlInitY = inity;
-		mdlInitZ = initz;
-		maxR = max_r;
-		maxR2 = max_r*max_r;
-		padding_factor = paddingFactor;
+	if (xdim == mdlX &&
+		ydim == mdlY &&
+		zdim == mdlZ &&
+		inity == mdlInitY &&
+		initz == mdlInitZ &&
+		maxr == maxR &&
+		paddingFactor == padding_factor)
+		return;
 
-		clear();
+	mdlX = xdim;
+	mdlY = ydim;
+	mdlZ = zdim;
+	if (mdlZ < 1) mdlZ = 1;
+	mdlXYZ = xdim*ydim*zdim;
+	mdlInitY = inity;
+	mdlInitZ = initz;
+	maxR = maxr;
+	maxR2 = maxr*maxr;
+	padding_factor = paddingFactor;
 
-		//Allocate space for model
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal,   mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag,   mdlXYZ * sizeof(XFLOAT)));
-		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
-	}
+	clear();
+
+	//Allocate space for model
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal,   mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag,   mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
 }
 
 void CudaBackprojector::initMdl()
