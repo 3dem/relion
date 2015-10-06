@@ -255,7 +255,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
-	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GB) assigned to custom allocator (if enabled) for each thread", "-1"));
 
 	if (do_gpu)
@@ -401,7 +401,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_parallel_disc_io = parser.checkOption("--parallel_disc_io", "Let parallel (MPI) processes access the disc simultaneously (use on gluster or fhgfs; this may break NFS)");
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
-	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","0");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GB) assigned to custom allocator (if enabled) for each thread", "-1"));
 
 	if (do_skip_align)
@@ -820,18 +820,24 @@ void MlOptimiser::initialise()
 
 	if (do_gpu)
 	{
-		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+		if (!std::isdigit(*gpu_ids.begin()))
+			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		else if(gpu_ids.length()<nr_threads)
 			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-		else if (gpu_ids.length()==1)
-			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 		for (int i = 0; i < nr_threads; i ++)
 		{
 			int dev_id;
-			if (gpu_ids.length()==1)
-				dev_id = i;
+			if (!std::isdigit(*gpu_ids.begin()))
+				dev_id = i%devCount;
 			else
 				dev_id = (int)(gpu_ids[i]-'0');
+
+			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
+
 			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
 		}
 	}
