@@ -13,10 +13,11 @@
  *   	DIFFERNECE-BASED KERNELS
  */
 
-
 template<bool do_3DProjection>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
 		CudaProjectorKernel projector,
@@ -53,23 +54,39 @@ __global__ void cuda_kernel_diff2_coarse(
 
 		if(pixel < image_size)
 		{
+			int x = pixel % projector.imgX;
+			int y = (int)floorf( (float)pixel / (float)projector.imgX);
+
+			if (y > projector.maxR)
+			{
+				if (y >= projector.imgY - projector.maxR)
+					y = y - projector.imgY;
+				else
+					continue;
+			}
+
 			if(do_3DProjection)
 				projector.project3Dmodel(
-					pixel,
+					x,y,
 					e0,e1,e3,e4,e6,e7,
 					ref_real, ref_imag);
 			else
 				projector.project2Dmodel(
-					pixel,
+					x,y,
 					e0,e1,e3,e4,e6,e7,
 					ref_real, ref_imag);
 
+			XFLOAT real = __ldg(&g_imgs_real[pixel]);
+			XFLOAT imag = __ldg(&g_imgs_imag[pixel]);
+
 			for (int itrans = 0; itrans < translation_num; itrans ++)
 			{
-				unsigned long img_pixel_idx = itrans * image_size + pixel;
+				XFLOAT dotp = x * trans_x[itrans] + y * trans_y[itrans];
+				XFLOAT s, c;
+				sincosf(dotp, &s, &c);
 
-				XFLOAT diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]);
-				XFLOAT diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
+				XFLOAT diff_real =  ref_real - c * real + s * imag;
+				XFLOAT diff_imag =  ref_imag - c * imag - s * real;
 				XFLOAT diff2 = (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_corr_img[pixel]);
 
 				s_cuda_kernel_diff2s[translation_num * tid + itrans] += diff2;
@@ -93,6 +110,8 @@ __global__ void cuda_kernel_diff2_coarse(
 		}
 	}
 }
+
+
 
 template<bool do_3DProjection>
 __global__ void cuda_kernel_diff2_fine(
@@ -146,16 +165,27 @@ __global__ void cuda_kernel_diff2_fine(
 
 			if(pixel < image_size)
 			{
+				int x = pixel % projector.imgX;
+				int y = (int)floorf( (float)pixel / (float)projector.imgX);
+
+				if (y > projector.maxR)
+				{
+					if (y >= projector.imgY - projector.maxR)
+						y = y - projector.imgY;
+					else
+						x = projector.maxR;
+				}
+
 				if(do_3DProjection)
 					projector.project3Dmodel(
-						pixel,
+						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
 						ref_real, ref_imag);
 				else
 					projector.project2Dmodel(
-						pixel,
+						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
@@ -247,14 +277,25 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 		if(pixel < image_size)
 		{
+			int x = pixel % projector.imgX;
+			int y = (int)floorf( (float)pixel / (float)projector.imgX);
+
+			if (y > projector.maxR)
+			{
+				if (y >= projector.imgY - projector.maxR)
+					y = y - projector.imgY;
+				else
+					x = projector.maxR;
+			}
+
 			if(do_3DProjection)
 				projector.project3Dmodel(
-					pixel,
+					x,y,
 					e0,e1,e3,e4,e6,e7,
 					ref_real, ref_imag);
 			else
 				projector.project2Dmodel(
-					pixel,
+					x,y,
 					e0,e1,e3,e4,e6,e7,
 					ref_real, ref_imag);
 
@@ -347,16 +388,26 @@ __global__ void cuda_kernel_diff2_CC_fine(
 
 			if(pixel < image_size)
 			{
+				int x = pixel % projector.imgX;
+				int y = (int)floorf( (float)pixel / (float)projector.imgX);
+
+				if (y > projector.maxR)
+				{
+					if (y >= projector.imgY - projector.maxR)
+						y = y - projector.imgY;
+					else
+						x = projector.maxR;
+				}
 				if(do_3DProjection)
 					projector.project3Dmodel(
-						pixel,
+						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
 						ref_real, ref_imag);
 				else
 					projector.project2Dmodel(
-						pixel,
+						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),

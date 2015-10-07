@@ -435,6 +435,8 @@ void runWavgKernel(
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
@@ -456,6 +458,8 @@ void runDiff2KernelCoarse(
 		if(projector.mdlZ!=0)
 				cuda_kernel_diff2_coarse<true><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
+					trans_x,
+					trans_y,
 					Fimgs_real,
 					Fimgs_imag,
 					projector,
@@ -467,6 +471,8 @@ void runDiff2KernelCoarse(
 			else
 				cuda_kernel_diff2_coarse<false><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
+					trans_x,
+					trans_y,
 					Fimgs_real,
 					Fimgs_imag,
 					projector,

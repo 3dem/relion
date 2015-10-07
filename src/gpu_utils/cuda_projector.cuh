@@ -42,7 +42,8 @@ public:
 		{};
 
 	__device__ __forceinline__ void project3Dmodel(
-			int pixel,
+			int x,
+			int y,
 			XFLOAT e0,
 			XFLOAT e1,
 			XFLOAT e3,
@@ -54,18 +55,6 @@ public:
 	{
 		bool is_neg_x;
 		int r2;
-
-		int x = pixel % imgX;
-		int y = (int)floorf( (float)pixel / (float)imgX);
-
-		// Dont search beyond square with side max_r
-		if (y > maxR)
-		{
-			if (y >= imgY - maxR)
-				y = y - imgY;
-			else
-				x = maxR;
-		}
 
 		r2 = x*x + y*y;
 		if (r2 <= maxR2)
@@ -166,7 +155,8 @@ public:
 	}
 
 	__device__ __forceinline__ void project2Dmodel(
-				int pixel,
+				int x,
+				int y,
 				XFLOAT e0,
 				XFLOAT e1,
 				XFLOAT e3,
@@ -178,18 +168,6 @@ public:
 		{
 			bool is_neg_x;
 			int r2;
-
-			int x = pixel % imgX;
-			int y = (int)floorf( (float)pixel / (float)imgX);
-
-			// Dont search beyond square with side max_r
-			if (y > maxR)
-			{
-				if (y >= imgY - maxR)
-					y = y - imgY;
-				else
-					x = maxR;
-			}
 
 			r2 = x*x + y*y;
 			if (r2 <= maxR2)
