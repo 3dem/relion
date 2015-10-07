@@ -8,7 +8,7 @@
 #include <fstream>
 
 //Non-concurrent benchmarking tools (only for Linux)
-#if defined CUDA_BENCHMARK
+#if defined CUDA_BENCHMARK_OLD
 #include <vector>
 #include <time.h>
 #include <string>
@@ -130,7 +130,7 @@ static void cuda_gpu_toc()
 		cuda_gpu_benchmark_stop_times.clear();
 	}
 }
-#elif defined CUDA_PROFILING
+#elif defined CUDA_PROFILING_OLD
 #include <nvToolsExt.h>
 
 #define CUDA_CPU_TIC(ID) (nvtxRangePush(ID))

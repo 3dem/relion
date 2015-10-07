@@ -1578,23 +1578,22 @@ void MlOptimiser::expectation()
 		expectationSomeParticles(my_first_ori_particle, my_last_ori_particle);
 
 #ifdef TIMING
-		timer.tic(TIMING_EXP_METADATA);
+        timer.tic(TIMING_EXP_CHANGES);
 #endif
 
-		// Set the metadata for these particles
-		setMetaDataSubset(my_first_ori_particle, my_last_ori_particle);
-
+        // Also monitor the changes in the optimal orientations and classes
+        monitorHiddenVariableChanges(my_first_ori_particle, my_last_ori_particle);
 
 #ifdef TIMING
-		timer.toc(TIMING_EXP_METADATA);
-		timer.tic(TIMING_EXP_CHANGES);
+        timer.toc(TIMING_EXP_CHANGES);
+        timer.tic(TIMING_EXP_METADATA);
 #endif
 
-		// Also monitor the changes in the optimal orientations and classes
-		monitorHiddenVariableChanges(my_first_ori_particle, my_last_ori_particle);
+        // Set the metadata for these particles
+        setMetaDataSubset(my_first_ori_particle, my_last_ori_particle);
 
 #ifdef TIMING
-		timer.toc(TIMING_EXP_CHANGES);
+        timer.toc(TIMING_EXP_METADATA);
 #endif
 
 		nr_ori_particles_done += my_last_ori_particle - my_first_ori_particle + 1;
