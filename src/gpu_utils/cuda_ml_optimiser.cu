@@ -30,25 +30,17 @@
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
-		std::vector<MultidimArray<Complex > > &exp_Fimgs,
-		std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-		std::vector<MultidimArray<double> > &exp_Fctfs,
-		std::vector<Matrix1D<double> > &exp_old_offset,
-		std::vector<Matrix1D<double> > &exp_prior,
-		std::vector<MultidimArray<double> > &exp_power_imgs,
-		std::vector<double> &exp_highres_Xi2_imgs,
-		std::vector<int> &exp_pointer_dir_nonzeroprior,
-		std::vector<int> &exp_pointer_psi_nonzeroprior,
-		std::vector<double> &exp_directions_prior,
-		std::vector<double> &exp_psi_prior,
+void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
 		MlOptimiserCuda *cudaMLO
 		)
 {
-
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
+#endif
 	FourierTransformer transformer;
 
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
@@ -71,14 +63,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		int group_id =baseMLO->mydata.getGroupId(part_id);
 
 		// Get the norm_correction
-		double normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_NORM);
+		double normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
 
 		// Get the optimal origin offsets from the previous iteration
 		Matrix1D<double> my_old_offset(2), my_prior(2);
-		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_XOFF);
-		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_YOFF);
-		XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_XOFF_PRIOR);
-		YY(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_YOFF_PRIOR);
+		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF);
+		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF);
+		XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF_PRIOR);
+		YY(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF_PRIOR);
 		// Uninitialised priors were set to 999.
 		if (XX(my_prior) > 998.99 && XX(my_prior) < 999.01)
 			XX(my_prior) = 0.;
@@ -89,8 +81,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		{
 			my_old_offset.resize(3);
 			my_prior.resize(3);
-			ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ZOFF);
-			ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ZOFF_PRIOR);
+			ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF);
+			ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF_PRIOR);
 			// Unitialised priors were set to 999.
 			if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
 				ZZ(my_prior) = 0.;
@@ -101,19 +93,19 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
 			// First try if there are some fixed prior angles
-			double prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
-			double prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
-			double prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
+			double prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT_PRIOR);
+			double prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
+			double prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
 
 			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
-				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_ROT);
+				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
-				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_TILT);
+				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
-				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_PSI);
+				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op. metadata_offset + ipart, METADATA_PSI);
 
 			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
@@ -122,13 +114,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 			// Select only those orientations that have non-zero prior probability
 			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
 					sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
-					exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
+					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
-			long int nr_orients = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) * baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
+			long int nr_orients = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) * baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior);
 			if (nr_orients == 0)
 			{
-				std::cerr << " sampling.NrDirections()= " << baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior)
-						<< " sampling.NrPsiSamplings()= " << baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
+				std::cerr << " sampling.NrDirections()= " << baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior)
+						<< " sampling.NrPsiSamplings()= " << baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior) << std::endl;
 				REPORT_ERROR("Zero orientations fall within the local angular search. Increase the sigma-value(s) on the orientations!");
 			}
 
@@ -192,7 +184,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
 				{
-					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, metadata_offset + ipart, i, j);
+					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.metadata_offset + ipart, i, j);
 				}
 				img().setXmippOrigin();
 				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
@@ -202,7 +194,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 					rec_img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
 					{
-						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, baseMLO->exp_nr_images + metadata_offset + ipart, i, j);
+						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, baseMLO->exp_nr_images + op.metadata_offset + ipart, i, j);
 					}
 					rec_img().setXmippOrigin();
 				}
@@ -225,9 +217,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
 
-		exp_old_offset[ipart] = my_old_offset;
+		op.old_offset[ipart] = my_old_offset;
 		// Also store priors on translations
-		exp_prior[ipart] = my_prior;
+		op.prior[ipart] = my_prior;
 		CUDA_CPU_TOC("selfTranslate");
 
 		CUDA_CPU_TIC("CenterFFT1");
@@ -282,15 +274,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		// This will only be used for reconstruction, not for alignment
 		// But beamtilt only affects very high-resolution components anyway...
 		//
-		double beamtilt_x = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_BEAMTILT_X);
-		double beamtilt_y = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_BEAMTILT_Y);
-		double Cs = DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_CS);
-		double V = 1000. * DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE);
+		double beamtilt_x = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_X);
+		double beamtilt_y = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_Y);
+		double Cs = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_CS);
+		double V = 1000. * DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_VOLTAGE);
 		double lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
 		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
 			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs,baseMLO->mymodel.pixel_size, baseMLO->mymodel.ori_size);
 
-		exp_Fimgs_nomask.at(ipart) = Fimg;
+		op.Fimgs_nomask.at(ipart) = Fimg;
 
 		CUDA_CPU_TOC("selfApplyBeamTilt");
 
@@ -433,12 +425,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 			}
 
 			// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
-			exp_power_imgs.at(ipart) = spectrum;
-			exp_highres_Xi2_imgs.at(ipart) = highres_Xi2;
+			op.power_imgs.at(ipart) = spectrum;
+			op.highres_Xi2_imgs.at(ipart) = highres_Xi2;
 		}
 		else
 		{
-			exp_highres_Xi2_imgs.at(ipart) = 0.;
+			op.highres_Xi2_imgs.at(ipart) = 0.;
 		}
 		CUDA_CPU_TOC("powerClass");
 		// We never need any resolutions higher than current_size
@@ -486,13 +478,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 			else
 			{
 				CTF ctf;
-				ctf.setValues(DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_ANGLE),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_CS),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_Q0),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC));
+				ctf.setValues(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_ANGLE),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_VOLTAGE),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_CS),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_Q0),
+							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_BFAC));
 
 				ctf.getFftwImage(Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
@@ -504,12 +496,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 		}
 		CUDA_CPU_TOC("ctfCorr");
 		// Store Fimg and Fctf
-		exp_Fimgs.at(ipart) = Fimg;
-		exp_Fctfs.at(ipart) = Fctf;
+		op.Fimgs.at(ipart) = Fimg;
+		op.Fctfs.at(ipart) = Fctf;
 
 	} // end loop ipart
 	transformer.clear();
-
+#ifdef TIMING
+	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_FT);
+#endif
 }
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
@@ -2408,9 +2403,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 				op.metadata_offset += baseMLO->mydata.ori_particles[iori].particles_id.size();
 			}
 			CUDA_CPU_TIC("getFourierTransformsAndCtfs");
-			getFourierTransformsAndCtfs(my_ori_particle, op.metadata_offset, op.Fimgs, op.Fimgs_nomask, op.Fctfs,
-					op.old_offset, op.prior, op.power_imgs, op.highres_Xi2_imgs,
-					op.pointer_dir_nonzeroprior, op.pointer_psi_nonzeroprior, op.directions_prior, op.psi_prior, op, sp, baseMLO, this);
+			getFourierTransformsAndCtfs(my_ori_particle, op, sp, baseMLO, this);
 			CUDA_CPU_TOC("getFourierTransformsAndCtfs");
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 			{
