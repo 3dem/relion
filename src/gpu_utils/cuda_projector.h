@@ -14,13 +14,13 @@ class CudaProjector
 	    mdlInitY, mdlInitZ,
 	    padding_factor;
 
-#ifndef CUDA_DOUBLE_PRECISION
-	float *texArrayReal2D, *texArrayImag2D;
+#ifndef CUDA_NO_TEXTURES
+	XFLOAT *texArrayReal2D, *texArrayImag2D;
 	cudaArray_t *texArrayReal, *texArrayImag;
 	cudaTextureObject_t *mdlReal, *mdlImag;
 	size_t pitch2D;
 #else
-	double *mdlReal, *mdlImag;
+	XFLOAT *mdlReal, *mdlImag;
 #endif
 
 public:
@@ -30,7 +30,7 @@ public:
 			mdlInitY(0), mdlInitZ(0),
 			padding_factor(0)
 	{
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef CUDA_NO_TEXTURES
 		texArrayReal2D = 0;
 		texArrayImag2D = 0;
 		texArrayReal = 0;

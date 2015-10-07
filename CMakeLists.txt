@@ -48,11 +48,18 @@ else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
 
+option(CudaTexture "CudaTexture" ON)
 option(CudaDouble "CudaDouble" OFF)
 if(CudaDouble)
     add_definitions(-DCUDA_DOUBLE_PRECISION)
     message(STATUS "Building cuda files with double precision.")
+	set(CudaTexture FALSE)
 endif(CudaDouble)
+
+if(NOT CudaTexture)
+    add_definitions(-DCUDA_NO_TEXTURES)
+    message(STATUS "Texture interpolation is omitted.")
+endif(NOT CudaTexture)
 
 option(CustomAlloc "CustomAlloc" ON)
 if(NOT CustomAlloc)

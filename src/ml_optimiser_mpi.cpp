@@ -168,21 +168,28 @@ void MlOptimiserMpi::initialise()
 
 	if (do_gpu && !node->isMaster()) //Device not initialized on master rank
 	{
-		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+		if (!std::isdigit(*gpu_ids.begin()))
+			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		else if(gpu_ids.length()<nr_threads)
 			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-		else if (gpu_ids.length()==1)
-			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 		for (int i = 0; i < nr_threads; i ++)
 		{
 			int dev_id;
-			if (gpu_ids.length()==1)
-				dev_id = i;
+			if (!std::isdigit(*gpu_ids.begin()))
+				dev_id = i%devCount;
 			else
 				dev_id = (int)(gpu_ids[i]-'0');
+
+			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
+
 			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
 		}
 	}
+
 
 
 #ifdef DEBUG
