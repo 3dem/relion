@@ -226,10 +226,9 @@ public:
 	//     rot_id  = id of rot     = which of all POSSIBLE orientations                               this weight signifies
 	//     rot_idx = index of rot  = which in the sequence of the determined significant orientations this weight signifies
 	//   trans_id  = id of trans   = which of all POSSIBLE translations                               this weight signifies
-	//   class_id  = id of class   = which of all POSSIBLE classes                                    this weight signifies
 	// -- special indices ---------------------------------
 	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
-	CudaGlobalPtr<long unsigned> rot_id, rot_idx, trans_idx, ihidden_overs, class_id;
+	CudaGlobalPtr<long unsigned> rot_id, rot_idx, trans_idx, ihidden_overs;
 
 	inline
 	 IndexedDataArray(CudaCustomAllocator *allocator):
@@ -237,8 +236,7 @@ public:
 		rot_id(allocator),
 		rot_idx(allocator),
 		trans_idx(allocator),
-		ihidden_overs(allocator),
-		class_id(allocator)
+		ihidden_overs(allocator)
 	{};
 
 	// constructor which takes a parent IndexedDataArray and a mask to create a child
@@ -248,22 +246,19 @@ public:
 		rot_id(			&(parent.rot_id.h_ptr[mask.firstPos])		,&(parent.rot_id.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
 		rot_idx(		&(parent.rot_idx.h_ptr[mask.firstPos])		,&(parent.rot_idx.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
 		trans_idx(		&(parent.trans_idx.h_ptr[mask.firstPos])	,&(parent.trans_idx.d_ptr[mask.firstPos])		,mask.weightNum, allocator),
-		ihidden_overs(	&(parent.ihidden_overs.h_ptr[mask.firstPos]),&(parent.ihidden_overs.d_ptr[mask.firstPos])	,mask.weightNum, allocator),
-		class_id(		&(parent.class_id.h_ptr[mask.firstPos])		,&(parent.class_id.d_ptr[mask.firstPos])		,mask.weightNum, allocator)
+		ihidden_overs(	&(parent.ihidden_overs.h_ptr[mask.firstPos]),&(parent.ihidden_overs.d_ptr[mask.firstPos])	,mask.weightNum, allocator)
 	{
 		weights.d_do_free=false;
 		rot_id.d_do_free=false;
 		rot_idx.d_do_free=false;
 		trans_idx.d_do_free=false;
 		ihidden_overs.d_do_free=false;
-		class_id.d_do_free=false;
 
 		weights.h_do_free=false;
 		rot_id.h_do_free=false;
 		rot_idx.h_do_free=false;
 		trans_idx.h_do_free=false;
 		ihidden_overs.h_do_free=false;
-		class_id.h_do_free=false;
 	};
 
 public:
@@ -275,7 +270,6 @@ public:
 		rot_idx.setSize(newSize);
 		trans_idx.setSize(newSize);
 		ihidden_overs.setSize(newSize);
-		class_id.setSize(newSize);
 	}
 
 	void dual_alloc_all()
@@ -285,14 +279,12 @@ public:
 		rot_idx.host_alloc();
 		trans_idx.host_alloc();
 		ihidden_overs.host_alloc();
-		class_id.host_alloc();
 		//-----------------------
 		weights.device_alloc();
 		rot_id.device_alloc();
 		rot_idx.device_alloc();
 		trans_idx.device_alloc();
 		ihidden_overs.device_alloc();
-		class_id.device_alloc();
 	}
 };
 

@@ -151,7 +151,7 @@ public:
      * etc...
      *
      * */
-    void initialise(int prior_mode, int ref_dim = -1, bool do_3d_trans = false);
+    void initialise(int prior_mode, int ref_dim = -1, bool do_3d_trans = false, bool do_warnpsi = false);
 
     // Reset the random perturbation
     void resetRandomlyPerturbedSampling();

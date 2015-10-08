@@ -1040,7 +1040,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
-	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, mymodel.data_dim == 3);
+	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, mymodel.data_dim == 3, do_gpu);
 
 	// Default max_coarse_size is original size
 	if (max_coarse_size < 0)
