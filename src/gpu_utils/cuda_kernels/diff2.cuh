@@ -113,24 +113,24 @@ __global__ void cuda_kernel_diff2_fine(
 		unsigned long *d_job_num
 		)
 {
-	int bid = blockIdx.y * gridDim.x + blockIdx.x;
-	int tid = threadIdx.x;
+	unsigned long bid = blockIdx.y * gridDim.x + blockIdx.x;
+	unsigned long tid = threadIdx.x;
 
 //    // Specialize BlockReduce for a 1D block of 128 threads on type XFLOAT
 //    typedef cub::BlockReduce<XFLOAT, 128> BlockReduce;
 //    // Allocate shared memory for BlockReduce
 //    __shared__ typename BlockReduce::TempStorage temp_storage;
 
-	int pixel;
+	unsigned long pixel;
 	XFLOAT ref_real;
 	XFLOAT ref_imag;
 
 	__shared__ XFLOAT s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
 	__shared__ XFLOAT s_outs[PROJDIFF_CHUNK_SIZE];
 	// inside the padded 2D orientation gri
-	if( bid < todo_blocks ) // we only need to make
+//	if( bid < todo_blocks ) // we only need to make
 	{
-		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot
+		unsigned trans_num  = (unsigned)d_job_num[bid]; //how many transes we have for this rot
 		for (int itrans=0; itrans<trans_num; itrans++)
 		{
 			s[itrans*BLOCK_SIZE+tid] = 0.0f;

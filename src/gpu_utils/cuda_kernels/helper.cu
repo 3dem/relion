@@ -19,17 +19,19 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
 
 	XFLOAT weight;
-	for (int itrans=0; itrans<nr_coarse_trans; itrans++)
+	if(iorient<nr_coarse_orient)
 	{
-		pos = iorient * nr_coarse_trans + itrans;
-		XFLOAT diff2 = g_Mweight[pos] - min_diff2;
-		if( diff2 < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
-			diff2 = (XFLOAT)0.0;
-		else
+		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
 		{
-			weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
+			pos = iorient * nr_coarse_trans + itrans;
+			XFLOAT diff2 = g_Mweight[pos] - min_diff2;
+			if( diff2 < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
+				diff2 = (XFLOAT)0.0;
+			else
+			{
+				weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
 
-			// next line because of numerical precision of exp-function
+				// next line because of numerical precision of exp-function
 #if defined(CUDA_DOUBLE_PRECISION)
 				if (diff2 > 700.)
 					weight = 0.;
@@ -42,16 +44,20 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 					weight *= expf(-diff2);
 #endif
 				diff2=weight;
-			// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+			}
+
+			// Store the weight
+			g_Mweight[pos] = diff2; // TODO put in shared mem
+
+			// Reduce weights for sum of all weights
+			s_sumweight[tid] += diff2;
 		}
-
-		// Store the weight
-		g_Mweight[pos] = diff2; // TODO put in shared mem
-
-		// Reduce weights for sum of all weights
-		s_sumweight[tid] += diff2;
 	}
-
+	else
+	{
+		s_sumweight[tid] = 0;
+	}
 	__syncthreads();
 	// Further reduction of all samples in this block
 	for(int j=(SUMW_BLOCK_SIZE/2); j>0; j/=2)
