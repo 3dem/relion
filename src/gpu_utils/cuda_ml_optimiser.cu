@@ -2216,9 +2216,12 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 		allocationSize = (float)free * .7; //Lets leave some for other processes for now
 	}
 
-	printf(" Custom allocator assigned %.2f MB of device memory (on device %d).\n", (float)allocationSize/(1000.*1000.), device_id);
+	int memAlignmentSize;
+	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, dev_id );
 
-	allocator = new CudaCustomAllocator(allocationSize);
+	printf(" DEBUG: Custom allocator assigned %.2f MB (on device %d), with memory alignment size %d.\n", (float)allocationSize/(1000.*1000.), device_id, memAlignmentSize);
+
+	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
 	allocator->setOutOfMemoryHandler(this);
 #endif
 
