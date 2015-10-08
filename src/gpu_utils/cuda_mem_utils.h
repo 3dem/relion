@@ -85,6 +85,7 @@ class CudaCustomAllocator
 {
 	typedef unsigned char BYTE;
 	size_t totalSize;
+	size_t alignmentSize;
 	OutOfMemoryHandler *outOfMemoryHandler;
 
 public:
@@ -144,8 +145,8 @@ private:
 
 public:
 
-	CudaCustomAllocator(size_t size):
-		totalSize(size),outOfMemoryHandler(NULL), first(0)
+	CudaCustomAllocator(size_t size, size_t alignmentSize):
+		totalSize(size), alignmentSize(alignmentSize), outOfMemoryHandler(NULL), first(0)
 	{
 #ifndef CUDA_NO_CUSTOM_ALLOCATION
 		first = last = new Alloc();
@@ -163,6 +164,8 @@ public:
 	inline
 	Alloc* alloc(size_t size)
 	{
+		size += size % alignmentSize; //To prevent miss-aligned memory
+
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		Alloc *nAlloc = new Alloc();
 		nAlloc->size = size;
