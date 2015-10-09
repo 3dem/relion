@@ -13,104 +13,132 @@
  *   	DIFFERNECE-BASED KERNELS
  */
 
+#define EULERS_PER_BLOCK 10
+
 template<bool do_3DProjection>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
-		XFLOAT *g_imgs_real,
-		XFLOAT *g_imgs_imag,
+		XFLOAT *g_real,
+		XFLOAT *g_imag,
 		CudaProjectorKernel projector,
-		XFLOAT *g_corr_img,
+		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
 		unsigned translation_num,
-		int image_size,
-		XFLOAT sum_init
+		int image_size
 		)
 {
-	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+	int bid = blockIdx.x * EULERS_PER_BLOCK;
 	int tid = threadIdx.x;
 
-	XFLOAT ref_real;
-	XFLOAT ref_imag;
+	XFLOAT diff2s[EULERS_PER_BLOCK] = {0.f};
+	XFLOAT tx, ty;
 
-	XFLOAT e0,e1,e3,e4,e6,e7;
-	e0 = __ldg(&g_eulers[bid*9  ]);
-	e1 = __ldg(&g_eulers[bid*9+1]);
-	e3 = __ldg(&g_eulers[bid*9+3]);
-	e4 = __ldg(&g_eulers[bid*9+4]);
-	e6 = __ldg(&g_eulers[bid*9+6]);
-	e7 = __ldg(&g_eulers[bid*9+7]);
+	__shared__ XFLOAT s_ref_real[D2C_BLOCK_SIZE*EULERS_PER_BLOCK];
+	__shared__ XFLOAT s_ref_imag[D2C_BLOCK_SIZE*EULERS_PER_BLOCK];
+	__shared__ XFLOAT s_real[D2C_BLOCK_SIZE];
+	__shared__ XFLOAT s_imag[D2C_BLOCK_SIZE];
+	__shared__ XFLOAT s_corr[D2C_BLOCK_SIZE];
+	__shared__ XFLOAT s_eulers[EULERS_PER_BLOCK*6];
 
-	extern __shared__ XFLOAT s_cuda_kernel_diff2s[];
-
-	for (unsigned i = 0; i < translation_num; i++)
-		s_cuda_kernel_diff2s[translation_num * tid + i] = 0.0f;
-
-	unsigned pixel_pass_num( ceilf( (float)image_size / (float)D2C_BLOCK_SIZE ) );
-	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
+	if (tid < EULERS_PER_BLOCK)
 	{
-		unsigned pixel = (pass * D2C_BLOCK_SIZE) + tid;
+		s_eulers[tid*6  ] = g_eulers[(bid+tid)*9  ];
+		s_eulers[tid*6+1] = g_eulers[(bid+tid)*9+1];
+		s_eulers[tid*6+2] = g_eulers[(bid+tid)*9+3];
+		s_eulers[tid*6+3] = g_eulers[(bid+tid)*9+4];
+		s_eulers[tid*6+4] = g_eulers[(bid+tid)*9+6];
+		s_eulers[tid*6+5] = g_eulers[(bid+tid)*9+7];
+	}
 
-		if(pixel < image_size)
+	tx = trans_x[tid%translation_num];
+	ty = trans_y[tid%translation_num];
+
+	int max_block_wise_pixel( ceilf( (float)image_size / (float)D2C_BLOCK_SIZE ) * D2C_BLOCK_SIZE );
+
+	for (int init_pixel = 0; init_pixel < max_block_wise_pixel; init_pixel += D2C_BLOCK_SIZE)
+	{
+		if(init_pixel + tid < image_size)
 		{
-			int x = pixel % projector.imgX;
-			int y = (int)floorf( (float)pixel / (float)projector.imgX);
+			#pragma unroll
+			for (int i = 0; i < EULERS_PER_BLOCK; i ++)
+			{
+				__syncthreads();
+
+				int x = (init_pixel + tid) % projector.imgX;
+				int y = (int)floorf( (float)(init_pixel + tid) / (float)projector.imgX);
+
+				if (y > projector.maxR)
+					y -= projector.imgY;
+
+				if(do_3DProjection)
+					projector.project3Dmodel(
+						x,y,
+						s_eulers[i*6  ],
+						s_eulers[i*6+1],
+						s_eulers[i*6+2],
+						s_eulers[i*6+3],
+						s_eulers[i*6+4],
+						s_eulers[i*6+5],
+						s_ref_real[EULERS_PER_BLOCK * tid + i],
+						s_ref_imag[EULERS_PER_BLOCK * tid + i]);
+				else
+					projector.project2Dmodel(
+						x,y,
+						s_eulers[i*6  ],
+						s_eulers[i*6+1],
+						s_eulers[i*6+2],
+						s_eulers[i*6+3],
+						s_eulers[i*6+4],
+						s_eulers[i*6+5],
+						s_ref_real[EULERS_PER_BLOCK * tid + i],
+						s_ref_imag[EULERS_PER_BLOCK * tid + i]);
+
+				s_real[tid] = g_real[(init_pixel + tid)];
+				s_imag[tid] = g_imag[(init_pixel + tid)];
+				s_corr[tid] = g_corr[(init_pixel + tid)];
+			}
+		}
+
+		if ((float) tid / translation_num >= D2C_BLOCK_SIZE/translation_num) //TODO Rest threads can be utilized
+			continue;
+
+		__syncthreads();
+
+		for (int i = tid / translation_num; i < D2C_BLOCK_SIZE; i += D2C_BLOCK_SIZE/translation_num)
+		{
+			if((init_pixel + i) >= image_size) break;
+
+			int x = (init_pixel + i) % projector.imgX;
+			int y = (int)floorf( (float)(init_pixel + i) / (float)projector.imgX);
 
 			if (y > projector.maxR)
+				y -= projector.imgY;
+
+			XFLOAT s, c;
+			sincosf( x * tx + y * ty , &s, &c);
+			XFLOAT real = c * s_real[i] - s * s_imag[i];
+			XFLOAT imag = c * s_imag[i] + s * s_real[i];
+
+			#pragma unroll
+			for (int j = 0; j < EULERS_PER_BLOCK; j ++)
 			{
-				if (y >= projector.imgY - projector.maxR)
-					y = y - projector.imgY;
-				else
-					continue;
-			}
-
-			if(do_3DProjection)
-				projector.project3Dmodel(
-					x,y,
-					e0,e1,e3,e4,e6,e7,
-					ref_real, ref_imag);
-			else
-				projector.project2Dmodel(
-					x,y,
-					e0,e1,e3,e4,e6,e7,
-					ref_real, ref_imag);
-
-			XFLOAT real = __ldg(&g_imgs_real[pixel]);
-			XFLOAT imag = __ldg(&g_imgs_imag[pixel]);
-
-			for (int itrans = 0; itrans < translation_num; itrans ++)
-			{
-				XFLOAT dotp = x * trans_x[itrans] + y * trans_y[itrans];
-				XFLOAT s, c;
-				sincosf(dotp, &s, &c);
-
-				XFLOAT diff_real =  ref_real - c * real + s * imag;
-				XFLOAT diff_imag =  ref_imag - c * imag - s * real;
-				XFLOAT diff2 = (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_corr_img[pixel]);
-
-				s_cuda_kernel_diff2s[translation_num * tid + itrans] += diff2;
+				XFLOAT diff_real =  s_ref_real[EULERS_PER_BLOCK * i + j] - real;
+				XFLOAT diff_imag =  s_ref_imag[EULERS_PER_BLOCK * i + j] - imag;
+				diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[i] / 2;
 			}
 		}
 	}
 
-	__syncthreads();
-
-	unsigned trans_pass_num( ceilf( (float)translation_num / (float)D2C_BLOCK_SIZE ) );
-	for (unsigned pass = 0; pass < trans_pass_num; pass++)
+	//Assuming translation_num > block-size
+	if ((float) tid / translation_num < D2C_BLOCK_SIZE/translation_num)
 	{
-		unsigned itrans = (pass * D2C_BLOCK_SIZE) + tid;
-		if (itrans < translation_num)
-		{
-			XFLOAT sum(sum_init);
-			for (unsigned i = 0; i < D2C_BLOCK_SIZE; i++)
-				sum += s_cuda_kernel_diff2s[i * translation_num + itrans];
-
-			g_diff2s[bid * translation_num + itrans] = sum;
-		}
+		#pragma unroll
+		for (int i = 0; i < EULERS_PER_BLOCK; i ++)
+			atomicAdd(&g_diff2s[(bid+i) * translation_num + tid%translation_num], diff2s[i]);
 	}
 }
-
 
 
 template<bool do_3DProjection>
@@ -245,7 +273,6 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT *g_diff2s,
 		unsigned translation_num,
 		int image_size,
-		XFLOAT sum_init,
 		XFLOAT exp_local_sqrtXi2
 		)
 {

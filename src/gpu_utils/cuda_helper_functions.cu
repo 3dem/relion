@@ -432,6 +432,26 @@ void runWavgKernel(
 	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
+#define INIT_VALUE_BLOCK_SIZE 512
+template< typename T>
+__global__ void cuda_kernel_init_value(
+		T *data,
+		T value,
+		size_t size)
+{
+	size_t idx = blockIdx.x * INIT_VALUE_BLOCK_SIZE + threadIdx.x;
+	if (idx < size)
+		data[idx] = value;
+}
+
+template< typename T>
+void deviceInitValue(CudaGlobalPtr<T> data, T value)
+{
+	cuda_kernel_init_value<T><<< data.getSize()/INIT_VALUE_BLOCK_SIZE, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			data.getSize());
+}
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
@@ -456,7 +476,7 @@ void runDiff2KernelCoarse(
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
-				cuda_kernel_diff2_coarse<true><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
+				cuda_kernel_diff2_coarse<true><<<orientation_num/EULERS_PER_BLOCK,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
 					trans_x,
 					trans_y,
@@ -466,10 +486,9 @@ void runDiff2KernelCoarse(
 					corr_img,
 					diff2s,
 					translation_num,
-					image_size,
-					op.highres_Xi2_imgs[ipart] / 2.);
+					image_size);
 			else
-				cuda_kernel_diff2_coarse<false><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
+				cuda_kernel_diff2_coarse<false><<<orientation_num/EULERS_PER_BLOCK,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
 					trans_x,
 					trans_y,
@@ -479,8 +498,7 @@ void runDiff2KernelCoarse(
 					corr_img,
 					diff2s,
 					translation_num,
-					image_size,
-					op.highres_Xi2_imgs[ipart] / 2.);
+					image_size);
 	}
 	else
 	{
@@ -494,7 +512,6 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 		else
 			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
@@ -506,7 +523,6 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 	}
 }
