@@ -40,7 +40,7 @@ void HealpixSampling::clear()
 
 }
 
-void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans, bool do_gpu)
+void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans, bool do_warnpsi)
 {
 
 	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
