@@ -1,0 +1,29 @@
+#!/bin/bash
+if [ $# != 0 ]; then
+ for i in `seq 1 ${1}`
+  do
+     printf "%06i%1s%s%s" ${i} "@" ${2}  " "
+     for (( c=3; c<=$#; c++ ))
+     do
+       echo -n ${!c}" "
+     done
+     echo ""
+ done
+else
+ echo " === Usage: === "
+ echo " ${0} <N> <stackname> <value1> <value2> ..."
+ echo " "
+ echo " === Purpose: === "
+ echo " This (bash) script generates the datablock for N images in a stack named stackname"
+ echo " Other (optional) data values are in value1, value2, etc. "
+ echo " "
+ echo " === Example: ==="
+ echo " ${0} 3 my_images.mrcs 10000 10500 0.0 200 2 0.1"
+ echo " yields: "
+ echo " 000001@my_images.mrcs 10000 10500 0.0 200 2 0.1" 
+ echo " 000002@my_images.mrcs 10000 10500 0.0 200 2 0.1" 
+ echo " 000003@my_images.mrcs 10000 10500 0.0 200 2 0.1" 
+fi
+
+
+

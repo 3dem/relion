@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+if [ $# != 0 ]; then
+ cat ${1} | awk -v"tab=${2}" 'BEGIN {a=0} {if ($0 ~ tab) {a = 22}; if (a==22) {if ($0 ~ "loop") a+=1} if (a==23) {if (length($0) < 2 || $1 ~ "data_") {exit} else {print $0} }}'  |grep -v "loop_" > tmp.dat
+ if [ $# == 2 ]; then
+    awk '{if (index($1,"_")!= 1) print; }' < tmp.dat
+ else
+  awk '{if (index($1,"_")!= 1) {j++; print j;} }' < tmp.dat > tmp1.dat
+  for (( c=3; c<=$#; c++ ))
+   do
+    awk -v"label=${!c}" '{i++; if ($1 ~ label) {col = i}; if (index($1,"_")!= 1) { j++; print j, $col} }' < tmp.dat >tmp2.dat
+    join tmp1.dat tmp2.dat > tmp3.dat
+    mv -f tmp3.dat tmp1.dat
+   done
+   awk '{for (i=2; i<=NF;i++) printf("%s%s", $i,(i==NF) ? "\n" : OFS)}' <tmp1.dat
+ fi
+ rm -f tmp.dat tmp1.dat tmp2.dat tmp3.dat
+else
+ echo " === Usage: === "
+ echo " ${0} <starfile> <tablename> <label1> <label2> ..."
+ echo " "
+ echo " === Purpose: === "
+ echo " This (bash) script prints the contents of a datablock (with name tablename) from a starfile"
+ echo " If any labels are given, then only those will be printed "
+ echo " "
+ echo " === Example: === "
+ echo " ${0} run3_it024_model.star data_model_class_1 _rlnResolution _rlnSsnrMap"
+fi
+
