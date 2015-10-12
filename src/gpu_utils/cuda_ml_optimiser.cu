@@ -715,15 +715,16 @@ void getAllSquaredDifferencesCoarse(
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		allWeights_pos=0;
 
-
-		if (!cudaMLO->refIs3D)
-		{
-			FILE *fPtr = fopen("allWeights.dat","w");
-			for (unsigned i = 0; i < allWeights.getSize(); i ++)
-				fprintf(fPtr,"%.5e\n",allWeights[i]);
-			fclose(fPtr);
-			exit(0);
-		}
+//
+//		if (!cudaMLO->refIs3D)
+//		{
+//			printf("translation_num=%d", translation_num);
+//			FILE *fPtr = fopen("allWeights.dat","w");
+//			for (unsigned i = 0; i < allWeights.getSize(); i ++)
+//				fprintf(fPtr,"%.5e\n",allWeights[i]);
+//			fclose(fPtr);
+//			exit(0);
+//		}
 
 		CUDA_CPU_TIC("diff_coarse_map");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)

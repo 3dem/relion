@@ -13,9 +13,7 @@
  *   	DIFFERNECE-BASED KERNELS
  */
 
-#define EULERS_PER_BLOCK 10
-
-template<bool do_3DProjection>
+template<bool do_3DProjection, int eulers_per_block>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
@@ -29,20 +27,20 @@ __global__ void cuda_kernel_diff2_coarse(
 		int image_size
 		)
 {
-	int bid = blockIdx.x * EULERS_PER_BLOCK;
+	int bid = blockIdx.x * eulers_per_block;
 	int tid = threadIdx.x;
 
-	XFLOAT diff2s[EULERS_PER_BLOCK] = {0.f};
+	XFLOAT diff2s[eulers_per_block] = {0.f};
 	XFLOAT tx, ty;
 
-	__shared__ XFLOAT s_ref_real[D2C_BLOCK_SIZE*EULERS_PER_BLOCK];
-	__shared__ XFLOAT s_ref_imag[D2C_BLOCK_SIZE*EULERS_PER_BLOCK];
+	__shared__ XFLOAT s_ref_real[D2C_BLOCK_SIZE*eulers_per_block];
+	__shared__ XFLOAT s_ref_imag[D2C_BLOCK_SIZE*eulers_per_block];
 	__shared__ XFLOAT s_real[D2C_BLOCK_SIZE];
 	__shared__ XFLOAT s_imag[D2C_BLOCK_SIZE];
 	__shared__ XFLOAT s_corr[D2C_BLOCK_SIZE];
-	__shared__ XFLOAT s_eulers[EULERS_PER_BLOCK*6];
+	__shared__ XFLOAT s_eulers[eulers_per_block*6];
 
-	if (tid < EULERS_PER_BLOCK)
+	if (tid < eulers_per_block)
 	{
 		s_eulers[tid*6  ] = g_eulers[(bid+tid)*9  ];
 		s_eulers[tid*6+1] = g_eulers[(bid+tid)*9+1];
@@ -59,19 +57,19 @@ __global__ void cuda_kernel_diff2_coarse(
 
 	for (int init_pixel = 0; init_pixel < max_block_wise_pixel; init_pixel += D2C_BLOCK_SIZE)
 	{
+		__syncthreads();
+
 		if(init_pixel + tid < image_size)
 		{
+			int x = (init_pixel + tid) % projector.imgX;
+			int y = (int)floorf( (float)(init_pixel + tid) / (float)projector.imgX);
+
+			if (y > projector.maxR)
+				y -= projector.imgY;
+
 			#pragma unroll
-			for (int i = 0; i < EULERS_PER_BLOCK; i ++)
+			for (int i = 0; i < eulers_per_block; i ++)
 			{
-				__syncthreads();
-
-				int x = (init_pixel + tid) % projector.imgX;
-				int y = (int)floorf( (float)(init_pixel + tid) / (float)projector.imgX);
-
-				if (y > projector.maxR)
-					y -= projector.imgY;
-
 				if(do_3DProjection)
 					projector.project3Dmodel(
 						x,y,
@@ -81,8 +79,8 @@ __global__ void cuda_kernel_diff2_coarse(
 						s_eulers[i*6+3],
 						s_eulers[i*6+4],
 						s_eulers[i*6+5],
-						s_ref_real[EULERS_PER_BLOCK * tid + i],
-						s_ref_imag[EULERS_PER_BLOCK * tid + i]);
+						s_ref_real[eulers_per_block * tid + i],
+						s_ref_imag[eulers_per_block * tid + i]);
 				else
 					projector.project2Dmodel(
 						x,y,
@@ -92,13 +90,13 @@ __global__ void cuda_kernel_diff2_coarse(
 						s_eulers[i*6+3],
 						s_eulers[i*6+4],
 						s_eulers[i*6+5],
-						s_ref_real[EULERS_PER_BLOCK * tid + i],
-						s_ref_imag[EULERS_PER_BLOCK * tid + i]);
-
-				s_real[tid] = g_real[(init_pixel + tid)];
-				s_imag[tid] = g_imag[(init_pixel + tid)];
-				s_corr[tid] = g_corr[(init_pixel + tid)];
+						s_ref_real[eulers_per_block * tid + i],
+						s_ref_imag[eulers_per_block * tid + i]);
 			}
+
+			s_real[tid] = g_real[(init_pixel + tid)];
+			s_imag[tid] = g_imag[(init_pixel + tid)];
+			s_corr[tid] = g_corr[(init_pixel + tid)];
 		}
 
 		if ((float) tid / translation_num >= D2C_BLOCK_SIZE/translation_num) //TODO Rest threads can be utilized
@@ -122,10 +120,10 @@ __global__ void cuda_kernel_diff2_coarse(
 			XFLOAT imag = c * s_imag[i] + s * s_real[i];
 
 			#pragma unroll
-			for (int j = 0; j < EULERS_PER_BLOCK; j ++)
+			for (int j = 0; j < eulers_per_block; j ++)
 			{
-				XFLOAT diff_real =  s_ref_real[EULERS_PER_BLOCK * i + j] - real;
-				XFLOAT diff_imag =  s_ref_imag[EULERS_PER_BLOCK * i + j] - imag;
+				XFLOAT diff_real =  s_ref_real[eulers_per_block * i + j] - real;
+				XFLOAT diff_imag =  s_ref_imag[eulers_per_block * i + j] - imag;
 				diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[i] / 2;
 			}
 		}
@@ -135,7 +133,7 @@ __global__ void cuda_kernel_diff2_coarse(
 	if ((float) tid / translation_num < D2C_BLOCK_SIZE/translation_num)
 	{
 		#pragma unroll
-		for (int i = 0; i < EULERS_PER_BLOCK; i ++)
+		for (int i = 0; i < eulers_per_block; i ++)
 			atomicAdd(&g_diff2s[(bid+i) * translation_num + tid%translation_num], diff2s[i]);
 	}
 }

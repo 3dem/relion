@@ -1436,7 +1436,7 @@ void MlOptimiser::iterate()
 			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
 			break;
 		}
-exit(0);
+//exit(0);
 		maximization();
 
 #ifdef TIMING

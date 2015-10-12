@@ -453,6 +453,9 @@ void deviceInitValue(CudaGlobalPtr<T> data, T value)
 			data.getSize());
 }
 
+#define EULERS_PERBLOCK_2D 2
+#define EULERS_PERBLOCK_3D 8
+
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
 		XFLOAT *trans_x,
@@ -476,29 +479,29 @@ void runDiff2KernelCoarse(
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
-				cuda_kernel_diff2_coarse<true><<<orientation_num/EULERS_PER_BLOCK,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
-					d_eulers,
-					trans_x,
-					trans_y,
-					Fimgs_real,
-					Fimgs_imag,
-					projector,
-					corr_img,
-					diff2s,
-					translation_num,
-					image_size);
-			else
-				cuda_kernel_diff2_coarse<false><<<orientation_num/EULERS_PER_BLOCK,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
-					d_eulers,
-					trans_x,
-					trans_y,
-					Fimgs_real,
-					Fimgs_imag,
-					projector,
-					corr_img,
-					diff2s,
-					translation_num,
-					image_size);
+			cuda_kernel_diff2_coarse<true, EULERS_PERBLOCK_3D><<<orientation_num/EULERS_PERBLOCK_3D,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+				d_eulers,
+				trans_x,
+				trans_y,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				corr_img,
+				diff2s,
+				translation_num,
+				image_size);
+		else
+			cuda_kernel_diff2_coarse<false, EULERS_PERBLOCK_2D><<<orientation_num/EULERS_PERBLOCK_2D,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+				d_eulers,
+				trans_x,
+				trans_y,
+				Fimgs_real,
+				Fimgs_imag,
+				projector,
+				corr_img,
+				diff2s,
+				translation_num,
+				image_size);
 	}
 	else
 	{
