@@ -293,6 +293,24 @@ public:
 	   }
    }
 
+
+#ifdef RELION_SINGLE_PRECISION
+   // Fnewweight needs decentering, but has to be in double-precision for correct calculations!
+   template <typename T>
+   void decenter(MultidimArray<T> &Min, MultidimArray<double> &Mout, int my_rmax2)
+   {
+
+	   // Mout should already have the right size
+	   // Initialize to zero
+	   Mout.initZeros();
+	   FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Mout)
+	   {
+		   if (kp*kp + ip*ip + jp*jp <= my_rmax2)
+                       DIRECT_A3D_ELEM(Mout, k, i, j) = (double)A3D_ELEM(Min, kp, ip, jp);
+	   }
+   }
+#endif
+
 };
 
 #endif /* BACKPROJECTOR_H_ */

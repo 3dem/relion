@@ -129,7 +129,7 @@ void progress_bar(long rlen)
         totlen = -rlen;
         prevt = startt = currt;
         fprintf(stdout, "000/??? sec ");
-        fprintf(stdout, "٩(͡๏̯͡๏)۶");
+        fprintf(stdout, "~~(,_,\">");
         for (i = 1; i < 10; i++)
             fprintf(stdout, "      ");
         fprintf(stdout, "    [oo]");
@@ -170,7 +170,7 @@ void progress_bar(long rlen)
         i = (int)(60 * (1 - (float)(totlen - rlen) / totlen));
         while (i--)
             fprintf(stdout, ".");
-        fprintf(stdout, "༼ つ ◕_◕ ༽つ");
+        fprintf(stdout, "~~(,_,\">");
         if (rlen == totlen)
         {
             fprintf(stdout, "\n");

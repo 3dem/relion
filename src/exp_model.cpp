@@ -633,7 +633,7 @@ void Experiment::usage()
 }
 
 // Read from file
-void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bool do_ignore_group_name)
+void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bool do_ignore_group_name, bool do_preread_images)
 {
 
 //#define DEBUG_READ
@@ -682,6 +682,13 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			// Add the particle to my_area = 0
 			part_id = addParticle(group_id, mic_id);
                         MDimg.addObject();
+			if (do_preread_images)
+			{
+				Image<RFLOAT> img;
+				img.read(fn_img);
+				img().setXmippOrigin();
+				particles[part_id].img = img();
+			}
 			// Also add OriginalParticle
 			(ori_particles[addOriginalParticle("particle")]).addParticle(part_id, 0, -1);
 			// Set the filename and other metadata parameters
@@ -868,6 +875,16 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 #ifdef DEBUG_READ
 			timer.tic(tori);
 #endif
+
+                        if (do_preread_images)
+                        {
+                            FileName fn_img;
+                            MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+                            Image<RFLOAT> img;
+                            img.read(fn_img);
+                            img().setXmippOrigin();
+                            particles[part_id].img = img();
+                        }
 
 			// Add this particle to an existing OriginalParticle, or create a new OriginalParticle
 			std::string ori_part_name;

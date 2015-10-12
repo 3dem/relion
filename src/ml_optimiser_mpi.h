@@ -29,9 +29,8 @@
 #define MPITAG_RANDOMSEED 3
 #define MPITAG_IMAGE 4
 #define MPITAG_PACK 5
-#define MPITAG_DOUBLE 6
+#define MPITAG_RFLOAT 6
 #define MPITAG_INT 7
-
 
 class MlOptimiserMpi: public MlOptimiser
 {

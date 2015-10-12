@@ -33,7 +33,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	ctf_win =  textToInteger(parser.getOption("--ctfWin", "Size (in pixels) of a centered, squared window to use for CTF-estimation", "-1"));
 
-	fn_ctffind_exe = parser.getOption("--ctffind_exe","Location of ctffind executable (or through RLN_CTFFIND_EXECUTABLE environment variable)","");
+	fn_ctffind_exe = parser.getOption("--ctffind_exe","Location of ctffind executable (or through RELION_CTFFIND_EXECUTABLE environment variable)","");
 
 	// First parameter line in CTFFIND
 	Cs = textToFloat(parser.getOption("--CS", "Spherical Aberration (mm) ","2.0"));
@@ -71,7 +71,7 @@ void CtffindRunner::initialise()
 	if (fn_ctffind_exe == "")
 	{
 		char * penv;
-		penv = getenv ("RLN_CTFFIND_EXECUTABLE");
+		penv = getenv ("RELION_CTFFIND_EXECUTABLE");
 		if (penv!=NULL)
 			fn_ctffind_exe = (std::string)penv;
 	}

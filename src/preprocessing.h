@@ -50,6 +50,9 @@ public:
 	// Perform particle extraction?
 	bool do_extract;
 
+	// Skip gathering CTF information from the ctffind logfiles (e.g. when the info is already there from Gctf)?
+	bool do_skip_ctf_logfiles;
+
 	// Extract particles from movies instead of single micrographs
 	bool do_movie_extract;
 
@@ -97,6 +100,9 @@ public:
 
 	// Perform normalization of the extract images
 	bool do_normalise;
+
+	// Subtract ramp instead of a level background in normalization
+	bool do_ramp;
 
 	// Perform contrast inversion of the extracted images
 	bool do_invert_contrast;

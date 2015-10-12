@@ -46,7 +46,6 @@
 #include "src/fftw.h"
 #include "src/args.h"
 #include <string.h>
-#include <pthread.h>
 
 static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -86,8 +85,6 @@ void FourierTransformer::init()
     fPlanBackward    = NULL;
     dataPtr          = NULL;
     complexDataPtr   = NULL;
-    threadsSetOn=false;
-    nthreads = 1;
 }
 
 void FourierTransformer::clear()
@@ -95,7 +92,7 @@ void FourierTransformer::clear()
     fFourier.clear();
     // Clean-up all other FFTW-allocated memory
     destroyPlans();
-    // Initialise all pointers to NULL, set nthreads to 1 and threadsSetOn to false
+    // Initialise all pointers to NULL
     init();
 
 }
@@ -106,11 +103,8 @@ void FourierTransformer::cleanup()
     clear();
     // Then clean up all the junk fftw keeps lying around
     // SOMEHOW THE FOLLOWING IS NOT ALLOWED WHEN USING MULTPLE TRANSFORMER OBJECTS....
-#ifndef USE_CUFFT
-    if(threadsSetOn)
-    	fftw_cleanup_threads();
-    else
-    	fftw_cleanup();
+#ifdef RELION_SINGLE_PRECISION
+    fftwf_cleanup();
 #else
     fftw_cleanup();
 #endif
@@ -123,43 +117,23 @@ void FourierTransformer::cleanup()
 
 void FourierTransformer::destroyPlans()
 {
-
     // Anything to do with plans has to be protected for threads!
     pthread_mutex_lock(&fftw_plan_mutex);
+
+#ifdef RELION_SINGLE_PRECISION
     if (fPlanForward !=NULL)
-    {
-#ifdef DEBUG_PLANS
-    	std::cerr << " DESTROY fPlanForward= " << fPlanForward  <<" this= "<<this<<std::endl;
-#endif
-    	fftw_destroy_plan(fPlanForward);
-    }
+    	fftwf_destroy_plan(fPlanForward);
     if (fPlanBackward!=NULL)
-    {
-#ifdef DEBUG_PLANS
-    	std::cerr << " DESTROY fPlanBackward= " << fPlanBackward  <<" this= "<<this<< std::endl;
+    	fftwf_destroy_plan(fPlanBackward);
+#else
+    if (fPlanForward !=NULL)
+    	fftw_destroy_plan(fPlanForward);
+    if (fPlanBackward!=NULL)
+    	fftw_destroy_plan(fPlanBackward);
 #endif
-   	fftw_destroy_plan(fPlanBackward);
-    }
+
     pthread_mutex_unlock(&fftw_plan_mutex);
 
-}
-
-void FourierTransformer::setThreadsNumber(int tNumber)
-{
-    if (tNumber!=1)
-    {
-        threadsSetOn=true;
-        nthreads = tNumber;
-        pthread_mutex_lock(&fftw_plan_mutex);
-#ifndef USE_CUFFT
-        if(fftw_init_threads()==0)
-            REPORT_ERROR("FFTW cannot init threads (setThreadsNumber)");
-        fftw_plan_with_nthreads(nthreads);
-#else
-        fftw_plan();
-#endif
-        pthread_mutex_unlock(&fftw_plan_mutex);
-    }
 }
 
 // Initialization ----------------------------------------------------------
@@ -216,11 +190,19 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
         destroyPlans();
         // Make new plans
         pthread_mutex_lock(&fftw_plan_mutex);
+#ifdef RELION_SINGLE_PRECISION
+        fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
+                                         (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
+        fPlanBackward = fftwf_plan_dft_c2r(ndim, N,
+                                          (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
+                                          FFTW_ESTIMATE);
+#else
         fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
                                          (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
         fPlanBackward = fftw_plan_dft_c2r(ndim, N,
                                           (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
                                           FFTW_ESTIMATE);
+#endif
         pthread_mutex_unlock(&fftw_plan_mutex);
 
         if (fPlanForward == NULL || fPlanBackward == NULL)
@@ -274,6 +256,22 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
         }
 
         pthread_mutex_lock(&fftw_plan_mutex);
+#ifdef RELION_SINGLE_PRECISION
+        if (fPlanForward!=NULL)
+            fftwf_destroy_plan(fPlanForward);
+        fPlanForward=NULL;
+        fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
+                                     (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+        if (fPlanBackward!=NULL)
+            fftwf_destroy_plan(fPlanBackward);
+        fPlanBackward=NULL;
+        fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
+                                      (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+        if (fPlanForward == NULL || fPlanBackward == NULL)
+            REPORT_ERROR("FFTW plans cannot be created");
+        delete [] N;
+        complexDataPtr=MULTIDIM_ARRAY(*fComplex);
+#else
         if (fPlanForward!=NULL)
             fftw_destroy_plan(fPlanForward);
         fPlanForward=NULL;
@@ -288,6 +286,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
             REPORT_ERROR("FFTW plans cannot be created");
         delete [] N;
         complexDataPtr=MULTIDIM_ARRAY(*fComplex);
+#endif
         pthread_mutex_unlock(&fftw_plan_mutex);
     }
 }
@@ -303,8 +302,11 @@ void FourierTransformer::Transform(int sign)
 {
     if (sign == FFTW_FORWARD)
     {
+#ifdef RELION_SINGLE_PRECISION
+        fftwf_execute(fPlanForward);
+#else
         fftw_execute(fPlanForward);
-
+#endif
         // Normalisation of the transform
         unsigned long int size=0;
         if(fReal!=NULL)
@@ -318,8 +320,13 @@ void FourierTransformer::Transform(int sign)
             DIRECT_MULTIDIM_ELEM(fFourier,n) /= size;
     }
     else if (sign == FFTW_BACKWARD)
+    {
+#ifdef RELION_SINGLE_PRECISION
+        fftwf_execute(fPlanBackward);
+#else
         fftw_execute(fPlanBackward);
-
+#endif
+    }
 }
 
 void FourierTransformer::FourierTransform()
@@ -464,43 +471,6 @@ void getFSC(MultidimArray< RFLOAT > &m1,
 	transformer.FourierTransform(m2, FT2);
 	getFSC(FT1, FT2, fsc);
 }
-
-/*
-void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<RFLOAT>& Mpmem, int nThreads)
-{
-
-    //Mmem = *this
-    //memory for fourier transform output
-    MultidimArray<Complex > MmemFourier;
-    // Perform the Fourier transform
-    FourierTransformer transformerM;
-    transformerM.setThreadsNumber(nThreads);
-    transformerM.FourierTransform(Mpmem, MmemFourier, true);
-
-    // Create space for the downsampled image and its Fourier transform
-    Mpmem.resize(Ydim, Xdim);
-    MultidimArray<Complex > MpmemFourier;
-    FourierTransformer transformerMp;
-    transformerMp.setReal(Mpmem);
-    transformerMp.getFourierAlias(MpmemFourier);
-    long int ihalf = XMIPP_MIN((YSIZE(MpmemFourier)/2+1),(YSIZE(MmemFourier)/2+1));
-    long int xsize = XMIPP_MIN((XSIZE(MmemFourier)),(XSIZE(MpmemFourier)));
-    //Init with zero
-    MpmemFourier.initZeros();
-    for (long int i=0; i<ihalf; i++)
-        for (long int j=0; j<xsize; j++)
-            MpmemFourier(i,j)=MmemFourier(i,j);
-    for (long int i=YSIZE(MpmemFourier)-1, n=1; n < ihalf-1; i--, n++)
-    {
-    	long int ip = YSIZE(MmemFourier) - n;
-    	for (long int j=0; j<xsize; j++)
-            MpmemFourier(i,j)=MmemFourier(ip,j);
-    }
-
-    // Transform data
-    transformerMp.inverseFourierTransform();
-}
-*/
 
 
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,

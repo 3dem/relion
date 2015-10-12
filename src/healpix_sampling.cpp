@@ -25,6 +25,7 @@ void HealpixSampling::clear()
 	is_3D = false;
 	fn_sym = "C1";
 	limit_tilt = psi_step = offset_range = offset_step = 0.;
+	random_perturbation = perturbation_factor = 0.;
 	orientational_prior_mode = NOPRIOR;
 	directions_ipix.clear();
 	rot_angles.clear();
@@ -39,7 +40,7 @@ void HealpixSampling::clear()
 
 }
 
-void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans, bool do_warnpsi)
+void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans, bool do_gpu)
 {
 
 	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
@@ -232,6 +233,14 @@ void HealpixSampling::setTranslations(RFLOAT _offset_step, RFLOAT _offset_range)
 		offset_step = _offset_step;
 		offset_range = _offset_range;
 	}
+	else
+	{
+		if (!(offset_step > 0.))
+		{
+			std::cerr << " offset_range= " << offset_range << " offset_step= " << offset_step << std::endl;
+			REPORT_ERROR("HealpixSampling::setTranslations BUG %% Trying to set translations with uninitialised offset_step!");
+		}
+	}
 
 	int maxr = CEIL(offset_range / offset_step);
 	for (long int ix = -maxr; ix <= maxr; ix++)
@@ -324,14 +333,14 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 		}
 //#define DEBUG_SAMPLING
 #ifdef  DEBUG_SAMPLING
-		writeAllOrientationsToBild("orients_all.bild", "1 0 0", 0.020);
+		writeAllOrientationsToBild("orients_all.bild", "1 0 0 ", 0.020);
 #endif
 		// Now remove symmetry-related pixels
 		// TODO check size of healpix_base.max_pixrad
 		removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
 
 #ifdef  DEBUG_SAMPLING
-		writeAllOrientationsToBild("orients_sym.bild", "0 1 0", 0.021);
+		writeAllOrientationsToBild("orients_sym.bild", "0 1 0 ", 0.021);
 #endif
 
 		// Also remove limited tilt angles
@@ -339,7 +348,7 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 
 		#ifdef  DEBUG_SAMPLING
 		if (ABS(limit_tilt) < 90.)
-			writeAllOrientationsToBild("orients_tilt.bild", "1 1 0", 0.022);
+			writeAllOrientationsToBild("orients_tilt.bild", "1 1 0 ", 0.022);
 #endif
 
 
@@ -737,13 +746,14 @@ void HealpixSampling::checkDirection(RFLOAT &rot, RFLOAT &tilt)
 
 void HealpixSampling::getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT &tilt)
 {
-	double zz, phi;
-	healpix_base.pix2ang_z_phi(ipix, zz, phi);
-	rot = RAD2DEG(phi);
-	tilt = ACOSD(zz);
+    // this one always has to be double (also for SINGLE_PRECISION CALCULATIONS) for call to external library
+    double zz, phi;
+    healpix_base.pix2ang_z_phi(ipix, zz, phi);
+    rot = RAD2DEG(phi);
+    tilt = ACOSD(zz);
 
-	// The geometrical considerations about the symmetry below require that rot = [-180,180] and tilt [0,180]
-	checkDirection(rot, tilt);
+    // The geometrical considerations about the symmetry below require that rot = [-180,180] and tilt [0,180]
+    checkDirection(rot, tilt);
 
 }
 
@@ -1031,6 +1041,7 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 			for (int i = fact * x; i < fact * (x+1); ++i)
 			{
 				long int overpix = HealPixOver.xyf2nest(i, j, face);
+                // this one always has to be double (also for SINGLE_PRECISION CALCULATIONS) for call to external library
 				double zz, phi;
 				HealPixOver.pix2ang_z_phi(overpix, zz, phi);
 				rot = RAD2DEG(phi);
@@ -1098,7 +1109,7 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 			oversampled_tilt.push_back(tilt);
 			if (!is_3D && overpsi>180.)
 				overpsi-=360.;
-			oversampled_psi.push_back(overpsi);
+ 			oversampled_psi.push_back(overpsi);
 		}
 	}
 
@@ -1108,38 +1119,47 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 RFLOAT HealpixSampling::calculateAngularDistance(RFLOAT rot1, RFLOAT tilt1, RFLOAT psi1,
 		RFLOAT rot2, RFLOAT tilt2, RFLOAT psi2)
 {
-	Matrix1D<RFLOAT>  direction1(3), direction1p(3), direction2(3);
-	Euler_angles2direction(rot1, tilt1, direction1);
-	Euler_angles2direction(rot2, tilt2, direction2);
 
-	// Find the symmetry operation where the Distance based on Euler axes is minimal
-	RFLOAT min_axes_dist = 3600.;
-	RFLOAT rot2p, tilt2p, psi2p;
-	Matrix2D<RFLOAT> E1, E2;
-	Matrix1D<RFLOAT> v1, v2;
-	for (int j = 0; j < R_repository.size(); j++)
+	if (is_3D)
 	{
+		Matrix1D<RFLOAT>  direction1(3), direction1p(3), direction2(3);
+		Euler_angles2direction(rot1, tilt1, direction1);
+		Euler_angles2direction(rot2, tilt2, direction2);
 
-        Euler_apply_transf(L_repository[j], R_repository[j], rot2, tilt2, psi2, rot2p, tilt2p, psi2p);
+		// Find the symmetry operation where the Distance based on Euler axes is minimal
+		RFLOAT min_axes_dist = 3600.;
+		RFLOAT rot2p, tilt2p, psi2p;
+		Matrix2D<RFLOAT> E1, E2;
+		Matrix1D<RFLOAT> v1, v2;
+		for (int j = 0; j < R_repository.size(); j++)
+		{
 
-	    // Distance based on Euler axes
-	    Euler_angles2matrix(rot1, tilt1, psi1, E1);
-	    Euler_angles2matrix(rot2p, tilt2p, psi2p, E2);
-	    RFLOAT axes_dist = 0;
-	    for (int i = 0; i < 3; i++)
-	    {
-	        E1.getRow(i, v1);
-	        E2.getRow(i, v2);
-	        axes_dist += ACOSD(CLIP(dotProduct(v1, v2), -1., 1.));
-	    }
-	    axes_dist /= 3.;
+			Euler_apply_transf(L_repository[j], R_repository[j], rot2, tilt2, psi2, rot2p, tilt2p, psi2p);
 
-	    if (axes_dist < min_axes_dist)
-	    	min_axes_dist = axes_dist;
+			// Distance based on Euler axes
+			Euler_angles2matrix(rot1, tilt1, psi1, E1);
+			Euler_angles2matrix(rot2p, tilt2p, psi2p, E2);
+			RFLOAT axes_dist = 0;
+			for (int i = 0; i < 3; i++)
+			{
+				E1.getRow(i, v1);
+				E2.getRow(i, v2);
+				axes_dist += ACOSD(CLIP(dotProduct(v1, v2), -1., 1.));
+			}
+			axes_dist /= 3.;
 
-	}// for all symmetry operations j
+			if (axes_dist < min_axes_dist)
+				min_axes_dist = axes_dist;
 
-	return min_axes_dist;
+		}// for all symmetry operations j
+
+		return min_axes_dist;
+	}
+	else
+	{
+		RFLOAT diff = ABS(psi2 - psi1);
+		return realWRAP(diff, 0., 360.);
+	}
 }
 
 void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOAT> &pdf_direction,

@@ -49,6 +49,9 @@ public:
 	// Random subset this particle belongs to
 	int random_subset;
 
+        // Pre-read array of the image in RAM
+        MultidimArray<RFLOAT> img;
+
 	// Empty Constructor
 	ExpParticle()
 	{
@@ -66,6 +69,7 @@ public:
 	{
 		id = micrograph_id = group_id = -1;
 		random_subset = 0;
+                img.clear();
 	}
 
 };
@@ -385,7 +389,7 @@ public:
 	void usage();
 
 	// Read from file
-	void read(FileName fn_in, bool do_ignore_original_particle_name = false, bool do_ignore_group_name = false);
+	void read(FileName fn_in, bool do_ignore_original_particle_name = false, bool do_ignore_group_name = false, bool do_preread_images = false);
 
 	// Write
 	void write(FileName fn_root);

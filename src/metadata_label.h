@@ -88,6 +88,7 @@ enum EMDLabel
     EMDL_CTF_VALUE, ///< CTF value
 
     EMDL_IMAGE_NAME,
+    EMDL_IMAGE_ORI_NAME,
     EMDL_IMAGE_RECONSTRUCT_NAME,
     EMDL_IMAGE_ID,
     EMDL_IMAGE_ENABLED,
@@ -412,6 +413,7 @@ private:
         EMDL::addLabel(EMDL_CTF_VALUE, EMDL_DOUBLE, "rlnCtfValue", "Value of the Contrast Transfer Function");
 
     	EMDL::addLabel(EMDL_IMAGE_NAME, EMDL_STRING, "rlnImageName", "Name of an image");
+    	EMDL::addLabel(EMDL_IMAGE_ORI_NAME, EMDL_STRING, "rlnImageOriginalName", "Original name of an image");
     	EMDL::addLabel(EMDL_IMAGE_RECONSTRUCT_NAME, EMDL_STRING, "rlnReconstructImageName", "Name of an image to be used for reconstruction only");
     	EMDL::addLabel(EMDL_IMAGE_ID, EMDL_LONG, "rlnImageId", "ID (i.e. a unique number) of an image");
     	EMDL::addLabel(EMDL_IMAGE_ENABLED, EMDL_BOOL, "rlnEnabled", "Not used in RELION, only included for backward compatibility with XMIPP selfiles");

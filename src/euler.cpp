@@ -251,23 +251,6 @@ void Euler_matrix2angles(const Matrix2D<RFLOAT> &A, RFLOAT &alpha,
     beta  = RAD2DEG(beta);
     alpha = RAD2DEG(alpha);
 
-#ifdef RFLOAT
-
-    Matrix2D<RFLOAT> Ap;
-    Euler_angles2matrix(alpha, beta, gamma, Ap);
-    if (A != Ap)
-    {
-        std::cout << "---\n";
-        std::cout << "Euler_matrix2angles: I have computed angles "
-        " which doesn't match with the original matrix\n";
-        std::cout << "Original matrix\n" << A;
-        std::cout << "Computed angles alpha=" << alpha << " beta=" << beta
-        << " gamma=" << gamma << std::endl;
-        std::cout << "New matrix\n" << Ap;
-        std::cout << "---\n";
-    }
-#endif
-
 #ifdef DEBUG_EULER
     std::cout << "abs_sb " << abs_sb << std::endl;
     std::cout << "A(1,2) " << A(1, 2) << " A(0,2) " << A(0, 2) << " gamma "

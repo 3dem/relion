@@ -62,8 +62,8 @@ public:
 	// if false, then intermediate files are re-read from disc and earlier calculations are skipped
 	bool do_start_all_over;
 
-	// First and last frame numbers to include in the average
-	int first_frame, last_frame;
+	// First and last frame numbers to include in the average, Also step if one had used --avg_movie_frames in the extraction
+	int first_frame, last_frame, step_frame;
 
 	// Which fitting mode (lienar/logarithmic/nofit)
 	int fitting_mode;
@@ -114,6 +114,9 @@ public:
 
 	// Normalise the polished particles?
 	bool do_normalise;
+
+	// Subtract a ramping background in the normalisation?
+	bool do_ramp;
 
 	// Radius of the background-circle for noise normalisation (in pixels)
 	int bg_radius;

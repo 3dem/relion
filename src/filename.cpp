@@ -138,7 +138,7 @@ bool FileName::contains(const std::string& str) const
 // Get substring before first instance of str
 FileName FileName::beforeFirstOf(const std::string& str) const
 {
-    int point = find_first_of(str);
+    int point = find(str);
     if (point > -1)
         return substr(0, point);
     else
@@ -148,7 +148,7 @@ FileName FileName::beforeFirstOf(const std::string& str) const
 // Get substring before last instance of str
 FileName FileName::beforeLastOf(const std::string& str) const
 {
-    int point = find_last_of(str);
+    int point = rfind(str);
     if (point > -1)
         return substr(0, point);
     else
@@ -158,7 +158,7 @@ FileName FileName::beforeLastOf(const std::string& str) const
 // Get substring after first instance of str
 FileName FileName::afterFirstOf(const std::string& str) const
 {
-    int point = find_first_of(str);
+    int point = find(str);
     if (point > -1)
         return substr(point + 1);
     else
@@ -168,7 +168,7 @@ FileName FileName::afterFirstOf(const std::string& str) const
 // Get substring after last instance of str
 FileName FileName::afterLastOf(const std::string& str) const
 {
-    int point = find_last_of(str);
+    int point = rfind(str);
     if (point > -1)
         return substr(point + 1);
     else
@@ -249,26 +249,7 @@ FileName FileName::withoutExtension() const
 // Insert before extension .................................................
 FileName FileName::insertBeforeExtension(const std::string &str) const
 {
-    int point = -1;
-    bool done = false;
-    do
-    {
-        point = find(".", point + 1);
-        if (point == -1)
-        {
-            point = length();
-            done = true;
-        }
-        else if (point == length() - 1)
-            done = true;
-        else if ((*this)[point+1] == '.' || (*this)[point+1] == '/')
-            done = false;
-        else
-            done = true;
-    }
-    while (!done);
-    FileName retval = *this;
-    return retval.insert(point, str);
+    return  withoutExtension() + str + "." + getExtension();
 }
 
 // Remove an extension wherever it is ......................................

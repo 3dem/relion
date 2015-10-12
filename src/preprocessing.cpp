@@ -45,12 +45,14 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	movie_last_frame = textToInteger(parser.getOption("--last_movie_frame", "Extract until this movie frame (default=all movie frames)", "0"));
 	movie_last_frame--; // (start counting at 0, not 1)
 	fn_movie = parser.getOption("--movie_rootname", "Common name to relate movies to the single micrographs (e.g. mic001_movie.mrcs related to mic001.mrc)", "movie");
+	do_skip_ctf_logfiles = parser.checkOption("--skip_ctf_logs", "Do not harvest information from CTFFIND logfiles?");
 
 	int perpart_section = parser.addSection("Particle operations");
 	do_project_3d = parser.checkOption("--project3d", "Project sub-tomograms along Z to generate 2D particles");
 	scale  = textToInteger(parser.getOption("--scale", "Re-scale the particles to this size (in pixels)", "-1"));
 	window  = textToInteger(parser.getOption("--window", "Re-window the particles to this size (in pixels)", "-1"));
 	do_normalise = parser.checkOption("--norm", "Normalise the background to average zero and stddev one");
+	do_ramp = !parser.checkOption("--no_ramp", "Just subtract the background mean in the normalisation, instead of subtracting a fitted ramping background. ");
 	bg_radius = textToInteger(parser.getOption("--bg_radius", "Radius of the circular mask that will be used to define the background area (in pixels)", "-1"));
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
@@ -175,7 +177,7 @@ void Preprocessing::joinAllStarFiles()
 	MDout.addLabel(EMDL_IMAGE_NAME);
 
 	std::cout << " Joining all metadata in one STAR file..." << std::endl;
-	bool has_other_ctfs, has_this_ctf;
+	bool has_other_ctfs, has_this_ctf = false;
 	RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 	has_other_ctfs = false;
 	FileName prev_fn_mic="";
@@ -186,7 +188,7 @@ void Preprocessing::joinAllStarFiles()
 		if (fn_mic == "")
 			continue;
 
-		if (fn_mic != prev_fn_mic)
+		if (fn_mic != prev_fn_mic && !do_skip_ctf_logfiles)
 		{
 			FileName fn_microot = getRootNameFromMicrographName(fn_mic);
 			// Gather the results from ctffind
@@ -200,7 +202,7 @@ void Preprocessing::joinAllStarFiles()
 		if (has_this_ctf && do_rescale)
                     DStep *= (RFLOAT)extract_size/(RFLOAT)scale;
 
-		if (ipos == 0 && has_this_ctf)
+		if (ipos == 0 && has_this_ctf && !do_skip_ctf_logfiles)
 		{
 			// Set has_other_ctfs to true if the first micrograph has a logfile
 			// In that case add all CTF labels to the output MDtable
@@ -450,6 +452,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 	long int ndim;
 	Imic.getDimensions(xdim, ydim, zdim, ndim);
 	dimensionality = (zdim > 1) ? 3 : 2;
+	if (dimensionality == 3 || do_movie_extract )
+            do_ramp = false;
 
 	// Name of the output stack
 	// Add the same root as the output STAR file (that way one could extract two "families" of different particle stacks)
@@ -740,7 +744,7 @@ void Preprocessing::performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_
 
 	if (do_rewindow) rewindow(Ipart, window);
 
-	if (do_normalise) normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev);
+	if (do_normalise) normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp);
 
 	if (do_invert_contrast) invert_contrast(Ipart);
 

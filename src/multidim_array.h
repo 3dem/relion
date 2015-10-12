@@ -267,41 +267,6 @@ extern std::string floatToString(float F, int _width, int _prec);
         for (long int i=STARTINGY(V); i<=FINISHINGY(V); i++) \
             for (long int j=STARTINGX(V); j<=FINISHINGX(V); j++)
 
-/** For all elements in common.
- *
- * This macro is used to generate loops for all the elements logically in common
- * between two volumes in an easy manner. Then k, i and j (locally defined)
- * range from
- *
- * MAX(STARTINGZ(V1),STARTINGZ(V2)) to MIN(FINISHINGZ(V1),FINISHINGZ(V2)),
- * MAX(STARTINGY(V1),STARTINGY(V2)) to MIN(FINISHINGY(V1),FINISHINGY(V2)),
- * MAX(STARTINGX(V1),STARTINGX(V2)) to MIN(FINISHINGX(V1),FINISHINGX(V2))
- *
- * (included limits) respectively. You need to define SPEED_UP_temps.
- *
- * @code
- * SPEED_UP_temps;
- * MultidimArray< RFLOAT > V1(10, 10, 10), V2(20, 20, 20);
- * V1.setXmippOrigin();
- * V2.setXmippOrigin();
- *
- * FOR_ALL_ELEMENTS_IN_COMMON_IN_ARRAY3D(V1, V2)
- * {
- *    // ...
- * }
- * @endcode
- */
-#define FOR_ALL_ELEMENTS_IN_COMMON_IN_ARRAY3D(V1, V2) \
-    ispduptmp0 = XMIPP_MAX(STARTINGZ(V1), STARTINGZ(V2)); \
-    ispduptmp1 = XMIPP_MIN(FINISHINGZ(V1),FINISHINGZ(V2)); \
-    ispduptmp2 = XMIPP_MAX(STARTINGY(V1), STARTINGY(V2)); \
-    ispduptmp3 = XMIPP_MIN(FINISHINGY(V1),FINISHINGY(V2)); \
-    ispduptmp4 = XMIPP_MAX(STARTINGX(V1), STARTINGX(V2)); \
-    ispduptmp5 = XMIPP_MIN(FINISHINGX(V1),FINISHINGX(V2)); \
-    for (long int k=ispduptmp0; k<=ispduptmp1; k++) \
-        for (long int i=ispduptmp2; i<=ispduptmp3; i++) \
-            for (long int j=ispduptmp4; j<=ispduptmp5; j++)
-
 /** For all direct elements in the array.
  *
  * This macro is used to generate loops for the volume in an easy way. It
@@ -1594,7 +1559,7 @@ public:
         case 3:
             return A3D_ELEM((*this), ZZ(v), YY(v), XX(v));
         default:
-            REPORT_ERROR("Matrix dimensions must be 1, 2, or 3");
+        	REPORT_ERROR("Matrix dimensions must be 1, 2, or 3");
         }
     }
 
@@ -2331,19 +2296,58 @@ public:
 
         T* ptr=NULL;
         long int n;
+
+
+#ifdef RELION_SINGLE_PRECISION
+        // Two-passes through the data, as single-precision is not enough for a single-pass
+        // Also: averages of large arrays will give trouble: computer median first....
+        RFLOAT median = 0.;
+        if (NZYXSIZE(*this) > 1e6)
+        	median = computeMedian();
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+        	RFLOAT val=static_cast< RFLOAT >(*ptr);
+        	avg += val - median;
+        }
+        avg /= NZYXSIZE(*this);
+        avg += median;
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+        	RFLOAT val=static_cast< RFLOAT >(*ptr);
+            stddev += (val - avg) * (val - avg);
+        }
+
+        if (NZYXSIZE(*this) > 1)
+        {
+            stddev = stddev / (NZYXSIZE(*this) - 1);
+            // Foreseeing numerical instabilities
+            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
+        }
+        else
+            stddev = 0;
+
+#else
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         {
             RFLOAT val=static_cast< RFLOAT >(*ptr);
             avg += val;
             stddev += val * val;
         }
-
         avg /= NZYXSIZE(*this);
-        stddev = stddev / NZYXSIZE(*this) - avg * avg;
-        stddev *= NZYXSIZE(*this) / (NZYXSIZE(*this) - 1);
 
-        // Foreseeing numerical instabilities
-        stddev = sqrt(static_cast<RFLOAT>((ABS(stddev))));
+        if (NZYXSIZE(*this) > 1)
+        {
+            stddev = stddev / NZYXSIZE(*this) - avg * avg;
+            stddev *= NZYXSIZE(*this) / (NZYXSIZE(*this) - 1);
+
+            // Foreseeing numerical instabilities
+            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
+        }
+        else
+            stddev = 0;
+#endif
 
         return stddev;
     }
@@ -2365,6 +2369,46 @@ public:
 
         T* ptr=NULL;
         long int n;
+
+#ifdef RELION_SINGLE_PRECISION
+        // Two-passes throught the data, as single-precision is not enough for a single-pass
+        // Also: averages of large arrays will give trouble: computer median first....
+        RFLOAT median = 0.;
+        if (NZYXSIZE(*this) > 1e6)
+         	median = (*this).computeMedian();
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+            T Tval=*ptr;
+            RFLOAT val=static_cast< RFLOAT >(Tval);
+            avg += val - median;
+            if (Tval > maxval)
+                 maxval = Tval;
+             else if (Tval < minval)
+                 minval = Tval;
+        }
+
+        avg /= NZYXSIZE(*this);
+        avg += median;
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+            T Tval=*ptr;
+            RFLOAT val=static_cast< RFLOAT >(Tval);
+            stddev += (val - avg)*(val - avg);
+        }
+
+        if (NZYXSIZE(*this) > 1)
+        {
+            stddev = stddev / (NZYXSIZE(*this) - 1);
+            // Foreseeing numerical instabilities
+            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
+        }
+        else
+            stddev = 0;
+
+#else
+
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         {
             T Tval=*ptr;
@@ -2390,6 +2434,7 @@ public:
         }
         else
             stddev = 0;
+#endif
     }
 
     /** Median
@@ -2409,7 +2454,11 @@ public:
             return DIRECT_MULTIDIM_ELEM(*this,0);
 
         // Initialise data
-        MultidimArray< RFLOAT > temp(*this);
+        MultidimArray< RFLOAT > temp(NZYXSIZE(*this));
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(*this)
+        {
+        	DIRECT_MULTIDIM_ELEM(temp, n) = DIRECT_MULTIDIM_ELEM(*this, n);
+        }
 
         // Sort indexes
         temp.sort();

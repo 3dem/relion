@@ -55,7 +55,7 @@
 #include <fstream>
 #include <typeinfo>
 
-void fitStraightLine(std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff)
+void fitStraightLine(const std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff)
 {
 	// From: http://mathworld.wolfram.com/LeastSquaresFitting.html
 	// ss_xx = Sum_i x_i^2 - n ave_x^2
@@ -98,6 +98,47 @@ void fitStraightLine(std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &in
 		intercept = slope = corr_coeff = 0.;
 	}
 }
+
+void fitLeastSquaresPlane(const std::vector<fit_point3D> & points, RFLOAT &plane_a, RFLOAT &plane_b, RFLOAT &plane_c)
+{
+    RFLOAT  D = 0;
+    RFLOAT  E = 0;
+    RFLOAT  F = 0;
+    RFLOAT  G = 0;
+    RFLOAT  H = 0;
+    RFLOAT  I = 0;
+    RFLOAT  J = 0;
+    RFLOAT  K = 0;
+    RFLOAT  L = 0;
+    RFLOAT  W2 = 0;
+    RFLOAT  error = 0;
+    RFLOAT  denom = 0;
+
+    for (int i = 0; i < points.size(); i++)
+    {
+        W2 = points[i].w * points[i].w;
+        D += points[i].x * points[i].x * W2 ;
+        E += points[i].x * points[i].y * W2 ;
+        F += points[i].x * W2 ;
+        G += points[i].y * points[i].y * W2 ;
+        H += points[i].y * W2 ;
+        I += 1 * W2 ;
+        J += points[i].x * points[i].z * W2 ;
+        K += points[i].y * points[i].z * W2 ;
+        L += points[i].z * W2 ;
+    }
+
+    denom = F * F * G - 2 * E * F * H + D * H * H + E * E * I - D * G * I;
+
+    // X axis slope
+    plane_a = (H * H * J - G * I * J + E * I * K + F * G * L - H * (F * K + E * L)) / denom;
+    // Y axis slope
+    plane_b = (E * I * J + F * F * K - D * I * K + D * H * L - F * (H * J + E * L)) / denom;
+    // Z axis intercept
+    plane_c = (F * G * J - E * H * J - E * F * K + D * H * K + E * E * L - D * G * L) / denom;
+}
+
+
 
 /* Value of a blob --------------------------------------------------------- */
 RFLOAT kaiser_value(RFLOAT r, RFLOAT a, RFLOAT alpha, int m)
@@ -525,77 +566,70 @@ RFLOAT icdf_FSnedecor(int d1, int d2, RFLOAT p)
     return xm;
 }
 
-/* Random functions -------------------------------------------------------- */
-int idum;
-
 // Uniform distribution ....................................................
-void  init_random_generator(int seed)
+void init_random_generator(int seed)
 {
-    idum = -1;
-    ran1(&idum);
-    if (seed != -1)
-    {
-        // Prevent seeds larger than 65000
-        seed %=0xffff;
-        for (int i = 0; i < seed; i++)
-            ran1(&idum);
-    }
+    if (seed < 0)
+    	randomize_random_generator();
+    else
+    	srand(static_cast <unsigned> (seed) );
 }
 
-void  randomize_random_generator()
+void randomize_random_generator()
 {
-    static  unsigned int seed;
-    int rand_return;
-
-    srand(seed);
-    rand_return = rand();
-
-    time_t t;
-    time(&t);
-    rand_return = abs(rand_return);
-    idum = (-(int)(t % 10000)
-            - (int)(rand_return % 10000));
-    ran1(&idum);
-    seed = (unsigned int)rand_return;
+	srand(static_cast <unsigned> (time(NULL)) );
 }
 
-float rnd_unif()
-{
-    return ran1(&idum);
-}
 float rnd_unif(float a, float b)
 {
-    if (a == b)
-        return a;
-    else
-        return a + (b - a)*ran1(&idum);
-}
 
-// t-distribution
-float rnd_student_t(RFLOAT nu)
-{
-    return tdev(nu, &idum);
-}
-float rnd_student_t(RFLOAT nu, float a, float b)
-{
-    if (b == 0)
+
+	if (a == b)
         return a;
     else
-        return b*tdev(nu, &idum) + a;
+        return a + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(b-a)));
 }
 
 // Gaussian distribution ...................................................
-float rnd_gaus()
+float rnd_gaus(float mu, float sigma)
 {
-    return gasdev(&idum);
+  float U1, U2, W, mult;
+  static float X1, X2;
+  static int call = 0;
+
+  if (sigma == 0)
+	  return mu;
+
+  if (call == 1)
+  {
+      call = !call;
+      return (mu + sigma * (float) X2);
+  }
+
+  do
+  {
+      U1 = -1 + ((float) rand () / RAND_MAX) * 2;
+      U2 = -1 + ((float) rand () / RAND_MAX) * 2;
+      W = pow (U1, 2) + pow (U2, 2);
+  }
+  while (W >= 1 || W == 0);
+
+  mult = sqrt ((-2 * log (W)) / W);
+  X1 = U1 * mult;
+  X2 = U2 * mult;
+
+  call = !call;
+
+  return (mu + sigma * (float) X1);
+
 }
-float rnd_gaus(float a, float b)
+
+float rnd_student_t(RFLOAT nu, float mu, float sigma)
 {
-    if (b == 0)
-        return a;
-    else
-        return b*gasdev(&idum) + a;
+	REPORT_ERROR("rnd_student_t currently not implemented!");
 }
+
+
 float gaus_within_x0(float x0, float mean, float stddev)
 {
     float z0 = (x0 - mean) / stddev;
@@ -713,16 +747,6 @@ float rnd_log(float a, float b)
     else
         return exp(rnd_unif(log(a), log(b)));
 }
-
-/* Log2 -------------------------------------------------------------------- */
-// Does not work with xlc compiler
-//#ifndef __xlC__
-//RFLOAT log2(RFLOAT value)
-//{
-//    return 3.32192809488736*log10(value);
-//    // log10(value)/log10(2)
-//}
-//#endif
 
 // Bsoft function
 void swapbytes(char* v, unsigned long n)

@@ -352,7 +352,7 @@ void Assembly::writePDB(std::string filename)
 				if (atomnum > 99999)
 					atomnum -= 99999;
 				char chainID = molecules[imol].name[0];
-				fprintf(file, "ATOM  %5ld %-4s %3s %1c%4d    %8.3f%8.3f%8.3f%6.2f%6.2f      %4s\n",
+				fprintf(file, "ATOM  %5d %-4s %3s %1c%4d    %8.3f%8.3f%8.3f%6.2f%6.2f      %4s\n",
 						                          atomnum, molecules[imol].residues[ires].atoms[iatom].name.c_str(), molecules[imol].residues[ires].name.c_str(),
 						                          chainID, molecules[imol].residues[ires].number,
 						                          XX(molecules[imol].residues[ires].atoms[iatom].coords),

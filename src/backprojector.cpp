@@ -771,11 +771,12 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 
     FourierTransformer transformer;
-	// The threads are giving me a headache. Let's switch them off
-    // Somehow I get lots of bad/non-reproducible errors when having these...
-    //transformer.setThreadsNumber(nr_threads);
 	MultidimArray<Complex > Fconv;
-	MultidimArray<RFLOAT> Fweight, Fnewweight;
+	MultidimArray<RFLOAT> Fweight;
+    
+	// Fnewweight can become too large for a float: always keep this one in double-precision
+    MultidimArray<double> Fnewweight;
+
 	int max_r2 = r_max * r_max * padding_factor * padding_factor;
 
 //#define DEBUG_RECONSTRUCT
@@ -1004,15 +1005,15 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
 		}
 
-        // convolute through Fourier-transform (as both grids are rectangular)
-        // Note that convoluteRealSpace acts on the complex array inside the transformer
-        convoluteBlobRealSpace(transformer);
+                // convolute through Fourier-transform (as both grids are rectangular)
+                // Note that convoluteRealSpace acts on the complex array inside the transformer
+                convoluteBlobRealSpace(transformer);
 
-        RFLOAT w, corr_min = 99.e99, corr_max = -99.e99, corr_avg=0., corr_nn=0.;
-        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-        {
-        	if (kp * kp + ip * ip + jp * jp < max_r2)
-        	{
+                RFLOAT w, corr_min = 99.e99, corr_max = -99.e99, corr_avg=0., corr_nn=0.;
+                FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+                {
+                    if (kp * kp + ip * ip + jp * jp < max_r2)
+                    {
 
         		// Make sure no division by zero can occur....
         		w = XMIPP_MAX(1e-6, abs(DIRECT_A3D_ELEM(Fconv, k, i, j)));
@@ -1023,8 +1024,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
         		corr_nn += 1.;
         		// Apply division of Eq. [14] in Pipe & Menon (1999)
         		DIRECT_A3D_ELEM(Fnewweight, k, i, j) /= w;
-        	}
-        }
+                    }
+                }
 
 #ifdef DEBUG_RECONSTRUCT
         std::cerr << " PREWEIGHTING ITERATION: "<< iter + 1 << " OF " << max_iter_preweight << std::endl;
@@ -1036,8 +1037,9 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	}
 
 #ifdef DEBUG_RECONSTRUCT
-	ttt()=Fnewweight;
-	ttt.write("reconstruct_gridding_weight.spi");
+	Image<double> tttt;
+	tttt()=Fnewweight;
+	tttt.write("reconstruct_gridding_weight.spi");
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 	{
 		DIRECT_MULTIDIM_ELEM(ttt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fconv, n));
@@ -1056,6 +1058,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	decenter(data, Fconv, max_r2);
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 	{
+#ifdef  RELION_SINGLE_PRECISION
+            // Prevent numerical instabilities in single-precision reconstruction with very unevenly sampled orientations
+            if (DIRECT_MULTIDIM_ELEM(Fnewweight, n) > 1e20)
+                DIRECT_MULTIDIM_ELEM(Fnewweight, n) = 1e20;
+#endif
 		DIRECT_MULTIDIM_ELEM(Fconv, n) *= DIRECT_MULTIDIM_ELEM(Fnewweight, n);
 	}
 

@@ -114,7 +114,14 @@ void MetaDataContainer::addValueFromString(const EMDLabel &lCode, const std::str
 	}
 }
 
+#ifdef RELION_SINGLE_PRECISION
 void MetaDataContainer::addValue(EMDLabel name, const double &value)
+{
+    addValue(name, (RFLOAT)value);
+}
+#endif
+
+void MetaDataContainer::addValue(EMDLabel name, const RFLOAT &value)
 {
 	if (! valueExists(name))
 		labels.push_back(name);

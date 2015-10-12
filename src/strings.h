@@ -52,6 +52,7 @@
 #include <sstream>
 #include <string.h>
 #include <stdio.h>
+#include "src/macros.h"
 
 /// @defgroup StringUtilities String utilities
 /// @ingroup DataLibrary

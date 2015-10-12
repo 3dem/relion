@@ -787,7 +787,7 @@ void translateCenterOfMassToCenter(const MultidimArray<T> &V1,
     Matrix1D< RFLOAT > center;
     V2.centerOfMass(center);
     center *= -1;
-    translate(V1, V2, center, wrap, 0.);
+    translate(V1, V2, center, wrap, (RFLOAT)0.);
 }
 
 /** Translate center of mass to center

@@ -74,6 +74,9 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 
 	if (checkParameter(argc, argv, "--continue"))
 	{
+		// Do this before reading in the data.star file below!
+		do_preread_images   = checkParameter(argc, argv, "--preread_images");
+
 		parser.addSection("Continue options");
 		FileName fn_in = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
 		// Read in previously calculated parameters
@@ -398,7 +401,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	available_memory = textToFloat(parser.getOption("--memory_per_thread", "Available RAM (in Gb) for each thread", "2"));
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
-	do_parallel_disc_io = parser.checkOption("--parallel_disc_io", "Let parallel (MPI) processes access the disc simultaneously (use on gluster or fhgfs; this may break NFS)");
+	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
+	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -577,7 +581,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
     debug1 = debug2 = 0.;
 
     // Then read in sampling, mydata and mymodel stuff
-    mydata.read(fn_data);
+    // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
+    bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
+    mydata.read(fn_data, false, false, do_preread);
     if (do_split_random_halves)
     {
 		if (rank % 2 == 1)
@@ -898,6 +904,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_EXTRA3= timer.setNew(" -extra3");
 #endif
 
+#ifdef RELION_SINGLE_PRECISION
+        if (verb > 0)
+            std::cout << " Running in single precision. Runs might not be exactly reproducible." << std::endl;
+#else
+        if (verb > 0)
+            std::cout << " Running in double precision. " << std::endl;
+#endif
+
 	if (do_print_metadata_labels)
 	{
 		if (verb > 0)
@@ -925,7 +939,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 
 		// Read in the experimental image metadata
-		mydata.read(fn_data, true); // true means ignore original particle name
+                // If do_preread_images: only the master reads all images into RAM when not do_parallel_disc_io; otherwise everyone reads images into RAM!
+		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
+		mydata.read(fn_data, true, false, do_preread); // true means ignore original particle name
 
 		// Also get original size of the images to pass to mymodel.read()
 		int ori_size = -1;
@@ -1119,6 +1135,25 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = nr_threads;
 
+	if (do_gpu)
+	{
+		do_shifts_onthefly = true;
+		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		else if (gpu_ids.length()==0)
+			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
+		for (int i = 0; i < nr_threads; i ++)
+		{
+			int dev_id;
+			if (gpu_ids.length()==1)
+				dev_id = i;
+			else
+				dev_id = (int)(gpu_ids[i]-'0');
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+		}
+	}
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -1188,8 +1223,15 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 
 			// Read image from disc
-			img.read(fn_img);
-			img().setXmippOrigin();
+                        if (do_preread_images && do_parallel_disc_io)
+                        {
+                            img() = mydata.particles[part_id].img;
+                        }
+                        else
+                        {
+                            img.read(fn_img);
+                            img().setXmippOrigin();
+                        }
 
 			// Check that the average in the noise area is approximately zero and the stddev is one
 			if (!dont_raise_norm_error)
@@ -1578,22 +1620,22 @@ void MlOptimiser::expectation()
 		expectationSomeParticles(my_first_ori_particle, my_last_ori_particle);
 
 #ifdef TIMING
-        timer.tic(TIMING_EXP_CHANGES);
+		timer.tic(TIMING_EXP_CHANGES);
 #endif
 
-        // Also monitor the changes in the optimal orientations and classes
-        monitorHiddenVariableChanges(my_first_ori_particle, my_last_ori_particle);
+		// Also monitor the changes in the optimal orientations and classes
+		monitorHiddenVariableChanges(my_first_ori_particle, my_last_ori_particle);
 
 #ifdef TIMING
-        timer.toc(TIMING_EXP_CHANGES);
-        timer.tic(TIMING_EXP_METADATA);
+		timer.toc(TIMING_EXP_CHANGES);
+		timer.tic(TIMING_EXP_METADATA);
 #endif
 
-        // Set the metadata for these particles
-        setMetaDataSubset(my_first_ori_particle, my_last_ori_particle);
+		// Set the metadata for these particles
+		setMetaDataSubset(my_first_ori_particle, my_last_ori_particle);
 
 #ifdef TIMING
-        timer.toc(TIMING_EXP_METADATA);
+		timer.toc(TIMING_EXP_METADATA);
 #endif
 
 		nr_ori_particles_done += my_last_ori_particle - my_first_ori_particle + 1;
@@ -1604,7 +1646,6 @@ void MlOptimiser::expectation()
 			progress_bar(nr_ori_particles_done);
 		}
 	}
-
 
 	if (verb > 0)
 		progress_bar(mydata.numberOfOriginalParticles());
@@ -1639,6 +1680,7 @@ void MlOptimiser::expectation()
 		}
 	}
 
+	// Clean up some memory
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		mymodel.PPref[iclass].data.clear();
 
@@ -2168,16 +2210,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
-//		MlOptimiserCuda cuda_optimiser(this);
-//		cuda_optimiser.getAllSquaredDifferences(my_ori_particle, exp_current_image_size, exp_ipass, exp_current_oversampling,
-//				metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-//				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
-//				exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
-//				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-//				exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-
-
-
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
 		{
@@ -2198,16 +2230,17 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
 
 #ifdef DEBUG_ESP_MEM
-		if (thread_id==0)
-		{
-			char c;
-			std::cerr << "After convertAllSquaredDifferencesToWeights, press any key to continue... " << std::endl;
-			std::cin >> c;
-		}
-		global_barrier->wait();
+	if (thread_id==0)
+	{
+		char c;
+		std::cerr << "After convertAllSquaredDifferencesToWeights, press any key to continue... " << std::endl;
+		std::cin >> c;
+	}
+	global_barrier->wait();
 #endif
 
-	}   // end loop over 2 exp_ipass iterations
+	}// end loop over 2 exp_ipass iterations
+
 
 #ifdef RELION_TESTING
 		std::string mode;
@@ -2404,30 +2437,34 @@ void MlOptimiser::maximizationOtherParameters()
 
 	if (do_scale_correction && !(iter==1 && do_firstiter_cc) )
 	{
-		RFLOAT avg_scale_correction = 0., nr_part = 0.;
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-
-#ifdef DEVEL_BFAC
-			// TMP
-			if (verb>0)
-			{
-				for (int i=0; i<XSIZE(wsum_model.wsum_signal_product_spectra[igroup]); i++)
-				{
-					std::cout <<" igroup= "<<igroup<< " i= "<<i<<" "<<wsum_model.wsum_signal_product_spectra[igroup](i)<<" "<<wsum_model.wsum_reference_power_spectra[igroup](i)<<std::endl;
-				}
-			}
-#endif
-
 			RFLOAT sumXA = wsum_model.wsum_signal_product_spectra[igroup].sum();
 			RFLOAT sumAA = wsum_model.wsum_reference_power_spectra[igroup].sum();
 			if (sumAA > 0.)
 				mymodel.scale_correction[igroup] = sumXA / sumAA;
 			else
 				mymodel.scale_correction[igroup] = 1.;
+		}
+
+		// TODO! Avoid extremities in scale estimates, because they lead to catastrophic events and instabilities in refinement
+		// Let's exclude anything bigger than 5x the median or smaller than 1/5 of the median...
+		// Use the median instead of the mean, because it is much more robust to outliers.
+		std::vector<RFLOAT> sorted = mymodel.scale_correction;
+		std::sort(sorted.begin(), sorted.end());
+		RFLOAT median = sorted[mymodel.nr_groups / 2];
+
+		RFLOAT avg_scale_correction = 0., nr_part = 0.;
+		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
+		{
+
+			if (mymodel.scale_correction[igroup] > 5. * median)
+				mymodel.scale_correction[igroup] = 5. * median;
+			else if (mymodel.scale_correction[igroup] < median / 5.)
+				mymodel.scale_correction[igroup] =  median / 5.;
+
 			avg_scale_correction += (RFLOAT)(mymodel.nr_particles_group[igroup]) * mymodel.scale_correction[igroup];
 			nr_part += (RFLOAT)(mymodel.nr_particles_group[igroup]);
-
 		}
 
 		// Constrain average scale_correction to one.
@@ -2479,8 +2516,13 @@ void MlOptimiser::maximizationOtherParameters()
 	// Update sigma2_offset
 	// Factor 2 because of the 2-dimensionality of the xy-plane
 	if (!fix_sigma_offset)
-		mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (2. * sum_weight);
+        {
+            if (mymodel.data_dim == 3)
+                mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (3. * sum_weight);
+            else
+                mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (2. * sum_weight);
 
+        }
 	// TODO: update estimates for sigma2_rot, sigma2_tilt and sigma2_psi!
 
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
@@ -2933,8 +2975,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
 
-			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
-
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
@@ -2942,8 +2982,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
-
-			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
 			////////// TODO TODO TODO
 			////////// How does this work now: each particle has a different sampling object?!!!
@@ -2965,14 +3003,22 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int meta
 		// Get the image and recimg data
 		if (do_parallel_disc_io)
 		{
-			// Read from disc
-			FileName fn_img;
-			std::istringstream split(exp_fn_img);
-			for (int i = 0; i <= istop; i++)
+			// If all slaves had preread images into RAM: get those now
+			if (do_preread_images)
+			{
+				img() = mydata.particles[part_id].img;
+			}
+			else
+			{
+				// Read from disc
+				FileName fn_img;
+				std::istringstream split(exp_fn_img);
+				for (int i = 0; i <= istop; i++)
 				getline(split, fn_img);
 
-			img.read(fn_img);
-			img().setXmippOrigin();
+				img.read(fn_img);
+				img().setXmippOrigin();
+			}
 			if (has_converged && do_use_reconstruct_images)
 			{
 				FileName fn_recimg;
@@ -3322,7 +3368,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
 		int group_id = mydata.getGroupId(part_id);
 
-
 		if (do_masked_shifts)
 			windowFourierTransform(exp_Fimgs[ipart], Fimg, exp_current_image_size);
 		if (do_also_unmasked)
@@ -3521,7 +3566,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 #endif
 
 	// Initialise min_diff and exp_Mweight for this pass
-	RFLOAT diff2;
+
 	int exp_nr_particles = mydata.ori_particles[my_ori_particle].particles_id.size();
 	long int exp_nr_dir = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
 	long int exp_nr_psi = (do_skip_align || do_skip_rotate) ? 1 : sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior);
@@ -3676,13 +3721,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) *= myscale;
 									}
 								}
-								RFLOAT tstart, tend;
-							    struct timeval t2start, t2end;
-							    gettimeofday(&t2start, NULL);
-								//t2start = gettimeofday();
-								tstart = clock();
+
 								long int ihidden = iorientclass * exp_nr_trans;
-								//std::cerr <<  std::endl << " diff2= " <<  std::endl ;
 								for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -3699,7 +3739,6 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 									{
 										sampling.getTranslations(itrans, exp_current_oversampling,
 												oversampled_translations_x, oversampled_translations_y, oversampled_translations_z );
-
 										for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
 										{
 #ifdef TIMING
@@ -3818,9 +3857,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 											if (my_ori_particle == exp_my_first_ori_particle)
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
-
-
-											if ((iter == 1 && do_firstiter_cc) || do_always_cc) // do cross-correlation instead of diff
+											RFLOAT diff2;
+											if ((iter == 1 && do_firstiter_cc) || do_always_cc)
 											{
 												// Do not calculate squared-differences, but signal product
 												// Negative values because smaller is worse in this case
@@ -3962,15 +4000,6 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 										} // end loop iover_trans
 									} // end if do_proceed translations
 								} // end loop itrans
-								//tend = clock();
-								gettimeofday(&t2end, NULL);
-								//std::cerr << "It took "<< tend-tstart <<" clicks."<< std::endl;
-								//std::cerr << "It took "<< t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
-								// BELOW LINE OUTPUTS uSEC COUNT FOR EACH DIFF2 CALCULATION
-								//std::cerr <<t2end.tv_usec-t2start.tv_usec <<" usecs."<< std::endl;
-								//std::cerr <<  std::endl << "press any key for next iteration" ;
-								//char c;
-								//std::cin >> c;
 							} // end loop part_id
 						}// end loop iover_rot
 					} // end if do_proceed orientations
@@ -4143,7 +4172,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							// This is the probability of the offset, given the model offset and variance.
 							RFLOAT pdf_offset;
 							if (mymodel.sigma2_offset < 0.0001)
-								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.; // FIXME ?? A bit hard, no?
+								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
 							else
 								pdf_offset = exp ( tdiff2 / (-2. * mymodel.sigma2_offset) ) / ( 2. * PI * mymodel.sigma2_offset );
 
@@ -4206,7 +4235,13 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 										RFLOAT weight = pdf_orientation * pdf_offset;
 										RFLOAT diff2 = DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) - exp_min_diff2[ipart];
 										// next line because of numerical precision of exp-function
-										if (diff2 > 700.) weight = 0.;
+#ifdef RELION_SINGLE_PRECISION
+										if (diff2 > 88.)
+											weight = 0.;
+#else
+										if (diff2 > 700.)
+											weight = 0.;
+#endif
 										// TODO: use tabulated exp function?
 										else weight *= exp(-diff2);
 //#define DEBUG_PSIANGLE_PDISTRIBUTION
@@ -4215,15 +4250,6 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 #endif
 										// Store the weight
 										DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) = weight;
-
-//											std::cerr << " ipart= " << ipart << std::endl;
-//											std::cerr << " exp_min_diff2[ipart]= " << exp_min_diff2[ipart] << std::endl;
-//											std::cerr << " diff2= " <<diff2<< std::endl;
-//											std::cerr << " weight= "<<weight<< std::endl;
-//											std::cerr << " part_id= " << part_id << std::endl;
-//											std::cerr << " DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over)= " << DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) << std::endl;
-
-
 										// Keep track of sum and maximum of all weights for this particle
 										// Later add all to exp_thisparticle_sumweight, but inside this loop sum to local thisthread_sumweight first
 										exp_thisparticle_sumweight += weight;
@@ -4796,16 +4822,16 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 													DIRECT_MULTIDIM_ELEM(thr_wsum_sigma2_noise[group_id], ires) += wdiff2;
 													// For norm_correction
 													exp_wsum_norm_correction[ipart] += wdiff2;
-												}
-											    if (do_scale_correction && DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
-												{
-											    	RFLOAT sumXA, sumA2;
-											    	sumXA = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
-											    	sumXA += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
-											    	DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += weight * sumXA;
-											    	sumA2 = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
-											    	sumA2 += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
-											    	DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += weight * sumA2;
+                                                    if (do_scale_correction && DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
+                                                    {
+                                                        RFLOAT sumXA, sumA2;
+                                                        sumXA = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
+                                                        sumXA += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
+                                                        DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += weight * sumXA;
+                                                        sumA2 = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
+                                                        sumA2 += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
+                                                        DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += weight * sumA2;
+                                                    }
 												}
 											}
 #ifdef TIMING
@@ -4945,6 +4971,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 		}
 		fclose(stdout);
 #endif
+
 						if (!do_skip_maximization)
 						{
 #ifdef TIMING
@@ -5127,16 +5154,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
 
-
-
-//	FILE *fPtr = fopen("cpu.dat","w");
-//	fprintf(fPtr,"exp_metadata\n");
-//	for (unsigned i = 0; i < std::min((int) exp_metadata.nzyxdim, 1000); i ++)
-//			fprintf(fPtr," %.10e\n", exp_metadata.data[i]);
-//
-//	wsum_model.printMe(fPtr);
-//	fclose(fPtr);
-//	exit(0);
 
 #ifdef DEBUG_OVERSAMPLING
 	std::cerr << " max_weight= " << max_weight << " nr_sign_sam= "<<nr_significant_samples<<" sign w= "<<exp_significant_weight<<std::endl;
@@ -5626,7 +5643,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 
 	std::cout << " Auto-refine: Estimated accuracy angles= " << acc_rot<< " degrees; offsets= " << acc_trans << " pixels" << std::endl;
 	// Warn for inflated resolution estimates
-	if (acc_rot > 10.)
+	if (acc_rot > 10. && do_auto_refine)
 	{
 		std::cout << " Auto-refine: WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles (yet)!" << std::endl;
 		std::cout << " Auto-refine: WARNING: You probably need not worry if the accuracy improves during the next few iterations." << std::endl;
@@ -6005,7 +6022,10 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			{
 				// First read the image from disc
 				Image<RFLOAT> img, rec_img;
-				img.read(fn_img);
+				if (do_preread_images)
+					img() = mydata.particles[part_id].img;
+				else
+					img.read(fn_img);
 				if (XSIZE(img()) != XSIZE(exp_imagedata) || YSIZE(img()) != YSIZE(exp_imagedata) )
 				{
 					std::cerr << " fn_img= " << fn_img << " XSIZE(img())= " << XSIZE(img()) << " YSIZE(img())= " << YSIZE(img()) << std::endl;

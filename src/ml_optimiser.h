@@ -90,6 +90,7 @@ class MlOptimiser
 {
 public:
 
+	// For GPU-acceleration
 	std::vector<void*> cudaMlOptimisers;
 
 	// I/O Parser
@@ -262,14 +263,17 @@ public:
 	// Only print metadata label definitions and exit
 	bool do_print_metadata_labels;
 
-    // Use parallel access to disc?
-    bool do_parallel_disc_io;
+	// Use parallel access to disc?
+	bool do_parallel_disc_io;
 
-    // Use gpu resources?
-    bool do_gpu;
+	// Use gpu resources?
+	bool do_gpu;
 
-    // Which GPU devices to use?
-    std::string gpu_ids;
+	// Which GPU devices to use?
+	std::string gpu_ids;
+
+	// Or preread all images into RAM on the master node?
+	bool do_preread_images;
 
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
@@ -542,11 +546,12 @@ public:
 		random_seed(0),
 		do_gpu(0)
 	{};
-    /** ========================== I/O operations  =========================== */
-	/// Print help message
-    void usage();
 
-    /// Interpret command line
+	/** ========================== I/O operations  =========================== */
+	/// Print help message
+	void usage();
+
+	/// Interpret command line
 	void read(int argc, char **argv, int rank = 0);
 
 	/// Interpret command line for the initial start of a run

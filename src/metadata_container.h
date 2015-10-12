@@ -95,7 +95,10 @@ public:
     void addValueFromString(const EMDLabel &label, const std::string &value);
 
     /** Creates a new label-value pair, and checks the type of the label is the same as that of value */
+#ifdef RELION_SINGLE_PRECISION
     void addValue(EMDLabel name, const double &value);
+#endif
+    void addValue(EMDLabel name, const RFLOAT &value);
     void addValue(EMDLabel name, const int &value);
     void addValue(EMDLabel name, const long int &value);
     void addValue(EMDLabel name, const bool &value);

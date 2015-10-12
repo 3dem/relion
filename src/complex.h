@@ -21,6 +21,7 @@
 #define COMPLEX_H_
 #include <iostream>
 #include <cmath>
+#include "src/macros.h"
 
 class Complex
 {

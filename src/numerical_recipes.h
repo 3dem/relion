@@ -60,11 +60,6 @@
 // Utilities --------------------------------------------------------------
 void nrerror(const char error_text[]);
 
-// Random numbers ---------------------------------------------------------
-RFLOAT ran1(int *idum);                                 // Uniform random
-RFLOAT gasdev(int *idum);                               // Gaussian random
-RFLOAT tdev(RFLOAT nu, int *idum);                      // t-student random
-
 // Bessel functions --------------------------------------------------------
 RFLOAT bessj0(RFLOAT x);
 RFLOAT bessj3_5(RFLOAT x);

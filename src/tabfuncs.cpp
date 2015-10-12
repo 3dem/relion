@@ -45,7 +45,7 @@ RFLOAT TabSine::operator()(RFLOAT val) const
 void TabCosine::initialise(const int _nr_elem)
 {
 	sampling = 2 * PI / (RFLOAT) _nr_elem;
-	TabCosine::fillTable();
+	TabCosine::fillTable(_nr_elem);
 }
 //Pre-calculate table values
 void TabCosine::fillTable(const int _nr_elem)

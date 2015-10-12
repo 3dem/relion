@@ -60,6 +60,16 @@
 #define MAXFLOAT  1e30
 #endif
 
+#ifdef RELION_SINGLE_PRECISION
+#define RFLOAT float
+#define MY_MPI_DOUBLE MPI_FLOAT
+#else
+#define RFLOAT double
+#define MY_MPI_DOUBLE MPI_DOUBLE
+#endif
+
+
+
 //#define DEBUG
 //#define DEBUG_CHECKSIZES
 
@@ -79,9 +89,13 @@
 /** Equal accuracy
  *
  * In a comparison if two values are closer than this epsilon they are said to
- * be the same. Actually set to 1e-6
+ * be the same. Actually For double precision calculations set to 1e-6, for single-precision set to 1e-4 (finding symmetry subgroups will go wrong otherwise)
  */
+#ifdef RELION_SINGLE_PRECISION
+#define XMIPP_EQUAL_ACCURACY 1e-4
+#else
 #define XMIPP_EQUAL_ACCURACY 1e-6
+#endif
 //@}
 
 /// @name Numerical functions
@@ -177,8 +191,7 @@
  * a = CEIL(0.8); // a = 1
  * @endcode
  */
-#define CEIL(x) (((x) == (int)(x)) ? (int)(x):(((x) > 0) ? (int)((x) + 1) : \
-                 (int)(x)))
+#define CEIL(x) (((x) == (int)(x)) ? (int)(x):(((x) > 0) ? (int)((x) + 1) : (int)(x)))
 
 /** Round to next smaller integer
  *
@@ -192,8 +205,7 @@
  * a = FLOOR(0.8); // a = 0
  * @endcode
  */
-#define FLOOR(x) (((x) == (int)(x)) ? (int)(x):(((x) > 0) ? (int)(x) : \
-                  (int)((x) - 1)))
+#define FLOOR(x) (((x) == (int)(x)) ? (int)(x):(((x) > 0) ? (int)(x) : (int)((x) - 1)))
 
 /** Return the fractional part of a value
  *
@@ -224,10 +236,7 @@
  * output = ...  2 -2 -1  0  1  2 -2 -1  0  1  2 -2 -1  0  1  2 -2 ...
  * @endcode
  */
-#define intWRAP(x, x0, xF) (((x) >= (x0) && (x) <= (xF)) ? (x) : ((x) < (x0)) \
-                            ? ((x) - (int)(((x) - (x0) + 1) / ((xF) - (x0) + 1) - 1) * \
-                               ((xF) - (x0) + 1)) : ((x) - (int)(((x) - (xF) - 1) / ((xF) - (x0) + 1) \
-                                                                 + 1) * ((xF) - (x0) + 1)))
+#define intWRAP(x, x0, xF) (((x) >= (x0) && (x) <= (xF)) ? (x) : ((x) < (x0)) ? ((x) - (int)(((x) - (x0) + 1) / ((xF) - (x0) + 1) - 1) *  ((xF) - (x0) + 1)) : ((x) - (int)(((x) - (xF) - 1) / ((xF) - (x0) + 1) + 1) * ((xF) - (x0) + 1)))
 
 /** Wrapping for real numbers
  *
@@ -239,9 +248,7 @@
  * Corrected_angle = realWRAP(angle, 0, 2*PI);
  * @endcode
  */
-#define realWRAP(x, x0, xF) (((x) >= (x0) && (x) <= (xF)) ? (x) : ((x) < (x0)) \
-                             ? ((x) - (int)(((x) - (x0)) / ((xF) - (x0)) - 1) * ((xF) - (x0))) : \
-                             ((x) - (int)(((x) - (xF)) / ((xF) - (x0)) + 1) * ((xF) - (x0))))
+#define realWRAP(x, x0, xF) (((x) >= (x0) && (x) <= (xF)) ? (x) : ((x) < (x0))  ? ((x) - (int)(((x) - (x0)) / ((xF) - (x0)) - 1) * ((xF) - (x0))) : ((x) - (int)(((x) - (xF)) / ((xF) - (x0)) + 1) * ((xF) - (x0))))
 
 /** Degrees to radians
  *
@@ -299,8 +306,7 @@
  *
  * The sinc function is defined as sin(PI*x)/(PI*x).
  */
-#define SINC(x) (((x) < 0.0001 && (x) > -0.0001) ? 1 : sin(PI * (x)) \
-                 / (PI * (x)))
+#define SINC(x) (((x) < 0.0001 && (x) > -0.0001) ? 1 : sin(PI * (x)) / (PI * (x)))
 
 /** Returns next positive power_class of 2
  *
@@ -320,20 +326,6 @@
  */
 #define LIN_INTERP(a, l, h) ((l) + ((h) - (l)) * (a))
 
-/** Cubic B-spline
- *
- */
-#define BSPLINE03(arg,result) {\
-	RFLOAT x = ABS(arg); \
-	if (x < 1.0) \
-	    result=(x * x * (x - 2.0) * (1.0 / 2.0) + 2.0 / 3.0);\
-	else if (x < 2.0) { \
-	    x -= 2.0;\
-	    result=x*x*x*(-1.0 / 6.0); \
-	} else \
-            result=0;\
-    }
-
 /** XOR
  *
  * Logical Xor
@@ -344,31 +336,12 @@
 /// @name Miscellaneous
 //@{
 
-/** Speed up temporary variables
- *
- * The following variables are provided:
- *
- * @code
- * float spduptmp0, spduptmp1, spduptmp2;
- * int ispduptmp0, ispduptmp1, ispduptmp2, ispduptmp3, ispduptmp4, ispduptmp5;
- * @endcode
- */
-#define SPEED_UP_temps \
-    RFLOAT spduptmp0, spduptmp1, spduptmp2, \
-    spduptmp3, spduptmp4, spduptmp5, \
-    spduptmp6, spduptmp7, spduptmp8; \
-    int   ispduptmp0, ispduptmp1, ispduptmp2, \
-    ispduptmp3, ispduptmp4, ispduptmp5;
-
 /** Swap two values
  *
  * It uses a temporal variable which must be of the same type as the two
  * parameters
  */
-#define SWAP(a, b, tmp) {\
-        tmp = a; \
-        a = b; \
-        b = tmp; }
+#define SWAP(a, b, tmp) { tmp = a; a = b; b = tmp; }
 
 /** Starting point for Xmipp volume/image
  *

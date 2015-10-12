@@ -43,8 +43,8 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#ifndef __XmippFFTW_H
-#define __XmippFFTW_H
+#ifndef __RELIONFFTW_H
+#define __RELIONFFTW_H
 
 #ifdef USE_CUFFT
 #include <cufftw.h>
@@ -143,17 +143,19 @@ public:
     /** Fourier array  */
     MultidimArray< Complex > fFourier;
 
-    /* fftw Forawrd plan */
+#ifdef RELION_SINGLE_PRECISION
+    /* fftw Forward plan */
+    fftwf_plan fPlanForward;
+
+    /* fftw Backward plan */
+    fftwf_plan fPlanBackward;
+#else
+    /* fftw Forward plan */
     fftw_plan fPlanForward;
 
     /* fftw Backward plan */
     fftw_plan fPlanBackward;
-
-    /* number of threads*/
-    int nthreads;
-
-    /* Threads has been used in this program*/
-    bool threadsSetOn;
+#endif
 
 // Public methods
 public:
@@ -170,23 +172,6 @@ public:
      *
      */
     FourierTransformer(const FourierTransformer& op);
-
-    /** Set Number of threads
-     * This function, which should be called once, performs any
-     * one-time initialization required to use threads on your
-     * system.
-     *
-     *  The nthreads argument indicates the number of threads you
-     *  want FFTW to use (or actually, the maximum number). All
-     *  plans subsequently created with any planner routine will use
-     *  that many threads. You can call fftw_plan_with_nthreads,
-     *  create some plans, call fftw_plan_with_nthreads again with a
-     *  different argument, and create some more plans for a new
-     *  number of threads. Plans already created before a call to
-     *  fftw_plan_with_nthreads are unaffected. If you pass an
-     *  nthreads argument of 1 (the default), threads are
-     *  disabled for subsequent plans. */
-    void setThreadsNumber(int tNumber);
 
     /** Compute the Fourier transform of a MultidimArray, 2D and 3D.
         If getCopy is false, an alias to the transformed data is returned.
@@ -337,8 +322,6 @@ public:
     void clear();
 
     /** This calls fftw_cleanup.
-     * NOTE!! When using multiple threads, only ONE thread can call this function, as it cleans up things that are shared among all threads...
- 	 *  Therefore, this cleanup is something that needs to be done manually...
     */
     void cleanup();
 
@@ -732,12 +715,6 @@ void getFSC(MultidimArray< RFLOAT > & m1,
 		    MultidimArray< RFLOAT > & m2,
 		    MultidimArray< RFLOAT > &fsc);
 
-/** Scale matrix using Fourier transform
- * @ingroup FourierOperations
- * Ydim and Xdim define the output size, Mpmem is the matrix to scale
- */
-//void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<RFLOAT>& Mpmem, int nthreads=1);
-
 // Get precalculated AB-matrices for on-the-fly shift calculations
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 									MultidimArray<Complex > &out,
@@ -842,4 +819,4 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
-#endif
+#endif // __RELIONFFTW_H

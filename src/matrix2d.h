@@ -97,69 +97,6 @@
  */
 #define MAT_YSIZE(m) ((m).mdimy)
 
-/** Matrix (2x2) by vector (2x1) (a=M*b)
- *
- * You must "load" the temporary variables, and create the result vector with
- * the appropiate size. You can reuse the vector b to store the results (that
- * is, M2x2_BY_V2x1(b, M, b);, is allowed).
- *
- * @code
- * RFLOAT example
- * {
- *     SPEED_UP_temps;
- *
- *     Matrix1D< RFLOAT > a(2), b(2);
- *     Matrix2D< RFLOAT > M(2, 2);
- *
- *     M.init_random(0, 1);
- *     b.init_random(0, 1);
- *
- *     M2x2_BY_V2x1(a, M, b);
- *
- *     return a.sum();
- * }
- * @endcode
- * 	TODO: remove this from the code.... DONT USE IT ANY FURTHER....
- */
-#define M2x2_BY_V2x1(a, M, b) { \
-        spduptmp0 = MAT_ELEM(M, 0, 0) * XX(b) + MAT_ELEM(M, 0, 1) * YY(b); \
-        spduptmp1 = MAT_ELEM(M, 1, 0) * XX(b) + MAT_ELEM(M, 1, 1) * YY(b); \
-        XX(a) = spduptmp0; \
-        YY(a) = spduptmp1; }
-
-/** Matrix (3x3) by vector (3x1) (a=M*b)
- *
- * You must "load" the temporary variables, and create the result vector with
- * the appropiate size. You can reuse the vector b to store the results (that
- * is, M3x3_BY_V3x1(b, M, b);, is allowed).
- *
- * @code
- * RFLOAT example
- * {
- *     SPEED_UP_temps;
- *
- *     Matrix1D< RFLOAT > a(3), b(3);
- *     Matrix2D< RFLOAT > M(3, 3);
- *
- *     M.init_random(0, 1);
- *     b.init_random(0, 1);
- *     M3x3_BY_V3x1(a, M, b);
- *
- *     return a.sum();
- * }
- * @endcode
- * 	TODO: remove this from the code.... DONT USE IT ANY FURTHER....
- */
-#define M3x3_BY_V3x1(a, M, b) { \
-        spduptmp0 = MAT_ELEM(M, 0, 0) * XX(b) + MAT_ELEM(M, 0, 1) * YY(b) + MAT_ELEM(M, 0, 2) \
-                    * ZZ(b); \
-        spduptmp1 = MAT_ELEM(M, 1, 0) * XX(b) + MAT_ELEM(M, 1, 1) * YY(b) + MAT_ELEM(M, 1, 2) \
-                    * ZZ(b); \
-        spduptmp2 = MAT_ELEM(M, 2, 0) * XX(b) + MAT_ELEM(M, 2, 1) * YY(b) + MAT_ELEM(M, 2, 2) \
-                    * ZZ(b); \
-        XX(a) = spduptmp0; YY(a) = spduptmp1; ZZ(a) = spduptmp2; }
-
-
 // Forward declarations
 template<typename T>
 class Matrix1D;
@@ -597,7 +534,10 @@ public:
         Matrix1D<T> result;
 
         if (mdimx != op1.size())
-            REPORT_ERROR("Not compatible sizes in matrix by vector");
+        {
+        	std::cerr << " mdimx= " << mdimx << " opp1.size()= " << op1.size() << std::endl;
+        	REPORT_ERROR("Not compatible sizes in matrix by vector");
+        }
 
         if (!op1.isCol())
             REPORT_ERROR("Vector is not a column");

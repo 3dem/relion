@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 /***************************************************************************
- * 
+ *
  * Authors:     J.R. Bilbao-Castro (jrbcast@ace.ual.es)
  *
  * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
@@ -150,7 +150,11 @@ RFLOAT textToDouble(const char* str, int _errno, std::string errmsg)
     if (str == NULL)
     	REPORT_ERROR( errmsg);
 
+#ifdef RELION_SINGLE_PRECISION
+    ok = sscanf(str, "%f", &retval);
+#else
     ok = sscanf(str, "%lf", &retval);
+#endif
 
     if (ok)
         return retval;

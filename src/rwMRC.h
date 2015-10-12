@@ -30,7 +30,7 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif 
+#endif
 
 #define MRCSIZE    1024 // Minimum size of the MRC header (when nsymbt = 0)
 
@@ -205,13 +205,6 @@ int readMRC(long int img_select, bool isStack=false)
         _nDim = 1;
 
     data.setDimensions(_xDim, _yDim, _zDim, _nDim);
-//    long int imgStart=0;
-//    long int imgEnd =_nDim;
-//    if (img_select != -1)
-//    {
-//        imgStart=img_select;
-//        imgEnd=img_select+1;
-//    }
 
     DataType datatype;
     switch ( header->mode%5 )
@@ -227,10 +220,8 @@ int readMRC(long int img_select, bool isStack=false)
         break;
     case 3:
     	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-    	//break;
     case 4:
     	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-        //break;
     default:
         datatype = UChar;
         break;
@@ -293,7 +284,6 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 			break;
 		case UNKNOWN_SYSTEM:
 			REPORT_ERROR("Unkown system type in writeMRC machine stamp determination.");
-			//break;
 		default:
 			break;
 	}
@@ -350,6 +340,12 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     header->alpha = (float)90.;
     header->beta = (float)90.;
     header->gamma = (float)90.;
+    header->xOrigin = (float)0.;
+    header->yOrigin = (float)0.;
+    header->zOrigin = (float)0.;
+    header->nxStart = (int)0;
+    header->nyStart = (int)0;
+    header->nzStart = (int)0;
 
     if (!MDMainHeader.isEmpty())
     {
@@ -409,7 +405,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     header->nlabl =  1;
 
     char label[MRC_LABEL_LEN] = "Relion ";
-    time_t rawtime; 
+    time_t rawtime;
     struct tm * timeinfo;
 
     time (&rawtime);
@@ -419,11 +415,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     strcat(label,PACKAGE_VERSION);
 #endif
     strcat(label,"   ");
-#ifdef RELION_TESTING
-    strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"06-jun-06  13:37:00",timeinfo);
-#else
     strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"%d-%b-%y  %R:%S",timeinfo);
-#endif
     strncpy(header->labels,label,MRC_LABEL_LEN);
 
     //strncpy(header->labels, p->label.c_str(), 799);

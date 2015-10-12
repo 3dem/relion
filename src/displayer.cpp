@@ -354,9 +354,9 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 
 					Matrix2D<RFLOAT> A;
 					rotation2DMatrix(psi, A);
-				    MAT_ELEM(A,0, 2) = XX(offset);
-				    MAT_ELEM(A,1, 2) = YY(offset);
-				    selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+                                        MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
+                                        MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
+                                        selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
 				}
 
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
@@ -810,6 +810,9 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 
 	if (nr_regroups <= 0)
 		return;
+
+	if (nr_regroups > 999)
+		REPORT_ERROR("regroupSelectedParticles: cannot regroup in more than 999 groups. Usually around 20-50 groups are useful.");
 
 	// First sort the MDgroups based on refined intensity scale factor
 	MDgroups.sort(EMDL_MLMODEL_GROUP_SCALE_CORRECTION);

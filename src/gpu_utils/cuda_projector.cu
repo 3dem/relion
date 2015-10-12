@@ -202,4 +202,3 @@ void CudaProjector::clear()
 		mdlImag = 0;
 	}
 }
-

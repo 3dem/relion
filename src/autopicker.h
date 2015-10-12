@@ -47,7 +47,7 @@ public:
 
 	// Particle diameter (in Angstroms)
 	RFLOAT particle_diameter;
-	int particle_radius2;
+	int particle_radius2, decrease_radius;
 
 	// Low pass filetr cutoff (in Angstroms)
 	RFLOAT lowpass;
@@ -99,6 +99,12 @@ public:
 	// Number of Angstroms any 2 particle peaks need to be apart
 	RFLOAT min_particle_distance;
 
+	// Maximum standard deviation of the noise prior to normalization to pick peaks from
+	RFLOAT max_stddev_noise;
+
+	// Removal of outlier pixel values
+	RFLOAT outlier_removal_zscore;
+
 	// Size of the downsize micrographs for autopicking
 	int downsize_mic;
 
@@ -132,7 +138,7 @@ private:
 			MultidimArray<Complex > &Fmsk, int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &Mstddev, MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
-	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, int iref, int skip_side, std::vector<Peak> &peaks);
+	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks);
 
 	// Now prune the coordinates: within min_particle_distance: all peaks are the same cluster
 	// From each cluster, take the single peaks with the highest ccf

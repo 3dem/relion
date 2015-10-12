@@ -17,7 +17,6 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/gpu_utils/cuda_ml_optimiser.h"
@@ -26,8 +25,8 @@
 //#define DEBUG_MPIEXP2
 
 #ifdef TIMING
-	int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
-	int TIMING_MPISLAVEWAIT1, TIMING_MPISLAVEWAIT2, TIMING_MPISLAVEWAIT3;
+        int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
+        int TIMING_MPISLAVEWAIT1, TIMING_MPISLAVEWAIT2, TIMING_MPISLAVEWAIT3;
 #endif
 
 void MlOptimiserMpi::read(int argc, char **argv)
@@ -313,24 +312,24 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 			if (node->rank == other_slave)
 			{
 				//std::cerr << "Sending from "<<other_slave<< " to "<<my_first_slave << std::endl;
-				node->relion_MPI_Send(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MPI_DOUBLE, my_first_slave, MPITAG_PACK, MPI_COMM_WORLD);
-				node->relion_MPI_Send(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MPI_DOUBLE, my_first_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MY_MPI_DOUBLE, my_first_slave, MPITAG_PACK, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MY_MPI_DOUBLE, my_first_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
 				Mnr.resize(mymodel.nr_groups);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mnr)
 				{
 					DIRECT_A1D_ELEM(Mnr, i) = mymodel.nr_particles_group[i];
         		}
 				node->relion_MPI_Send(MULTIDIM_ARRAY(Mnr), MULTIDIM_SIZE(Mnr), MPI_INT, my_first_slave, MPITAG_METADATA, MPI_COMM_WORLD);
-				node->relion_MPI_Send(&wsum_model.sumw_group[0], 1, MPI_DOUBLE, my_first_slave, MPITAG_DOUBLE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(&wsum_model.sumw_group[0], 1, MY_MPI_DOUBLE, my_first_slave, MPITAG_RFLOAT, MPI_COMM_WORLD);
 
     		}
 			else if (node->rank == my_first_slave)
 			{
 				//std::cerr << "Receiving at "<<my_first_slave<< " from "<<other_slave<<std::endl;
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MPI_DOUBLE, other_slave, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MY_MPI_DOUBLE, other_slave, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mnr), MULTIDIM_SIZE(Mnr), MPI_INT, other_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(&wsum_model.sumw_group[0], 1, MPI_DOUBLE, other_slave, MPITAG_DOUBLE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(&wsum_model.sumw_group[0], 1, MY_MPI_DOUBLE, other_slave, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 				// Add the contribution of this other slave
 				Msum  += wsum_model.sigma2_noise[0];
 				MsumI += Mavg;
@@ -346,18 +345,18 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 			if (node->rank == my_first_slave)
 			{
 				//std::cerr << "Sending from my_first_slave"<<my_first_slave<< " to other_slave "<<other_slave<< std::endl;
-				node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
 				node->relion_MPI_Send(MULTIDIM_ARRAY(Msumnr), MULTIDIM_SIZE(Msumnr), MPI_INT, other_slave, MPITAG_METADATA, MPI_COMM_WORLD);
-				node->relion_MPI_Send(MULTIDIM_ARRAY(MsumI), MULTIDIM_SIZE(MsumI), MPI_DOUBLE, other_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
-				node->relion_MPI_Send(&dsum, 1, MPI_DOUBLE, other_slave, MPITAG_DOUBLE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(MsumI), MULTIDIM_SIZE(MsumI), MY_MPI_DOUBLE, other_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(&dsum, 1, MY_MPI_DOUBLE, other_slave, MPITAG_RFLOAT, MPI_COMM_WORLD);
 			}
 			else if (node->rank == other_slave)
 			{
 				//std::cerr << "Receiving at other_slave "<<other_slave<<" from my_first_slave "<<my_first_slave<< std::endl;
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MPI_DOUBLE, my_first_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MY_MPI_DOUBLE, my_first_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mnr), MULTIDIM_SIZE(Mnr), MPI_INT, my_first_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MPI_DOUBLE, my_first_slave, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(&wsum_model.sumw_group[0], 1, MPI_DOUBLE, my_first_slave, MPITAG_DOUBLE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MY_MPI_DOUBLE, my_first_slave, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(&wsum_model.sumw_group[0], 1, MY_MPI_DOUBLE, my_first_slave, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 				// Unpack Mnr on the other slave
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mnr)
 				{
@@ -433,9 +432,9 @@ void MlOptimiserMpi::expectation()
 			MlOptimiser::getMetaAndImageDataSubset(0, n_trials_acc-1, false);
 			my_nr_images = YSIZE(exp_metadata);
 			node->relion_MPI_Send(&my_nr_images, 1, MPI_INT, first_slave, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
-			node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MPI_DOUBLE, first_slave, MPITAG_METADATA, MPI_COMM_WORLD);
+			node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, first_slave, MPITAG_METADATA, MPI_COMM_WORLD);
 			// Also send exp_fn_ctfs if necessary
-			length_fn_ctf = exp_fn_img.length() + 1; // +1 to include \0 at the end of the string
+			length_fn_ctf = exp_fn_ctf.length() + 1; // +1 to include \0 at the end of the string
 			node->relion_MPI_Send(&length_fn_ctf, 1, MPI_INT, first_slave, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
 			if (length_fn_ctf > 1)
 				node->relion_MPI_Send((void*)exp_fn_ctf.c_str(), length_fn_ctf, MPI_CHAR, first_slave, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -445,7 +444,7 @@ void MlOptimiserMpi::expectation()
 			// Slave has to receive all metadata from the master!
 			node->relion_MPI_Recv(&my_nr_images, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
 			exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH);
-			node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+			node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
 			node->relion_MPI_Recv(&length_fn_ctf, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
 			if (length_fn_ctf > 1)
 			{
@@ -459,8 +458,8 @@ void MlOptimiserMpi::expectation()
 		}
 
 		// The reconstructing slave Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
-		node->relion_MPI_Bcast(&acc_rot, 1, MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
-		node->relion_MPI_Bcast(&acc_trans, 1, MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
 	}
 
 	// D. Update the angular sampling (all nodes except master)
@@ -535,7 +534,7 @@ void MlOptimiserMpi::expectation()
 				if (JOB_NIMG > 0)
 				{
 					exp_metadata.resize(JOB_NIMG, METADATA_LINE_LENGTH);
-					node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
+					node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
 
 					// The master monitors the changes in the optimal orientations and classes
 					monitorHiddenVariableChanges(JOB_FIRST, JOB_LAST);
@@ -610,7 +609,7 @@ void MlOptimiserMpi::expectation()
 				// Master also sends the required metadata and imagedata for this job
 				if (JOB_NIMG > 0)
 				{
-					node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD);
+					node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD);
 					if (do_parallel_disc_io)
 					{
 						node->relion_MPI_Send((void*)exp_fn_img.c_str(), JOB_LEN_FN_IMG, MPI_CHAR, this_slave, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -623,7 +622,7 @@ void MlOptimiserMpi::expectation()
 					else
 					{
 						// Send imagedata to the slaves
-						node->relion_MPI_Send(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MPI_DOUBLE, this_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
+						node->relion_MPI_Send(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, this_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
 					}
 				}
 
@@ -653,11 +652,12 @@ void MlOptimiserMpi::expectation()
     	try
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
+
     		if (do_gpu)
     			for (int i = 0; i < cudaMlOptimisers.size(); i ++)
     				((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
 
-			// Start off with an empty job request
+    		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
 			JOB_NIMG = 0;
@@ -695,7 +695,7 @@ void MlOptimiserMpi::expectation()
 #endif
 					// Also receive the imagedata and the metadata for these images from the master
 					exp_metadata.resize(JOB_NIMG, METADATA_LINE_LENGTH);
-					node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+					node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
 
 					// Receive the image filenames or the exp_imagedata
 					if (do_parallel_disc_io)
@@ -752,7 +752,7 @@ void MlOptimiserMpi::expectation()
 							else
 								exp_imagedata.resize(JOB_NIMG, mymodel.ori_size, mymodel.ori_size);
 						}
-						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
 
 					// Now process these images
@@ -772,7 +772,7 @@ void MlOptimiserMpi::expectation()
 					// Report to the master how many particles I have processed
 					node->relion_MPI_Send(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
 					// Also send the metadata belonging to those
-					node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD);
+					node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD);
 
 #ifdef TIMING
 					timer.toc(TIMING_MPISLAVEWAIT3);
@@ -1034,11 +1034,11 @@ void MlOptimiserMpi::combineAllWeightedSums()
 						std::cerr << " AA SEND node->rank= " << node->rank << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " other_slave= "<<other_slave << std::endl;
 #endif
-						node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
+						node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
 					}
 					else if (node->rank == other_slave)
 					{
-						MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, &status);
+						MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, &status);
 #ifdef DEBUG
 						std::cerr << " AA RECV node->rank= " << node->rank  << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " other_slave= "<<other_slave << std::endl;
@@ -1056,11 +1056,11 @@ void MlOptimiserMpi::combineAllWeightedSums()
 						std::cerr << " BB SEND node->rank= " << node->rank  << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " first_slave= "<<first_slave << std::endl;
 #endif
-						node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, first_slave, MPITAG_PACK, MPI_COMM_WORLD);
+						node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, first_slave, MPITAG_PACK, MPI_COMM_WORLD);
 					}
 					else if (node->rank == first_slave)
 					{
-						node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
+						node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
 #ifdef DEBUG
 						std::cerr << " BB RECV node->rank= " << node->rank  << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " first_slave= "<<first_slave << std::endl;
@@ -1084,11 +1084,11 @@ void MlOptimiserMpi::combineAllWeightedSums()
 						std::cerr << " CC SEND node->rank= " << node->rank << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " other_slave= "<<other_slave << std::endl;
 #endif
-						node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
+						node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
 					}
 					else if (node->rank == other_slave)
 					{
-						node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
+						node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
 #ifdef DEBUG
 						std::cerr << " CC RECV node->rank= " << node->rank << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " other_slave= "<<other_slave << std::endl;
@@ -1193,7 +1193,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 		if (node->rank == 2)
 		{
 			wsum_model.pack(Mpack, piece, nr_pieces, false); // do not clear the model!
-			node->relion_MPI_Send(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MPI_DOUBLE, 1, MPITAG_PACK, MPI_COMM_WORLD);
+			node->relion_MPI_Send(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, 1, MPITAG_PACK, MPI_COMM_WORLD);
 			Mpack.clear();
 		}
 		else if (node->rank == 1)
@@ -1201,7 +1201,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 			std::cout << " Combining two random halves ..."<< std::endl;
 			wsum_model.pack(Mpack, piece, nr_pieces);
 			Msum.initZeros(Mpack);
-			node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MPI_DOUBLE, 2, MPITAG_PACK, MPI_COMM_WORLD, status);
+			node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, 2, MPITAG_PACK, MPI_COMM_WORLD, status);
 			Msum += Mpack;
 			// Unpack the sum (subtract 1 from piece because it was incremented already...)
 			wsum_model.unpack(Msum, piece - 1);
@@ -1232,11 +1232,11 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 			if (node->rank == 1)
 			{
 				for (int other_slave = 2; other_slave < node->size; other_slave++)
-					node->relion_MPI_Send(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
+					node->relion_MPI_Send(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
 			}
 			else
 			{
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MPI_DOUBLE, 1, MPITAG_PACK, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, 1, MPITAG_PACK, MPI_COMM_WORLD, status);
 			}
 
 			// Everyone unpacks the new Mpack
@@ -1362,18 +1362,18 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 							std::cerr << "isubset= "<<isubset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
 #endif
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[iclass]), MULTIDIM_SIZE(mymodel.Iref[iclass]), MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MPI_DOUBLE, recv_node, MPITAG_DOUBLE, MPI_COMM_WORLD);
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
+							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[iclass]), MULTIDIM_SIZE(mymodel.Iref[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
+							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
+							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
 						}
 						else if (node->rank != reconstruct_rank && node->rank == recv_node)
 						{
 							//std::cerr << "isubset= "<<isubset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[iclass]), MULTIDIM_SIZE(mymodel.Iref[iclass]), MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MPI_DOUBLE, reconstruct_rank, MPITAG_DOUBLE, MPI_COMM_WORLD, status);
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
+							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[iclass]), MULTIDIM_SIZE(mymodel.Iref[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
+							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
 #ifdef DEBUG
 							std::cerr << "isubset= "<<isubset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 #endif
@@ -1394,13 +1394,13 @@ void MlOptimiserMpi::maximization()
 			int reconstruct_rank = (iclass % (node->size - 1) ) + 1;
 			// Broadcast the reconstructed references to all other MPI nodes
 			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[iclass]),
-					MULTIDIM_SIZE(mymodel.Iref[iclass]), MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+					MULTIDIM_SIZE(mymodel.Iref[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 			// Broadcast the data_vs_prior spectra to all other MPI nodes
 			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]),
-					MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+					MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 			// Broadcast the sigma2_class spectra to all other MPI nodes
 			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
-					MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+					MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 
 		}
 
@@ -1430,13 +1430,13 @@ void MlOptimiserMpi::maximization()
 	}
 
 	// The master broadcasts the changes in hidden variables to all other nodes
-	node->relion_MPI_Bcast(&current_changes_optimal_classes, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	node->relion_MPI_Bcast(&current_changes_optimal_orientations, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	node->relion_MPI_Bcast(&current_changes_optimal_offsets, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&current_changes_optimal_classes, 1, MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&current_changes_optimal_orientations, 1, MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&current_changes_optimal_offsets, 1, MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_large_hidden_variable_changes, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	node->relion_MPI_Bcast(&smallest_changes_optimal_classes, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	node->relion_MPI_Bcast(&smallest_changes_optimal_offsets, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	node->relion_MPI_Bcast(&smallest_changes_optimal_orientations, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&smallest_changes_optimal_classes, 1, MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&smallest_changes_optimal_offsets, 1, MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&smallest_changes_optimal_orientations, 1, MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
@@ -1473,14 +1473,14 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 				MPI_Status status;
 
 				// The second slave sends its lowres_data and lowres_weight to the first slave
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MPI_DOUBLE, 1, MPITAG_DOUBLE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, 1, MPITAG_RFLOAT, MPI_COMM_WORLD);
 
 				// Now the first slave is calculating the average....
 
 				// Then the second slave receives the average back from the first slave
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MPI_DOUBLE, 1, MPITAG_DOUBLE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, 1, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 
 
 			}
@@ -1499,8 +1499,8 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 				std::cerr << "AAArank=1 lowresdata_half2: "; lowres_data_half2.printShape();
 #endif
 				// The first slave receives the average from the second slave
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data_half2), 2*MULTIDIM_SIZE(lowres_data_half2), MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight_half2), MULTIDIM_SIZE(lowres_weight_half2), MPI_DOUBLE, 2, MPITAG_DOUBLE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data_half2), 2*MULTIDIM_SIZE(lowres_data_half2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight_half2), MULTIDIM_SIZE(lowres_weight_half2), MY_MPI_DOUBLE, 2, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 
 				// The first slave calculates the average of the two lowres_data and lowres_weight arrays
 #ifdef DEBUG
@@ -1516,8 +1516,8 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 				}
 
 				// The first slave sends the average lowres_data and lowres_weight also back to the second slave
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD);
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MPI_DOUBLE, 2, MPITAG_DOUBLE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, 2, MPITAG_RFLOAT, MPI_COMM_WORLD);
 
 			}
 
@@ -1681,7 +1681,7 @@ void MlOptimiserMpi::compareTwoHalves()
 			if (node->rank == 2)
 			{
 				// The second slave sends its average to the first slave
-				node->relion_MPI_Send(MULTIDIM_ARRAY(avg1), 2*MULTIDIM_SIZE(avg1), MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(avg1), 2*MULTIDIM_SIZE(avg1), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
 			}
 			else if (node->rank == 1)
 			{
@@ -1691,14 +1691,14 @@ void MlOptimiserMpi::compareTwoHalves()
 				MPI_Status status;
 				MultidimArray<Complex > avg2;
 				avg2.resize(avg1);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 				wsum_model.BPref[iclass].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class[iclass]);
 			}
 
 		}
 
 		// Now slave 1 sends the fsc curve to everyone else
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MPI_DOUBLE, 1, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
 
 #ifdef DEBUG
@@ -1819,7 +1819,7 @@ void MlOptimiserMpi::iterate()
 		// Make sure all nodes have the same resolution, set the data_vs_prior array from half1 also for half2
 		if (do_split_random_halves)
 			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MPI_DOUBLE, 1, MPI_COMM_WORLD);
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 
 #ifdef TIMING
 		timer.toc(TIMING_MAX);

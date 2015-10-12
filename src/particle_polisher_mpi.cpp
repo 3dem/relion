@@ -79,7 +79,7 @@ void ParticlePolisherMpi::fitMovementsAllMicrographs()
 	// Combine results from all nodes
 	MultidimArray<RFLOAT> allnodes_fitted_movements;
 	allnodes_fitted_movements.resize(fitted_movements);
-	MPI_Allreduce(MULTIDIM_ARRAY(fitted_movements), MULTIDIM_ARRAY(allnodes_fitted_movements), MULTIDIM_SIZE(fitted_movements), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(MULTIDIM_ARRAY(fitted_movements), MULTIDIM_ARRAY(allnodes_fitted_movements), MULTIDIM_SIZE(fitted_movements), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	fitted_movements = allnodes_fitted_movements;
 
     // Set the fitted movements in the xoff and yoff columns of the exp_model.MDimg
@@ -190,7 +190,7 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 	// Combine results from all nodes
 	MultidimArray<RFLOAT> allnodes_perframe_bfactors;
 	allnodes_perframe_bfactors.resize(perframe_bfactors);
-	MPI_Allreduce(MULTIDIM_ARRAY(perframe_bfactors), MULTIDIM_ARRAY(allnodes_perframe_bfactors), MULTIDIM_SIZE(perframe_bfactors), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(MULTIDIM_ARRAY(perframe_bfactors), MULTIDIM_ARRAY(allnodes_perframe_bfactors), MULTIDIM_SIZE(perframe_bfactors), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	perframe_bfactors = allnodes_perframe_bfactors;
 
 	if (verb > 0)
@@ -380,7 +380,7 @@ void ParticlePolisherMpi::optimiseBeamTilt()
 	{
 		MultidimArray<RFLOAT> allnodes_diff2_beamtilt;
 		allnodes_diff2_beamtilt.initZeros(diff2_beamtilt);
-		MPI_Allreduce(MULTIDIM_ARRAY(diff2_beamtilt), MULTIDIM_ARRAY(allnodes_diff2_beamtilt), MULTIDIM_SIZE(diff2_beamtilt), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		MPI_Allreduce(MULTIDIM_ARRAY(diff2_beamtilt), MULTIDIM_ARRAY(allnodes_diff2_beamtilt), MULTIDIM_SIZE(diff2_beamtilt), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		diff2_beamtilt = allnodes_diff2_beamtilt;
 	}
 
@@ -388,7 +388,7 @@ void ParticlePolisherMpi::optimiseBeamTilt()
 	{
 		MultidimArray<RFLOAT> allnodes_defocus_shift_allmics;
 		allnodes_defocus_shift_allmics.initZeros(defocus_shift_allmics);
-		MPI_Allreduce(MULTIDIM_ARRAY(defocus_shift_allmics), MULTIDIM_ARRAY(allnodes_defocus_shift_allmics), MULTIDIM_SIZE(defocus_shift_allmics), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		MPI_Allreduce(MULTIDIM_ARRAY(defocus_shift_allmics), MULTIDIM_ARRAY(allnodes_defocus_shift_allmics), MULTIDIM_SIZE(defocus_shift_allmics), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		defocus_shift_allmics = allnodes_defocus_shift_allmics;
 	}
 

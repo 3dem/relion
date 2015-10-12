@@ -62,6 +62,7 @@ void ParticlePolisher::read(int argc, char **argv)
 	int norm_section = parser.addSection("Normalisation options");
 	do_normalise = !parser.checkOption("--skip_normalise", "Do not normalise the polsihed particles?");
 	bg_radius =  textToInteger(parser.getOption("--bg_radius", "Radius of the circular mask that will be used to define the background area (in pixels)", "-1"));
+	do_ramp = !parser.checkOption("--no_ramp", "Just subtract the background mean in the normalisation, instead of subtracting a fitted ramping background. ");
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 
@@ -73,6 +74,7 @@ void ParticlePolisher::read(int argc, char **argv)
 	int out_section = parser.addSection("Polished particles output options");
 	first_frame = textToInteger(parser.getOption("--first_frame", "First frame to include in the polished particles", "1"));
 	last_frame = textToInteger(parser.getOption("--last_frame", "First frame to include in the polished particles (default is all)", "-1"));
+	step_frame  = textToInteger(parser.getOption("--avg_movie_frames", "Give the same value as used in particle extraction (usually just 1)", "1"));
 
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
@@ -97,11 +99,11 @@ void ParticlePolisher::initialise()
     if (verb > 0)
     	std::cout << " + Reading the input STAR file ... " << std::endl;
     exp_model.read(fn_in, false, true); // false means NOT do_ignore_particle_name here, true means DO_ignore_group_name...
-    
+
 	// Pre-size the fitted_movements array (for parallelised output...)
 	long int total_nr_images = exp_model.numberOfParticles();
 	fitted_movements.resize(total_nr_images, 2);
-  
+
 	last_frame = (last_frame < 0) ? exp_model.ori_particles[0].particles_id.size() : last_frame;
 	perframe_bfactors.initZeros( 3 * (last_frame - first_frame + 1)); // now store bfactor, offset and corr_coeff
 #endif
@@ -119,9 +121,12 @@ void ParticlePolisher::initialise()
 
     if (do_weighting)
     {
+        if (fn_mask == "")
+            REPORT_ERROR("When doing B-factor weighting, you have to provide a mask!");
+
     	// Read in the Imask
     	Imask.read(fn_mask);
-	ori_size = XSIZE(Imask());
+    	ori_size = XSIZE(Imask());
     }
 
 	if (do_normalise && bg_radius < 0)
@@ -235,8 +240,9 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	{
 		long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
 
-		RFLOAT my_pick_x = x_pick[ipar] + x_off_prior[ipar];
-		RFLOAT my_pick_y = y_pick[ipar] + y_off_prior[ipar];
+                // Sjors 14sep2015: bug reported by Kailu Yang
+		RFLOAT my_pick_x = x_pick[ipar] - x_off_prior[ipar];
+		RFLOAT my_pick_y = y_pick[ipar] - y_off_prior[ipar];
 
 		fit_point2D      onepoint;
 		std::vector<fit_point2D> points_x, points_y;
@@ -245,8 +251,9 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 		for (long int ii = 0; ii < x_pick.size(); ii++)
 		{
 
-			RFLOAT nb_pick_x = x_pick[ii] + x_off_prior[ii]; // add prior to center at average position
-			RFLOAT nb_pick_y = y_pick[ii] + y_off_prior[ii]; // add prior to center at average position
+                        // Sjors 14sep2015: bug reported by Kailu Yang
+			RFLOAT nb_pick_x = x_pick[ii] - x_off_prior[ii]; // add prior to center at average position
+			RFLOAT nb_pick_y = y_pick[ii] - y_off_prior[ii]; // add prior to center at average position
 			RFLOAT dist2 = (nb_pick_x - my_pick_x) * (nb_pick_x - my_pick_x) + (nb_pick_y - my_pick_y) * (nb_pick_y - my_pick_y);
 			RFLOAT weight;
 			if (ABS(min2sigma2) < 0.01)
@@ -562,6 +569,9 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 		exp_model.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, i_half);
 		exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 		fn_mic.decompose(i_frame, dum);
+		// If we used --avg_movie_frame upon extraction, now count less
+		// e.g. instead of counting 4, 8, 12 count 1, 2, 3
+		i_frame /= step_frame;
 
 		// TODO!! Make a running average window here
 		if (ABS(i_frame - this_frame) <= frame_running_average/2 && i_half == this_half)
@@ -899,7 +909,7 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		transformer.inverseFourierTransform(Fwsum, img());
 
 		if (do_normalise)
-			normalise(img, bg_radius, white_dust_stddev, black_dust_stddev);
+			normalise(img, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp);
 
 		// Calculate statistics for the (normalised?) particle
 		RFLOAT minval, maxval, avgval, stddev;

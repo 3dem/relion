@@ -62,7 +62,7 @@
 
 #define FILENAMENUMBERLENGTH 6
 
-/** Structure of the points to do least-squares fitting
+/** Structure of the points to do least-squares straight-line fitting
  */
 struct fit_point2D
 {
@@ -74,7 +74,22 @@ struct fit_point2D
     RFLOAT w;
 };
 
-void fitStraightLine(std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff);
+void fitStraightLine(const std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff);
+
+/** Structure of the points to do least-squares plane fitting
+ */
+struct fit_point3D
+{
+    /// x coordinate
+    RFLOAT x;
+    /// y coordinate
+    RFLOAT y;
+    /// z coordinate (assumed to be a function of x,y)
+    RFLOAT z;
+    /// Weight of the point in the Least-Squares problem
+    RFLOAT w;
+};
+void fitLeastSquaresPlane(const std::vector<fit_point3D> & points, RFLOAT &plane_a, RFLOAT &plane_b, RFLOAT &plane_c);
 
 /* ========================================================================= */
 /* BLOBS                                                                     */
@@ -294,14 +309,6 @@ RFLOAT gaussian2D(RFLOAT x,
                   RFLOAT muY = 0);
 //@}
 
-/** Compute the logarithm in base 2
- */
-// Does not work with xlc compiler
-//#ifndef __xlC__
-//RFLOAT log2(RFLOAT value);
-//#endif
-//@}
-
 /** @name Random functions
  *
  * These functions allow you to work in an easier way with the random functions
@@ -343,15 +350,6 @@ void init_random_generator(int seed = -1);
  */
 void randomize_random_generator();
 
-/** Produce a uniform random number between 0 and 1
- *
- * @code
- * std::cout << "This random number should be between 0 and 1: " << rnd_unif()
- * << std::endl;
- * @endcode
- */
-float rnd_unif();
-
 /** Produce a uniform random number between a and b
  *
  * @code
@@ -359,34 +357,7 @@ float rnd_unif();
  * << std::endl;
  * @endcode
  */
-float rnd_unif(float a, float b);
-
-/** Produce a t-distributed random number with mean 0 and standard deviation 1 and nu degrees of freedom
- *
- * @code
- * std::cout << "This random number should follow t(0,1) with 3 degrees of freedon: " << rnd_student_t(3.)
- * << std::endl;
- * @endcode
- */
-float rnd_student_t(RFLOAT nu);
-
-/** Produce a gaussian random number with mean a and standard deviation b and nu degrees of freedom
- *
- * @code
- * std::cout << "This random number should follow t(1,4) with 3 d.o.f.: " << rnd_gaus(3,1,2)
- * << std::endl;
- * @endcode
- */
-float rnd_student_t(RFLOAT nu, float a, float b);
-
-/** Produce a gaussian random number with mean 0 and standard deviation 1
- *
- * @code
- * std::cout << "This random number should follow N(0,1): " << rnd_gaus()
- * << std::endl;
- * @endcode
- */
-float rnd_gaus();
+float rnd_unif(float a = 0., float b = 1.);
 
 /** Produce a gaussian random number with mean a and standard deviation b
  *
@@ -395,7 +366,16 @@ float rnd_gaus();
  * << std::endl;
  * @endcode
  */
-float rnd_gaus(float a, float b);
+float rnd_gaus(float mu = 0., float sigma = 1.);
+
+/** Produce a gaussian random number with mean mu and standard deviation sigma and nu degrees of freedom
+ *
+ * @code
+ * std::cout << "This random number should follow t(1,4) with 3 d.o.f.: " << rnd_gaus(3,1,2)
+ * << std::endl;
+ * @endcode
+ */
+float rnd_student_t(RFLOAT nu, float mu = 0., float sigma = 1.);
 
 /** Gaussian area from -x0 to x0
  *
@@ -489,7 +469,6 @@ float rnd_log(float a, float b);
 /** Conversion little-big endian
  */
 void swapbytes(char* v, unsigned long n);
-
 
 //@}
 

@@ -30,6 +30,8 @@ void AutoPicker::read(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output rootname", "autopick");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)"));
+	decrease_radius = textToInteger(parser.getOption("--shrink_particle_mask", "Shrink the particle mask by this many pixels (to detect Einstein-from-noise classes)", "2"));
+	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
 
@@ -44,7 +46,9 @@ void AutoPicker::read(int argc, char **argv)
 	int peak_section = parser.addSection("Peak-search options");
 	min_fraction_expected_Pratio = textToFloat(parser.getOption("--threshold", "Fraction of expected probability ratio in order to consider peaks?", "0.25"));
 	min_particle_distance = textToFloat(parser.getOption("--min_distance", "Minimum distance (in A) between any two particles (default is half the box size)","-1"));
+	max_stddev_noise = textToFloat(parser.getOption("--max_stddev_noise", "Maximum standard deviation in the noise area to use for picking peaks (default is no maximum)","-1"));
 	autopick_skip_side = textToInteger(parser.getOption("--skip_side", "Keep this many extra pixels (apart from particle_size/2) away from the edge of the micrograph ","0"));
+
 
 	int expert_section = parser.addSection("Expert options");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
@@ -136,6 +140,7 @@ void AutoPicker::initialise()
 
 	// Get the squared particle radius (in integer pixels)
 	particle_radius2 = ROUND(particle_diameter/(2. * angpix));
+	particle_radius2 -= decrease_radius;
 	particle_radius2*= particle_radius2;
 #ifdef DEBUG
 	std::cerr << " particle_size= " << particle_size << " sqrt(particle_radius2)= " << sqrt(particle_radius2) << std::endl;
@@ -324,7 +329,16 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	}
 
 	// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
-	Imic().statisticsAdjust(0., 1.);
+    RFLOAT avg0, stddev0, minval0, maxval0;
+	Imic().computeStats(avg0, stddev0, minval0, maxval0);
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imic())
+	{
+		// Remove pixel values that are too far away from the mean
+		if ( ABS(DIRECT_MULTIDIM_ELEM(Imic(), n) - avg0) / stddev0 > outlier_removal_zscore)
+			DIRECT_MULTIDIM_ELEM(Imic(), n) = avg0;
+
+		DIRECT_MULTIDIM_ELEM(Imic(), n) = (DIRECT_MULTIDIM_ELEM(Imic(), n) - avg0) / stddev0;
+	}
 
 	if (micrograph_xsize != micrograph_ysize)
 	{
@@ -370,7 +384,14 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	Mpsi_best.resize(micrograph_size, micrograph_size);
 
 	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_pixels_circular_mask;;
-	if (!do_read_fom_maps)
+	if (do_read_fom_maps)
+	{
+		FileName fn_tmp=fn_mic.withoutExtension()+"_"+fn_out+"_stddevNoise.spi";
+		Image<RFLOAT> It;
+		It.read(fn_tmp);
+		Mstddev = It();
+	}
+	else
 	{
 		/*
 		 * Squared difference FOM:
@@ -420,6 +441,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
 		calculateStddevAndMeanUnderMask(Fmic, Fmic2, Finvmsk, nr_pixels_circular_invmask, Mstddev, Mmean);
+
+		if (do_write_fom_maps)
+		{
+			// TMP output
+			FileName fn_tmp=fn_mic.withoutExtension()+"_"+fn_out+"_stddevNoise.spi";
+			Image<RFLOAT> It;
+			It() = Mstddev;
+			It.write(fn_tmp);
+		}
 
 		// From now on use downsized Fmic, as the cross-correlation with the references can be done at lower resolution
 		windowFourierTransform(Fmic, Faux, downsize_mic);
@@ -625,9 +655,10 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 		// Now that we have Mccf_best and Mpsi_best, get the peaks
 		std::vector<Peak> my_ref_peaks;
+		Mstddev.setXmippOrigin();
 		Mccf_best.setXmippOrigin();
 		Mpsi_best.setXmippOrigin();
-		peakSearch(Mccf_best, Mpsi_best, iref, my_skip_side, my_ref_peaks);
+		peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
 
 		prunePeakClusters(my_ref_peaks, min_distance_pix);
 
@@ -726,7 +757,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 
 }
 
-void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArray<RFLOAT> &Mpsi, int iref,
+void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref,
 		int skip_side, std::vector<Peak> &peaks)
 {
 
@@ -746,6 +777,11 @@ void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArr
 			// check if this element is above the threshold
 			if (myval  >= min_fraction_expected_Pratio)
 			{
+
+				// Only check stddev in the noise areas if max_stddev_noise is positive!
+				if (max_stddev_noise > 0. && A2D_ELEM(Mstddev, i, j) > max_stddev_noise)
+					continue;
+
 				// This is a peak if all four neighbours are also above the threshold, AND have lower values than myval
 				if (A2D_ELEM(Mfom, i-1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i-1, j) > myval )
 					continue;

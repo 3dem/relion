@@ -202,10 +202,19 @@ class image_handler_parameters
 		}
 		else if (fn_div != "")
 		{
+                    bool is_first = true;
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
 			{
-				if (DIRECT_A3D_ELEM(Iop(), k, i, j) < 1e-10)
-					std::cout << "Warning: very small pixel values in divide image..." << std::endl;
+                            if (ABS(DIRECT_A3D_ELEM(Iop(), k, i, j)) < 1e-10)
+                            {
+				if (is_first)
+                                {
+                                    std::cout << "Warning: ignore very small pixel values in divide image..." << std::endl;
+                                    is_first = false;
+                                }
+                                DIRECT_A3D_ELEM(Iout(), k, i, j) = 0.;
+                            }
+                            else
 				DIRECT_A3D_ELEM(Iout(), k, i, j) /= DIRECT_A3D_ELEM(Iop(), k, i, j);
 			}
 		}
@@ -437,7 +446,7 @@ class image_handler_parameters
 				Iin.read(fn_img);
 				RFLOAT avg, stddev, minval, maxval;
 				Iin().computeStats(avg, stddev, minval, maxval);
-				std::cout << fn_img << " size= " << XSIZE(Iin()) << "x"<< YSIZE(Iin()) << "x"<< ZSIZE(Iin()) << " avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
+				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
 			}
 			else if (bin_avg > 0 || (avg_first >= 0 && avg_last >= 0))
 			{

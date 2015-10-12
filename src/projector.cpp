@@ -83,9 +83,6 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	MultidimArray<RFLOAT> Mpad;
 	MultidimArray<Complex > Faux;
     FourierTransformer transformer;
-    // DEBUGGING: multi-threaded FFTWs are giving me a headache?
-	// For a long while: switch them off!
-	//transformer.setThreadsNumber(nr_threads);
     RFLOAT normfft;
 
 	// Size of padded real-space volume

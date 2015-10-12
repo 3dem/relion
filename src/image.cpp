@@ -71,7 +71,7 @@ int datatypeString2Int(std::string s)
 }
 
 // Some image-specific operations
-void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev)
+void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev, bool do_ramp)
 {
 	int bg_radius2 = bg_radius * bg_radius;
 	RFLOAT avg, stddev;
@@ -79,19 +79,23 @@ void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT
 	if (2*bg_radius > XSIZE(I()))
 		REPORT_ERROR("normalise ERROR: 2*bg_radius is larger than image size!");
 
-	// Calculate initial avg and stddev values
-	calculateBackgroundAvgStddev(I, avg, stddev, bg_radius);
-
-	// Remove white and black noise
-	if (white_dust_stddev > 0.)
-		removeDust(I, true, white_dust_stddev, avg, stddev);
-	if (black_dust_stddev > 0.)
-		removeDust(I, false, black_dust_stddev, avg, stddev);
-
-	// If some dust was removed: recalculate avg and stddev
 	if (white_dust_stddev > 0. || black_dust_stddev > 0.)
+	{
+		// Calculate initial avg and stddev values
 		calculateBackgroundAvgStddev(I, avg, stddev, bg_radius);
 
+		// Remove white and black noise
+		if (white_dust_stddev > 0.)
+			removeDust(I, true, white_dust_stddev, avg, stddev);
+		if (black_dust_stddev > 0.)
+			removeDust(I, false, black_dust_stddev, avg, stddev);
+	}
+
+	if (do_ramp)
+		subtractBackgroundRamp(I, bg_radius);
+
+	// Calculate avg and stddev (also redo if dust was removed!)
+	calculateBackgroundAvgStddev(I, avg, stddev, bg_radius);
 
 	if (stddev < 1e-10)
 	{
@@ -134,6 +138,41 @@ void calculateBackgroundAvgStddev(Image<RFLOAT> &I, RFLOAT &avg, RFLOAT &stddev,
 	}
 	stddev = sqrt(stddev/n);
 }
+
+
+void subtractBackgroundRamp(Image<RFLOAT> &I, int bg_radius)
+{
+
+	int bg_radius2 = bg_radius * bg_radius;
+	fit_point3D point;
+	std::vector<fit_point3D>  allpoints;
+    RFLOAT pA, pB, pC, avgbg, stddevbg, minbg, maxbg;
+
+    if (I().getDim() == 3)
+    	REPORT_ERROR("ERROR %% calculateBackgroundRamp is not implemented for 3D data!");
+
+    FOR_ALL_ELEMENTS_IN_ARRAY2D(I())
+	{
+		if (i*i + j*j > bg_radius2)
+		{
+            point.x = j;
+            point.y = i;
+            point.z = A2D_ELEM(I(), i, j);
+            point.w = 1.;
+            allpoints.push_back(point);
+		}
+	}
+
+    fitLeastSquaresPlane(allpoints, pA, pB, pC);
+
+    // Substract the plane from the image
+    FOR_ALL_ELEMENTS_IN_ARRAY2D(I())
+    {
+        A2D_ELEM(I(), i, j) -= pA * j + pB * i + pC;
+    }
+
+}
+
 
 void removeDust(Image<RFLOAT> &I, bool is_white, RFLOAT thresh, RFLOAT avg, RFLOAT stddev)
 {

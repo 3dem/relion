@@ -176,16 +176,6 @@ long int MetaDataTable::numberOfObjects() const
 
 void MetaDataTable::clear()
 {
-	//This is abundant since the destructor for all objects in vector are called by vector.clear()
-//    for (unsigned long int i = 0; i < objects.size(); i++)
-//    {
-//        if (objects[i])
-//        {
-//        	//objects[i]->clear();
-//            delete objects[i];
-//        }
-//    }
-
     objects.clear();
     comment.clear();
     name.clear();

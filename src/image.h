@@ -427,7 +427,6 @@ public:
                 {
                     std::cerr<<"Datatype= "<<datatype<<std::endl;
                     REPORT_ERROR(" ERROR: cannot cast datatype to T");
-                    //break;
                 }
             }
 
@@ -500,7 +499,6 @@ public:
                 {
                     std::cerr<<"outputDatatype= "<<datatype<<std::endl;
                     REPORT_ERROR(" ERROR: cannot cast T to outputDatatype");
-                    //break;
                 }
             }
     }
@@ -520,7 +518,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case SChar:
             {
@@ -528,7 +525,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case UShort:
             {
@@ -536,7 +532,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case Short:
             {
@@ -544,7 +539,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case UInt:
             {
@@ -552,7 +546,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case Int:
             {
@@ -560,7 +553,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case Long:
             {
@@ -568,7 +560,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case Float:
             {
@@ -576,7 +567,6 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         case Double:
             {
@@ -584,13 +574,11 @@ public:
                     return 1;
                 else
                     return 0;
-                //break;
             }
         default:
             {
                 std::cerr<<"Datatype= "<<datatype<<std::endl;
                 REPORT_ERROR(" ERROR: cannot cast datatype to T");
-                //break;
             }
         }
         //               int * iTemp = (int*) map;
@@ -1044,8 +1032,11 @@ public:
             wmChar = "w";
             break;
         case WRITE_APPEND:
-            if (_exists == exists(fileName))
+            if (exists(fileName))
+            {
+                _exists = true;
                 wmChar = "r+";
+            }
             else
                 wmChar = "w+";
             break;
@@ -1188,6 +1179,7 @@ private:
         long int aux;
         FileName filNamePlusExt(name);
         name.decompose(aux, filNamePlusExt);
+
         // Subtract 1 to have numbering 0...N-1 instead of 1...N
         if (aux > 0)
         	aux--;
@@ -1303,10 +1295,10 @@ private:
 
 // Some image-specific operations
 
-// For image normalization
-void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev);
-
+// For image normalisation
+void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev, bool do_ramp);
 void calculateBackgroundAvgStddev(Image<RFLOAT> &I, RFLOAT &avg, RFLOAT &stddev, int bg_radius);
+void subtractBackgroundRamp(Image<RFLOAT> &I, int bg_radius);
 
 // For dust removal
 void removeDust(Image<RFLOAT> &I, bool is_white, RFLOAT thresh, RFLOAT avg, RFLOAT stddev);
