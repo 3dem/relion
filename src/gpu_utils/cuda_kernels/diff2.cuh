@@ -13,6 +13,8 @@
  *   	DIFFERNECE-BASED KERNELS
  */
 
+#define PREFETCH_FRACTION 2
+
 template<bool do_3DProjection, int eulers_per_block>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
@@ -27,27 +29,24 @@ __global__ void cuda_kernel_diff2_coarse(
 		int image_size
 		)
 {
-	int bid = blockIdx.x * eulers_per_block;
+	int init_euler = blockIdx.x * eulers_per_block;
 	int tid = threadIdx.x;
 
 	XFLOAT diff2s[eulers_per_block] = {0.f};
 	XFLOAT tx, ty;
 
-	__shared__ XFLOAT s_ref_real[D2C_BLOCK_SIZE*eulers_per_block];
-	__shared__ XFLOAT s_ref_imag[D2C_BLOCK_SIZE*eulers_per_block];
-	__shared__ XFLOAT s_real[D2C_BLOCK_SIZE];
-	__shared__ XFLOAT s_imag[D2C_BLOCK_SIZE];
-	__shared__ XFLOAT s_corr[D2C_BLOCK_SIZE];
+	__shared__ XFLOAT s_ref_real[D2C_BLOCK_SIZE/PREFETCH_FRACTION * eulers_per_block];
+	__shared__ XFLOAT s_ref_imag[D2C_BLOCK_SIZE/PREFETCH_FRACTION * eulers_per_block];
 	__shared__ XFLOAT s_eulers[eulers_per_block*6];
 
 	if (tid < eulers_per_block)
 	{
-		s_eulers[tid*6  ] = g_eulers[(bid+tid)*9  ];
-		s_eulers[tid*6+1] = g_eulers[(bid+tid)*9+1];
-		s_eulers[tid*6+2] = g_eulers[(bid+tid)*9+3];
-		s_eulers[tid*6+3] = g_eulers[(bid+tid)*9+4];
-		s_eulers[tid*6+4] = g_eulers[(bid+tid)*9+6];
-		s_eulers[tid*6+5] = g_eulers[(bid+tid)*9+7];
+		s_eulers[tid*6  ] = g_eulers[(init_euler+tid)*9  ];
+		s_eulers[tid*6+1] = g_eulers[(init_euler+tid)*9+1];
+		s_eulers[tid*6+2] = g_eulers[(init_euler+tid)*9+3];
+		s_eulers[tid*6+3] = g_eulers[(init_euler+tid)*9+4];
+		s_eulers[tid*6+4] = g_eulers[(init_euler+tid)*9+6];
+		s_eulers[tid*6+5] = g_eulers[(init_euler+tid)*9+7];
 	}
 
 	tx = trans_x[tid%translation_num];
@@ -55,20 +54,20 @@ __global__ void cuda_kernel_diff2_coarse(
 
 	int max_block_wise_pixel( ceilf( (float)image_size / (float)D2C_BLOCK_SIZE ) * D2C_BLOCK_SIZE );
 
-	for (int init_pixel = 0; init_pixel < max_block_wise_pixel; init_pixel += D2C_BLOCK_SIZE)
+	for (int init_pixel = 0; init_pixel < max_block_wise_pixel; init_pixel += D2C_BLOCK_SIZE/PREFETCH_FRACTION)
 	{
 		__syncthreads();
 
-		if(init_pixel + tid < image_size)
+		if(init_pixel + tid/PREFETCH_FRACTION < image_size)
 		{
-			int x = (init_pixel + tid) % projector.imgX;
-			int y = (int)floorf( (float)(init_pixel + tid) / (float)projector.imgX);
+			int x = (init_pixel + tid/PREFETCH_FRACTION) % projector.imgX;
+			int y = (int)floorf( (float)(init_pixel + tid/PREFETCH_FRACTION) / (float)projector.imgX);
 
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
-			#pragma unroll
-			for (int i = 0; i < eulers_per_block; i ++)
+//			#pragma unroll
+			for (int i = tid%PREFETCH_FRACTION; i < eulers_per_block; i += PREFETCH_FRACTION)
 			{
 				if(do_3DProjection)
 					projector.project3Dmodel(
@@ -79,8 +78,8 @@ __global__ void cuda_kernel_diff2_coarse(
 						s_eulers[i*6+3],
 						s_eulers[i*6+4],
 						s_eulers[i*6+5],
-						s_ref_real[eulers_per_block * tid + i],
-						s_ref_imag[eulers_per_block * tid + i]);
+						s_ref_real[eulers_per_block * (tid/PREFETCH_FRACTION) + i],
+						s_ref_imag[eulers_per_block * (tid/PREFETCH_FRACTION) + i]);
 				else
 					projector.project2Dmodel(
 						x,y,
@@ -90,41 +89,39 @@ __global__ void cuda_kernel_diff2_coarse(
 						s_eulers[i*6+3],
 						s_eulers[i*6+4],
 						s_eulers[i*6+5],
-						s_ref_real[eulers_per_block * tid + i],
-						s_ref_imag[eulers_per_block * tid + i]);
+						s_ref_real[eulers_per_block * (tid/PREFETCH_FRACTION) + i],
+						s_ref_imag[eulers_per_block * (tid/PREFETCH_FRACTION) + i]);
 			}
-
-			s_real[tid] = g_real[(init_pixel + tid)];
-			s_imag[tid] = g_imag[(init_pixel + tid)];
-			s_corr[tid] = g_corr[(init_pixel + tid)];
 		}
-
-		if ((float) tid / translation_num >= D2C_BLOCK_SIZE/translation_num) //TODO Rest threads can be utilized
-			continue;
 
 		__syncthreads();
 
-		for (int i = tid / translation_num; i < D2C_BLOCK_SIZE; i += D2C_BLOCK_SIZE/translation_num)
+		if ((float) tid / translation_num < D2C_BLOCK_SIZE/translation_num) //TODO Rest threads can be utilized
 		{
-			if((init_pixel + i) >= image_size) break;
-
-			int x = (init_pixel + i) % projector.imgX;
-			int y = (int)floorf( (float)(init_pixel + i) / (float)projector.imgX);
-
-			if (y > projector.maxR)
-				y -= projector.imgY;
-
-			XFLOAT s, c;
-			sincosf( x * tx + y * ty , &s, &c);
-			XFLOAT real = c * s_real[i] - s * s_imag[i];
-			XFLOAT imag = c * s_imag[i] + s * s_real[i];
-
-			#pragma unroll
-			for (int j = 0; j < eulers_per_block; j ++)
+			for (int i = tid / translation_num; i < D2C_BLOCK_SIZE/PREFETCH_FRACTION; i += D2C_BLOCK_SIZE/translation_num)
 			{
-				XFLOAT diff_real =  s_ref_real[eulers_per_block * i + j] - real;
-				XFLOAT diff_imag =  s_ref_imag[eulers_per_block * i + j] - imag;
-				diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[i] / 2;
+				if((init_pixel + i) >= image_size) break;
+
+				int x = (init_pixel + i) % projector.imgX;
+				int y = (int)floorf( (float)(init_pixel + i) / (float)projector.imgX);
+
+				if (y > projector.maxR)
+					y -= projector.imgY;
+
+				XFLOAT s, c;
+				sincosf( x * tx + y * ty , &s, &c);
+				XFLOAT real = c * g_real[init_pixel + i] - s * g_imag[init_pixel + i];
+				XFLOAT imag = c * g_imag[init_pixel + i] + s * g_real[init_pixel + i];
+
+				XFLOAT r_corr = g_corr[init_pixel + i];
+
+				#pragma unroll
+				for (int j = 0; j < eulers_per_block; j ++)
+				{
+					XFLOAT diff_real =  s_ref_real[eulers_per_block * i + j] - real;
+					XFLOAT diff_imag =  s_ref_imag[eulers_per_block * i + j] - imag;
+					diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * r_corr / 2;
+				}
 			}
 		}
 	}
@@ -134,7 +131,7 @@ __global__ void cuda_kernel_diff2_coarse(
 	{
 		#pragma unroll
 		for (int i = 0; i < eulers_per_block; i ++)
-			atomicAdd(&g_diff2s[(bid+i) * translation_num + tid%translation_num], diff2s[i]);
+			atomicAdd(&g_diff2s[(init_euler+i) * translation_num + tid%translation_num], diff2s[i]);
 	}
 }
 

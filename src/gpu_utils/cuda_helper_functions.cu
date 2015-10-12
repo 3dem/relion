@@ -453,8 +453,8 @@ void deviceInitValue(CudaGlobalPtr<T> data, T value)
 			data.getSize());
 }
 
-#define EULERS_PERBLOCK_2D 2
-#define EULERS_PERBLOCK_3D 8
+#define EULERS_PERBLOCK_3D 16
+#define EULERS_PERBLOCK_2D 4
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
