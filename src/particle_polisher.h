@@ -53,10 +53,10 @@ public:
 	Experiment exp_model;
 
 	// Standard deviation for a Gaussian-weight on the distance between particles in the micrograph
-	double sigma_neighbour_distance;
+	RFLOAT sigma_neighbour_distance;
 
 	// Maximum resolution in pre-frame reconstructions
-	double perframe_highres;
+	RFLOAT perframe_highres;
 
 	// Flag to indicate all calculations have to be repeated from scratch
 	// if false, then intermediate files are re-read from disc and earlier calculations are skipped
@@ -76,7 +76,7 @@ public:
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak;
 
 	// Pixel size (for B-factors)
-	double angpix;
+	RFLOAT angpix;
 
 	// Original image size
 	int ori_size;
@@ -85,22 +85,22 @@ public:
 	bool do_weighting;
 
 	// Minimum resolution (in Angstrom) for fitting of B-factor in Guinier plot
-	double fit_minres;
+	RFLOAT fit_minres;
 
 	// Width of a running average window for the single-frame reconstructions
 	int frame_running_average;
 
 	// Vector with the B-factors for all individual frames
-	MultidimArray<double> perframe_bfactors;
+	MultidimArray<RFLOAT> perframe_bfactors;
 
 	// Fitted movement coordinates for all input images
-	MultidimArray<double> fitted_movements;
+	MultidimArray<RFLOAT> fitted_movements;
 
 	// Image with the mask (used for relative weighting of each frame)
-	Image<double> Imask;
+	Image<RFLOAT> Imask;
 
 	// FSC curve of the masked, averages of all single-frame reconstructions
-	MultidimArray<double> fsc_average;
+	MultidimArray<RFLOAT> fsc_average;
 
 	// Metadatatable with the information from the polished particles
 	MetaDataTable MDshiny;
@@ -119,13 +119,13 @@ public:
 	int bg_radius;
 
 	// Sigma-levels for dust removal
-	double white_dust_stddev, black_dust_stddev;
+	RFLOAT white_dust_stddev, black_dust_stddev;
 
 	// Maximum useful resolution in the reconstruction
-	double maxres_model;
+	RFLOAT maxres_model;
 
 	// Maximum beam tilt to analyse, and step-size to sample in X and Y
-	double beamtilt_max, beamtilt_step;
+	RFLOAT beamtilt_max, beamtilt_step;
 	// Number of sampled beamtilts
 	int nr_sampled_beam_tilts;
 
@@ -133,19 +133,19 @@ public:
 	std::vector<FileName> fn_beamtilt_groups;
 
 	// Minimum resolution to take beamtilt into account
-	double minres_beamtilt;
+	RFLOAT minres_beamtilt;
 
 	// Weighted squared-differences for all beamtilts
-	MultidimArray<double> diff2_beamtilt;
+	MultidimArray<RFLOAT> diff2_beamtilt;
 
 	// Weighted squared-differences for all defocus values
-	MultidimArray<double> defocus_shift_allmics;
+	MultidimArray<RFLOAT> defocus_shift_allmics;
 
 	// Optimal beamtilts for each data set
-	std::vector<Matrix1D<double> > best_beamtilts;
+	std::vector<Matrix1D<RFLOAT> > best_beamtilts;
 
 	// Per-particle CTF optimisation
-	double defocus_shift_max, defocus_shift_step;
+	RFLOAT defocus_shift_max, defocus_shift_step;
 
 
 public:
@@ -184,7 +184,7 @@ public:
 	void postProcessSingleFrameReconstruction(int this_frame);
 
 	// Calculate the B-factors for a single-frame reconstruction
-	void calculateBfactorSingleFrameReconstruction(int this_frame, double &bfactor, double &offset, double &corr_coeff);
+	void calculateBfactorSingleFrameReconstruction(int this_frame, RFLOAT &bfactor, RFLOAT &offset, RFLOAT &corr_coeff);
 
 	// Calculate the average of all single-frame rconstructions (for a given half)
 	void calculateAverageAllSingleFrameReconstructions(int ihalf);

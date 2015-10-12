@@ -153,13 +153,13 @@ int  readSPIDER(long int img_select)
     offset = (int) header->labbyt;
     DataType datatype  = Float;
 
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(double)header->fmin);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(double)header->fmax);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(double)header->av);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(double)header->sig);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(double)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(double)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(double)header->scale);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(RFLOAT)header->fmin);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->fmax);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->av);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->sig);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)header->scale);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)header->scale);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->scale);
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
     bool isStack = ( header->istack > 0 );
@@ -308,7 +308,7 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
     	header->iform = 1;     // 2D image
     else
     	header->iform = 3;     // 3D volume
-    double aux;
+    RFLOAT aux;
 //    bool baux;
     header->imami = 0;//never trust max/min
 

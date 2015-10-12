@@ -64,7 +64,7 @@ bool compareStringNoAt(MetaDataContainer *lh, MetaDataContainer *rh)
 }
 bool compareDouble(MetaDataContainer *lh, MetaDataContainer *rh)
 {
-	double lhstr, rhstr;
+	RFLOAT lhstr, rhstr;
 	lh->getValue(sortlabel, lhstr);
 	rh->getValue(sortlabel, rhstr);
 	return lhstr < rhstr;
@@ -843,7 +843,7 @@ void MetaDataTable::writeValueToString(std::string & result,
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
-		EMDLabel label1, double eps, EMDLabel label2, EMDLabel label3)
+		EMDLabel label1, RFLOAT eps, EMDLabel label2, EMDLabel label3)
 {
 	if (!MD1.containsLabel(label1))
 		REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label1.");
@@ -853,7 +853,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	if (label2 != EMDL_UNDEFINED)
 	{
 		if (!EMDL::isDouble(label1) || !EMDL::isDouble(label2))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 2D or 3D distances are only allowed for doubles.");
+			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 2D or 3D distances are only allowed for RFLOATs.");
 		if (!MD1.containsLabel(label2))
 			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label2.");
 		if (!MD2.containsLabel(label2))
@@ -863,7 +863,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	if (label3 != EMDL_UNDEFINED)
 	{
 		if (!EMDL::isDouble(label3))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 3D distances are only allowed for doubles.");
+			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 3D distances are only allowed for RFLOATs.");
 		if (!MD1.containsLabel(label3))
 			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label3.");
 		if (!MD2.containsLabel(label3))
@@ -876,7 +876,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 
 	std::string mystr1, mystr2;
 	int myint1, myint2;
-	double myd1, myd2, mydy1 = 0., mydy2 = 0., mydz1 = 0., mydz2 = 0.;
+	RFLOAT myd1, myd2, mydy1 = 0., mydy2 = 0., mydz1 = 0., mydz2 = 0.;
 
 
 	// loop over MD1
@@ -898,7 +898,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 				MD1.getValue(label3, mydz1);
 		}
 		else
-			REPORT_ERROR("compareMetaDataTableEqualLabel ERROR: only implemented for strings, integers or doubles");
+			REPORT_ERROR("compareMetaDataTableEqualLabel ERROR: only implemented for strings, integers or RFLOATs");
 
 		// loop over MD2
 		bool have_in_2 = false;
@@ -937,7 +937,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 				if (label3 != EMDL_UNDEFINED)
 					MD2.getValue(label3, mydz2);
 
-				double dist = sqrt( (myd1 - myd2) * (myd1 - myd2) +
+				RFLOAT dist = sqrt( (myd1 - myd2) * (myd1 - myd2) +
 						            (mydy1 - mydy2) * (mydy1 - mydy2) +
 						            (mydz1 - mydz2) * (mydz1 - mydz2) );
 				if ( ABS(dist) <= eps )

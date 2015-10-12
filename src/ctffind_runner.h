@@ -57,31 +57,31 @@ public:
 
 	////// CTFFIND parameters
 	// Size of the box to calculate FFTw
-	double box_size;
+	RFLOAT box_size;
 
 	// Minimum and maximum resolution (in A) to be taken into account
-	double resol_min, resol_max;
+	RFLOAT resol_min, resol_max;
 
 	// Defocus search parameters (in A, positive is underfocus)
-	double min_defocus, max_defocus, step_defocus;
+	RFLOAT min_defocus, max_defocus, step_defocus;
 
 	// Amount of astigmatism (in A)
-	double amount_astigmatism;
+	RFLOAT amount_astigmatism;
 
 	// Voltage (kV)
-	double Voltage;
+	RFLOAT Voltage;
 
 	// Spherical aberration
-	double Cs;
+	RFLOAT Cs;
 
 	// Amplitude contrast (e.g. 0.07)
-	double AmplitudeConstrast;
+	RFLOAT AmplitudeConstrast;
 
 	// Magnification
-	double Magnification;
+	RFLOAT Magnification;
 
 	// Detector pixel size (um)
-	double PixelSize;
+	RFLOAT PixelSize;
 
 	// Flag to only join results into a star file
 	bool do_only_join_results;
@@ -108,8 +108,8 @@ public:
 };
 
 // Get micrograph metadata
-bool getCtffindResults(FileName fn_mic, double &defU, double &defV, double &defAng, double &CC,
-		double &HT, double &CS, double &AmpCnst, double &XMAG, double &DStep, bool die_if_not_found = true);
+bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep, bool die_if_not_found = true);
 
 
 #endif /* CTFFIND_RUNNER_H_ */

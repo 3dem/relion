@@ -125,7 +125,7 @@
  * FourierTransformer transformer;
  * MultidimArray< Complex > Vfft;
  * transformer.FourierTransform(V(),Vfft,false);
- * MultidimArray<double> Vmag;
+ * MultidimArray<RFLOAT> Vmag;
  * Vmag.resize(Vfft);
  * FOR_ALL_ELEMENTS_IN_ARRAY3D(Vmag)
  *     Vmag(k,i,j)=20*log10(abs(Vfft(k,i,j)));
@@ -135,7 +135,7 @@ class FourierTransformer
 {
 public:
     /** Real array, in fact a pointer to the user array is stored. */
-    MultidimArray<double> *fReal;
+    MultidimArray<RFLOAT> *fReal;
 
      /** Complex array, in fact a pointer to the user array is stored. */
     MultidimArray<Complex > *fComplex;
@@ -241,7 +241,7 @@ public:
         void getFourierCopy(T& V) {
             V.resize(fFourier);
             memcpy(MULTIDIM_ARRAY(V),MULTIDIM_ARRAY(fFourier),
-                MULTIDIM_SIZE(fFourier)*2*sizeof(double));
+                MULTIDIM_SIZE(fFourier)*2*sizeof(RFLOAT));
         }
 
     /** Return a complete Fourier transform (two halves).
@@ -324,10 +324,10 @@ public:
 
 // Internal methods
 public:
-    /* Pointer to the array of doubles with which the plan was computed */
-    double * dataPtr;
+    /* Pointer to the array of RFLOATs with which the plan was computed */
+    RFLOAT * dataPtr;
 
-    /* Pointer to the array of complex<double> with which the plan was computed */
+    /* Pointer to the array of complex<RFLOAT> with which the plan was computed */
     Complex * complexDataPtr;
 
     /* Initialise all pointers to NULL */
@@ -354,7 +354,7 @@ public:
     void Transform(int sign);
 
     /** Get the Multidimarray that is being used as input. */
-    const MultidimArray<double> &getReal() const;
+    const MultidimArray<RFLOAT> &getReal() const;
     const MultidimArray<Complex > &getComplex() const;
 
     /** Set a Multidimarray for input.
@@ -362,7 +362,7 @@ public:
         transforms it is not modified, but in backward transforms,
         the result will be stored in img. This means that the size
         of img cannot change between calls. */
-    void setReal(MultidimArray<double> &img);
+    void setReal(MultidimArray<RFLOAT> &img);
 
     /** Set a Multidimarray for input.
         The data of img will be the one of fComplex. In forward
@@ -380,7 +380,7 @@ public:
 };
 
 // Randomize phases beyond the given shell (index)
-void randomizePhasesBeyond(MultidimArray<double> &I, int index);
+void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
 
 /** Center an array, to have its origin at the origin of the FFTW
  *
@@ -656,7 +656,7 @@ void resizeFourierTransform(MultidimArray<T > &in,
 
 	// Otherwise apply a windowing operation
 	MultidimArray<Complex > Fin;
-	MultidimArray<double> Min;
+	MultidimArray<RFLOAT> Min;
 	FourierTransformer transformer;
 	long int x0, y0, z0, xF, yF, zF;
 	x0 = y0 = z0 = FIRST_XMIPP_INDEX(newdim);
@@ -680,7 +680,7 @@ void resizeFourierTransform(MultidimArray<T > &in,
     	REPORT_ERROR("resizeFourierTransform ERROR: dimension should be 1, 2 or 3!");
     }
 
-	// This is to handle double-valued input arrays
+	// This is to handle RFLOAT-valued input arrays
 	Fin.resize(ZSIZE(in), YSIZE(in), XSIZE(in));
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(in)
 	{
@@ -722,27 +722,27 @@ void resizeFourierTransform(MultidimArray<T > &in,
  */
 void getFSC(MultidimArray< Complex > &FT1,
 		    MultidimArray< Complex > &FT2,
-		    MultidimArray< double > &fsc);
+		    MultidimArray< RFLOAT > &fsc);
 
 /** Fourier-Ring-Correlation between two multidimArrays using FFT
  * @ingroup FourierOperations
  * Simpler I/O than above.
  */
-void getFSC(MultidimArray< double > & m1,
-		    MultidimArray< double > & m2,
-		    MultidimArray< double > &fsc);
+void getFSC(MultidimArray< RFLOAT > & m1,
+		    MultidimArray< RFLOAT > & m2,
+		    MultidimArray< RFLOAT > &fsc);
 
 /** Scale matrix using Fourier transform
  * @ingroup FourierOperations
  * Ydim and Xdim define the output size, Mpmem is the matrix to scale
  */
-//void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<double>& Mpmem, int nthreads=1);
+//void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<RFLOAT>& Mpmem, int nthreads=1);
 
 // Get precalculated AB-matrices for on-the-fly shift calculations
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 									MultidimArray<Complex > &out,
 									TabSine &tab_sin, TabCosine &tab_cos,
-									double oridim, double shift_x, double shift_y, double shift_z = 0.);
+									RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
 
 // Shift an image through phase-shifts in its Fourier Transform
 // Note that in and out may be the same array, in that case in is overwritten with the result
@@ -751,7 +751,7 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 								  MultidimArray<Complex > &out,
 								  TabSine &tab_sin, TabCosine &tab_cos,
-								  double oridim, double shift_x, double shift_y, double shift_z = 0.);
+								  RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
 
 // Shift an image through phase-shifts in its Fourier Transform (without tabulated sine and cosine)
 // Note that in and out may be the same array, in that case in is overwritten with the result
@@ -759,7 +759,7 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 // or both can be in Angstroms
 void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 						          MultidimArray<Complex > &out,
-								  double oridim, double shift_x, double shift_y, double shift_z = 0.);
+								  RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
 
 #define POWER_SPECTRUM 0
 #define AMPLITUDE_SPECTRUM 1
@@ -768,32 +768,32 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
  * @ingroup FourierOperations
     i.e. the radial average of the (squared) amplitudes of all Fourier components
 */
-void getSpectrum(MultidimArray<double> &Min,
-                 MultidimArray<double> &spectrum,
+void getSpectrum(MultidimArray<RFLOAT> &Min,
+                 MultidimArray<RFLOAT> &spectrum,
                  int spectrum_type=POWER_SPECTRUM);
 
 /** Divide the input map in Fourier-space by the spectrum provided.
  * @ingroup FourierOperations
     If leave_origin_intact==true, the origin pixel will remain untouched
 */
-void divideBySpectrum(MultidimArray<double> &Min,
-                      MultidimArray<double> &spectrum,
+void divideBySpectrum(MultidimArray<RFLOAT> &Min,
+                      MultidimArray<RFLOAT> &spectrum,
                       bool leave_origin_intact=false);
 
 /** Multiply the input map in Fourier-space by the spectrum provided.
  * @ingroup FourierOperations
     If leave_origin_intact==true, the origin pixel will remain untouched
 */
-void multiplyBySpectrum(MultidimArray<double> &Min,
-                        MultidimArray<double> &spectrum,
+void multiplyBySpectrum(MultidimArray<RFLOAT> &Min,
+                        MultidimArray<RFLOAT> &spectrum,
                         bool leave_origin_intact=false);
 
 /** Perform a whitening of the amplitude/power_class spectrum of a 3D map
  * @ingroup FourierOperations
     If leave_origin_intact==true, the origin pixel will remain untouched
 */
-void whitenSpectrum(MultidimArray<double> &Min,
-                    MultidimArray<double> &Mout,
+void whitenSpectrum(MultidimArray<RFLOAT> &Min,
+                    MultidimArray<RFLOAT> &Mout,
                     int spectrum_type=AMPLITUDE_SPECTRUM,
                     bool leave_origin_intact=false);
 
@@ -801,45 +801,45 @@ void whitenSpectrum(MultidimArray<double> &Min,
  * @ingroup FourierOperations
     If only_amplitudes==true, the amplitude rather than the power_class spectrum will be equalized
 */
-void adaptSpectrum(MultidimArray<double> &Min,
-                   MultidimArray<double> &Mout,
-                   const MultidimArray<double> &spectrum_ref,
+void adaptSpectrum(MultidimArray<RFLOAT> &Min,
+                   MultidimArray<RFLOAT> &Mout,
+                   const MultidimArray<RFLOAT> &spectrum_ref,
                    int spectrum_type=AMPLITUDE_SPECTRUM,
                    bool leave_origin_intact=false);
 
 /** Kullback-Leibner divergence */
-double getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
-		MultidimArray<Complex > &Fref, MultidimArray<double> &sigma2,
-		MultidimArray<double> &p_i, MultidimArray<double> &q_i,
+RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
+		MultidimArray<Complex > &Fref, MultidimArray<RFLOAT> &sigma2,
+		MultidimArray<RFLOAT> &p_i, MultidimArray<RFLOAT> &q_i,
 		int highshell = -1, int lowshell = -1);
 
 
 // Resize a map by windowing it's Fourier Transform
-void resizeMap(MultidimArray<double > &img, int newsize);
+void resizeMap(MultidimArray<RFLOAT > &img, int newsize);
 
 // Apply a B-factor to a map (given it's Fourier transform)
-void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, double bfactor, double angpix);
+void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT bfactor, RFLOAT angpix);
 
 // Apply a B-factor to a map (given it's real-space array)
-void applyBFactorToMap(MultidimArray<double > &img, double bfactor, double angpix);
+void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpix);
 
 // Low-pass filter a map (given it's Fourier transform)
 void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
-		double low_pass, double angpix, int filter_edge_width = 2, bool do_highpass_instead = false);
+		RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2, bool do_highpass_instead = false);
 
 // Low-pass and high-pass filter a map (given it's real-space array)
-void lowPassFilterMap(MultidimArray<double > &img, double low_pass, double angpix, int filter_edge_width = 2);
-void highPassFilterMap(MultidimArray<double > &img, double low_pass, double angpix, int filter_edge_width = 2);
+void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
+void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
 
 /*
  *  Beamtilt x and y are given in mradians
  *  Wavelength in Angstrom, Cs in mm
  *  Phase shifts caused by the beamtilt will be calculated and applied to Fimg
  */
-void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, double beamtilt_x, double beamtilt_y,
-		double wavelength, double Cs, double angpix, int ori_size);
+void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
-void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, double beamtilt_x, double beamtilt_y,
-		double wavelength, double Cs, double angpix, int ori_size);
+void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 #endif

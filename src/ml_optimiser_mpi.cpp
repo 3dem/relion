@@ -79,7 +79,7 @@ void MlOptimiserMpi::initialise()
 	{
 		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
 		MetaDataTable MDsigma;
-		double val;
+		RFLOAT val;
 		int idx;
 		MDsigma.read(fn_sigma);
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
@@ -100,7 +100,7 @@ void MlOptimiserMpi::initialise()
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
-		MultidimArray<double> Mavg;
+		MultidimArray<RFLOAT> Mavg;
 		// Calculate initial sigma noise model from power_class spectra of the individual images
 		// This is done in parallel
 		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
@@ -272,7 +272,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 #endif
 }
 
-void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<double> &Mavg)
+void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg)
 {
 
 	// First calculate the sum of all individual power spectra on each subset
@@ -282,9 +282,9 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<dou
 	// When splitting the data into two random halves, perform two passes: one for each subset
 	int nr_subsets = (do_split_random_halves) ? 2 : 1;
 
-	MultidimArray<double> Msum, MsumI;
+	MultidimArray<RFLOAT> Msum, MsumI;
 	MultidimArray<int> Mnr, Msumnr;
-	double dsum;
+	RFLOAT dsum;
 	int isum;
 	MPI_Status status;
 
@@ -391,7 +391,7 @@ void MlOptimiserMpi::expectation()
 #endif
 
 	MultidimArray<long int> first_last_nr_images(6);
-	MultidimArray<double> metadata;
+	MultidimArray<RFLOAT> metadata;
 	int first_slave = 1;
 	// Use maximum of 100 particles for 3D and 10 particles for 2D estimations
 	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -797,9 +797,9 @@ void MlOptimiserMpi::expectation()
 
 						for (unsigned long n = 0; n < s; n++)
 						{
-							wsum_model.BPref[iclass].data.data[n].real += (double) reals[n];
-							wsum_model.BPref[iclass].data.data[n].imag += (double) imags[n];
-							wsum_model.BPref[iclass].weight.data[n] += (double) weights[n];
+							wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) reals[n];
+							wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) imags[n];
+							wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) weights[n];
 						}
 
 						delete [] reals;
@@ -857,7 +857,7 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 #ifdef TIMING
     timer.tic(TIMING_MPICOMBINEDISC);
 #endif
-	MultidimArray<double> Mpack;
+	MultidimArray<RFLOAT> Mpack;
 	FileName fn_pack;
 
 	int nr_subsets = (do_split_random_halves) ? 2 : 1;
@@ -979,7 +979,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 #endif
 
     // Pack all weighted sums in Mpack
-	MultidimArray<double> Mpack, Msum;
+	MultidimArray<RFLOAT> Mpack, Msum;
 	MPI_Status status;
 
 	// First slave manually sums over all other slaves of it's subset
@@ -1123,7 +1123,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalvesViaFile()
 	if (!do_split_random_halves)
 		REPORT_ERROR("MlOptimiserMpi::combineWeightedSumsTwoRandomHalvesViaFile BUG: you cannot combineWeightedSumsTwoRandomHalves if you have not split random halves");
 
-	MultidimArray<double> Mpack;
+	MultidimArray<RFLOAT> Mpack;
 	FileName fn_pack = fn_out + ".tmp";
         if (fn_scratch != "")
             fn_pack = fn_scratch + "/" + fn_pack;
@@ -1179,7 +1179,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 	if (!do_split_random_halves)
 		REPORT_ERROR("MlOptimiserMpi::combineWeightedSumsTwoRandomHalves BUG: you cannot combineWeightedSumsTwoRandomHalves if you have not split random halves");
 
-	MultidimArray<double> Mpack, Msum;
+	MultidimArray<RFLOAT> Mpack, Msum;
 	MPI_Status status;
 
 	int piece = 0;
@@ -1457,7 +1457,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 		REPORT_ERROR("BUG: you should not be in MlOptimiserMpi::joinTwoHalvesAtLowResolution!");
 
 	// Loop over all classes (this will be just one class for now...)
-	double myres = XMIPP_MAX(low_resol_join_halves, 1./mymodel.current_resolution);
+	RFLOAT myres = XMIPP_MAX(low_resol_join_halves, 1./mymodel.current_resolution);
 	int lowres_r_max = CEIL(mymodel.ori_size * mymodel.pixel_size / myres);
 
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++ )
@@ -1465,7 +1465,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > lowres_data;
-			MultidimArray<double > lowres_weight;
+			MultidimArray<RFLOAT > lowres_weight;
 			wsum_model.BPref[iclass].getLowResDataAndWeight(lowres_data, lowres_weight, lowres_r_max);
 
 			if (node->rank == 2)
@@ -1491,7 +1491,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 				std::cout << " Note that only for higher resolutions the FSC-values are according to the gold-standard!" << std::endl;
 				MPI_Status status;
 				MultidimArray<Complex > lowres_data_half2;
-				MultidimArray<double > lowres_weight_half2;
+				MultidimArray<RFLOAT > lowres_weight_half2;
 				lowres_data_half2.resize(lowres_data);
 				lowres_weight_half2.resize(lowres_weight);
 #ifdef DEBUG
@@ -1538,7 +1538,7 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 
 	if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 	{
-		Image<double> It;
+		Image<RFLOAT> It;
 		FileName fn_root = fn_out + "_half" + integerToString(node->rank);;
 
 		// Write out temporary arrays for all classes
@@ -1571,8 +1571,8 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 {
 	if (mymodel.ref_dim == 3)
 	{
-		MultidimArray<double> dummy;
-		Image<double> Iunreg, Itmp;
+		MultidimArray<RFLOAT> dummy;
+		Image<RFLOAT> Iunreg, Itmp;
 		FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
 		fn_root.compose(fn_root+"_class", iclass+1, "", 3);
 
@@ -1623,7 +1623,7 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 		wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 
 		// Update header information
-		double avg, stddev, minval, maxval;
+		RFLOAT avg, stddev, minval, maxval;
 	    Iunreg().computeStats(avg, stddev, minval, maxval);
 	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
 	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
@@ -1664,7 +1664,7 @@ void MlOptimiserMpi::compareTwoHalves()
 //#define DEBUG_FSC
 #ifdef DEBUG_FSC
 			MultidimArray<Complex > avg;
-			MultidimArray<double> Mavg;
+			MultidimArray<RFLOAT> Mavg;
 			Mavg.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
 			FourierTransformer transformer_debug;
 			transformer_debug.setReal(Mavg);
@@ -1673,7 +1673,7 @@ void MlOptimiserMpi::compareTwoHalves()
 			transformer_debug.inverseFourierTransform();
 			FileName fnt;
 			fnt.compose("downsampled_avg_half",node->rank,"spi");
-			Image<double> It;
+			Image<RFLOAT> It;
 			CenterFFT(Mavg, true);
 			It()=Mavg;
 			It.write(fnt);

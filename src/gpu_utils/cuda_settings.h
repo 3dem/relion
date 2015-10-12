@@ -7,6 +7,12 @@
 #define XFLOAT float
 #endif
 
+#ifdef RELION_SINGLE_PRECISION
+#define RFLOAT float
+#else
+#define RFLOAT double
+#endif
+
 #define MAX_RESOL_SHARED_MEM 32
 #define BLOCK_SIZE  128         	// -- Number of threads in a block --
 									// This is optimally set as big as possible without

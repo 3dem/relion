@@ -53,8 +53,8 @@ void DisplayBox::draw()
     //fl_pop_clip();
 }
 
-void DisplayBox::setData(MultidimArray<double> &img, MetaDataContainer *MDCin, int _ipos,
-		double _minval, double _maxval, double _scale, bool do_relion_scale)
+void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
+		RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
 {
 
 	scale = _scale;
@@ -70,7 +70,7 @@ void DisplayBox::setData(MultidimArray<double> &img, MetaDataContainer *MDCin, i
 	// For volumes only show the central slice
 	if (ZSIZE(img) > 1)
 	{
-		MultidimArray<double> slice;
+		MultidimArray<RFLOAT> slice;
 		img.getSlice(ZSIZE(img)/2, slice);
 		img=slice;
 	}
@@ -81,9 +81,9 @@ void DisplayBox::setData(MultidimArray<double> &img, MetaDataContainer *MDCin, i
 	xoff = (xsize_data < w() ) ? (w() - xsize_data) / 2 : 0;
 	yoff = (ysize_data < h() ) ? (h() - ysize_data) / 2 : 0;
 	img_data = new char [xsize_data * ysize_data];
-	double range = maxval - minval;
-	double step = range / 255; // 8-bit scaling range from 0 to 255
-	double* old_ptr=NULL;
+	RFLOAT range = maxval - minval;
+	RFLOAT step = range / 255; // 8-bit scaling range from 0 to 255
+	RFLOAT* old_ptr=NULL;
     long int n;
 
     // For micrographs use relion-scaling to avoid bias in down-sampled positions
@@ -163,7 +163,7 @@ bool DisplayBox::unSelect()
 }
 
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
-		double _minval, double _maxval, double _sigma_contrast, double _scale, double _ori_scale, int _ncol, bool _do_class,
+		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool _do_class,
 		MetaDataTable *_MDdata, int _nr_regroup, bool _is_data, MetaDataTable *_MDgroups)
 {
     // Scroll bars
@@ -171,14 +171,14 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 
     // Pre-set the canvas to the correct size
     FileName fn_img;
-    Image<double> img;
+    Image<RFLOAT> img;
     MDin.getValue(display_label, fn_img);
 	img.read(fn_img, false);
 	int nimgs = MDin.numberOfObjects();
 	if (viewer_type == MULTIVIEWER)
 	{
 		int xsize_canvas = _ncol * (CEIL(XSIZE(img())*_scale) + BOX_OFFSET);
-		int nrow = CEIL((double)nimgs/_ncol);
+		int nrow = CEIL((RFLOAT)nimgs/_ncol);
 		int ysize_canvas = nrow * (CEIL(YSIZE(img())*_scale) + BOX_OFFSET);
 		multiViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
 		canvas.SetScroll(&scroll);
@@ -220,9 +220,9 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 	}
 }
 
-int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<double> image, double _minval, double _maxval, double _sigma_contrast,
-		double _scale, int _particle_radius, FileName _fn_coords,
-		FileName _fn_color, FileName _fn_mic, FileName _color_label, double _color_blue_value, double _color_red_value)
+int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
+		RFLOAT _scale, int _particle_radius, FileName _fn_coords,
+		FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
     // Scroll bars
     Fl_Scroll scroll(0, 0, w(), h());
@@ -251,7 +251,7 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<double> image, doubl
 
 }
 
-int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<double> image, double _minval, double _maxval, double _sigma_contrast, double _scale)
+int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
     // Scroll bars
     Fl_Scroll scroll(0, 0, w(), h());
@@ -268,8 +268,8 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<double> image, doubl
 	return Fl::run();
 
 }
-int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, double _minval, double _maxval,
-		double _sigma_contrast, double _scale, int _ncol)
+int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol)
 {
 
 	ncol = _ncol;
@@ -325,7 +325,7 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 		if (fn_next_stack != fn_my_stack)
 		{
 
-			Image<double> stack, img;
+			Image<RFLOAT> stack, img;
 			fImageHandler* hFile;
 			if (do_read_whole_stacks)
 				// Read the entire stack into memory
@@ -346,13 +346,13 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 
 				if (_do_apply_orient)
 				{
-					double psi;
-					Matrix1D<double> offset(2);
+					RFLOAT psi;
+					Matrix1D<RFLOAT> offset(2);
 					MDin.getValue(EMDL_ORIENT_PSI, psi, my_ipos);
 					MDin.getValue(EMDL_ORIENT_ORIGIN_X, XX(offset), my_ipos);
 					MDin.getValue(EMDL_ORIENT_ORIGIN_Y, YY(offset), my_ipos);
 
-					Matrix2D<double> A;
+					Matrix2D<RFLOAT> A;
 					rotation2DMatrix(psi, A);
 				    MAT_ELEM(A,0, 2) = XX(offset);
 				    MAT_ELEM(A,1, 2) = YY(offset);
@@ -360,8 +360,8 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 				}
 
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
-				double myminval = _minval;
-				double mymaxval = _maxval;
+				RFLOAT myminval = _minval;
+				RFLOAT mymaxval = _maxval;
 				getImageContrast(img(), myminval, mymaxval, _sigma_contrast);
 
 				long int my_sorted_ipos = my_ipos;
@@ -410,7 +410,7 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 
 
 }
-int basisViewerCanvas::fill(MultidimArray<double> &image, double _minval, double _maxval, double _sigma_contrast, double _scale)
+int basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
 	xoff = yoff = 0;
 	nrow = ncol = 1;
@@ -428,14 +428,14 @@ int basisViewerCanvas::fill(MultidimArray<double> &image, double _minval, double
 
 }
 
-void basisViewerCanvas::getImageContrast(MultidimArray<double> &image, double &minval, double &maxval, double &sigma_contrast)
+void basisViewerCanvas::getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast)
 {
 	// First check whether to apply sigma-contrast, i.e. set minval and maxval to the mean +/- sigma_contrast times the stddev
 	bool redo_minmax = (sigma_contrast > 0. || minval != maxval);
 
 	if (sigma_contrast > 0. || minval == maxval)
 	{
-		double avg, stddev;
+		RFLOAT avg, stddev;
 		image.computeStats(avg, stddev, minval, maxval);
 		if (sigma_contrast > 0.)
 		{
@@ -449,7 +449,7 @@ void basisViewerCanvas::getImageContrast(MultidimArray<double> &image, double &m
 	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(image)
 		{
-			double val = DIRECT_MULTIDIM_ELEM(image, n);
+			RFLOAT val = DIRECT_MULTIDIM_ELEM(image, n);
 			if (val > maxval)
 				DIRECT_MULTIDIM_ELEM(image, n) = maxval;
 			else if (val < minval)
@@ -686,8 +686,8 @@ void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
 {
 	int xsize = boxes[0]->xsize_data;
 	int ysize = boxes[0]->ysize_data;
-	MultidimArray<double> sum(ysize, xsize);
-	MultidimArray<double> sum2(ysize, xsize);
+	MultidimArray<RFLOAT> sum(ysize, xsize);
+	MultidimArray<RFLOAT> sum2(ysize, xsize);
 
 	int nn = 0;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
@@ -745,7 +745,7 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	/*
 	FileName fn_img;
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
-	Image<double> img;
+	Image<RFLOAT> img;
 	img.read(fn_img);
     basisViewerWindow win(CEIL(ori_scale*XSIZE(img())), CEIL(ori_scale*YSIZE(img())), fn_img.c_str());
     if (sigma_contrast > 0.)
@@ -931,8 +931,8 @@ int singleViewerCanvas::handle(int ev)
 		{
 			int ival = boxes[0]->img_data[ry*boxes[0]->xsize_data + rx];
 			if (ival < 0) ival += 256;
-			double step = (boxes[0]->maxval - boxes[0]->minval) / 255.;
-			double dval = ival * step + boxes[0]->minval;
+			RFLOAT step = (boxes[0]->maxval - boxes[0]->minval) / 255.;
+			RFLOAT dval = ival * step + boxes[0]->minval;
 			int ysc = ROUND(ry/boxes[0]->scale);
 			int xsc = ROUND(rx/boxes[0]->scale);
 			int yscp = ysc - ROUND((boxes[0]->ysize_data/(2.* boxes[0]->scale)));
@@ -991,7 +991,7 @@ int singleViewerCanvas::handle(int ev)
 			fl_circle(postdrag_xc, postdrag_yc, 3);
 			int dx = postdrag_xc - predrag_xc;
 			int dy = postdrag_yc - predrag_yc;
-			double dist = sqrt((double)(dx*dx + dy*dy));
+			RFLOAT dist = sqrt((RFLOAT)(dx*dx + dy*dy));
 			std::string text =  floatToString(dist/boxes[0]->scale) + " pixels";
 			fl_draw(text.c_str(), (postdrag_xc + predrag_xc)/2, (postdrag_yc + predrag_yc)/2);
 			// Also write to the screen, in case the text falls outside the screen
@@ -1013,22 +1013,22 @@ void singleViewerCanvas::printHelp()
 
 void pickerViewerCanvas::draw()
 {
-	double scale = boxes[0]->scale;
+	RFLOAT scale = boxes[0]->scale;
 
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
 	{
-		double xcoor, ycoor;
+		RFLOAT xcoor, ycoor;
 		MDcoords.getValue(EMDL_IMAGE_COORD_X, xcoor);
 		MDcoords.getValue(EMDL_IMAGE_COORD_Y, ycoor);
 
 		if (color_label != EMDL_UNDEFINED)
 		{
-			double colval;
+			RFLOAT colval;
 			if (EMDL::isInt(color_label))
 			{
 				int ival;
 				MDcoords.getValue(color_label, ival);
-				colval = (double)ival;
+				colval = (RFLOAT)ival;
 			}
 			else
 			{
@@ -1073,17 +1073,17 @@ int pickerViewerCanvas::handle(int ev)
 
 	if (ev==FL_PUSH || (ev==FL_DRAG && Fl::event_button() == FL_MIDDLE_MOUSE) )
 	{
-		double scale = boxes[0]->scale;
+		RFLOAT scale = boxes[0]->scale;
 		int xc = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
 		int yc = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
-		double xcoor = (double)ROUND(xc/scale);
-		double ycoor = (double)ROUND(yc/scale);
-		double rad2 = particle_radius*particle_radius/(scale*scale);
+		RFLOAT xcoor = (RFLOAT)ROUND(xc/scale);
+		RFLOAT ycoor = (RFLOAT)ROUND(yc/scale);
+		RFLOAT rad2 = particle_radius*particle_radius/(scale*scale);
 		if (Fl::event_button() == FL_LEFT_MOUSE)
 		{
 			// Left mouse for picking
 			// Check the pick is not inside an existing circle
-			double xcoor_p, ycoor_p;
+			RFLOAT xcoor_p, ycoor_p;
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
 			{
 				MDcoords.getValue(EMDL_IMAGE_COORD_X, xcoor_p);
@@ -1107,17 +1107,17 @@ int pickerViewerCanvas::handle(int ev)
 			}
 			if (MDcoords.containsLabel(EMDL_ORIENT_PSI))
 			{
-				double psi = -999.;
+				RFLOAT psi = -999.;
 				MDcoords.setValue(EMDL_ORIENT_PSI, psi);
 			}
 			if (MDcoords.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
 			{
-				double fom = -999.;
+				RFLOAT fom = -999.;
 				MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
 			}
 			if (MDcoords.containsLabel(color_label))
 			{
-				double z = -999.;
+				RFLOAT z = -999.;
 				MDcoords.setValue(color_label, z);
 			}
 
@@ -1128,7 +1128,7 @@ int pickerViewerCanvas::handle(int ev)
 		{
 			boxes[0]->redraw();
 			// Middle mouse for deleting
-			double xcoor_p, ycoor_p;
+			RFLOAT xcoor_p, ycoor_p;
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
 			{
 				MDcoords.getValue(EMDL_IMAGE_COORD_X, xcoor_p);
@@ -1275,7 +1275,7 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 	}
 	else
 	{
-		double val = -999.;
+		RFLOAT val = -999.;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
 		{
 			MDcoords.setValue(color_label, val);
@@ -1296,11 +1296,11 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 			iimg--; // counting starts at 1 in STAR file!
 
 			// Check that this entry in the coord file has the same xpos and ypos
-			double my_xpos, my_ypos;
+			RFLOAT my_xpos, my_ypos;
 			MDcoords.getValue(EMDL_IMAGE_COORD_X, my_xpos, iimg);
 			MDcoords.getValue(EMDL_IMAGE_COORD_Y, my_ypos, iimg);
 
-			double x, y;
+			RFLOAT x, y;
 			MDcolor.getValue(EMDL_IMAGE_COORD_X, x);
 			MDcolor.getValue(EMDL_IMAGE_COORD_Y, y);
 
@@ -1321,7 +1321,7 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 				}
 				else
 				{
-					double val;
+					RFLOAT val;
 					MDcolor.getValue(color_label, val);
 					MDcoords.setValue(color_label, val, iimg);
 				}
@@ -1839,7 +1839,7 @@ int Displayer::runGui()
 	else
 	{
 		// Try reading as an image/stack header
-		Image<double> img;
+		Image<RFLOAT> img;
 		img.read(_fn_in, false);
 		win.is_multi = (ZSIZE(img()) * NSIZE(img()) > 1);
 	}
@@ -1856,7 +1856,7 @@ int Displayer::run()
     else if (do_pick)
     {
 
-        Image<double> img;
+        Image<RFLOAT> img;
         img.read(fn_in); // dont read data yet: only header to get size
 
         if (lowpass > 0.)
@@ -1901,7 +1901,7 @@ int Displayer::run()
     else
     {
         // Attempt to read a single-file image
-        Image<double> img;
+        Image<RFLOAT> img;
         img.read(fn_in, false); // dont read data yet: only header to get size
 
         MDin.clear();
@@ -1929,7 +1929,7 @@ int Displayer::run()
         	// Use a single minval and maxval for all slice
         	if (minval == maxval)
         	{
-        		Image<double> It;
+        		Image<RFLOAT> It;
         		It.read(fn_in);
         		It().computeDoubleMinMax(minval, maxval);
         	}

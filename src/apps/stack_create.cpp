@@ -71,7 +71,7 @@ class stack_create_parameters
 		if (do_split_per_micrograph && !MD.containsLabel(EMDL_MICROGRAPH_NAME))
 			REPORT_ERROR("ERROR: Input STAR file does not contain the rlnMicrographName label");
 
-		Image<double> in;
+		Image<RFLOAT> in;
 		FileName fn_img, fn_mic;
 		std::vector<FileName> fn_mics;
 		std::vector<int> mics_ndims;
@@ -131,9 +131,9 @@ class stack_create_parameters
 
 			// Resize the output image
 			std::cout << "Resizing the output stack to "<< ndim<<" images of size: "<<xdim<<"x"<<ydim<<"x"<<zdim << std::endl;
-			double Gb = ndim*zdim*ydim*xdim*8./1024./1024./1024.;
+			RFLOAT Gb = ndim*zdim*ydim*xdim*8./1024./1024./1024.;
 			std::cout << "This will require " << Gb << "Gb of memory...."<< std::endl;
-			Image<double> out(xdim, ydim, zdim, ndim);
+			Image<RFLOAT> out(xdim, ydim, zdim, ndim);
 
 			int n = 0;
 			init_progress_bar(ndim);
@@ -153,14 +153,14 @@ class stack_create_parameters
 
 					if (do_apply_trans)
 					{
-						double xoff = 0.;
-						double yoff = 0.;
-						double psi = 0.;
+						RFLOAT xoff = 0.;
+						RFLOAT yoff = 0.;
+						RFLOAT psi = 0.;
 						MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
 						MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
 						MD.getValue(EMDL_ORIENT_PSI, psi);
 						// Apply the actual transformation
-						Matrix2D<double> A;
+						Matrix2D<RFLOAT> A;
 						rotation2DMatrix(psi, A);
 					    MAT_ELEM(A,0, 2) = xoff;
 					    MAT_ELEM(A,1, 2) = yoff;

@@ -55,7 +55,7 @@
 #include <fstream>
 #include <typeinfo>
 
-void fitStraightLine(std::vector<fit_point2D> &points, double &slope, double &intercept, double &corr_coeff)
+void fitStraightLine(std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff)
 {
 	// From: http://mathworld.wolfram.com/LeastSquaresFitting.html
 	// ss_xx = Sum_i x_i^2 - n ave_x^2
@@ -64,12 +64,12 @@ void fitStraightLine(std::vector<fit_point2D> &points, double &slope, double &in
 	// slope = xx_xy / ss_xx
 	// intercept = ave_y - slope * ave_x
 	// corr_coeff = ss_xy^2 / (ss_xx * ss_yy)
-	double ss_xy = 0.;
-	double ss_xx = 0.;
-	double ss_yy = 0.;
-	double ave_x = 0.;
-	double ave_y = 0.;
-	double sum_w = 0.;
+	RFLOAT ss_xy = 0.;
+	RFLOAT ss_xx = 0.;
+	RFLOAT ss_yy = 0.;
+	RFLOAT ave_x = 0.;
+	RFLOAT ave_y = 0.;
+	RFLOAT sum_w = 0.;
 	for (int i = 0; i < points.size(); i++)
 	{
 		ave_x += points[i].w * points[i].x;
@@ -100,9 +100,9 @@ void fitStraightLine(std::vector<fit_point2D> &points, double &slope, double &in
 }
 
 /* Value of a blob --------------------------------------------------------- */
-double kaiser_value(double r, double a, double alpha, int m)
+RFLOAT kaiser_value(RFLOAT r, RFLOAT a, RFLOAT alpha, int m)
 {
-    double rda, rdas, arg, w;
+    RFLOAT rda, rdas, arg, w;
     rda = r / a;
     rdas = rda * rda;
     if (rdas <= 1.0)
@@ -149,9 +149,9 @@ double kaiser_value(double r, double a, double alpha, int m)
 /* Value of line integral through Kaiser-Bessel radial function
    (n >=2 dimensions) at distance s from center of function.
    Parameter m = 0, 1, or 2. */
-double kaiser_proj(double s, double a, double alpha, int m)
+RFLOAT kaiser_proj(RFLOAT s, RFLOAT a, RFLOAT alpha, int m)
 {
-    double sda, sdas, w, arg, p;
+    RFLOAT sda, sdas, w, arg, p;
     sda = s / a;
     sdas = sda * sda;
     w = 1.0 - sdas;
@@ -188,9 +188,9 @@ double kaiser_proj(double s, double a, double alpha, int m)
     return p;
 }
 /* Fourier value of a blob ------------------------------------------------- */
-double kaiser_Fourier_value(double w, double a, double alpha, int m)
+RFLOAT kaiser_Fourier_value(RFLOAT w, RFLOAT a, RFLOAT alpha, int m)
 {
-    double sigma = sqrt(ABS(alpha * alpha - (2. * PI * a * w) * (2. * PI * a * w)));
+    RFLOAT sigma = sqrt(ABS(alpha * alpha - (2. * PI * a * w) * (2. * PI * a * w)));
     if (m == 2)
     {
         if (2.*PI*a*w > alpha)
@@ -213,9 +213,9 @@ double kaiser_Fourier_value(double w, double a, double alpha, int m)
     	REPORT_ERROR("m out of range in kaiser_Fourier_value()");
 }
 /* Volume integral of a blob ----------------------------------------------- */
-double  basvolume(double a, double alpha, int m, int n)
+RFLOAT  basvolume(RFLOAT a, RFLOAT alpha, int m, int n)
 {
-    double  hn, tpi, v;
+    RFLOAT  hn, tpi, v;
     hn = 0.5 * n;
     tpi = 2.0 * PI;
     if (alpha == 0.0)
@@ -232,14 +232,14 @@ double  basvolume(double a, double alpha, int m, int n)
         else                        /* n odd                                */
             v = pow(tpi / alpha, hn) * i_nph(n / 2 + m, alpha) / i_n(m, alpha);
     }
-    return v * pow(a, (double)n);
+    return v * pow(a, (RFLOAT)n);
 }
 /* Bessel function I_n (x),  n = 0, 1, 2, ...
  Use ONLY for small values of n     */
-double i_n(int n, double x)
+RFLOAT i_n(int n, RFLOAT x)
 {
     int i;
-    double i_ns1, i_n, i_np1;
+    RFLOAT i_ns1, i_n, i_np1;
     if (n == 0)   return bessi0(x);
     if (n == 1)   return bessi1(x);
     if (x == 0.0) return 0.0;
@@ -254,11 +254,11 @@ double i_n(int n, double x)
     return i_n;
 }
 /*.....Bessel function I_(n+1/2) (x),  n = 0, 1, 2, ..........................*/
-double i_nph(int n, double x)
+RFLOAT i_nph(int n, RFLOAT x)
 {
     int i;
-    double r2dpix;
-    double i_ns1, i_n, i_np1;
+    RFLOAT r2dpix;
+    RFLOAT i_ns1, i_n, i_np1;
     if (x == 0.0) return 0.0;
     r2dpix = sqrt(2.0 / (PI * x));
     i_ns1 = r2dpix * cosh(x);
@@ -272,10 +272,10 @@ double i_nph(int n, double x)
     return i_n;
 }
 /*....Limit (z->0) of (1/z)^n I_n(z)..........................................*/
-double in_zeroarg(int n)
+RFLOAT in_zeroarg(int n)
 {
     int i;
-    double fact;
+    RFLOAT fact;
     fact = 1.0;
     for (i = 1; i <= n; i++)
     {
@@ -284,10 +284,10 @@ double in_zeroarg(int n)
     return fact;
 }
 /*.......Limit (z->0) of (1/z)^(n+1/2) I_(n+1/2) (z)..........................*/
-double inph_zeroarg(int n)
+RFLOAT inph_zeroarg(int n)
 {
     int i;
-    double fact;
+    RFLOAT fact;
     fact = 1.0;
     for (i = 1; i <= n; i++)
     {
@@ -296,46 +296,46 @@ double inph_zeroarg(int n)
     return fact*sqrt(2.0 / PI);
 }
 /* Zero freq --------------------------------------------------------------- */
-double blob_freq_zero(struct blobtype b)
+RFLOAT blob_freq_zero(struct blobtype b)
 {
     return sqrt(b.alpha*b.alpha + 6.9879*6.9879) / (2*PI*b.radius);
 }
 /* Attenuation ------------------------------------------------------------- */
-double blob_att(double w, struct blobtype b)
+RFLOAT blob_att(RFLOAT w, struct blobtype b)
 {
     return blob_Fourier_val(w, b) / blob_Fourier_val(0, b);
 }
 /* Number of operations ---------------------------------------------------- */
-double blob_ops(double w, struct blobtype b)
+RFLOAT blob_ops(RFLOAT w, struct blobtype b)
 {
     return pow(b.alpha*b.alpha + 6.9879*6.9879, 1.5) / b.radius;
 }
 
 /* Gaussian value ---------------------------------------------------------- */
-double gaussian1D(double x, double sigma, double mu)
+RFLOAT gaussian1D(RFLOAT x, RFLOAT sigma, RFLOAT mu)
 {
     x -= mu;
     return 1 / sqrt(2*PI*sigma*sigma)*exp(-0.5*((x / sigma)*(x / sigma)));
 }
 
 /* t-student value -------------------------------------------------------- */
-double tstudent1D(double x, double df, double sigma, double mu)
+RFLOAT tstudent1D(RFLOAT x, RFLOAT df, RFLOAT sigma, RFLOAT mu)
 {
     x -= mu;
-    double norm = exp(gammln((df+1.)/2.)) / exp(gammln(df/2.));
+    RFLOAT norm = exp(gammln((df+1.)/2.)) / exp(gammln(df/2.));
     norm /= sqrt(df*PI*sigma*sigma);
     return norm * pow((1 + (x/sigma)*(x/sigma)/df),-((df+1.)/2.));
 
 }
 
-double gaussian2D(double x, double y, double sigmaX, double sigmaY,
-                  double ang, double muX, double muY)
+RFLOAT gaussian2D(RFLOAT x, RFLOAT y, RFLOAT sigmaX, RFLOAT sigmaY,
+                  RFLOAT ang, RFLOAT muX, RFLOAT muY)
 {
     // Express x,y in the gaussian internal coordinates
     x -= muX;
     y -= muY;
-    double xp = cos(ang) * x + sin(ang) * y;
-    double yp = -sin(ang) * x + cos(ang) * y;
+    RFLOAT xp = cos(ang) * x + sin(ang) * y;
+    RFLOAT yp = -sin(ang) * x + cos(ang) * y;
 
     // Now evaluate
     return 1 / sqrt(2*PI*sigmaX*sigmaY)*exp(-0.5*((xp / sigmaX)*(xp / sigmaX) +
@@ -343,36 +343,36 @@ double gaussian2D(double x, double y, double sigmaX, double sigmaY,
 }
 
 /* ICDF Gaussian ----------------------------------------------------------- */
-double icdf_gauss(double p)
+RFLOAT icdf_gauss(RFLOAT p)
 {
-    const double c[] =
+    const RFLOAT c[] =
         {
             2.515517, 0.802853, 0.010328
         };
-    const double d[] =
+    const RFLOAT d[] =
         {
             1.432788, 0.189269, 0.001308
         };
     if (p < 0.5)
     {
         // F^-1(p) = - G^-1(p)
-        double t=sqrt(-2.0*log(p));
-        double z=t - ((c[2]*t + c[1])*t + c[0]) /
+        RFLOAT t=sqrt(-2.0*log(p));
+        RFLOAT z=t - ((c[2]*t + c[1])*t + c[0]) /
                  (((d[2]*t + d[1])*t + d[0])*t + 1.0);
         return -z;
     }
     else
     {
         // F^-1(p) = G^-1(1-p)
-        double t=sqrt(-2.0*log(1-p));
-        double z=t - ((c[2]*t + c[1])*t + c[0]) /
+        RFLOAT t=sqrt(-2.0*log(1-p));
+        RFLOAT z=t - ((c[2]*t + c[1])*t + c[0]) /
                  (((d[2]*t + d[1])*t + d[0])*t + 1.0);
         return z;
     }
 }
 
 /* CDF Gaussian ------------------------------------------------------------ */
-double cdf_gauss(double x)
+RFLOAT cdf_gauss(RFLOAT x)
 {
     return 0.5 * (1. + erf(x/sqrt(2.)));
 }
@@ -418,17 +418,17 @@ arithmetic   domain     # trials      peak         rms
 Cephes Math Library Release 2.8:  June, 2000
 Copyright 1984, 1987, 1995, 2000 by Stephen L. Moshier
 *************************************************************************/
-double cdf_tstudent(int k, double t)
+RFLOAT cdf_tstudent(int k, RFLOAT t)
 {
-    double EPS=5E-16;
-    double result;
-    double x;
-    double rk;
-    double z;
-    double f;
-    double tz;
-    double p;
-    double xsqk;
+    RFLOAT EPS=5E-16;
+    RFLOAT result;
+    RFLOAT x;
+    RFLOAT rk;
+    RFLOAT z;
+    RFLOAT f;
+    RFLOAT tz;
+    RFLOAT p;
+    RFLOAT xsqk;
     int j;
 
     if ( t==0 )
@@ -495,17 +495,17 @@ double cdf_tstudent(int k, double t)
 
 /* Snedecor's F ------------------------------------------------------------ */
 // http://en.wikipedia.org/wiki/F-distribution
-double cdf_FSnedecor(int d1, int d2, double x)
+RFLOAT cdf_FSnedecor(int d1, int d2, RFLOAT x)
 {
     return betai(0.5*d1,0.5*d2,(d1*x)/(d1*x+d2));
 }
 
-double icdf_FSnedecor(int d1, int d2, double p)
+RFLOAT icdf_FSnedecor(int d1, int d2, RFLOAT p)
 {
-    double xl=0, xr=1e6;
-    double pl=cdf_FSnedecor(d1,d2,xl);
-    double pr=cdf_FSnedecor(d1,d2,xr);
-    double xm, pm;
+    RFLOAT xl=0, xr=1e6;
+    RFLOAT pl=cdf_FSnedecor(d1,d2,xl);
+    RFLOAT pr=cdf_FSnedecor(d1,d2,xr);
+    RFLOAT xm, pm;
     do
     {
         xm=(xl+xr)*0.5;
@@ -572,11 +572,11 @@ float rnd_unif(float a, float b)
 }
 
 // t-distribution
-float rnd_student_t(double nu)
+float rnd_student_t(RFLOAT nu)
 {
     return tdev(nu, &idum);
 }
-float rnd_student_t(double nu, float a, float b)
+float rnd_student_t(RFLOAT nu, float a, float b)
 {
     if (b == 0)
         return a;
@@ -717,7 +717,7 @@ float rnd_log(float a, float b)
 /* Log2 -------------------------------------------------------------------- */
 // Does not work with xlc compiler
 //#ifndef __xlC__
-//double log2(double value)
+//RFLOAT log2(RFLOAT value)
 //{
 //    return 3.32192809488736*log10(value);
 //    // log10(value)/log10(2)

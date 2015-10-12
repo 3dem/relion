@@ -55,8 +55,8 @@
 #include "src/metadata_label.h"
 
 //useful to init values to zero
-//static double zeroD=0.;
-//static double    oneD=1.;
+//static RFLOAT zeroD=0.;
+//static RFLOAT    oneD=1.;
 //static bool  falseb=false;
 
 class MetaDataContainer
@@ -64,7 +64,7 @@ class MetaDataContainer
 	//Labels is just to keep the order of things
 	std::vector<EMDLabel> labels;
 
-    std::map<EMDLabel, double *> doubles;
+    std::map<EMDLabel, RFLOAT *> RFLOATs;
     std::map<EMDLabel, int *> ints;
     std::map<EMDLabel, long *> longs;
     std::map<EMDLabel, bool *> bools;
@@ -109,9 +109,9 @@ public:
      */
     void clear(void)
     {
-    	for (std::map<EMDLabel, double *>::iterator it = doubles.begin(); it != doubles.end(); ++it)
+    	for (std::map<EMDLabel, RFLOAT *>::iterator it = RFLOATs.begin(); it != RFLOATs.end(); ++it)
     		delete it->second;
-    	doubles.clear();
+    	RFLOATs.clear();
     	for (std::map<EMDLabel, int *>::iterator it = ints.begin(); it != ints.end(); ++it)
     		delete it->second;
     	ints.clear();
@@ -133,7 +133,7 @@ public:
      *  If the name does not exist in the container, the function returns false
      *
      */
-    bool getValue( const EMDLabel name, double &value);
+    bool getValue( const EMDLabel name, RFLOAT &value);
     bool getValue( const EMDLabel name, int &value);
     bool getValue( const EMDLabel name, long int &value);
     bool getValue( const EMDLabel name, bool &value);
@@ -142,10 +142,10 @@ public:
     // Check whether this label is present in the container
     bool valueExists(EMDLabel name);
 
-    bool pairExists(EMDLabel name, const double value)
+    bool pairExists(EMDLabel name, const RFLOAT value)
     {
-        std::map<EMDLabel, double *>::iterator It = doubles.find(name);
-        if (It != doubles.end())
+        std::map<EMDLabel, RFLOAT *>::iterator It = RFLOATs.find(name);
+        if (It != RFLOATs.end())
             if (ABS( *It->second - value ) < XMIPP_EQUAL_ACCURACY)
                 return true;
         return false;

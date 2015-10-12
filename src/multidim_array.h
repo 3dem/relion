@@ -281,7 +281,7 @@ extern std::string floatToString(float F, int _width, int _prec);
  *
  * @code
  * SPEED_UP_temps;
- * MultidimArray< double > V1(10, 10, 10), V2(20, 20, 20);
+ * MultidimArray< RFLOAT > V1(10, 10, 10), V2(20, 20, 20);
  * V1.setXmippOrigin();
  * V2.setXmippOrigin();
  *
@@ -587,7 +587,7 @@ public:
      * different memory assignment.
      *
      * @code
-     * MultidimArray< double > V2(V1);
+     * MultidimArray< RFLOAT > V2(V1);
      * @endcode
      */
     MultidimArray(const MultidimArray<T>& V)
@@ -1391,7 +1391,7 @@ public:
      * TRUE if the logical index given is outside the definition region of this
      * array.
      */
-    bool outside(const Matrix1D<double> &r) const
+    bool outside(const Matrix1D<RFLOAT> &r) const
     {
         if (r.size() < 1)
         {
@@ -1524,7 +1524,7 @@ public:
      * TRUE if the logical index given is a corner of the definition region of this
      * array.
      */
-    bool isCorner(const Matrix1D< double >& v) const
+    bool isCorner(const Matrix1D< RFLOAT >& v) const
     {
         if (v.size() < 2)
             REPORT_ERROR( "isCorner: index vector has got not enough components");
@@ -1551,7 +1551,7 @@ public:
     ///@name Access to the pixel values
     //@{
 
-    /** Volume element access via double vector.
+    /** Volume element access via RFLOAT vector.
      *
      * Returns the value of a matrix logical position, but this time the
      * element position is determined by a R3 vector. The elements can be used
@@ -1566,7 +1566,7 @@ public:
      * val = V(vectorR3(1, -2, 0));
      * @endcode
      */
-    T& operator()(const Matrix1D< double >& v) const
+    T& operator()(const Matrix1D< RFLOAT >& v) const
     {
         switch (VEC_XSIZE(v))
         {
@@ -1830,7 +1830,7 @@ public:
      * choosen column.
      *
      * @code
-     * std::vector< double > v;
+     * std::vector< RFLOAT > v;
      * m.getCol(-1, v);
      * @endcode
      */
@@ -1881,7 +1881,7 @@ public:
      * logical not physical.
      *
      * @code
-     * std::vector< double > v;
+     * std::vector< RFLOAT > v;
      * m.getRow(-2, v);
      * @endcode
      */
@@ -2014,18 +2014,18 @@ public:
      *
      * (x,y,z) are in logical coordinates.
      */
-    T interpolatedElement3D(double x, double y, double z, T outside_value = (T) 0, long int n = 0)
+    T interpolatedElement3D(RFLOAT x, RFLOAT y, RFLOAT z, T outside_value = (T) 0, long int n = 0)
     {
         long int x0 = FLOOR(x);
-        double fx = x - x0;
+        RFLOAT fx = x - x0;
         long int x1 = x0 + 1;
 
         long int y0 = FLOOR(y);
-        double fy = y - y0;
+        RFLOAT fy = y - y0;
         long int y1 = y0 + 1;
 
         long int z0 = FLOOR(z);
-        double fz = z - z0;
+        RFLOAT fz = z - z0;
         long int z1 = z0 + 1;
 
         T d000 = (outside(z0, y0, x0)) ? outside_value : NZYX_ELEM(*this, n, z0, y0, x0);
@@ -2037,12 +2037,12 @@ public:
         T d110 = (outside(z1, y1, x0)) ? outside_value : NZYX_ELEM(*this, n, z1, y1, x0);
         T d111 = (outside(z1, y1, x1)) ? outside_value : NZYX_ELEM(*this, n, z1, y1, x1);
 
-        double dx00 = LIN_INTERP(fx, (double) d000, (double) d001);
-        double dx01 = LIN_INTERP(fx, (double) d100, (double) d101);
-        double dx10 = LIN_INTERP(fx, (double) d010, (double) d011);
-        double dx11 = LIN_INTERP(fx, (double) d110, (double) d111);
-        double dxy0 = LIN_INTERP(fy, (double) dx00, (double) dx10);
-        double dxy1 = LIN_INTERP(fy, (double) dx01, (double) dx11);
+        RFLOAT dx00 = LIN_INTERP(fx, (RFLOAT) d000, (RFLOAT) d001);
+        RFLOAT dx01 = LIN_INTERP(fx, (RFLOAT) d100, (RFLOAT) d101);
+        RFLOAT dx10 = LIN_INTERP(fx, (RFLOAT) d010, (RFLOAT) d011);
+        RFLOAT dx11 = LIN_INTERP(fx, (RFLOAT) d110, (RFLOAT) d111);
+        RFLOAT dxy0 = LIN_INTERP(fy, (RFLOAT) dx00, (RFLOAT) dx10);
+        RFLOAT dxy1 = LIN_INTERP(fy, (RFLOAT) dx01, (RFLOAT) dx11);
 
         return (T) LIN_INTERP(fz, dxy0, dxy1);
     }
@@ -2051,13 +2051,13 @@ public:
      *
      * Bilinear interpolation. (x,y) are in logical coordinates.
      */
-    inline T interpolatedElement2D(double x, double y, T outside_value = (T) 0, long int n = 0) const
+    inline T interpolatedElement2D(RFLOAT x, RFLOAT y, T outside_value = (T) 0, long int n = 0) const
     {
         long int x0 = FLOOR(x);
-        double fx = x - x0;
+        RFLOAT fx = x - x0;
         long int x1 = x0 + 1;
         long int y0 = FLOOR(y);
-        double fy = y - y0;
+        RFLOAT fy = y - y0;
         long int y1 = y0 + 1;
 
         T d00 = outside(y0, x0) ? outside_value : NZYX_ELEM(*this, n, 0, y0, x0);
@@ -2065,8 +2065,8 @@ public:
         T d11 = outside(y1, x1) ? outside_value : NZYX_ELEM(*this, n, 0, y1, x1);
         T d01 = outside(y0, x1) ? outside_value : NZYX_ELEM(*this, n, 0, y0, x1);
 
-        double d0 = (T) LIN_INTERP(fx, (double) d00, (double) d01);
-        double d1 = (T) LIN_INTERP(fx, (double) d10, (double) d11);
+        RFLOAT d0 = (T) LIN_INTERP(fx, (RFLOAT) d00, (RFLOAT) d01);
+        RFLOAT d1 = (T) LIN_INTERP(fx, (RFLOAT) d10, (RFLOAT) d11);
         return (T) LIN_INTERP(fy, d0, d1);
     }
     //@}
@@ -2088,7 +2088,7 @@ public:
     void printStats(std::ostream& out = std::cout) const
     {
         T minval, maxval;
-        double avgval, devval;
+        RFLOAT avgval, devval;
 
         computeStats(avgval, devval, minval, maxval);
 
@@ -2275,14 +2275,14 @@ public:
 
     /** Minimum and maximum of the values in the array.
      *
-     * As doubles.
+     * As RFLOATs.
      */
-    void computeDoubleMinMax(double& minval, double& maxval) const
+    void computeDoubleMinMax(RFLOAT& minval, RFLOAT& maxval) const
     {
         if (NZYXSIZE(*this) <= 0)
             return;
 
-        minval = maxval = static_cast< double >(data[0]);
+        minval = maxval = static_cast< RFLOAT >(data[0]);
 
         T* ptr=NULL;
         long int n;
@@ -2290,28 +2290,28 @@ public:
         {
             T val=*ptr;
             if (val < minval)
-                minval = static_cast< double >(val);
+                minval = static_cast< RFLOAT >(val);
             else if (val > maxval)
-                maxval = static_cast< double >(val);
+                maxval = static_cast< RFLOAT >(val);
         }
     }
 
     /** Average of the values in the array.
      *
-     * The returned value is always double, independently of the type of the
+     * The returned value is always RFLOAT, independently of the type of the
      * array.
      */
-    double computeAvg() const
+    RFLOAT computeAvg() const
     {
         if (NZYXSIZE(*this) <= 0)
             return 0;
 
-        double sum = 0;
+        RFLOAT sum = 0;
 
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        sum += static_cast< double >(*ptr);
+        sum += static_cast< RFLOAT >(*ptr);
 
         return sum / NZYXSIZE(*this);
     }
@@ -2319,21 +2319,21 @@ public:
     /** Standard deviation of the values in the array.
      *
      * Be careful that the standard deviation and NOT the variance is returned.
-     * The returned value is always double, independently of the type of the
+     * The returned value is always RFLOAT, independently of the type of the
      * array.
      */
-    double computeStddev() const
+    RFLOAT computeStddev() const
     {
         if (NZYXSIZE(*this) <= 1)
             return 0;
 
-        double avg = 0, stddev = 0;
+        RFLOAT avg = 0, stddev = 0;
 
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         {
-            double val=static_cast< double >(*ptr);
+            RFLOAT val=static_cast< RFLOAT >(*ptr);
             avg += val;
             stddev += val * val;
         }
@@ -2343,7 +2343,7 @@ public:
         stddev *= NZYXSIZE(*this) / (NZYXSIZE(*this) - 1);
 
         // Foreseeing numerical instabilities
-        stddev = sqrt(static_cast<double>((ABS(stddev))));
+        stddev = sqrt(static_cast<RFLOAT>((ABS(stddev))));
 
         return stddev;
     }
@@ -2353,7 +2353,7 @@ public:
      * The average, standard deviation, minimum and maximum value are
      * returned.
      */
-    void computeStats(double& avg, double& stddev, T& minval, T& maxval) const
+    void computeStats(RFLOAT& avg, RFLOAT& stddev, T& minval, T& maxval) const
     {
         if (NZYXSIZE(*this) <= 0)
             return;
@@ -2368,7 +2368,7 @@ public:
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         {
             T Tval=*ptr;
-            double val=static_cast< double >(Tval);
+            RFLOAT val=static_cast< RFLOAT >(Tval);
             avg += val;
             stddev += val * val;
 
@@ -2386,7 +2386,7 @@ public:
             stddev *= NZYXSIZE(*this) / (NZYXSIZE(*this) - 1);
 
             // Foreseeing numerical instabilities
-            stddev = sqrt(static_cast< double >(ABS(stddev)));
+            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
         }
         else
             stddev = 0;
@@ -2400,7 +2400,7 @@ public:
      * med = v1.computeMedian();
      * @endcode
      */
-    double computeMedian() const
+    RFLOAT computeMedian() const
     {
         if (XSIZE(*this) == 0)
             return 0;
@@ -2409,7 +2409,7 @@ public:
             return DIRECT_MULTIDIM_ELEM(*this,0);
 
         // Initialise data
-        MultidimArray< double > temp(*this);
+        MultidimArray< RFLOAT > temp(*this);
 
         // Sort indexes
         temp.sort();
@@ -2438,15 +2438,15 @@ public:
         if (NZYXSIZE(*this) <= 0)
             return;
 
-        double min0, max0;
+        RFLOAT min0, max0;
         computeDoubleMinMax(min0, max0);
 
         // If max0==min0, it means that the vector is a constant one, so the
         // only possible transformation is to a fixed minF
-        double slope;
+        RFLOAT slope;
         if (max0 != min0)
-            slope = static_cast< double >(maxF - minF) /
-                    static_cast< double >(max0 - min0);
+            slope = static_cast< RFLOAT >(maxF - minF) /
+                    static_cast< RFLOAT >(max0 - min0);
         else
             slope = 0;
 
@@ -2454,7 +2454,7 @@ public:
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         *ptr = minF + static_cast< T >(slope *
-                                       static_cast< double >(*ptr - min0));
+                                       static_cast< RFLOAT >(*ptr - min0));
     }
 
     /** Adjust the range of the array to a given one within a mask.
@@ -2475,7 +2475,7 @@ public:
         if (MULTIDIM_SIZE(*this) <= 0)
             return;
 
-        double min0, max0;
+        RFLOAT min0, max0;
         bool first=true;
         T* ptr=NULL;
         long int n;
@@ -2487,7 +2487,7 @@ public:
                 T val= *ptr;
                 if (first)
                 {
-                    min0=max0=(double)val;
+                    min0=max0=(RFLOAT)val;
                     first=false;
                 }
                 else
@@ -2501,16 +2501,16 @@ public:
 
         // If max0==min0, it means that the vector is a constant one, so the
         // only possible transformation is to a fixed minF
-        double slope;
+        RFLOAT slope;
         if (max0 != min0)
-            slope = static_cast< double >(maxF - minF) /
-                    static_cast< double >(max0 - min0);
+            slope = static_cast< RFLOAT >(maxF - minF) /
+                    static_cast< RFLOAT >(max0 - min0);
         else
             slope = 0;
 
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         *ptr = minF + static_cast< T >(slope *
-                                       static_cast< double >(*ptr - min0));
+                                       static_cast< RFLOAT >(*ptr - min0));
     }
 
     /** Adjust the range of the array to the range of another array in
@@ -2521,9 +2521,9 @@ public:
      * (L2 sense) to the values of the array shown as sample
      */
 
-    //As written this will only work for T=double
+    //As written this will only work for T=RFLOAT
     //nevertheless since this is used is better
-    //to use T than double or will create problem for int multidim arrays
+    //to use T than RFLOAT or will create problem for int multidim arrays
     void rangeAdjust(const MultidimArray<T> &example,
                      const MultidimArray<int> *mask=NULL)
     {
@@ -2531,7 +2531,7 @@ public:
             return;
 
         // y=a+bx
-        double sumx=0, sumy=0, sumxy=0, sumx2=0;
+        RFLOAT sumx=0, sumy=0, sumxy=0, sumx2=0;
 
         T* ptrExample=MULTIDIM_ARRAY(example);
         int* ptrMask=NULL;
@@ -2539,7 +2539,7 @@ public:
             ptrMask=MULTIDIM_ARRAY(*mask);
         T* ptr=NULL;
         long int n;
-        double N=0;
+        RFLOAT N=0;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         {
             bool process=true;
@@ -2560,10 +2560,10 @@ public:
             if (mask!=NULL)
                 ptrMask++;
         }
-        double b=(N*sumxy-sumx*sumy)/(N*sumx2-sumx*sumx);
-        double a=sumy/N-b*sumx/N;
+        RFLOAT b=(N*sumxy-sumx*sumy)/(N*sumx2-sumx*sumx);
+        RFLOAT a=sumy/N-b*sumx/N;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        *ptr = static_cast< double >(a+b * static_cast< double > (*ptr));
+        *ptr = static_cast< RFLOAT >(a+b * static_cast< RFLOAT > (*ptr));
     }
 
     /** Adjust the average and stddev of the array to given values.
@@ -2578,10 +2578,10 @@ public:
      * @endcode
      */
     // This function must be explictly implemented outside.
-    void statisticsAdjust(double avgF, double stddevF)
+    void statisticsAdjust(RFLOAT avgF, RFLOAT stddevF)
     {
-        double avg0, stddev0;
-        double a, b;
+        RFLOAT avg0, stddev0;
+        RFLOAT a, b;
 
         if (NZYXSIZE(*this) == 0)
             return;
@@ -2590,23 +2590,23 @@ public:
         computeStats(avg0, stddev0, minval, maxval);
 
         if (stddev0 != 0)
-            a = static_cast< double >(stddevF) / static_cast< double >(stddev0);
+            a = static_cast< RFLOAT >(stddevF) / static_cast< RFLOAT >(stddev0);
         else
             a = 0;
 
-        b = static_cast< double >(avgF) - a * static_cast< double >(avg0);
+        b = static_cast< RFLOAT >(avgF) - a * static_cast< RFLOAT >(avg0);
 
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        *ptr = static_cast< T >(a * static_cast< double > (*ptr) + b);
+        *ptr = static_cast< T >(a * static_cast< RFLOAT > (*ptr) + b);
     }
     //@}
 
     /** @name Array "by" array operations.
      *
      * These are operations that are performed between 2 arrays of the
-     * SAME type (two integer vectors, two double matrices, ...). If they
+     * SAME type (two integer vectors, two RFLOAT matrices, ...). If they
      * are not of the same type you can convert one of the arrays to the
      * desired type using the function typeCast. The result must have been
      * defined to be of the same type as the operands.
@@ -2982,7 +2982,7 @@ public:
     /** Same value in all components.
      *
      * The constant must be of a type compatible with the array type, ie,
-     * you cannot  assign a double to an integer array without a casting.
+     * you cannot  assign a RFLOAT to an integer array without a casting.
      * It is not an error if the array is empty, then nothing is done.
      *
      * @code
@@ -3083,12 +3083,12 @@ public:
      */
     void initLinear(T minF, T maxF, int n = 1, const std::string& mode = "incr")
     {
-        double slope;
+        RFLOAT slope;
         int steps;
 
         if (mode == "incr")
         {
-            steps = 1 + (int) FLOOR((double) ABS((maxF - minF)) / ((double) n));
+            steps = 1 + (int) FLOOR((RFLOAT) ABS((maxF - minF)) / ((RFLOAT) n));
             slope = n * SGN(maxF - minF);
         }
         else if (mode == "steps")
@@ -3105,7 +3105,7 @@ public:
         {
             resize(steps);
             for (int i = 0; i < steps; i++)
-                A1D_ELEM(*this, i) = (T)((double) minF + slope * i);
+                A1D_ELEM(*this, i) = (T)((RFLOAT) minF + slope * i);
         }
     }
 
@@ -3130,7 +3130,7 @@ public:
      * // gaussian distribution with 0 mean and stddev=1
      * @endcode
      */
-    void initRandom(double op1, double op2, const std::string& mode = "uniform")
+    void initRandom(RFLOAT op1, RFLOAT op2, const std::string& mode = "uniform")
     {
         T* ptr=NULL;
         long int n;
@@ -3171,10 +3171,10 @@ public:
 
      * @endcode
      */
-    void addNoise(double op1,
-                  double op2,
+    void addNoise(RFLOAT op1,
+                  RFLOAT op2,
                   const std::string& mode = "uniform",
-                  double df = 3.) const
+                  RFLOAT df = 3.) const
     {
         T* ptr=NULL;
         unsigned long int n;
@@ -3204,7 +3204,7 @@ public:
      *
      * This function must be used only as a preparation for routines which need
      * that the first physical index is 1 and not 0 as it usually is in C. New
-     * memory is needed to hold the new double pointer array.
+     * memory is needed to hold the new RFLOAT pointer array.
      */
     T*** adaptForNumericalRecipes3D(long int n = 0) const
     {
@@ -3228,7 +3228,7 @@ public:
      *
      * This function must be used only as a preparation for routines which need
      * that the first physical index is 1 and not 0 as it usually is in C. New
-     * memory is needed to hold the new double pointer array.
+     * memory is needed to hold the new RFLOAT pointer array.
      */
     T** adaptForNumericalRecipes2D(long int n = 0) const
     {
@@ -3304,10 +3304,10 @@ public:
 
     /** Computes the center of mass of the nth array
      */
-    void centerOfMass(Matrix1D< double >& center, void * mask=NULL, long int n = 0)
+    void centerOfMass(Matrix1D< RFLOAT >& center, void * mask=NULL, long int n = 0)
     {
         center.initZeros(3);
-        double mass = 0;
+        RFLOAT mass = 0;
         MultidimArray< int >* imask = (MultidimArray< int >*) mask;
 
         FOR_ALL_ELEMENTS_IN_ARRAY3D(*this)
@@ -3535,7 +3535,7 @@ public:
      */
     void substitute(T oldv,
                     T newv,
-                    double accuracy = XMIPP_EQUAL_ACCURACY,
+                    RFLOAT accuracy = XMIPP_EQUAL_ACCURACY,
                     MultidimArray<int> * mask = NULL )
     {
         T* ptr=NULL;
@@ -3555,7 +3555,7 @@ public:
     void randomSubstitute(T oldv,
                           T avgv,
                           T sigv,
-                          double accuracy = XMIPP_EQUAL_ACCURACY,
+                          RFLOAT accuracy = XMIPP_EQUAL_ACCURACY,
                           MultidimArray<int> * mask = NULL )
     {
         T* ptr=NULL;
@@ -3572,8 +3572,8 @@ public:
      * than val+accuracy by 1 and the rest are set to 0. Use threshold to get a
      * very powerful binarization.
      */
-    void binarize(double val = 0,
-                  double accuracy = XMIPP_EQUAL_ACCURACY,
+    void binarize(RFLOAT val = 0,
+                  RFLOAT accuracy = XMIPP_EQUAL_ACCURACY,
                   MultidimArray<int> * mask = NULL )
     {
         T* ptr=NULL;
@@ -3690,7 +3690,7 @@ public:
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        *ptr = static_cast< T >(sqrt(static_cast< double >(*ptr)));
+        *ptr = static_cast< T >(sqrt(static_cast< RFLOAT >(*ptr)));
     }
 
     /** Sum of matrix values.
@@ -3698,12 +3698,12 @@ public:
      * This function returns the sum of all internal values.
      *
      * @code
-     * double sum = m.sum();
+     * RFLOAT sum = m.sum();
      * @endcode
      */
-    double sum() const
+    RFLOAT sum() const
     {
-        double sum = 0;
+        RFLOAT sum = 0;
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
@@ -3717,12 +3717,12 @@ public:
      * power_class.
      *
      * @code
-     * double sum2 = m.sum2();
+     * RFLOAT sum2 = m.sum2();
      * @endcode
      */
-    double sum2() const
+    RFLOAT sum2() const
     {
-        double sum = 0;
+        RFLOAT sum = 0;
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
@@ -3739,7 +3739,7 @@ public:
         T* ptr=NULL;
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        *ptr = static_cast< T >(log10(static_cast< double >(*ptr)));
+        *ptr = static_cast< T >(log10(static_cast< RFLOAT >(*ptr)));
     }
 
     /** Reverse matrix values over X axis, keep in this object.
@@ -3883,13 +3883,13 @@ public:
      * in the line is N.
      */
     void profile(long int x0, long int y0, long int xF, long int yF, long int N,
-                 MultidimArray< double >& profile) const
+                 MultidimArray< RFLOAT >& profile) const
     {
         checkDimension(2);
         profile.initZeros(N);
-        double tx_step = (double)(xF - x0) / (N - 1);
-        double ty_step = (double)(yF - y0) / (N - 1);
-        double tx = x0, ty = y0;
+        RFLOAT tx_step = (RFLOAT)(xF - x0) / (N - 1);
+        RFLOAT ty_step = (RFLOAT)(yF - y0) / (N - 1);
+        RFLOAT tx = x0, ty = y0;
 
         for (long int i = 0; i < N; i++)
         {
@@ -4103,7 +4103,7 @@ public:
      * than the argument and the same values (within accuracy).
      */
     bool equal(const MultidimArray<T>& op,
-               double accuracy = XMIPP_EQUAL_ACCURACY) const
+               RFLOAT accuracy = XMIPP_EQUAL_ACCURACY) const
     {
         if (!sameShape(op) || data==NULL || op.data == NULL)
             return false;
@@ -4121,7 +4121,7 @@ public:
 
 /** Conversion from one type to another.
  *
- * If we have an integer array and we need a double one, we can use this
+ * If we have an integer array and we need a RFLOAT one, we can use this
  * function. The conversion is done through a type casting of each element
  * If n >= 0, only the nth volumes will be converted, otherwise all NSIZE volumes
  */
@@ -4154,7 +4154,7 @@ void typeCast(const MultidimArray<T1>& v1,  MultidimArray<T2>& v2, long n = -1)
 /** Force positive.
  *  A median filter is applied at those negative values. Positive values are untouched.
  */
-void forcePositive(MultidimArray<double> &V);
+void forcePositive(MultidimArray<RFLOAT> &V);
 
 /** MultidimArray equality.*/
 template<typename T>
@@ -4177,12 +4177,12 @@ bool operator!=(const MultidimArray<T>& op1, const MultidimArray<T>& op2)
  * computed.
  *
  * @code
- * MultidimArray< double > V1(4, 5, 3);
+ * MultidimArray< RFLOAT > V1(4, 5, 3);
  * V1.startingX() = -2;
  * V1.startingY() = -2;
  * V1.startingZ() = -2;
  *
- * MultidimArray< double > V2(4, 2, 3);
+ * MultidimArray< RFLOAT > V2(4, 2, 3);
  * V2.startingX() = 0;
  * V2.startingY() = 0;
  * V2.startingZ() = 0;
@@ -4216,7 +4216,7 @@ std::ostream& operator<< (std::ostream& ostrm, const MultidimArray<T>& v)
     else
         ostrm << std::endl;
 
-    double max_val = ABS(DIRECT_A3D_ELEM(v , 0, 0, 0));
+    RFLOAT max_val = ABS(DIRECT_A3D_ELEM(v , 0, 0, 0));
 
     T* ptr;
     long int n;
@@ -4228,7 +4228,7 @@ std::ostream& operator<< (std::ostream& ostrm, const MultidimArray<T>& v)
     if (YSIZE(v)==1 && ZSIZE(v)==1)
     {
         for (long int j = STARTINGX(v); j <= FINISHINGX(v); j++)
-            ostrm << floatToString((double) A3D_ELEM(v, 0, 0, j), 10, prec)
+            ostrm << floatToString((RFLOAT) A3D_ELEM(v, 0, 0, j), 10, prec)
             << std::endl;
     }
     else
@@ -4245,7 +4245,7 @@ std::ostream& operator<< (std::ostream& ostrm, const MultidimArray<T>& v)
                 {
                     for (long int j = STARTINGX(v); j <= FINISHINGX(v); j++)
                     {
-                        ostrm << floatToString((double) A3D_ELEM(v, k, i, j), 10, prec) << ' ';
+                        ostrm << floatToString((RFLOAT) A3D_ELEM(v, k, i, j), 10, prec) << ' ';
                     }
                     ostrm << std::endl;
                 }

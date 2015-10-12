@@ -25,7 +25,7 @@ class star_compare_parameters
 {
 	public:
    	FileName fn1, fn2, fn_both, fn_only1, fn_only2, fn_label1, fn_label2, fn_label3;
-	double eps;
+	RFLOAT eps;
    	MetaDataTable MD1, MD2, MDonly1, MDonly2, MDboth;
 	// I/O Parser
 	IOParser parser;
@@ -47,10 +47,10 @@ class star_compare_parameters
 	    fn_both = parser.getOption("--both", "Output STAR file with entries from both input STAR files ", "");
 	    fn_only1 = parser.getOption("--only1", "Output STAR file with entries that only occur in the 1st input STAR files ", "");
 	    fn_only2 = parser.getOption("--only2", "Output STAR file with entries that only occur in the 2nd input STAR files ", "");
-	    fn_label1 = parser.getOption("--label1", "1st metadata label for the comparison (may be string, int or double)", "");
-	    fn_label2 = parser.getOption("--label2", "2nd metadata label for the comparison (double only) for 2D/3D-distance)", "");
-	    fn_label3 = parser.getOption("--label3", "3rd metadata label for the comparison (double only) for 3D-distance)", "");
-	    eps = textToFloat(parser.getOption("--max_dist", "Maximum distance to consider a match (for int and double only)", "0."));
+	    fn_label1 = parser.getOption("--label1", "1st metadata label for the comparison (may be string, int or RFLOAT)", "");
+	    fn_label2 = parser.getOption("--label2", "2nd metadata label for the comparison (RFLOAT only) for 2D/3D-distance)", "");
+	    fn_label3 = parser.getOption("--label3", "3rd metadata label for the comparison (RFLOAT only) for 3D-distance)", "");
+	    eps = textToFloat(parser.getOption("--max_dist", "Maximum distance to consider a match (for int and RFLOAT only)", "0."));
 
       	// Check for errors in the command-line option
     	if (parser.checkForErrors())

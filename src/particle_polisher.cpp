@@ -109,7 +109,7 @@ void ParticlePolisher::initialise()
 	// Get the pixel size from the input STAR file
 	if (exp_model.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && exp_model.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 	{
-		double mag, dstep;
+		RFLOAT mag, dstep;
 		exp_model.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
 		exp_model.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 		angpix = 10000. * dstep / mag;
@@ -157,8 +157,8 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 
 	{
 		long int part_id = exp_model.particles[ipart].id;
-		double xoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 0);
-		double yoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 1);
+		RFLOAT xoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 0);
+		RFLOAT yoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 1);
 		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_X, xoff, part_id);
 		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, yoff, part_id);
 	}
@@ -181,9 +181,9 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 {
 
-	std::vector<double> x_pick, y_pick, x_off_prior, y_off_prior, x_start, x_end, dummy; // X and Y-coordinates for the average particles in the micrograph
-	std::vector< std::vector<double> > x_off, y_off; // X and Y shifts w.r.t. the average for each movie frame
-	double x_pick_p, y_pick_p, x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
+	std::vector<RFLOAT> x_pick, y_pick, x_off_prior, y_off_prior, x_start, x_end, dummy; // X and Y-coordinates for the average particles in the micrograph
+	std::vector< std::vector<RFLOAT> > x_off, y_off; // X and Y shifts w.r.t. the average for each movie frame
+	RFLOAT x_pick_p, y_pick_p, x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
 
 
 	// Loop over all original_particles in this average_micrograph
@@ -228,15 +228,15 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	}
 
 	// Now do the actual fitting
-	double gauss_const = 1. / sqrt(2 * PI * sigma_neighbour_distance * sigma_neighbour_distance);
-	double min2sigma2 = - 2. * sigma_neighbour_distance * sigma_neighbour_distance;
+	RFLOAT gauss_const = 1. / sqrt(2 * PI * sigma_neighbour_distance * sigma_neighbour_distance);
+	RFLOAT min2sigma2 = - 2. * sigma_neighbour_distance * sigma_neighbour_distance;
 	// Loop over all ori_particles
 	for (long int ipar = 0; ipar < (exp_model.average_micrographs[imic]).ori_particles_id.size(); ipar++)
 	{
 		long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
 
-		double my_pick_x = x_pick[ipar] + x_off_prior[ipar];
-		double my_pick_y = y_pick[ipar] + y_off_prior[ipar];
+		RFLOAT my_pick_x = x_pick[ipar] + x_off_prior[ipar];
+		RFLOAT my_pick_y = y_pick[ipar] + y_off_prior[ipar];
 
 		fit_point2D      onepoint;
 		std::vector<fit_point2D> points_x, points_y;
@@ -245,10 +245,10 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 		for (long int ii = 0; ii < x_pick.size(); ii++)
 		{
 
-			double nb_pick_x = x_pick[ii] + x_off_prior[ii]; // add prior to center at average position
-			double nb_pick_y = y_pick[ii] + y_off_prior[ii]; // add prior to center at average position
-			double dist2 = (nb_pick_x - my_pick_x) * (nb_pick_x - my_pick_x) + (nb_pick_y - my_pick_y) * (nb_pick_y - my_pick_y);
-			double weight;
+			RFLOAT nb_pick_x = x_pick[ii] + x_off_prior[ii]; // add prior to center at average position
+			RFLOAT nb_pick_y = y_pick[ii] + y_off_prior[ii]; // add prior to center at average position
+			RFLOAT dist2 = (nb_pick_x - my_pick_x) * (nb_pick_x - my_pick_x) + (nb_pick_y - my_pick_y) * (nb_pick_y - my_pick_y);
+			RFLOAT weight;
 			if (ABS(min2sigma2) < 0.01)
 				weight = (dist2 < 0.01) ? 1. : 0.;
 			else
@@ -276,8 +276,8 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 			}
 		}
 
-		double slope_x, intercept_x, ccf_x;
-		double slope_y, intercept_y, ccf_y;
+		RFLOAT slope_x, intercept_x, ccf_x;
+		RFLOAT slope_y, intercept_y, ccf_y;
 		fitStraightLine(points_x, slope_x, intercept_x, ccf_x);
 		fitStraightLine(points_y, slope_y, intercept_y, ccf_y);
 
@@ -322,7 +322,7 @@ void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 		return;
 	}
 
-	double bfactor, offset, corr_coeff;
+	RFLOAT bfactor, offset, corr_coeff;
 
 	// Loop over all frames to be included in the reconstruction
 	int my_nr_frames = last_frame - first_frame + 1;
@@ -434,16 +434,16 @@ void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
         REPORT_ERROR( (std::string)"ParticlePolisher::writeStarFileRelativeWeights: Cannot write file: " + fn_star);
 
     // First pre-calculate the sum of all weights at every frequency
-    MultidimArray<double> sumweight_per_shell(ori_size/2), cumulative_relweight_per_shell(ori_size/2);
+    MultidimArray<RFLOAT> sumweight_per_shell(ori_size/2), cumulative_relweight_per_shell(ori_size/2);
     sumweight_per_shell.initZeros();
     for (int iframe = 0; iframe < XSIZE(perframe_bfactors)/3; iframe++ )
    	{
-    	double bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
-    	double offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
+    	RFLOAT bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
+    	RFLOAT offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
 		for (int i = 1; i < ori_size/2; i++) // ignore origin
 		{
-			double res = (double)i / (ori_size * angpix); // resolution in 1/A
-			double w = exp( (bfactor / 4.)  * res * res  + offset);
+			RFLOAT res = (RFLOAT)i / (ori_size * angpix); // resolution in 1/A
+			RFLOAT w = exp( (bfactor / 4.)  * res * res  + offset);
 
 			DIRECT_A1D_ELEM(sumweight_per_shell, i) += w;
 		}
@@ -454,8 +454,8 @@ void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
     for (int iframe = 0; iframe < XSIZE(perframe_bfactors)/3; iframe++ )
     {
 
-    	double bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
-    	double offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
+    	RFLOAT bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
+    	RFLOAT offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
 
     	MetaDataTable MDout;
 		std::string fn_table = "relative_weights_frame_" + integerToString(first_frame + iframe);
@@ -463,8 +463,8 @@ void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
 
 		for (int i = 1; i < ori_size/2; i++) // ignore origin
 		{
-			double res = (double)i / (ori_size * angpix); // resolution in 1/A
-			double w = exp( (bfactor / 4.)  * res * res  + offset);
+			RFLOAT res = (RFLOAT)i / (ori_size * angpix); // resolution in 1/A
+			RFLOAT w = exp( (bfactor / 4.)  * res * res  + offset);
 
 			w /= DIRECT_A1D_ELEM(sumweight_per_shell, i); // from absolute to relative weight
 			DIRECT_A1D_ELEM(cumulative_relweight_per_shell, i) += w;
@@ -495,7 +495,7 @@ void ParticlePolisher::calculateAverageAllSingleFrameReconstructions(int this_ha
 		return;
 	}
 
-	Image<double> Isum, Ione;
+	Image<RFLOAT> Isum, Ione;
 	for (long int this_frame = first_frame; this_frame <= last_frame; this_frame++)
 	{
     	FileName fn_vol;
@@ -546,13 +546,13 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 
 	CTF ctf;
 	std::string dum;
-	Matrix2D<double> A3D;
+	Matrix2D<RFLOAT> A3D;
 	MultidimArray<Complex > Faux, F2D, F2Dp, Fsub;
-	MultidimArray<double> Fweight, Fctf;
-	Image<double> img, vol;
+	MultidimArray<RFLOAT> Fweight, Fctf;
+	Image<RFLOAT> img, vol;
 	FourierTransformer transformer;
-	double xtrans, ytrans;
-	double rot, tilt, psi;
+	RFLOAT xtrans, ytrans;
+	RFLOAT rot, tilt, psi;
 	int i_half;
 	long int i_frame;
 	FileName fn_img, fn_mic;
@@ -606,14 +606,14 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 	}
 
 	// Now do the reconstruction
-	MultidimArray<double> dummy;
+	MultidimArray<RFLOAT> dummy;
 	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy);
 
 	vol.write(fn_vol);
 
 }
 
-void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame, double &bfactor, double &offset, double &corr_coeff)
+void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame, RFLOAT &bfactor, RFLOAT &offset, RFLOAT &corr_coeff)
 {
 
 	if (NZYXSIZE(Imask()) == 0)
@@ -632,8 +632,8 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 		fn_root_half.compose(fn_in.withoutExtension() + "_" + fn_out+"_frame",this_frame,"", 3);
 
 	FileName fn_half1, fn_half2;
-	Image<double> I1, I2;
-	MultidimArray<double> fsc_frame;
+	Image<RFLOAT> I1, I2;
+	MultidimArray<RFLOAT> fsc_frame;
 	I1.read(fn_root_half + "_half1_class001_unfil.mrc");
 	I2.read(fn_root_half + "_half2_class001_unfil.mrc");
 
@@ -666,12 +666,12 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 		std::vector<fit_point2D> guinier;
 		for (int i = 1; i < XSIZE(fsc_frame); i++) // ignore origin
 		{
-			double res = (double)i / (XSIZE(I1()) * angpix); // resolution in 1/A
-			double resang = 1. / res;
-			double res2 = res*res;
+			RFLOAT res = (RFLOAT)i / (XSIZE(I1()) * angpix); // resolution in 1/A
+			RFLOAT resang = 1. / res;
+			RFLOAT res2 = res*res;
 
-			double fsc_f = DIRECT_A1D_ELEM(fsc_frame, i);
-			double fsc_a = DIRECT_A1D_ELEM(fsc_average, i);
+			RFLOAT fsc_f = DIRECT_A1D_ELEM(fsc_frame, i);
+			RFLOAT fsc_a = DIRECT_A1D_ELEM(fsc_average, i);
 
 			if (resang < fit_minres && resang > perframe_highres && fsc_f < 1 && fsc_a < 1 && fsc_f > 0.143 && fsc_a > 0.143)
 			{
@@ -679,7 +679,7 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 				// I could have calculated the same using: ln(tau_f / tau_a)   = ln(tau_f) - ln(tau_a)
 				// where tau_f = sqrt (FSC_f / (1 - FSC_f)) and tau_a = sqrt (FSC_a / (1 - FSC_a))
 				// This is numerically identical
-				double logreltau = log( sqrt( (fsc_f - fsc_f * fsc_a) / (fsc_a - fsc_f * fsc_a) ) );
+				RFLOAT logreltau = log( sqrt( (fsc_f - fsc_f * fsc_a) / (fsc_a - fsc_f * fsc_a) ) );
 
 				onepoint.x = res2;
 				onepoint.y = logreltau;
@@ -759,7 +759,7 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 
 			// The orientations and offsets in this line of the metadatatable come only from a single frame!!!
 			// Use the ones stored in the prior instead.
-			double xoff, yoff, rot, tilt, psi;
+			RFLOAT xoff, yoff, rot, tilt, psi;
 			MDshiny.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR, xoff);
 			MDshiny.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, yoff);
 			MDshiny.getValue(EMDL_ORIENT_ROT_PRIOR, rot);
@@ -810,14 +810,14 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 
 	// Then read in all individual movie frames, apply frame x,y-movements as phase shifts and calculate polished (shiny) particles
 	// as average of the re-aligned frames
-	double x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
+	RFLOAT x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
 	FileName fn_img, fn_part;
-	Image<double> img;
+	Image<RFLOAT> img;
 	FourierTransformer transformer;
 	MultidimArray<Complex > Fimg, Fwsum;
-	MultidimArray<double> Fsumw;
-	double xtrans, ytrans;
-	double all_minval = 99999., all_maxval = -99999., all_avg = 0., all_stddev = 0.;
+	MultidimArray<RFLOAT> Fsumw;
+	RFLOAT xtrans, ytrans;
+	RFLOAT all_minval = 99999., all_maxval = -99999., all_avg = 0., all_stddev = 0.;
 
 	// Loop over all original_particles in this average_micrograph
 	for (long int ipar = 0; ipar < exp_model.average_micrographs[imic].ori_particles_id.size(); ipar++)
@@ -845,7 +845,7 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 			}
 
 			img.read(fn_img);
-			double ori_size= XSIZE(img());
+			RFLOAT ori_size= XSIZE(img());
 
 			// Get the image shifts relative to the prior
 			xtrans = x_off_p - x_off_prior_p;
@@ -854,7 +854,7 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 #ifdef DEBUG
 			if (fn_part =="000001@Particles/Micrographs/Falcon_2012_06_13-01_05_13_0_rh15particles.mrcs")
 			{
-				double xp, yp;
+				RFLOAT xp, yp;
 				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, xp, part_id);
 				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, yp, part_id);
 				std::cerr << " x_off_prior_p= " << x_off_prior_p << " x_off_p= " << x_off_p << " xp= " << xp << std::endl;
@@ -876,14 +876,14 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 
 			// Apply (positive!!) B-factor weighting and store weighted sums
 			int iframe = i_frame - first_frame;
-			double bfactor = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3*iframe + 0) : 0.;
-			double offset  = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3*iframe + 1) : 0.;
+			RFLOAT bfactor = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3*iframe + 0) : 0.;
+			RFLOAT offset  = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3*iframe + 1) : 0.;
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
 			{
-				double res = sqrt((double)ip * ip + jp * jp) / (XSIZE(img()) * angpix); // get resolution in 1/Angstrom
+				RFLOAT res = sqrt((RFLOAT)ip * ip + jp * jp) / (XSIZE(img()) * angpix); // get resolution in 1/Angstrom
 				if (res <= 1. / (angpix * 2.) ) // Apply B-factor weighting until Nyquist
 				{
-					double w = exp( (bfactor / 4)  * res * res  + offset);
+					RFLOAT w = exp( (bfactor / 4)  * res * res  + offset);
 					DIRECT_A2D_ELEM(Fwsum, i, j) += w * DIRECT_A2D_ELEM(Fimg, i, j);
 					DIRECT_A2D_ELEM(Fsumw, i, j) += w;
 				}
@@ -902,7 +902,7 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 			normalise(img, bg_radius, white_dust_stddev, black_dust_stddev);
 
 		// Calculate statistics for the (normalised?) particle
-		double minval, maxval, avgval, stddev;
+		RFLOAT minval, maxval, avgval, stddev;
 		img().computeStats(avgval, stddev, minval, maxval);
 
 		// Keep track of overall statistics for all particles in this field-of-view
@@ -989,8 +989,8 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 	if (verb > 0)
 		std::cout << " + Setting Fourier transforms of the two shiny half-reconstructions ..." << std::endl;
 
-	MultidimArray<double> dum;
-	Image<double> refvol;
+	MultidimArray<RFLOAT> dum;
+	Image<RFLOAT> refvol;
 	FileName fn_vol;
 	fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half1_class001_unfil.mrc";
 	refvol.read(fn_vol);
@@ -1032,13 +1032,13 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 
 	CTF ctf;
 	std::string dum;
-	Matrix2D<double> A3D;
+	Matrix2D<RFLOAT> A3D;
 	MultidimArray<Complex > Faux, F2D, Fsub;
-	MultidimArray<double> Fweight, Fctf;
-	Image<double> img, vol;
+	MultidimArray<RFLOAT> Fweight, Fctf;
+	Image<RFLOAT> img, vol;
 	FourierTransformer transformer;
-	double xtrans, ytrans;
-	double rot, tilt, psi;
+	RFLOAT xtrans, ytrans;
+	RFLOAT rot, tilt, psi;
 	int i_half;
 	long int i_frame;
 	FileName fn_img;
@@ -1088,7 +1088,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 	}
 
 	// Now do the reconstruction
-	MultidimArray<double> dummy;
+	MultidimArray<RFLOAT> dummy;
 	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy);
 
 	vol.write(fn_vol);
@@ -1183,9 +1183,9 @@ void ParticlePolisher::initialiseSquaredDifferenceVectors()
 	if (beamtilt_max > 0.)
 	{
 		int n_steps = CEIL(beamtilt_max / beamtilt_step);
-		for (double tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
+		for (RFLOAT tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
 		{
-			for (double tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
+			for (RFLOAT tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
 			{
 				if (sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max)
 				{
@@ -1213,21 +1213,21 @@ void ParticlePolisher::applyOptimisedBeamTiltsAndDefocus()
 		int n_steps = CEIL(beamtilt_max / beamtilt_step);
 
 		best_beamtilts.clear();
-		Matrix1D<double> my_tilts(2);
+		Matrix1D<RFLOAT> my_tilts(2);
 		for (int igroup = 0; igroup < fn_beamtilt_groups.size(); igroup++)
 		{
-			double mindiff2 = 99.e99;
-			double best_tilt_x, best_tilt_y;
+			RFLOAT mindiff2 = 99.e99;
+			RFLOAT best_tilt_x, best_tilt_y;
 			if (verb > 0)
 				std::cout << " + Beamtilt group " << fn_beamtilt_groups[igroup] << std::endl;
 			int n_tilt= 0;
-			for (double tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
+			for (RFLOAT tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
 			{
-				for (double tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
+				for (RFLOAT tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
 				{
 					if (sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max)
 					{
-						double diff2 = DIRECT_A2D_ELEM(diff2_beamtilt, igroup, n_tilt);
+						RFLOAT diff2 = DIRECT_A2D_ELEM(diff2_beamtilt, igroup, n_tilt);
 						if (verb > 1)
 							std::cout << " + tilt_x = " << tilt_x << " + tilt_y = " << tilt_y << " diff2= " << diff2 << std::endl;
 #ifdef DEBUG_TILT
@@ -1262,7 +1262,7 @@ void ParticlePolisher::applyOptimisedBeamTiltsAndDefocus()
 	for (long int imic = 0; imic < exp_model.micrographs.size(); imic++)
 	{
 
-		double best_defocus_shift = (defocus_shift_max > 0.) ? DIRECT_A1D_ELEM(defocus_shift_allmics, imic) : 0.;
+		RFLOAT best_defocus_shift = (defocus_shift_max > 0.) ? DIRECT_A1D_ELEM(defocus_shift_allmics, imic) : 0.;
 		for (long int ipart = 0; ipart < exp_model.micrographs[imic].particle_ids.size(); ipart++)
     	{
 			long int part_id = exp_model.micrographs[imic].particle_ids[ipart];
@@ -1306,7 +1306,7 @@ void ParticlePolisher::applyOptimisedBeamTiltsAndDefocus()
 				if (ipart == 0 && verb > 0)
 					std::cout << " + Micrograph " << exp_model.micrographs[imic].name << " defocus_shift= " << best_defocus_shift << std::endl;
 
-				double ori_defocusU, ori_defocusV;
+				RFLOAT ori_defocusU, ori_defocusV;
 				exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSU, ori_defocusU, part_id);
 				exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSV, ori_defocusV, part_id);
 				exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSU, ori_defocusU + best_defocus_shift, part_id);
@@ -1327,21 +1327,21 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 	exp_model.MDexp.getValue(EMDL_IMAGE_SIZE, image_size);
 
 	CTF ctf;
-	Matrix2D<double> A3D;
+	Matrix2D<RFLOAT> A3D;
 	MultidimArray<Complex > F2D, F2Dtilt, Fref;
-	MultidimArray<double> Fctf;
-	Image<double> img;
+	MultidimArray<RFLOAT> Fctf;
+	Image<RFLOAT> img;
 	FourierTransformer transformer;
-	double xtrans, ytrans;
-	double rot, tilt, psi;
+	RFLOAT xtrans, ytrans;
+	RFLOAT rot, tilt, psi;
 	FileName fn_img;
 	int i_group = -1, my_half = 0;
 
-	double xsize = angpix * PPrefvol_half1.ori_size;
+	RFLOAT xsize = angpix * PPrefvol_half1.ori_size;
 
 	// Weighted squared-differences for all defocusses
 	int nr_sampled_defocus_shifts;
-	MultidimArray<double> wdiff2_defocus;
+	MultidimArray<RFLOAT> wdiff2_defocus;
 	if (defocus_shift_max > 0.)
 	{
 		nr_sampled_defocus_shifts = CEIL(defocus_shift_max / defocus_shift_step);
@@ -1415,17 +1415,17 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 			ctf.read(exp_model.MDimg, exp_model.MDimg, part_id);
 
 			// Store the original values of defocusU and defocusV
-			double ori_defocusU = ctf.DeltafU;
-			double ori_defocusV = ctf.DeltafV;
-			double best_defocus_shift;
-			double mindiff_thispart = 99.e99;
+			RFLOAT ori_defocusU = ctf.DeltafU;
+			RFLOAT ori_defocusV = ctf.DeltafV;
+			RFLOAT best_defocus_shift;
+			RFLOAT mindiff_thispart = 99.e99;
 			// Optimise per-particle CTF defocus
 			// For now only non-anisotropically
 			if (defocus_shift_max > 0.)
 			{
 
 				int n_defocus = 0;
-				for (double defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
+				for (RFLOAT defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
 						defocus_shift <= nr_sampled_defocus_shifts*defocus_shift_step;
 						defocus_shift += defocus_shift_step)
 				{
@@ -1436,14 +1436,14 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 					ctf.getFftwImage(Fctf, image_size, image_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 
 					// Calculate squared difference with the image
-					double diff2 = 0.;
+					RFLOAT diff2 = 0.;
 					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(F2D)
 					{
-						double res = xsize/sqrt((double)(ip * ip + jp * jp)); // get resolution in 1/pixel
+						RFLOAT res = xsize/sqrt((RFLOAT)(ip * ip + jp * jp)); // get resolution in 1/pixel
 						if (res <= minres_beamtilt && res >= maxres_model)
 				    	{
-							double diff_real = DIRECT_A2D_ELEM(Fctf, i, j) * (DIRECT_A2D_ELEM(Fref, i, j)).real - (DIRECT_A2D_ELEM(F2D, i, j)).real;
-							double diff_imag = DIRECT_A2D_ELEM(Fctf, i, j) * (DIRECT_A2D_ELEM(Fref, i, j)).imag - (DIRECT_A2D_ELEM(F2D, i, j)).imag;
+							RFLOAT diff_real = DIRECT_A2D_ELEM(Fctf, i, j) * (DIRECT_A2D_ELEM(Fref, i, j)).real - (DIRECT_A2D_ELEM(F2D, i, j)).real;
+							RFLOAT diff_imag = DIRECT_A2D_ELEM(Fctf, i, j) * (DIRECT_A2D_ELEM(Fref, i, j)).imag - (DIRECT_A2D_ELEM(F2D, i, j)).imag;
 							diff2 += (diff_real * diff_real + diff_imag * diff_imag);
 				    	}
 					}
@@ -1490,26 +1490,26 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 			// Loop over all beam tilts
 			int n_tilts = 0;
 			int n_steps = CEIL(beamtilt_max / beamtilt_step);
-			for (double tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
+			for (RFLOAT tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
 			{
-				for (double tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
+				for (RFLOAT tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
 				{
 					if (sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max)
 					{
 						// Now calculate the squared differences, taking the beamtilt into account
 						applyBeamTilt(F2D, F2Dtilt, tilt_x, tilt_y, ctf.lambda, ctf.Cs, angpix, image_size);
 
-						double diff2 = 0.;
-						double ndiff = 0.;
+						RFLOAT diff2 = 0.;
+						RFLOAT ndiff = 0.;
 						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(F2Dtilt)
 						{
 							// Store amplitude-weighted phase difference and sum of amplitude-weights
-							double res = xsize/sqrt((double)(ip * ip + jp * jp)); // get resolution in 1/pixel
+							RFLOAT res = xsize/sqrt((RFLOAT)(ip * ip + jp * jp)); // get resolution in 1/pixel
 							if (res <= minres_beamtilt && res >= maxres_model)
 							{
 
-								double diff_real = (DIRECT_A2D_ELEM(Fref, i, j)).real - (DIRECT_A2D_ELEM(F2Dtilt, i, j)).real;
-								double diff_imag = (DIRECT_A2D_ELEM(Fref, i, j)).imag - (DIRECT_A2D_ELEM(F2Dtilt, i, j)).imag;
+								RFLOAT diff_real = (DIRECT_A2D_ELEM(Fref, i, j)).real - (DIRECT_A2D_ELEM(F2Dtilt, i, j)).real;
+								RFLOAT diff_imag = (DIRECT_A2D_ELEM(Fref, i, j)).imag - (DIRECT_A2D_ELEM(F2Dtilt, i, j)).imag;
 								diff2 += (diff_real * diff_real + diff_imag * diff_imag);
 								ndiff += 1.;
 							}
@@ -1539,13 +1539,13 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 	// Set optimal defocus shift averaged over all particles in this micrograph:
 	if (defocus_shift_max > 0.)
 	{
-		double mindiff2=99.e99, best_defocus_shift;
+		RFLOAT mindiff2=99.e99, best_defocus_shift;
 		int n_defocus = 0;
-		for (double defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
+		for (RFLOAT defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
 				defocus_shift <= nr_sampled_defocus_shifts*defocus_shift_step;
 				defocus_shift += defocus_shift_step)
 		{
-			double diff2 = DIRECT_A1D_ELEM(wdiff2_defocus, n_defocus);
+			RFLOAT diff2 = DIRECT_A1D_ELEM(wdiff2_defocus, n_defocus);
 			//std::cerr << std::setprecision(10) << " imic= " << imic << " defocus_shift= " << defocus_shift << " diff2= " << diff2 << std::endl;
 			if (diff2 < mindiff2)
 			{
@@ -1563,7 +1563,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 		for (long int ipart = 0; ipart < exp_model.micrographs[imic].particle_ids.size(); ipart++)
 		{
 			long int part_id = exp_model.micrographs[imic].particle_ids[ipart];
-			double ori_defocusU, ori_defocusV;
+			RFLOAT ori_defocusU, ori_defocusV;
 			exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSU, ori_defocusU, part_id);
 			exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSV, ori_defocusV, part_id);
 

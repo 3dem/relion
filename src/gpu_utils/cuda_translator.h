@@ -36,8 +36,8 @@ public:
 			unsigned long itrans_max,
 			CudaCustomAllocator *allocator,
 			cudaStream_t stream,
-			double scale_correction = 1,
-			double *h_ctf = NULL):
+			RFLOAT scale_correction = 1,
+			RFLOAT *h_ctf = NULL):
 				itrans_min(itrans_min),
 				itrans_max(itrans_max),
 				scale_correction(scale_correction),

@@ -162,7 +162,7 @@ bool Postprocessing::getMask()
 		Im().setXmippOrigin();
 
 		// Check values are between 0 and 1
-		double avg, stddev, minval, maxval;
+		RFLOAT avg, stddev, minval, maxval;
 		Im().computeStats(avg, stddev, minval, maxval);
 		if (minval < -1e-6 || maxval - 1. > 1.e-6)
 		{
@@ -208,7 +208,7 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 			REPORT_ERROR("Postprocessing::divideByMtf ERROR: input MTF file is not a STAR file.");
 
 		MDmtf.read(fn_mtf);
-		MultidimArray<double> mtf_resol, mtf_value;
+		MultidimArray<RFLOAT> mtf_resol, mtf_value;
 		mtf_resol.resize(MDmtf.numberOfObjects());
 		mtf_value.resize(mtf_resol);
 
@@ -225,11 +225,11 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 			i++;
 		}
 
-	    double xsize = (double)XSIZE(I1());
+	    RFLOAT xsize = (RFLOAT)XSIZE(I1());
 	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	    {
 	    	int r2 = kp * kp + ip * ip + jp * jp;
-	    	double res = sqrt((double)r2)/xsize; // get resolution in 1/pixel
+	    	RFLOAT res = sqrt((RFLOAT)r2)/xsize; // get resolution in 1/pixel
 			if (res < 0.5 )
 			{
 
@@ -242,15 +242,15 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 					i_0 = ii;
 				}
 				// linear interpolation: y = y_0 + (y_1 - y_0)*(x-x_0)/(x1_x0)
-				double mtf;
-				double x_0 = DIRECT_A1D_ELEM(mtf_resol, i_0);
+				RFLOAT mtf;
+				RFLOAT x_0 = DIRECT_A1D_ELEM(mtf_resol, i_0);
 				if (i_0 == MULTIDIM_SIZE(mtf_resol) - 1 || i_0 == 0) // check boundaries of the array
 					mtf = DIRECT_A1D_ELEM(mtf_value, i_0);
 				else
 				{
-					double x_1 = DIRECT_A1D_ELEM(mtf_resol, i_0 + 1);
-					double y_0 = DIRECT_A1D_ELEM(mtf_value, i_0);
-					double y_1 = DIRECT_A1D_ELEM(mtf_value, i_0 + 1);
+					RFLOAT x_1 = DIRECT_A1D_ELEM(mtf_resol, i_0 + 1);
+					RFLOAT y_0 = DIRECT_A1D_ELEM(mtf_value, i_0);
+					RFLOAT y_1 = DIRECT_A1D_ELEM(mtf_value, i_0 + 1);
 					mtf = y_0 + (y_1 - y_0)*(res - x_0)/(x_1 - x_0);
 				}
 
@@ -335,7 +335,7 @@ void Postprocessing::sharpenMap()
 	{
 		std::cout << "== Low-pass filtering final map ... " << std::endl;
 	}
-	double my_filter = (low_pass_freq > 0.) ? low_pass_freq : global_resol;
+	RFLOAT my_filter = (low_pass_freq > 0.) ? low_pass_freq : global_resol;
 	if (verb > 0)
 	{
 		std::cout.width(35); std::cout << std::left  <<"  + filter frequency: "; std::cout << my_filter << std::endl;
@@ -346,7 +346,7 @@ void Postprocessing::sharpenMap()
 
 }
 
-void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<double> my_fsc)
+void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc)
 {
 	// Find resolution where fsc_true drops below zero for the first time
 	// Set all weights to zero beyond that resolution
@@ -359,10 +359,10 @@ void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArra
 	}
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	int ires = ROUND(sqrt((double)kp * kp + ip * ip + jp * jp));
+    	int ires = ROUND(sqrt((RFLOAT)kp * kp + ip * ip + jp * jp));
 		if (ires <= ires_max)
 		{
-	        double fsc = DIRECT_A1D_ELEM(my_fsc, ires);
+	        RFLOAT fsc = DIRECT_A1D_ELEM(my_fsc, ires);
 	        if (fsc < 1e-10)
 	        	REPORT_ERROR("Postprocessing::applyFscWeighting BUG: fsc <= 0");
 	        DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
@@ -379,13 +379,13 @@ void Postprocessing::makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fi
 {
 
 	MultidimArray<int> radial_count(XSIZE(FT));
-	MultidimArray<double> lnF(XSIZE(FT));
+	MultidimArray<RFLOAT> lnF(XSIZE(FT));
 	fit_point2D      onepoint;
 
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
     	int r2 = kp * kp + ip * ip + jp * jp;
-    	int ires = ROUND(sqrt((double)r2));
+    	int ires = ROUND(sqrt((RFLOAT)r2));
 		if (ires < XSIZE(radial_count))
 		{
 
@@ -394,12 +394,12 @@ void Postprocessing::makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fi
 		}
 	}
 
-	double xsize = XSIZE(I1());
+	RFLOAT xsize = XSIZE(I1());
 	guinier.clear();
 	FOR_ALL_ELEMENTS_IN_ARRAY1D(radial_count)
 	{
 
-		double res = (xsize * angpix)/(double)i; // resolution in Angstrom
+		RFLOAT res = (xsize * angpix)/(RFLOAT)i; // resolution in Angstrom
 		if (res >= angpix * 2.) // Apply B-factor sharpening until Nyquist, then low-pass filter later on (with a soft edge)
         {
             onepoint.x = 1. / (res * res);
@@ -438,7 +438,7 @@ void Postprocessing::writeOutput()
 	FileName fn_tmp;
 	fn_tmp = fn_out + ".mrc";
 
-	double avg, stddev, minval, maxval;
+	RFLOAT avg, stddev, minval, maxval;
     I1().computeStats(avg, stddev, minval, maxval);
     I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
     I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
@@ -522,7 +522,7 @@ void Postprocessing::writeOutput()
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
 	{
 		MDfsc.addObject();
-		double res = (i > 0) ? (XSIZE(I1()) * angpix / (double)i) : 999.;
+		RFLOAT res = (i > 0) ? (XSIZE(I1()) * angpix / (RFLOAT)i) : 999.;
 		MDfsc.setValue(EMDL_SPECTRAL_IDX, (int)i);
 		MDfsc.setValue(EMDL_RESOLUTION, 1./res);
 		MDfsc.setValue(EMDL_RESOLUTION_ANGSTROM, res);
@@ -582,7 +582,7 @@ void Postprocessing::writeFscXml(MetaDataTable &MDfsc)
 
     FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
     {
-    	double xx, yy;
+    	RFLOAT xx, yy;
     	MDfsc.getValue(EMDL_RESOLUTION, xx);
     	MDfsc.getValue(EMDL_POSTPROCESS_FSC_TRUE, yy);
     	fh << "  <coordinate>" << std::endl;
@@ -662,8 +662,8 @@ void Postprocessing::run()
 			}
 			else
 			{
-				double fsct = DIRECT_A1D_ELEM(fsc_masked, i);
-				double fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
+				RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
+				RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
 				if (fscn > fsct)
 					DIRECT_A1D_ELEM(fsc_true, i) = 0.;
 				else
@@ -689,7 +689,7 @@ void Postprocessing::run()
 	{
 		if ( DIRECT_A1D_ELEM(fsc_true, i) < 0.143)
 			break;
-		global_resol = XSIZE(I1())*angpix/(double)i;
+		global_resol = XSIZE(I1())*angpix/(RFLOAT)i;
 	}
 
 	// Add the two half-maps together for subsequent sharpening

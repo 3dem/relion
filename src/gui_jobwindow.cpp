@@ -624,7 +624,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix)
+		std::string &final_command, RFLOAT angpix)
 {
 	commands.clear();
 	std::string command;
@@ -635,7 +635,7 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 
 	// Calculate magnification from user-specified pixel size in Angstroms
-	double magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
+	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
 
 	command += " --i \"" + mic_names.getValue()+"\"";
 	command += " --o \"" + output_star_ctf_mics.getValue()+"\"";
@@ -790,7 +790,7 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix, double particle_diameter)
+		RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -943,7 +943,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1145,7 +1145,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix, double particle_diameter)
+		RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1171,7 +1171,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		}
 
 		// Operate stuff
-		double bg_radius;
+		RFLOAT bg_radius;
 		bg_radius = (particle_diameter / (2. * angpix));
 		if (do_rescale.getValue())
 		{
@@ -1260,7 +1260,7 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1524,7 +1524,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1940,7 +1940,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -2386,7 +2386,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -2673,7 +2673,7 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix)
+		RFLOAT angpix)
 {
 	commands.clear();
 	std::string command;
@@ -2872,7 +2872,7 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix, double particle_diameter, double black_dust, double white_dust)
+		RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust)
 {
 	commands.clear();
 	std::string command;
@@ -2914,7 +2914,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --sym " + sym_name.getValue();
 
 	// Normalisation
-	double bg_rad = ROUND(particle_diameter / (2. * angpix));
+	RFLOAT bg_rad = ROUND(particle_diameter / (2. * angpix));
 	command += " --bg_radius " + floatToString(bg_rad);
 	command += " --white_dust " + floatToString(white_dust);
 	command += " --black_dust " + floatToString(black_dust);
@@ -3016,7 +3016,7 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix)
+		RFLOAT angpix)
 {
 	commands.clear();
 	std::string command;

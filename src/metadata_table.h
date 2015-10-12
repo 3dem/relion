@@ -63,7 +63,7 @@
 /** For all objects.
  @code
  FOR_ALL_OBJECTS_IN_METADATA(metadata) {
-   double rot;
+   RFLOAT rot;
    DF.getValue( EMDL_ANGLEROT, rot);
  }
  @endcode
@@ -247,23 +247,23 @@ public:
     {
     	if ( !(EMDL::isInt(name) || EMDL::isLong(name) || EMDL::isDouble(name)) )
     		REPORT_ERROR("MetadataTable::sort%% ERROR: can only sorted numbers");
-    	std::vector<std::pair<double,long int> > vp;
+    	std::vector<std::pair<RFLOAT,long int> > vp;
     	vp.reserve(objects.size());
     	long int i = 0;
     	FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
     	{
-    		double dval;
+    		RFLOAT dval;
     		if (EMDL::isInt(name))
     		{
     			int val;
     			getValue(name, val);
-    			dval = (double) val;
+    			dval = (RFLOAT) val;
     		}
     		else if (EMDL::isLong(name))
     		{
     			long int val;
     			getValue(name, val);
-    			dval = (double) val;
+    			dval = (RFLOAT) val;
     		}
     		else
     		{
@@ -400,7 +400,7 @@ public:
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
-		EMDLabel label1, double eps = 0., EMDLabel label2 = EMDL_UNDEFINED, EMDLabel label3 = EMDL_UNDEFINED);
+		EMDLabel label1, RFLOAT eps = 0., EMDLabel label2 = EMDL_UNDEFINED, EMDLabel label3 = EMDL_UNDEFINED);
 
 
 

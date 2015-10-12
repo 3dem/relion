@@ -37,7 +37,7 @@ class project_parameters
 public:
 
 	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym;
-	double rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step;
+	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step;
 	int padding_factor;
 	int r_max, r_min_nn, interpolator;
     bool do_only_one, do_ctf, ctf_phase_flipped, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot;
@@ -97,12 +97,12 @@ public:
 	{
 
             MetaDataTable DFo, MDang;
-    	Matrix2D<double> A3D;
+    	Matrix2D<RFLOAT> A3D;
     	FileName fn_expimg;
 
     	MultidimArray<Complex > F3D, F2D, Fexpimg;
-    	MultidimArray<double> Fctf, dummy;
-    	Image<double> vol, img, expimg;
+    	MultidimArray<RFLOAT> Fctf, dummy;
+    	Image<RFLOAT> vol, img, expimg;
     	FourierTransformer transformer, transformer_expimg;
 
 		std::cerr << " Reading map: " << fn_map << std::endl;
@@ -142,7 +142,7 @@ public:
     		projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
             if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001)
             {
-            	Matrix1D<double> shift(2);
+            	Matrix1D<RFLOAT> shift(2);
             	XX(shift) = -xoff;
             	YY(shift) = -yoff;
             	if (do_3d_rot)
@@ -197,7 +197,7 @@ public:
 
                 if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001)
                 {
-                    Matrix1D<double> shift(2);
+                    Matrix1D<RFLOAT> shift(2);
                     XX(shift) = -xoff;
                     YY(shift) = -yoff;
 
@@ -259,7 +259,7 @@ public:
                         if (my_mic_id < 0)
                             REPORT_ERROR("ERROR: cannot find " + fn_group + " in the input model file...");
 
-                        double normcorr = 1.;
+                        RFLOAT normcorr = 1.;
                         if (MDang.containsLabel(EMDL_IMAGE_NORM_CORRECTION))
                         {
                             MDang.getValue(EMDL_IMAGE_NORM_CORRECTION, normcorr);
@@ -268,10 +268,10 @@ public:
                         // Add coloured noise
                         FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
                         {
-                            int ires = ROUND( sqrt( (double)(kp*kp + ip*ip + jp*jp) ) );
+                            int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
                             ires = XMIPP_MIN(ires, model.ori_size/2); // at freqs higher than Nyquist: use last sigma2 value
 
-                            double sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
+                            RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
                             DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
                             DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., sigma);
                         }

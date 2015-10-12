@@ -395,7 +395,7 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 	{
 		long int group_id, mic_id, part_id;
 		int my_random_subset, my_class;
-		double rot, tilt, psi, xoff, yoff;
+		RFLOAT rot, tilt, psi, xoff, yoff;
 		FileName fn_curr_img, group_name, fn_ori_part, fn_mic;
 		MDmovie.getValue(EMDL_PARTICLE_ORI_NAME, fn_ori_part);
 
@@ -521,7 +521,7 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 			Exp_movie.MDimg.setValue(EMDL_PARTICLE_CLASS, my_class, part_id);
 			Exp_movie.MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, part_id);
 			// Set normcorrection to 1
-			double norm = 1.;
+			RFLOAT norm = 1.;
 			Exp_movie.MDimg.setValue(EMDL_IMAGE_NORM_CORRECTION, norm);
 			// Set the new group name
 			Exp_movie.MDimg.setValue(EMDL_MLMODEL_GROUP_NAME, group_name);
@@ -669,7 +669,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			REPORT_ERROR("Experiment::read: ERROR: MRC stacks of 2D images should be have extension .mrcs, not .mrc!");
 
 		// Read in header-only information to get the NSIZE of the stack
-		Image<double> img;
+		Image<RFLOAT> img;
 		img.read(fn_exp, false); // false means skip data, only read header
 		
 		// allocate 1 block of memory
@@ -949,7 +949,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 	bool have_norm = MDimg.containsLabel(EMDL_IMAGE_NORM_CORRECTION);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
-		double dzero=0., done=1.;
+		RFLOAT dzero=0., done=1.;
 		int izero = 0;
 		if (!have_rot)
 			MDimg.setValue(EMDL_ORIENT_ROT, dzero);
@@ -977,7 +977,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 	
 	// Also set the image_size (use the last image for that, still in fn_img)
 	FileName fn_img;
-	Image<double> img;
+	Image<RFLOAT> img;
 	MDimg.getValue(EMDL_IMAGE_NAME, fn_img, MDimg.firstObject());
 	if (fn_img != "")
 	{

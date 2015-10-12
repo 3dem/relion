@@ -51,7 +51,7 @@ void MetaDataContainer::copy(const MetaDataContainer &MDc)
     {
 		labels = MDc.labels;
 
-        for (std::map<EMDLabel, double *>::const_iterator It = MDc.doubles.begin(); It != MDc.doubles.end(); It++)
+        for (std::map<EMDLabel, RFLOAT *>::const_iterator It = MDc.RFLOATs.begin(); It != MDc.RFLOATs.end(); It++)
             addValue(It->first, *It->second);
         for (std::map<EMDLabel, int *>::const_iterator It = MDc.ints.begin(); It != MDc.ints.end(); It++)
             addValue(It->first, *It->second);
@@ -86,12 +86,12 @@ void MetaDataContainer::addValueFromString(const EMDLabel &lCode, const std::str
 	else
 	{
 		std::istringstream i(value);
-		// Look for a double value
+		// Look for a RFLOAT value
 		if (EMDL::isDouble(lCode))
 		{
-			double doubleValue;
-			i >> doubleValue;
-			addValue(lCode, doubleValue);
+			RFLOAT RFLOATValue;
+			i >> RFLOATValue;
+			addValue(lCode, RFLOATValue);
 		}
 		else if (EMDL::isInt(lCode))
 		{
@@ -121,12 +121,12 @@ void MetaDataContainer::addValue(EMDLabel name, const double &value)
 
     if (EMDL::isDouble(name))
     {
-		if (doubles[name])
-			delete doubles[name];
-		doubles[name] = new double(value);
+		if (RFLOATs[name])
+			delete RFLOATs[name];
+		RFLOATs[name] = new RFLOAT(value);
     }
     else
-    	REPORT_ERROR("addValue for double: label " + EMDL::label2Str(name) + " is not of type double!");
+    	REPORT_ERROR("addValue for RFLOAT: label " + EMDL::label2Str(name) + " is not of type RFLOAT!");
 }
 
 void MetaDataContainer::addValue(EMDLabel name, const int &value)
@@ -197,9 +197,9 @@ void MetaDataContainer::addDefaultValue(EMDLabel name)
 
 	if (EMDL::isDouble(name))
     {
-		if (doubles[name])
-			delete doubles[name];
-		doubles[name] = new double(0.);
+		if (RFLOATs[name])
+			delete RFLOATs[name];
+		RFLOATs[name] = new RFLOAT(0.);
     }
     else if (EMDL::isInt(name))
     {
@@ -229,10 +229,10 @@ void MetaDataContainer::addDefaultValue(EMDLabel name)
     	REPORT_ERROR("MetaDataContainer::addDefaultValu: unrecognised data type for label " + EMDL::label2Str(name));
 }
 
-bool MetaDataContainer::getValue( const EMDLabel name, double &value)
+bool MetaDataContainer::getValue( const EMDLabel name, RFLOAT &value)
 {
-    std::map<EMDLabel, double *>::iterator element = doubles.find(name);
-    if (element == doubles.end())
+    std::map<EMDLabel, RFLOAT *>::iterator element = RFLOATs.find(name);
+    if (element == RFLOATs.end())
         return false;
     else
     	value = *element->second;
@@ -300,7 +300,7 @@ bool MetaDataContainer::writeValueToStream(std::ostream &outstream, EMDLabel inp
     {
 		if (EMDL::isDouble(inputLabel))
         {
-            double d;
+            RFLOAT d;
             if (! getValue(inputLabel, d))
         		REPORT_ERROR("Double value not found in writeValueToStream.");
             if ((ABS(d) > 0. && ABS(d) < 0.001) || ABS(d) > 100000.)

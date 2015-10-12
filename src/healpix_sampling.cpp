@@ -73,8 +73,8 @@ void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans,
 		SL.read_sym_file(fn_sym);
 
 		// Precalculate (3x3) symmetry matrices
-		Matrix2D<double>  L(4, 4), R(4, 4);
-		Matrix2D<double>  Identity(3,3);
+		Matrix2D<RFLOAT>  L(4, 4), R(4, 4);
+		Matrix2D<RFLOAT>  Identity(3,3);
 		Identity.initIdentity();
 		R_repository.clear();
 		L_repository.clear();
@@ -99,9 +99,9 @@ void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans,
 
 //			Force-adjust psi_step:
 //			t_nr_psi = CEIL((float)t_nr_psi / 32.0)*32;
-//			float tdiff = psi_step - 360./(double)t_nr_psi;
+//			float tdiff = psi_step - 360./(RFLOAT)t_nr_psi;
 		}
-		psi_step = 360./(double)t_nr_psi;
+		psi_step = 360./(RFLOAT)t_nr_psi;
 		fn_sym = "C1"; // This may not be set yet if restarting a 2D run....
 	}
 
@@ -206,7 +206,7 @@ void HealpixSampling::write(FileName fn_out)
 		MD.setName("sampling_directions");
 		for (long int idir = 0; idir < NrDirections(); idir++)
 		{
-			double rot, tilt;
+			RFLOAT rot, tilt;
 			getDirection(idir, rot, tilt);
 			MD.addObject();
 			MD.setValue(EMDL_ORIENT_ROT, rot);
@@ -222,7 +222,7 @@ void HealpixSampling::write(FileName fn_out)
 
 }
 
-void HealpixSampling::setTranslations(double _offset_step, double _offset_range)
+void HealpixSampling::setTranslations(RFLOAT _offset_step, RFLOAT _offset_range)
 {
 	translations_x.clear();
 	translations_y.clear();
@@ -236,16 +236,16 @@ void HealpixSampling::setTranslations(double _offset_step, double _offset_range)
 	int maxr = CEIL(offset_range / offset_step);
 	for (long int ix = -maxr; ix <= maxr; ix++)
 	{
-		double xoff = ix * offset_step;
+		RFLOAT xoff = ix * offset_step;
 		for (long int iy = -maxr; iy <= maxr; iy++)
 		{
-			double yoff = iy * offset_step;
+			RFLOAT yoff = iy * offset_step;
 
 			if (is_3d_trans)
 			{
 				for (long int iz = -maxr; iz <= maxr; iz++)
 				{
-					double zoff = iz * offset_step;
+					RFLOAT zoff = iz * offset_step;
 					if (xoff*xoff + yoff*yoff + zoff*zoff <= offset_range * offset_range)
 					{
 						translations_x.push_back(xoff);
@@ -274,7 +274,7 @@ void HealpixSampling::setTranslations(double _offset_step, double _offset_range)
 
 }
 /* Set only a single translation */
-void HealpixSampling::addOneTranslation(double offset_x, double offset_y, double offset_z, bool do_clear)
+void HealpixSampling::addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear)
 {
 	if (do_clear)
 	{
@@ -290,7 +290,7 @@ void HealpixSampling::addOneTranslation(double offset_x, double offset_y, double
 
 
 
-void HealpixSampling::setOrientations(int _order, double _psi_step)
+void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 {
 
 	// Initialise
@@ -310,7 +310,7 @@ void HealpixSampling::setOrientations(int _order, double _psi_step)
 	// 3D directions
 	if (is_3D)
 	{
-		double rot, tilt;
+		RFLOAT rot, tilt;
 		for (long int ipix = 0; ipix < healpix_base.Npix(); ipix++)
 		{
 			getDirectionFromHealPix(ipix, rot, tilt);
@@ -358,8 +358,8 @@ void HealpixSampling::setOrientations(int _order, double _psi_step)
 		psi_step = _psi_step;
 
 	int nr_psi = CEIL(360./psi_step);
-	double psi;
-	psi_step = 360./(double)nr_psi;
+	RFLOAT psi;
+	psi_step = 360./(RFLOAT)nr_psi;
 	for (int ipsi = 0; ipsi < nr_psi; ipsi++)
 	{
 		psi = ipsi * psi_step;
@@ -368,7 +368,7 @@ void HealpixSampling::setOrientations(int _order, double _psi_step)
 }
 
 /* Set only a single orientation */
-void HealpixSampling::addOneOrientation(double rot, double tilt, double psi, bool do_clear)
+void HealpixSampling::addOneOrientation(RFLOAT rot, RFLOAT tilt, RFLOAT psi, bool do_clear)
 {
 	if (do_clear)
 	{
@@ -399,7 +399,7 @@ void HealpixSampling::addOneOrientation(double rot, double tilt, double psi, boo
 }
 
 
-void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string rgb, double size)
+void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string rgb, RFLOAT size)
 {
     std::ofstream out;
     out.open (fn_bild.c_str());
@@ -415,7 +415,7 @@ void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string r
     out << ".arrow 0 0 0 0 0 1 0.01 \n";
 
 
-    Matrix1D<double> v(3);
+    Matrix1D<RFLOAT> v(3);
 	out << ".color " << rgb << std::endl;
 
 	for (unsigned long int ipix = 0; ipix < rot_angles.size(); ipix++)
@@ -428,8 +428,8 @@ void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string r
 
 }
 
-void HealpixSampling::writeNonZeroPriorOrientationsToBild(FileName fn_bild, double rot_prior, double tilt_prior,
-		std::vector<int> &pointer_dir_nonzeroprior, std::string rgb, double size)
+void HealpixSampling::writeNonZeroPriorOrientationsToBild(FileName fn_bild, RFLOAT rot_prior, RFLOAT tilt_prior,
+		std::vector<int> &pointer_dir_nonzeroprior, std::string rgb, RFLOAT size)
 {
     std::ofstream out;
     out.open (fn_bild.c_str());
@@ -444,7 +444,7 @@ void HealpixSampling::writeNonZeroPriorOrientationsToBild(FileName fn_bild, doub
     out << ".color 0 0 1 \n";
     out << ".arrow 0 0 0 0 0 1 0.01 \n";
 
-    Matrix1D<double> v(3);
+    Matrix1D<RFLOAT> v(3);
 
 	Euler_angles2direction(rot_prior, tilt_prior, v);
 	out << ".color 0 0 0 \n";
@@ -463,11 +463,11 @@ void HealpixSampling::writeNonZeroPriorOrientationsToBild(FileName fn_bild, doub
 }
 
 void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
-		double prior_rot, double prior_tilt, double prior_psi,
-		double sigma_rot, double sigma_tilt, double sigma_psi,
-    	std::vector<int> &pointer_dir_nonzeroprior, std::vector<double> &directions_prior,
-    	std::vector<int> &pointer_psi_nonzeroprior, std::vector<double> &psi_prior,
-		double sigma_cutoff)
+		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,
+		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
+    	std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+    	std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
+		RFLOAT sigma_cutoff)
 {
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
@@ -476,9 +476,9 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	{
 
 		// Loop over all directions
-		double sumprior = 0.;
+		RFLOAT sumprior = 0.;
 		// Keep track of the closest distance to prevent 0 orientations
-		double best_ang = 9999.;
+		RFLOAT best_ang = 9999.;
 		long int best_idir = -999;
 		for (long int idir = 0; idir < rot_angles.size(); idir++)
 		{
@@ -487,7 +487,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			if (sigma_rot > 0. || sigma_tilt > 0. )
 			{
 
-				Matrix1D<double> prior_direction, my_direction, sym_direction, best_direction;
+				Matrix1D<RFLOAT> prior_direction, my_direction, sym_direction, best_direction;
 				// Get the direction of the prior
 				Euler_angles2direction(prior_rot, prior_tilt, prior_direction);
 
@@ -495,12 +495,12 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
 
 				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
-				double best_dotProduct = dotProduct(prior_direction, my_direction);
+				RFLOAT best_dotProduct = dotProduct(prior_direction, my_direction);
 				best_direction = my_direction;
 				for (int j = 0; j < R_repository.size(); j++)
 				{
 					sym_direction =  L_repository[j] * (my_direction.transpose() * R_repository[j]).transpose();
-					double my_dotProduct = dotProduct(prior_direction, sym_direction);
+					RFLOAT my_dotProduct = dotProduct(prior_direction, sym_direction);
 					if (my_dotProduct > best_dotProduct)
 					{
 						best_direction = sym_direction;
@@ -511,14 +511,14 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				if (sigma_rot > 0. && sigma_tilt > 0.)
 				{
 
-					double diffang = ACOSD( dotProduct(best_direction, prior_direction) );
+					RFLOAT diffang = ACOSD( dotProduct(best_direction, prior_direction) );
 					if (diffang > 180.) diffang = ABS(diffang - 360.);
 
 					// Only consider differences within sigma_cutoff * sigma_rot
 					if (diffang < sigma_cutoff * sigma_rot)
 					{
 						// TODO!!! If tilt is zero then any rot will be OK!!!!!
-						double prior = gaussian1D(diffang, sigma_rot, 0.);
+						RFLOAT prior = gaussian1D(diffang, sigma_rot, 0.);
 						pointer_dir_nonzeroprior.push_back(idir);
 						directions_prior.push_back(prior);
 						sumprior += prior;
@@ -533,16 +533,16 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				}
 				else if (sigma_rot > 0.)
 				{
-					double best_rot, best_tilt;
+					RFLOAT best_rot, best_tilt;
 
 					Euler_direction2angles(best_direction, best_rot, best_tilt);
-					double diffrot = ABS(best_rot - prior_rot);
+					RFLOAT diffrot = ABS(best_rot - prior_rot);
 					if (diffrot > 180.) diffrot = ABS(diffrot - 360.);
 
 					// Only consider differences within sigma_cutoff * sigma_rot
 					if (diffrot < sigma_cutoff * sigma_rot)
 					{
-						double prior = gaussian1D(diffrot, sigma_rot, 0.);
+						RFLOAT prior = gaussian1D(diffrot, sigma_rot, 0.);
 						pointer_dir_nonzeroprior.push_back(idir);
 						directions_prior.push_back(prior);
 						sumprior += prior;
@@ -559,16 +559,16 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				else if (sigma_tilt > 0.)
 				{
 
-					double best_rot, best_tilt;
+					RFLOAT best_rot, best_tilt;
 
 					Euler_direction2angles(best_direction, best_rot, best_tilt);
-					double difftilt = ABS(best_tilt - prior_tilt);
+					RFLOAT difftilt = ABS(best_tilt - prior_tilt);
 					if (difftilt > 180.) difftilt = ABS(difftilt - 360.);
 
 					// Only consider differences within sigma_cutoff * sigma_tilt
 					if (difftilt < sigma_cutoff * sigma_tilt)
 					{
-						double prior = gaussian1D(difftilt, sigma_tilt, 0.);
+						RFLOAT prior = gaussian1D(difftilt, sigma_tilt, 0.);
 						pointer_dir_nonzeroprior.push_back(idir);
 						directions_prior.push_back(prior);
 						sumprior += prior;
@@ -630,20 +630,20 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	pointer_psi_nonzeroprior.clear();
 	psi_prior.clear();
 
-	double sumprior = 0.;
-	double best_diff = 9999.;
+	RFLOAT sumprior = 0.;
+	RFLOAT best_diff = 9999.;
 	long int best_ipsi = -999;
 	for (long int ipsi = 0; ipsi < psi_angles.size(); ipsi++)
 	{
 		if (sigma_psi > 0.)
 		{
-			double diffpsi = ABS(psi_angles[ipsi] - prior_psi);
+			RFLOAT diffpsi = ABS(psi_angles[ipsi] - prior_psi);
 			if (diffpsi > 180.) diffpsi = ABS(diffpsi - 360.);
 
 			// Only consider differences within sigma_cutoff * sigma_psi
 			if (diffpsi < sigma_cutoff * sigma_psi)
 			{
-				double prior = gaussian1D(diffpsi, sigma_psi, 0.);
+				RFLOAT prior = gaussian1D(diffpsi, sigma_psi, 0.);
 				pointer_psi_nonzeroprior.push_back(ipsi);
 				psi_prior.push_back(prior);
 				sumprior += prior;
@@ -710,7 +710,7 @@ long int HealpixSampling::getHealPixIndex(long int idir)
 	return directions_ipix[idir];
 }
 
-void HealpixSampling::checkDirection(double &rot, double &tilt)
+void HealpixSampling::checkDirection(RFLOAT &rot, RFLOAT &tilt)
 {
 
 	// The geometrical considerations about the symmetry below require that rot = [-180,180] and tilt [0,180]
@@ -735,7 +735,7 @@ void HealpixSampling::checkDirection(double &rot, double &tilt)
 
 }
 
-void HealpixSampling::getDirectionFromHealPix(long int ipix, double &rot, double &tilt)
+void HealpixSampling::getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT &tilt)
 {
 	double zz, phi;
 	healpix_base.pix2ang_z_phi(ipix, zz, phi);
@@ -747,12 +747,12 @@ void HealpixSampling::getDirectionFromHealPix(long int ipix, double &rot, double
 
 }
 
-double HealpixSampling::getTranslationalSampling(int adaptive_oversampling)
+RFLOAT HealpixSampling::getTranslationalSampling(int adaptive_oversampling)
 {
 	return offset_step / std::pow(2., adaptive_oversampling);
 }
 
-double HealpixSampling::getAngularSampling(int adaptive_oversampling)
+RFLOAT HealpixSampling::getAngularSampling(int adaptive_oversampling)
 {
 	if (is_3D)
 	{
@@ -825,7 +825,7 @@ int HealpixSampling::oversamplingFactorTranslations(int oversampling_order)
 }
 
 
-void HealpixSampling::getDirection(long int idir, double &rot, double &tilt)
+void HealpixSampling::getDirection(long int idir, RFLOAT &rot, RFLOAT &tilt)
 {
 #ifdef DEBUG_CHECKSIZES
 	if (idir >= rot_angles.size())
@@ -839,7 +839,7 @@ void HealpixSampling::getDirection(long int idir, double &rot, double &tilt)
 	tilt = tilt_angles[idir];
 }
 
-void HealpixSampling::getPsiAngle(long int ipsi, double &psi)
+void HealpixSampling::getPsiAngle(long int ipsi, RFLOAT &psi)
 {
 #ifdef DEBUG_CHECKSIZES
 	if (ipsi >= psi_angles.size())
@@ -851,7 +851,7 @@ void HealpixSampling::getPsiAngle(long int ipsi, double &psi)
 	psi = psi_angles[ipsi];
 }
 
-void HealpixSampling::getTranslation(long int itrans, double &trans_x, double &trans_y, double &trans_z)
+void HealpixSampling::getTranslation(long int itrans, RFLOAT &trans_x, RFLOAT &trans_y, RFLOAT &trans_z)
 {
 #ifdef DEBUG_CHECKSIZES
 if (itrans >= translations_x.size())
@@ -887,9 +887,9 @@ long int HealpixSampling::getPositionOversampledSamplingPoint(long int ipos, int
 }
 
 void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
-		std::vector<double > &my_translations_x,
-		std::vector<double > &my_translations_y,
-		std::vector<double > &my_translations_z)
+		std::vector<RFLOAT > &my_translations_x,
+		std::vector<RFLOAT > &my_translations_y,
+		std::vector<RFLOAT > &my_translations_z)
 {
 
 #ifdef DEBUG_CHECKSIZES
@@ -916,13 +916,13 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 		{
 			for (int itrans_overy = 0; itrans_overy < nr_oversamples; itrans_overy++)
 			{
-				double over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
+				RFLOAT over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
 				for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
 				{
-					double over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
+					RFLOAT over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
 					for (int itrans_overz = 0; itrans_overz < nr_oversamples; itrans_overz++)
 					{
-						double over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
+						RFLOAT over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
 						my_translations_x.push_back(over_xoff);
 						my_translations_y.push_back(over_yoff);
 						my_translations_z.push_back(over_zoff);
@@ -934,10 +934,10 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 		{
 			for (int itrans_overy = 0; itrans_overy < nr_oversamples; itrans_overy++)
 			{
-				double over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
+				RFLOAT over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
 				for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
 				{
-					double over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
+					RFLOAT over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
 					my_translations_x.push_back(over_xoff);
 					my_translations_y.push_back(over_yoff);
 				}
@@ -947,7 +947,7 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 
 	if (ABS(random_perturbation) > 0.)
 	{
-		double myperturb = random_perturbation * offset_step;
+		RFLOAT myperturb = random_perturbation * offset_step;
 		for (int iover = 0; iover < my_translations_x.size(); iover++)
 		{
 			my_translations_x[iover] += myperturb;
@@ -960,9 +960,9 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 }
 
 void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversampling_order,
-		std::vector<double > &my_rot, std::vector<double > &my_tilt, std::vector<double > &my_psi,
-		std::vector<int> &pointer_dir_nonzeroprior, std::vector<double> &directions_prior,
-		std::vector<int> &pointer_psi_nonzeroprior, std::vector<double> &psi_prior)
+		std::vector<RFLOAT > &my_rot, std::vector<RFLOAT > &my_tilt, std::vector<RFLOAT > &my_psi,
+		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior)
 {
 	my_rot.clear();
 	my_tilt.clear();
@@ -1021,7 +1021,7 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 		Healpix_Base HealPixOver(oversampling_order + healpix_order, NEST);
 		int fact = HealPixOver.Nside()/healpix_base.Nside();
 		int x, y, face;
-		double rot, tilt;
+		RFLOAT rot, tilt;
 		// Get x, y and face for the original, coarse grid
 		long int ipix = directions_ipix[my_idir];
 		healpix_base.nest2xyf(ipix, x, y, face);
@@ -1048,12 +1048,12 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 	// Random perturbation
 	if (ABS(random_perturbation) > 0.)
 	{
-		double myperturb = random_perturbation * getAngularSampling();
+		RFLOAT myperturb = random_perturbation * getAngularSampling();
 		for (int iover = 0; iover < my_rot.size(); iover++)
 		{
 			if (is_3D)
 			{
-				Matrix2D<double> A(3,3), R(3,3);
+				Matrix2D<RFLOAT> A(3,3), R(3,3);
 				Euler_angles2matrix(my_rot[iover],
 									my_tilt[iover],
 									my_psi[iover],
@@ -1078,8 +1078,8 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 
 
 void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampling_order,
-		double rot, double tilt, std::vector<double> &oversampled_rot,
-		std::vector<double> &oversampled_tilt, std::vector<double> &oversampled_psi)
+		RFLOAT rot, RFLOAT tilt, std::vector<RFLOAT> &oversampled_rot,
+		std::vector<RFLOAT> &oversampled_tilt, std::vector<RFLOAT> &oversampled_psi)
 {
 
 	if (oversampling_order == 0)
@@ -1093,7 +1093,7 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 		int nr_ipsi_over = ROUND(std::pow(2., oversampling_order));
 		for (int ipsi_over = 0; ipsi_over < nr_ipsi_over; ipsi_over++)
 		{
-			double overpsi = psi_angles[ipsi] - 0.5 * psi_step + (0.5 + ipsi_over) * psi_step / nr_ipsi_over;
+			RFLOAT overpsi = psi_angles[ipsi] - 0.5 * psi_step + (0.5 + ipsi_over) * psi_step / nr_ipsi_over;
 			oversampled_rot.push_back(rot);
 			oversampled_tilt.push_back(tilt);
 			if (!is_3D && overpsi>180.)
@@ -1105,18 +1105,18 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 }
 
 /* Calculate an angular distance between two sets of Euler angles */
-double HealpixSampling::calculateAngularDistance(double rot1, double tilt1, double psi1,
-		double rot2, double tilt2, double psi2)
+RFLOAT HealpixSampling::calculateAngularDistance(RFLOAT rot1, RFLOAT tilt1, RFLOAT psi1,
+		RFLOAT rot2, RFLOAT tilt2, RFLOAT psi2)
 {
-	Matrix1D<double>  direction1(3), direction1p(3), direction2(3);
+	Matrix1D<RFLOAT>  direction1(3), direction1p(3), direction2(3);
 	Euler_angles2direction(rot1, tilt1, direction1);
 	Euler_angles2direction(rot2, tilt2, direction2);
 
 	// Find the symmetry operation where the Distance based on Euler axes is minimal
-	double min_axes_dist = 3600.;
-	double rot2p, tilt2p, psi2p;
-	Matrix2D<double> E1, E2;
-	Matrix1D<double> v1, v2;
+	RFLOAT min_axes_dist = 3600.;
+	RFLOAT rot2p, tilt2p, psi2p;
+	Matrix2D<RFLOAT> E1, E2;
+	Matrix1D<RFLOAT> v1, v2;
 	for (int j = 0; j < R_repository.size(); j++)
 	{
 
@@ -1125,7 +1125,7 @@ double HealpixSampling::calculateAngularDistance(double rot1, double tilt1, doub
 	    // Distance based on Euler axes
 	    Euler_angles2matrix(rot1, tilt1, psi1, E1);
 	    Euler_angles2matrix(rot2p, tilt2p, psi2p, E2);
-	    double axes_dist = 0;
+	    RFLOAT axes_dist = 0;
 	    for (int i = 0; i < 3; i++)
 	    {
 	        E1.getRow(i, v1);
@@ -1142,8 +1142,8 @@ double HealpixSampling::calculateAngularDistance(double rot1, double tilt1, doub
 	return min_axes_dist;
 }
 
-void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<double> &pdf_direction,
-		FileName &fn_bild, double R, double offset, double Rmax_frac, double width_frac)
+void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOAT> &pdf_direction,
+		FileName &fn_bild, RFLOAT R, RFLOAT offset, RFLOAT Rmax_frac, RFLOAT width_frac)
 {
 	if (!is_3D)
 		return;
@@ -1152,7 +1152,7 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<doubl
 		REPORT_ERROR("HealpixSampling::writeBildFileOrientationalDistribution XSIZE(pdf_direction) != rot_angles.size()!");
 
 
-	double pdfmax, pdfmin, pdfmean, pdfsigma;
+	RFLOAT pdfmax, pdfmin, pdfmean, pdfsigma;
 	pdf_direction.computeStats(pdfmean, pdfsigma, pdfmin, pdfmax);
 
 	std::ofstream fh_bild;
@@ -1161,25 +1161,25 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<doubl
     	REPORT_ERROR("HealpixSampling::writeBildFileOrientationalDistribution: cannot open " + fn_bild);
 
     // 2 * PI * R = 360 degrees, 2*radius should cover angular sampling at width_frac=1
-    double width = width_frac * PI*R*(getAngularSampling()/360.);
-    Matrix1D<double> v(3);
+    RFLOAT width = width_frac * PI*R*(getAngularSampling()/360.);
+    Matrix1D<RFLOAT> v(3);
 
     for (long int iang = 0; iang < rot_angles.size(); iang++)
     {
-     	double pdf = DIRECT_A1D_ELEM(pdf_direction, iang);
+     	RFLOAT pdf = DIRECT_A1D_ELEM(pdf_direction, iang);
 
      	// Don't make a cylinder for pdf==0
      	if (pdf > 0.)
      	{
 			// Colour from blue to red according to deviations from sigma_pdf
-			double colscale = (pdf - pdfmean) / pdfsigma;
+			RFLOAT colscale = (pdf - pdfmean) / pdfsigma;
 			colscale = XMIPP_MIN(colscale, 5.);
 			colscale = XMIPP_MAX(colscale, -1.);
 			colscale /= 6.;
 			colscale += 1./6.; // colscale ranges from 0 (-5 sigma) to 1 (+5 sigma)
 
 			// The length of the cylinder will depend on the pdf_direction
-			double Rp = R + Rmax_frac * R * pdf / pdfmax;
+			RFLOAT Rp = R + Rmax_frac * R * pdf / pdfmax;
 
 			Euler_angles2direction(rot_angles[iang], tilt_angles[iang], v);
 
@@ -1217,8 +1217,8 @@ void HealpixSampling::removePointsOutsideLimitedTiltAngles()
 
     if (ABS(limit_tilt) < 90.)
     {
-    	std::vector<double> pruned_rot_angles;
-    	std::vector<double> pruned_tilt_angles;
+    	std::vector<RFLOAT> pruned_rot_angles;
+    	std::vector<RFLOAT> pruned_tilt_angles;
 		std::vector<int>               pruned_directions_ipix;
 		pruned_rot_angles.clear();
 		pruned_tilt_angles.clear();
@@ -1226,7 +1226,7 @@ void HealpixSampling::removePointsOutsideLimitedTiltAngles()
 
 		for (long int i = 0; i < tilt_angles.size(); i++)
 		{
-			double tilt = tilt_angles[i];
+			RFLOAT tilt = tilt_angles[i];
 			// Let tilt angle range from -90 to 90.
 			if (tilt > 90.) tilt -= 180.;
 
@@ -1273,13 +1273,13 @@ void HealpixSampling::removePointsOutsideLimitedTiltAngles()
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-void HealpixSampling::removeSymmetryEquivalentPoints(double max_ang)
+void HealpixSampling::removeSymmetryEquivalentPoints(RFLOAT max_ang)
 {
     // Maximum distance
-    double cos_max_ang = cos(DEG2RAD(max_ang));
-    double my_dotProduct;
-    Matrix1D<double>  direction(3), direction1(3);
-    std::vector<Matrix1D<double> > directions_vector;
+    RFLOAT cos_max_ang = cos(DEG2RAD(max_ang));
+    RFLOAT my_dotProduct;
+    Matrix1D<RFLOAT>  direction(3), direction1(3);
+    std::vector<Matrix1D<RFLOAT> > directions_vector;
 
     // Calculate all vectors and fill directions_vector
     for (long int i = 0; i < rot_angles.size(); i++)
@@ -1302,9 +1302,9 @@ void HealpixSampling::removeSymmetryEquivalentPoints(double max_ang)
     if (rot_angles.size() < 4000)
     {
     	// Create no_redundant vectors
-		std::vector <Matrix1D<double> > no_redundant_directions_vector;
-		std::vector <double> no_redundant_rot_angles;
-		std::vector <double> no_redundant_tilt_angles;
+		std::vector <Matrix1D<RFLOAT> > no_redundant_directions_vector;
+		std::vector <RFLOAT> no_redundant_rot_angles;
+		std::vector <RFLOAT> no_redundant_tilt_angles;
 		std::vector <int> no_redundant_directions_ipix;
 
 		// Then check all points versus each other
@@ -1351,18 +1351,18 @@ void HealpixSampling::removeSymmetryEquivalentPoints(double max_ang)
 }
 
 void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry,
-        int sym_order, std::vector <Matrix1D<double> >  &directions_vector)
+        int sym_order, std::vector <Matrix1D<RFLOAT> >  &directions_vector)
 {
-    Matrix2D<double>  L(4, 4), R(4, 4);
-    Matrix2D<double>  aux(3, 3);
-    Matrix1D<double>  row1(3), row2(3), row(3);
+    Matrix2D<RFLOAT>  L(4, 4), R(4, 4);
+    Matrix2D<RFLOAT>  aux(3, 3);
+    Matrix1D<RFLOAT>  row1(3), row2(3), row(3);
 
-    std::vector <Matrix1D<double> > no_redundant_directions_vector;
-    std::vector <double> no_redundant_rot_angles;
-    std::vector <double> no_redundant_tilt_angles;
+    std::vector <Matrix1D<RFLOAT> > no_redundant_directions_vector;
+    std::vector <RFLOAT> no_redundant_rot_angles;
+    std::vector <RFLOAT> no_redundant_tilt_angles;
     std::vector <int> no_redundant_directions_ipix;
 
-    double my_dotProduct;
+    RFLOAT my_dotProduct;
     if (symmetry == pg_CN)
     {//OK
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1487,13 +1487,13 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_T )
     {//OK
-        Matrix1D<double>  _3_fold_axis_1_by_3_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_1_by_3_fold_axis_2(3);
         _3_fold_axis_1_by_3_fold_axis_2 = vectorR3(-0.942809, 0., 0.);
         _3_fold_axis_1_by_3_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_2_by_3_fold_axis_3(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_2_by_3_fold_axis_3(3);
         _3_fold_axis_2_by_3_fold_axis_3 = vectorR3(0.471405, 0.272165, 0.7698);
         _3_fold_axis_2_by_3_fold_axis_3.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_3_by_3_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_3_by_3_fold_axis_1(3);
         _3_fold_axis_3_by_3_fold_axis_1 = vectorR3(0.471404, 0.816497, 0.);
         _3_fold_axis_3_by_3_fold_axis_1.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1517,13 +1517,13 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_TD )
     {//OK
-        Matrix1D<double>  _2_fold_axis_1_by_3_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _2_fold_axis_1_by_3_fold_axis_2(3);
         _2_fold_axis_1_by_3_fold_axis_2 = vectorR3(-0.942809, 0., 0.);
         _2_fold_axis_1_by_3_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_2_by_3_fold_axis_5(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_2_by_3_fold_axis_5(3);
         _3_fold_axis_2_by_3_fold_axis_5 = vectorR3(0.471405, 0.272165, 0.7698);
         _3_fold_axis_2_by_3_fold_axis_5.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_5_by_2_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_5_by_2_fold_axis_1(3);
         _3_fold_axis_5_by_2_fold_axis_1 = vectorR3(0., 0.471405, -0.666667);
         _3_fold_axis_5_by_2_fold_axis_1.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1547,13 +1547,13 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_TH )
     {//OK
-        Matrix1D<double>  _3_fold_axis_1_by_2_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_1_by_2_fold_axis_1(3);
         _3_fold_axis_1_by_2_fold_axis_1 = vectorR3(-0.816496, 0., 0.);
         _3_fold_axis_1_by_2_fold_axis_1.selfNormalize();
-        Matrix1D<double>  _2_fold_axis_1_by_2_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _2_fold_axis_1_by_2_fold_axis_2(3);
         _2_fold_axis_1_by_2_fold_axis_2 = vectorR3(0.707107, 0.408248, -0.57735);
         _2_fold_axis_1_by_2_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _2_fold_axis_2_by_3_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _2_fold_axis_2_by_3_fold_axis_1(3);
         _2_fold_axis_2_by_3_fold_axis_1 = vectorR3(-0.408248, -0.707107, 0.);
         _2_fold_axis_2_by_3_fold_axis_1.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1577,13 +1577,13 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_O )
     {//OK
-        Matrix1D<double>  _3_fold_axis_1_by_3_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_1_by_3_fold_axis_2(3);
         _3_fold_axis_1_by_3_fold_axis_2 = vectorR3(0., -1., 1.);
         _3_fold_axis_1_by_3_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_2_by_4_fold_axis(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_2_by_4_fold_axis(3);
         _3_fold_axis_2_by_4_fold_axis = vectorR3(1., 1., 0.);
         _3_fold_axis_2_by_4_fold_axis.selfNormalize();
-        Matrix1D<double>  _4_fold_axis_by_3_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _4_fold_axis_by_3_fold_axis_1(3);
         _4_fold_axis_by_3_fold_axis_1 = vectorR3(-1., 1., 0.);
         _4_fold_axis_by_3_fold_axis_1.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1608,13 +1608,13 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_OH )
     {//OK
-        Matrix1D<double>  _3_fold_axis_1_by_3_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_1_by_3_fold_axis_2(3);
         _3_fold_axis_1_by_3_fold_axis_2 = vectorR3(0., -1., 1.);
         _3_fold_axis_1_by_3_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_2_by_4_fold_axis(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_2_by_4_fold_axis(3);
         _3_fold_axis_2_by_4_fold_axis = vectorR3(1., 1., 0.);
         _3_fold_axis_2_by_4_fold_axis.selfNormalize();
-        Matrix1D<double>  _4_fold_axis_by_3_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _4_fold_axis_by_3_fold_axis_1(3);
         _4_fold_axis_by_3_fold_axis_1 = vectorR3(-1., 1., 0.);
         _4_fold_axis_by_3_fold_axis_1.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1637,15 +1637,15 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I || symmetry  == pg_I2)
     {//OK
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = vectorR3(0., 1., 0.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = vectorR3(-0.4999999839058737,
                                                  -0.8090170074556163,
                                                   0.3090169861701543);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = vectorR3(0.4999999839058737,
                                                 -0.8090170074556163,
                                                  0.3090169861701543);
@@ -1667,17 +1667,17 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I1)
     {//OK
-        Matrix2D<double>  A(3, 3);
+        Matrix2D<RFLOAT>  A(3, 3);
 	    Euler_angles2matrix(0, 90, 0, A);
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = A * vectorR3(0., 1., 0.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = A * vectorR3(-0.4999999839058737,
                                                  -0.8090170074556163,
                                                   0.3090169861701543);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = A * vectorR3(0.4999999839058737,
                                                 -0.8090170074556163,
                                                  0.3090169861701543);
@@ -1700,17 +1700,17 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I3)
     {//OK
-        Matrix2D<double>  A(3, 3);
+        Matrix2D<RFLOAT>  A(3, 3);
 	    Euler_angles2matrix(0,31.7174745559,0, A);
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = A * vectorR3(0., 1., 0.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = A * vectorR3(-0.4999999839058737,
                                                  -0.8090170074556163,
                                                   0.3090169861701543);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = A * vectorR3(0.4999999839058737,
                                                 -0.8090170074556163,
                                                  0.3090169861701543);
@@ -1733,17 +1733,17 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I4)
     {//OK
-        Matrix2D<double>  A(3, 3);
+        Matrix2D<RFLOAT>  A(3, 3);
 	    Euler_angles2matrix(0,-31.7174745559,0, A);
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = A * vectorR3(0., 0., 1.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = A * vectorR3(0.187592467856686,
                                         -0.303530987314591,
                                         -0.491123477863004);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = A * vectorR3(0.187592467856686,
                                         0.303530987314591,
                                         -0.491123477863004);
@@ -1774,20 +1774,20 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_IH || symmetry  == pg_I2H)
     {//OK
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = vectorR3(0., 1., 0.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = vectorR3(-0.4999999839058737,
                                                  -0.8090170074556163,
                                                   0.3090169861701543);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = vectorR3(0.4999999839058737,
                                                 -0.8090170074556163,
                                                  0.3090169861701543);
         _3_fold_axis_by_5_fold_axis_1.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_2_fold_axis(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_2_fold_axis(3);
         _3_fold_axis_by_2_fold_axis =  vectorR3(1.,0.,0.);
         _3_fold_axis_by_2_fold_axis.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1807,22 +1807,22 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I1H)
     {//OK
-        Matrix2D<double>  A(3, 3);
+        Matrix2D<RFLOAT>  A(3, 3);
 	    Euler_angles2matrix(0, 90, 0, A);
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = A * vectorR3(0., 1., 0.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = A * vectorR3(-0.4999999839058737,
                                                  -0.8090170074556163,
                                                   0.3090169861701543);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = A * vectorR3(0.4999999839058737,
                                                 -0.8090170074556163,
                                                  0.3090169861701543);
         _3_fold_axis_by_5_fold_axis_1.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_2_fold_axis(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_2_fold_axis(3);
         _3_fold_axis_by_2_fold_axis =  A * vectorR3(1.,0.,0.);
         _3_fold_axis_by_2_fold_axis.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1842,22 +1842,22 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I3H)
     {//OK
-        Matrix2D<double>  A(3, 3);
+        Matrix2D<RFLOAT>  A(3, 3);
 	    Euler_angles2matrix(0,31.7174745559,0, A);
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = A * vectorR3(0., 0., 1.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = A * vectorR3(0.187592467856686,
                                         -0.303530987314591,
                                         -0.491123477863004);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = A * vectorR3(0.187592467856686,
                                         0.303530987314591,
                                         -0.491123477863004);
         _3_fold_axis_by_5_fold_axis_1.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_2_fold_axis(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_2_fold_axis(3);
         _3_fold_axis_by_2_fold_axis = vectorR3(0.,1.,0.);
         _3_fold_axis_by_2_fold_axis.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)
@@ -1882,22 +1882,22 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     }
     else if (symmetry  == pg_I4H)
     {//OK
-        Matrix2D<double>  A(3, 3);
+        Matrix2D<RFLOAT>  A(3, 3);
 	Euler_angles2matrix(0,-31.7174745559,0, A);
-        Matrix1D<double>  _5_fold_axis_1_by_5_fold_axis_2(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_1_by_5_fold_axis_2(3);
         _5_fold_axis_1_by_5_fold_axis_2 = A * vectorR3(0., 0., 1.);
         _5_fold_axis_1_by_5_fold_axis_2.selfNormalize();
-        Matrix1D<double>  _5_fold_axis_2_by_3_fold_axis(3);
+        Matrix1D<RFLOAT>  _5_fold_axis_2_by_3_fold_axis(3);
         _5_fold_axis_2_by_3_fold_axis = A * vectorR3(0.187592467856686,
                                         -0.303530987314591,
                                         -0.491123477863004);
         _5_fold_axis_2_by_3_fold_axis.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_5_fold_axis_1(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_5_fold_axis_1(3);
         _3_fold_axis_by_5_fold_axis_1 = A * vectorR3(0.187592467856686,
                                         0.303530987314591,
                                         -0.491123477863004);
         _3_fold_axis_by_5_fold_axis_1.selfNormalize();
-        Matrix1D<double>  _3_fold_axis_by_2_fold_axis(3);
+        Matrix1D<RFLOAT>  _3_fold_axis_by_2_fold_axis(3);
         _3_fold_axis_by_2_fold_axis = vectorR3(0.,1.,0.);
         _3_fold_axis_by_2_fold_axis.selfNormalize();
         for (long int i = 0; i < rot_angles.size(); i++)

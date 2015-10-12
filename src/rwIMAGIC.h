@@ -63,8 +63,8 @@ struct IMAGIChead
     float oldavd;      // 20      old average
     float densmax;       // 21      maximum
     float densmin;       // 22      minimum
-    //     double sum;       // 23+24  sum of densities
-    //     double squares;    // 25+26  sum of squares
+    //     RFLOAT sum;       // 23+24  sum of densities
+    //     RFLOAT squares;    // 25+26  sum of squares
     float dummy[4];   // 23-26  dummy place holder
     char lastpr[8];      // 27+28     last program writing file
     char name[80];       // 29-48     image name
@@ -174,13 +174,13 @@ int  readIMAGIC(long int img_select)
         header->densmax = header->avdens + header->sigma;
     }
 
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(double)header->densmin);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(double)header->densmax);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(double)header->avdens);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(double)header->sigma);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(double)1.);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(double)1.);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(double)1.);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(RFLOAT)header->densmin);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->densmax);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->avdens);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->sigma);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)1.);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)1.);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)1.);
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
     offset = 0;   // separate header file
@@ -263,7 +263,7 @@ void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
 //        imgStart=0;
 
     // Convert T to datatype
-    if ( typeid(T) == typeid(double) ||
+    if ( typeid(T) == typeid(RFLOAT) ||
          typeid(T) == typeid(float) ||
          typeid(T) == typeid(int) )
         strcpy(header->type,"REAL");
@@ -276,7 +276,7 @@ void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
     size_t datasize, datasize_n;
     datasize_n = Xdim*Ydim*Zdim;
     datasize = datasize_n * gettypesize(Float);
-    double aux;
+    RFLOAT aux;
 
     if (!MDMainHeader.isEmpty())
     {

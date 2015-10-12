@@ -72,7 +72,7 @@ public:
     void initialiseWorkLoad();
 
     /** Perform individual power spectra calculation in parallel */
-    void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<double> &Mavg);
+    void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg);
 
     /** Expectation
      *  This cares care of gathering all weighted sums after the expectation

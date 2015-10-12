@@ -46,9 +46,9 @@
 #include "src/transformations.h"
 
 /* Rotation 2D ------------------------------------------------------------- */
-void rotation2DMatrix(double ang, Matrix2D< double > &result, bool homogeneous)
+void rotation2DMatrix(RFLOAT ang, Matrix2D< RFLOAT > &result, bool homogeneous)
 {
-    double cosine, sine;
+    RFLOAT cosine, sine;
 
     ang = DEG2RAD(ang);
     cosine = cos(ang);
@@ -76,8 +76,8 @@ void rotation2DMatrix(double ang, Matrix2D< double > &result, bool homogeneous)
 }
 
 /* Translation 2D ---------------------------------------------------------- */
-void translation2DMatrix(const Matrix1D<double> &v,
-                         Matrix2D< double > &result)
+void translation2DMatrix(const Matrix1D<RFLOAT> &v,
+                         Matrix2D< RFLOAT > &result)
 {
     if (VEC_XSIZE(v) != 2)
         REPORT_ERROR("Translation2D_matrix: vector is not in R2");
@@ -88,7 +88,7 @@ void translation2DMatrix(const Matrix1D<double> &v,
 }
 
 /* Rotation 3D around the system axes -------------------------------------- */
-void rotation3DMatrix(double ang, char axis, Matrix2D< double > &result,
+void rotation3DMatrix(RFLOAT ang, char axis, Matrix2D< RFLOAT > &result,
                       bool homogeneous)
 {
     if (homogeneous)
@@ -99,7 +99,7 @@ void rotation3DMatrix(double ang, char axis, Matrix2D< double > &result,
     else
         result.initZeros(3,3);
 
-    double cosine, sine;
+    RFLOAT cosine, sine;
     ang = DEG2RAD(ang);
     cosine = cos(ang);
     sine = sin(ang);
@@ -133,7 +133,7 @@ void rotation3DMatrix(double ang, char axis, Matrix2D< double > &result,
 }
 
 /* Align a vector with Z axis */
-void alignWithZ(const Matrix1D<double> &axis, Matrix2D<double>& result,
+void alignWithZ(const Matrix1D<RFLOAT> &axis, Matrix2D<RFLOAT>& result,
                 bool homogeneous)
 {
     if (axis.size() != 3)
@@ -145,11 +145,11 @@ void alignWithZ(const Matrix1D<double> &axis, Matrix2D<double>& result,
     }
     else
         result.initZeros(3,3);
-    Matrix1D<double>  Axis(axis);
+    Matrix1D<RFLOAT>  Axis(axis);
     Axis.selfNormalize();
 
     // Compute length of the projection on YZ plane
-    double proj_mod = sqrt(YY(Axis) * YY(Axis) + ZZ(Axis) * ZZ(Axis));
+    RFLOAT proj_mod = sqrt(YY(Axis) * YY(Axis) + ZZ(Axis) * ZZ(Axis));
     if (proj_mod > XMIPP_EQUAL_ACCURACY)
     {   // proj_mod!=0
         // Build Matrix result, which makes the turning axis coincident with Z
@@ -179,19 +179,19 @@ void alignWithZ(const Matrix1D<double> &axis, Matrix2D<double>& result,
 }
 
 /* Rotation 3D around any axis -------------------------------------------- */
-void rotation3DMatrix(double ang, const Matrix1D<double> &axis,
-                      Matrix2D<double> &result, bool homogeneous)
+void rotation3DMatrix(RFLOAT ang, const Matrix1D<RFLOAT> &axis,
+                      Matrix2D<RFLOAT> &result, bool homogeneous)
 {
     // Compute a matrix which makes the turning axis coincident with Z
     // And turn around this axis
-    Matrix2D<double> A,R;
+    Matrix2D<RFLOAT> A,R;
     alignWithZ(axis,A,homogeneous);
     rotation3DMatrix(ang, 'Z', R, homogeneous);
     result=A.transpose() * R * A;
 }
 
 /* Translation 3D ---------------------------------------------------------- */
-void translation3DMatrix(const Matrix1D<double> &v, Matrix2D<double> &result)
+void translation3DMatrix(const Matrix1D<RFLOAT> &v, Matrix2D<RFLOAT> &result)
 {
     if (VEC_XSIZE(v) != 3)
         REPORT_ERROR("Translation3D_matrix: vector is not in R3");
@@ -203,7 +203,7 @@ void translation3DMatrix(const Matrix1D<double> &v, Matrix2D<double> &result)
 }
 
 /* Scale 3D ---------------------------------------------------------------- */
-void scale3DMatrix(const Matrix1D<double> &sc, Matrix2D<double>& result,
+void scale3DMatrix(const Matrix1D<RFLOAT> &sc, Matrix2D<RFLOAT>& result,
                    bool homogeneous)
 {
     if (VEC_XSIZE(sc) != 3)

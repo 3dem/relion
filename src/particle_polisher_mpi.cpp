@@ -77,7 +77,7 @@ void ParticlePolisherMpi::fitMovementsAllMicrographs()
 	}
 
 	// Combine results from all nodes
-	MultidimArray<double> allnodes_fitted_movements;
+	MultidimArray<RFLOAT> allnodes_fitted_movements;
 	allnodes_fitted_movements.resize(fitted_movements);
 	MPI_Allreduce(MULTIDIM_ARRAY(fitted_movements), MULTIDIM_ARRAY(allnodes_fitted_movements), MULTIDIM_SIZE(fitted_movements), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	fitted_movements = allnodes_fitted_movements;
@@ -86,8 +86,8 @@ void ParticlePolisherMpi::fitMovementsAllMicrographs()
     for (long int ipart = 0; ipart < exp_model.numberOfParticles(); ipart++)
 	{
 		long int part_id = exp_model.particles[ipart].id;
-		double xoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 0);
-		double yoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 1);
+		RFLOAT xoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 0);
+		RFLOAT yoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 1);
 		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_X, xoff, part_id);
 		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, yoff, part_id);
 	}
@@ -114,7 +114,7 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 		return;
 	}
 
-	double bfactor, offset, corr_coeff;
+	RFLOAT bfactor, offset, corr_coeff;
 
 	int total_nr_frames = last_frame - first_frame + 1;
 	long int my_first_frame, my_last_frame, my_nr_frames;
@@ -188,7 +188,7 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 	}
 
 	// Combine results from all nodes
-	MultidimArray<double> allnodes_perframe_bfactors;
+	MultidimArray<RFLOAT> allnodes_perframe_bfactors;
 	allnodes_perframe_bfactors.resize(perframe_bfactors);
 	MPI_Allreduce(MULTIDIM_ARRAY(perframe_bfactors), MULTIDIM_ARRAY(allnodes_perframe_bfactors), MULTIDIM_SIZE(perframe_bfactors), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	perframe_bfactors = allnodes_perframe_bfactors;
@@ -307,8 +307,8 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 	// Wait until the FSC-weighting has been done
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	MultidimArray<double> dum;
-	Image<double> refvol;
+	MultidimArray<RFLOAT> dum;
+	Image<RFLOAT> refvol;
 	FileName fn_vol;
 	fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half1_class001_unfil.mrc";
 	refvol.read(fn_vol);
@@ -378,7 +378,7 @@ void ParticlePolisherMpi::optimiseBeamTilt()
 	// Combine results from all nodes
 	if (beamtilt_max > 0.)
 	{
-		MultidimArray<double> allnodes_diff2_beamtilt;
+		MultidimArray<RFLOAT> allnodes_diff2_beamtilt;
 		allnodes_diff2_beamtilt.initZeros(diff2_beamtilt);
 		MPI_Allreduce(MULTIDIM_ARRAY(diff2_beamtilt), MULTIDIM_ARRAY(allnodes_diff2_beamtilt), MULTIDIM_SIZE(diff2_beamtilt), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		diff2_beamtilt = allnodes_diff2_beamtilt;
@@ -386,7 +386,7 @@ void ParticlePolisherMpi::optimiseBeamTilt()
 
 	if (defocus_shift_max > 0.)
 	{
-		MultidimArray<double> allnodes_defocus_shift_allmics;
+		MultidimArray<RFLOAT> allnodes_defocus_shift_allmics;
 		allnodes_defocus_shift_allmics.initZeros(defocus_shift_allmics);
 		MPI_Allreduce(MULTIDIM_ARRAY(defocus_shift_allmics), MULTIDIM_ARRAY(allnodes_defocus_shift_allmics), MULTIDIM_SIZE(defocus_shift_allmics), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		defocus_shift_allmics = allnodes_defocus_shift_allmics;

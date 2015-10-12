@@ -91,15 +91,15 @@ public:
 	char * img_data;
 
 	// For getting back close the original image values from the uchar ones...
-	double minval;
-	double maxval;
-	double scale;
+	RFLOAT minval;
+	RFLOAT maxval;
+	RFLOAT scale;
 
 	// Constructor with an image and its metadata
 	DisplayBox(int X, int Y, int W, int H, const char *L=0) : Fl_Box(X,Y,W,H,L) { img_data = NULL; MDimg.clear(); }
 
-	void setData(MultidimArray<double> &img, MetaDataContainer *MDCin, int ipos, double minval, double maxval,
-			double _scale, bool do_relion_scale = false);
+	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
+			RFLOAT _scale, bool do_relion_scale = false);
 
 	// Destructor
 	~DisplayBox()
@@ -129,13 +129,13 @@ public:
 	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
-			double _minval, double _maxval, double _sigma_contrast,
-			double _scale, double _ori_scale, int _ncol, bool do_class = false, MetaDataTable *MDdata = NULL,
+			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
+			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool do_class = false, MetaDataTable *MDdata = NULL,
 			int _nr_regroup = -1, bool _is_data = false, MetaDataTable *MDgroups = NULL);
-	int fillSingleViewerCanvas(MultidimArray<double> image, double _minval, double _maxval, double _sigma_contrast, double _scale);
-	int fillPickerViewerCanvas(MultidimArray<double> image, double _minval, double _maxval, double _sigma_contrast, double _scale,
+	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
+	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
 			int _particle_radius, FileName _fn_coords = "",
-			FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", double _color_blue_value = 0., double _color_red_value = 1.);
+			FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
 
 
 };
@@ -169,12 +169,12 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, double _minval, double _maxval,
-			double _sigma_contrast, double _scale, int _ncol);
-	int fill(MultidimArray<double> &image, double _minval, double _maxval, double _sigma_contrast, double _scale = 1.);
+	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol);
+	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 
 private:
-	void getImageContrast(MultidimArray<double> &image, double &minval, double &maxval, double &sigma_contrast);
+	void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
 
 };
 
@@ -202,13 +202,13 @@ public:
 	MetaDataTable *MDgroups;
 
 	// Scale for showing the original image
-	double ori_scale;
+	RFLOAT ori_scale;
 
 	// To know which original image to display
 	EMDLabel display_label;
 
 	// To know which contrast to apply to original image display
-	double sigma_contrast;
+	RFLOAT sigma_contrast;
 
 	// Constructor with w x h size of the window and a title
 	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title) { }
@@ -279,10 +279,10 @@ public:
 	EMDLabel color_label;
 
 	// Blue value for coloring
-	double smallest_color_value;
+	RFLOAT smallest_color_value;
 
 	// Red value for coloring
-	double biggest_color_value;
+	RFLOAT biggest_color_value;
 
 	// Red->Blue is true; blue->red is false
 	bool do_blue_to_red;
@@ -310,13 +310,13 @@ private:
 class popupInputWindow : Fl_Window
 {
 	Fl_Input * input;
-	double result;
+	RFLOAT result;
 public:
 
 	// Constructor with w x h size of the window and a title
 	popupInputWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
-	int fill(std::string label, double &_result)
+	int fill(std::string label, RFLOAT &_result)
 	{
 		input = new Fl_Input(x() + 200, 0, 100, 30, "black value: ") ;
 		Fl_Button * done = new Fl_Button(x()+350, 0, 30, 30, "go!");
@@ -400,7 +400,7 @@ public:
 	bool reverse_sort;
 
 	// Scale factor for displaying
-	double scale;
+	RFLOAT scale;
 
 	// Number of rows for tiled view
 	int nrow, ncol;
@@ -409,13 +409,13 @@ public:
 	bool do_apply_orient;
 
 	// Scale for showing the original image
-	double ori_scale;
+	RFLOAT ori_scale;
 
 	// Black and white values
-	double minval, maxval;
+	RFLOAT minval, maxval;
 
 	// For setting black and white contrast to a specified times the image standard deviation from the mean
-	double sigma_contrast;
+	RFLOAT sigma_contrast;
 
 	// Particle diameter
 	int particle_radius;
@@ -433,7 +433,7 @@ public:
 	FileName color_label;
 
 	// Values for blue and red coloring
-	double color_blue_value, color_red_value;
+	RFLOAT color_blue_value, color_red_value;
 
 	// Tablename to read from in the input STAR file
 	FileName table_name;
@@ -463,10 +463,10 @@ public:
 	std::vector<DisplayBox*> boxes;
 
 	// Lowpass filter for picker images
-	double lowpass;
+	RFLOAT lowpass;
 
 	// Pixel size to calculate lowpass filter in Angstroms
-	double angpix;
+	RFLOAT angpix;
 
 public:
 	// Read command line arguments

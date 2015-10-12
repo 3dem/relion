@@ -47,9 +47,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	{
 		CUDA_CPU_TIC("init");
 		FileName fn_img;
-		Image<double> img, rec_img;
+		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg, Faux;
-		MultidimArray<double> Fctf;
+		MultidimArray<RFLOAT> Fctf;
 
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
@@ -63,10 +63,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		int group_id =baseMLO->mydata.getGroupId(part_id);
 
 		// Get the norm_correction
-		double normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
+		RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
 
 		// Get the optimal origin offsets from the previous iteration
-		Matrix1D<double> my_old_offset(2), my_prior(2);
+		Matrix1D<RFLOAT> my_old_offset(2), my_prior(2);
 		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF);
 		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF);
 		XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF_PRIOR);
@@ -93,9 +93,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
 			// First try if there are some fixed prior angles
-			double prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT_PRIOR);
-			double prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
-			double prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
+			RFLOAT prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT_PRIOR);
+			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
+			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
 
 			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
@@ -224,7 +224,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CUDA_CPU_TIC("CenterFFT1");
 		// Always store FT of image without mask (to be used for the reconstruction)
-		MultidimArray<double> img_aux;
+		MultidimArray<RFLOAT> img_aux;
 		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 		CenterFFT(img_aux, true);
 		CUDA_CPU_TOC("CenterFFT1");
@@ -256,8 +256,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //		XFLOAT corrFactor = 1. / cudaMLO->inputImageData->reals.getSize();
 //		for (unsigned long i = 0; i < cudaMLO->inputImageData->fouriers.getSize(); i ++)
 //		{
-//			Faux.data[i].real = (double) cudaMLO->inputImageData->fouriers[i].x * corrFactor;
-//			Faux.data[i].imag = (double) cudaMLO->inputImageData->fouriers[i].y * corrFactor;
+//			Faux.data[i].real = (RFLOAT) cudaMLO->inputImageData->fouriers[i].x * corrFactor;
+//			Faux.data[i].imag = (RFLOAT) cudaMLO->inputImageData->fouriers[i].y * corrFactor;
 //		}
 //		CUDA_CPU_TOC("Memset2");
 
@@ -274,11 +274,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// This will only be used for reconstruction, not for alignment
 		// But beamtilt only affects very high-resolution components anyway...
 		//
-		double beamtilt_x = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_X);
-		double beamtilt_y = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_Y);
-		double Cs = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_CS);
-		double V = 1000. * DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_VOLTAGE);
-		double lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
+		RFLOAT beamtilt_x = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_X);
+		RFLOAT beamtilt_y = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_Y);
+		RFLOAT Cs = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_CS);
+		RFLOAT V = 1000. * DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_VOLTAGE);
+		RFLOAT lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
 		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
 			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs,baseMLO->mymodel.pixel_size, baseMLO->mymodel.ori_size);
 
@@ -287,7 +287,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CUDA_CPU_TOC("selfApplyBeamTilt");
 
 		CUDA_CPU_TIC("zeroMask");
-		MultidimArray<double> Mnoise;
+		MultidimArray<RFLOAT> Mnoise;
 		if (!baseMLO->do_zero_mask)
 		{
 			// Make a noisy background image with the same spectrum as the sigma2_noise
@@ -302,7 +302,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			// If we're doing running averages, then the sigma2_noise was already adjusted for the running averages.
 			// Undo this adjustment here in order to get the right noise in the individual frames
-			MultidimArray<double> power_noise = baseMLO->sigma2_fudge * baseMLO->mymodel.sigma2_noise[group_id];
+			MultidimArray<RFLOAT> power_noise = baseMLO->sigma2_fudge * baseMLO->mymodel.sigma2_noise[group_id];
 			if (baseMLO->do_realign_movies)
 				power_noise *= (2. * baseMLO->movie_frame_running_avg_side + 1.);
 
@@ -314,10 +314,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
 			{
-				int ires = ROUND( sqrt( (double)(kp * kp + ip * ip + jp * jp) ) );
+				int ires = ROUND( sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
 				if (ires >= 0 && ires < XSIZE(Fnoise))
 				{
-					double sigma = sqrt(DIRECT_A1D_ELEM(power_noise, ires));
+					RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(power_noise, ires));
 					DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
 					DIRECT_A3D_ELEM(Fnoise, k, i, j).imag = rnd_gaus(0., sigma);
 				}
@@ -336,7 +336,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TOC("setXmippOrigin");
 
 			CUDA_CPU_TIC("softMaskOutsideMap");
-			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (double)baseMLO->width_mask_edge, &Mnoise);
+			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
 			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
 		else
@@ -344,9 +344,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TIC("softMaskOutsideMap");
 
 			XFLOAT cosine_width = baseMLO->width_mask_edge;
-			XFLOAT radius = (XFLOAT)((double)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
+			XFLOAT radius = (XFLOAT)((RFLOAT)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
 			if (radius < 0)
-				radius = ((double)img.data.xdim)/2.;
+				radius = ((RFLOAT)img.data.xdim)/2.;
 			XFLOAT radius_p = radius + cosine_width;
 
 
@@ -378,11 +378,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 				{
-					img.data.data[n]=(double)dev_img[n];
+					img.data.data[n]=(RFLOAT)dev_img[n];
 				}
 			}
 			else
-				softMaskOutsideMap(img(), radius, (double)cosine_width);
+				softMaskOutsideMap(img(), radius, (RFLOAT)cosine_width);
 
 //			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 //			{
@@ -406,17 +406,17 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			MultidimArray<double> spectrum;
+			MultidimArray<RFLOAT> spectrum;
 			spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
-			double highres_Xi2 = 0.;
+			RFLOAT highres_Xi2 = 0.;
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 			{
-				int ires = ROUND( sqrt( (double)(kp*kp + ip*ip + jp*jp) ) );
+				int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
 				// Skip Hermitian pairs in the x==0 column
 
 				if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
 				{
-					double normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
+					RFLOAT normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
 					DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
 					// Store sumXi2 from current_size until ori_size
 					if (ires >= baseMLO->mymodel.current_size/2 + 1)
@@ -447,7 +447,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			if (baseMLO->mymodel.data_dim == 3)
 			{
-				Image<double> Ictf;
+				Image<RFLOAT> Ictf;
 				if (baseMLO->do_parallel_disc_io)
 				{
 					// Read CTF-image from disc
@@ -956,7 +956,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
-		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(double)getMinOnDevice(FinePassWeights[ipart].weights));
+		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(RFLOAT)getMinOnDevice(FinePassWeights[ipart].weights));
 		CUDA_CPU_TOC("collect_data_1");
 //		std::cerr << "  fine pass minweight  =  " << op.min_diff2[ipart] << std::endl;
 
@@ -1018,11 +1018,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
-		double exp_thisparticle_sumweight = 0.;
+		RFLOAT exp_thisparticle_sumweight = 0.;
 
-		double old_offset_z;
-		double old_offset_x = XX(op.old_offset[ipart]);
-		double old_offset_y = YY(op.old_offset[ipart]);
+		RFLOAT old_offset_z;
+		RFLOAT old_offset_x = XX(op.old_offset[ipart]);
+		RFLOAT old_offset_y = YY(op.old_offset[ipart]);
 		if (baseMLO->mymodel.data_dim == 3)
 			old_offset_z = ZZ(op.old_offset[ipart]);
 
@@ -1052,13 +1052,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 //
 //				// Binarize the squared differences array to skip marginalisation
-//				double mymindiff2 = 99.e10;
+//				RFLOAT mymindiff2 = 99.e10;
 //				long int myminidx = -1;
 //				// Find the smallest element in this row of op.Mweight
 //				for (long int i = 0; i < XSIZE(op.Mweight); i++)
 //				{
 //
-//					double cc = DIRECT_A2D_ELEM(op.Mweight, ipart, i);
+//					RFLOAT cc = DIRECT_A2D_ELEM(op.Mweight, ipart, i);
 //					// ignore non-determined cc
 //					if (cc == -999.)
 //						continue;
@@ -1096,7 +1096,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				/*=========================================
 						Fetch+generate Translation data
 				===========================================*/
-				double myprior_x, myprior_y, myprior_z;
+				RFLOAT myprior_x, myprior_y, myprior_z;
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
 					myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
@@ -1112,12 +1112,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
-					double offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
-					double offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
-					double tdiff2 = (offset_x - myprior_x) * (offset_x - myprior_x) + (offset_y - myprior_y) * (offset_y - myprior_y);
+					RFLOAT offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
+					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
+					RFLOAT tdiff2 = (offset_x - myprior_x) * (offset_x - myprior_x) + (offset_y - myprior_y) * (offset_y - myprior_y);
 					if (baseMLO->mymodel.data_dim == 3)
 					{
-						double offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
+						RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
 						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 					}
 					// P(offset|sigma2_offset)
@@ -1225,14 +1225,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
-		double frac_weight = 0.;
-		double my_significant_weight;
+		RFLOAT frac_weight = 0.;
+		RFLOAT my_significant_weight;
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
 			my_significant_weight = 0.999;
 			frac_weight = 1.;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (double) 1.;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) 1.;
 			if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
 				for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
 					if (DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden) >= my_significant_weight)
@@ -1333,7 +1333,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 
 			// Store nr_significant_coarse_samples for this particle
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (double)my_nr_significant_coarse_samples;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
 
 			// Keep track of which coarse samplings were significant were significant for this particle
 			for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
@@ -1395,15 +1395,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	op.max_weight.resize(sp.nr_particles, -1.);
 
 	// For norm_correction and scale_correction of all particles of this ori_particle
-	std::vector<double> exp_wsum_norm_correction;
-	std::vector<MultidimArray<double> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
-	std::vector<MultidimArray<double> > thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
+	std::vector<RFLOAT> exp_wsum_norm_correction;
+	std::vector<MultidimArray<RFLOAT> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
+	std::vector<MultidimArray<RFLOAT> > thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
 	exp_wsum_norm_correction.resize(sp.nr_particles, 0.);
 
 	// For scale_correction
 	if (baseMLO->do_scale_correction)
 	{
-		MultidimArray<double> aux;
+		MultidimArray<RFLOAT> aux;
 		aux.initZeros(baseMLO->mymodel.ori_size/2 + 1);
 		exp_wsum_scale_correction_XA.resize(sp.nr_particles, aux);
 		exp_wsum_scale_correction_AA.resize(sp.nr_particles, aux);
@@ -1411,31 +1411,31 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		thr_wsum_reference_power_spectra.resize(baseMLO->mymodel.nr_groups, aux);
 	}
 
-	std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+	std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	bool have_warned_small_scale = false;
 
 	// Make local copies of weighted sums (except BPrefs, which are too big)
 	// so that there are not too many mutex locks below
-	std::vector<MultidimArray<double> > thr_wsum_sigma2_noise, thr_wsum_pdf_direction;
-	std::vector<double> thr_wsum_norm_correction, thr_sumw_group, thr_wsum_pdf_class, thr_wsum_prior_offsetx_class, thr_wsum_prior_offsety_class;
-	double thr_wsum_sigma2_offset;
-	MultidimArray<double> thr_metadata, zeroArray;
+	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise, thr_wsum_pdf_direction;
+	std::vector<RFLOAT> thr_wsum_norm_correction, thr_sumw_group, thr_wsum_pdf_class, thr_wsum_prior_offsetx_class, thr_wsum_prior_offsety_class;
+	RFLOAT thr_wsum_sigma2_offset;
+	MultidimArray<RFLOAT> thr_metadata, zeroArray;
 	// Wsum_sigma_noise2 is a 1D-spectrum for each group
 	zeroArray.initZeros(baseMLO->mymodel.ori_size/2 + 1);
 	thr_wsum_sigma2_noise.resize(baseMLO->mymodel.nr_groups, zeroArray);
 	// wsum_pdf_direction is a 1D-array (of length sampling.NrDirections()) for each class
 	zeroArray.initZeros(baseMLO->sampling.NrDirections());
 	thr_wsum_pdf_direction.resize(baseMLO->mymodel.nr_classes, zeroArray);
-	// sumw_group is a double for each group
+	// sumw_group is a RFLOAT for each group
 	thr_sumw_group.resize(baseMLO->mymodel.nr_groups, 0.);
-	// wsum_pdf_class is a double for each class
+	// wsum_pdf_class is a RFLOAT for each class
 	thr_wsum_pdf_class.resize(baseMLO->mymodel.nr_classes, 0.);
 	if (baseMLO->mymodel.ref_dim == 2)
 	{
 		thr_wsum_prior_offsetx_class.resize(baseMLO->mymodel.nr_classes, 0.);
 		thr_wsum_prior_offsety_class.resize(baseMLO->mymodel.nr_classes, 0.);
 	}
-	// wsum_sigma2_offset is just a double
+	// wsum_sigma2_offset is just a RFLOAT
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
 
@@ -1482,10 +1482,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			sumBlockNum+=block_nums[nr_fake_classes*ipart + fake_class];
 
-			double myprior_x, myprior_y, myprior_z;
-			double old_offset_x = XX(op.old_offset[ipart]);
-			double old_offset_y = YY(op.old_offset[ipart]);
-			double old_offset_z;
+			RFLOAT myprior_x, myprior_y, myprior_z;
+			RFLOAT old_offset_x = XX(op.old_offset[ipart]);
+			RFLOAT old_offset_y = YY(op.old_offset[ipart]);
+			RFLOAT old_offset_z;
 
 			if (baseMLO->mymodel.ref_dim == 2)
 			{
@@ -1516,11 +1516,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
 					oo_otrans_y[fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
-					double diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
-					double diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
+					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
+					RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
 					if (baseMLO->mymodel.data_dim == 3)
 					{
-						double diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
+						RFLOAT diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
 						myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
 					}
 					else
@@ -1629,7 +1629,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	                     SET METADATA
 	======================================================*/
 
-	std::vector< double> oversampled_rot, oversampled_tilt, oversampled_psi;
+	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		CUDA_CPU_TIC("setMetadata");
@@ -1653,9 +1653,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 				op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
-		double rot = oversampled_rot[max_index.ioverrot];
-		double tilt = oversampled_tilt[max_index.ioverrot];
-		double psi = oversampled_psi[max_index.ioverrot];
+		RFLOAT rot = oversampled_rot[max_index.ioverrot];
+		RFLOAT tilt = oversampled_tilt[max_index.ioverrot];
+		RFLOAT psi = oversampled_psi[max_index.ioverrot];
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
 		if (psi>180.)
@@ -1668,7 +1668,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		if (baseMLO->mymodel.data_dim == 3)
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (double)max_index.iclass + 1;
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
 
 		CUDA_CPU_TOC("setMetadata");
@@ -2008,8 +2008,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
 			if (ires > -1)
 			{
-				thr_wsum_sigma2_noise[group_id].data[ires] += (double) wdiff2s_sum[j];
-				exp_wsum_norm_correction[ipart] += (double) wdiff2s_sum[j]; //TODO could be gpu-reduced
+				thr_wsum_sigma2_noise[group_id].data[ires] += (RFLOAT) wdiff2s_sum[j];
+				exp_wsum_norm_correction[ipart] += (RFLOAT) wdiff2s_sum[j]; //TODO could be gpu-reduced
 			}
 		}
 	} // end loop ipart
@@ -2023,8 +2023,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Extend norm_correction and sigma2_noise estimation to higher resolutions for all particles
 	// Also calculate dLL for each particle and store in metadata
 	// loop over all particles inside this ori_particle
-	double thr_avg_norm_correction = 0.;
-	double thr_sum_dLL = 0., thr_sum_Pmax = 0.;
+	RFLOAT thr_avg_norm_correction = 0.;
+	RFLOAT thr_sum_dLL = 0., thr_sum_Pmax = 0.;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -2042,11 +2042,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// Multiply by old value because the old norm_correction term was already applied to the image
 		if (baseMLO->do_norm_correction)
 		{
-			double old_norm_correction = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
+			RFLOAT old_norm_correction = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
 			old_norm_correction /= baseMLO->mymodel.avg_norm_correction;
 			// The factor two below is because exp_wsum_norm_correctiom is similar to sigma2_noise, which is the variance for the real/imag components
 			// The variance of the total image (on which one normalizes) is twice this value!
-			double normcorr = old_norm_correction * sqrt(exp_wsum_norm_correction[ipart] * 2.);
+			RFLOAT normcorr = old_norm_correction * sqrt(exp_wsum_norm_correction[ipart] * 2.);
 			thr_avg_norm_correction += normcorr;
 
 			// Now set the new norm_correction in the relevant position of exp_metadata
@@ -2073,7 +2073,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 
 		// Calculate DLL for each particle
-		double logsigma2 = 0.;
+		RFLOAT logsigma2 = 0.;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine)
 		{
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, n);
@@ -2096,7 +2096,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			std::cerr << " ml_model.sigma2_noise[group_id]= " << baseMLO->mymodel.sigma2_noise[group_id] << std::endl;
 			REPORT_ERROR("ERROR: op.sum_weight[ipart]==0");
 		}
-		double dLL;
+		RFLOAT dLL;
 		if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 			dLL = -op.min_diff2[ipart];
 		else
@@ -2288,8 +2288,8 @@ void MlOptimiserCuda::resetData()
 		{
 			std::vector<int> exp_pointer_dir_nonzeroprior;
 			std::vector<int> exp_pointer_psi_nonzeroprior;
-			std::vector<double> exp_directions_prior;
-			std::vector<double> exp_psi_prior;
+			std::vector<RFLOAT> exp_directions_prior;
+			std::vector<RFLOAT> exp_psi_prior;
 
 			long unsigned itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
 			long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);

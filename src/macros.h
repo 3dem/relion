@@ -311,7 +311,7 @@
  * next_power = NEXT_POWER_OF_2(1000); // next_power = 1024
  * @endcode
  */
-#define NEXT_POWER_OF_2(x) pow(2, ceil(log((double) x) / log(2.0)-XMIPP_EQUAL_ACCURACY) )
+#define NEXT_POWER_OF_2(x) pow(2, ceil(log((RFLOAT) x) / log(2.0)-XMIPP_EQUAL_ACCURACY) )
 
 /** Linear interpolation
  *
@@ -324,7 +324,7 @@
  *
  */
 #define BSPLINE03(arg,result) {\
-	double x = ABS(arg); \
+	RFLOAT x = ABS(arg); \
 	if (x < 1.0) \
 	    result=(x * x * (x - 2.0) * (1.0 / 2.0) + 2.0 / 3.0);\
 	else if (x < 2.0) { \
@@ -354,7 +354,7 @@
  * @endcode
  */
 #define SPEED_UP_temps \
-    double spduptmp0, spduptmp1, spduptmp2, \
+    RFLOAT spduptmp0, spduptmp1, spduptmp2, \
     spduptmp3, spduptmp4, spduptmp5, \
     spduptmp6, spduptmp7, spduptmp8; \
     int   ispduptmp0, ispduptmp1, ispduptmp2, \

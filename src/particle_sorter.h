@@ -57,14 +57,14 @@ public:
 	MetaDataTable MDin;
 
 	// Pixel size (for low-pass filter and particle diameter)
-	double angpix;
+	RFLOAT angpix;
 
 	// Particle diameter (in Angstroms)
-	double particle_diameter;
+	RFLOAT particle_diameter;
 	int particle_radius2;
 
 	// Low pass filetr cutoff (in Angstroms)
-	double lowpass;
+	RFLOAT lowpass;
 
 	// Original size of the reference images
 	int particle_size;
@@ -73,16 +73,16 @@ public:
 	int current_size;
 
 	// Minimum Z-value to count in the sorting
-	double min_z;
+	RFLOAT min_z;
 
 	// Vector with all original reference images
-	std::vector<MultidimArray<double> > Mrefs;
+	std::vector<MultidimArray<RFLOAT> > Mrefs;
 
 	// FTs of the reference images for feature calculation
 	std::vector<Projector > PPref;
 
 	// Feature values for all input images
-	MultidimArray<double> features;
+	MultidimArray<RFLOAT> features;
 
 	// Is density in micrograph inverted wrt templates?
 	bool do_invert;
@@ -115,10 +115,10 @@ protected:
 	// Write out (for now in libsvm format)
 	void writeFeatures();
 
-	void calculateStatsOneImage(MultidimArray<double> &img,
-			double &mean, double &stddev, double &skew, double &kurt, double &quadrant_stddev);
+	void calculateStatsOneImage(MultidimArray<RFLOAT> &img,
+			RFLOAT &mean, RFLOAT &stddev, RFLOAT &skew, RFLOAT &kurt, RFLOAT &quadrant_stddev);
 
-	double rotationalSymmetryFourierTransform(MultidimArray<Complex > &Fimg);
+	RFLOAT rotationalSymmetryFourierTransform(MultidimArray<Complex > &Fimg);
 
 };
 

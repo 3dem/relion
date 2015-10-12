@@ -27,11 +27,11 @@ class Complex
 
 	public:
 
-	double real;
-	double imag;
+	RFLOAT real;
+	RFLOAT imag;
 
     // Constructor
-	Complex(double _r = 0.0, double _i = 0.0);
+	Complex(RFLOAT _r = 0.0, RFLOAT _i = 0.0);
 
     Complex operator+(Complex &op);
     void operator+=(Complex &op);
@@ -41,42 +41,42 @@ class Complex
 
     Complex operator*(Complex &op);
 
-    void operator*=(double op);
+    void operator*=(RFLOAT op);
 
-    Complex operator*(double op);
+    Complex operator*(RFLOAT op);
 
     Complex operator/(Complex &op);
 
-    Complex operator/(double op);
+    Complex operator/(RFLOAT op);
 
-    void operator/=(double op);
+    void operator/=(RFLOAT op);
 
     // Complex conjugated
     Complex conj();
 
     // Abs value: sqrt(real*real+imag*imag)
-    double abs();
+    RFLOAT abs();
 
     // Norm value: real*real+imag*imag
-    double norm();
+    RFLOAT norm();
 
     // Phase angle: atan2(imag,real)
-    double arg();
+    RFLOAT arg();
 
 
 };
 
 Complex conj(const Complex& op);
-double abs(const Complex& op);
-double norm(const Complex& op);
-double arg(const Complex& op);
+RFLOAT abs(const Complex& op);
+RFLOAT norm(const Complex& op);
+RFLOAT arg(const Complex& op);
 
 Complex operator+(const Complex& lhs, const Complex& rhs);
 Complex operator-(const Complex& lhs, const Complex& rhs);
 Complex operator*(const Complex& lhs, const Complex& rhs);
-Complex operator*(const Complex& lhs, const double& val);
-Complex operator*(const double& val, const Complex& rhs);
-Complex operator/(const Complex& lhs, const double& val);
+Complex operator*(const Complex& lhs, const RFLOAT& val);
+Complex operator*(const RFLOAT& val, const Complex& rhs);
+Complex operator/(const Complex& lhs, const RFLOAT& val);
 
 void operator+=(Complex& lhs, const Complex& rhs);
 void operator-=(Complex& lhs, const Complex& rhs);

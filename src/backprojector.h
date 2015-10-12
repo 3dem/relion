@@ -38,7 +38,7 @@ class BackProjector: public Projector
 {
 public:
 	// For backward projection: sum of weights
-	MultidimArray<double> weight;
+	MultidimArray<RFLOAT> weight;
 
 	// Tabulated blob values
 	TabFtBlob tab_ftblob;
@@ -58,7 +58,7 @@ public:
 	 */
 	BackProjector(int _ori_size, int _ref_dim, FileName fn_sym,
 			      int _interpolator = TRILINEAR, int _padding_factor_3d = 2, int _r_min_nn = 10,
-			      int _blob_order = 0, double _blob_radius = 1.9, double _blob_alpha = 15, int _data_dim = 2)
+			      int _blob_order = 0, RFLOAT _blob_radius = 1.9, RFLOAT _blob_alpha = 15, int _data_dim = 2)
 	{
     	// Store original dimension
     	ori_size = _ori_size;
@@ -158,8 +158,8 @@ public:
 	* Depending on the dimension of the map, this will be a backprojection or a rotation operation
 	*/
 	void set2DFourierTransform(const MultidimArray<Complex > &img_in,
-							   const Matrix2D<double> &A, bool inv,
-						       const MultidimArray<double> *Mweight = NULL)
+							   const Matrix2D<RFLOAT> &A, bool inv,
+						       const MultidimArray<RFLOAT> *Mweight = NULL)
 	{
 		// Back-rotation of a 3D Fourier Transform
 		if (img_in.getDim() == 3)
@@ -189,37 +189,37 @@ public:
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backrotate2D(const MultidimArray<Complex > &img_in,
-			          const Matrix2D<double> &A, bool inv,
-			          const MultidimArray<double> *Mweight = NULL);
+			          const Matrix2D<RFLOAT> &A, bool inv,
+			          const MultidimArray<RFLOAT> *Mweight = NULL);
 
 	/*
 	* Set a 3D-rotated version of the 3D map into the data array (mere interpolation)
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backrotate3D(const MultidimArray<Complex > &img_in,
-			          const Matrix2D<double> &A, bool inv,
-			          const MultidimArray<double> *Mweight = NULL);
+			          const Matrix2D<RFLOAT> &A, bool inv,
+			          const MultidimArray<RFLOAT> *Mweight = NULL);
 
 	/*
 	* Set a 2D slice in the 3D map (backward projection)
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backproject(const MultidimArray<Complex > &img_in,
-			         const Matrix2D<double> &A, bool inv,
-			         const MultidimArray<double> *Mweight = NULL);
+			         const Matrix2D<RFLOAT> &A, bool inv,
+			         const MultidimArray<RFLOAT> *Mweight = NULL);
 
 	/*
 	 * Get only the lowest resolution components from the data and weight array
 	 * (to be joined together for two independent halves in order to force convergence in the same orientation)
 	 */
-	void getLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<double> &lowres_weight,
+	void getLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<RFLOAT> &lowres_weight,
 			int lowres_r_max);
 
 	/*
 	 * Set only the lowest resolution components from the data and weight array
 	 * (to be joined together for two independent halves in order to force convergence in the same orientation)
 	 */
-	void setLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<double> &lowres_weight,
+	void setLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<RFLOAT> &lowres_weight,
 			int lowres_r_max);
 
 	/*
@@ -234,21 +234,21 @@ public:
 	 */
 	void calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
 			                                         MultidimArray<Complex > &avg2,
-			                                         MultidimArray<double> &fsc);
+			                                         MultidimArray<RFLOAT> &fsc);
 
 	/* Get the 3D reconstruction
          * If do_map is true, 1 will be added to all weights
          * alpha will contain the noise-reduction spectrum
 	*/
-	void reconstruct(MultidimArray<double> &vol_out,
+	void reconstruct(MultidimArray<RFLOAT> &vol_out,
                      int max_iter_preweight,
                      bool do_map,
-                     double tau2_fudge,
-                     MultidimArray<double> &tau2,
-                     MultidimArray<double> &sigma2,
-                     MultidimArray<double> &evidence_vs_prior,
-                     MultidimArray<double> fsc,
-                     double normalise = 1.,
+                     RFLOAT tau2_fudge,
+                     MultidimArray<RFLOAT> &tau2,
+                     MultidimArray<RFLOAT> &sigma2,
+                     MultidimArray<RFLOAT> &evidence_vs_prior,
+                     MultidimArray<RFLOAT> fsc,
+                     RFLOAT normalise = 1.,
                      bool update_tau2_with_fsc = false,
                      bool is_whole_instead_of_half = false,
                      int nr_threads = 1,
@@ -259,12 +259,12 @@ public:
 	* Repairing it here gives like a 2-fold averaging correction for interpolation errors...
     */
 	void enforceHermitianSymmetry(MultidimArray<Complex > &mydata,
-								  MultidimArray<double> &myweight);
+								  MultidimArray<RFLOAT> &myweight);
 
 	/* Applies the symmetry from the SymList object to the weight and the data array
 	 */
 	void symmetrise(MultidimArray<Complex > &mydata,
-					MultidimArray<double> &myweight, int my_rmax2);
+					MultidimArray<RFLOAT> &myweight, int my_rmax2);
 
    /* Convolute in Fourier-space with the blob by multiplication in real-space
 	 * Note the convlution is done on the complex array inside the transformer object!!
@@ -274,7 +274,7 @@ public:
 	/* Calculate the inverse FFT of Fin and windows the result to ori_size
 	 * Also pass the transformer, to prevent making and clearing a new one before clearing the one in reconstruct()
 	 */
-	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<Complex > &Fin, MultidimArray<double> &Mout, int nr_threads = 1);
+	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<Complex > &Fin, MultidimArray<RFLOAT> &Mout, int nr_threads = 1);
 
    /*
 	* Go from the Projector-centered fourier transform back to FFTW-uncentered one

@@ -31,13 +31,13 @@ class image_handler_parameters
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box;
 	bool do_add_edge, do_flipXY, do_flipmXY, do_shiftCOM, do_stats;
-	double multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z;
    	int verb;
 	// I/O Parser
 	IOParser parser;
 
-	Image<double> Iout;
-	Image<double> Iop;
+	Image<RFLOAT> Iout;
+	Image<RFLOAT> Iop;
 	MetaDataTable MD;
 
 	// Image size
@@ -115,10 +115,10 @@ class image_handler_parameters
 
 
 
-	void perImageOperations(Image<double> &Iin, FileName &my_fn_out)
+	void perImageOperations(Image<RFLOAT> &Iin, FileName &my_fn_out)
 	{
 
-		Image<double> Iout;
+		Image<RFLOAT> Iout;
 		Iout().resize(Iin());
 
 		if (do_add_edge)
@@ -226,14 +226,14 @@ class image_handler_parameters
 		else if (fn_fsc != "")
 		{
 			/// TODO
-			MultidimArray<double> fsc;
+			MultidimArray<RFLOAT> fsc;
 			MetaDataTable MDfsc;
 			getFSC(Iout(), Iop(), fsc);
 			MDfsc.setName("fsc");
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc)
 			{
 				MDfsc.addObject();
-				double res = (i > 0) ? (XSIZE(Iout()) * angpix / (double)i) : 999.;
+				RFLOAT res = (i > 0) ? (XSIZE(Iout()) * angpix / (RFLOAT)i) : 999.;
 				MDfsc.setValue(EMDL_SPECTRAL_IDX, (int)i);
 				MDfsc.setValue(EMDL_RESOLUTION, 1./res);
 				MDfsc.setValue(EMDL_RESOLUTION_ANGSTROM, res);
@@ -243,7 +243,7 @@ class image_handler_parameters
 		}
 		else if (fn_adjust_power != "")
 		{
-			MultidimArray<double> spectrum;
+			MultidimArray<RFLOAT> spectrum;
 			getSpectrum(Iop(), spectrum, AMPLITUDE_SPECTRUM);
 			adaptSpectrum(Iin(), Iout(), spectrum, AMPLITUDE_SPECTRUM);
 		}
@@ -262,7 +262,7 @@ class image_handler_parameters
 			selfTranslateCenterOfMassToCenter(Iout(), DONT_WRAP);
 		else if (fabs(shift_x) > 0. || fabs(shift_y) > 0. || fabs(shift_z) > 0.)
 		{
-			Matrix1D<double> shift(2);
+			Matrix1D<RFLOAT> shift(2);
 			XX(shift) = shift_x;
 			YY(shift) = shift_y;
 			if (zdim > 1)
@@ -370,7 +370,7 @@ class image_handler_parameters
 			else
 			{
 				// Read the header to get the number of images inside the stack and generate that many lines in the MD
-				Image<double> tmp;
+				Image<RFLOAT> tmp;
 				FileName fn_tmp;
 				tmp.read(fn_in, false); //false means do not read image now, only header
 				for (int i = 1; i <= NSIZE(tmp()); i++)
@@ -398,11 +398,11 @@ class image_handler_parameters
 			FileName fn_img;
 			MD.getValue(EMDL_IMAGE_NAME, fn_img);
 
-			Image<double> Iin;
+			Image<RFLOAT> Iin;
 			// Initialise for the first image
 			if (i_img == 0)
 			{
-				Image<double> Ihead;
+				Image<RFLOAT> Ihead;
 				Ihead.read(fn_img, false);
 				Ihead.getDimensions(xdim, ydim, zdim, ndim);
 
@@ -435,7 +435,7 @@ class image_handler_parameters
 			if (do_stats) // only write statistics to screen
 			{
 				Iin.read(fn_img);
-				double avg, stddev, minval, maxval;
+				RFLOAT avg, stddev, minval, maxval;
 				Iin().computeStats(avg, stddev, minval, maxval);
 				std::cout << fn_img << " size= " << XSIZE(Iin()) << "x"<< YSIZE(Iin()) << "x"<< ZSIZE(Iin()) << " avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
 			}
@@ -447,7 +447,7 @@ class image_handler_parameters
 				{
 					avgndim = ndim / bin_avg;
 				}
-				Image<double> Iavg(xdim, ydim, zdim, avgndim);
+				Image<RFLOAT> Iavg(xdim, ydim, zdim, avgndim);
 
 				if (ndim == 1)
 					REPORT_ERROR("ERROR: you are trying to perform movie-averaging options on a single image/volume");

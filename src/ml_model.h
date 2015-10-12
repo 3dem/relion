@@ -44,13 +44,13 @@ public:
 	int ori_size;
 
 	// Pixel size (in Angstrom)
-	double pixel_size;
+	RFLOAT pixel_size;
 
 	// Current size of the images to be used in the expectation
 	int current_size;
 
 	// Current resolution (in 1/Ang)
-	double current_resolution;
+	RFLOAT current_resolution;
 
 	// Number of classes
 	int nr_classes;
@@ -65,7 +65,7 @@ public:
 	int nr_directions;
 
 	// Log-likelihood target value
-	double LL;
+	RFLOAT LL;
 
 	// Padding factor
 	int padding_factor;
@@ -77,19 +77,19 @@ public:
 	int r_min_nn;
 
 	// Average Pmax of the normalised probability distributions
-	double ave_Pmax;
+	RFLOAT ave_Pmax;
 
 	// Average normalisation correction factor
-	double avg_norm_correction;
+	RFLOAT avg_norm_correction;
 
 	// Variance in the origin offsets
-	double sigma2_offset;
+	RFLOAT sigma2_offset;
 
 	// Fudge factor to adjust estimated tau2_class spectra
-	double tau2_fudge_factor;
+	RFLOAT tau2_fudge_factor;
 
 	// Vector with all reference images
-	std::vector<MultidimArray<double> > Iref;
+	std::vector<MultidimArray<RFLOAT> > Iref;
 
 	// One projector for each class;
 	std::vector<Projector > PPref;
@@ -98,55 +98,55 @@ public:
 	std::vector<FileName> group_names;
 
 	// One noise spectrum for each group
-	std::vector<MultidimArray<double > > sigma2_noise;
+	std::vector<MultidimArray<RFLOAT > > sigma2_noise;
 
 	// One intensity scale for each group
-	std::vector<double> scale_correction;
+	std::vector<RFLOAT> scale_correction;
 
 	// One intensity B-factor for each group
-	std::vector<double> bfactor_correction;
+	std::vector<RFLOAT> bfactor_correction;
 
 	// Prior information: one restrained power_class spectrum for each class (inverse of right-hand side in Wiener-filter-like update formula)
-	std::vector<MultidimArray<double > > tau2_class;
+	std::vector<MultidimArray<RFLOAT > > tau2_class;
 
 	// Radial average of the estimated variance in the reconstruction (inverse of left-hand side in Wiener-filter-like update formula)
-	std::vector<MultidimArray<double > > sigma2_class;
+	std::vector<MultidimArray<RFLOAT > > sigma2_class;
 
 	// FSC spectra between random halves of the data
-	std::vector<MultidimArray<double > > fsc_halves_class;
+	std::vector<MultidimArray<RFLOAT > > fsc_halves_class;
 
 	// One likelihood vs prior ratio spectrum for each class
-	std::vector<MultidimArray<double > > data_vs_prior_class;
+	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;
 
 	// One value for each class
-	std::vector<double > pdf_class;
+	std::vector<RFLOAT > pdf_class;
 
 	// One array for each class
-	std::vector<MultidimArray<double> > pdf_direction;
+	std::vector<MultidimArray<RFLOAT> > pdf_direction;
 
 	// Priors for offsets for each class (only in 2D)
-	std::vector<Matrix1D<double> > prior_offset_class;
+	std::vector<Matrix1D<RFLOAT> > prior_offset_class;
 
 	// Mode for orientational prior distributions
 	int orientational_prior_mode;
 
 	// Variance in rot angle for the orientational pdf
-	double sigma2_rot;
+	RFLOAT sigma2_rot;
 
 	// Variance in tilt angle for the orientational pdf
-	double sigma2_tilt;
+	RFLOAT sigma2_tilt;
 
 	// Variance in psi angle for the orientational pdf
-	double sigma2_psi;
+	RFLOAT sigma2_psi;
 
 	// Estimated accuracy at which rotations can be assigned, one for each class
-	std::vector<double> acc_rot;
+	std::vector<RFLOAT> acc_rot;
 
 	// Estimated accuracy at which translations can be assigned, one for each class
-	std::vector<double> acc_trans;
+	std::vector<RFLOAT> acc_trans;
 
 	// Spectral contribution to orientability of individual particles, one for each class
-	std::vector<MultidimArray<double > > orientability_contrib;
+	std::vector<MultidimArray<RFLOAT > > orientability_contrib;
 
 
 public:
@@ -230,11 +230,11 @@ public:
 	// For that: remove "00000i@" as well as movie extension from the rlnGroupName in the expanded Experiment and compare with group_names in current MlModel
 	void expandToMovieFrames(Experiment &moviedataexpand, int running_avg_side);
 
-	double getResolution(int ipix)	{ return (double)ipix/(pixel_size * ori_size); }
+	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
-	double getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(double)ipix; }
+	RFLOAT getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(RFLOAT)ipix; }
 
-	int getPixelFromResolution(double resol)	{ return (int)(resol * pixel_size * ori_size); }
+	int getPixelFromResolution(RFLOAT resol)	{ return (int)(resol * pixel_size * ori_size); }
 
 	/** Initialise pdf_orient arrays to the given size
 	* If the pdf_orient vectors were empty, resize them to the given size and initialise with an even distribution
@@ -261,14 +261,14 @@ public:
 
 	// Store the sum of the weights inside each group
 	// That is the number of particles inside each group
-	std::vector<double> sumw_group;
+	std::vector<RFLOAT> sumw_group;
 
 	// For the refinement of group intensity scales and bfactors
 	// For each group store weighted sums of experimental image times reference image as a function of resolution
-	std::vector<MultidimArray<double > > wsum_signal_product_spectra;
+	std::vector<MultidimArray<RFLOAT > > wsum_signal_product_spectra;
 
 	// For each group store weighted sums of squared reference as a function of resolution
-	std::vector<MultidimArray<double > > wsum_reference_power_spectra;
+	std::vector<MultidimArray<RFLOAT > > wsum_reference_power_spectra;
 
 	// Constructor
 	MlWsumModel()
@@ -296,21 +296,21 @@ public:
 	// Initialize all weighted sums to zero (with resizing the BPrefs to current_size)
 	void initZeros();
 
-	// Pack entire structure into one large MultidimArray<double> for reading/writing to disc
+	// Pack entire structure into one large MultidimArray<RFLOAT> for reading/writing to disc
 	// To save memory, the model itself will be cleared after packing.
-	void pack(MultidimArray<double> &packed);
+	void pack(MultidimArray<RFLOAT> &packed);
 
 	// Fill the model again using unpack (this is the inverse operation from pack)
-	void unpack(MultidimArray<double> &packed);
+	void unpack(MultidimArray<RFLOAT> &packed);
 
-	// Pack entire structure into one large MultidimArray<double> for shipping over with MPI
+	// Pack entire structure into one large MultidimArray<RFLOAT> for shipping over with MPI
 	// To save memory, the model itself will be cleared after packing.
     // If the whole thing becomes bigger than 1Gb (see MAX_PACK_SIZE in ml_model.cpp), then break it up into pieces because MPI cannot handle very large messages
 	// When broken up: nr_pieces > 1
-	void pack(MultidimArray<double> &packed, int &piece, int &nr_pieces, bool do_clear=true);
+	void pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces, bool do_clear=true);
 
 	// Fill the model again using unpack (this is the inverse operation from pack)
-	void unpack(MultidimArray<double> &packed, int piece, bool do_clear=true);
+	void unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear=true);
 
 };
 

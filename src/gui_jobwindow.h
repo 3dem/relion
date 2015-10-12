@@ -206,7 +206,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix);
+			std::string &final_command, RFLOAT angpix);
 
 };
 
@@ -244,7 +244,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -286,7 +286,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -335,7 +335,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -368,7 +368,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -420,7 +420,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -481,7 +481,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -545,7 +545,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -595,7 +595,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			double angpix);
+			RFLOAT angpix);
 
 };
 
@@ -638,7 +638,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			double angpix, double particle_diameter, double black_dust, double white_dust);
+			RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust);
 };
 
 class ResmapJobWindow : public RelionJobWindow
@@ -675,7 +675,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			double angpix);
+			RFLOAT angpix);
 
 };
 

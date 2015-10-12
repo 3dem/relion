@@ -43,16 +43,16 @@ void BackProjector::initZeros(int current_size)
 }
 
 void BackProjector::backproject(const MultidimArray<Complex > &f2d,
-		                        const Matrix2D<double> &A, bool inv,
-		                        const MultidimArray<double> *Mweight)
+		                        const Matrix2D<RFLOAT> &A, bool inv,
+		                        const MultidimArray<RFLOAT> *Mweight)
 {
-	double fx, fy, fz, mfx, mfy, mfz, xp, yp, zp;
+	RFLOAT fx, fy, fz, mfx, mfy, mfz, xp, yp, zp;
 	int first_x, x0, x1, y0, y1, z0, z1, y, y2, r2;
 	bool is_neg_x;
-	double dd000, dd001, dd010, dd011, dd100, dd101, dd110, dd111;
+	RFLOAT dd000, dd001, dd010, dd011, dd100, dd101, dd110, dd111;
 	Complex my_val;
-	Matrix2D<double> Ainv;
-	double my_weight = 1.;
+	Matrix2D<RFLOAT> Ainv;
+	RFLOAT my_weight = 1.;
 
 	// f2d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -64,7 +64,7 @@ void BackProjector::backproject(const MultidimArray<Complex > &f2d,
     	Ainv = A.transpose();
 
     // Go from the 2D slice coordinates to the 3D coordinates
-    Ainv *= (double)padding_factor;  // take scaling into account directly
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
     int max_r2 = r_max * r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 
@@ -221,16 +221,16 @@ void BackProjector::backproject(const MultidimArray<Complex > &f2d,
 }
 
 void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
-		                         const Matrix2D<double> &A, bool inv,
-		                         const MultidimArray<double> *Mweight)
+		                         const Matrix2D<RFLOAT> &A, bool inv,
+		                         const MultidimArray<RFLOAT> *Mweight)
 {
-	double fx, fy, mfx, mfy, xp, yp;
+	RFLOAT fx, fy, mfx, mfy, xp, yp;
 	int first_x, x0, x1, y0, y1, y, y2, r2;
 	bool is_neg_x;
-	double dd00, dd01, dd10, dd11;
+	RFLOAT dd00, dd01, dd10, dd11;
 	Complex my_val;
-	Matrix2D<double> Ainv;
-	double my_weight = 1.;
+	Matrix2D<RFLOAT> Ainv;
+	RFLOAT my_weight = 1.;
 
 	// f2d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -242,7 +242,7 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
     	Ainv = A.transpose();
 
     // Go from the 2D slice coordinates to the data-array coordinates
-    Ainv *= (double)padding_factor;  // take scaling into account directly
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
     int max_r2 = r_max * r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 
@@ -374,16 +374,16 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 }
 
 void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
-		                         const Matrix2D<double> &A, bool inv,
-		                         const MultidimArray<double> *Mweight)
+		                         const Matrix2D<RFLOAT> &A, bool inv,
+		                         const MultidimArray<RFLOAT> *Mweight)
 {
-	double fx, fy, fz, mfx, mfy, mfz, xp, yp, zp;
+	RFLOAT fx, fy, fz, mfx, mfy, mfz, xp, yp, zp;
 	int first_x, x0, x1, y0, y1, z0, z1, y, y2, z, z2, r2;
 	bool is_neg_x;
-	double dd000, dd010, dd100, dd110, dd001, dd011, dd101, dd111;
+	RFLOAT dd000, dd010, dd100, dd110, dd001, dd011, dd101, dd111;
 	Complex my_val;
-	Matrix2D<double> Ainv;
-	double my_weight = 1.;
+	Matrix2D<RFLOAT> Ainv;
+	RFLOAT my_weight = 1.;
 
 	// f3d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -395,7 +395,7 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
     	Ainv = A.transpose();
 
     // Go from the 2D slice coordinates to the data-array coordinates
-    Ainv *= (double)padding_factor;  // take scaling into account directly
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
     int max_r2 = r_max * r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 
@@ -566,7 +566,7 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
 	} // endif z-loop
 }
 
-void BackProjector::getLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<double> &lowres_weight,
+void BackProjector::getLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<RFLOAT> &lowres_weight,
 		int lowres_r_max)
 {
 
@@ -603,7 +603,7 @@ void BackProjector::getLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 
 }
 
-void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<double> &lowres_weight,
+void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data, MultidimArray<RFLOAT> &lowres_weight,
 		int lowres_r_max)
 {
 
@@ -645,7 +645,7 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 
 void BackProjector::getDownsampledAverage(MultidimArray<Complex > &avg)
 {
-	MultidimArray<double> down_weight;
+	MultidimArray<RFLOAT> down_weight;
 
 	// Pre-set down_data and down_weight sizes
 	int down_size = 2 * (r_max + 1) + 1;
@@ -672,9 +672,9 @@ void BackProjector::getDownsampledAverage(MultidimArray<Complex > &avg)
 	int kp, ip, jp;
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
-		kp = ROUND((double)k/padding_factor);
-		ip = ROUND((double)i/padding_factor);
-		jp = ROUND((double)j/padding_factor);
+		kp = ROUND((RFLOAT)k/padding_factor);
+		ip = ROUND((RFLOAT)i/padding_factor);
+		jp = ROUND((RFLOAT)j/padding_factor);
 
 // TMP
 //#define CHECK_SIZE
@@ -712,13 +712,13 @@ void BackProjector::getDownsampledAverage(MultidimArray<Complex > &avg)
 
 void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
 																MultidimArray<Complex > &avg2,
-																MultidimArray<double> &fsc)
+																MultidimArray<RFLOAT> &fsc)
 {
 
     if (!avg1.sameShape(avg2))
     	REPORT_ERROR("ERROR BackProjector::calculateDownSampledFourierShellCorrelation: two arrays have different sizes");
 
-    MultidimArray<double> num, den1, den2;
+    MultidimArray<RFLOAT> num, den1, den2;
     num.initZeros(ori_size/2 + 1);
     den1.initZeros(num);
     den2.initZeros(num);
@@ -726,14 +726,14 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Co
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(avg1)
     {
-    	double R = sqrt(k*k + i*i + j*j);
+    	RFLOAT R = sqrt(k*k + i*i + j*j);
         if (R > r_max)
             continue;
         int idx=ROUND(R);
         Complex z1=A3D_ELEM(avg1, k, i, j);
         Complex z2=A3D_ELEM(avg2, k, i, j);
-        double absz1=abs(z1);
-        double absz2=abs(z2);
+        RFLOAT absz1=abs(z1);
+        RFLOAT absz2=abs(z2);
         num(idx)+=(conj(z1) * z2).real;
         den1(idx)+= absz1*absz1;
         den2(idx)+= absz2*absz2;
@@ -753,15 +753,15 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Co
 }
 
 
-void BackProjector::reconstruct(MultidimArray<double> &vol_out,
+void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
-                                double tau2_fudge,
-                                MultidimArray<double> &tau2,
-                                MultidimArray<double> &sigma2,
-                                MultidimArray<double> &data_vs_prior,
-                                MultidimArray<double> fsc, // only input
-                                double normalise,
+                                RFLOAT tau2_fudge,
+                                MultidimArray<RFLOAT> &tau2,
+                                MultidimArray<RFLOAT> &sigma2,
+                                MultidimArray<RFLOAT> &data_vs_prior,
+                                MultidimArray<RFLOAT> fsc, // only input
+                                RFLOAT normalise,
                                 bool update_tau2_with_fsc,
                                 bool is_whole_instead_of_half,
                                 int nr_threads,
@@ -775,12 +775,12 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
     // Somehow I get lots of bad/non-reproducible errors when having these...
     //transformer.setThreadsNumber(nr_threads);
 	MultidimArray<Complex > Fconv;
-	MultidimArray<double> Fweight, Fnewweight;
+	MultidimArray<RFLOAT> Fweight, Fnewweight;
 	int max_r2 = r_max * r_max * padding_factor * padding_factor;
 
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
-	Image<double> ttt;
+	Image<RFLOAT> ttt;
 	FileName fnttt;
 	ttt()=weight;
 	ttt.write("reconstruct_initial_weight.spi");
@@ -829,8 +829,8 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 	decenter(weight, Fweight, max_r2);
 
 	// Take oversampling into account
-	double oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
-	MultidimArray<double> counter;
+	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
+	MultidimArray<RFLOAT> counter;
 
 
 	// First calculate the radial average of the (inverse of the) power of the noise in the reconstruction
@@ -844,8 +844,8 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 		int r2 = kp * kp + ip * ip + jp * jp;
 		if (r2 < max_r2)
 		{
-			int ires = ROUND( sqrt((double)r2) / padding_factor );
-			double invw = oversampling_correction * DIRECT_A3D_ELEM(Fweight, k, i, j);
+			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+			RFLOAT invw = oversampling_correction * DIRECT_A3D_ELEM(Fweight, k, i, j);
 			DIRECT_A1D_ELEM(sigma2, ires) += invw;
 			DIRECT_A1D_ELEM(counter, ires) += 1.;
 		}
@@ -880,7 +880,7 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
 		{
 			// FSC cannot be negative or zero for conversion into tau2
-			double myfsc = XMIPP_MAX(0.001, DIRECT_A1D_ELEM(fsc, i));
+			RFLOAT myfsc = XMIPP_MAX(0.001, DIRECT_A1D_ELEM(fsc, i));
 			if (is_whole_instead_of_half)
 			{
 				// Factor two because of twice as many particles
@@ -888,8 +888,8 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 				myfsc = sqrt(2. * myfsc / (myfsc + 1.));
 			}
 			myfsc = XMIPP_MIN(0.999, myfsc);
-			double myssnr = myfsc / (1. - myfsc);
-			double fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
+			RFLOAT myssnr = myfsc / (1. - myfsc);
+			RFLOAT fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
 			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
 			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
 			DIRECT_A1D_ELEM(data_vs_prior, i) = myssnr;
@@ -911,10 +911,10 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 			int r2 = kp * kp + ip * ip + jp * jp;
 			if (r2 < max_r2)
 			{
-				int ires = ROUND( sqrt((double)r2) / padding_factor );
-				double invw = DIRECT_A3D_ELEM(Fweight, k, i, j);
+				int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+				RFLOAT invw = DIRECT_A3D_ELEM(Fweight, k, i, j);
 
-				double invtau2;
+				RFLOAT invtau2;
 				if (DIRECT_A1D_ELEM(tau2, ires) > 0.)
 				{
 					// Calculate inverse of tau2
@@ -1008,7 +1008,7 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
         // Note that convoluteRealSpace acts on the complex array inside the transformer
         convoluteBlobRealSpace(transformer);
 
-        double w, corr_min = 99.e99, corr_max = -99.e99, corr_avg=0., corr_nn=0.;
+        RFLOAT w, corr_min = 99.e99, corr_max = -99.e99, corr_avg=0., corr_nn=0.;
         FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
         {
         	if (kp * kp + ip * ip + jp * jp < max_r2)
@@ -1110,12 +1110,12 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 	softMaskOutsideMap(vol_out);
 
 	// Gridding correction for the blob
-	double normftblob = tab_ftblob(0.);
+	RFLOAT normftblob = tab_ftblob(0.);
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_out)
 	{
 
-		double r = sqrt((double)(k*k+i*i+j*j));
-		double rval = r / (ori_size * padding_factor);
+		RFLOAT r = sqrt((RFLOAT)(k*k+i*i+j*j));
+		RFLOAT rval = r / (ori_size * padding_factor);
 		A3D_ELEM(vol_out, k, i, j) /= tab_ftblob(rval) / normftblob;
 		//if (k==0 && i==0)
 		//	std::cerr << " j= " << j << " rval= " << rval << " tab_ftblob(rval) / normftblob= " << tab_ftblob(rval) / normftblob << std::endl;
@@ -1130,9 +1130,9 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 	// This is the same as convolution with a SINC. It seems to give better maps.
 	// Then just make the blob look as much as a SINC as possible....
 	// The "standard" r1.9, m2 and a15 blob looks quite like a sinc until the first zero (perhaps that's why it is standard?)
-	//for (double r = 0.1; r < 10.; r+=0.01)
+	//for (RFLOAT r = 0.1; r < 10.; r+=0.01)
 	//{
-	//	double sinc = sin(PI * r / padding_factor ) / ( PI * r / padding_factor);
+	//	RFLOAT sinc = sin(PI * r / padding_factor ) / ( PI * r / padding_factor);
 	//	std::cout << " r= " << r << " sinc= " << sinc << " blob= " << blob_val(r, blob) << std::endl;
 	//}
 
@@ -1157,7 +1157,7 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 	{
 
 		// New tau2 will be the power spectrum of the new map
-		MultidimArray<double> spectrum, count;
+		MultidimArray<RFLOAT> spectrum, count;
 
 		// Calculate this map's power spectrum
 		// Don't call getSpectrum() because we want to use the same transformer object to prevent memory trouble....
@@ -1175,7 +1175,7 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 
 		// Factor two because of two-dimensionality of the complex plane
 		// (just like sigma2_noise estimates, the power spectra should be divided by 2)
-		double normfft = (ref_dim == 3 && data_dim == 2) ? (double)(ori_size * ori_size) : 1.;
+		RFLOAT normfft = (ref_dim == 3 && data_dim == 2) ? (RFLOAT)(ori_size * ori_size) : 1.;
 		spectrum *= normfft / 2.;
 
 		// New SNR^MAP will be power spectrum divided by the noise in the reconstruction (i.e. sigma2)
@@ -1196,7 +1196,7 @@ void BackProjector::reconstruct(MultidimArray<double> &vol_out,
 }
 
 void BackProjector::enforceHermitianSymmetry(MultidimArray<Complex > &my_data,
-											 MultidimArray<double> &my_weight)
+											 MultidimArray<RFLOAT> &my_weight)
 {
 
 	for (int iz = STARTINGZ(my_data); iz <=FINISHINGZ(my_data); iz++)
@@ -1209,7 +1209,7 @@ void BackProjector::enforceHermitianSymmetry(MultidimArray<Complex > &my_data,
 			Complex fsum = (A3D_ELEM(my_data, iz, iy, 0) + conj(A3D_ELEM(my_data, -iz, -iy, 0)));
 			A3D_ELEM(my_data, iz, iy, 0) = fsum;
 			A3D_ELEM(my_data, -iz, -iy, 0) = conj(fsum);
-			double sum = (A3D_ELEM(my_weight, iz, iy, 0) + A3D_ELEM(my_weight, -iz, -iy, 0));
+			RFLOAT sum = (A3D_ELEM(my_weight, iz, iy, 0) + A3D_ELEM(my_weight, -iz, -iy, 0));
 			A3D_ELEM(my_weight, iz, iy, 0) = sum;
 			A3D_ELEM(my_weight, -iz, -iy, 0) = sum;
 		}
@@ -1218,7 +1218,7 @@ void BackProjector::enforceHermitianSymmetry(MultidimArray<Complex > &my_data,
 }
 
 void BackProjector::symmetrise(MultidimArray<Complex > &my_data,
-		 MultidimArray<double> &my_weight, int my_rmax2)
+		 MultidimArray<RFLOAT> &my_weight, int my_rmax2)
 {
 
 //#define DEBUG_SYMM
@@ -1229,16 +1229,16 @@ void BackProjector::symmetrise(MultidimArray<Complex > &my_data,
 
 	if (SL.SymsNo() > 0 && ref_dim == 3)
 	{
-		Matrix2D<double> L(4, 4), R(4, 4); // A matrix from the list
-		MultidimArray<double> sum_weight;
+		Matrix2D<RFLOAT> L(4, 4), R(4, 4); // A matrix from the list
+		MultidimArray<RFLOAT> sum_weight;
 		MultidimArray<Complex > sum_data;
-        double x, y, z, fx, fy, fz, xp, yp, zp, r2;
+        RFLOAT x, y, z, fx, fy, fz, xp, yp, zp, r2;
         bool is_neg_x;
         int x0, x1, y0, y1, z0, z1;
     	Complex d000, d001, d010, d011, d100, d101, d110, d111;
     	Complex dx00, dx01, dx10, dx11, dxy0, dxy1;
-    	double dd000, dd001, dd010, dd011, dd100, dd101, dd110, dd111;
-    	double ddx00, ddx01, ddx10, ddx11, ddxy0, ddxy1;
+    	RFLOAT dd000, dd001, dd010, dd011, dd100, dd101, dd110, dd111;
+    	RFLOAT ddx00, ddx01, ddx10, ddx11, ddxy0, ddxy1;
 
         // First symmetry operator (not stored in SL) is the identity matrix
 		sum_weight = my_weight;
@@ -1255,9 +1255,9 @@ void BackProjector::symmetrise(MultidimArray<Complex > &my_data,
 	        FOR_ALL_ELEMENTS_IN_ARRAY3D(sum_weight)
 	        {
 
-	        	x = (double)j; // STARTINGX(sum_weight) is zero!
-	        	y = (double)i;
-	        	z = (double)k;
+	        	x = (RFLOAT)j; // STARTINGX(sum_weight) is zero!
+	        	y = (RFLOAT)i;
+	        	z = (RFLOAT)k;
 	        	r2 = x*x + y*y + z*z;
 	        	if (r2 <= my_rmax2)
 	        	{
@@ -1364,8 +1364,8 @@ void BackProjector::symmetrise(MultidimArray<Complex > &my_data,
 	    /*
 	    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(data)
 	    {
-	    	DIRECT_MULTIDIM_ELEM(data, n) = DIRECT_MULTIDIM_ELEM(sum_data, n) / (double)(SL.SymsNo() + 1);
-	    	DIRECT_MULTIDIM_ELEM(weight, n) = DIRECT_MULTIDIM_ELEM(sum_weight, n) / (double)(SL.SymsNo() + 1);
+	    	DIRECT_MULTIDIM_ELEM(data, n) = DIRECT_MULTIDIM_ELEM(sum_data, n) / (RFLOAT)(SL.SymsNo() + 1);
+	    	DIRECT_MULTIDIM_ELEM(weight, n) = DIRECT_MULTIDIM_ELEM(sum_weight, n) / (RFLOAT)(SL.SymsNo() + 1);
 	    }
 	    */
 	}
@@ -1375,7 +1375,7 @@ void BackProjector::symmetrise(MultidimArray<Complex > &my_data,
 void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask)
 {
 
-	MultidimArray<double> Mconv;
+	MultidimArray<RFLOAT> Mconv;
 	int padhdim = pad_size / 2;
 
 	// Set up right dimension of real-space array
@@ -1390,7 +1390,7 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 	transformer.inverseFourierTransform();
 
 	// Blob normalisation in Fourier space
-	double normftblob = tab_ftblob(0.);
+	RFLOAT normftblob = tab_ftblob(0.);
 
 	// TMP DEBUGGING
 	//struct blobtype blob;
@@ -1404,7 +1404,7 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 		int kp = (k < padhdim) ? k : k - pad_size;
 		int ip = (i < padhdim) ? i : i - pad_size;
 		int jp = (j < padhdim) ? j : j - pad_size;
-    	double rval = sqrt ( (double)(kp * kp + ip * ip + jp * jp) ) / (ori_size * padding_factor);
+    	RFLOAT rval = sqrt ( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) / (ori_size * padding_factor);
     	//if (kp==0 && ip==0 && jp > 0)
 		//	std::cerr << " jp= " << jp << " rval= " << rval << " tab_ftblob(rval) / normftblob= " << tab_ftblob(rval) / normftblob << " ori_size/2= " << ori_size/2 << std::endl;
     	// In the final reconstruction: mask the real-space map beyond its original size to prevent aliasing ghosts
@@ -1420,16 +1420,16 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 
 }
 
-void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<Complex > &Fin, MultidimArray<double> &Mout, int nr_threads)
+void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<Complex > &Fin, MultidimArray<RFLOAT> &Mout, int nr_threads)
 {
 
 	MultidimArray<Complex > Ftmp;
 	int padoridim = padding_factor * ori_size;
-	double normfft;
+	RFLOAT normfft;
 
 //#define DEBUG_WINDOWORIDIMREALSPACE
 #ifdef DEBUG_WINDOWORIDIMREALSPACE
-	Image<double> tt;
+	Image<RFLOAT> tt;
 	tt().resize(ZSIZE(Fin), YSIZE(Fin), XSIZE(Fin));
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fin)
 	{
@@ -1441,15 +1441,15 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	if (ref_dim == 2)
 	{
 		Mout.resize(padoridim, padoridim);
-		normfft = (double)(padding_factor * padding_factor);
+		normfft = (RFLOAT)(padding_factor * padding_factor);
 	}
 	else
 	{
 		Mout.resize(padoridim, padoridim, padoridim);
 		if (data_dim == 3)
-			normfft = (double)(padding_factor * padding_factor * padding_factor);
+			normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
 		else
-			normfft = (double)(padding_factor * padding_factor * padding_factor * ori_size);
+			normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor * ori_size);
 	}
 	Mout.setXmippOrigin();
 

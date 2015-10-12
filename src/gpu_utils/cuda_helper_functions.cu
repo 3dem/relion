@@ -218,9 +218,9 @@ void generateEulerMatrices(
 		XFLOAT *eulers,
 		bool inverse)
 {
-	double alpha, beta, gamma;
-    double ca, sa, cb, sb, cg, sg;
-    double cc, cs, sc, ss;
+	RFLOAT alpha, beta, gamma;
+    RFLOAT ca, sa, cb, sb, cg, sg;
+    RFLOAT cc, cs, sc, ss;
 
 	for (long int i = 0; i < ProjectionData.rots.size(); i++)
 	{
@@ -286,7 +286,7 @@ long unsigned generateProjectionSetup(
  */
 {
 	//Local variables
-	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
+	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 	long int orientation_num = 0;
 
 	for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
@@ -296,7 +296,7 @@ long unsigned generateProjectionSetup(
 			long int iorientclass = iclass * sp.nr_dir * sp.nr_psi + iorient;
 
 			// Get prior for this direction and skip calculation if prior==0
-			double pdf_orientation;
+			RFLOAT pdf_orientation;
 			if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
 			{
 				pdf_orientation = baseMLO->mymodel.pdf_class[iclass];
@@ -700,14 +700,14 @@ void windowFourierTransform2(
 
 
 
-void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, double beamtilt_x, double beamtilt_y,
-		double wavelength, double Cs, double angpix, int ori_size)
+void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
 {
 	if (Fimg.getDim() != 2)
 		REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
 
-	double boxsize = angpix * ori_size;
-	double factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+	RFLOAT boxsize = angpix * ori_size;
+	RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
 
 	for (unsigned n = 0 ; n < Fimg.yxdim; n ++)
 	{
@@ -716,11 +716,11 @@ void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, double beamtilt_x, double
 		unsigned jp = j;
 		int ip = i < Fimg.xdim ? i : i - Fimg.ydim;
 
-		double delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
-		double realval = Fimg.data[i*Fimg.xdim+j].real;
-		double imagval = Fimg.data[i*Fimg.xdim+j].imag;
-		double mag = sqrt(realval * realval + imagval * imagval);
-		double phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+		RFLOAT delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
+		RFLOAT realval = Fimg.data[i*Fimg.xdim+j].real;
+		RFLOAT imagval = Fimg.data[i*Fimg.xdim+j].imag;
+		RFLOAT mag = sqrt(realval * realval + imagval * imagval);
+		RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
 		realval = mag * cos(phas);
 		imagval = mag * sin(phas);
 		Fimg.data[i*Fimg.xdim+j] = Complex(realval, imagval);

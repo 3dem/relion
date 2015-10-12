@@ -151,7 +151,7 @@ public:
      * An empty image is created.
      *
      * @code
-     * Image<double> I;
+     * Image<RFLOAT> I;
      * @endcode
      */
     Image()
@@ -411,13 +411,13 @@ public:
             }
         case Double:
                 {
-                    if (typeid(T) == typeid(double))
+                    if (typeid(T) == typeid(RFLOAT))
                 {
                     memcpy(ptrDest, page, pageSize*sizeof(T));
                     }
                     else
                     {
-                        double * ptr = (double *) page;
+                        RFLOAT * ptr = (RFLOAT *) page;
                         for(int i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
@@ -456,15 +456,15 @@ public:
             }
         case Double:
                 {
-                    if (typeid(T) == typeid(double))
+                    if (typeid(T) == typeid(RFLOAT))
                 {
                     memcpy(page, srcPtr, pageSize*sizeof(T));
                     }
                     else
                     {
-                        double * ptr = (double *) page;
+                        RFLOAT * ptr = (RFLOAT *) page;
                         for(int i=0; i<pageSize; i++)
-                            ptr[i] = (double)srcPtr[i];
+                            ptr[i] = (RFLOAT)srcPtr[i];
                     }
                 break;
             }
@@ -580,7 +580,7 @@ public:
             }
         case Double:
             {
-                if (typeid(T) == typeid(double))
+                if (typeid(T) == typeid(RFLOAT))
                     return 1;
                 else
                     return 0;
@@ -888,9 +888,9 @@ public:
     * std::cout << "sampling= " << samplingRateX() << std::endl;
     * @endcode
     */
-    double samplingRateX(const long int n = 0) const
+    RFLOAT samplingRateX(const long int n = 0) const
     {
-        double dummy = 1.;
+        RFLOAT dummy = 1.;
         MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, dummy);
         return dummy;
     }
@@ -901,9 +901,9 @@ public:
     * std::cout << "sampling= " << samplingRateY() << std::endl;
     * @endcode
     */
-    double samplingRateY(const long int n = 0) const
+    RFLOAT samplingRateY(const long int n = 0) const
     {
-        double dummy = 1.;
+        RFLOAT dummy = 1.;
         MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Y, dummy);
         return dummy;
     }
@@ -920,7 +920,7 @@ public:
      */
     void setStatisticsInHeader()
     {
-    	double avg,stddev,minval,maxval;
+    	RFLOAT avg,stddev,minval,maxval;
     	data.computeStats(avg, stddev, minval, maxval);
     	MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
     	MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
@@ -928,7 +928,7 @@ public:
     	MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
     }
 
-    void setSamplingRateInHeader(double rate_x, double rate_y = -1., double rate_z = -1.)
+    void setSamplingRateInHeader(RFLOAT rate_x, RFLOAT rate_y = -1., RFLOAT rate_z = -1.)
     {
     	MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, rate_x);
     	if (rate_y < 0.)
@@ -1304,21 +1304,21 @@ private:
 // Some image-specific operations
 
 // For image normalization
-void normalise(Image<double> &I, int bg_radius, double white_dust_stddev, double black_dust_stddev);
+void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev);
 
-void calculateBackgroundAvgStddev(Image<double> &I, double &avg, double &stddev, int bg_radius);
+void calculateBackgroundAvgStddev(Image<RFLOAT> &I, RFLOAT &avg, RFLOAT &stddev, int bg_radius);
 
 // For dust removal
-void removeDust(Image<double> &I, bool is_white, double thresh, double avg, double stddev);
+void removeDust(Image<RFLOAT> &I, bool is_white, RFLOAT thresh, RFLOAT avg, RFLOAT stddev);
 
 // for contrast inversion
-void invert_contrast(Image<double> &I);
+void invert_contrast(Image<RFLOAT> &I);
 
 // for image re-scaling
-void rescale(Image<double> &I, int mysize);
+void rescale(Image<RFLOAT> &I, int mysize);
 
 // for image re-windowing
-void rewindow(Image<double> &I, int mysize);
+void rewindow(Image<RFLOAT> &I, int mysize);
 
 
 
