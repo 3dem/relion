@@ -7,15 +7,19 @@
 #include <fstream>
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_settings.h"
+#include "src/gpu_utils/cuda_device_utils.cuh"
 
 
 /*
  *   	DIFFERNECE-BASED KERNELS
  */
 
-#define PREFETCH_FRACTION 2
-
-template<bool do_3DProjection, int eulers_per_block>
+/*
+ * Assuming block_sz % prefetch_fraction == 0 and prefetch_fraction < block_sz
+ * Assuming block_sz % eulers_per_block == 0
+ * Assuming eulers_per_block * 3 < block_sz
+ */
+template<bool do_3DProjection, int block_sz, int eulers_per_block, int prefetch_fraction>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
@@ -25,114 +29,124 @@ __global__ void cuda_kernel_diff2_coarse(
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
-		unsigned translation_num,
+		int translation_num,
 		int image_size
 		)
 {
-	int init_euler = blockIdx.x * eulers_per_block;
 	int tid = threadIdx.x;
 
+	//Prefetch euler matrices
+	__shared__ XFLOAT s_eulers[eulers_per_block * 9];
+
+	int max_block_pass_euler( ceilf( (float)(eulers_per_block * 9) / (float)block_sz ) * block_sz);
+
+	for (int i = tid; i < max_block_pass_euler; i += block_sz)
+		if (i < eulers_per_block * 9)
+			s_eulers[i] = g_eulers[blockIdx.x * eulers_per_block * 9 + i];
+
+
+	//Setup variables
+	__shared__ XFLOAT s_ref_real[block_sz/prefetch_fraction * eulers_per_block];
+	__shared__ XFLOAT s_ref_imag[block_sz/prefetch_fraction * eulers_per_block];
+
+	__shared__ XFLOAT s_real[block_sz];
+	__shared__ XFLOAT s_imag[block_sz];
+	__shared__ XFLOAT s_corr[block_sz];
+
 	XFLOAT diff2s[eulers_per_block] = {0.f};
-	XFLOAT tx, ty;
 
-	__shared__ XFLOAT s_ref_real[D2C_BLOCK_SIZE/PREFETCH_FRACTION * eulers_per_block];
-	__shared__ XFLOAT s_ref_imag[D2C_BLOCK_SIZE/PREFETCH_FRACTION * eulers_per_block];
-	__shared__ XFLOAT s_eulers[eulers_per_block*6];
+	XFLOAT tx = trans_x[tid%translation_num];
+	XFLOAT ty = trans_y[tid%translation_num];
 
-	if (tid < eulers_per_block)
-	{
-		s_eulers[tid*6  ] = g_eulers[(init_euler+tid)*9  ];
-		s_eulers[tid*6+1] = g_eulers[(init_euler+tid)*9+1];
-		s_eulers[tid*6+2] = g_eulers[(init_euler+tid)*9+3];
-		s_eulers[tid*6+3] = g_eulers[(init_euler+tid)*9+4];
-		s_eulers[tid*6+4] = g_eulers[(init_euler+tid)*9+6];
-		s_eulers[tid*6+5] = g_eulers[(init_euler+tid)*9+7];
-	}
 
-	tx = trans_x[tid%translation_num];
-	ty = trans_y[tid%translation_num];
+	//Step through data
+	int max_block_pass_pixel( ceilf( (float)image_size / (float)block_sz ) * block_sz );
 
-	int max_block_wise_pixel( ceilf( (float)image_size / (float)D2C_BLOCK_SIZE ) * D2C_BLOCK_SIZE );
-
-	for (int init_pixel = 0; init_pixel < max_block_wise_pixel; init_pixel += D2C_BLOCK_SIZE/PREFETCH_FRACTION)
+	for (int init_pixel = 0; init_pixel < max_block_pass_pixel; init_pixel += block_sz/prefetch_fraction)
 	{
 		__syncthreads();
 
-		if(init_pixel + tid/PREFETCH_FRACTION < image_size)
+		//Prefetch block-fraction-wise
+		if(init_pixel + tid/prefetch_fraction < image_size)
 		{
-			int x = (init_pixel + tid/PREFETCH_FRACTION) % projector.imgX;
-			int y = (int)floorf( (float)(init_pixel + tid/PREFETCH_FRACTION) / (float)projector.imgX);
+			int x = (init_pixel + tid/prefetch_fraction) % projector.imgX;
+			int y = (int)floorf( (float)(init_pixel + tid/prefetch_fraction) / (float)projector.imgX);
 
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
 //			#pragma unroll
-			for (int i = tid%PREFETCH_FRACTION; i < eulers_per_block; i += PREFETCH_FRACTION)
+			for (int i = tid%prefetch_fraction; i < eulers_per_block; i += prefetch_fraction)
 			{
 				if(do_3DProjection)
 					projector.project3Dmodel(
 						x,y,
-						s_eulers[i*6  ],
-						s_eulers[i*6+1],
-						s_eulers[i*6+2],
-						s_eulers[i*6+3],
-						s_eulers[i*6+4],
-						s_eulers[i*6+5],
-						s_ref_real[eulers_per_block * (tid/PREFETCH_FRACTION) + i],
-						s_ref_imag[eulers_per_block * (tid/PREFETCH_FRACTION) + i]);
+						s_eulers[i*9  ],
+						s_eulers[i*9+1],
+						s_eulers[i*9+3],
+						s_eulers[i*9+4],
+						s_eulers[i*9+6],
+						s_eulers[i*9+7],
+						s_ref_real[eulers_per_block * (tid/prefetch_fraction) + i],
+						s_ref_imag[eulers_per_block * (tid/prefetch_fraction) + i]);
 				else
 					projector.project2Dmodel(
 						x,y,
-						s_eulers[i*6  ],
-						s_eulers[i*6+1],
-						s_eulers[i*6+2],
-						s_eulers[i*6+3],
-						s_eulers[i*6+4],
-						s_eulers[i*6+5],
-						s_ref_real[eulers_per_block * (tid/PREFETCH_FRACTION) + i],
-						s_ref_imag[eulers_per_block * (tid/PREFETCH_FRACTION) + i]);
+						s_eulers[i*9  ],
+						s_eulers[i*9+1],
+						s_eulers[i*9+3],
+						s_eulers[i*9+4],
+						s_eulers[i*9+6],
+						s_eulers[i*9+7],
+						s_ref_real[eulers_per_block * (tid/prefetch_fraction) + i],
+						s_ref_imag[eulers_per_block * (tid/prefetch_fraction) + i]);
 			}
+		}
+
+		//Prefetch block-wise
+		if (init_pixel % block_sz == 0)
+		{
+			s_real[tid] = g_real[init_pixel + tid];
+			s_imag[tid] = g_imag[init_pixel + tid];
+			s_corr[tid] = g_corr[init_pixel + tid];
 		}
 
 		__syncthreads();
 
-		if ((float) tid / translation_num < D2C_BLOCK_SIZE/translation_num) //TODO Rest threads can be utilized
+		/*
+		 * The index-skip-interval is dependent on the number of threads working with the current translation.
+		 * This in turn depends on the number of rest-threads (block_sz % translation_num)
+		 */
+		for (int i = tid / translation_num; i < block_sz/prefetch_fraction; i += block_sz/translation_num + (int) (tid % translation_num < block_sz % translation_num))
 		{
-			for (int i = tid / translation_num; i < D2C_BLOCK_SIZE/PREFETCH_FRACTION; i += D2C_BLOCK_SIZE/translation_num)
+			if((init_pixel + i) >= image_size) break;
+
+			int x = (init_pixel + i) % projector.imgX;
+			int y = (int)floorf( (float)(init_pixel + i) / (float)projector.imgX);
+
+			if (y > projector.maxR)
+				y -= projector.imgY;
+
+			XFLOAT s, c;
+			sincosf( x * tx + y * ty , &s, &c);
+
+			XFLOAT real = c * s_real[i + init_pixel % block_sz] - s * s_imag[i + init_pixel % block_sz];
+			XFLOAT imag = c * s_imag[i + init_pixel % block_sz] + s * s_real[i + init_pixel % block_sz];
+
+			#pragma unroll
+			for (int j = 0; j < eulers_per_block; j ++)
 			{
-				if((init_pixel + i) >= image_size) break;
-
-				int x = (init_pixel + i) % projector.imgX;
-				int y = (int)floorf( (float)(init_pixel + i) / (float)projector.imgX);
-
-				if (y > projector.maxR)
-					y -= projector.imgY;
-
-				XFLOAT s, c;
-				sincosf( x * tx + y * ty , &s, &c);
-				XFLOAT real = c * g_real[init_pixel + i] - s * g_imag[init_pixel + i];
-				XFLOAT imag = c * g_imag[init_pixel + i] + s * g_real[init_pixel + i];
-
-				XFLOAT r_corr = g_corr[init_pixel + i];
-
-				#pragma unroll
-				for (int j = 0; j < eulers_per_block; j ++)
-				{
-					XFLOAT diff_real =  s_ref_real[eulers_per_block * i + j] - real;
-					XFLOAT diff_imag =  s_ref_imag[eulers_per_block * i + j] - imag;
-					diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * r_corr / 2;
-				}
+				XFLOAT diff_real =  s_ref_real[eulers_per_block * i + j] - real;
+				XFLOAT diff_imag =  s_ref_imag[eulers_per_block * i + j] - imag;
+				diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[i + init_pixel % block_sz] / 2;
 			}
 		}
 	}
 
-	//Assuming translation_num > block-size
-	if ((float) tid / translation_num < D2C_BLOCK_SIZE/translation_num)
-	{
-		#pragma unroll
-		for (int i = 0; i < eulers_per_block; i ++)
-			atomicAdd(&g_diff2s[(init_euler+i) * translation_num + tid%translation_num], diff2s[i]);
-	}
+	//Set global
+	#pragma unroll
+	for (int i = 0; i < eulers_per_block; i ++)
+		cuda_atomic_add(&g_diff2s[(blockIdx.x * eulers_per_block + i) * translation_num + tid % translation_num], diff2s[i]);
 }
 
 

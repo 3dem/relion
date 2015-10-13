@@ -709,16 +709,14 @@ void getAllSquaredDifferencesCoarse(
 
 			} // end if class significant
 		} // end loop iclass
-		cudaDeviceSynchronize();
+
 		allWeights.cp_to_host();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		allWeights_pos=0;
 
-//
 //		if (!cudaMLO->refIs3D)
 //		{
-//			printf("translation_num=%d", translation_num);
 //			FILE *fPtr = fopen("allWeights.dat","w");
 //			for (unsigned i = 0; i < allWeights.getSize(); i ++)
 //				fprintf(fPtr,"%.5e\n",allWeights[i]);
@@ -1005,7 +1003,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
-		cudaDeviceSynchronize();
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
@@ -1243,7 +1241,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
-			cudaDeviceSynchronize();
+
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			if(exp_ipass==0)
 				allMweight.cp_to_host();

@@ -447,14 +447,12 @@ __global__ void cuda_kernel_init_value(
 template< typename T>
 void deviceInitValue(CudaGlobalPtr<T> data, T value)
 {
-	cuda_kernel_init_value<T><<< data.getSize()/INIT_VALUE_BLOCK_SIZE, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
 			~data,
 			value,
 			data.getSize());
 }
-
-#define EULERS_PERBLOCK_3D 16
-#define EULERS_PERBLOCK_2D 4
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
@@ -468,7 +466,7 @@ void runDiff2KernelCoarse(
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
-		long unsigned translation_num,
+		int translation_num,
 		unsigned image_size,
 		int ipart,
 		int group_id,
@@ -478,8 +476,15 @@ void runDiff2KernelCoarse(
 {
 	if(!do_CC)
 	{
+		if (translation_num > D2C_BLOCK_SIZE)
+		{
+			printf("Number of coarse translations larger than %d not supported (if you really need this contact the developers).\n", D2C_BLOCK_SIZE);
+			fflush(stdout);
+			exit(1);
+		}
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_coarse<true, EULERS_PERBLOCK_3D><<<orientation_num/EULERS_PERBLOCK_3D,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_coarse<true, 128, 16, 4>
+			<<<orientation_num/16,128,0,cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
 				trans_x,
 				trans_y,
@@ -491,7 +496,8 @@ void runDiff2KernelCoarse(
 				translation_num,
 				image_size);
 		else
-			cuda_kernel_diff2_coarse<false, EULERS_PERBLOCK_2D><<<orientation_num/EULERS_PERBLOCK_2D,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE, 2, 2>
+			<<<orientation_num/2,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
 				trans_x,
 				trans_y,

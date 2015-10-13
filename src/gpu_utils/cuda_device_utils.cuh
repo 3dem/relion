@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 
 #ifdef CUDA_DOUBLE_PRECISION
-__device__ inline XFLOAT cuda_atomic_add(double* address, double val)
+__device__ inline double cuda_atomic_add(double* address, double val)
 {
 	unsigned long long int* address_as_ull = (unsigned long long int*)address;
 	unsigned long long int old = *address_as_ull, assumed;
@@ -17,7 +17,6 @@ __device__ inline XFLOAT cuda_atomic_add(double* address, double val)
 	return __longlong_as_double(old);
 }
 #else
-#define XFLOAT float
 __device__ inline void cuda_atomic_add(float* address, float value)
 {
   atomicAdd(address,value);
