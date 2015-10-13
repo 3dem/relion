@@ -254,10 +254,10 @@ void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
     if ( typeid(T) == typeid(RFLOAT) ||
          typeid(T) == typeid(float) ||
          typeid(T) == typeid(int) )
-        strcpy(header->type,"REAL");
+        strncpy(header->type,"REAL",4);
     else if ( typeid(T) == typeid(unsigned char) ||
               typeid(T) == typeid(signed char) )
-        strcpy(header->type,"PACK");
+        strncpy(header->type,"PACK",4);
     else
         REPORT_ERROR("ERROR write IMAGIC image: invalid typeid(T)");
 
