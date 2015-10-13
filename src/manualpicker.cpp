@@ -106,7 +106,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 
 	command += " &";
 	std::cerr << command << std::endl;
-	system(command.c_str());
+	int res = system(command.c_str());
 
 	last_pick_viewed = imic;
 	for (int i = 0; i < viewmic_buttons.size(); i++)
@@ -137,7 +137,7 @@ void cb_viewctf(Fl_Widget* w, void* data)
 	command += " --sigma_contrast " + floatToString(global_ctfsigma);
 	command += " &";
 	std::cerr << command << std::endl;
-	system(command.c_str());
+	int res = system(command.c_str());
 
 	last_ctf_viewed = imic;
 	for (int i = 0; i < viewctf_buttons.size(); i++)

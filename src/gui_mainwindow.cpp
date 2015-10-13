@@ -384,7 +384,7 @@ void RelionMainWindow::cb_display(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_display_i()
 {
 	std::string command = " relion_display --gui &" ;
-	system(command.c_str());
+	int res = system(command.c_str());
 }
 
 void RelionMainWindow::cb_toggle_continue(Fl_Widget*, void* v)
@@ -454,7 +454,7 @@ void RelionMainWindow::cb_run_i()
 	}
 
 	std::cout << "Executing: " << final_command << std::endl;
-	system(final_command.c_str());
+	int res = system(final_command.c_str());
 
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();

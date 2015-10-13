@@ -373,7 +373,7 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	{
 		std::string dirs = outputname.substr(0, last_slash);
 		std::string makedirs = "mkdir -p " + dirs;
-		system(makedirs.c_str());
+		int res = system(makedirs.c_str());
 	}
 
 	// Prepare full mpi commands or save jobsubmission script to disc

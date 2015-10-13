@@ -740,7 +740,7 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	// send job in the background
 	cl += " &";
 
-	system(cl.c_str());
+	int res = system(cl.c_str());
 
 	/*
 	FileName fn_img;
@@ -1663,7 +1663,7 @@ void displayerGuiWindow::cb_display_i()
 	// send job in the background
 	cl += " &";
 	std::cerr << "Executing: " << cl << std::endl;
-	system(cl.c_str());
+	int res = system(cl.c_str());
 
 }
 

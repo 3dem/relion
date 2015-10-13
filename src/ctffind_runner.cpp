@@ -234,7 +234,7 @@ void CtffindRunner::executeCtffind(FileName fn_mic)
 	if (!system(NULL))
 	 REPORT_ERROR("There is a problem with the system call to run ctffind");
 	FileName fn_cmnd = "csh "+ fn_script;
-	system ( fn_cmnd.c_str() );
+	int res = system ( fn_cmnd.c_str() );
 
 	// Remove windowed file again
 	if (ctf_win > 0)
