@@ -98,11 +98,14 @@ template<typename T> inline T sign (const T& signvalue)
 //! Returns the integer \a n, which fulfills \a n*n<=arg<(n+1)*(n+1).
 template<typename I> inline unsigned int isqrt (I arg)
   {
-  using namespace std;
-  if (sizeof(I)<=4)
-    return unsigned (sqrt(arg+0.5));
-  long double arg2 = arg;
-  return unsigned (sqrt(arg2+0.5));
+	  using namespace std;
+	  if (sizeof(I)<=4)
+		return unsigned (sqrt(arg+0.5));
+	  else
+	  {
+		  long double arg2 = arg;
+		  return unsigned (sqrt(arg2+0.5));
+	  }
   }
 
 //! Returns the largest integer \a n that fulfills \a 2^n<=arg.
@@ -262,7 +265,7 @@ void module_startup (const std::string &name, int argc, const char **argv,
 inline unsigned int healpix_repcount (int npix)
   {
   if (npix<1024) return 1;
-  if ((npix%1024)==0) return 1024;
-  return isqrt (npix/12);
+  else if ((npix%1024)==0) return 1024;
+  else return isqrt (npix/12);
   }
 #endif
