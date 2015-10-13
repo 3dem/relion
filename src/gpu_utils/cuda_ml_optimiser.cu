@@ -2352,9 +2352,13 @@ void MlOptimiserCuda::resetData()
 	}
 };
 
-void MlOptimiserCuda::doThreadExpectationSomeParticles()
+void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 {
-
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_THR);
+#endif
 //	CUDA_CPU_TOC("interParticle");
 	CUDA_CPU_TIC("oneTask");
 	DEBUG_HANDLE_ERROR(cudaSetDevice(device_id));
@@ -2367,7 +2371,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 		for (long unsigned ipart = first_ipart; ipart <= last_ipart; ipart++)
 		{
 			CUDA_CPU_TIC("oneParticle");
-
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
+#endif
 			unsigned my_ori_particle = baseMLO->exp_my_first_ori_particle + ipart;
 			SamplingParameters sp;
 			sp.nr_particles = baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size();
@@ -2405,9 +2413,15 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 				if (iori == my_ori_particle) break;
 				op.metadata_offset += baseMLO->mydata.ori_particles[iori].particles_id.size();
 			}
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
+#endif
 			CUDA_CPU_TIC("getFourierTransformsAndCtfs");
 			getFourierTransformsAndCtfs(my_ori_particle, op, sp, baseMLO, this);
 			CUDA_CPU_TOC("getFourierTransformsAndCtfs");
+
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 			{
 				baseMLO->calculateRunningAveragesOfMovieFrames(my_ori_particle, op.Fimgs, op.power_imgs, op.highres_Xi2_imgs);
@@ -2458,7 +2472,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 			for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 			{
 				CUDA_CPU_TIC("weightPass");
-
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_B);
+#endif
 				if (baseMLO->strict_highres_exp > 0.)
 					// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
 					sp.current_image_size = baseMLO->coarse_size;
@@ -2476,9 +2494,18 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 				sp.nr_trans = (baseMLO->do_skip_align) ? 1 : baseMLO->sampling.NrTranslationalSamplings();
 				sp.nr_oversampled_rot = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				sp.nr_oversampled_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
-
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
+#endif
 				if (ipass == 0)
 				{
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_C);
+#endif
 					 //If particle specific sampling plan required
 					if (generateProjectionPlanOnTheFly)
 					{
@@ -2520,7 +2547,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 						}
 						CUDA_CPU_TOC("generateProjectionSetupCoarse");
 					}
-
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_C);
+#endif
 					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
 					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, stagerD2);
 					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
@@ -2531,6 +2562,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 				}
 				else
 				{
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
+#endif
 //					// -- go through all classes and generate projectionsetups for all classes - to be used in getASDF and storeWS below --
 //					// the reason to do this globally is subtle - we want the orientation_num of all classes to estimate a largest possible
 //					// weight-array, which would be insanely much larger than necessary if we had to assume the worst.
@@ -2560,7 +2596,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 						stagerD2[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
 						stagerD2[iframe].prepare();
 					}
-
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
+#endif
 //					printf("Allocator used space before 'getAllSquaredDifferencesFine': %.2f MiB\n", (float)allocator->getTotalUsedSpace()/(1024.*1024.));
 
 					CUDA_CPU_TIC("getAllSquaredDifferencesFine");
@@ -2576,6 +2616,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 
 				CUDA_CPU_TOC("weightPass");
 			}
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
+#endif
 
 			// For the reconstruction step use mymodel.current_size!
 			sp.current_image_size = baseMLO->mymodel.current_size;
@@ -2584,6 +2629,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 				stagerSWS[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses);
 				stagerSWS[iframe].prepare();
 			}
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
+#endif
 			CUDA_CPU_TIC("storeWeightedSums");
 			storeWeightedSums(op, sp, baseMLO, this, FinePassWeights, FineProjectionData, FinePassClassMasks, stagerSWS);
 			CUDA_CPU_TOC("storeWeightedSums");
@@ -2602,5 +2652,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 	CUDA_CPU_TOC("oneTask");
 //	CUDA_CPU_TIC("interParticle");
 //	exit(0);
+
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.toc(baseMLO->TIMING_ESP_THR);
+#endif
 }
 

@@ -497,7 +497,7 @@ public:
 
 	void resetData();
 
-	void doThreadExpectationSomeParticles();
+	void doThreadExpectationSomeParticles(int thread_id);
 
 	void storeBpMdlData()
 	{

@@ -51,7 +51,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
 	if (MLO->do_gpu)
-		((MlOptimiserCuda*) MLO->cudaMlOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles();
+		((MlOptimiserCuda*) MLO->cudaMlOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
 	else
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
@@ -823,6 +823,29 @@ void MlOptimiser::initialise()
 		}
 	}
 
+	if (do_gpu)
+	{
+		do_shifts_onthefly = true;
+		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		else if (gpu_ids.length()==0)
+			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
+
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		for (int i = 0; i < nr_threads; i ++)
+		{
+			int dev_id;
+			if (!std::isdigit(*gpu_ids.begin()))
+				dev_id = i%devCount;
+			else
+				dev_id = (int)(gpu_ids[i]-'0');
+
+			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+		}
+	}
+
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Done"<<std::endl;
@@ -1110,29 +1133,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = nr_threads;
-
-	if (do_gpu)
-	{
-		do_shifts_onthefly = true;
-		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
-			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-		else if (gpu_ids.length()==0)
-			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
-
-		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		for (int i = 0; i < nr_threads; i ++)
-		{
-			int dev_id;
-			if (!std::isdigit(*gpu_ids.begin()))
-				dev_id = i%devCount;
-			else
-				dev_id = (int)(gpu_ids[i]-'0');
-
-			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
-		}
-	}
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
