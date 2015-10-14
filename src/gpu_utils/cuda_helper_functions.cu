@@ -467,7 +467,7 @@ void runDiff2KernelCoarse(
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		int translation_num,
-		unsigned image_size,
+		int image_size,
 		int ipart,
 		int group_id,
 		int exp_iclass,
@@ -476,13 +476,21 @@ void runDiff2KernelCoarse(
 {
 	if(!do_CC)
 	{
-		if (translation_num > D2C_BLOCK_SIZE)
-		{
-			printf("Number of coarse translations larger than %d not supported (if you really need this contact the developers).\n", D2C_BLOCK_SIZE);
-			fflush(stdout);
-			exit(1);
-		}
 		if(projector.mdlZ!=0)
+		{
+			if (translation_num > 128)
+			{
+				printf("Number of coarse translations larger than %d not supported yet.\n", 128);
+				fflush(stdout);
+				exit(1);
+			}
+
+			if (orientation_num % 16 != 0)
+			{
+				printf("None evenly divisible number of coarse orientations (%d) by %d not supported yet.\n", orientation_num, 16);
+				fflush(stdout);
+				exit(1);
+			}
 			cuda_kernel_diff2_coarse<true, 128, 16, 4>
 			<<<orientation_num/16,128,0,cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
@@ -495,9 +503,26 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size);
+		}
 		else
-			cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE, 2, 2>
-			<<<orientation_num/2,D2C_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+		{
+
+			if (translation_num > 512)
+			{
+				printf("Number of coarse translations larger than %d not supported yet.\n", 512);
+				fflush(stdout);
+				exit(1);
+			}
+
+			if (orientation_num % 4 != 0)
+			{
+				printf("None evenly divisible number of coarse orientations (%d) by %d not supported yet.\n", orientation_num, 4);
+				fflush(stdout);
+				exit(1);
+			}
+
+			cuda_kernel_diff2_coarse<false, 512, 4, 2>
+			<<<orientation_num/4,512,0,cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
 				trans_x,
 				trans_y,
@@ -508,6 +533,7 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size);
+		}
 	}
 	else
 	{

@@ -104,20 +104,19 @@ __global__ void cuda_kernel_diff2_coarse(
 		}
 
 		//Prefetch block-wise
-		if (init_pixel % block_sz == 0)
+		if (init_pixel % block_sz == 0 && init_pixel + tid < image_size)
 		{
 			s_real[tid] = g_real[init_pixel + tid];
 			s_imag[tid] = g_imag[init_pixel + tid];
-			s_corr[tid] = g_corr[init_pixel + tid];
+			s_corr[tid] = g_corr[init_pixel + tid] / 2;
 		}
 
 		__syncthreads();
 
-		/*
-		 * The index-skip-interval is dependent on the number of threads working with the current translation.
-		 * This in turn depends on the number of rest-threads (block_sz % translation_num)
-		 */
-		for (int i = tid / translation_num; i < block_sz/prefetch_fraction; i += block_sz/translation_num + (int) (tid % translation_num < block_sz % translation_num))
+		if (((float) tid / (float) translation_num) < block_sz/translation_num)
+		for (int i = tid / translation_num;
+				i < block_sz/prefetch_fraction;
+				i += block_sz/translation_num)
 		{
 			if((init_pixel + i) >= image_size) break;
 
@@ -128,7 +127,7 @@ __global__ void cuda_kernel_diff2_coarse(
 				y -= projector.imgY;
 
 			XFLOAT s, c;
-			sincosf( x * tx + y * ty , &s, &c);
+			sincosf( x * tx + y * ty , &s, &c );
 
 			XFLOAT real = c * s_real[i + init_pixel % block_sz] - s * s_imag[i + init_pixel % block_sz];
 			XFLOAT imag = c * s_imag[i + init_pixel % block_sz] + s * s_real[i + init_pixel % block_sz];
@@ -138,7 +137,7 @@ __global__ void cuda_kernel_diff2_coarse(
 			{
 				XFLOAT diff_real =  s_ref_real[eulers_per_block * i + j] - real;
 				XFLOAT diff_imag =  s_ref_imag[eulers_per_block * i + j] - imag;
-				diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[i + init_pixel % block_sz] / 2;
+				diff2s[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[i + init_pixel % block_sz];
 			}
 		}
 	}
