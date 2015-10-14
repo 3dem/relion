@@ -178,6 +178,9 @@ if (in.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size));

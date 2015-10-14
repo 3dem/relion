@@ -164,7 +164,7 @@ public:
 	inline
 	Alloc* alloc(size_t size)
 	{
-		size += size % alignmentSize; //To prevent miss-aligned memory
+		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
 
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		Alloc *nAlloc = new Alloc();
@@ -947,7 +947,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to host-alloc a stager with size=0");
-	        exit( EXIT_FAILURE );
+			raise(SIGSEGV);
 		}
 		int temp_size=AllData.size;
 		AllData.size=size;
@@ -962,7 +962,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
-	        exit( EXIT_FAILURE );
+			raise(SIGSEGV);
 		}
 		int temp_size=AllData.size;
 		AllData.size=alloc_size;
@@ -977,7 +977,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to host-alloc a stager with size=0");
-	        exit( EXIT_FAILURE );
+			raise(SIGSEGV);
 		}
 		int temp_size=AllData.size;
 		AllData.size=size;
@@ -992,7 +992,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
-	        exit( EXIT_FAILURE );
+			raise(SIGSEGV);
 		}
 		int temp_size=AllData.size;
 		AllData.size=alloc_size;

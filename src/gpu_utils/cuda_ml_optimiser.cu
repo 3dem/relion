@@ -24,7 +24,7 @@
 #ifdef CUDA_FORCESTL
 #include "src/gpu_utils/cuda_utils_stl.cuh"
 #else
-#include "src/gpu_utils/cuda_utils_thrust.cuh"
+#include "src/gpu_utils/cuda_utils_cub.cuh"
 #endif
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
