@@ -485,12 +485,9 @@ void runDiff2KernelCoarse(
 				exit(1);
 			}
 
-			if (orientation_num % 16 != 0)
-			{
-				printf("None evenly divisible number of coarse orientations (%d) by %d not supported yet.\n", orientation_num, 16);
-				fflush(stdout);
-				exit(1);
-			}
+			unsigned rest = orientation_num % 16;
+			orientation_num -= rest;
+
 			cuda_kernel_diff2_coarse<true, 128, 16, 4>
 			<<<orientation_num/16,128,0,cudaMLO->classStreams[exp_iclass]>>>(
 				d_eulers,
@@ -503,6 +500,23 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size);
+
+			if (rest != 0)
+			{
+				cuda_kernel_diff2_coarse<true, 128, 1, 4>
+				<<<rest,128,0,cudaMLO->classStreams[exp_iclass]>>>(
+					&d_eulers[9*orientation_num],
+					trans_x,
+					trans_y,
+					Fimgs_real,
+					Fimgs_imag,
+					projector,
+					corr_img,
+					&diff2s[translation_num*orientation_num],
+					translation_num,
+					image_size);
+			}
+
 		}
 		else
 		{
@@ -514,12 +528,8 @@ void runDiff2KernelCoarse(
 				exit(1);
 			}
 
-			if (orientation_num % 4 != 0)
-			{
-				printf("None evenly divisible number of coarse orientations (%d) by %d not supported yet.\n", orientation_num, 4);
-				fflush(stdout);
-				exit(1);
-			}
+			unsigned rest = orientation_num % 4;
+			orientation_num -= rest;
 
 			cuda_kernel_diff2_coarse<false, 512, 4, 2>
 			<<<orientation_num/4,512,0,cudaMLO->classStreams[exp_iclass]>>>(
@@ -533,6 +543,22 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size);
+
+			if (rest != 0)
+			{
+				cuda_kernel_diff2_coarse<false, 512, 1, 2>
+				<<<rest,512,0,cudaMLO->classStreams[exp_iclass]>>>(
+					&d_eulers[9*orientation_num],
+					trans_x,
+					trans_y,
+					Fimgs_real,
+					Fimgs_imag,
+					projector,
+					corr_img,
+					&diff2s[translation_num*orientation_num],
+					translation_num,
+					image_size);
+			}
 		}
 	}
 	else
