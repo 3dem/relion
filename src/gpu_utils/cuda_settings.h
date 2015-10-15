@@ -11,7 +11,14 @@
 #define BLOCK_SIZE  128         	// -- Number of threads in a block --
 									// This is optimally set as big as possible without
 									// its ceil:ed multiple exceeding imagesize by too much.
-#define D2C_BLOCK_SIZE  128
+
+
+#define D2C_BLOCK_SIZE_3D 128
+#define D2C_BLOCK_SIZE_2D 512
+#define D2C_EULERS_PER_BLOCK_3D 16
+#define D2C_EULERS_PER_BLOCK_2D 4
+
+
 #define WAVG_BLOCK_SIZE 256
 #define SUMW_BLOCK_SIZE 32
 #define SOFTMASK_BLOCK_SIZE 1024

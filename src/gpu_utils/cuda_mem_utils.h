@@ -164,8 +164,6 @@ public:
 	inline
 	Alloc* alloc(size_t size)
 	{
-		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
-
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		Alloc *nAlloc = new Alloc();
 		nAlloc->size = size;
@@ -173,6 +171,7 @@ public:
 		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
 		return nAlloc;
 #else
+		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
 		
 		Alloc *curAlloc = getFirstSuitedFree(size);
 
@@ -239,6 +238,8 @@ public:
 		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
 		return nAlloc;
 #else
+		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
+
 		Alloc *curAlloc = getLastSuitedFree(size);
 
 		//If out of memory

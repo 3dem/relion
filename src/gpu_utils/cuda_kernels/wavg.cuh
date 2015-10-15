@@ -70,16 +70,27 @@ __global__ void cuda_kernel_wavg(
 
 		if(pixel<image_size)
 		{
+			int x = pixel % projector.imgX;
+			int y = (int)floorf( (float)pixel / (float)projector.imgX);
+
+			if (y > projector.maxR)
+			{
+				if (y >= projector.imgY - projector.maxR)
+					y = y - projector.imgY;
+				else
+					x = projector.maxR;
+			}
+
 			if(do_3DProjection)
 				projector.project3Dmodel(
-					pixel,
+					x,y,
 					s_eulers[0], s_eulers[1],
 					s_eulers[3], s_eulers[4],
 					s_eulers[6], s_eulers[7],
 					ref_real, ref_imag);
 			else
 				projector.project2Dmodel(
-					pixel,
+						x,y,
 					s_eulers[0], s_eulers[1],
 					s_eulers[3], s_eulers[4],
 					s_eulers[6], s_eulers[7],

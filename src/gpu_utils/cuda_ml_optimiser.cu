@@ -506,6 +506,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_FT);
 #endif
 }
+
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
 		OptimisationParamters &op,
@@ -562,58 +563,91 @@ void getAllSquaredDifferencesCoarse(
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(cudaMLO->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->allocator);
 
-		Fimgs_real.device_alloc(image_size * translation_num);
-		Fimgs_imag.device_alloc(image_size * translation_num);
+		std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
-		if (baseMLO->do_shifts_onthefly)
+		for (long int itrans = 0; itrans < translation_num; itrans++)
 		{
-			CudaTranslator::Plan transPlan(
-					op.local_Fimgs_shifted[ipart].data,
-					image_size,
-					sp.itrans_min * sp.nr_oversampled_trans,
-					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-					cudaMLO->allocator,
-					0, //stream
-					baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
-					baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
+			baseMLO->sampling.getTranslations(itrans, 0, oversampled_translations_x,
+					oversampled_translations_y, oversampled_translations_z);
 
-			if (sp.current_oversampling == 0)
-			{
-				if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
-					cudaMLO->translator_coarse1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-				else
-					cudaMLO->translator_current1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-			}
-			else
-			{
-				if (baseMLO->strict_highres_exp > 0.)
-					cudaMLO->translator_coarse2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-				else
-					cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-			}
+			trans_x[itrans] = -2 * PI * oversampled_translations_x[0] / (double)baseMLO->mymodel.ori_size;
+			trans_y[itrans] = -2 * PI * oversampled_translations_y[0] / (double)baseMLO->mymodel.ori_size;
 		}
-		else
+
+		trans_x.put_on_device();
+		trans_y.put_on_device();
+
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size, cudaMLO->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size, cudaMLO->allocator);
+
+		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
+
+		for (unsigned i = 0; i < op.local_Fimgs_shifted[ipart].nzyxdim; i ++)
 		{
-			Fimgs_real.host_alloc();
-			Fimgs_imag.host_alloc();
+			XFLOAT pixel_correction = scale_correction;
+			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+				pixel_correction /= op.local_Fctfs[ipart].data[i];
 
-			unsigned long k = 0;
-			for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
-			{
-				for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
-				{
-					Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
-					Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
-					k++;
-				}
-			}
-
-			Fimgs_real.cp_to_device();
-			Fimgs_imag.cp_to_device();
+			Fimgs_real[i] = op.local_Fimgs_shifted[ipart].data[i].real * pixel_correction;
+			Fimgs_imag[i] = op.local_Fimgs_shifted[ipart].data[i].imag * pixel_correction;
 		}
+
+		Fimgs_real.put_on_device();
+		Fimgs_imag.put_on_device();
+
+
+//		Fimgs_real.device_alloc(image_size * translation_num);
+//		Fimgs_imag.device_alloc(image_size * translation_num);
+
+//		if (baseMLO->do_shifts_onthefly)
+//		{
+//			CudaTranslator::Plan transPlan(
+//					op.local_Fimgs_shifted[ipart].data,
+//					image_size,
+//					sp.itrans_min * sp.nr_oversampled_trans,
+//					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
+//					cudaMLO->allocator,
+//					0, //stream
+//					baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
+//					baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
+//
+//			if (sp.current_oversampling == 0)
+//			{
+//				if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
+//					cudaMLO->translator_coarse1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+//				else
+//					cudaMLO->translator_current1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+//			}
+//			else
+//			{
+//				if (baseMLO->strict_highres_exp > 0.)
+//					cudaMLO->translator_coarse2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+//				else
+//					cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+//			}
+//		}
+//		else
+//		{
+//			Fimgs_real.host_alloc();
+//			Fimgs_imag.host_alloc();
+//
+//			unsigned long k = 0;
+//			for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
+//			{
+//				for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
+//				{
+//					Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
+//					Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
+//					k++;
+//				}
+//			}
+//
+//			Fimgs_real.cp_to_device();
+//			Fimgs_imag.cp_to_device();
+//		}
 
 		CUDA_CPU_TOC("translation_1");
 
@@ -625,6 +659,7 @@ void getAllSquaredDifferencesCoarse(
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 		corr_img.cp_to_device();
 
+		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -644,6 +679,8 @@ void getAllSquaredDifferencesCoarse(
 
 				runDiff2KernelCoarse(
 						projKernel,
+						~trans_x,
+						~trans_y,
 						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
@@ -667,11 +704,20 @@ void getAllSquaredDifferencesCoarse(
 
 			} // end if class significant
 		} // end loop iclass
-		cudaDeviceSynchronize();
+
 		allWeights.cp_to_host();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		allWeights_pos=0;
+
+//		if (!cudaMLO->refIs3D)
+//		{
+//			FILE *fPtr = fopen("allWeights.dat","w");
+//			for (unsigned i = 0; i < allWeights.getSize(); i ++)
+//				fprintf(fPtr,"%.5e\n",allWeights[i]);
+//			fclose(fPtr);
+//			exit(0);
+//		}
 
 		CUDA_CPU_TIC("diff_coarse_map");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -952,7 +998,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
-		cudaDeviceSynchronize();
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
@@ -1190,7 +1236,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
-			cudaDeviceSynchronize();
+
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			if(exp_ipass==0)
 				allMweight.cp_to_host();
@@ -2197,8 +2244,8 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 	======================================================*/
 
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
-	printf(" Custom allocator is disabled.\n");
-	allocator = new CudaCustomAllocator(0);
+	printf(" DEBUG: Custom allocator is disabled.\n");
+	allocator = new CudaCustomAllocator(0, 1);
 #else
 	size_t allocationSize(0);
 

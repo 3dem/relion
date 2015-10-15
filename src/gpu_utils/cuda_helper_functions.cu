@@ -432,9 +432,32 @@ void runWavgKernel(
 	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
+#define INIT_VALUE_BLOCK_SIZE 512
+template< typename T>
+__global__ void cuda_kernel_init_value(
+		T *data,
+		T value,
+		size_t size)
+{
+	size_t idx = blockIdx.x * INIT_VALUE_BLOCK_SIZE + threadIdx.x;
+	if (idx < size)
+		data[idx] = value;
+}
+
+template< typename T>
+void deviceInitValue(CudaGlobalPtr<T> data, T value)
+{
+	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			data.getSize());
+}
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
@@ -443,8 +466,8 @@ void runDiff2KernelCoarse(
 		OptimisationParamters &op,
 		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
-		long unsigned translation_num,
-		unsigned image_size,
+		int translation_num,
+		int image_size,
 		int ipart,
 		int group_id,
 		int exp_iclass,
@@ -454,27 +477,96 @@ void runDiff2KernelCoarse(
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
-				cuda_kernel_diff2_coarse<true><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
+		{
+			if (translation_num > D2C_BLOCK_SIZE_3D)
+			{
+				printf("Number of coarse translations larger than %d not supported yet.\n", D2C_BLOCK_SIZE_3D);
+				fflush(stdout);
+				exit(1);
+			}
+
+			unsigned rest = orientation_num % D2C_EULERS_PER_BLOCK_3D;
+			long unsigned even_orientation_num = orientation_num - rest;
+
+			if (even_orientation_num != 0)
+			{
+				cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, D2C_EULERS_PER_BLOCK_3D, 4>
+				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D,0,cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
+					trans_x,
+					trans_y,
 					Fimgs_real,
 					Fimgs_imag,
 					projector,
 					corr_img,
 					diff2s,
 					translation_num,
-					image_size,
-					op.highres_Xi2_imgs[ipart] / 2.);
-			else
-				cuda_kernel_diff2_coarse<false><<<orientation_num,D2C_BLOCK_SIZE,translation_num*D2C_BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
+					image_size);
+			}
+
+			if (rest != 0)
+			{
+				cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, 1, 4>
+				<<<rest,D2C_BLOCK_SIZE_3D,0,cudaMLO->classStreams[exp_iclass]>>>(
+					&d_eulers[9*even_orientation_num],
+					trans_x,
+					trans_y,
+					Fimgs_real,
+					Fimgs_imag,
+					projector,
+					corr_img,
+					&diff2s[translation_num*even_orientation_num],
+					translation_num,
+					image_size);
+			}
+
+		}
+		else
+		{
+
+			if (translation_num > D2C_BLOCK_SIZE_2D)
+			{
+				printf("Number of coarse translations larger than %d not supported yet.\n", D2C_BLOCK_SIZE_2D);
+				fflush(stdout);
+				exit(1);
+			}
+
+
+			unsigned rest = orientation_num % D2C_EULERS_PER_BLOCK_2D;
+			long unsigned even_orientation_num = orientation_num - rest;
+
+			if (even_orientation_num != 0)
+			{
+				cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
+				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_2D,D2C_BLOCK_SIZE_2D,0,cudaMLO->classStreams[exp_iclass]>>>(
 					d_eulers,
+					trans_x,
+					trans_y,
 					Fimgs_real,
 					Fimgs_imag,
 					projector,
 					corr_img,
 					diff2s,
 					translation_num,
-					image_size,
-					op.highres_Xi2_imgs[ipart] / 2.);
+					image_size);
+			}
+
+			if (rest != 0)
+			{
+				cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE_2D, 1, 2>
+				<<<rest,D2C_BLOCK_SIZE_2D,0,cudaMLO->classStreams[exp_iclass]>>>(
+					&d_eulers[9*even_orientation_num],
+					trans_x,
+					trans_y,
+					Fimgs_real,
+					Fimgs_imag,
+					projector,
+					corr_img,
+					&diff2s[translation_num*even_orientation_num],
+					translation_num,
+					image_size);
+			}
+		}
 	}
 	else
 	{
@@ -488,7 +580,6 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 		else
 			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
@@ -500,7 +591,6 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 	}
 }
