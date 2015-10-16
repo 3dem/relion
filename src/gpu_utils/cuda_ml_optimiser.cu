@@ -2016,9 +2016,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2s[0].ydim,
 				orientation_num);
 
-//			cudaMLO->backprojectDataBundleStack.push(dataBundle);
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->cudaBackprojectors[exp_iclass].getStream()));
-			delete dataBundle;
+			cudaMLO->backprojectDataBundleStack.push(dataBundle);
+//			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->cudaBackprojectors[exp_iclass].getStream()));
+//			delete dataBundle;
 
 			CUDA_CPU_TOC("backproject");
 
