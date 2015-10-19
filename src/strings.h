@@ -52,6 +52,7 @@
 #include <sstream>
 #include <string.h>
 #include <stdio.h>
+#include "src/macros.h"
 
 /// @defgroup StringUtilities String utilities
 /// @ingroup DataLibrary
@@ -108,10 +109,10 @@ int bestPrecision(float F, int _width);
 /** String (char*) to double conversion.
  *
  * @code
- * double key = textToDouble(firstToken(line), 1602, "Error reading key");
+ * RFLOAT key = textToDouble(firstToken(line), 1602, "Error reading key");
  * @endcode
  */
-double textToDouble(const char* str,
+RFLOAT textToDouble(const char* str,
                     int _errno = 2101,
                     std::string errmsg = "Error in textToDouble");
 
@@ -256,7 +257,7 @@ std::string removeSpaces(const std::string& _str);
 
 /** Remove quotes.
  *
- * This function removes the first character if it is a double or single quote,
+ * This function removes the first character if it is a RFLOAT or single quote,
  * as well as the last character. The char pointer might be moved.
  *
  * @code

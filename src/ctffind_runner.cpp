@@ -33,7 +33,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	ctf_win =  textToInteger(parser.getOption("--ctfWin", "Size (in pixels) of a centered, squared window to use for CTF-estimation", "-1"));
 
-	fn_ctffind_exe = parser.getOption("--ctffind_exe","Location of ctffind executable (or through RLN_CTFFIND_EXECUTABLE environment variable)","");
+	fn_ctffind_exe = parser.getOption("--ctffind_exe","Location of ctffind executable (or through RELION_CTFFIND_EXECUTABLE environment variable)","");
 
 	// First parameter line in CTFFIND
 	Cs = textToFloat(parser.getOption("--CS", "Spherical Aberration (mm) ","2.0"));
@@ -71,7 +71,7 @@ void CtffindRunner::initialise()
 	if (fn_ctffind_exe == "")
 	{
 		char * penv;
-		penv = getenv ("RLN_CTFFIND_EXECUTABLE");
+		penv = getenv ("RELION_CTFFIND_EXECUTABLE");
 		if (penv!=NULL)
 			fn_ctffind_exe = (std::string)penv;
 	}
@@ -101,7 +101,7 @@ void CtffindRunner::initialise()
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			FileName fn_microot = fn_micrographs[imic].without(".mrc");
-			double defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
 					HT, CS, AmpCnst, XMAG, DStep, false)) // false: dont die if not found Final values
 				fns_todo.push_back(fn_micrographs[imic]);
@@ -158,7 +158,7 @@ void CtffindRunner::joinCtffindResults()
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
     {
 		FileName fn_microot = fn_micrographs[imic].without(".mrc");
-		double defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
 				HT, CS, AmpCnst, XMAG, DStep);
 
@@ -202,12 +202,12 @@ void CtffindRunner::executeCtffind(FileName fn_mic)
             // Window micrograph to a smaller, squared sub-micrograph to estimate CTF on
             fn_mic_win = fn_root + "_win.mrc";
             // Read in micrograph, window and write out again
-            Image<double> I;
+            Image<RFLOAT> I;
             I.read(fn_mic);
             I().setXmippOrigin();
             I().window(FIRST_XMIPP_INDEX(ctf_win), FIRST_XMIPP_INDEX(ctf_win), LAST_XMIPP_INDEX(ctf_win), LAST_XMIPP_INDEX(ctf_win));
             // Calculate mean, stddev, min and max
-            double avg, stddev, minval, maxval;
+            RFLOAT avg, stddev, minval, maxval;
             I().computeStats(avg, stddev, minval, maxval);
             I.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
             I.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
@@ -234,7 +234,7 @@ void CtffindRunner::executeCtffind(FileName fn_mic)
 	if (!system(NULL))
 	 REPORT_ERROR("There is a problem with the system call to run ctffind");
 	FileName fn_cmnd = "csh "+ fn_script;
-	system ( fn_cmnd.c_str() );
+	int res = system ( fn_cmnd.c_str() );
 
 	// Remove windowed file again
 	if (ctf_win > 0)
@@ -245,8 +245,8 @@ void CtffindRunner::executeCtffind(FileName fn_mic)
 
 }
 
-bool getCtffindResults(FileName fn_microot, double &defU, double &defV, double &defAng, double &CC,
-		double &HT, double &CS, double &AmpCnst, double &XMAG, double &DStep, bool die_if_not_found)
+bool getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep, bool die_if_not_found)
 {
 
 	FileName fn_log = fn_microot + "_ctffind3.log";

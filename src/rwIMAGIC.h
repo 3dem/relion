@@ -63,8 +63,8 @@ struct IMAGIChead
     float oldavd;      // 20      old average
     float densmax;       // 21      maximum
     float densmin;       // 22      minimum
-    //     double sum;       // 23+24  sum of densities
-    //     double squares;    // 25+26  sum of squares
+    //     RFLOAT sum;       // 23+24  sum of densities
+    //     RFLOAT squares;    // 25+26  sum of squares
     float dummy[4];   // 23-26  dummy place holder
     char lastpr[8];      // 27+28     last program writing file
     char name[80];       // 29-48     image name
@@ -118,11 +118,9 @@ int  readIMAGIC(long int img_select)
 
     // Determine byte order and swap bytes if from little-endian machine
     char*   b = (char *) header;
-    //int    swap = 0;
     long int extent = IMAGICSIZE - 916;  // exclude char bytes from swapping
     if ( ( abs(header->nyear) > SWAPTRIG ) || ( header->ixlp > SWAPTRIG ) )
     {
-    	//swap = 1;
         for ( i=0; i<extent; i+=4 )
             if ( i != 56 )          // exclude type string
                 swapbytes(b+i, 4);
@@ -174,26 +172,22 @@ int  readIMAGIC(long int img_select)
         header->densmax = header->avdens + header->sigma;
     }
 
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(double)header->densmin);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(double)header->densmax);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(double)header->avdens);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(double)header->sigma);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(double)1.);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(double)1.);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(double)1.);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(RFLOAT)header->densmin);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->densmax);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->avdens);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->sigma);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)1.);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)1.);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)1.);
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
     offset = 0;   // separate header file
 
-    // unsigned long   Ndim = _nDim, j = 0;
     if (dataflag<0)   // Don't read the individual header and the data if not necessary
     {
     	delete header;
     	return 0;
     }
-
-    // View   view;
-    // char*   hend;
 
    // Get the header information
     int error_fseek;
@@ -256,27 +250,21 @@ void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
     header->nminut = t->tm_min;
     header->nsec = t->tm_sec;
 
-//    long int  imgStart=0;
-//    if (img_select != -1)
-//        imgStart=img_select;
-//    if (mode == WRITE_APPEND)
-//        imgStart=0;
-
     // Convert T to datatype
-    if ( typeid(T) == typeid(double) ||
+    if ( typeid(T) == typeid(RFLOAT) ||
          typeid(T) == typeid(float) ||
          typeid(T) == typeid(int) )
-        strcpy(header->type,"REAL");
+        strncpy(header->type,"REAL",4);
     else if ( typeid(T) == typeid(unsigned char) ||
               typeid(T) == typeid(signed char) )
-        strcpy(header->type,"PACK");
+        strncpy(header->type,"PACK",4);
     else
         REPORT_ERROR("ERROR write IMAGIC image: invalid typeid(T)");
 
     size_t datasize, datasize_n;
     datasize_n = Xdim*Ydim*Zdim;
     datasize = datasize_n * gettypesize(Float);
-    double aux;
+    RFLOAT aux;
 
     if (!MDMainHeader.isEmpty())
     {
@@ -337,7 +325,6 @@ void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
 
     delete header;
 
-    //return(0);
 }
 
 #endif /* RWIMAGIC_H_ */

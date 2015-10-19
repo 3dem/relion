@@ -30,7 +30,7 @@ class mask_create_parameters
 {
 	public:
    	FileName fn_apply_in, fn_mask, fn_apply_out, fn_thr, fn_omask, fn_and, fn_or, fn_andnot, fn_ornot;
-   	double ini_threshold, extend_ini_mask, width_soft_edge;
+   	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge;
 	bool do_invert;
    	IOParser parser;
 
@@ -68,7 +68,7 @@ class mask_create_parameters
 	void run()
 	{
 
-		Image<double> Iin, Iout, Ip;
+		Image<RFLOAT> Iin, Iout, Ip;
 		std:: cout << " Creating a mask ..." << std::endl;
 		Iin.read(fn_thr);
 

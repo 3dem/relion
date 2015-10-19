@@ -14,7 +14,7 @@ void Atom::clear()
     coords.clear();
 }
 
-Matrix1D<double> Atom::getCoordinates()
+Matrix1D<RFLOAT> Atom::getCoordinates()
 {
 	return coords;
 }
@@ -26,7 +26,7 @@ void Residue::clear()
 	atoms.clear();
 }
 
-long int Residue::addAtom(std::string atomname, double x, double y, double z, double occ, double bfac)
+long int Residue::addAtom(std::string atomname, RFLOAT x, RFLOAT y, RFLOAT z, RFLOAT occ, RFLOAT bfac)
 {
 	Atom atom(atomname);
 	atom.coords = vectorR3(x,y,z);
@@ -403,7 +403,7 @@ void Assembly::sortResidues()
 
 }
 
-void Assembly::applyTransformation(Matrix2D<double> &mat, Matrix1D<double> &shift)
+void Assembly::applyTransformation(Matrix2D<RFLOAT> &mat, Matrix1D<RFLOAT> &shift)
 {
 	for (int imol = 0; imol < molecules.size(); imol++)
 	{

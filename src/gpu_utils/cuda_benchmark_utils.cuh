@@ -130,7 +130,7 @@ static void cuda_gpu_toc()
 		cuda_gpu_benchmark_stop_times.clear();
 	}
 }
-#elif defined CUDA_PROFILING_OLD
+#elif defined CUDA_PROFILING
 #include <nvToolsExt.h>
 
 #define CUDA_CPU_TIC(ID) (nvtxRangePush(ID))

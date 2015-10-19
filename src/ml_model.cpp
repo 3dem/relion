@@ -24,12 +24,12 @@ void MlModel::initialise()
 {
 
 	// Auxiliary vector with relevant size in Fourier space
-	MultidimArray<double > aux;
+	MultidimArray<RFLOAT > aux;
     aux.initZeros(ori_size / 2 + 1);
 
 	// Now resize all relevant vectors
     Iref.resize(nr_classes);
-    pdf_class.resize(nr_classes, 1./(double)nr_classes);
+    pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes);
     group_names.resize(nr_groups, "");
     sigma2_noise.resize(nr_groups, aux);
@@ -47,7 +47,7 @@ void MlModel::initialise()
 
 	if (ref_dim==2)
 	{
-		Matrix1D<double> empty(2);
+		Matrix1D<RFLOAT> empty(2);
 		prior_offset_class.resize(nr_classes, empty);
 	}
 	// These arrays will be resized when they are filled
@@ -115,7 +115,7 @@ void MlModel::read(FileName fn_in)
 
 	// Read classes
 	FileName fn_tmp;
-	Image<double> img;
+	Image<RFLOAT> img;
 	MDclass.readStar(in, "model_classes");
 	int iclass = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
@@ -200,8 +200,8 @@ void MlModel::read(FileName fn_in)
 		{
 			MDclass.readStar(in, "model_pdf_orient_class_" + integerToString(iclass + 1));
 			pdf_direction[iclass].clear();
-			double aux;
-			std::vector<double> vaux;
+			RFLOAT aux;
+			std::vector<RFLOAT> vaux;
 			vaux.clear();
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 			{
@@ -239,13 +239,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma;
     FileName fn_tmp, fn_tmp2;
-    double aux;
+    RFLOAT aux;
     std::ofstream  fh;
 
     // A. Write images
     if (ref_dim == 2)
     {
-    	Image<double> img(XSIZE(Iref[0]), YSIZE(Iref[0]), 1, nr_classes);
+    	Image<RFLOAT> img(XSIZE(Iref[0]), YSIZE(Iref[0]), 1, nr_classes);
     	for (int iclass = 0; iclass < nr_classes; iclass++)
     	{
     		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Iref[iclass])
@@ -257,7 +257,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     }
     else
     {
-    	Image<double> img;
+    	Image<RFLOAT> img;
     	// Set correct voxel size in the header
 		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size);
 		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size);
@@ -280,7 +280,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				FileName fn_bild;
 				fn_bild.compose(fn_out+"_class",iclass+1,"", 3);
 				fn_bild += "_angdist.bild";
-				double offset = ori_size * pixel_size / 2.;
+				RFLOAT offset = ori_size * pixel_size / 2.;
 				sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset, offset);
 			}
     	}
@@ -426,7 +426,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 {
 	MetaDataTable MDtau;
-	double val;
+	RFLOAT val;
 	int idx;
 	MDtau.read(fn_tau);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDtau)
@@ -454,13 +454,13 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 	// Set some stuff
 	nr_groups = _mydata.groups.size();
 	ori_size = _ori_size;
-	double avg_norm_correction = 1.;
+	RFLOAT avg_norm_correction = 1.;
 
 	// Data dimensionality
 	_mydata.MDexp.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim);
 
 	// Read references into memory
-	Image<double> img;
+	Image<RFLOAT> img;
 	FileName fn_tmp;
 	if (fn_ref != "None")
 	{
@@ -602,7 +602,7 @@ void MlModel::expandToMovieFrames(Experiment &moviedata, int running_avg_side)
 	// Correct the input sigma2noise spectra by a factor of nframes
 	for (int i=0; i < moviemodel.nr_groups; i++)
 	{
-		moviemodel.sigma2_noise[i] *= (double)nr_frames_in_group[i]/((double)(2 * running_avg_side + 1));
+		moviemodel.sigma2_noise[i] *= (RFLOAT)nr_frames_in_group[i]/((RFLOAT)(2 * running_avg_side + 1));
 	}
 
 	// Now replace the current model with the expanded moviemodel
@@ -621,7 +621,7 @@ void MlModel::initialisePdfDirection(int newsize)
 		if (oldsize == 0 || oldsize != newsize)
 		{
 			pdf_direction[iclass].resize(newsize);
-			pdf_direction[iclass].initConstant(1./((double) nr_classes * newsize));
+			pdf_direction[iclass].initConstant(1./((RFLOAT) nr_classes * newsize));
 		}
 	}
 	nr_directions = newsize;
@@ -639,7 +639,7 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads)
         }
         else
         {
-        	MultidimArray<double> dummy;
+        	MultidimArray<RFLOAT> dummy;
         	PPref[iclass].computeFourierTransformMap(Iref[iclass], dummy, current_size, nr_threads);
         }
     }
@@ -650,23 +650,23 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 {
 
     // Get total number of particles
-	double nr_particles = 0.;
+	RFLOAT nr_particles = 0.;
 	for (int igroup = 0; igroup < nr_particles_group.size(); igroup++)
-		nr_particles += (double)nr_particles_group[igroup];
+		nr_particles += (RFLOAT)nr_particles_group[igroup];
 
 	// Calculate average sigma2_noise over all image groups
-	MultidimArray<double> avg_sigma2_noise;
+	MultidimArray<RFLOAT> avg_sigma2_noise;
 	avg_sigma2_noise.initZeros(sigma2_noise[0]);
 	for (int igroup = 0; igroup < nr_particles_group.size(); igroup++)
 	{
-		avg_sigma2_noise += (double)(nr_particles_group[igroup]) * sigma2_noise[igroup];
+		avg_sigma2_noise += (RFLOAT)(nr_particles_group[igroup]) * sigma2_noise[igroup];
 	}
 	avg_sigma2_noise /= nr_particles;
 
 	// Get the FT of all reference structures
     // The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
     // And spectrum is squared, so ori_size*ori_size in the 3D case!
-	double normfft = (ref_dim == 3 && data_dim == 2) ? (double)(ori_size * ori_size) : 1.;
+	RFLOAT normfft = (ref_dim == 3 && data_dim == 2) ? (RFLOAT)(ori_size * ori_size) : 1.;
 
     for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
@@ -674,7 +674,7 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 		tau2_class[iclass].resize(sigma2_noise[0]);
 
 		// Get the power spectrum of the reference
-		MultidimArray<double> spectrum(sigma2_noise[0]);
+		MultidimArray<RFLOAT> spectrum(sigma2_noise[0]);
 		getSpectrum(Iref[iclass], spectrum, POWER_SPECTRUM);
 
 		// Factor two because of two-dimensionality of the complex plane
@@ -696,12 +696,12 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 		fsc_halves_class[iclass].initZeros(sigma2_noise[0]);
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
 		{
-			double evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);
+			RFLOAT evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);
 			// empirical accounting for ratio of pixels in 3D shells compared to 2D shells
 			if (ref_dim == 3 && i > 0)
-				evidence /= (2. * (double)i);
-			double prior = 1. /  DIRECT_A1D_ELEM(tau2_class[iclass], i);
-			double myssnr = evidence / prior;
+				evidence /= (2. * (RFLOAT)i);
+			RFLOAT prior = 1. /  DIRECT_A1D_ELEM(tau2_class[iclass], i);
+			RFLOAT myssnr = evidence / prior;
 			DIRECT_A1D_ELEM(data_vs_prior_class[iclass], i ) = myssnr;
 			// Also initialise FSC-halves here (...)
 			//DIRECT_A1D_ELEM(fsc_halves_class[iclass], i ) = myssnr / (myssnr + 1);
@@ -744,7 +744,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
     orientability_contrib.clear();
 
 
-    MultidimArray<double> aux(ori_size / 2 + 1);
+    MultidimArray<RFLOAT> aux(ori_size / 2 + 1);
     wsum_signal_product_spectra.resize(nr_groups, aux);
     wsum_reference_power_spectra.resize(nr_groups, aux);
 
@@ -797,7 +797,7 @@ void MlWsumModel::initZeros()
 #define MAX_PACK_SIZE 671010000
 #endif
 
-void MlWsumModel::pack(MultidimArray<double> &packed)
+void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 {
 	// for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
 	long long int packed_size = 0;
@@ -901,7 +901,7 @@ void MlWsumModel::pack(MultidimArray<double> &packed)
     }
 
 }
-void MlWsumModel::unpack(MultidimArray<double> &packed)
+void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
 {
     int spectral_size = (ori_size / 2) + 1;
 
@@ -973,7 +973,7 @@ void MlWsumModel::unpack(MultidimArray<double> &packed)
 }
 
 
-void MlWsumModel::pack(MultidimArray<double> &packed, int &piece, int &nr_pieces, bool do_clear)
+void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces, bool do_clear)
 {
 
 
@@ -1013,7 +1013,7 @@ void MlWsumModel::pack(MultidimArray<double> &packed, int &piece, int &nr_pieces
     {
         idx_start = piece * MAX_PACK_SIZE;
         idx_stop = XMIPP_MIN(idx_start + MAX_PACK_SIZE, packed_size);
-        nr_pieces = CEIL((double)packed_size/(double)MAX_PACK_SIZE);
+        nr_pieces = CEIL((RFLOAT)packed_size/(RFLOAT)MAX_PACK_SIZE);
     }
     else
     {
@@ -1140,7 +1140,7 @@ void MlWsumModel::pack(MultidimArray<double> &packed, int &piece, int &nr_pieces
 
 }
 
-void MlWsumModel::unpack(MultidimArray<double> &packed, int piece, bool do_clear)
+void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear)
 {
 
 

@@ -1,0 +1,49 @@
+#Downloaded Healpix_2.15a from http://sourceforge.net/projects/healpix/?showfeed=everything
+#Extracted tarball in: ~/app/Healpix_2.15a
+#Then copied relevant parts of it:
+
+cd $ELMOHOME/external/Healpix_2.15a/
+cp -r ~/app/Healpix_2.15a/src/cxx/cxxsupport .
+cp -r ~/app/Healpix_2.15a/src/cxx/Healpix_cxx .
+cp -r ~/app/Healpix_2.15a/src/cxx/libfftpack .
+
+# Then changed all the header to simplify my Makefile.am:
+./change_includes.csh
+WHICH IS:
+#!/bin/csh -f
+foreach pat (*/*.h)
+  set head=`echo $pat | awk -F"/" '{print $NF}'`
+  echo $pat
+  foreach cfile (*/*.h */*.cc)
+    sed "s|${head}|external/Healpix_2.15a/${pat}|" <${cfile} > t;
+    mv -f t ${cfile}
+  end
+end
+
+# Then move xyf2nest,  nest2xyf, xyf2ring and ring2xyf in 
+# Healpix_cxx/healpix_base.h from protected to public
+
+
+# Then added header and sources to the Makefile.am:
+# remove stuff to do with fits
+cd $ELMOHOME
+ls external/Healpix_2.15a/*/*.h |awk '{print $NF, "\\"}' |grep -v "fits" |grep -v "simparam"
+ls external/Healpix_2.15a/*/*.cc |awk '{print $NF, "\\"}' |grep -v "fits" |grep -v "simparam"
+
+#not fitshandle
+
+
+
+# In the end only keep minimum of the library and store all in this directory:
+arr.h  
+cxxutils.cc  
+cxxutils.h  
+datatypes.h  
+geom_utils.h  
+healpix_base.cc  
+healpix_base.h  
+lsconstants.h  
+message_error.h  
+openmp_support.h  
+pointing.h  
+vec3.h

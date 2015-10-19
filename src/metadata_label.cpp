@@ -70,7 +70,7 @@ void EMDL::printDefinitions(std::ostream& out)
 		else if (EMDL::isBool(names[strIt->first]))
 			out << " (bool)   ";
 		else if (EMDL::isDouble(names[strIt->first]))
-			out << " (double) ";
+			out << " (RFLOAT) ";
 		else if (EMDL::isString(names[strIt->first]))
 			out << " (string) ";
 		else

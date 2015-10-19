@@ -90,6 +90,7 @@ class MlOptimiser
 {
 public:
 
+	// For GPU-acceleration
 	std::vector<void*> cudaMlOptimisers;
 
 	// I/O Parser
@@ -123,7 +124,7 @@ public:
 	bool fix_tau;
 
     // some parameters for debugging
-	double debug1, debug2;
+	RFLOAT debug1, debug2;
 
 	// Starting and finishing particles (for parallelisation)
     long int my_first_ori_particle_id, my_last_ori_particle_id;
@@ -135,7 +136,7 @@ public:
 	bool do_split_random_halves;
 
 	// resolution (in Angstrom) to join the two random halves
-	double low_resol_join_halves;
+	RFLOAT low_resol_join_halves;
 
 	// Flag to join random halves again
 	bool do_join_random_halves;
@@ -177,7 +178,7 @@ public:
 	int nr_iter_wo_resol_gain;
 
 	// Best resolution obtained thus far
-	double best_resol_thus_far;
+	RFLOAT best_resol_thus_far;
 
 	// Is the FSC still high at the resolution limit?
 	bool has_high_fsc_at_limit;
@@ -189,22 +190,22 @@ public:
 	int autosampling_hporder_local_searches;
 
 	// Smallest changes thus far in the optimal translational offsets, orientations and classes
-	double smallest_changes_optimal_offsets;
-	double smallest_changes_optimal_orientations;
+	RFLOAT smallest_changes_optimal_offsets;
+	RFLOAT smallest_changes_optimal_orientations;
 	int smallest_changes_optimal_classes;
 
 	// Number of iterations without a decrease in OffsetChanges
 	int nr_iter_wo_large_hidden_variable_changes;
 
 	// Strict high-res limit in the expectation step
-	double strict_highres_exp;
+	RFLOAT strict_highres_exp;
 
 	// Flag to indicate to estimate angular accuracy until current_size (and not coarse_size) when restricting high-res limit in the expectation step
 	// This is used for testing purposes only
 	bool do_acc_currentsize_despite_highres_exp;
 
 	// Global parameters to store accuracy on rot and trans
-	double acc_rot, acc_trans;
+	RFLOAT acc_rot, acc_trans;
 
 	// Flag to indicate to use all data out to Nyquist
 	bool do_use_all_data;
@@ -228,7 +229,7 @@ public:
 	int max_coarse_size;
 
 	// Particle diameter (in Ang)
-	double particle_diameter;
+	RFLOAT particle_diameter;
 
 	// How many fourier shells should be included beyond the highest shell where evidenceVsPriorRatio < 1?
 	int incr_size;
@@ -253,8 +254,8 @@ public:
 	int nr_pool;
 
 	// Available memory (in Gigabyte)
-	double available_memory;
-	double available_gpu_memory;
+	RFLOAT available_memory;
+	RFLOAT available_gpu_memory;
 
 	// Perform combination of weight through files written on disc
 	bool combine_weights_thru_disc;
@@ -262,14 +263,17 @@ public:
 	// Only print metadata label definitions and exit
 	bool do_print_metadata_labels;
 
-    // Use parallel access to disc?
-    bool do_parallel_disc_io;
+	// Use parallel access to disc?
+	bool do_parallel_disc_io;
 
-    // Use gpu resources?
-    bool do_gpu;
+	// Use gpu resources?
+	bool do_gpu;
 
-    // Which GPU devices to use?
-    std::string gpu_ids;
+	// Which GPU devices to use?
+	std::string gpu_ids;
+
+	// Or preread all images into RAM on the master node?
+	bool do_preread_images;
 
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
@@ -293,7 +297,7 @@ public:
 	 * The closer to one, the more orientations will be oversampled
 	 * The default is 0.999.
 	 */
-	double adaptive_fraction;
+	RFLOAT adaptive_fraction;
 
 	// Seed for random number generator
 	int random_seed;
@@ -316,7 +320,7 @@ public:
 	bool do_always_cc;
 
 	// Initial low-pass filter for all references (in digital frequency)
-	double ini_high;
+	RFLOAT ini_high;
 
 	// Flag whether to generate seeds
 	// TODO: implement!
@@ -361,7 +365,7 @@ public:
 	FileName fn_sigma;
 
 	// Multiplicative fdge factor for the sigma estimates
-	double sigma2_fudge;
+	RFLOAT sigma2_fudge;
 
 	// Perform two reconstructions of random halves sequentially (to save memory for very big cases)
 	bool do_sequential_halves_recons;
@@ -374,16 +378,16 @@ public:
 	/////////// Keep track of hidden variable changes ////////////////////////
 
 	// Changes from one iteration to the next in the angles
-	double current_changes_optimal_orientations, sum_changes_optimal_orientations;
+	RFLOAT current_changes_optimal_orientations, sum_changes_optimal_orientations;
 
 	// Changes from one iteration to the next in the translations
-	double current_changes_optimal_offsets, sum_changes_optimal_offsets;
+	RFLOAT current_changes_optimal_offsets, sum_changes_optimal_offsets;
 
 	// Changes from one iteration to the next in the class assignments
-	double current_changes_optimal_classes, sum_changes_optimal_classes;
+	RFLOAT current_changes_optimal_classes, sum_changes_optimal_classes;
 
 	// Just count how often the optimal changes are summed
-	double sum_changes_count;
+	RFLOAT sum_changes_count;
 
 	/////////// Some internal stuff ////////////////////////
 
@@ -404,7 +408,7 @@ public:
 	int nr_threads;
 
 	long int exp_my_first_ori_particle, exp_my_last_ori_particle;
-	MultidimArray<double> exp_metadata, exp_imagedata;
+	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	int exp_nr_images;
 
@@ -416,25 +420,25 @@ public:
 	/// Taken from getAllSquaredDifferences
 	/*
 	std::vector<MultidimArray<Complex > > exp_Fimgs, exp_Fimgs_nomask, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<double> > exp_Fctfs, exp_local_Fctfs, exp_local_Minvsigma2s;
-	Matrix2D<double> exp_R_mic;
+	std::vector<MultidimArray<RFLOAT> > exp_Fctfs, exp_local_Fctfs, exp_local_Minvsigma2s;
+	Matrix2D<RFLOAT> exp_R_mic;
 	int exp_iseries, exp_iclass, exp_ipass, exp_iimage, exp_ipart, exp_current_image_size, exp_current_oversampling, exp_nr_ori_particles, exp_nr_particles, exp_nr_images;
 	long int exp_nr_oversampled_rot, exp_nr_oversampled_trans, exp_nr_rot, exp_nr_dir, exp_nr_psi, exp_nr_trans;
 	long int exp_part_id, exp_my_first_ori_particle, exp_my_last_ori_particle
 	std::vector<int> exp_starting_image_no;
 	std::vector<long int> exp_ipart_to_part_id, exp_ipart_to_ori_part_id, exp_ipart_to_ori_part_nframe, exp_iimg_to_ipart;
-	std::vector<double> exp_highres_Xi2_imgs, exp_min_diff2, exp_local_sqrtXi2, exp_local_oldcc;
-	MultidimArray<double> exp_Mweight;
+	std::vector<RFLOAT> exp_highres_Xi2_imgs, exp_min_diff2, exp_local_sqrtXi2, exp_local_oldcc;
+	MultidimArray<RFLOAT> exp_Mweight;
 	MultidimArray<bool> exp_Mcoarse_significant;
 	// And from storeWeightedSums
-	std::vector<double> exp_sum_weight, exp_significant_weight, exp_max_weight;
-	std::vector<Matrix1D<double> > exp_old_offset, exp_prior;
-	std::vector<double> exp_wsum_norm_correction;
-	std::vector<MultidimArray<double> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA, exp_power_imgs;
-	double exp_thisparticle_sumweight;
+	std::vector<RFLOAT> exp_sum_weight, exp_significant_weight, exp_max_weight;
+	std::vector<Matrix1D<RFLOAT> > exp_old_offset, exp_prior;
+	std::vector<RFLOAT> exp_wsum_norm_correction;
+	std::vector<MultidimArray<RFLOAT> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA, exp_power_imgs;
+	RFLOAT exp_thisparticle_sumweight;
 	*/
 	//TMP DEBUGGING
-	MultidimArray<double> DEBUGGING_COPY_exp_Mweight;
+	MultidimArray<RFLOAT> DEBUGGING_COPY_exp_Mweight;
 
 #ifdef TIMING
     Timer timer;
@@ -542,11 +546,12 @@ public:
 		random_seed(0),
 		do_gpu(0)
 	{};
-    /** ========================== I/O operations  =========================== */
-	/// Print help message
-    void usage();
 
-    /// Interpret command line
+	/** ========================== I/O operations  =========================== */
+	/// Print help message
+	void usage();
+
+	/// Interpret command line
 	void read(int argc, char **argv, int rank = 0);
 
 	/// Interpret command line for the initial start of a run
@@ -575,13 +580,13 @@ public:
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat
 	 */
-	void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<double> &Mavg, bool myverb = true);
+	void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb = true);
 
 	/** Use the sum of the individual power spectra to calculate their average and set this in sigma2_noise
 	 * Also subtract the power spectrum of the average images,
 	 * and if (do_average_unaligned) then also set Mavg to all Iref
 	 */
-	void setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<double> &Mavg);
+	void setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT> &Mavg);
 
 	/* Perform an initial low-pass filtering of the references
 	 * Note that because of the MAP estimation, this is not necessary inside the refinement
@@ -658,23 +663,23 @@ public:
 	 */
 	void calculateRunningAveragesOfMovieFrames(long int my_ori_particle,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs,
-		std::vector<MultidimArray<double> > &exp_power_imgs,
-		std::vector<double> &exp_highres_Xi2_imgs);
+		std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
+		std::vector<RFLOAT> &exp_highres_Xi2_imgs);
 
 	/* Read image and its metadata from disc (threaded over all pooled particles)
 	 */
 	void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
-			std::vector<Matrix1D<double> > &exp_old_offset,
-			std::vector<Matrix1D<double> > &exp_prior,
-			std::vector<MultidimArray<double> > &exp_power_imgs,
-			std::vector<double> &exp_highres_Xi2_imgs,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
+			std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
+			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
-			std::vector<double> &exp_directions_prior,
-			std::vector<double> &exp_psi_prior);
+			std::vector<RFLOAT> &exp_directions_prior,
+			std::vector<RFLOAT> &exp_psi_prior);
 
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
@@ -684,12 +689,12 @@ public:
 			int exp_itrans_min, int exp_itrans_max,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
+			std::vector<RFLOAT> &exp_local_sqrtXi2,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
 	bool isSignificantAnyParticleAnyTranslation(long int iorient,
@@ -700,18 +705,18 @@ public:
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<double> &exp_min_diff2,
-			std::vector<double> &exp_highres_Xi2_imgs,
+			std::vector<RFLOAT> &exp_min_diff2,
+			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
-			MultidimArray<double> &exp_Mweight,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
-			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
+			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
+			std::vector<RFLOAT> &exp_local_sqrtXi2);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
@@ -719,38 +724,38 @@ public:
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			MultidimArray<double> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<double> &exp_significant_weight, std::vector<double> &exp_sum_weight,
-			std::vector<Matrix1D<double> > &exp_old_offset, std::vector<Matrix1D<double> > &exp_prior,
-			std::vector<double> &exp_min_diff2,
+			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
+			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			std::vector<RFLOAT> &exp_min_diff2,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
-			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior);
+			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
 	// Store all relevant weighted sums, also return optimal hidden variables, max_weight and dLL
 	void storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<double> &exp_min_diff2,
-			std::vector<double> &exp_highres_Xi2_imgs,
+			std::vector<RFLOAT> &exp_min_diff2,
+			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<double> > &exp_Fctfs,
-			std::vector<MultidimArray<double> > &exp_power_imgs,
-			std::vector<Matrix1D<double> > &exp_old_offset,
-			std::vector<Matrix1D<double> > &exp_prior,
-			MultidimArray<double> &exp_Mweight,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+			std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
+			std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<double> &exp_significant_weight,
-			std::vector<double> &exp_sum_weight,
-			std::vector<double> &exp_max_weight,
+			std::vector<RFLOAT> &exp_significant_weight,
+			std::vector<RFLOAT> &exp_sum_weight,
+			std::vector<RFLOAT> &exp_max_weight,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
-			std::vector<double> &exp_directions_prior, std::vector<double> &exp_psi_prior,
+			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<double> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<double> > &exp_local_Fctfs,
-			std::vector<double> &exp_local_sqrtXi2);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
+			std::vector<RFLOAT> &exp_local_sqrtXi2);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
 	void monitorHiddenVariableChanges(long int my_first_ori_particle, long int my_last_ori_particle);

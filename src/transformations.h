@@ -71,7 +71,7 @@
  *  rotation2DMatrix(60,m);
  * @endcode
  */
-void rotation2DMatrix(double ang, Matrix2D< double > &m, bool homogeneous=true);
+void rotation2DMatrix(RFLOAT ang, Matrix2D< RFLOAT > &m, bool homogeneous=true);
 
 /** Creates a translational matrix (3x3) for images
  * @ingroup GeometricalTransformations
@@ -84,7 +84,7 @@ void rotation2DMatrix(double ang, Matrix2D< double > &m, bool homogeneous=true);
  * m = translation2DMatrix(vectorR2(1, 0));
  * @endcode
  */
-void translation2DMatrix(const Matrix1D< double > &v, Matrix2D< double > &m);
+void translation2DMatrix(const Matrix1D< RFLOAT > &v, Matrix2D< RFLOAT > &m);
 
 /** Creates a rotational matrix (4x4) for volumes around system axis
  * @ingroup GeometricalTransformations
@@ -118,7 +118,7 @@ void translation2DMatrix(const Matrix1D< double > &v, Matrix2D< double > &m);
  * m = rotation3DMatrix(60, 'X');
  * @endcode
  */
-void rotation3DMatrix(double ang, char axis, Matrix2D< double > &m,
+void rotation3DMatrix(RFLOAT ang, char axis, Matrix2D< RFLOAT > &m,
 		bool homogeneous=true);
 
 /** Creates a rotational matrix (4x4) for volumes around any axis
@@ -132,7 +132,7 @@ void rotation3DMatrix(double ang, char axis, Matrix2D< double > &m,
  * m = rotation3DMatrix(60, vectorR3(1, 1, 1));
  * @endcode
  */
-void rotation3DMatrix(double ang, const Matrix1D< double >& axis, Matrix2D< double > &m,
+void rotation3DMatrix(RFLOAT ang, const Matrix1D< RFLOAT >& axis, Matrix2D< RFLOAT > &m,
 		bool homogeneous=true);
 
 /** Matrix which transforms the given axis into Z
@@ -143,14 +143,14 @@ void rotation3DMatrix(double ang, const Matrix1D< double >& axis, Matrix2D< doub
  * order to produce rotational matrices, for instance, around any axis.
  *
  * @code
- * Matrix2D< double > A = alignWithZ(axis);
+ * Matrix2D< RFLOAT > A = alignWithZ(axis);
  * return A.transpose() * rotation3DMatrix(ang, 'Z') * A;
  * @endcode
  *
  * The returned matrix is such that A*axis=Z, where Z and axis are column
  * vectors.
  */
-void alignWithZ(const Matrix1D< double >& axis, Matrix2D< double > &m, bool homogeneous=true);
+void alignWithZ(const Matrix1D< RFLOAT >& axis, Matrix2D< RFLOAT > &m, bool homogeneous=true);
 
 /** Creates a translational matrix (4x4) for volumes
  * @ingroup GeometricalTransformations
@@ -163,7 +163,7 @@ void alignWithZ(const Matrix1D< double >& axis, Matrix2D< double > &m, bool homo
  * m = translation3DMatrix(vectorR3(0, 0, 2));
  * @endcode
  */
-void translation3DMatrix(const Matrix1D< double >& v, Matrix2D< double > &m);
+void translation3DMatrix(const Matrix1D< RFLOAT >& v, Matrix2D< RFLOAT > &m);
 
 /** Creates a scaling matrix (4x4) for volumes
  * @ingroup GeometricalTransformations
@@ -171,13 +171,13 @@ void translation3DMatrix(const Matrix1D< double >& v, Matrix2D< double > &m);
  * The scaling factors for the different axis must be given as a vector. So
  * that, XX(sc)=scale for X axis, YY(sc)=...
  */
-void scale3DMatrix(const Matrix1D< double >& sc, Matrix2D< double > &m,
+void scale3DMatrix(const Matrix1D< RFLOAT >& sc, Matrix2D< RFLOAT > &m,
 		bool homogeneous=true);
 
 /** Applies a geometrical transformation.
  * @ingroup GeometricalTransformations
  *
- * Any geometrical transformation defined by the matrix A (double (4x4)!!
+ * Any geometrical transformation defined by the matrix A (RFLOAT (4x4)!!
  * ie, in homogeneous R3 coordinates) is applied to the volume V1.
  * The result is stored in V2 (it cannot be the same as the input volume).
  * An exception is thrown if the transformation matrix is not 4x4.
@@ -242,7 +242,7 @@ void scale3DMatrix(const Matrix1D< double >& sc, Matrix2D< double > &m,
  * Although you can also use the constants IS_INV, or WRAP.
  *
  * @code
- * Matrix2D< double > A(4,4);
+ * Matrix2D< RFLOAT > A(4,4);
  * A.initIdentity;
  * applyGeometry(V2, A, V1);
  * @endcode
@@ -250,7 +250,7 @@ void scale3DMatrix(const Matrix1D< double >& sc, Matrix2D< double > &m,
 template<typename T>
 void applyGeometry(const MultidimArray<T>& V1,
                    MultidimArray<T>& V2,
-                   const Matrix2D< double > A,
+                   const Matrix2D< RFLOAT > A,
                    bool inv,
                    bool wrap,
                    T outside = 0)
@@ -277,14 +277,14 @@ void applyGeometry(const MultidimArray<T>& V1,
         return;
     }
 
-    Matrix2D<double> Ainv;
-    const Matrix2D<double> * Aptr=&A;
+    Matrix2D<RFLOAT> Ainv;
+    const Matrix2D<RFLOAT> * Aptr=&A;
     if (!inv)
     {
         Ainv = A.inv();
         Aptr=&Ainv;
     }
-    const Matrix2D<double> &Aref=*Aptr;
+    const Matrix2D<RFLOAT> &Aref=*Aptr;
 
     // For scalings the output matrix is resized outside to the final
     // size instead of being resized inside the routine with the
@@ -297,10 +297,10 @@ void applyGeometry(const MultidimArray<T>& V1,
         // 2D transformation
 
         int m1, n1, m2, n2;
-        double x, y, xp, yp;
-        double minxp, minyp, maxxp, maxyp;
+        RFLOAT x, y, xp, yp;
+        RFLOAT minxp, minyp, maxxp, maxyp;
         int cen_x, cen_y, cen_xp, cen_yp;
-        double wx, wy;
+        RFLOAT wx, wy;
         int Xdim, Ydim;
 
         // Find center and limits of image
@@ -455,10 +455,10 @@ void applyGeometry(const MultidimArray<T>& V1,
         // 3D transformation
 
         int m1, n1, o1, m2, n2, o2;
-        double x, y, z, xp, yp, zp;
-        double minxp, minyp, maxxp, maxyp, minzp, maxzp;
+        RFLOAT x, y, z, xp, yp, zp;
+        RFLOAT minxp, minyp, maxxp, maxyp, minzp, maxzp;
         int cen_x, cen_y, cen_z, cen_xp, cen_yp, cen_zp;
-        double wx, wy, wz;
+        RFLOAT wx, wy, wz;
 
         // Find center of MultidimArray
         cen_z = (int)(V2.zdim / 2);
@@ -675,7 +675,7 @@ void applyGeometry(const MultidimArray<T>& V1,
  */
 template<typename T>
 void selfApplyGeometry(MultidimArray<T>& V1,
-                       const Matrix2D< double > A, bool inv,
+                       const Matrix2D< RFLOAT > A, bool inv,
                        bool wrap, T outside = 0)
 {
     MultidimArray<T> aux = V1;
@@ -697,10 +697,10 @@ void selfApplyGeometry(MultidimArray<T>& V1,
 template<typename T>
 void rotate(const MultidimArray<T>& V1,
             MultidimArray<T>& V2,
-            double ang, char axis = 'Z',
+            RFLOAT ang, char axis = 'Z',
             bool wrap = DONT_WRAP, T outside = 0)
 {
-    Matrix2D< double > tmp;
+    Matrix2D< RFLOAT > tmp;
     if (V1.getDim()==2)
     {
         rotation2DMatrix(ang,tmp);
@@ -722,7 +722,7 @@ void rotate(const MultidimArray<T>& V1,
  */
 template<typename T>
 void selfRotate(MultidimArray<T>& V1,
-                double ang, char axis = 'Z',
+                RFLOAT ang, char axis = 'Z',
                 bool wrap = DONT_WRAP, T outside = 0)
 {
     MultidimArray<T> aux = V1;
@@ -743,10 +743,10 @@ void selfRotate(MultidimArray<T>& V1,
 template<typename T>
 void translate(const MultidimArray<T> &V1,
                MultidimArray<T> &V2,
-               const Matrix1D< double >& v,
+               const Matrix1D< RFLOAT >& v,
                bool wrap = WRAP, T outside = 0)
 {
-    Matrix2D< double > tmp;
+    Matrix2D< RFLOAT > tmp;
     if (V1.getDim()==2)
         translation2DMatrix(v, tmp);
     else if (V1.getDim()==3)
@@ -764,7 +764,7 @@ void translate(const MultidimArray<T> &V1,
  */
 template<typename T>
 void selfTranslate(MultidimArray<T>& V1,
-                   const Matrix1D< double >& v,
+                   const Matrix1D< RFLOAT >& v,
                    bool wrap = WRAP, T outside = 0)
 {
     MultidimArray<T> aux = V1;
@@ -784,10 +784,10 @@ void translateCenterOfMassToCenter(const MultidimArray<T> &V1,
 {
     V2 = V1;
     V2.setXmippOrigin();
-    Matrix1D< double > center;
+    Matrix1D< RFLOAT > center;
     V2.centerOfMass(center);
     center *= -1;
-    translate(V1, V2, center, wrap, 0.);
+    translate(V1, V2, center, wrap, (RFLOAT)0.);
 }
 
 /** Translate center of mass to center
@@ -820,20 +820,20 @@ void scaleToSize(const MultidimArray<T> &V1,
                  int Xdim, int Ydim, int Zdim = 1)
 {
 
-    Matrix2D< double > tmp;
+    Matrix2D< RFLOAT > tmp;
     if (V1.getDim()==2)
     {
         tmp.initIdentity(3);
-        tmp(0, 0) = (double) Xdim / (double) XSIZE(V1);
-        tmp(1, 1) = (double) Ydim / (double) YSIZE(V1);
+        tmp(0, 0) = (RFLOAT) Xdim / (RFLOAT) XSIZE(V1);
+        tmp(1, 1) = (RFLOAT) Ydim / (RFLOAT) YSIZE(V1);
         V2.resize(1, 1, Ydim, Xdim);
     }
     else if (V1.getDim()==3)
     {
         tmp.initIdentity(4);
-        tmp(0, 0) = (double) Xdim / (double) XSIZE(V1);
-        tmp(1, 1) = (double) Ydim / (double) YSIZE(V1);
-        tmp(2, 2) = (double) Zdim / (double) ZSIZE(V1);
+        tmp(0, 0) = (RFLOAT) Xdim / (RFLOAT) XSIZE(V1);
+        tmp(1, 1) = (RFLOAT) Ydim / (RFLOAT) YSIZE(V1);
+        tmp(2, 2) = (RFLOAT) Zdim / (RFLOAT) ZSIZE(V1);
         V2.resize(1, Zdim, Ydim, Xdim);
     }
     else
@@ -882,7 +882,7 @@ void radialAverage(const MultidimArray< T >& m,
                    MultidimArray< int >& radial_count,
                    const bool& rounding = false)
 {
-    Matrix1D< double > idx(3);
+    Matrix1D< RFLOAT > idx(3);
 
     // If center_of_rot was written for 2D image
     if (center_of_rot.size() < 3)
@@ -892,9 +892,9 @@ void radialAverage(const MultidimArray< T >& m,
     // dimension of the radial average vector
     MultidimArray< int > distances(8);
 
-    double z = STARTINGZ(m) - ZZ(center_of_rot);
-    double y = STARTINGY(m) - YY(center_of_rot);
-    double x = STARTINGX(m) - XX(center_of_rot);
+    RFLOAT z = STARTINGZ(m) - ZZ(center_of_rot);
+    RFLOAT y = STARTINGY(m) - YY(center_of_rot);
+    RFLOAT x = STARTINGX(m) - XX(center_of_rot);
 
     distances(0) = (int) floor(sqrt(x * x + y * y + z * z));
     x = FINISHINGX(m) - XX(center_of_rot);

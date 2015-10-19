@@ -30,13 +30,13 @@ public:
 
 	void setup(
 			HealpixSampling &sampling,
-			std::vector<double> &directions_prior,
-			std::vector<double> &psi_prior,
+			std::vector<RFLOAT> &directions_prior,
+			std::vector<RFLOAT> &psi_prior,
 			std::vector<int> &pointer_dir_nonzeroprior,
 			std::vector<int> &pointer_psi_nonzeroprior,
 			MultidimArray<bool> *Mcoarse_significant,
-			std::vector<double > &pdf_class,
-			std::vector<MultidimArray<double> > &pdf_direction,
+			std::vector<RFLOAT > &pdf_class,
+			std::vector<MultidimArray<RFLOAT> > &pdf_direction,
 			unsigned long nr_dir,
 			unsigned long nr_psi,
 			unsigned long nr_oversampled_rot,

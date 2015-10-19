@@ -153,13 +153,13 @@ int  readSPIDER(long int img_select)
     offset = (int) header->labbyt;
     DataType datatype  = Float;
 
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(double)header->fmin);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(double)header->fmax);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(double)header->av);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(double)header->sig);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(double)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(double)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(double)header->scale);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(RFLOAT)header->fmin);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->fmax);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->av);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->sig);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)header->scale);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)header->scale);
+    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->scale);
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
     bool isStack = ( header->istack > 0 );
@@ -202,18 +202,7 @@ int  readSPIDER(long int img_select)
     	return 0;
     }
 
-//    size_t header_size = offset;
-//    size_t image_size  = header_size + ZYXSIZE(data)*sizeof(float);
     size_t pad         = 0;
-//    long int imgStart=0;
-//    long int imgEnd =_nDim;
-//    if (img_select != -1)
-//    {
-//        imgStart=img_select;
-//        imgEnd=img_select+1;
-//    }
-
-//    char*   hend;
 
     std::stringstream Num;
     std::stringstream Num2;
@@ -294,12 +283,6 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
     header->nrow   = Ydim;
     header->nslice = Zdim;
 
-//    long int  imgStart=0;
-//    if (select_img != -1)
-//        imgStart=select_img;
-//    if (mode == WRITE_APPEND)
-//        imgStart=0;
-
 #ifdef DEBUG
     printf("DEBUG writeSPIDER: Size: %g %g %g\n", header->nsam, header->nrow, header->nslice);
 #endif
@@ -308,8 +291,7 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
     	header->iform = 1;     // 2D image
     else
     	header->iform = 3;     // 3D volume
-    double aux;
-//    bool baux;
+    RFLOAT aux;
     header->imami = 0;//never trust max/min
 
     if (!MDMainHeader.isEmpty())
@@ -404,12 +386,6 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
         // SJORS 30Oct12: I am completely unsure whether the code below will actually work....
         // Let's just rais an error an go out...
         REPORT_ERROR("writeSPIDER append/replace writing of SPIDER stacks not implemented yet....");
-        //for ( size_t i=0; i<Ndim; i++ )
-//        size_t i =imgStart;
-//        //do not need to unlock because we are in the overwrite case
-//        fwrite( header, offset, 1, fimg );
-//        castPage2Datatype(MULTIDIM_ARRAY(data) + i*datasize_n, fdata, Float, datasize_n);
-//        fwrite( fdata, datasize, 1, fimg );
     }
     //I guess I do not need to unlock since we are going to close the file
     fl.l_type   = F_UNLCK;

@@ -85,8 +85,8 @@ void CTF::read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID)
 
 	initialise();
 }
-void CTF::setValues(double _defU, double _defV, double _defAng, double _voltage,
-		double _Cs, double _Q0, double _Bfac, double _scale)
+void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
+		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale)
 {
 	kV              = _voltage;
 	DeltafU         = _defU;
@@ -138,8 +138,8 @@ void CTF::initialise()
 {
 
 	// Change units
-    double local_Cs = Cs * 1e7;
-    double local_kV = kV * 1e3;
+    RFLOAT local_Cs = Cs * 1e7;
+    RFLOAT local_kV = kV * 1e3;
     rad_azimuth = DEG2RAD(azimuthal_angle);
 
     // Average focus and deviation
@@ -171,31 +171,31 @@ void CTF::initialise()
 }
 
 /* Generate a complete CTF Image ------------------------------------------------------ */
-void CTF::getFftwImage(MultidimArray<double> &result, int orixdim, int oriydim, double angpix,
+void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
 		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
 {
 
-	double xs = (double)orixdim * angpix;
-	double ys = (double)oriydim * angpix;
+	RFLOAT xs = (RFLOAT)orixdim * angpix;
+	RFLOAT ys = (RFLOAT)oriydim * angpix;
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
-		double x = (double)jp / xs;
-		double y = (double)ip / ys;
+		RFLOAT x = (RFLOAT)jp / xs;
+		RFLOAT y = (RFLOAT)ip / ys;
 		DIRECT_A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
 	}
 }
 
-void CTF::getCenteredImage(MultidimArray<double> &result, double Tm,
+void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
 		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
 {
 	result.setXmippOrigin();
-	double xs = (double)XSIZE(result) * Tm;
-	double ys = (double)YSIZE(result) * Tm;
+	RFLOAT xs = (RFLOAT)XSIZE(result) * Tm;
+	RFLOAT ys = (RFLOAT)YSIZE(result) * Tm;
 
 	FOR_ALL_ELEMENTS_IN_ARRAY2D(result)
 	{
-		double x = (double)j / xs;
-		double y = (double)i / ys;
+		RFLOAT x = (RFLOAT)j / xs;
+		RFLOAT y = (RFLOAT)i / ys;
 		A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
 	}
 

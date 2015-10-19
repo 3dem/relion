@@ -55,7 +55,7 @@ void PreprocessingMpi::runExtractParticles()
 		barstep = XMIPP_MAX(1, my_nr_coords / 60);
 
 		// Make a Particles directory
-		system("mkdir -p Particles");
+		int res = system("mkdir -p Particles");
 	}
 
 	FileName fn_olddir = "";
@@ -65,7 +65,7 @@ void PreprocessingMpi::runExtractParticles()
 		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
-			system(("mkdir -p " + fn_dir).c_str());
+			int res = system(("mkdir -p " + fn_dir).c_str());
 			fn_olddir = fn_dir;
 		}
 

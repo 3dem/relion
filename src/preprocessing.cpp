@@ -45,12 +45,14 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	movie_last_frame = textToInteger(parser.getOption("--last_movie_frame", "Extract until this movie frame (default=all movie frames)", "0"));
 	movie_last_frame--; // (start counting at 0, not 1)
 	fn_movie = parser.getOption("--movie_rootname", "Common name to relate movies to the single micrographs (e.g. mic001_movie.mrcs related to mic001.mrc)", "movie");
+	do_skip_ctf_logfiles = parser.checkOption("--skip_ctf_logs", "Do not harvest information from CTFFIND logfiles?");
 
 	int perpart_section = parser.addSection("Particle operations");
 	do_project_3d = parser.checkOption("--project3d", "Project sub-tomograms along Z to generate 2D particles");
 	scale  = textToInteger(parser.getOption("--scale", "Re-scale the particles to this size (in pixels)", "-1"));
 	window  = textToInteger(parser.getOption("--window", "Re-window the particles to this size (in pixels)", "-1"));
 	do_normalise = parser.checkOption("--norm", "Normalise the background to average zero and stddev one");
+	do_ramp = !parser.checkOption("--no_ramp", "Just subtract the background mean in the normalisation, instead of subtracting a fitted ramping background. ");
 	bg_radius = textToInteger(parser.getOption("--bg_radius", "Radius of the circular mask that will be used to define the background area (in pixels)", "-1"));
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
@@ -175,8 +177,8 @@ void Preprocessing::joinAllStarFiles()
 	MDout.addLabel(EMDL_IMAGE_NAME);
 
 	std::cout << " Joining all metadata in one STAR file..." << std::endl;
-	bool has_other_ctfs, has_this_ctf;
-	double defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+	bool has_other_ctfs, has_this_ctf = false;
+	RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 	has_other_ctfs = false;
 	FileName prev_fn_mic="";
 	for (long int ipos = 0; ipos < fn_coords.size(); ipos++)
@@ -186,7 +188,7 @@ void Preprocessing::joinAllStarFiles()
 		if (fn_mic == "")
 			continue;
 
-		if (fn_mic != prev_fn_mic)
+		if (fn_mic != prev_fn_mic && !do_skip_ctf_logfiles)
 		{
 			FileName fn_microot = getRootNameFromMicrographName(fn_mic);
 			// Gather the results from ctffind
@@ -198,9 +200,9 @@ void Preprocessing::joinAllStarFiles()
 
 			// Re-scaled detector pixel size
 		if (has_this_ctf && do_rescale)
-                    DStep *= (double)extract_size/(double)scale;
+                    DStep *= (RFLOAT)extract_size/(RFLOAT)scale;
 
-		if (ipos == 0 && has_this_ctf)
+		if (ipos == 0 && has_this_ctf && !do_skip_ctf_logfiles)
 		{
 			// Set has_other_ctfs to true if the first micrograph has a logfile
 			// In that case add all CTF labels to the output MDtable
@@ -228,7 +230,7 @@ void Preprocessing::joinAllStarFiles()
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDonestack)
 		{
-			// This was double, right?
+			// This was RFLOAT, right?
 			//MDonestack.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 			if (has_this_ctf)
@@ -283,7 +285,7 @@ void Preprocessing::runExtractParticles()
 		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
-			system(("mkdir -p " + fn_dir).c_str());
+			int res = system(("mkdir -p " + fn_dir).c_str());
 			fn_olddir = fn_dir;
 		}
 
@@ -349,8 +351,8 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 				int ypos = num2 + num4 / 2;
 
 				MD.addObject();
-				MD.setValue(EMDL_IMAGE_COORD_X, (double)xpos);
-				MD.setValue(EMDL_IMAGE_COORD_Y, (double)ypos);
+				MD.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)xpos);
+				MD.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)ypos);
 			}
 			else // Try reading as plain ASCII....
 			{
@@ -366,12 +368,12 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 					if (words.size() > 1 && sscanf(words[0].c_str(), "%d", &num1) && sscanf(words[1].c_str(), "%d", &num2))
 					{
 						MD.addObject();
-						MD.setValue(EMDL_IMAGE_COORD_X, (double)num1);
-						MD.setValue(EMDL_IMAGE_COORD_Y, (double)num2);
+						MD.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)num1);
+						MD.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)num2);
 
 						// It could also be a X,Y,Z coordinate...
 						if (words.size() > 2 && sscanf(words[2].c_str(), "%d", &num3))
-							MD.setValue(EMDL_IMAGE_COORD_Z, (double)num3);
+							MD.setValue(EMDL_IMAGE_COORD_Z, (RFLOAT)num3);
 					}
 
 
@@ -388,11 +390,11 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 					int num3;
 
 					MD.addObject();
-					MD.setValue(EMDL_IMAGE_COORD_X, (double)num1);
-					MD.setValue(EMDL_IMAGE_COORD_Y, (double)num2);
+					MD.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)num1);
+					MD.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)num2);
 					// It could also be a X,Y,Z coordinate...
 					if (words.size() > 2 && sscanf(words[2].c_str(), "%d", &num3))
-						MD.setValue(EMDL_IMAGE_COORD_Z, (double)num3);
+						MD.setValue(EMDL_IMAGE_COORD_Z, (RFLOAT)num3);
 
 				}
 			}
@@ -415,7 +417,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 	{
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
-			double xcoor, ycoor;
+			RFLOAT xcoor, ycoor;
 			MDin.getValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDin.getValue(EMDL_IMAGE_COORD_Y, ycoor);
 			xcoor += extract_bias_x;
@@ -443,13 +445,15 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 	}
 
 	// Read the header of the micrograph to see how many frames there are.
-	Image<double> Imic;
+	Image<RFLOAT> Imic;
 	Imic.read(fn_mic, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
 
 	int xdim, ydim, zdim;
 	long int ndim;
 	Imic.getDimensions(xdim, ydim, zdim, ndim);
 	dimensionality = (zdim > 1) ? 3 : 2;
+	if (dimensionality == 3 || do_movie_extract )
+            do_ramp = false;
 
 	// Name of the output stack
 	// Add the same root as the output STAR file (that way one could extract two "families" of different particle stacks)
@@ -462,10 +466,10 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 		std::cout << "WARNING: movie " << fn_mic << " does not have multiple frames..." << std::endl;
 
 	long int my_current_nr_images = 0;
-	double all_avg = 0;
-	double all_stddev = 0;
-	double all_minval = 99.e99;
-	double all_maxval = -99.e99;
+	RFLOAT all_avg = 0;
+	RFLOAT all_stddev = 0;
+	RFLOAT all_minval = 99.e99;
+	RFLOAT all_maxval = -99.e99;
 
 	// To deal with default movie_last_frame value
 	if (movie_last_frame < 0)
@@ -496,10 +500,10 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		FileName fn_mic, int iframe, int n_frames,
 		FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
-		double &all_avg, double &all_stddev, double &all_minval, double &all_maxval)
+		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
 
-	Image<double> Ipart, Imic, Itmp;
+	Image<RFLOAT> Ipart, Imic, Itmp;
 
 	FileName fn_frame;
 	// If movies, then average over avg_n_frames
@@ -534,7 +538,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 	int ipos = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		double dxpos, dypos, dzpos;
+		RFLOAT dxpos, dypos, dzpos;
 		long int xpos, ypos, zpos;
 		long int x0, xF, y0, yF, z0, zF;
 		MD.getValue(EMDL_IMAGE_COORD_X, dxpos);
@@ -617,7 +621,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			if (dimensionality == 3 && do_project_3d)
 			{
 				// Project the 3D sub-tomogram into a 2D particle again
-				Image<double> Iproj(YSIZE(Ipart()), XSIZE(Ipart()));
+				Image<RFLOAT> Iproj(YSIZE(Ipart()), XSIZE(Ipart()));
 				Iproj().setXmippOrigin();
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Ipart())
 				{
@@ -657,7 +661,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 
 void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 {
-	Image<double> Ipart, Iout;
+	Image<RFLOAT> Ipart, Iout;
 	MetaDataTable MD;
 	long int Nimg;
 
@@ -682,10 +686,10 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 		Nimg = NSIZE(Iout());
 	}
 
-	double all_avg = 0;
-	double all_stddev = 0;
-	double all_minval = 99.e99;
-	double all_maxval = -99.e99;
+	RFLOAT all_avg = 0;
+	RFLOAT all_stddev = 0;
+	RFLOAT all_minval = 99.e99;
+	RFLOAT all_maxval = -99.e99;
 	init_progress_bar(Nimg);
 	int barstep = XMIPP_MAX(1, Nimg / 120);
 	for (long int i = 0; i < Nimg; i++)
@@ -730,8 +734,8 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 }
 
 
-void Preprocessing::performPerImageOperations(Image<double> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
-		double &all_avg, double &all_stddev, double &all_minval, double &all_maxval)
+void Preprocessing::performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
+		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
 
 	Ipart().setXmippOrigin();
@@ -740,16 +744,16 @@ void Preprocessing::performPerImageOperations(Image<double> &Ipart, FileName fn_
 
 	if (do_rewindow) rewindow(Ipart, window);
 
-	if (do_normalise) normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev);
+	if (do_normalise) normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp);
 
 	if (do_invert_contrast) invert_contrast(Ipart);
 
 	// For movies: multiple the image intensities by sqrt(nframes) so the stddev in the average of the normalised frames is again 1
 	if (nframes > 1)
-		Ipart() *= sqrt((double)nframes/(double)avg_n_frames);
+		Ipart() *= sqrt((RFLOAT)nframes/(RFLOAT)avg_n_frames);
 
 	// Calculate mean, stddev, min and max
-	double avg, stddev, minval, maxval;
+	RFLOAT avg, stddev, minval, maxval;
 	Ipart().computeStats(avg, stddev, minval, maxval);
 
 	if (Ipart().getDim() == 3)

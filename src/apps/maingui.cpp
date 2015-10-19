@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 
 	char my_dir[_MAX_PATH];
 	char short_dir[49];
-	getcwd(my_dir, _MAX_PATH);
+	char* res = getcwd(my_dir, _MAX_PATH);
 
 	// Get last 45 characters of my_dir to fit in titlebar of window
 	if (strlen(my_dir) > 45)

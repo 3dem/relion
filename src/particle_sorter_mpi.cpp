@@ -75,9 +75,9 @@ void ParticleSorterMpi::run()
 		progress_bar(my_nr_images);
 
 	// Combine results from all nodes
-	MultidimArray<double> allnodes_features;
+	MultidimArray<RFLOAT> allnodes_features;
 	allnodes_features.resize(features);
-	MPI_Allreduce(MULTIDIM_ARRAY(features), MULTIDIM_ARRAY(allnodes_features), MULTIDIM_SIZE(features), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(MULTIDIM_ARRAY(features), MULTIDIM_ARRAY(allnodes_features), MULTIDIM_SIZE(features), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	features = allnodes_features;
 
 	// Only the master writes out files

@@ -31,17 +31,17 @@ public:
 
 	FileName fn_unt, fn_til, fn_out;
 	MetaDataTable MDunt, MDtil;
-	double tilt, tilt0, tiltF, tiltStep;
-	double rot, rot0, rotF, rotStep;
+	RFLOAT tilt, tilt0, tiltF, tiltStep;
+	RFLOAT rot, rot0, rotF, rotStep;
         int size, dim;
 	int x0, xF, xStep;
 	int y0, yF, yStep;
-	double acc;
+	RFLOAT acc;
 	int mind2;
 	bool do_opt;
-	double best_rot, best_tilt;
+	RFLOAT best_rot, best_tilt;
 	int best_x, best_y;
-	Matrix2D<double> Pass;
+	Matrix2D<RFLOAT> Pass;
 	std::vector<int> p_unt, p_til, p_map, pairs_t2u;
 	// I/O Parser
 	IOParser parser;
@@ -126,7 +126,7 @@ public:
 		if (!MDtil.containsLabel(EMDL_IMAGE_COORD_X) || !MDtil.containsLabel(EMDL_IMAGE_COORD_Y))
 			REPORT_ERROR("ERROR: Tilted STAR file does not contain the rlnCoordinateX or Y labels");
 
-		double x, y;
+		RFLOAT x, y;
 
 		p_unt.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDunt)
@@ -182,7 +182,7 @@ public:
 
 	}
 
-	double getAverageDistance(int dx=0, int dy=0)
+	RFLOAT getAverageDistance(int dx=0, int dy=0)
 	{
 
 
@@ -191,7 +191,7 @@ public:
 		fn_map = "dist.txt";
 		fh.open(fn_map.c_str(), std::ios::out);
 
-		double result = 0.;
+		RFLOAT result = 0.;
 		int count = 0;
 		for (int t = 0; t < pairs_t2u.size(); t++)
 		{
@@ -208,7 +208,7 @@ public:
 				count ++;
 			}
 		}
-		result /= (double)count;
+		result /= (RFLOAT)count;
 		fh.close();
 		return result;
 
@@ -218,7 +218,7 @@ public:
 	{
 
 		int nprune = 0;
-		// Prune for double pairs
+		// Prune for RFLOAT pairs
 		for (int t = 0; t < pairs_t2u.size(); t++)
 		{
 			int u = pairs_t2u[t];
@@ -260,8 +260,8 @@ public:
 		p_map.resize(p_unt.size());
 		for (int u = 0; u < p_map.size()/2; u++)
 		{
-			double xu = (double)p_unt[2*u];
-			double yu = (double)p_unt[2*u+1];
+			RFLOAT xu = (RFLOAT)p_unt[2*u];
+			RFLOAT yu = (RFLOAT)p_unt[2*u+1];
 
 			p_map[2*u] = ROUND(MAT_ELEM(Pass, 0, 0) * xu + MAT_ELEM(Pass, 0, 1) * yu + MAT_ELEM(Pass, 0, 2));
 			p_map[2*u+1] = ROUND(MAT_ELEM(Pass, 1, 0) * xu + MAT_ELEM(Pass, 1, 1) * yu + MAT_ELEM(Pass, 1, 2));
@@ -270,10 +270,10 @@ public:
 	}
 
 
-	double optimiseTransformationMatrix(bool do_optimise_nr_pairs)
+	RFLOAT optimiseTransformationMatrix(bool do_optimise_nr_pairs)
 	{
 		std::vector<int> best_pairs_t2u, best_map;
-		double score, best_score, best_dist=9999.;
+		RFLOAT score, best_score, best_dist=9999.;
 		if (do_optimise_nr_pairs)
 			best_score = 0.;
 		else
@@ -285,12 +285,12 @@ public:
 		nn *= XMIPP_MAX(1., (yF-y0)/yStep);
 		int n = 0;
 		init_progress_bar(nn);
-		for (double rot = rot0; rot <= rotF; rot+= rotStep)
+		for (RFLOAT rot = rot0; rot <= rotF; rot+= rotStep)
 		{
-			for (double tilt = tilt0; tilt <= tiltF; tilt+= tiltStep)
+			for (RFLOAT tilt = tilt0; tilt <= tiltF; tilt+= tiltStep)
 			{
 				// Assume tilt-axis lies in-plane...
-				double psi = -rot;
+				RFLOAT psi = -rot;
 				// Rotate all points correspondingly
 				Euler_angles2matrix(rot, tilt, psi, Pass);
 				//std::cerr << " Pass= " << Pass << std::endl;
@@ -309,7 +309,7 @@ public:
                                                 bool is_best = false;
                                                 if (do_optimise_nr_pairs && score==best_score)
                                                 {
-                                                    double dist = getAverageDistance(x, y);
+                                                    RFLOAT dist = getAverageDistance(x, y);
                                                     if (dist < best_dist)
                                                     {
                                                         best_dist = dist;
@@ -347,7 +347,7 @@ public:
 	void optimiseTransformationMatrixContinuous()
 	{
 		// Get coordinates of all pairs:
-		Matrix2D<double> Au, Bt;
+		Matrix2D<RFLOAT> Au, Bt;
 	    Au.initZeros(3, 3);
 	    Bt.initZeros(3, 3);
 	    Pass.initZeros(4,4);
@@ -358,24 +358,24 @@ public:
 			int u = pairs_t2u[t];
 			if (u >= 0)
 	        {
-				Au(0, 0) += (double)(p_unt[2*u] * p_unt[2*u]);
-				Au(0, 1) += (double)(p_unt[2*u] * p_unt[2*u+1]);
-				Au(0, 2) += (double)(p_unt[2*u]);
+				Au(0, 0) += (RFLOAT)(p_unt[2*u] * p_unt[2*u]);
+				Au(0, 1) += (RFLOAT)(p_unt[2*u] * p_unt[2*u+1]);
+				Au(0, 2) += (RFLOAT)(p_unt[2*u]);
 				Au(1, 0) = Au(0, 1);
-				Au(1, 1) += (double)(p_unt[2*u+1] * p_unt[2*u+1]);
-				Au(1, 2) += (double)(p_unt[2*u+1]);
+				Au(1, 1) += (RFLOAT)(p_unt[2*u+1] * p_unt[2*u+1]);
+				Au(1, 2) += (RFLOAT)(p_unt[2*u+1]);
 				Au(2, 0) = Au(0, 2);
 				Au(2, 1) = Au(1, 2);
 				Au(2, 2) += 1.;
 
-				Bt(0, 0) += (double)(p_til[2*t] * p_unt[2*u]);
-				Bt(0, 1) += (double)(p_til[2*t+1] * p_unt[2*u]);
+				Bt(0, 0) += (RFLOAT)(p_til[2*t] * p_unt[2*u]);
+				Bt(0, 1) += (RFLOAT)(p_til[2*t+1] * p_unt[2*u]);
 				Bt(0, 2) = Au(0, 2);
-				Bt(1, 0) += (double)(p_til[2*t] * p_unt[2*u+1]);
-				Bt(1, 1) += (double)(p_til[2*t+1] * p_unt[2*u+1]);
+				Bt(1, 0) += (RFLOAT)(p_til[2*t] * p_unt[2*u+1]);
+				Bt(1, 1) += (RFLOAT)(p_til[2*t+1] * p_unt[2*u+1]);
 				Bt(1, 2) = Au(1, 2);
-				Bt(2, 0) += (double)(p_til[2*t]);
-				Bt(2, 1) += (double)(p_til[2*t+1]);
+				Bt(2, 0) += (RFLOAT)(p_til[2*t]);
+				Bt(2, 1) += (RFLOAT)(p_til[2*t+1]);
 				Bt(2,2) += 1.;
 	        }
 	    }
@@ -385,7 +385,7 @@ public:
 	    Pass = Pass.transpose();
 	    std::cout << " Optimised passing matrix= " << Pass << std::endl;
 	    //These values can be complete CRAP. Better not show them at all....
-	    //double rotp, tiltp, psip;
+	    //RFLOAT rotp, tiltp, psip;
 	    //tiltp = acos(Pass(1,1));
 	    //rotp = acos(Pass(1,0)/sin(tiltp));
 	    //psip = acos(Pass(0,1)/-sin(tiltp));
@@ -402,11 +402,11 @@ public:
 		// First do a crude search over the given parameter optimization space
 		// Optimize the number of pairs here...
 		int npart = optimiseTransformationMatrix(true);
-		// Get rid of double pairs (two different untilted coordinates are close to a tilted coordinate)
+		// Get rid of RFLOAT pairs (two different untilted coordinates are close to a tilted coordinate)
 		int nprune = 0;
 		nprune = prunePairs(best_x, best_y);
 		// Calculate average distance between the pairs
-		double avgdist = getAverageDistance(best_x, best_y);
+		RFLOAT avgdist = getAverageDistance(best_x, best_y);
 		std::cout << " Before optimization of the passing matrix: "<<std::endl;
 		std::cout << "  - Number of pruned pairs= "<<nprune<<std::endl;
 		std::cout << "  - best_rot= " << best_rot << " best_tilt= " << best_tilt << " best_x= " << best_x << " best_y= " << best_y << std::endl;
@@ -457,12 +457,12 @@ public:
 			if (u >= 0)
 			{
 				MDu.addObject();
-				MDu.setValue(EMDL_IMAGE_COORD_X, ((double)(p_unt[2*u])));
-				MDu.setValue(EMDL_IMAGE_COORD_Y, ((double)(p_unt[2*u+1])));
+				MDu.setValue(EMDL_IMAGE_COORD_X, ((RFLOAT)(p_unt[2*u])));
+				MDu.setValue(EMDL_IMAGE_COORD_Y, ((RFLOAT)(p_unt[2*u+1])));
 
 				MDt.addObject();
-				MDt.setValue(EMDL_IMAGE_COORD_X, ((double)(p_til[2*t])));
-				MDt.setValue(EMDL_IMAGE_COORD_Y, ((double)(p_til[2*t+1])));
+				MDt.setValue(EMDL_IMAGE_COORD_X, ((RFLOAT)(p_til[2*t])));
+				MDt.setValue(EMDL_IMAGE_COORD_Y, ((RFLOAT)(p_til[2*t+1])));
 			}
 		}
 		fn_unt = fn_unt.withoutExtension() + "_pairs.star";

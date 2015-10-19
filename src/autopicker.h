@@ -21,9 +21,9 @@ struct Peak
 	int x;
 	int y;
 	int ref;
-	double psi;
-	double fom;
-	double relative_fom;
+	RFLOAT psi;
+	RFLOAT fom;
+	RFLOAT relative_fom;
 };
 
 class AutoPicker
@@ -40,17 +40,17 @@ public:
 	FileName fn_in, fn_ref, fns_autopick, fn_out;
 
 	// Pixel size (for low-pass filter and particle diameter)
-	double angpix;
+	RFLOAT angpix;
 
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
 
 	// Particle diameter (in Angstroms)
-	double particle_diameter;
-	int particle_radius2;
+	RFLOAT particle_diameter;
+	int particle_radius2, decrease_radius;
 
 	// Low pass filetr cutoff (in Angstroms)
-	double lowpass;
+	RFLOAT lowpass;
 
 	// Original size of the reference images
 	int particle_size;
@@ -59,7 +59,7 @@ public:
 	int current_size;
 
 	// Vector with all original reference images
-	std::vector<MultidimArray<double> > Mrefs;
+	std::vector<MultidimArray<RFLOAT> > Mrefs;
 
 	// FTs of the reference images (either for autopicking or for feature calculation)
 	std::vector<Projector > PPref;
@@ -91,13 +91,19 @@ public:
 	int autopick_skip_side;
 
 	// In-plane rotational sampling (in degrees)
-	double psi_sampling;
+	RFLOAT psi_sampling;
 
 	// Fraction of expected probability ratio to consider as peaks
-	double min_fraction_expected_Pratio;
+	RFLOAT min_fraction_expected_Pratio;
 
 	// Number of Angstroms any 2 particle peaks need to be apart
-	double min_particle_distance;
+	RFLOAT min_particle_distance;
+
+	// Maximum standard deviation of the noise prior to normalization to pick peaks from
+	RFLOAT max_stddev_noise;
+
+	// Removal of outlier pixel values
+	RFLOAT outlier_removal_zscore;
 
 	// Size of the downsize micrographs for autopicking
 	int downsize_mic;
@@ -129,10 +135,10 @@ private:
 	// The FFTs of the micrograph (Fmic), micrograph-squared (Fmic2) and the mask (Fmsk) need to be provided at downsize_mic
 	// The putput (Mstddev) will be at (binned) micrograph_size
 	void calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &Fmic, const MultidimArray<Complex > &Fmic2,
-			MultidimArray<Complex > &Fmsk, int nr_nonzero_pixels_mask, MultidimArray<double> &Mstddev, MultidimArray<double> &Mmean);
+			MultidimArray<Complex > &Fmsk, int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &Mstddev, MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
-	void peakSearch(const MultidimArray<double> &Mccf, const MultidimArray<double> &Mpsi, int iref, int skip_side, std::vector<Peak> &peaks);
+	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks);
 
 	// Now prune the coordinates: within min_particle_distance: all peaks are the same cluster
 	// From each cluster, take the single peaks with the highest ccf

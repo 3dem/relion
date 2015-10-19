@@ -54,10 +54,10 @@ int SymList::read_sym_file(FileName fn_sym)
     FILE *fpoii;
     char line[80];
     char *auxstr;
-    double ang_incr, rot_ang;
+    RFLOAT ang_incr, rot_ang;
     int  fold;
-    Matrix2D<double> L(4, 4), R(4, 4);
-    Matrix1D<double> axis(3);
+    Matrix2D<RFLOAT> L(4, 4), R(4, 4);
+    Matrix1D<RFLOAT> axis(3);
     int pgGroup = 0, pgOrder = 0;
     std::vector<std::string> fileContent;
 
@@ -178,7 +178,7 @@ int SymList::read_sym_file(FileName fn_sym)
             ZZ(axis) = textToFloat(auxstr);
             L.initIdentity();
             L(2, 2) = -1;
-            Matrix2D<double> A;
+            Matrix2D<RFLOAT> A;
             alignWithZ(axis,A);
             A = A.transpose();
             R = A * L * A.inv();
@@ -194,7 +194,7 @@ int SymList::read_sym_file(FileName fn_sym)
 }
 
 // Get matrix ==============================================================
-void SymList::get_matrices(int i, Matrix2D<double> &L, Matrix2D<double> &R)
+void SymList::get_matrices(int i, Matrix2D<RFLOAT> &L, Matrix2D<RFLOAT> &R)
 const
 {
     int k, l;
@@ -209,8 +209,8 @@ const
 }
 
 // Set matrix ==============================================================
-void SymList::set_matrices(int i, const Matrix2D<double> &L,
-                           const Matrix2D<double> &R)
+void SymList::set_matrices(int i, const Matrix2D<RFLOAT> &L,
+                           const Matrix2D<RFLOAT> &R)
 {
     int k, l;
     for (k = 4 * i; k < 4*i + 4; k++)
@@ -222,7 +222,7 @@ void SymList::set_matrices(int i, const Matrix2D<double> &L,
 }
 
 // Add matrix ==============================================================
-void SymList::add_matrices(const Matrix2D<double> &L, const Matrix2D<double> &R,
+void SymList::add_matrices(const Matrix2D<RFLOAT> &L, const Matrix2D<RFLOAT> &R,
                            int chain_length)
 {
     if (MAT_XSIZE(L) != 4 || MAT_YSIZE(L) != 4 || MAT_XSIZE(R) != 4 || MAT_YSIZE(R) != 4)
@@ -272,9 +272,9 @@ bool found_not_tried(const Matrix2D<int> &tried, int &i, int &j,
 //#define DEBUG
 void SymList::compute_subgroup()
 {
-    Matrix2D<double> I(4, 4);
+    Matrix2D<RFLOAT> I(4, 4);
     I.initIdentity();
-    Matrix2D<double> L1(4, 4), R1(4, 4), L2(4, 4), R2(4, 4), newL(4, 4), newR(4, 4);
+    Matrix2D<RFLOAT> L1(4, 4), R1(4, 4), L2(4, 4), R2(4, 4), newL(4, 4), newR(4, 4);
     Matrix2D<int>    tried(true_symNo, true_symNo);
     int i, j;
     int new_chain_length;
@@ -287,7 +287,7 @@ void SymList::compute_subgroup()
         newL = L1 * L2;
         newR = R1 * R2;
         new_chain_length = __chain_length(i) + __chain_length(j);
-        Matrix2D<double> newR3 = newR;
+        Matrix2D<RFLOAT> newR3 = newR;
         newR3.resize(3,3);
         if (newL.isIdentity() && newR3.isIdentity()) continue;
 
@@ -767,7 +767,7 @@ void SymList::fill_symmetry_class(const FileName symmetry, int pgGroup, int pgOr
 void SymList::writeDefinition(std::ostream &outstream, FileName fn_sym)
 {
 	read_sym_file(fn_sym);
-	Matrix2D<double> L(3,3), R(3,3);
+	Matrix2D<RFLOAT> L(3,3), R(3,3);
 	outstream << " ++++ Using symmetry group " << fn_sym << ", with the following " << SymsNo()+1 << " transformation matrices:"<< std::endl;
     R.initIdentity();
     outstream << " R(1)= " << R;
@@ -783,7 +783,7 @@ void SymList::writeDefinition(std::ostream &outstream, FileName fn_sym)
 
 }
 
-double SymList::non_redundant_ewald_sphere(int pgGroup, int pgOrder)
+RFLOAT SymList::non_redundant_ewald_sphere(int pgGroup, int pgOrder)
 {
     if (pgGroup == pg_CN)
     {
@@ -892,7 +892,7 @@ double SymList::non_redundant_ewald_sphere(int pgGroup, int pgOrder)
     }
 }
 
-void symmetriseMap(MultidimArray<double> &img, FileName &fn_sym, bool do_wrap)
+void symmetriseMap(MultidimArray<RFLOAT> &img, FileName &fn_sym, bool do_wrap)
 {
 
 	if (img.getDim() != 3)
@@ -903,8 +903,8 @@ void symmetriseMap(MultidimArray<double> &img, FileName &fn_sym, bool do_wrap)
 	SymList SL;
 	SL.read_sym_file(fn_sym);
 
-	Matrix2D<double> L(4, 4), R(4, 4); // A matrix from the list
-    MultidimArray<double> sum, aux;
+	Matrix2D<RFLOAT> L(4, 4), R(4, 4); // A matrix from the list
+    MultidimArray<RFLOAT> sum, aux;
     sum = img;
     aux.resize(img);
 
