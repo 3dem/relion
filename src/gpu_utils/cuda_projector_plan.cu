@@ -34,11 +34,12 @@ void CudaProjectorPlan::setup(
 	tilts.reserve(nr_dir * nr_psi * nr_oversampled_rot);
 	psis.reserve(nr_dir * nr_psi * nr_oversampled_rot);
 
-	iorientclasses.clear();
-	iover_rots.clear();
-
-	iorientclasses.reserve(nr_dir * nr_psi * nr_oversampled_rot);
-	iover_rots.reserve(nr_dir * nr_psi * nr_oversampled_rot);
+	if (iorientclasses.getSize() < nr_dir * nr_psi * nr_oversampled_rot)
+	{
+		iorientclasses.free_if_set();
+		iorientclasses.setSize(nr_dir * nr_psi * nr_oversampled_rot);
+		iorientclasses.host_alloc();
+	}
 
 	orientation_num = 0;
 
@@ -101,8 +102,7 @@ void CudaProjectorPlan::setup(
 					rots.push_back(oversampled_rot[iover_rot]);
 					tilts.push_back(oversampled_tilt[iover_rot]);
 					psis.push_back(oversampled_psi[iover_rot]);
-					iorientclasses.push_back(iorientclass);
-					iover_rots.push_back(iover_rot);
+					iorientclasses[orientation_num] = iorientclass;
 
 					orientation_num ++;
 				}
@@ -110,12 +110,13 @@ void CudaProjectorPlan::setup(
 		}
 	}
 
+	iorientclasses.put_on_device(orientation_num);
 
 	double alpha(.0), beta(.0), gamma(.0);
 	double ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
 	double cc(.0), cs(.0), sc(.0), ss(.0);
 
-	if (eulers.getSize() != orientation_num * 9)
+	if (eulers.getSize() < orientation_num * 9)
 	{
 		eulers.free_if_set();
 		eulers.setSize(orientation_num * 9);
@@ -170,13 +171,12 @@ void CudaProjectorPlan::setup(
 void CudaProjectorPlan::printTo(std::ostream &os) // print
 {
 	os << "orientation_num = " << orientation_num << std::endl;
-	os << "iorientclasses.size = " << iorientclasses.size() << std::endl;
-	os << "iover_rots.size = " << iover_rots.size() << std::endl;
+	os << "iorientclasses.size = " << iorientclasses.getSize() << std::endl;
 	os << std::endl << "iorientclasses\tiover_rots\teulers" << std::endl;
 
-	for (int i = 0; i < iorientclasses.size(); i ++)
+	for (int i = 0; i < iorientclasses.getSize(); i ++)
 	{
-		os << iorientclasses[i] << "\t\t" << iover_rots[i] << "\t";
+		os << iorientclasses[i] << "\t\t" << "\t";
 		for (int j = 0; j < 9; j++)
 			os << eulers[i * 9 + j] << "\t";
 		os << std::endl;
@@ -185,9 +185,9 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 
 void CudaProjectorPlan::clear()
 {
-	iorientclasses.clear();
-	iover_rots.clear();
 	orientation_num = 0;
+	iorientclasses.free_if_set();
+	iorientclasses.setSize(0);
 	eulers.free_if_set();
 	eulers.setSize(0);
 }

@@ -11,20 +11,21 @@
 class CudaProjectorPlan
 {
 public:
-	std::vector< long unsigned > iorientclasses, iover_rots;
-	long unsigned orientation_num;
+	CudaGlobalPtr< long unsigned > iorientclasses;
 	CudaGlobalPtr<XFLOAT> eulers;
+	long unsigned orientation_num;
 
 	CudaProjectorPlan(CudaCustomAllocator *allocator):
-		orientation_num(0), eulers(allocator)
+		iorientclasses(allocator),
+		eulers(allocator),
+		orientation_num(0)
 	{};
 
 	//Copy constructor
 	CudaProjectorPlan( const CudaProjectorPlan& other ):
 		iorientclasses(other.iorientclasses),
-		iover_rots(other.iover_rots),
-		orientation_num(other.orientation_num),
-		eulers(other.eulers)
+		eulers(other.eulers),
+		orientation_num(other.orientation_num)
 	{};
 
 	void setup(

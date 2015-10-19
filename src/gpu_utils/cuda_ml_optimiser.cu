@@ -513,7 +513,8 @@ void getAllSquaredDifferencesCoarse(
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
 		MlOptimiserCuda *cudaMLO,
-	 	std::vector<cudaStager<unsigned long> > &stagerD2)
+	 	std::vector<cudaStager<unsigned long> > &stagerD2,
+	 	CudaGlobalPtr<XFLOAT> Mweight)
 {
 
 #ifdef TIMING
@@ -523,11 +524,7 @@ void getAllSquaredDifferencesCoarse(
 
 	CUDA_CPU_TIC("diff_pre_gpu");
 
-	op.Mweight.resize(sp.nr_particles, baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
-	op.Mweight.initConstant(-999.);
-
-	op.Mcoarse_significant.resize(sp.nr_dir*sp.nr_psi*sp.nr_trans, 1);
-	op.Mcoarse_significant.clear();
+	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	op.min_diff2.clear();
 	op.min_diff2.resize(sp.nr_particles, 99.e99);
@@ -598,57 +595,6 @@ void getAllSquaredDifferencesCoarse(
 		Fimgs_real.put_on_device();
 		Fimgs_imag.put_on_device();
 
-
-//		Fimgs_real.device_alloc(image_size * translation_num);
-//		Fimgs_imag.device_alloc(image_size * translation_num);
-
-//		if (baseMLO->do_shifts_onthefly)
-//		{
-//			CudaTranslator::Plan transPlan(
-//					op.local_Fimgs_shifted[ipart].data,
-//					image_size,
-//					sp.itrans_min * sp.nr_oversampled_trans,
-//					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-//					cudaMLO->allocator,
-//					0, //stream
-//					baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
-//					baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
-//
-//			if (sp.current_oversampling == 0)
-//			{
-//				if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
-//					cudaMLO->translator_coarse1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-//				else
-//					cudaMLO->translator_current1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-//			}
-//			else
-//			{
-//				if (baseMLO->strict_highres_exp > 0.)
-//					cudaMLO->translator_coarse2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-//				else
-//					cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-//			}
-//		}
-//		else
-//		{
-//			Fimgs_real.host_alloc();
-//			Fimgs_imag.host_alloc();
-//
-//			unsigned long k = 0;
-//			for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
-//			{
-//				for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
-//				{
-//					Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
-//					Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
-//					k++;
-//				}
-//			}
-//
-//			Fimgs_real.cp_to_device();
-//			Fimgs_imag.cp_to_device();
-//		}
-
 		CUDA_CPU_TOC("translation_1");
 
 
@@ -697,46 +643,27 @@ void getAllSquaredDifferencesCoarse(
 						cudaMLO,
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc));
 
+				mapAllWeightsToMweights(
+						~projectorPlan.iorientclasses,
+						&allWeights(allWeights_pos),
+						&Mweight(ipart*weightsPerPart),
+						projectorPlan.orientation_num,
+						translation_num,
+						0
+						);
+
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
-				allWeights_pos+=projectorPlan.orientation_num*translation_num;
+				allWeights_pos += projectorPlan.orientation_num*translation_num;
 
 			} // end if class significant
 		} // end loop iclass
 
-		allWeights.cp_to_host();
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
-		allWeights_pos=0;
-
-//		if (!cudaMLO->refIs3D)
-//		{
-//			FILE *fPtr = fopen("allWeights.dat","w");
-//			for (unsigned i = 0; i < allWeights.getSize(); i ++)
-//				fprintf(fPtr,"%.5e\n",allWeights[i]);
-//			fclose(fPtr);
-//			exit(0);
-//		}
-
-		CUDA_CPU_TIC("diff_coarse_map");
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		{
-			CudaProjectorPlan projectorPlan = cudaMLO->coarseProjectionPlans[exp_iclass];
-			if ( projectorPlan.orientation_num > 0 )
-			{
-				for (unsigned i = 0; i < projectorPlan.orientation_num; i ++)
-				{
-					unsigned iorientclass = projectorPlan.iorientclasses[i];
-					for (unsigned j = 0; j < translation_num; j ++)
-						DIRECT_A2D_ELEM(op.Mweight, ipart, iorientclass * translation_num + j) = allWeights[i * translation_num + j + allWeights_pos];
-				}
-				allWeights_pos+=projectorPlan.orientation_num*translation_num;
-			}
-		}
-		CUDA_CPU_TOC("diff_coarse_map");
 
 	} // end loop ipart
+
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF1);
@@ -1021,7 +948,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											MlOptimiserCuda *cudaMLO,
 											std::vector< IndexedDataArray> &PassWeights,
 											std::vector< std::vector< IndexedDataArrayMask > > &FPCMasks,
-											std::vector<cudaStager<unsigned long> > &stagerD2) // FPCMasks = Fine-Pass Class-Masks
+											std::vector<cudaStager<unsigned long> > &stagerD2,
+											CudaGlobalPtr<XFLOAT> Mweight) // FPCMasks = Fine-Pass Class-Masks
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1033,12 +961,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
-	CudaGlobalPtr<XFLOAT> allMweight( &(op.Mweight.data[sp.iclass_min*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans]),(sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, cudaMLO->allocator);
-	if(exp_ipass==0) // send all the weights in one go, rather than mess about with sending each weight on it's own -- we'll make a new device pointer for each class instead, which is (almost) free
-	{
-		allMweight.device_alloc();
-		allMweight.cp_to_device();
-	}
+	CudaGlobalPtr<XFLOAT> allMweight(Mweight, sp.iclass_min*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans, (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
 	// Ready the "prior-containers" for all classes (remake every ipart)
 	CudaGlobalPtr<XFLOAT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, cudaMLO->allocator);
@@ -1184,8 +1107,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
 				{
-					CudaGlobalPtr<XFLOAT>  Mweight( &allMweight[(ipart)*(op.Mweight).xdim+
-					                                  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans],
+					CudaGlobalPtr<XFLOAT>  Mweight( NULL,
 													&allMweight((ipart)*(op.Mweight).xdim+
 													  (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi * sp.nr_trans),
 													  sp.nr_dir * sp.nr_psi * sp.nr_trans);
@@ -1262,6 +1184,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	} // end loop ipart
 	if (exp_ipass==0)
 	{
+		op.Mcoarse_significant.clear();
 		op.Mcoarse_significant.resize(sp.nr_particles, XSIZE(op.Mweight));
 	}
 
@@ -2568,12 +2491,23 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 						CUDA_CPU_TOC("generateProjectionSetupCoarse");
 					}
 
+					unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
+
+					op.Mweight.resize(sp.nr_particles, weightsPerPart);
+					op.Mweight.initConstant(-999.);
+
+					CudaGlobalPtr<XFLOAT> Mweight(allocator);
+					Mweight.setSize(sp.nr_particles * weightsPerPart);
+					Mweight.setHstPtr(op.Mweight.data);
+					Mweight.device_alloc();
+					deviceInitValue<XFLOAT>(Mweight, -999.);
+
 					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
-					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, stagerD2);
+					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, stagerD2, Mweight);
 					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
 
 					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsCoarse");
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, stagerD2);
+					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, stagerD2, Mweight);
 					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsCoarse");
 				}
 				else
@@ -2614,9 +2548,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles()
 					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
 					CUDA_CPU_TOC("getAllSquaredDifferencesFine");
 
+					CudaGlobalPtr<XFLOAT> Mweight(allocator); //DUMMY
 
 					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsFine");
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, stagerD2);
+					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, stagerD2, Mweight);
 					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsFine");
 
 				}

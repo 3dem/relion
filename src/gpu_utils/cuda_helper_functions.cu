@@ -454,6 +454,32 @@ void deviceInitValue(CudaGlobalPtr<T> data, T value)
 			data.getSize());
 }
 
+
+
+__global__ void cuda_kernel_allweights_to_mweights(
+		unsigned long * d_iorient,
+		XFLOAT * d_allweights,
+		XFLOAT * d_mweights
+		)
+{
+	d_mweights[d_iorient[blockIdx.x] * blockDim.x + threadIdx.x] = d_allweights[blockIdx.x * blockDim.x + threadIdx.x];
+}
+
+void mapAllWeightsToMweights(
+		unsigned long * d_iorient, //projectorPlan.iorientclasses
+		XFLOAT * d_allweights, //allWeights
+		XFLOAT * d_mweights, //Mweight
+		unsigned long orientation_num, //projectorPlan.orientation_num
+		unsigned long translation_num, //translation_num
+		cudaStream_t stream
+		)
+{
+	cuda_kernel_allweights_to_mweights<<< orientation_num, translation_num, 0, stream >>>(
+			d_iorient,
+			d_allweights,
+			d_mweights);
+}
+
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
 		XFLOAT *trans_x,
