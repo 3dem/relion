@@ -3,13 +3,13 @@
 
 void CudaProjectorPlan::setup(
 		HealpixSampling &sampling,
-		std::vector<double> &directions_prior,
-		std::vector<double> &psi_prior,
+		std::vector<RFLOAT> &directions_prior,
+		std::vector<RFLOAT> &psi_prior,
 		std::vector<int> &pointer_dir_nonzeroprior,
 		std::vector<int> &pointer_psi_nonzeroprior,
 		MultidimArray<bool> *Mcoarse_significant,
-		std::vector<double > &pdf_class,
-		std::vector<MultidimArray<double> > &pdf_direction,
+		std::vector<RFLOAT > &pdf_class,
+		std::vector<MultidimArray<RFLOAT> > &pdf_direction,
 		unsigned long nr_dir,
 		unsigned long nr_psi,
 		unsigned long idir_min,
@@ -27,8 +27,8 @@ void CudaProjectorPlan::setup(
 		bool do_skip_rotate,
 		int orientational_prior_mode)
 {
-	std::vector< double > rots, tilts, psis;
-	std::vector< double > oversampled_rot, oversampled_tilt, oversampled_psi;
+	std::vector< RFLOAT > rots, tilts, psis;
+	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
 	rots.reserve(nr_dir * nr_psi * nr_oversampled_rot);
 	tilts.reserve(nr_dir * nr_psi * nr_oversampled_rot);
@@ -49,7 +49,7 @@ void CudaProjectorPlan::setup(
 			long int iorientclass = iclass * nr_dir * nr_psi + iorient;
 
 			// Get prior for this direction and skip calculation if prior==0
-			double pdf_orientation;
+			RFLOAT pdf_orientation;
 			if (do_skip_align || do_skip_rotate)
 			{
 				pdf_orientation = pdf_class[iclass];
@@ -111,9 +111,9 @@ void CudaProjectorPlan::setup(
 	}
 
 
-	double alpha(.0), beta(.0), gamma(.0);
-	double ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
-	double cc(.0), cs(.0), sc(.0), ss(.0);
+	RFLOAT alpha(.0), beta(.0), gamma(.0);
+	RFLOAT ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
+	RFLOAT cc(.0), cs(.0), sc(.0), ss(.0);
 
 	if (eulers.getSize() != orientation_num * 9)
 	{

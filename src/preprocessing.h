@@ -50,6 +50,9 @@ public:
 	// Perform particle extraction?
 	bool do_extract;
 
+	// Skip gathering CTF information from the ctffind logfiles (e.g. when the info is already there from Gctf)?
+	bool do_skip_ctf_logfiles;
+
 	// Extract particles from movies instead of single micrographs
 	bool do_movie_extract;
 
@@ -84,7 +87,7 @@ public:
 	int extract_size;
 
 	// Bias in picked coordinates in X and in Y direction (in pixels)
-	double extract_bias_x, extract_bias_y;
+	RFLOAT extract_bias_x, extract_bias_y;
 
 	////////////////////////////////////// Post-extraction image modifications
 	// Perform re-scaling of extracted images
@@ -98,11 +101,14 @@ public:
 	// Perform normalization of the extract images
 	bool do_normalise;
 
+	// Subtract ramp instead of a level background in normalization
+	bool do_ramp;
+
 	// Perform contrast inversion of the extracted images
 	bool do_invert_contrast;
 
 	// Standard deviations to remove black and white dust
-	double white_dust_stddev, black_dust_stddev;
+	RFLOAT white_dust_stddev, black_dust_stddev;
 
 	// Radius of a circle in the extracted images outside of which one calculates background mean and stddev
 	int bg_radius;
@@ -145,14 +151,14 @@ public:
 	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
 	void extractParticlesFromOneFrame(MetaDataTable &MD,
 			FileName fn_mic, int iframe, int n_frames, FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
-			double &all_avg, double &all_stddev, double &all_minval, double &all_maxval);
+			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
 	// Perform per-image operations (e.g. normalise, rescaling, rewindowing and inverting contrast) on an input stack (or STAR file)
 	void runOperateOnInputFile(FileName fn_perimage_in);
 
 	// Here normalisation, windowing etc is performed on an individual image and it is written to disc
-	void performPerImageOperations(Image<double> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
-			double &all_avg, double &all_stddev, double &all_minval, double &all_maxval);
+	void performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
+			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
 	// Get micrograph name from the rootname
 	// The rootname may have an additional string after the uniqye micrograph name

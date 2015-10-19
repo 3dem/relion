@@ -54,7 +54,6 @@ MpiNode::MpiNode(int &argc, char ** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     // Handle errors
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
-    //MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN); //deprecated after MPI-2.0
 }
 
 MpiNode::~MpiNode()
@@ -85,7 +84,7 @@ void MpiNode::barrierWait()
 int MpiNode::relion_MPI_Send(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm) {
 
     int result(0);
-    double start_time = MPI_Wtime();
+    RFLOAT start_time = MPI_Wtime();
 
 //#define ONLY_NORMAL_SEND
 //#ifdef ONLY_NORMAL_SEND
@@ -165,8 +164,8 @@ int MpiNode::relion_MPI_Send(void *buf, std::ptrdiff_t count, MPI_Datatype datat
 int MpiNode::relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status &status) {
     int result;
     MPI_Request request;
-    double current_time = MPI_Wtime();
-    double start_time = current_time;
+    RFLOAT current_time = MPI_Wtime();
+    RFLOAT start_time = current_time;
 
     int unitsize(0);
     MPI_Type_size(datatype, &unitsize);

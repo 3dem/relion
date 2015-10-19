@@ -58,133 +58,14 @@ void nrerror(const char error_text[])
 }
 #define NRSIGN(a,b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
 
-/* RANDOM NUMBERS ---------------------------------------------------------- */
-#define M1 259200
-#define IA1 7141
-#define IC1 54773
-#define RM1 (1.0/M1)
-#define M2 134456
-#define IA2 8121
-#define IC2 28411
-#define RM2 (1.0/M2)
-#define M3 243000
-#define IA3 4561
-#define IC3 51349
-
-/* Chapter 7 Section 1: UNIFORM RANDOM NUMBERS */
-double ran1(int *idum)
-{
-    static long ix1, ix2, ix3;
-    static double r[98];
-    double temp;
-    static int iff = 0;
-    int j;
-
-    if (*idum < 0 || iff == 0)
-    {
-        iff = 1;
-        ix1 = (IC1 - (*idum)) % M1;
-        ix1 = (IA1 * ix1 + IC1) % M1;
-        ix2 = ix1 % M2;
-        ix1 = (IA1 * ix1 + IC1) % M1;
-        ix3 = ix1 % M3;
-        for (j = 1;j <= 97;j++)
-        {
-            ix1 = (IA1 * ix1 + IC1) % M1;
-            ix2 = (IA2 * ix2 + IC2) % M2;
-            r[j] = (ix1 + ix2 * RM2) * RM1;
-        }
-        *idum = 1;
-    }
-    ix1 = (IA1 * ix1 + IC1) % M1;
-    ix2 = (IA2 * ix2 + IC2) % M2;
-    ix3 = (IA3 * ix3 + IC3) % M3;
-    j = 1 + ((97 * ix3) / M3);
-    if (j > 97 || j < 1)
-        nrerror("RAN1: This cannot happen.");
-    temp = r[j];
-    r[j] = (ix1 + ix2 * RM2) * RM1;
-    return temp;
-}
-
-#undef M1
-#undef IA1
-#undef IC1
-#undef RM1
-#undef M2
-#undef IA2
-#undef IC2
-#undef RM2
-#undef M3
-#undef IA3
-#undef IC3
-
-/* Chapter 7 Section 3: GAUSSIAN RANDOM NUMBERS */
-double gasdev(int *idum)
-{
-    static int iset = 0;
-    static double gset;
-    double fac, r, v1, v2;
-
-    if (iset == 0)
-    {
-        do
-        {
-            v1 = 2.0 * ran1(idum) - 1.0;
-            v2 = 2.0 * ran1(idum) - 1.0;
-            r = v1 * v1 + v2 * v2;
-        }
-        while (r >= 1.0);
-        fac = sqrt(-2.0 * log(r) / r);
-        gset = v1 * fac;
-        iset = 1;
-        return v2*fac;
-    }
-    else
-    {
-        iset = 0;
-        return gset;
-    }
-}
-
-// t-distribution (nor Numerical Recipes, but Mathematics of Computation, vol. 62, 779-781.
-// I downloaded sem-code from http://ideas.repec.org/c/ega/comcod/200703.html
-// Sjors May 2008
-double tdev(double nu, int *idum)
-{
-    static int iset = 0;
-    static double gset;
-    double fac, r, v1, v2;
-
-    if (iset == 0)
-    {
-        do
-        {
-            v1 = 2.0 * ran1(idum) - 1.0;
-            v2 = 2.0 * ran1(idum) - 1.0;
-            r = v1 * v1 + v2 * v2;
-        }
-        while (r >= 1.0);
-        fac = sqrt(nu*(pow(r,-2.0/nu) -1.0)/r);
-        gset = v1 * fac;
-        iset = 1;
-        return v2*fac;
-    }
-    else
-    {
-        iset = 0;
-        return gset;
-    }
-}
-
 
 /* BESSEL FUNCTIONS -------------------------------------------------------- */
 /* CO: They may not come in the numerical recipes but it is not a bad
    idea to put them here, in fact they come from Gabor's group in Feb'84     */
-double bessj0(double x)
+RFLOAT bessj0(RFLOAT x)
 {
-    double ax, z;
-    double xx, y, ans, ans1, ans2;
+    RFLOAT ax, z;
+    RFLOAT xx, y, ans, ans1, ans2;
 
     if ((ax = fabs(x)) < 8.0)
     {
@@ -217,9 +98,9 @@ double bessj0(double x)
 }
 
 /*............................................................................*/
-double bessi0(double x)
+RFLOAT bessi0(RFLOAT x)
 {
-    double y, ax, ans;
+    RFLOAT y, ax, ans;
     if ((ax = fabs(x)) < 3.75)
     {
         y = x / 3.75;
@@ -239,10 +120,10 @@ double bessi0(double x)
 }
 
 /*............................................................................*/
-double bessi1(double x)
+RFLOAT bessi1(RFLOAT x)
 {
-    double ax, ans;
-    double y;
+    RFLOAT ax, ans;
+    RFLOAT y;
     if ((ax = fabs(x)) < 3.75)
     {
         y = x / 3.75;
@@ -263,9 +144,9 @@ double bessi1(double x)
 }
 
 /* General Bessel functions ------------------------------------------------ */
-double chebev(double a, double b, double c[], int m, double x)
+RFLOAT chebev(RFLOAT a, RFLOAT b, RFLOAT c[], int m, RFLOAT x)
 {
-    double d = 0.0, dd = 0.0, sv, y, y2;
+    RFLOAT d = 0.0, dd = 0.0, sv, y, y2;
     int j;
 
     if ((x - a)*(x - b) > 0.0)
@@ -282,16 +163,16 @@ double chebev(double a, double b, double c[], int m, double x)
 #define NUSE1 5
 #define NUSE2 5
 
-void beschb(double x, double *gam1, double *gam2, double *gampl, double *gammi)
+void beschb(RFLOAT x, RFLOAT *gam1, RFLOAT *gam2, RFLOAT *gampl, RFLOAT *gammi)
 {
-    double xx;
-    static double c1[] =
+    RFLOAT xx;
+    static RFLOAT c1[] =
         {
             -1.142022680371172e0, 6.516511267076e-3,
             3.08709017308e-4, -3.470626964e-6, 6.943764e-9,
             3.6780e-11, -1.36e-13
         };
-    static double c2[] =
+    static RFLOAT c2[] =
         {
             1.843740587300906e0, -0.076852840844786e0,
             1.271927136655e-3, -4.971736704e-6, -3.3126120e-8,
@@ -312,10 +193,10 @@ void beschb(double x, double *gam1, double *gam2, double *gampl, double *gammi)
 #define FPMIN 1.0e-30
 #define MAXIT 10000
 #define XMIN 2.0
-void bessjy(double x, double xnu, double *rj, double *ry, double *rjp, double *ryp)
+void bessjy(RFLOAT x, RFLOAT xnu, RFLOAT *rj, RFLOAT *ry, RFLOAT *rjp, RFLOAT *ryp)
 {
     int i, isign, l, nl;
-    double a, b, br, bi, c, cr, ci, d, del, del1, den, di, dlr, dli, dr, e, f, fact, fact2,
+    RFLOAT a, b, br, bi, c, cr, ci, d, del, del1, den, di, dlr, dli, dr, e, f, fact, fact2,
     fact3, ff, gam, gam1, gam2, gammi, gampl, h, p, pimu, pimu2, q, r, rjl,
     rjl1, rjmu, rjp1, rjpl, rjtemp, ry1, rymu, rymup, rytemp, sum, sum1,
     temp, w, x2, xi, xi2, xmu, xmu2;
@@ -478,52 +359,52 @@ void bessjy(double x, double xnu, double *rj, double *ry, double *rjp, double *r
 #undef XMIN
 
 /*............................................................................*/
-double bessi0_5(double x)
+RFLOAT bessi0_5(RFLOAT x)
 {
     return (x == 0) ? 0 : sqrt(2 / (PI*x))*sinh(x);
 }
-double bessi1_5(double x)
+RFLOAT bessi1_5(RFLOAT x)
 {
     return (x == 0) ? 0 : sqrt(2 / (PI*x))*(cosh(x) - sinh(x) / x);
 }
-double bessi2(double x)
+RFLOAT bessi2(RFLOAT x)
 {
     return (x == 0) ? 0 : bessi0(x) - ((2*1) / x) * bessi1(x);
 }
-double bessi2_5(double x)
+RFLOAT bessi2_5(RFLOAT x)
 {
     return (x == 0) ? 0 : bessi0_5(x) - ((2*1.5) / x) * bessi1_5(x);
 }
-double bessi3(double x)
+RFLOAT bessi3(RFLOAT x)
 {
     return (x == 0) ? 0 : bessi1(x) - ((2*2) / x) * bessi2(x);
 }
-double bessi3_5(double x)
+RFLOAT bessi3_5(RFLOAT x)
 {
     return (x == 0) ? 0 : bessi1_5(x) - ((2*2.5) / x) * bessi2_5(x);
 }
-double bessi4(double x)
+RFLOAT bessi4(RFLOAT x)
 {
     return (x == 0) ? 0 : bessi2(x) - ((2*3) / x) * bessi3(x);
 }
-double bessj1_5(double x)
+RFLOAT bessj1_5(RFLOAT x)
 {
-    double rj, ry, rjp, ryp;
+    RFLOAT rj, ry, rjp, ryp;
     bessjy(x, 1.5, &rj, &ry, &rjp, &ryp);
     return rj;
 }
-double bessj3_5(double x)
+RFLOAT bessj3_5(RFLOAT x)
 {
-    double rj, ry, rjp, ryp;
+    RFLOAT rj, ry, rjp, ryp;
     bessjy(x, 3.5, &rj, &ry, &rjp, &ryp);
     return rj;
 }
 
 /* Special functions ------------------------------------------------------- */
-double gammln(double xx)
+RFLOAT gammln(RFLOAT xx)
 {
-    double x, tmp, ser;
-    static double cof[6] =
+    RFLOAT x, tmp, ser;
+    static RFLOAT cof[6] =
         {
             76.18009173, -86.50532033, 24.01409822,
             -1.231739516, 0.120858003e-2, -0.536382e-5
@@ -543,9 +424,9 @@ double gammln(double xx)
 }
 
 
-double betai(double a, double b, double x)
+RFLOAT betai(RFLOAT a, RFLOAT b, RFLOAT x)
 {
-    double bt;
+    RFLOAT bt;
     if (x < 0.0 || x > 1.0)
         nrerror("Bad x in routine BETAI");
     if (x == 0.0 || x == 1.0)
@@ -561,11 +442,11 @@ double betai(double a, double b, double x)
 
 #define ITMAX 100
 #define EPS 3.0e-7
-double betacf(double a, double b, double x)
+RFLOAT betacf(RFLOAT a, RFLOAT b, RFLOAT x)
 {
-    double qap, qam, qab, em, tem, d;
-    double bz, bm = 1.0, bp, bpp;
-    double az = 1.0, am = 1.0, ap, app, aold;
+    RFLOAT qap, qam, qab, em, tem, d;
+    RFLOAT bz, bm = 1.0, bp, bpp;
+    RFLOAT az = 1.0, am = 1.0, ap, app, aold;
     int m;
 
     qab = a + b;
@@ -574,7 +455,7 @@ double betacf(double a, double b, double x)
     bz = 1.0 - qab * x / qap;
     for (m = 1;m <= ITMAX;m++)
     {
-        em = (double) m;
+        em = (RFLOAT) m;
         tem = em + em;
         d = em * (b - em) * x / ((qam + tem) * (a + tem));
         ap = az + d * am;
@@ -610,12 +491,12 @@ double betacf(double a, double b, double x)
         xt[j] = pcom[j] + x * xicom[j]; \
     f = (*func)(xt,prm);}
 
-void mnbrak(double *ax, double *bx, double *cx,
-            double *fa, double *fb, double *fc, double(*func)(double *, void*),
-            void *prm, int ncom, double *pcom, double *xicom)
+void mnbrak(RFLOAT *ax, RFLOAT *bx, RFLOAT *cx,
+            RFLOAT *fa, RFLOAT *fb, RFLOAT *fc, RFLOAT(*func)(RFLOAT *, void*),
+            void *prm, int ncom, RFLOAT *pcom, RFLOAT *xicom)
 {
-    double ulim, u, r, q, fu, dum;
-    double *xt=NULL;
+    RFLOAT ulim, u, r, q, fu, dum;
+    RFLOAT *xt=NULL;
     ask_Tvector(xt, 1, ncom);
 
     F1DIM(*ax,*fa);
@@ -660,7 +541,7 @@ void mnbrak(double *ax, double *bx, double *cx,
             if (fu < *fc)
             {
                 SHFT(*bx, *cx, u, *cx + GOLD*(*cx - *bx))
-                double aux; F1DIM(u,aux);
+                RFLOAT aux; F1DIM(u,aux);
                 SHFT(*fb, *fc, fu, aux)
             }
         }
@@ -688,14 +569,14 @@ void mnbrak(double *ax, double *bx, double *cx,
 #define ITMAX 100
 #define CGOLD 0.3819660
 #define ZEPS 1.0e-10
-double brent(double ax, double bx, double cx, double(*func)(double *,void*),
-             void *prm, double tol, double *xmin,
-             int ncom, double *pcom, double *xicom)
+RFLOAT brent(RFLOAT ax, RFLOAT bx, RFLOAT cx, RFLOAT(*func)(RFLOAT *,void*),
+             void *prm, RFLOAT tol, RFLOAT *xmin,
+             int ncom, RFLOAT *pcom, RFLOAT *xicom)
 {
     int iter;
-    double a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
-    double e = 0.0;
-    double *xt=NULL;
+    RFLOAT a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
+    RFLOAT e = 0.0;
+    RFLOAT *xt=NULL;
     ask_Tvector(xt, 1, ncom);
 
     a = (ax < cx ? ax : cx);
@@ -781,15 +662,15 @@ double brent(double ax, double bx, double cx, double(*func)(double *,void*),
 #undef F1DIM
 
 #define TOL 2.0e-4
-void linmin(double *p, double *xi, int n, double &fret,
-            double(*func)(double *, void*), void *prm)
+void linmin(RFLOAT *p, RFLOAT *xi, int n, RFLOAT &fret,
+            RFLOAT(*func)(RFLOAT *, void*), void *prm)
 {
     int j;
-    double xx, xmin, fx, fb, fa, bx, ax;
+    RFLOAT xx, xmin, fx, fb, fa, bx, ax;
 
     int ncom = n;
-    double *pcom=NULL;
-    double *xicom=NULL;
+    RFLOAT *pcom=NULL;
+    RFLOAT *xicom=NULL;
     ask_Tvector(pcom, 1, n);
     ask_Tvector(xicom, 1, n);
     for (j = 1;j <= n;j++)
@@ -813,13 +694,13 @@ void linmin(double *p, double *xi, int n, double &fret,
 #undef TOL
 
 #define ITMAX 200
-void powell(double *p, double *xi, int n, double ftol, int &iter,
-            double &fret, double(*func)(double *, void *), void *prm,
+void powell(RFLOAT *p, RFLOAT *xi, int n, RFLOAT ftol, int &iter,
+            RFLOAT &fret, RFLOAT(*func)(RFLOAT *, void *), void *prm,
             bool show)
 {
     int i, ibig, j;
-    double t, fptt, fp, del;
-    double *pt, *ptt, *xit;
+    RFLOAT t, fptt, fp, del;
+    RFLOAT *pt, *ptt, *xit;
     bool   different_from_0;
 
     ask_Tvector(pt, 1, n);
@@ -915,9 +796,9 @@ void powell(double *p, double *xi, int n, double ftol, int &iter,
 
 /* Singular value descomposition ------------------------------------------- */
 /* Copied from Bilib library (linearalgebra.h) */
-double Pythag(double a, double b)
+RFLOAT Pythag(RFLOAT a, RFLOAT b)
 {
-    double absa, absb;
+    RFLOAT absa, absb;
     absa = fabs(a);
     absb = fabs(b);
     if (absb < absa)
@@ -927,12 +808,12 @@ double Pythag(double a, double b)
 }
 
 #define SVDMAXITER 1000
-void svdcmp(double *U, int Lines, int Columns, double *W, double *V)
+void svdcmp(RFLOAT *U, int Lines, int Columns, RFLOAT *W, RFLOAT *V)
 {
-    double *rv1 = (double *)NULL;
-    double Norm, Scale;
-    double c, f, g, h, s;
-    double x, y, z;
+    RFLOAT *rv1 = (RFLOAT *)NULL;
+    RFLOAT Norm, Scale;
+    RFLOAT c, f, g, h, s;
+    RFLOAT x, y, z;
     long i, its, j, jj, k, l = 0L, nm = 0L;
     bool    Flag;
     int     MaxIterations = SVDMAXITER;
@@ -1216,10 +1097,10 @@ void svdcmp(double *U, int Lines, int Columns, double *W, double *V)
     free_Tvector(rv1, 0, Columns*Columns - 1);
 }
 
-void svbksb(double *u, double *w, double *v, int m, int n, double *b, double *x)
+void svbksb(RFLOAT *u, RFLOAT *w, RFLOAT *v, int m, int n, RFLOAT *b, RFLOAT *x)
 {
     int jj, j, i;
-    double s, *tmp;
+    RFLOAT s, *tmp;
 
     ask_Tvector(tmp, 1, n);
     for (j = 1;j <= n;j++)
@@ -1248,10 +1129,10 @@ void svbksb(double *u, double *w, double *v, int m, int n, double *b, double *x)
 #define ITMAX 100
 #define EPS 3.0e-7
 
-void gser(double *gamser, double a, double x, double *gln)
+void gser(RFLOAT *gamser, RFLOAT a, RFLOAT x, RFLOAT *gln)
 {
     int n;
-    double sum, del, ap;
+    RFLOAT sum, del, ap;
 
     *gln = gammln(a);
     if (x <= 0.0)
@@ -1287,10 +1168,10 @@ void gser(double *gamser, double a, double x, double *gln)
 #define EPS 3.0e-7
 #define FPMIN 1.0e-30
 
-void gcf(double *gammcf, double a, double x, double *gln)
+void gcf(RFLOAT *gammcf, RFLOAT a, RFLOAT x, RFLOAT *gln)
 {
     int i;
-    double an, b, c, d, del, h;
+    RFLOAT an, b, c, d, del, h;
 
     *gln = gammln(a);
     b = x + 1.0 - a;
@@ -1321,9 +1202,9 @@ void gcf(double *gammcf, double a, double x, double *gln)
 #undef EPS
 #undef FPMIN
 
-double gammp(double a, double x)
+RFLOAT gammp(RFLOAT a, RFLOAT x)
 {
-    double gamser, gammcf, gln;
+    RFLOAT gamser, gammcf, gln;
 
     if (x < 0.0 || a <= 0.0)
         nrerror("Invalid arguments in routine gammp");

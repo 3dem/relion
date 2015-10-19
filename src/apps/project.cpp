@@ -37,10 +37,10 @@ class project_parameters
 public:
 
 	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym;
-	double rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step;
+	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step;
 	int padding_factor;
 	int r_max, r_min_nn, interpolator;
-    bool do_only_one, do_ctf, ctf_phase_flipped, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot;
+    bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot;
 	// I/O Parser
 	IOParser parser;
 	MlModel model;
@@ -60,6 +60,7 @@ public:
 		fn_out = parser.getOption("--o", "Rootname for output projections", "proj");
        	do_ctf = parser.checkOption("--ctf", "Apply CTF to reference projections");
        	ctf_phase_flipped = parser.checkOption("--ctf_phase_flip", "Flip phases of the CTF in the output projections");
+       	do_ctf_intact_1st_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
        	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
        	fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
        	rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
@@ -78,7 +79,7 @@ public:
 
        	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
        	padding_factor = textToInteger(parser.getOption("--pad", "Padding factor", "2"));
-
+    	do_ctf2 = parser.checkOption("--ctf2", "Apply CTF*CTF to reference projections");
        	if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation"))
        		interpolator = NEAREST_NEIGHBOUR;
        	else
@@ -97,12 +98,12 @@ public:
 	{
 
             MetaDataTable DFo, MDang;
-    	Matrix2D<double> A3D;
+    	Matrix2D<RFLOAT> A3D;
     	FileName fn_expimg;
 
     	MultidimArray<Complex > F3D, F2D, Fexpimg;
-    	MultidimArray<double> Fctf, dummy;
-    	Image<double> vol, img, expimg;
+    	MultidimArray<RFLOAT> Fctf, dummy;
+    	Image<RFLOAT> vol, img, expimg;
     	FourierTransformer transformer, transformer_expimg;
 
 		std::cerr << " Reading map: " << fn_map << std::endl;
@@ -142,7 +143,7 @@ public:
     		projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
             if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001)
             {
-            	Matrix1D<double> shift(2);
+            	Matrix1D<RFLOAT> shift(2);
             	XX(shift) = -xoff;
             	YY(shift) = -yoff;
             	if (do_3d_rot)
@@ -197,7 +198,7 @@ public:
 
                 if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001)
                 {
-                    Matrix1D<double> shift(2);
+                    Matrix1D<RFLOAT> shift(2);
                     XX(shift) = -xoff;
                     YY(shift) = -yoff;
 
@@ -213,14 +214,16 @@ public:
 
                 // Apply CTF if necessary
                 CTF ctf;
-                if (do_ctf)
+                if (do_ctf || do_ctf2)
                 {
                     ctf.read(MDang, MDang);
                     Fctf.resize(F2D);
-                    ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false, false, true);
+                    ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
                     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
                     {
                         DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+                        if (do_ctf2)
+                        	DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
                     }
                 }
 
@@ -259,7 +262,7 @@ public:
                         if (my_mic_id < 0)
                             REPORT_ERROR("ERROR: cannot find " + fn_group + " in the input model file...");
 
-                        double normcorr = 1.;
+                        RFLOAT normcorr = 1.;
                         if (MDang.containsLabel(EMDL_IMAGE_NORM_CORRECTION))
                         {
                             MDang.getValue(EMDL_IMAGE_NORM_CORRECTION, normcorr);
@@ -268,10 +271,10 @@ public:
                         // Add coloured noise
                         FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
                         {
-                            int ires = ROUND( sqrt( (double)(kp*kp + ip*ip + jp*jp) ) );
+                            int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
                             ires = XMIPP_MIN(ires, model.ori_size/2); // at freqs higher than Nyquist: use last sigma2 value
 
-                            double sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
+                            RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
                             DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
                             DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., sigma);
                         }
@@ -295,9 +298,10 @@ public:
                 if (do_subtract_exp)
                 {
                     MDang.getValue(EMDL_IMAGE_NAME, fn_expimg);
+                    MDang.setValue(EMDL_IMAGE_ORI_NAME, fn_expimg); // Store fn_expimg in rlnOriginalParticleName
                     expimg.read(fn_expimg);
                     img() = expimg() - img();
-					}
+                }
 
                 if (do_3d_rot)
                 {

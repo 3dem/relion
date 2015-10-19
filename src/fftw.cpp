@@ -46,7 +46,6 @@
 #include "src/fftw.h"
 #include "src/args.h"
 #include <string.h>
-#include <pthread.h>
 
 static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -86,8 +85,6 @@ void FourierTransformer::init()
     fPlanBackward    = NULL;
     dataPtr          = NULL;
     complexDataPtr   = NULL;
-    threadsSetOn=false;
-    nthreads = 1;
 }
 
 void FourierTransformer::clear()
@@ -95,7 +92,7 @@ void FourierTransformer::clear()
     fFourier.clear();
     // Clean-up all other FFTW-allocated memory
     destroyPlans();
-    // Initialise all pointers to NULL, set nthreads to 1 and threadsSetOn to false
+    // Initialise all pointers to NULL
     init();
 
 }
@@ -106,11 +103,8 @@ void FourierTransformer::cleanup()
     clear();
     // Then clean up all the junk fftw keeps lying around
     // SOMEHOW THE FOLLOWING IS NOT ALLOWED WHEN USING MULTPLE TRANSFORMER OBJECTS....
-#ifndef USE_CUFFT
-    if(threadsSetOn)
-    	fftw_cleanup_threads();
-    else
-    	fftw_cleanup();
+#ifdef RELION_SINGLE_PRECISION
+    fftwf_cleanup();
 #else
     fftw_cleanup();
 #endif
@@ -123,47 +117,27 @@ void FourierTransformer::cleanup()
 
 void FourierTransformer::destroyPlans()
 {
-
     // Anything to do with plans has to be protected for threads!
     pthread_mutex_lock(&fftw_plan_mutex);
+
+#ifdef RELION_SINGLE_PRECISION
     if (fPlanForward !=NULL)
-    {
-#ifdef DEBUG_PLANS
-    	std::cerr << " DESTROY fPlanForward= " << fPlanForward  <<" this= "<<this<<std::endl;
-#endif
-    	fftw_destroy_plan(fPlanForward);
-    }
+    	fftwf_destroy_plan(fPlanForward);
     if (fPlanBackward!=NULL)
-    {
-#ifdef DEBUG_PLANS
-    	std::cerr << " DESTROY fPlanBackward= " << fPlanBackward  <<" this= "<<this<< std::endl;
+    	fftwf_destroy_plan(fPlanBackward);
+#else
+    if (fPlanForward !=NULL)
+    	fftw_destroy_plan(fPlanForward);
+    if (fPlanBackward!=NULL)
+    	fftw_destroy_plan(fPlanBackward);
 #endif
-   	fftw_destroy_plan(fPlanBackward);
-    }
+
     pthread_mutex_unlock(&fftw_plan_mutex);
 
 }
 
-void FourierTransformer::setThreadsNumber(int tNumber)
-{
-    if (tNumber!=1)
-    {
-        threadsSetOn=true;
-        nthreads = tNumber;
-        pthread_mutex_lock(&fftw_plan_mutex);
-#ifndef USE_CUFFT
-        if(fftw_init_threads()==0)
-            REPORT_ERROR("FFTW cannot init threads (setThreadsNumber)");
-        fftw_plan_with_nthreads(nthreads);
-#else
-        fftw_plan();
-#endif
-        pthread_mutex_unlock(&fftw_plan_mutex);
-    }
-}
-
 // Initialization ----------------------------------------------------------
-const MultidimArray<double> &FourierTransformer::getReal() const
+const MultidimArray<RFLOAT> &FourierTransformer::getReal() const
 {
     return (*fReal);
 }
@@ -174,7 +148,7 @@ const MultidimArray<Complex > &FourierTransformer::getComplex() const
 }
 
 
-void FourierTransformer::setReal(MultidimArray<double> &input)
+void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 {
     bool recomputePlan=false;
     if (fReal==NULL)
@@ -216,11 +190,19 @@ void FourierTransformer::setReal(MultidimArray<double> &input)
         destroyPlans();
         // Make new plans
         pthread_mutex_lock(&fftw_plan_mutex);
+#ifdef RELION_SINGLE_PRECISION
+        fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
+                                         (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
+        fPlanBackward = fftwf_plan_dft_c2r(ndim, N,
+                                          (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
+                                          FFTW_ESTIMATE);
+#else
         fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
                                          (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
         fPlanBackward = fftw_plan_dft_c2r(ndim, N,
                                           (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
                                           FFTW_ESTIMATE);
+#endif
         pthread_mutex_unlock(&fftw_plan_mutex);
 
         if (fPlanForward == NULL || fPlanBackward == NULL)
@@ -274,6 +256,22 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
         }
 
         pthread_mutex_lock(&fftw_plan_mutex);
+#ifdef RELION_SINGLE_PRECISION
+        if (fPlanForward!=NULL)
+            fftwf_destroy_plan(fPlanForward);
+        fPlanForward=NULL;
+        fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
+                                     (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+        if (fPlanBackward!=NULL)
+            fftwf_destroy_plan(fPlanBackward);
+        fPlanBackward=NULL;
+        fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
+                                      (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+        if (fPlanForward == NULL || fPlanBackward == NULL)
+            REPORT_ERROR("FFTW plans cannot be created");
+        delete [] N;
+        complexDataPtr=MULTIDIM_ARRAY(*fComplex);
+#else
         if (fPlanForward!=NULL)
             fftw_destroy_plan(fPlanForward);
         fPlanForward=NULL;
@@ -288,6 +286,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
             REPORT_ERROR("FFTW plans cannot be created");
         delete [] N;
         complexDataPtr=MULTIDIM_ARRAY(*fComplex);
+#endif
         pthread_mutex_unlock(&fftw_plan_mutex);
     }
 }
@@ -295,7 +294,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
 void FourierTransformer::setFourier(MultidimArray<Complex > &inputFourier)
 {
     memcpy(MULTIDIM_ARRAY(fFourier),MULTIDIM_ARRAY(inputFourier),
-           MULTIDIM_SIZE(inputFourier)*2*sizeof(double));
+           MULTIDIM_SIZE(inputFourier)*2*sizeof(RFLOAT));
 }
 
 // Transform ---------------------------------------------------------------
@@ -303,8 +302,11 @@ void FourierTransformer::Transform(int sign)
 {
     if (sign == FFTW_FORWARD)
     {
+#ifdef RELION_SINGLE_PRECISION
+        fftwf_execute(fPlanForward);
+#else
         fftw_execute(fPlanForward);
-
+#endif
         // Normalisation of the transform
         unsigned long int size=0;
         if(fReal!=NULL)
@@ -318,8 +320,13 @@ void FourierTransformer::Transform(int sign)
             DIRECT_MULTIDIM_ELEM(fFourier,n) /= size;
     }
     else if (sign == FFTW_BACKWARD)
+    {
+#ifdef RELION_SINGLE_PRECISION
+        fftwf_execute(fPlanBackward);
+#else
         fftw_execute(fPlanBackward);
-
+#endif
+    }
 }
 
 void FourierTransformer::FourierTransform()
@@ -389,7 +396,7 @@ void FourierTransformer::enforceHermitianSymmetry()
 }
 
 
-void randomizePhasesBeyond(MultidimArray<double> &v, int index)
+void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index)
 {
     MultidimArray< Complex > FT;
     FourierTransformer transformer;
@@ -401,10 +408,10 @@ void randomizePhasesBeyond(MultidimArray<double> &v, int index)
     {
     	if (kp*kp + ip*ip + jp*jp >= index2)
     	{
-    		double mag = abs(DIRECT_A3D_ELEM(FT, k, i, j));
-    		double phas = rnd_unif(0., 2.*PI);
-    		double realval = mag * cos(phas);
-    		double imagval = mag * sin(phas);
+    		RFLOAT mag = abs(DIRECT_A3D_ELEM(FT, k, i, j));
+    		RFLOAT phas = rnd_unif(0., 2.*PI);
+    		RFLOAT realval = mag * cos(phas);
+    		RFLOAT imagval = mag * sin(phas);
     		DIRECT_A3D_ELEM(FT, k, i, j) = Complex(realval, imagval);
     	}
     }
@@ -419,14 +426,14 @@ void randomizePhasesBeyond(MultidimArray<double> &v, int index)
 // from precalculated Fourier Transforms, and without sampling rate etc.
 void getFSC(MultidimArray< Complex > &FT1,
 			MultidimArray< Complex > &FT2,
-			MultidimArray< double > &fsc)
+			MultidimArray< RFLOAT > &fsc)
 {
 	if (!FT1.sameShape(FT2))
         REPORT_ERROR("fourierShellCorrelation ERROR: MultidimArrays have different shapes!");
 
     MultidimArray< int > radial_count(XSIZE(FT1));
-    MultidimArray<double> num, den1, den2;
-    Matrix1D<double> f(3);
+    MultidimArray<RFLOAT> num, den1, den2;
+    Matrix1D<RFLOAT> f(3);
     num.initZeros(radial_count);
     den1.initZeros(radial_count);
     den2.initZeros(radial_count);
@@ -438,8 +445,8 @@ void getFSC(MultidimArray< Complex > &FT1,
         	continue;
         Complex z1=DIRECT_A3D_ELEM(FT1, k, i, j);
         Complex z2=DIRECT_A3D_ELEM(FT2, k, i, j);
-        double absz1=abs(z1);
-        double absz2=abs(z2);
+        RFLOAT absz1=abs(z1);
+        RFLOAT absz2=abs(z2);
         num(idx)+= (conj(z1) * z2).real;
         den1(idx)+= absz1*absz1;
         den2(idx)+= absz2*absz2;
@@ -454,9 +461,9 @@ void getFSC(MultidimArray< Complex > &FT1,
 }
 
 
-void getFSC(MultidimArray< double > &m1,
-		    MultidimArray< double > &m2,
-		    MultidimArray< double > &fsc)
+void getFSC(MultidimArray< RFLOAT > &m1,
+		    MultidimArray< RFLOAT > &m2,
+		    MultidimArray< RFLOAT > &fsc)
 {
 	MultidimArray< Complex > FT1, FT2;
 	FourierTransformer transformer;
@@ -465,51 +472,14 @@ void getFSC(MultidimArray< double > &m1,
 	getFSC(FT1, FT2, fsc);
 }
 
-/*
-void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<double>& Mpmem, int nThreads)
-{
-
-    //Mmem = *this
-    //memory for fourier transform output
-    MultidimArray<Complex > MmemFourier;
-    // Perform the Fourier transform
-    FourierTransformer transformerM;
-    transformerM.setThreadsNumber(nThreads);
-    transformerM.FourierTransform(Mpmem, MmemFourier, true);
-
-    // Create space for the downsampled image and its Fourier transform
-    Mpmem.resize(Ydim, Xdim);
-    MultidimArray<Complex > MpmemFourier;
-    FourierTransformer transformerMp;
-    transformerMp.setReal(Mpmem);
-    transformerMp.getFourierAlias(MpmemFourier);
-    long int ihalf = XMIPP_MIN((YSIZE(MpmemFourier)/2+1),(YSIZE(MmemFourier)/2+1));
-    long int xsize = XMIPP_MIN((XSIZE(MmemFourier)),(XSIZE(MpmemFourier)));
-    //Init with zero
-    MpmemFourier.initZeros();
-    for (long int i=0; i<ihalf; i++)
-        for (long int j=0; j<xsize; j++)
-            MpmemFourier(i,j)=MmemFourier(i,j);
-    for (long int i=YSIZE(MpmemFourier)-1, n=1; n < ihalf-1; i--, n++)
-    {
-    	long int ip = YSIZE(MmemFourier) - n;
-    	for (long int j=0; j<xsize; j++)
-            MpmemFourier(i,j)=MmemFourier(ip,j);
-    }
-
-    // Transform data
-    transformerMp.inverseFourierTransform();
-}
-*/
-
 
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
         MultidimArray<Complex > &out,
 		  TabSine &tab_sin, TabCosine &tab_cos,
-		  double oridim, double xshift, double yshift, double zshift)
+		  RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	out.resize(in);
-	double dotp, a, b, x, y, z;
+	RFLOAT dotp, a, b, x, y, z;
 	switch (in.getDim())
 	{
 	case 1:
@@ -582,10 +552,10 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 		                          MultidimArray<Complex > &out,
 								  TabSine &tab_sin, TabCosine &tab_cos,
-								  double oridim, double xshift, double yshift, double zshift)
+								  RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	out.resize(in);
-	double dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
+	RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
 	switch (in.getDim())
 	{
 	case 1:
@@ -688,10 +658,10 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 // Shift an image through phase-shifts in its Fourier Transform (without pretabulated sine and cosine)
 void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 		                          MultidimArray<Complex > &out,
-		                          double oridim, double xshift, double yshift, double zshift)
+		                          RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	out.resize(in);
-	double dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
+	RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
 	switch (in.getDim())
 	{
 	case 1:
@@ -792,15 +762,15 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 	}
 }
 
-void getSpectrum(MultidimArray<double> &Min,
-                 MultidimArray<double> &spectrum,
+void getSpectrum(MultidimArray<RFLOAT> &Min,
+                 MultidimArray<RFLOAT> &spectrum,
                  int spectrum_type)
 {
 
     MultidimArray<Complex > Faux;
     int xsize = XSIZE(Min);
-    Matrix1D<double> f(3);
-    MultidimArray<double> count(xsize);
+    Matrix1D<RFLOAT> f(3);
+    MultidimArray<RFLOAT> count(xsize);
     FourierTransformer transformer;
 
     spectrum.initZeros(xsize);
@@ -822,12 +792,12 @@ void getSpectrum(MultidimArray<double> &Min,
 
 }
 
-void divideBySpectrum(MultidimArray<double> &Min,
-                      MultidimArray<double> &spectrum,
+void divideBySpectrum(MultidimArray<RFLOAT> &Min,
+                      MultidimArray<RFLOAT> &spectrum,
                       bool leave_origin_intact)
 {
 
-    MultidimArray<double> div_spec(spectrum);
+    MultidimArray<RFLOAT> div_spec(spectrum);
     FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
     {
         if (ABS(dAi(spectrum,i)) > 0.)
@@ -838,16 +808,16 @@ void divideBySpectrum(MultidimArray<double> &Min,
     multiplyBySpectrum(Min,div_spec,leave_origin_intact);
 }
 
-void multiplyBySpectrum(MultidimArray<double> &Min,
-                        MultidimArray<double> &spectrum,
+void multiplyBySpectrum(MultidimArray<RFLOAT> &Min,
+                        MultidimArray<RFLOAT> &spectrum,
                         bool leave_origin_intact)
 {
 
     MultidimArray<Complex > Faux;
-    Matrix1D<double> f(3);
-    MultidimArray<double> lspectrum;
+    Matrix1D<RFLOAT> f(3);
+    MultidimArray<RFLOAT> lspectrum;
     FourierTransformer transformer;
-    //double dim3 = XSIZE(Min)*YSIZE(Min)*ZSIZE(Min);
+    //RFLOAT dim3 = XSIZE(Min)*YSIZE(Min)*ZSIZE(Min);
     transformer.FourierTransform(Min, Faux, false);
     lspectrum=spectrum;
     if (leave_origin_intact)
@@ -862,27 +832,27 @@ void multiplyBySpectrum(MultidimArray<double> &Min,
 }
 
 
-void whitenSpectrum(MultidimArray<double> &Min,
-                    MultidimArray<double> &Mout,
+void whitenSpectrum(MultidimArray<RFLOAT> &Min,
+                    MultidimArray<RFLOAT> &Mout,
                     int spectrum_type,
                     bool leave_origin_intact)
 {
 
-    MultidimArray<double> spectrum;
+    MultidimArray<RFLOAT> spectrum;
     getSpectrum(Min,spectrum,spectrum_type);
     Mout=Min;
     divideBySpectrum(Mout,spectrum,leave_origin_intact);
 
 }
 
-void adaptSpectrum(MultidimArray<double> &Min,
-                   MultidimArray<double> &Mout,
-                   const MultidimArray<double> &spectrum_ref,
+void adaptSpectrum(MultidimArray<RFLOAT> &Min,
+                   MultidimArray<RFLOAT> &Mout,
+                   const MultidimArray<RFLOAT> &spectrum_ref,
                    int spectrum_type,
                    bool leave_origin_intact)
 {
 
-    MultidimArray<double> spectrum;
+    MultidimArray<RFLOAT> spectrum;
     getSpectrum(Min,spectrum,spectrum_type);
     FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
     {
@@ -893,9 +863,9 @@ void adaptSpectrum(MultidimArray<double> &Min,
 }
 
 /** Kullback-Leibner divergence */
-double getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
-		MultidimArray<Complex > &Fref, MultidimArray<double> &sigma2,
-		MultidimArray<double> &p_i, MultidimArray<double> &q_i, int highshell, int lowshell )
+RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
+		MultidimArray<Complex > &Fref, MultidimArray<RFLOAT> &sigma2,
+		MultidimArray<RFLOAT> &p_i, MultidimArray<RFLOAT> &q_i, int highshell, int lowshell )
 {
 	// First check dimensions are OK
 	if (!Fimg.sameShape(Fref))
@@ -916,8 +886,8 @@ double getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
 	MultidimArray<int> histogram;
 	int histogram_size = 101;
 	int histogram_origin = histogram_size / 2;
-	double sigma_max = 10.;
-	double histogram_factor = histogram_origin / sigma_max;
+	RFLOAT sigma_max = 10.;
+	RFLOAT histogram_factor = histogram_origin / sigma_max;
 	histogram.initZeros(histogram_size);
 
 	// This way this will work in both 2D and 3D
@@ -927,9 +897,9 @@ double getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
 		if (ires >= lowshell && ires <= highshell)
 		{
 			// Use FT of masked image for noise estimation!
-			double diff_real = (DIRECT_A3D_ELEM(Fref, k, i, j)).real - (DIRECT_A3D_ELEM(Fimg, k, i, j)).real;
-			double diff_imag = (DIRECT_A3D_ELEM(Fref, k, i, j)).imag - (DIRECT_A3D_ELEM(Fimg, k, i, j)).imag;
-			double sigma = sqrt(DIRECT_A1D_ELEM(sigma2, ires));
+			RFLOAT diff_real = (DIRECT_A3D_ELEM(Fref, k, i, j)).real - (DIRECT_A3D_ELEM(Fimg, k, i, j)).real;
+			RFLOAT diff_imag = (DIRECT_A3D_ELEM(Fref, k, i, j)).imag - (DIRECT_A3D_ELEM(Fimg, k, i, j)).imag;
+			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(sigma2, ires));
 
 			// Divide by standard deviation to normalise all the difference
 			diff_real /= sigma;
@@ -959,35 +929,35 @@ double getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
 	}
 
 	// Normalise the histogram and the discretised analytical Gaussian
-	double norm = (double)histogram.sum();
-	double gaussnorm = 0.;
+	RFLOAT norm = (RFLOAT)histogram.sum();
+	RFLOAT gaussnorm = 0.;
 	for (int i = 0; i < histogram_size; i++)
 	{
-		double x = (double)i / histogram_factor;
+		RFLOAT x = (RFLOAT)i / histogram_factor;
 		gaussnorm += gaussian1D(x - sigma_max, 1. , 0.);
 	}
 
 	// Now calculate the actual Kullback-Leibner divergence
-	double kl_divergence = 0.;
+	RFLOAT kl_divergence = 0.;
 	p_i.resize(histogram_size);
 	q_i.resize(histogram_size);
 	for (int i = 0; i < histogram_size; i++)
 	{
 		// Data distribution
-		p_i(i) = (double)histogram(i) / norm;
+		p_i(i) = (RFLOAT)histogram(i) / norm;
 		// Theoretical distribution
-		double x = (double)i / histogram_factor;
+		RFLOAT x = (RFLOAT)i / histogram_factor;
 		q_i(i) = gaussian1D(x - sigma_max, 1. , 0.) / gaussnorm;
 
 		if (p_i(i) > 0.)
 			kl_divergence += p_i(i) * log (p_i(i) / q_i(i));
 	}
-	kl_divergence /= (double)histogram_size;
+	kl_divergence /= (RFLOAT)histogram_size;
 
 	return kl_divergence;
 
 }
-void resizeMap(MultidimArray<double > &img, int newsize)
+void resizeMap(MultidimArray<RFLOAT > &img, int newsize)
 {
 
 	FourierTransformer transformer;
@@ -1002,12 +972,12 @@ void resizeMap(MultidimArray<double > &img, int newsize)
 
 }
 
-void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, double bfactor, double angpix)
+void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT bfactor, RFLOAT angpix)
 {
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
     	int r2 = kp * kp + ip * ip + jp * jp;
-    	double res = sqrt((double)r2)/(ori_size * angpix); // get resolution in 1/Angstrom
+    	RFLOAT res = sqrt((RFLOAT)r2)/(ori_size * angpix); // get resolution in 1/Angstrom
     	if (res <= 1. / (angpix * 2.) ) // Apply B-factor sharpening until Nyquist, then low-pass filter later on (with a soft edge)
 		{
     		DIRECT_A3D_ELEM(FT, k, i, j) *= exp( -(bfactor / 4.)  * res * res);
@@ -1019,7 +989,7 @@ void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, double bfactor
 	}
 }
 
-void applyBFactorToMap(MultidimArray<double > &img, double bfactor, double angpix)
+void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpix)
 {
 
 	FourierTransformer transformer;
@@ -1031,7 +1001,7 @@ void applyBFactorToMap(MultidimArray<double > &img, double bfactor, double angpi
 
 
 void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
-		double low_pass, double angpix, int filter_edge_width, bool do_highpass_instead)
+		RFLOAT low_pass, RFLOAT angpix, int filter_edge_width, bool do_highpass_instead)
 {
 
 	// Which resolution shell is the filter?
@@ -1039,15 +1009,15 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 	int filter_edge_halfwidth = filter_edge_width / 2;
 
 	// Soft-edge: from 1 shell less to one shell more:
-	double edge_low = XMIPP_MAX(0., (ires_filter - filter_edge_halfwidth) / (double)ori_size); // in 1/pix
-	double edge_high = XMIPP_MIN(XSIZE(FT), (ires_filter + filter_edge_halfwidth) / (double)ori_size); // in 1/pix
-	double edge_width = edge_high - edge_low;
+	RFLOAT edge_low = XMIPP_MAX(0., (ires_filter - filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
+	RFLOAT edge_high = XMIPP_MIN(XSIZE(FT), (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
+	RFLOAT edge_width = edge_high - edge_low;
 
 	// Put a raised cosine from edge_low to edge_high
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
     	int r2 = kp * kp + ip * ip + jp * jp;
-    	double res = sqrt((double)r2)/ori_size; // get resolution in 1/pixel
+    	RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
 
     	if (do_highpass_instead)
     	{
@@ -1072,7 +1042,7 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 
 }
 
-void lowPassFilterMap(MultidimArray<double > &img, double low_pass, double angpix, int filter_edge_width)
+void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width)
 {
 	FourierTransformer transformer;
 	MultidimArray<Complex > FT;
@@ -1114,7 +1084,7 @@ void lowPassFilterMap(MultidimArray<double > &img, double low_pass, double angpi
 
 }
 
-void highPassFilterMap(MultidimArray<double > &img, double low_pass, double angpix, int filter_edge_width)
+void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width)
 {
 	FourierTransformer transformer;
 	MultidimArray<Complex > FT;
@@ -1125,29 +1095,29 @@ void highPassFilterMap(MultidimArray<double > &img, double low_pass, double angp
 
 
 
-void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, double beamtilt_x, double beamtilt_y,
-		double wavelength, double Cs, double angpix, int ori_size)
+void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
 {
 
 	Fout = Fin;
 	selfApplyBeamTilt(Fout, beamtilt_x, beamtilt_y, wavelength, Cs, angpix, ori_size);
 }
 
-void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, double beamtilt_x, double beamtilt_y,
-		double wavelength, double Cs, double angpix, int ori_size)
+void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
 {
 	if (Fimg.getDim() != 2)
 		REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
 
-	double boxsize = angpix * ori_size;
-	double factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+	RFLOAT boxsize = angpix * ori_size;
+	RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
 	{
-		double delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
-		double realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
-		double imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
-		double mag = sqrt(realval * realval + imagval * imagval);
-		double phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+		RFLOAT delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
+		RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
+		RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
+		RFLOAT mag = sqrt(realval * realval + imagval * imagval);
+		RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
 		realval = mag * cos(phas);
 		imagval = mag * sin(phas);
 		DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);

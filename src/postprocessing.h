@@ -45,10 +45,10 @@ public:
 	FileName fn_in, fn_out, fn_I1, fn_I2;
 
 	// Images for the two half-reconstructions and the mask
-	Image<double> I1, I2, I1phi, I2phi, Im;
+	Image<RFLOAT> I1, I2, I1phi, I2phi, Im;
 
 	// Pixel size in Angstroms
-	double angpix;
+	RFLOAT angpix;
 
 	/////// Masking
 
@@ -56,16 +56,16 @@ public:
 	bool do_auto_mask;
 
 	// Density threshold below which to calculate initial mask seed
-	double ini_mask_density_threshold;
+	RFLOAT ini_mask_density_threshold;
 
 	// Number of pixels to extend the mask beyond the initial mask seed
-	double extend_ini_mask;
+	RFLOAT extend_ini_mask;
 
 	// Width (in pixels) for soft mask edge
-	double width_soft_mask_edge;
+	RFLOAT width_soft_mask_edge;
 
 	// From the resolution where the FSC drops below this value, randomize the phases in the two maps
-	double randomize_fsc_at;
+	RFLOAT randomize_fsc_at;
 
 	// Filename for a user-provided mask
 	FileName fn_mask;
@@ -82,10 +82,10 @@ public:
 	bool do_mask;
 
 	// Minimum and maximum resolution to use in the fit
-	double fit_minres, fit_maxres;
+	RFLOAT fit_minres, fit_maxres;
 
 	// User-provided (ad hoc) B-factor
-	double adhoc_bfac;
+	RFLOAT adhoc_bfac;
 
 	///////// Filtering
 
@@ -93,15 +93,15 @@ public:
 	bool do_fsc_weighting;
 
 	// Frequency at which to low-pass filter the final map
-	double low_pass_freq;
+	RFLOAT low_pass_freq;
 
 	// Width of raised cosine edge on low-pass filter
 	int filter_edge_width;
 
 	// Arrays to store FSC, Guinier curves etc
-	MultidimArray<double> fsc_unmasked;
-	MultidimArray<double> fsc_masked, fsc_random_masked, fsc_true;
-	double global_intercept, global_slope, global_corr_coeff, global_bfactor, global_resol;
+	MultidimArray<RFLOAT> fsc_unmasked;
+	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true;
+	RFLOAT global_intercept, global_slope, global_corr_coeff, global_bfactor, global_resol;
 	// The Guinier plots
 	std::vector<fit_point2D>  guinierin, guinierinvmtf, guinierweighted, guiniersharpen;
 
@@ -135,7 +135,7 @@ public:
 	void makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fit_point2D> &guinier);
 
 	// Apply sqrt(2FSC/(FSC=1)) weighting prior to B-factor sharpening
-	void applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<double> my_fsc);
+	void applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc);
 
 	// Output map and STAR files with metadata, also write final resolution to screen
 	void writeOutput();

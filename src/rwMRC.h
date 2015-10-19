@@ -30,7 +30,7 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif 
+#endif
 
 #define MRCSIZE    1024 // Minimum size of the MRC header (when nsymbt = 0)
 
@@ -205,13 +205,6 @@ int readMRC(long int img_select, bool isStack=false)
         _nDim = 1;
 
     data.setDimensions(_xDim, _yDim, _zDim, _nDim);
-//    long int imgStart=0;
-//    long int imgEnd =_nDim;
-//    if (img_select != -1)
-//    {
-//        imgStart=img_select;
-//        imgEnd=img_select+1;
-//    }
 
     DataType datatype;
     switch ( header->mode%5 )
@@ -227,28 +220,26 @@ int readMRC(long int img_select, bool isStack=false)
         break;
     case 3:
     	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-    	//break;
     case 4:
     	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-        //break;
     default:
         datatype = UChar;
         break;
     }
     offset = MRCSIZE + header->nsymbt;
 
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(double)header->amin);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(double)header->amax);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(double)header->amean);
-    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(double)header->arms);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN,(RFLOAT)header->amin);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->amax);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->amean);
+    MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->arms);
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
     if ( header->mx && header->a!=0)//ux
-        MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(double)header->a/header->mx);
+        MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)header->a/header->mx);
     if ( header->my && header->b!=0)//yx
-        MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(double)header->b/header->my);
+        MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)header->b/header->my);
     if ( header->mz && header->c!=0)//zx
-        MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(double)header->c/header->mz);
+        MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->c/header->mz);
 
    if (isStack && dataflag<0)   // Don't read the individual header and the data if not necessary
    {
@@ -293,7 +284,6 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 			break;
 		case UNKNOWN_SYSTEM:
 			REPORT_ERROR("Unkown system type in writeMRC machine stamp determination.");
-			//break;
 		default:
 			break;
 	}
@@ -324,7 +314,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     	header->nz = Zdim;
 
     // Convert T to datatype
-    if ( typeid(T) == typeid(double) ||
+    if ( typeid(T) == typeid(RFLOAT) ||
          typeid(T) == typeid(float) ||
          typeid(T) == typeid(int) )
         header->mode = 2;
@@ -341,7 +331,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     header->mapc = 1;
     header->mapr = 2;
     header->maps = 3;
-    double aux,aux2;
+    RFLOAT aux,aux2;
 
     // TODO: fix this!
     header->a = (float)0.;// ua;
@@ -350,6 +340,12 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     header->alpha = (float)90.;
     header->beta = (float)90.;
     header->gamma = (float)90.;
+    header->xOrigin = (float)0.;
+    header->yOrigin = (float)0.;
+    header->zOrigin = (float)0.;
+    header->nxStart = (int)0;
+    header->nyStart = (int)0;
+    header->nzStart = (int)0;
 
     if (!MDMainHeader.isEmpty())
     {
@@ -409,7 +405,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     header->nlabl =  1;
 
     char label[MRC_LABEL_LEN] = "Relion ";
-    time_t rawtime; 
+    time_t rawtime;
     struct tm * timeinfo;
 
     time (&rawtime);
@@ -419,11 +415,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
     strcat(label,PACKAGE_VERSION);
 #endif
     strcat(label,"   ");
-#ifdef RELION_TESTING
-    strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"06-jun-06  13:37:00",timeinfo);
-#else
     strftime (label+strlen(label),MRC_LABEL_LEN-strlen(label),"%d-%b-%y  %R:%S",timeinfo);
-#endif
     strncpy(header->labels,label,MRC_LABEL_LEN);
 
     //strncpy(header->labels, p->label.c_str(), 799);

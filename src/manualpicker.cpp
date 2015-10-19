@@ -35,17 +35,17 @@ int last_ctf_viewed;
 
 
 bool   global_has_ctf;
-double global_angpix;
-double global_lowpass;
-double global_particle_diameter;
-double global_sigma_contrast;
-double global_black_val;
-double global_white_val;
-double global_micscale;
-double global_ctfscale;
-double global_ctfsigma;
-double global_blue_value;
-double global_red_value;
+RFLOAT global_angpix;
+RFLOAT global_lowpass;
+RFLOAT global_particle_diameter;
+RFLOAT global_sigma_contrast;
+RFLOAT global_black_val;
+RFLOAT global_white_val;
+RFLOAT global_micscale;
+RFLOAT global_ctfscale;
+RFLOAT global_ctfsigma;
+RFLOAT global_blue_value;
+RFLOAT global_red_value;
 int    global_total_count;
 FileName global_pickname;
 FileName global_fn_color;
@@ -106,7 +106,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 
 	command += " &";
 	std::cerr << command << std::endl;
-	system(command.c_str());
+	int res = system(command.c_str());
 
 	last_pick_viewed = imic;
 	for (int i = 0; i < viewmic_buttons.size(); i++)
@@ -137,7 +137,7 @@ void cb_viewctf(Fl_Widget* w, void* data)
 	command += " --sigma_contrast " + floatToString(global_ctfsigma);
 	command += " &";
 	std::cerr << command << std::endl;
-	system(command.c_str());
+	int res = system(command.c_str());
 
 	last_ctf_viewed = imic;
 	for (int i = 0; i < viewctf_buttons.size(); i++)
@@ -475,7 +475,7 @@ void ManualPicker::initialise()
 
 	if (global_micscale < 1.)
 	{
-		double new_nyquist = global_angpix * 2. / global_micscale;
+		RFLOAT new_nyquist = global_angpix * 2. / global_micscale;
 		if (new_nyquist > global_lowpass)
 			global_lowpass = new_nyquist;
 		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;

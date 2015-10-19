@@ -21,13 +21,13 @@
 
 // Mask out corners outside sphere (replace by average value)
 // Apply a soft mask (raised cosine with cosine_width pixels width)
-void softMaskOutsideMap(MultidimArray<double> &vol, double radius, double cosine_width, MultidimArray<double> *Mnoise)
+void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, RFLOAT radius, RFLOAT cosine_width, MultidimArray<RFLOAT> *Mnoise)
 {
 
 	vol.setXmippOrigin();
-	double r, radius_p, raisedcos, sum_bg = 0., sum = 0.;
+	RFLOAT r, radius_p, raisedcos, sum_bg = 0., sum = 0.;
 	if (radius < 0)
-		radius = (double)XSIZE(vol)/2.;
+		radius = (RFLOAT)XSIZE(vol)/2.;
 	radius_p = radius + cosine_width;
 
 
@@ -36,7 +36,7 @@ void softMaskOutsideMap(MultidimArray<double> &vol, double radius, double cosine
 		// Calculate average background value
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
 		{
-			r = sqrt((double)(k*k + i*i + j*j));
+			r = sqrt((RFLOAT)(k*k + i*i + j*j));
 			if (r < radius)
 				continue;
 			else if (r > radius_p)
@@ -57,7 +57,7 @@ void softMaskOutsideMap(MultidimArray<double> &vol, double radius, double cosine
 	// Apply noisy or average background value
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
 	{
-		r = sqrt((double)(k*k + i*i + j*j));
+		r = sqrt((RFLOAT)(k*k + i*i + j*j));
 		if (r < radius)
 		{
 			continue;
@@ -69,14 +69,14 @@ void softMaskOutsideMap(MultidimArray<double> &vol, double radius, double cosine
 		else
 		{
 			raisedcos = 0.5 + 0.5 * cos(PI * (radius_p - r) / cosine_width );
-			double add = (Mnoise == NULL) ?  sum_bg : A3D_ELEM(*Mnoise, k, i, j);
+			RFLOAT add = (Mnoise == NULL) ?  sum_bg : A3D_ELEM(*Mnoise, k, i, j);
 			A3D_ELEM(vol, k, i, j) = (1 - raisedcos) * A3D_ELEM(vol, k, i, j) + raisedcos * add;
 		}
 	}
 
 }
 
-void softMaskOutsideMap(MultidimArray<double> &vol, MultidimArray<double> &msk, bool invert_mask)
+void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, MultidimArray<RFLOAT> &msk, bool invert_mask)
 {
 
 	if (msk.computeMax() > 1. || msk.computeMin() < 0.)
@@ -88,9 +88,9 @@ void softMaskOutsideMap(MultidimArray<double> &vol, MultidimArray<double> &msk, 
 		REPORT_ERROR("ERROR: Solvent mask does not have the same size as the reference vol.");
 
 	// Replace solvent by the average value in the solvent region
-	double sum = 0.;
-	double sum_bg = 0.;
-	double solv;
+	RFLOAT sum = 0.;
+	RFLOAT sum_bg = 0.;
+	RFLOAT solv;
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(msk)
 	{
 		solv = (invert_mask) ? DIRECT_A3D_ELEM(msk, k, i, j) : 1. - DIRECT_A3D_ELEM(msk, k, i, j);
@@ -108,11 +108,11 @@ void softMaskOutsideMap(MultidimArray<double> &vol, MultidimArray<double> &msk, 
 
 }
 
-void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
-		double ini_mask_density_threshold, double extend_ini_mask, double width_soft_mask_edge, bool verb)
+void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
+		RFLOAT ini_mask_density_threshold, RFLOAT extend_ini_mask, RFLOAT width_soft_mask_edge, bool verb)
 
 {
-	MultidimArray<double> msk_cp;
+	MultidimArray<RFLOAT> msk_cp;
 	int barstep, update_bar, totalbar;
 
 	// Resize output mask
@@ -145,7 +145,7 @@ void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
 		}
 
 		int extend_size = ABS(CEIL(extend_ini_mask));
-		double extend_ini_mask2 = extend_ini_mask * extend_ini_mask;
+		RFLOAT extend_ini_mask2 = extend_ini_mask * extend_ini_mask;
 		msk_cp = msk_out;
 		if (extend_ini_mask > 0.)
 		{
@@ -168,7 +168,7 @@ void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
 									// only check distance if neighbouring Im() is one
 									if (A3D_ELEM(msk_cp, kp, ip, jp) > 0.999)
 									{
-										double r2 = (double)( (kp-k)*(kp-k) + (ip-i)*(ip-i)+ (jp-j)*(jp-j) );
+										RFLOAT r2 = (RFLOAT)( (kp-k)*(kp-k) + (ip-i)*(ip-i)+ (jp-j)*(jp-j) );
 										// Set original voxel to 1 if a neghouring with Im()=1 is within distance extend_ini_mask
 										if (r2 < extend_ini_mask2)
 										{
@@ -217,7 +217,7 @@ void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
 									// only check distance if neighbouring Im() is one
 									if (A3D_ELEM(msk_cp, kp, ip, jp) < 0.001)
 									{
-										double r2 = (double)( (kp-k)*(kp-k) + (ip-i)*(ip-i)+ (jp-j)*(jp-j) );
+										RFLOAT r2 = (RFLOAT)( (kp-k)*(kp-k) + (ip-i)*(ip-i)+ (jp-j)*(jp-j) );
 										// Set original voxel to 1 if a neghouring with Im()=1 is within distance extend_ini_mask
 										if (r2 < extend_ini_mask2)
 										{
@@ -264,13 +264,13 @@ void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
 
 		msk_cp = msk_out;
 		int extend_size = CEIL(width_soft_mask_edge);
-		double width_soft_mask_edge2 = width_soft_mask_edge * width_soft_mask_edge;
+		RFLOAT width_soft_mask_edge2 = width_soft_mask_edge * width_soft_mask_edge;
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(msk_cp)
 		{
 			// only extend zero values to values between 0 and 1.
 			if (A3D_ELEM(msk_cp, k, i, j) < 0.001)
 			{
-				double min_r2 = 9999.;
+				RFLOAT min_r2 = 9999.;
 				for (long int kp = k - extend_size; kp <= k + extend_size; kp++)
 				{
 					for (long int ip = i - extend_size; ip <= i + extend_size; ip++)
@@ -284,7 +284,7 @@ void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
 								// only update distance to a neighbouring msk_cp is one
 								if (A3D_ELEM(msk_cp, kp, ip, jp) > 0.999)
 								{
-									double r2 = (double)( (kp-k)*(kp-k) + (ip-i)*(ip-i)+ (jp-j)*(jp-j) );
+									RFLOAT r2 = (RFLOAT)( (kp-k)*(kp-k) + (ip-i)*(ip-i)+ (jp-j)*(jp-j) );
 									// Set original voxel to 1 if a neghouring with Im()=1 is within distance extend_ini_mask
 									if (r2 < min_r2)
 										min_r2 = r2;
@@ -314,13 +314,13 @@ void autoMask(MultidimArray<double> &img_in, MultidimArray<double> &msk_out,
 	}
 
 }
-void raisedCosineMask(MultidimArray<double> &mask, double radius, double radius_p, int x, int y, int z)
+void raisedCosineMask(MultidimArray<RFLOAT> &mask, RFLOAT radius, RFLOAT radius_p, int x, int y, int z)
 {
 	mask.setXmippOrigin();
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(mask)
 	{
 		// calculate distance from the origin
-		double d = sqrt((double)((z-k)*(z-k) + (y-i)*(y-i) + (x-j)*(x-j)));
+		RFLOAT d = sqrt((RFLOAT)((z-k)*(z-k) + (y-i)*(y-i) + (x-j)*(x-j)));
 		if (d > radius_p)
 			A3D_ELEM(mask, k, i, j) = 0.;
 		else if (d < radius)

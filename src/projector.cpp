@@ -77,16 +77,13 @@ long int Projector::getSize()
 }
 
 // Fill data array with oversampled Fourier transform, and calculate its power spectrum
-void Projector::computeFourierTransformMap(MultidimArray<double> &vol_in, MultidimArray<double> &power_spectrum, int current_size, int nr_threads, bool do_gridding)
+void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding)
 {
 
-	MultidimArray<double> Mpad;
+	MultidimArray<RFLOAT> Mpad;
 	MultidimArray<Complex > Faux;
     FourierTransformer transformer;
-    // DEBUGGING: multi-threaded FFTWs are giving me a headache?
-	// For a long while: switch them off!
-	//transformer.setThreadsNumber(nr_threads);
-    double normfft;
+    RFLOAT normfft;
 
 	// Size of padded real-space volume
 	int padoridim = padding_factor * ori_size;
@@ -99,14 +96,14 @@ void Projector::computeFourierTransformMap(MultidimArray<double> &vol_in, Multid
 	{
 	case 2:
 	   Mpad.initZeros(padoridim, padoridim);
-	   normfft = (double)(padding_factor * padding_factor);
+	   normfft = (RFLOAT)(padding_factor * padding_factor);
 	   break;
 	case 3:
 	   Mpad.initZeros(padoridim, padoridim, padoridim);
 	   if (data_dim ==3)
-		   normfft = (double)(padding_factor * padding_factor * padding_factor);
+		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
 	   else
-		   normfft = (double)(padding_factor * padding_factor * padding_factor * ori_size);
+		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor * ori_size);
 	   break;
 	default:
 	   REPORT_ERROR("Projector::computeFourierTransformMap%%ERROR: Dimension of the data array should be 2 or 3");
@@ -141,7 +138,7 @@ void Projector::computeFourierTransformMap(MultidimArray<double> &vol_in, Multid
 	// (other points will be zero because of initZeros() call above
 	// Also calculate radial power spectrum
 	power_spectrum.initZeros(ori_size / 2 + 1);
-	MultidimArray<double> counter(power_spectrum);
+	MultidimArray<RFLOAT> counter(power_spectrum);
 	counter.initZeros();
 
 	int max_r2 = r_max * r_max * padding_factor * padding_factor;
@@ -155,7 +152,7 @@ void Projector::computeFourierTransformMap(MultidimArray<double> &vol_in, Multid
 			A3D_ELEM(data, kp, ip, jp) = DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
 
 			// Calculate power spectrum
-			int ires = ROUND( sqrt((double)r2) / padding_factor );
+			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
 			// Factor two because of two-dimensionality of the complex plane
 			DIRECT_A1D_ELEM(power_spectrum, ires) += norm(A3D_ELEM(data, kp, ip, jp)) / 2.;
 			DIRECT_A1D_ELEM(counter, ires) += 1.;
@@ -175,19 +172,19 @@ void Projector::computeFourierTransformMap(MultidimArray<double> &vol_in, Multid
 
 }
 
-void Projector::griddingCorrect(MultidimArray<double> &vol_in)
+void Projector::griddingCorrect(MultidimArray<RFLOAT> &vol_in)
 {
 	// Correct real-space map by dividing it by the Fourier transform of the interpolator(s)
 	vol_in.setXmippOrigin();
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_in)
 	{
-		double r = sqrt((double)(k*k+i*i+j*j));
+		RFLOAT r = sqrt((RFLOAT)(k*k+i*i+j*j));
 		// if r==0: do nothing (i.e. divide by 1)
 		if (r > 0.)
 		{
-			double rval = r / (ori_size * padding_factor);
-			double sinc = sin(PI * rval) / ( PI * rval);
-			//double ftblob = blob_Fourier_val(rval, blob) / blob_Fourier_val(0., blob);
+			RFLOAT rval = r / (ori_size * padding_factor);
+			RFLOAT sinc = sin(PI * rval) / ( PI * rval);
+			//RFLOAT ftblob = blob_Fourier_val(rval, blob) / blob_Fourier_val(0., blob);
 			// Interpolation (goes with "interpolator") to go from arbitrary to fine grid
 			if (interpolator==NEAREST_NEIGHBOUR && r_min_nn == 0)
 			{
@@ -210,14 +207,14 @@ void Projector::griddingCorrect(MultidimArray<double> &vol_in)
 	}
 }
 
-void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<double> &A, bool inv)
+void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool inv)
 {
-	double fx, fy, fz, xp, yp, zp;
+	RFLOAT fx, fy, fz, xp, yp, zp;
 	int x0, x1, y0, y1, z0, z1, y, y2, r2;
 	bool is_neg_x;
 	Complex d000, d001, d010, d011, d100, d101, d110, d111;
 	Complex dx00, dx01, dx10, dx11, dxy0, dxy1;
-	Matrix2D<double> Ainv;
+	Matrix2D<RFLOAT> Ainv;
 
     // f2d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside r_max should already be zero...
@@ -233,7 +230,7 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<double> &A, bool 
     int my_r_max = XMIPP_MIN(r_max, XSIZE(f2d) - 1);
 
     // Go from the 2D slice coordinates to the 3D coordinates
-    Ainv *= (double)padding_factor;  // take scaling into account directly
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
     int max_r2 = my_r_max * my_r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 
@@ -358,13 +355,13 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<double> &A, bool 
 #endif
 }
 
-void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<double> &A, bool inv)
+void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool inv)
 {
-	double fx, fy, xp, yp;
+	RFLOAT fx, fy, xp, yp;
 	int x0, x1, y0, y1, y, y2, r2;
 	bool is_neg_x;
 	Complex d00, d01, d10, d11, dx0, dx1;
-	Matrix2D<double> Ainv;
+	Matrix2D<RFLOAT> Ainv;
 
     // f2d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -379,7 +376,7 @@ void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<double> &A, bool
     int my_r_max = XMIPP_MIN(r_max, XSIZE(f2d) - 1);
 
     // Go from the 2D slice coordinates to the map coordinates
-    Ainv *= (double)padding_factor;  // take scaling into account directly
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
     int max_r2 = my_r_max * my_r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 #ifdef DEBUG
@@ -474,13 +471,13 @@ void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<double> &A, bool
 }
 
 
-void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<double> &A, bool inv)
+void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A, bool inv)
 {
-	double fx, fy, fz, xp, yp, zp;
+	RFLOAT fx, fy, fz, xp, yp, zp;
 	int x0, x1, y0, y1, z0, z1, y, z, y2, z2, r2;
 	bool is_neg_x;
 	Complex d000, d010, d100, d110, d001, d011, d101, d111, dx00, dx10, dxy0, dx01, dx11, dxy1;
-	Matrix2D<double> Ainv;
+	Matrix2D<RFLOAT> Ainv;
 
     // f3d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -495,7 +492,7 @@ void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<double> &A, bool
     int my_r_max = XMIPP_MIN(r_max, XSIZE(f3d) - 1);
 
     // Go from the 3D rotated coordinates to the original map coordinates
-    Ainv *= (double)padding_factor;  // take scaling into account directly
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
     int max_r2 = my_r_max * my_r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 #ifdef DEBUG

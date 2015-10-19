@@ -50,6 +50,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include "src/error.h"
+#include "src/macros.h"
 
  /** Class to wrapp some MPI common calls in an work node.
  *

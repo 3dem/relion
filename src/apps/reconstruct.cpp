@@ -32,7 +32,7 @@ class reconstruct_parameters
    	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug;
 	MetaDataTable DF;
 	int r_max, r_min_nn, blob_order, padding_factor, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim;
-	double blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y;
+	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y;
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt;
 	// I/O Parser
 	IOParser parser;
@@ -119,7 +119,7 @@ class reconstruct_parameters
 			backprojector.initialiseDataAndWeight(debug_size);
 			backprojector.data.printShape();
 			backprojector.weight.printShape();
-			Image<double> It;
+			Image<RFLOAT> It;
 			It.read(fn_debug+"_data_real.mrc");
 			It().setXmippOrigin();
 			It().xinit=0;
@@ -144,7 +144,7 @@ class reconstruct_parameters
 				A3D_ELEM(backprojector.weight, k, i, j) = A3D_ELEM(It(), k, i, j);
 			}
 
-			MultidimArray<double> dummy;
+			MultidimArray<RFLOAT> dummy;
 			backprojector.reconstruct(It(), iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 	    	It.write(fn_out);
 	    	std::cerr<<" Done writing map in "<<fn_out<<std::endl;
@@ -154,13 +154,13 @@ class reconstruct_parameters
 		else
 		{
 
-		double rot, tilt, psi, fom;
-		Matrix2D<double> A3D;
+		RFLOAT rot, tilt, psi, fom;
+		Matrix2D<RFLOAT> A3D;
 		MultidimArray<Complex > Faux, F2D, Fsub;
-		MultidimArray<double> Fweight, Fctf, dummy;
-		Image<double> vol, img, sub;
+		MultidimArray<RFLOAT> Fweight, Fctf, dummy;
+		Image<RFLOAT> vol, img, sub;
 		FourierTransformer transformer;
-		Matrix1D< double > trans(2);
+		Matrix1D< RFLOAT > trans(2);
 		Projector proj;
 		int mysize;
 //#define DEBUG_WW
@@ -174,7 +174,7 @@ class reconstruct_parameters
 		BackProjector backprojectort(mysize, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha);
 		backprojectort.initZeros(2 * r_max);
 
-		Image<double> Imagn, Iphas, Iw, tvol;
+		Image<RFLOAT> Imagn, Iphas, Iw, tvol;
 		Imagn.read("FEW_it24_rank2_data_magn.spi");
 		Iphas.read("FEW_it24_rank2_data_phas.spi");
 		Iw.read("FEW_it24_rank2_weight.spi");
@@ -182,7 +182,7 @@ class reconstruct_parameters
         Iw().xinit=0;
 
 		// Write out invw
-		Image<double> oo;
+		Image<RFLOAT> oo;
 		oo=Iw;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iw())
 		{
@@ -196,8 +196,8 @@ class reconstruct_parameters
 		backprojectort.weight.printShape();
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imagn())
 		{
-			double realval = sin(DIRECT_MULTIDIM_ELEM(Iphas(), n)) * DIRECT_MULTIDIM_ELEM(Imagn(), n);
-			double imagval = cos(DIRECT_MULTIDIM_ELEM(Iphas(), n)) * DIRECT_MULTIDIM_ELEM(Imagn(), n);
+			RFLOAT realval = sin(DIRECT_MULTIDIM_ELEM(Iphas(), n)) * DIRECT_MULTIDIM_ELEM(Imagn(), n);
+			RFLOAT imagval = cos(DIRECT_MULTIDIM_ELEM(Iphas(), n)) * DIRECT_MULTIDIM_ELEM(Imagn(), n);
 			DIRECT_MULTIDIM_ELEM(backprojectort.data, n) = (Complex)(realval, imagval);
 		}
 		backprojectort.weight = Iw();
@@ -227,7 +227,7 @@ class reconstruct_parameters
 
    		if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
     	{
-    		double mag, dstep;
+    		RFLOAT mag, dstep;
    			DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
    			DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
    			angpix = 10000. * dstep / mag;
@@ -408,7 +408,7 @@ class reconstruct_parameters
 						//std::cerr << " exp_R_mic= " << exp_R_mic << std::endl;
 						std::cerr << " rot= " << rot << " tilt= " << tilt << " psi= " << psi << " xoff= "<< XX(trans)<< " yoff= "<<YY(trans)<<std::endl;
 						//std::cerr << "mic_id= "<<mic_id<<" mymodel.sigma2_noise[mic_id]= " << mymodel.sigma2_noise[mic_id] << std::endl;
-						Image<double> It;
+						Image<RFLOAT> It;
 						It()=Fctf;
 						It.write("reconstruct_Fctf.spi");
 						It().resize(mysize, mysize);
@@ -434,7 +434,7 @@ class reconstruct_parameters
 
    		bool do_map = false;
    		bool do_use_fsc = false;
-   		MultidimArray<double> fsc;
+   		MultidimArray<RFLOAT> fsc;
    		fsc.resize(mysize/2+1);
    		if (fn_fsc != "")
    		{
@@ -445,7 +445,7 @@ class reconstruct_parameters
    			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
    			{
    				int idx;
-   				double val;
+   				RFLOAT val;
    				MDfsc.getValue(EMDL_SPECTRAL_IDX, idx);
    				MDfsc.getValue(EMDL_MLMODEL_FSC_HALVES_REF, val);
    				fsc(idx) =  val;
@@ -461,11 +461,11 @@ class reconstruct_parameters
    			transformer.FourierTransform(vol(), F2D);
 
    			// CenterOriginFFT: Set the center of the FFT in the FFTW origin
-			Matrix1D<double> shift(3);
-			XX(shift)=-(double)(int)(ctf_dim / 2);
-			YY(shift)=-(double)(int)(ctf_dim / 2);
-			ZZ(shift)=-(double)(int)(ctf_dim / 2);
-			shiftImageInFourierTransform(F2D, F2D, (double)ctf_dim, XX(shift), YY(shift), ZZ(shift));
+			Matrix1D<RFLOAT> shift(3);
+			XX(shift)=-(RFLOAT)(int)(ctf_dim / 2);
+			YY(shift)=-(RFLOAT)(int)(ctf_dim / 2);
+			ZZ(shift)=-(RFLOAT)(int)(ctf_dim / 2);
+			shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, XX(shift), YY(shift), ZZ(shift));
 			vol().setXmippOrigin();
    			vol().initZeros();
    			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
@@ -476,7 +476,7 @@ class reconstruct_parameters
    				A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D, kp, ip, jp).real;
    				A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
    			}
-   			vol() *= (double)ctf_dim;
+   			vol() *= (RFLOAT)ctf_dim;
    		}
 
    		vol.write(fn_out);

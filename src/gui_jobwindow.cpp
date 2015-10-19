@@ -27,7 +27,20 @@ RelionJobWindow::RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, b
 	has_mpi = _has_mpi;
 	has_thread = _has_thread;
 
-    // Set up tabs
+	// Check for environment variable RELION_QSUB_TEMPLATE
+	char * my_minimum_dedicated = getenv ("RELION_MINIMUM_DEDICATED");
+	minimum_nr_dedicated = (my_minimum_dedicated == NULL) ? DEFAULTMININIMUMDEDICATED : textToInteger(my_minimum_dedicated);
+
+	char * my_allow_change_dedicated = getenv ("RELION_ALLOW_CHANGE_MINIMUM_DEDICATED");
+	if (my_allow_change_dedicated == NULL)
+		do_allow_change_minimum_dedicated = DEFAULTMININIMUMDEDICATED;
+	else
+	{
+		int check_allow =  textToInteger(my_allow_change_dedicated);
+		do_allow_change_minimum_dedicated = (check_allow == 0) ? false : true;
+	}
+
+	// Set up tabs
     if (nr_tabs >= 1) // there is always the running tab, which is not counted on the input nr_tabs!
     {
     	tabs = new Fl_Tabs(x, current_y, w, h - MENUHEIGHT);
@@ -183,7 +196,9 @@ XXXcommandXXX = relion command + arguments; \n \
 XXXqueueXXX = The queue name; \n \
 XXXmpinodesXXX = The number of MPI nodes; \n \
 XXXthreadsXXX = The number of threads; \n \
-XXXcoresXXX = The number of MPI nodes * nr_threads; \n \
+XXXcoresXXX = XXXmpinodesXXX * XXXthreadsXXX; \n \
+XXXdedicatedXXX = The minimum number of dedicated cores on each node; \n \
+XXXnodesXXX = The number of requested nodes = CEIL(XXXcoresXXX / XXXdedicatedXXX); \n \
 If these options are not enough for your standard jobs, you may define two extra variables: XXXextra1XXX and XXXextra2XXX \
 Their help text is set by the environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 \
 For example, setenv RELION_QSUB_EXTRA1 \"Max number of hours in queue\" will result in an additional (text) ein the GUI \
@@ -191,9 +206,16 @@ Any variables XXXextra1XXX in the template script will be replaced by the corres
 Likewise, default values for the extra entries can be set through environment variables RELION_QSUB_EXTRA1_DEFAULT and  RELION_QSUB_EXTRA2_DEFAULT. \
 But note that (unlike all other entries in the GUI) the extra values are not remembered from one run to the other.");
 
+	min_dedicated.place(current_y, "Minimum dedicated cores per node:", minimum_nr_dedicated, 1, 64, 1, "Minimum number of dedicated cores that need to be requested on each node. This is useful to force the queue to fill up entire nodes of a given size.");
+	if (do_allow_change_minimum_dedicated)
+		min_dedicated.deactivate(false);
+	else
+		min_dedicated.deactivate(true);
 
 	queue_group->end();
 	do_queue.cb_menu_i(); // This is to make the default effective
+
+
 
     // Add a little spacer
     current_y += STEPY/2;
@@ -298,11 +320,24 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	    fl_alert("Error reading from file \'%s\':\n%s.", qsubscript.getValue().c_str(), strerror(errno));
 
 	// default to a single thread
+	int nmpi = nr_mpi.getValue();
 	int nthr = (has_thread) ? nr_threads.getValue() : 1;
+	int ncores = nr_mpi.getValue() * nthr;
+	int ndedi = min_dedicated.getValue();
+	float fnodes = (float)ncores / (float)ndedi;
+	int nnodes = CEIL(fnodes);
+	if (fmod(fnodes, 1) > 0)
+	{
+		std:: cout << std::endl;
+		std::cout << " Warning! You're using " << nmpi << " MPI processes with " << nthr << " threads each (i.e. " << ncores << " cores), while asking for " << nnodes << " nodes with " << ndedi << " cores." << std::endl;
+		std::cout << " It is more efficient to make the number of cores (i.e. mpi*threads) a multiple of the minimum number of dedicated cores per node " << std::endl;
+	}
 
-	replaceStringAll(textbuf, "XXXmpinodesXXX", floatToString(nr_mpi.getValue()) );
+	replaceStringAll(textbuf, "XXXmpinodesXXX", floatToString(nmpi) );
 	replaceStringAll(textbuf, "XXXthreadsXXX", floatToString(nthr) );
-	replaceStringAll(textbuf, "XXXcoresXXX", floatToString(nr_mpi.getValue() * nthr) );
+	replaceStringAll(textbuf, "XXXcoresXXX", floatToString(ncores) );
+	replaceStringAll(textbuf, "XXXdedicatedXXX", floatToString(ndedi) );
+	replaceStringAll(textbuf, "XXXnodesXXX", floatToString(nnodes) );
 	replaceStringAll(textbuf, "XXXnameXXX", outputname);
 	replaceStringAll(textbuf, "XXXerrfileXXX", outputname + ".err");
 	replaceStringAll(textbuf, "XXXoutfileXXX", outputname + ".out");
@@ -338,7 +373,7 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	{
 		std::string dirs = outputname.substr(0, last_slash);
 		std::string makedirs = "mkdir -p " + dirs;
-		system(makedirs.c_str());
+		int res = system(makedirs.c_str());
 	}
 
 	// Prepare full mpi commands or save jobsubmission script to disc
@@ -624,7 +659,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix)
+		std::string &final_command, RFLOAT angpix)
 {
 	commands.clear();
 	std::string command;
@@ -635,7 +670,7 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 
 	// Calculate magnification from user-specified pixel size in Angstroms
-	double magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
+	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
 
 	command += " --i \"" + mic_names.getValue()+"\"";
 	command += " --o \"" + output_star_ctf_mics.getValue()+"\"";
@@ -790,7 +825,7 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix, double particle_diameter)
+		RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -878,6 +913,8 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 
 	mindist_autopick.place(current_y, "Minimum inter-particle distance (A):", 100, 0, 1000, 20, "Particles closer together than this distance will be consider to be a single cluster. From each cluster, only one particle will be picked.");
 
+	maxstddevnoise_autopick.place(current_y, "Maximum stddev noise:", 1.1, 0.9, 1.5, 0.02, "This is useful to prevent picking in carbon areas, or areas with big contamination features. Peaks in areas where the background standard deviation in the normalized micrographs is higher than this value will be ignored. Useful values are probably in the range 1.0 to 1.2. Set to -1 to switch off the feature to eliminate peaks due to high background standard deviations.");
+
 	current_y += STEPY/2;
 
 	do_write_fom_maps.place(current_y, "Write FOM maps?", false, "If set to Yes, intermediate probability maps will be written out, which (upon reading them back in) will speed up tremendously the optimization of the threshold and inter-particle distance parameters. However, with this option, one cannot run in parallel, as disc I/O is very heavy with this option set.");
@@ -907,6 +944,7 @@ void AutopickJobWindow::write(std::string fn)
 	do_read_fom_maps.writeValue(fh);
 	threshold_autopick.writeValue(fh);
 	mindist_autopick.writeValue(fh);
+	maxstddevnoise_autopick.writeValue(fh);
 
 	closeWriteFile(fh);
 }
@@ -930,6 +968,7 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		do_read_fom_maps.readValue(fh);
 		threshold_autopick.readValue(fh);
 		mindist_autopick.readValue(fh);
+		maxstddevnoise_autopick.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -943,7 +982,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -978,7 +1017,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	command += " --threshold " + floatToString(threshold_autopick.getValue());
 	command += " --min_distance " + floatToString(mindist_autopick.getValue());
-
+	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
 
 	// Other arguments
 	command += " " + other_args.getValue();
@@ -1145,7 +1184,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix, double particle_diameter)
+		RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1171,7 +1210,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		}
 
 		// Operate stuff
-		double bg_radius;
+		RFLOAT bg_radius;
 		bg_radius = (particle_diameter / (2. * angpix));
 		if (do_rescale.getValue())
 		{
@@ -1260,7 +1299,7 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1322,6 +1361,13 @@ from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1453,6 +1499,7 @@ void Class2DJobWindow::write(std::string fn)
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	nr_classes.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
 
 	// CTF
 	do_ctf_correction.writeValue(fh);
@@ -1486,6 +1533,7 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		nr_classes.readValue(fh);
+		do_parallel_discio.readValue(fh);
 
 		// CTF
 		do_ctf_correction.readValue(fh);
@@ -1524,7 +1572,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1558,6 +1606,9 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --particle_diameter " + floatToString(particle_diameter);
 		command += " --angpix " + floatToString(angpix);
 	}
+	// Parallel disc I/O?
+	if (!do_parallel_discio.getValue())
+		command += " --no_parallel_disc_io";
 
 	// CTF stuff
 	if (!is_continue)
@@ -1643,6 +1694,11 @@ from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1733,7 +1789,7 @@ Also note that upon restarting, the iteration number continues to be increased, 
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
 
-	tau_fudge.place(current_y, "Regularisation parameter T:", 2 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
+	tau_fudge.place(current_y, "Regularisation parameter T:", 4 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
 the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
 the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
 weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
@@ -1835,6 +1891,7 @@ void Class3DJobWindow::write(std::string fn)
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	nr_classes.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
 
 	// Reference
 	fn_ref.writeValue(fh);
@@ -1878,6 +1935,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		nr_classes.readValue(fh);
+		do_parallel_discio.readValue(fh);
 
 		// Reference
 		fn_ref.readValue(fh);
@@ -1940,7 +1998,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -1981,6 +2039,9 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --ini_high " + floatToString(ini_high.getValue());
 
 	}
+	// Parallel disc I/O?
+	if (!do_parallel_discio.getValue())
+		command += " --no_parallel_disc_io";
 
 	// CTF stuff
 	if (!is_continue)
@@ -2084,6 +2145,13 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run. \n \
 Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
 
 	tab1->end();
 	tab2->begin();
@@ -2265,6 +2333,7 @@ void Auto3DJobWindow::write(std::string fn)
 	fn_out.writeValue(fh);
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
 
 	// Reference
 	fn_ref.writeValue(fh);
@@ -2310,6 +2379,7 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		fn_out.readValue(fh);
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
+		do_parallel_discio.readValue(fh);
 
 		// Reference
 		fn_ref.readValue(fh);
@@ -2386,7 +2456,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, double angpix, double particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	commands.clear();
 	std::string command;
@@ -2427,6 +2497,9 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			command += " --ini_high " + floatToString(ini_high.getValue());
 
 	}
+	// Parallel disc I/O?
+	if (!do_parallel_discio.getValue())
+		command += " --no_parallel_disc_io";
 
 	// CTF stuff
 	if (!is_continue)
@@ -2673,7 +2746,7 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix)
+		RFLOAT angpix)
 {
 	commands.clear();
 	std::string command;
@@ -2872,7 +2945,7 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix, double particle_diameter, double black_dust, double white_dust)
+		RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust)
 {
 	commands.clear();
 	std::string command;
@@ -2914,7 +2987,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --sym " + sym_name.getValue();
 
 	// Normalisation
-	double bg_rad = ROUND(particle_diameter / (2. * angpix));
+	RFLOAT bg_rad = ROUND(particle_diameter / (2. * angpix));
 	command += " --bg_radius " + floatToString(bg_rad);
 	command += " --white_dust " + floatToString(white_dust);
 	command += " --black_dust " + floatToString(black_dust);
@@ -3016,7 +3089,7 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		double angpix)
+		RFLOAT angpix)
 {
 	commands.clear();
 	std::string command;
@@ -3080,20 +3153,22 @@ PublishJobWindow::PublishJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_T
 
 	cite_text.place(current_y, "\
 If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
- * The general Bayesian approach (and the first mention of RELION): \n \
+ * General Bayesian approach (and first mention of RELION): \n \
      Scheres (2012) J. Mol. Biol. (PMID: 22100448)	 \n \n\
  * RELION implementation details and the 3D auto-refine procedure: \n \
      Scheres (2012) J. Struct. Biol. (PMID: 23000701)	 \n \n\
- * The gold-standard FSC and the relevance of the 0.143 criterion: \n \
+ * Gold-standard FSC and the relevance of the 0.143 criterion: \n \
      Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)	 \n \n\
- * The movie-processing procedure: \n \
+ * Movie-processing procedure: \n \
      Bai et al. (2013) eLife (PMID: 23427024 )	 \n \n\
- * The correction of mask effects on the FSC curve by randomised phases: \n \
+ * Correction of mask effects on the FSC curve by randomised phases: \n \
      Chen et al. (2013) Ultramicroscopy (PMID: 23872039)	 \n \n\
- * The particle-polishing: \n \
+ * Particle-polishing: \n \
      Scheres (2014) eLife (PMID: 25122622)	 \n \n\
- * The auto-picking and sorting: \n \
-     Scheres (2014) in preparation"
+ * Auto-picking : \n \
+     Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
+ * Sub-tomogram averaging : \n \
+     Bharat et al. (2015) Structure (submitted). \n \n "
 , GUIWIDTH - WCOL0 - 50, GUIHEIGHT - 150);
 
 	//cite_text.mydisp->textsize(12);

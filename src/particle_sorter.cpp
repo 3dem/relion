@@ -81,7 +81,7 @@ void ParticleSorter::initialise()
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDref)
 		{
 			// Get all reference images and their names
-			Image<double> Iref;
+			Image<RFLOAT> Iref;
 
 			FileName fn_img;
 			if (!MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_img))
@@ -96,7 +96,7 @@ void ParticleSorter::initialise()
 	}
 	else
 	{
-		Image<double> Istk, Iref;
+		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
 		for (int n = 0; n < NSIZE(Istk()); n++)
 		{
@@ -135,7 +135,7 @@ void ParticleSorter::initialise()
 
 	// Calculate (downsized) Fourier transforms of the references
 	PPref.clear();
-	MultidimArray<double> dummy;
+	MultidimArray<RFLOAT> dummy;
 	Projector projector(particle_size);
 	for (int iref = 0; iref < Mrefs.size(); iref++)
 	{
@@ -189,8 +189,8 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 {
 
 	FourierTransformer transformer;
-	Image<double> img;
-	MultidimArray<double> Mref_rot;
+	Image<RFLOAT> img;
+	MultidimArray<RFLOAT> Mref_rot;
 	MultidimArray<Complex > Fimg, Fref;
 
 	// Get the image
@@ -205,13 +205,13 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 	}
 #ifdef DEBUG
 	std::cerr << " fn_img= " << fn_img << std::endl;
-	Image<double> tt;
+	Image<RFLOAT> tt;
 	tt = img;
 	tt.write("debug_ori_image.spi");
 #endif
 
 	// If the particle has non-zero shifts, then apply the rounded shifts here!
-	Matrix1D<double> offset(2);
+	Matrix1D<RFLOAT> offset(2);
 	MDin.getValue(EMDL_ORIENT_ORIGIN_X, XX(offset), ipart);
 	MDin.getValue(EMDL_ORIENT_ORIGIN_Y, YY(offset), ipart);
 	offset.selfROUND();
@@ -226,13 +226,13 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 	// Low-pass filter the image if necessary
 	if (lowpass > 0.)
 	{
-		double radius = XSIZE(img()) * angpix / lowpass;
+		RFLOAT radius = XSIZE(img()) * angpix / lowpass;
 		radius -= WIDTH_FMASK_EDGEB / 2.;
-		double radius_p = radius + WIDTH_FMASK_EDGEB;
+		RFLOAT radius_p = radius + WIDTH_FMASK_EDGEB;
 		transformer.FourierTransform(img(), Fimg);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			double r = sqrt((double)(kp*kp + ip*ip + jp*jp));
+			RFLOAT r = sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp));
 			if (r < radius)
 				continue;
 			else if (r > radius_p)
@@ -251,9 +251,9 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 #endif
 
 	// Get the transformation parameters and which reference this is
-	double psi = 0.;
-	double rot = 0.;
-	double tilt = 0.;
+	RFLOAT psi = 0.;
+	RFLOAT rot = 0.;
+	RFLOAT tilt = 0.;
 	int iref;
 	MDin.getValue(EMDL_ORIENT_ROT, rot, ipart);
 	MDin.getValue(EMDL_ORIENT_TILT, tilt, ipart);
@@ -285,7 +285,7 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 	}
 
 	// Get the rotational matrix
-	Matrix2D<double> A;
+	Matrix2D<RFLOAT> A;
 	Euler_angles2matrix(rot, tilt, psi, A);
 
 	// Get the reference image in the right orientation
@@ -294,7 +294,7 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 	if (do_ctf)
 	{
 		CTF ctf;
-		MultidimArray<double> Fctf;
+		MultidimArray<RFLOAT> Fctf;
 		ctf.read(MDin, MDin, ipart);
 		Fctf.resize(Fref);
 		ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), angpix, false, false, intact_ctf_first_peak, true);
@@ -321,8 +321,8 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 
 	/*
 	// Calculate the optimal scale between the image and the reference:
-	double sumxa = 0.;
-	double suma2 = 0.;
+	RFLOAT sumxa = 0.;
+	RFLOAT suma2 = 0.;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mref_rot)
 	{
 		if (DIRECT_MULTIDIM_ELEM(iMsk, n) > 0.5)
@@ -333,7 +333,7 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 	}
 	if (suma2 < 1e-10)
 		REPORT_ERROR("ERROR: Empty reference encountered!!");
-	double scale = sumxa/suma2;
+	RFLOAT scale = sumxa/suma2;
 	// Calculate the difference between the particle and the oriented reference
 	img() -= scale * Mref_rot;
 	*/
@@ -356,7 +356,7 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 
 	// Calculate real-space statistics on the difference image (only within the masked protein area)
 	//iMsk.initConstant(1.);
-    double mean = 0., stddev = 0., skew = 0., kurt = 0., quadrant_stddev = 0., rotsym = 0.;
+    RFLOAT mean = 0., stddev = 0., skew = 0., kurt = 0., quadrant_stddev = 0., rotsym = 0.;
 	calculateStatsOneImage(img(), mean, stddev, skew, kurt, quadrant_stddev);
 	DIRECT_A2D_ELEM(features, ipart, FEATURE_DF_AVG) = mean;
 	DIRECT_A2D_ELEM(features, ipart, FEATURE_DF_SIG) = stddev;
@@ -384,12 +384,12 @@ void ParticleSorter::normaliseFeatures()
 {
 
 	// Ignore manually added particles, which will have all features set to 0...
-	std::vector< std::vector<double> > normfeatures(XSIZE(features));
-	MultidimArray<double> onerow;
+	std::vector< std::vector<RFLOAT> > normfeatures(XSIZE(features));
+	MultidimArray<RFLOAT> onerow;
 	for (int ipart = 0; ipart < YSIZE(features); ipart++)
 	{
 		features.getRow(ipart, onerow);
-		double abssum = 0.;
+		RFLOAT abssum = 0.;
 		for (int ifeat = 0; ifeat < XSIZE(features); ifeat++)
 		{
 			abssum += ABS(DIRECT_A1D_ELEM(onerow, ifeat));
@@ -404,7 +404,7 @@ void ParticleSorter::normaliseFeatures()
 	}
 
 	// Now calculate average and stddev for all particles which did not have all features set to 0
-	std::vector<double> avg(XSIZE(features), 0.), stddev(XSIZE(features), 0.);
+	std::vector<RFLOAT> avg(XSIZE(features), 0.), stddev(XSIZE(features), 0.);
 	for (int ifeat = 0; ifeat < XSIZE(features); ifeat++)
 	{
 		// average
@@ -422,7 +422,7 @@ void ParticleSorter::normaliseFeatures()
 	for (int ipart = 0; ipart < YSIZE(features); ipart++)
 	{
 		features.getRow(ipart, onerow);
-		double abssum = 0.;
+		RFLOAT abssum = 0.;
 		for (int ifeat = 0; ifeat < XSIZE(features); ifeat++)
 		{
 			abssum += ABS(DIRECT_A1D_ELEM(onerow, ifeat));
@@ -465,7 +465,7 @@ void ParticleSorter::writeFeatures()
 		REPORT_ERROR( (std::string)" ParticleSorter::writeFeatures: Cannot write file: " + fn_tmp);
 #endif
 
-	MultidimArray<double> sumfeatures(YSIZE(features));
+	MultidimArray<RFLOAT> sumfeatures(YSIZE(features));
 	sumfeatures.initZeros();
 	for (int ipart = 0; ipart < YSIZE(features); ipart++)
 	{
@@ -482,7 +482,7 @@ void ParticleSorter::writeFeatures()
 		}
 		DIRECT_A1D_ELEM(sumfeatures, ipart) /= XSIZE(features);
 #ifdef WRITE_LIBSVM
-		MultidimArray<double> row(1);
+		MultidimArray<RFLOAT> row(1);
 		features.getRow(ipart, row);
 		fh2<< " sum= " << DIRECT_A1D_ELEM(sumfeatures, ipart);
 		MDin.getValue(EMDL_IMAGE_NAME, fn_img, ipart);
@@ -518,13 +518,13 @@ void ParticleSorter::writeFeatures()
 		std::cout <<" Written out "<< fn_tmp << std::endl;
 }
 
-double ParticleSorter::rotationalSymmetryFourierTransform(MultidimArray<Complex > &Fimg)
+RFLOAT ParticleSorter::rotationalSymmetryFourierTransform(MultidimArray<Complex > &Fimg)
 {
-	double result;
+	RFLOAT result;
 	// Calculate average and stddev per ring
 
 	int radius = ROUND(YSIZE(Fimg) * angpix / lowpass);
-	MultidimArray<double> count, power;
+	MultidimArray<RFLOAT> count, power;
 
     power.initZeros(radius+1);
     count.initZeros(radius+1);
@@ -543,15 +543,15 @@ double ParticleSorter::rotationalSymmetryFourierTransform(MultidimArray<Complex 
             power(i) /= count(i);
     }
 
-    double sum = 0.;
-    double sum2 = 0.;
-    double cc  = 0.;
+    RFLOAT sum = 0.;
+    RFLOAT sum2 = 0.;
+    RFLOAT cc  = 0.;
     FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
     {
     	long int idx = ROUND(sqrt(ip*ip + jp*jp));
     	if (idx < radius)
     	{
-    		double aux = norm(DIRECT_A2D_ELEM(Fimg, i, j)) - power(idx);
+    		RFLOAT aux = norm(DIRECT_A2D_ELEM(Fimg, i, j)) - power(idx);
     		sum += aux;
     		sum2 += aux*aux;
     		cc++;
@@ -568,8 +568,8 @@ double ParticleSorter::rotationalSymmetryFourierTransform(MultidimArray<Complex 
 	return result;
 }
 
-void ParticleSorter::calculateStatsOneImage(MultidimArray<double> &img,
-							double &mean, double &stddev, double &skew, double &kurt, double &quadrant_stddev)
+void ParticleSorter::calculateStatsOneImage(MultidimArray<RFLOAT> &img,
+							RFLOAT &mean, RFLOAT &stddev, RFLOAT &skew, RFLOAT &kurt, RFLOAT &quadrant_stddev)
 {
 
 	// First pass: calculate mean
@@ -578,14 +578,14 @@ void ParticleSorter::calculateStatsOneImage(MultidimArray<double> &img,
 	int n2 = 0;
 	int n3 = 0;
 	int n4 = 0;
-	double mean_q1 = 0.;
-	double mean_q2 = 0.;
-	double mean_q3 = 0.;
-	double mean_q4 = 0.;
-	double stddev_q1 = 0.;
-	double stddev_q2 = 0.;
-	double stddev_q3 = 0.;
-	double stddev_q4 = 0.;
+	RFLOAT mean_q1 = 0.;
+	RFLOAT mean_q2 = 0.;
+	RFLOAT mean_q3 = 0.;
+	RFLOAT mean_q4 = 0.;
+	RFLOAT stddev_q1 = 0.;
+	RFLOAT stddev_q2 = 0.;
+	RFLOAT stddev_q3 = 0.;
+	RFLOAT stddev_q4 = 0.;
 	mean = 0.;
 	stddev = 0;
 	skew   = 0.;
@@ -634,8 +634,8 @@ void ParticleSorter::calculateStatsOneImage(MultidimArray<double> &img,
 	{
 		if (i*i + j*j < particle_radius2)
 		{
-			double aux = A2D_ELEM(img, i, j) - mean;
-			double aux2 = aux * aux;
+			RFLOAT aux = A2D_ELEM(img, i, j) - mean;
+			RFLOAT aux2 = aux * aux;
 			stddev += aux2;
 			skew += aux2 * aux;
 			kurt += aux2 * aux2;
@@ -665,7 +665,7 @@ void ParticleSorter::calculateStatsOneImage(MultidimArray<double> &img,
 			}
 		}
 	}
-	double var = stddev/na;
+	RFLOAT var = stddev/na;
 	stddev = sqrt(var);
 	skew = (skew/na)/(var*stddev);
 	kurt = (kurt/na)/(var*var) - 3.;
@@ -682,8 +682,8 @@ void ParticleSorter::calculateStatsOneImage(MultidimArray<double> &img,
 	var = stddev_q4/n4;
 	stddev_q4 = sqrt(var);
 
-	double mean_stddevs = 0.;
-	double stddev_stddevs = 0.;
+	RFLOAT mean_stddevs = 0.;
+	RFLOAT stddev_stddevs = 0.;
 	mean_stddevs = (stddev_q1 + stddev_q2 + stddev_q3 + stddev_q4) / 4.;
 	stddev_stddevs += (stddev_q1-mean_stddevs)*(stddev_q1-mean_stddevs) + (stddev_q2-mean_stddevs)*(stddev_q2-mean_stddevs) + (stddev_q3-mean_stddevs)*(stddev_q3-mean_stddevs) + (stddev_q4-mean_stddevs)*(stddev_q4-mean_stddevs);
 	quadrant_stddev = sqrt(stddev_stddevs / 4.);

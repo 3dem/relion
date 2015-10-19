@@ -37,7 +37,7 @@ class tiltpair_plot_parameters
 	public:
    	FileName fn_unt, fn_til, fn_eps, fn_sym;
    	MetaDataTable MDu, MDt;
-   	double exp_tilt, exp_beta, dist_from_alpha, dist_from_tilt, plot_max_tilt, plot_spot_radius;
+   	RFLOAT exp_tilt, exp_beta, dist_from_alpha, dist_from_tilt, plot_max_tilt, plot_spot_radius;
 	// I/O Parser
 	IOParser parser;
 	SymList SL;
@@ -103,10 +103,10 @@ class tiltpair_plot_parameters
 	    fh_eps << "50 400 newpath moveto 550 400 lineto stroke\n";
 	}
 
-	void add_to_postscript(double tilt_angle, double alpha, double beta)
+	void add_to_postscript(RFLOAT tilt_angle, RFLOAT alpha, RFLOAT beta)
 	{
 
-		double rr, th, x, y, r, g, b;
+		RFLOAT rr, th, x, y, r, g, b;
 
 		rr = (tilt_angle / plot_max_tilt)* 250;
 		x = 300. + rr * COSD(alpha);
@@ -115,9 +115,9 @@ class tiltpair_plot_parameters
 		fh_eps << x << " " << y << " " << plot_spot_radius << " 0 360 arc closepath "<<r<<" "<<g<<" "<<b<<" setrgbcolor fill stroke\n";
 	}
 
-	void value_to_redblue_scale(double val, double minF, double maxF, double &r, double &g, double &b)
+	void value_to_redblue_scale(RFLOAT val, RFLOAT minF, RFLOAT maxF, RFLOAT &r, RFLOAT &g, RFLOAT &b)
 	{
-		double diff, half;
+		RFLOAT diff, half;
 		half = (maxF - minF)/2.;
 		if (val < half)
 		{
@@ -133,19 +133,19 @@ class tiltpair_plot_parameters
 
 	}
 
-	double check_symmetries(double rot1, double tilt1, double psi1,
-	        double &rot2, double &tilt2, double &psi2)
+	RFLOAT check_symmetries(RFLOAT rot1, RFLOAT tilt1, RFLOAT psi1,
+	        RFLOAT &rot2, RFLOAT &tilt2, RFLOAT &psi2)
 	{
 
 	    int imax = SL.SymsNo() + 1;
-	    Matrix2D<double>  L(4, 4), R(4, 4);  // A matrix from the list
-	    double best_ang_dist = 3600;
-	    double best_rot2, best_tilt2, best_psi2;
-	    double tilt_angle, alpha, beta;
+	    Matrix2D<RFLOAT>  L(4, 4), R(4, 4);  // A matrix from the list
+	    RFLOAT best_ang_dist = 3600;
+	    RFLOAT best_rot2, best_tilt2, best_psi2;
+	    RFLOAT tilt_angle, alpha, beta;
 
 	    for (int i = 0; i < imax; i++)
 	    {
-	        double rot2p, tilt2p, psi2p;
+	        RFLOAT rot2p, tilt2p, psi2p;
 	        if (i == 0)
 	        {
 	            rot2p = rot2;
@@ -160,7 +160,7 @@ class tiltpair_plot_parameters
                 Euler_apply_transf(L, R, rot2, tilt2, psi2, rot2p, tilt2p, psi2p);
 	        }
 
-	        double ang_dist = check_tilt_pairs(rot1, tilt1, psi1, rot2p, tilt2p, psi2p);
+	        RFLOAT ang_dist = check_tilt_pairs(rot1, tilt1, psi1, rot2p, tilt2p, psi2p);
 
 	        if (ang_dist < best_ang_dist)
 	        {
@@ -180,15 +180,15 @@ class tiltpair_plot_parameters
 	}
 
 
-	double check_tilt_pairs(double rot1, double tilt1, double psi1,
-			double &alpha, double &tilt_angle, double &beta)
+	RFLOAT check_tilt_pairs(RFLOAT rot1, RFLOAT tilt1, RFLOAT psi1,
+			RFLOAT &alpha, RFLOAT &tilt_angle, RFLOAT &beta)
 	{
 	    // Transformation matrices
-		Matrix1D<double> axis(3);
-	    Matrix2D<double> E1, E2;
+		Matrix1D<RFLOAT> axis(3);
+	    Matrix2D<RFLOAT> E1, E2;
 	    axis.resize(3);
-	    double aux, sine_tilt_angle;
-	    double rot2 = alpha, tilt2 = tilt_angle, psi2 = beta;
+	    RFLOAT aux, sine_tilt_angle;
+	    RFLOAT rot2 = alpha, tilt2 = tilt_angle, psi2 = beta;
 
 	    // Calculate the transformation from one setting to the second one.
 	    Euler_angles2matrix(psi1, tilt1, rot1, E1);
@@ -233,7 +233,7 @@ class tiltpair_plot_parameters
 
 
 	    // Return the value that needs to be optimized
-	    double minimizer=0.;
+	    RFLOAT minimizer=0.;
 	    if (exp_beta < 999.)
 	    	minimizer = ABS(beta - exp_beta);
 	    if (exp_tilt < 999.)
@@ -252,11 +252,11 @@ class tiltpair_plot_parameters
 
 
 			// Read input data
-	        double rot1,  tilt1,  psi1;
-	        double rot2,  tilt2,  psi2;
-	        double rot2p, tilt2p, psi2p;
-	        double best_tilt, best_alpha, best_beta;
-	        double distp;
+	        RFLOAT rot1,  tilt1,  psi1;
+	        RFLOAT rot2,  tilt2,  psi2;
+	        RFLOAT rot2p, tilt2p, psi2p;
+	        RFLOAT best_tilt, best_alpha, best_beta;
+	        RFLOAT distp;
 
 	        MDu.getValue(EMDL_ORIENT_ROT, rot1);
 	        MDt.getValue(EMDL_ORIENT_ROT, rot2, iline);
@@ -281,8 +281,8 @@ class tiltpair_plot_parameters
 	        distp = check_symmetries(rot1, tilt1, psi1, rot2p, tilt2p, psi2p);
 
 	        // Calculate distance to user-defined point
-			double xp, yp, x, y;
-			Matrix1D<double> aux2(4);
+			RFLOAT xp, yp, x, y;
+			Matrix1D<RFLOAT> aux2(4);
 			xp = dist_from_tilt * COSD(dist_from_alpha);
 			yp = dist_from_tilt * SIND(dist_from_alpha);
 			x = tilt2p * COSD(rot2p);

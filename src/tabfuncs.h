@@ -29,8 +29,8 @@ class TabFunction
 {
 
 protected:
-	MultidimArray<double> tabulatedValues;
-	double  sampling;
+	MultidimArray<RFLOAT> tabulatedValues;
+	RFLOAT  sampling;
 public:
 	// Empty constructor
 	TabFunction() {}
@@ -84,7 +84,7 @@ public:
 	void fillTable(const int _nr_elem = 5000);
 
 	// Value access
-	double operator()(double val) const;
+	RFLOAT operator()(RFLOAT val) const;
 
 };
 
@@ -100,7 +100,7 @@ public:
 	void fillTable(const int _nr_elem = 5000);
 
 	// Value access
-	double operator()(double val) const;
+	RFLOAT operator()(RFLOAT val) const;
 
 };
 
@@ -108,8 +108,8 @@ class TabBlob : public TabFunction
 {
 
 private:
-	double radius;
-	double alpha;
+	RFLOAT radius;
+	RFLOAT alpha;
 	int order;
 
 public:
@@ -117,13 +117,13 @@ public:
 	TabBlob() {}
 
 	// Constructor (with parameters)
-	void initialise(double _radius, double _alpha, int _order, const int _nr_elem = 10000);
+	void initialise(RFLOAT _radius, RFLOAT _alpha, int _order, const int _nr_elem = 10000);
 
 	//Pre-calculate table values
 	void fillTable(const int _nr_elem = 5000);
 
 	// Value access
-	double operator()(double val) const;
+	RFLOAT operator()(RFLOAT val) const;
 
 };
 
@@ -131,8 +131,8 @@ class TabFtBlob : public TabFunction
 {
 
 private:
-	double radius;
-	double alpha;
+	RFLOAT radius;
+	RFLOAT alpha;
 	int order;
 
 public:
@@ -140,13 +140,13 @@ public:
 	TabFtBlob() {}
 
 	 // Constructor (with parameters)
-	void initialise(double _radius, double _alpha, int _order, const int _nr_elem = 10000);
+	void initialise(RFLOAT _radius, RFLOAT _alpha, int _order, const int _nr_elem = 10000);
 
 	//Pre-calculate table values
 	void fillTable(const int _nr_elem = 5000);
 
 	// Value access
-	double operator()(double val) const;
+	RFLOAT operator()(RFLOAT val) const;
 
 };
 

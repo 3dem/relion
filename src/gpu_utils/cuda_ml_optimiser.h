@@ -39,15 +39,15 @@ public:
 	unsigned long my_ori_particle;
 
 	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<double> > Fctfs, local_Fctfs, local_Minvsigma2s;
+	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
-	std::vector<double> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<double> highres_Xi2_imgs, min_diff2;
+	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
+	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
-	std::vector<double> sum_weight, significant_weight, max_weight;
-	std::vector<Matrix1D<double> > old_offset, prior;
-	std::vector<MultidimArray<double> > power_imgs;
+	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
+	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
+	std::vector<MultidimArray<RFLOAT> > power_imgs;
 	MultidimArray<XFLOAT> Mweight;
 
 	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
@@ -295,7 +295,7 @@ class ProjectionParams
 public:
 	std::vector< long unsigned > orientation_num; 					// the number of significant orientation for each class
 	long unsigned orientationNumAllClasses;							// sum of the above
-	std::vector< double > rots, tilts, psis;
+	std::vector< RFLOAT > rots, tilts, psis;
 	std::vector< long unsigned > iorientclasses, iover_rots;
 
 	// These are arrays which detial the number of entries in each class, and where each class starts.
@@ -358,7 +358,7 @@ public:
 	// begins @ element class_idx[n]
 	// ends   @ element class_idx[n]+class_entries[n]
 
-	void pushBackAll(long unsigned iclass, double NEWrot,double NEWtilt ,double NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
+	void pushBackAll(long unsigned iclass, RFLOAT NEWrot,RFLOAT NEWtilt ,RFLOAT NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
 	{
 		// incremement the counter for this class
 		class_entries[iclass]++;
@@ -497,7 +497,7 @@ public:
 
 	void resetData();
 
-	void doThreadExpectationSomeParticles();
+	void doThreadExpectationSomeParticles(int thread_id);
 
 	void storeBpMdlData()
 	{
@@ -512,9 +512,9 @@ public:
 
 			for (unsigned long n = 0; n < s; n++)
 			{
-				baseMLO->wsum_model.BPref[iclass].data.data[n].real += (double) r[n];
-				baseMLO->wsum_model.BPref[iclass].data.data[n].imag += (double) i[n];
-				baseMLO->wsum_model.BPref[iclass].weight.data[n] += (double) w[n];
+				baseMLO->wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) r[n];
+				baseMLO->wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) i[n];
+				baseMLO->wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) w[n];
 			}
 
 			delete [] r;

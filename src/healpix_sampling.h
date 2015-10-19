@@ -41,14 +41,14 @@ public:
     Healpix_Base healpix_base;
 
     /** Random perturbation */
-    double random_perturbation;
+    RFLOAT random_perturbation;
 
     /** Amount of random perturbation */
-    double perturbation_factor;
+    RFLOAT perturbation_factor;
 
     /** In-plane (psi-angle) sampling rate
      */
-    double psi_step;
+    RFLOAT psi_step;
 
     /** Healpix order */
     int healpix_order;
@@ -61,7 +61,7 @@ public:
 
     /* Translational search range and sampling rate
      */
-    double offset_range, offset_step;
+    RFLOAT offset_range, offset_step;
 
     /** Flag whether this is a real 3D sampling */
     bool is_3D;
@@ -73,26 +73,26 @@ public:
     FileName fn_sym;
 
     /** List of symmetry operators */
-    std::vector <Matrix2D<double> > R_repository, L_repository;
+    std::vector <Matrix2D<RFLOAT> > R_repository, L_repository;
 
     /** Two numbers that describe the symmetry group */
     int pgGroup;
     int pgOrder;
 
     /** Limited tilt angle range */
-    double limit_tilt;
+    RFLOAT limit_tilt;
 
     /** vector with the original pixel number in the healpix object */
     std::vector<int> directions_ipix;
 
     /** vector with sampling points described by angles */
-    std::vector<double > rot_angles, tilt_angles;
+    std::vector<RFLOAT > rot_angles, tilt_angles;
 
     /** vector with the psi-samples */
-    std::vector<double> psi_angles;
+    std::vector<RFLOAT> psi_angles;
 
     /** vector with the X,Y(,Z)-translations */
-    std::vector<double> translations_x, translations_y, translations_z;
+    std::vector<RFLOAT> translations_x, translations_y, translations_z;
 
 
 public:
@@ -169,34 +169,34 @@ public:
     void write(FileName fn_out);
 
     /* Set the non-oversampled list of translations */
-    void setTranslations(double offset_step = -1., double offset_range = -1.);
+    void setTranslations(RFLOAT offset_step = -1., RFLOAT offset_range = -1.);
 
     /* Add a single translation */
-    void addOneTranslation(double offset_x, double offset_y, double offset_z, bool do_clear = false);
+    void addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear = false);
 
     /* Set the non-oversampled lists of directions and in-plane rotations */
-    void setOrientations(int _order = -1, double _psi_step = -1.);
+    void setOrientations(int _order = -1, RFLOAT _psi_step = -1.);
 
     /* Add a single orientation */
-    void addOneOrientation(double rot, double tilt, double psi, bool do_clear = false);
+    void addOneOrientation(RFLOAT rot, RFLOAT tilt, RFLOAT psi, bool do_clear = false);
 
 
     /* Write all orientations as a sphere in a bild file
      * Mainly useful for debugging */
-    void writeAllOrientationsToBild(FileName fn_bild, std::string rgb = "1 0 0", double size = 0.025);
-    void writeNonZeroPriorOrientationsToBild(FileName fn_bild, double rot_prior, double tilt_prior,
-    		std::vector<int> &pointer_dir_nonzeroprior, std::string rgb = "0 0 1", double size = 0.025);
+    void writeAllOrientationsToBild(FileName fn_bild, std::string rgb = "1 0 0", RFLOAT size = 0.025);
+    void writeNonZeroPriorOrientationsToBild(FileName fn_bild, RFLOAT rot_prior, RFLOAT tilt_prior,
+    		std::vector<int> &pointer_dir_nonzeroprior, std::string rgb = "0 0 1", RFLOAT size = 0.025);
 
     /* Select all orientations with zero prior probabilities
      * store all these in the vectors pointer_dir_nonzeroprior and pointer_psi_nonzeroprior
      * Also precalculate their prior probabilities and store in directions_prior and psi_prior
      */
     void selectOrientationsWithNonZeroPriorProbability(
-    		double prior_rot, double prior_tilt, double prior_psi,
-    		double sigma_rot, double sigma_tilt, double sigma_psi,
-    		std::vector<int> &pointer_dir_nonzeroprior, std::vector<double> &directions_prior,
-    		std::vector<int> &pointer_psi_nonzeroprior, std::vector<double> &psi_prior,
-    		double sigma_cutoff = 3.);
+    		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,
+    		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
+    		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+    		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
+    		RFLOAT sigma_cutoff = 3.);
 
     /** Get the symmetry group of this sampling object
      */
@@ -210,19 +210,19 @@ public:
 
     /** The geometrical considerations about the symmetry below require that rot = [-180,180] and tilt [0,180]
      */
-    void checkDirection(double &rot, double &tilt);
+    void checkDirection(RFLOAT &rot, RFLOAT &tilt);
 
     /* Get the rot and tilt angles in the center of the ipix'th HEALPix sampling pixel
      * This involves calculations in the HEALPix library
      */
-    void getDirectionFromHealPix(long int ipix, double &rot, double &tilt);
+    void getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT &tilt);
 
     /* Get the translational sampling step in pixels */
-    double getTranslationalSampling(int adaptive_oversampling = 0);
+    RFLOAT getTranslationalSampling(int adaptive_oversampling = 0);
 
     /* Get approximate angular sampling in degrees for any adaptive oversampling
      */
-    double getAngularSampling(int adaptive_oversampling = 0);
+    RFLOAT getAngularSampling(int adaptive_oversampling = 0);
 
     /* Get the number of symmetry-unique sampling points
      * Note that because of symmetry-equivalence removal this number is not the number of original HEALPix pixels
@@ -254,15 +254,15 @@ public:
      * This does not involve calculations in the HEALPix library
      * Note that because of symmetry-equivalence removal idir no longer corresponds to the HEALPix pixel number
      */
-    void getDirection(long int idir, double &rot, double &tilt);
+    void getDirection(long int idir, RFLOAT &rot, RFLOAT &tilt);
 
     /* Get the value for the ipsi'th precalculated psi angle
      */
-    void getPsiAngle(long int ipsi, double &psi);
+    void getPsiAngle(long int ipsi, RFLOAT &psi);
 
     /* Get the value for the itrans'th precalculated translations
      */
-    void getTranslation(long int itrans, double &trans_x, double &trans_y, double &trans_z);
+    void getTranslation(long int itrans, RFLOAT &trans_x, RFLOAT &trans_y, RFLOAT &trans_z);
 
     /* Get the position of this sampling point in the original array */
     long int getPositionSamplingPoint(int iclass, long int idir, long int ipsi, long int itrans);
@@ -278,9 +278,9 @@ public:
      * etc.
      */
     void getTranslations(long int itrans, int oversampling_order,
-    		std::vector<double > &my_translations_x,
-    		std::vector<double > &my_translations_y,
-    		std::vector<double > &my_translations_z);
+    		std::vector<RFLOAT > &my_translations_x,
+    		std::vector<RFLOAT > &my_translations_y,
+    		std::vector<RFLOAT > &my_translations_z);
 
     /* Get the vectors of (rot, tilt, psi) angle triplets for a more finely (oversampled) sampling
      * The oversampling_order is the difference in order of the original (coarse) and the oversampled (fine) sampling
@@ -293,9 +293,9 @@ public:
      * This is for local angular searches
      */
     void getOrientations(long int idir, long int ipsi, int oversampling_order,
-    		std::vector<double > &my_rot, std::vector<double > &my_tilt, std::vector<double > &my_psi,
-    		std::vector<int> &pointer_dir_nonzeroprior, std::vector<double> &directions_prior,
-    		std::vector<int> &pointer_psi_nonzeroprior, std::vector<double> &psi_prior);
+    		std::vector<RFLOAT > &my_rot, std::vector<RFLOAT > &my_tilt, std::vector<RFLOAT > &my_psi,
+    		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+    		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior);
 
     /* Gets the vector of psi angles for a more finely (oversampled) sampling and
      * pushes each instance back into the oversampled_orientations vector with the given rot and tilt
@@ -306,20 +306,20 @@ public:
      * etc.
      */
     void pushbackOversampledPsiAngles(long int ipsi, int oversampling_order,
-    		double rot, double tilt, std::vector<double> &oversampled_rot,
-    		std::vector<double> &oversampled_tilt, std::vector<double> &oversampled_psi);
+    		RFLOAT rot, RFLOAT tilt, std::vector<RFLOAT> &oversampled_rot,
+    		std::vector<RFLOAT> &oversampled_tilt, std::vector<RFLOAT> &oversampled_psi);
 
     /* Calculate an angular distance between two sets of Euler angles */
-    double calculateAngularDistance(double rot1, double tilt1, double psi1,
-    		double rot2, double tilt2, double psi2);
+    RFLOAT calculateAngularDistance(RFLOAT rot1, RFLOAT tilt1, RFLOAT psi1,
+    		RFLOAT rot2, RFLOAT tilt2, RFLOAT psi2);
 
     /* Write a BILD file describing the angular distribution
      *  R determines the radius of the sphere on which cylinders will be placed
      *  Rmax_frac determines the length of the longest cylinder (relative to R, 0.2 + +20%)
      *  width_frac determines how broad each cylinder is. frac=1 means they touch each other
      * */
-    void writeBildFileOrientationalDistribution(MultidimArray<double> &pdf_direction,
-    		FileName &fn_bild, double R, double offset = 0., double Rmax_frac = 0.3, double width_frac = 0.5);
+    void writeBildFileOrientationalDistribution(MultidimArray<RFLOAT> &pdf_direction,
+    		FileName &fn_bild, RFLOAT R, RFLOAT offset = 0., RFLOAT Rmax_frac = 0.3, RFLOAT width_frac = 0.5);
 
 private:
 
@@ -337,12 +337,12 @@ private:
         If this distance is less than 0.8 times the angular sampling, the point is deleted
         This cares care of sampling points near the edge of the geometrical considerations
     */
-    void removeSymmetryEquivalentPoints(double max_ang);
+    void removeSymmetryEquivalentPoints(RFLOAT max_ang);
 
     /* eliminate symmetry-related points based on simple geometrical considerations,
         symmetry group, symmetry order */
     void removeSymmetryEquivalentPointsGeometric(const int symmetry, int sym_order,
-												 std::vector <Matrix1D<double> >  &sampling_points_vector);
+												 std::vector <Matrix1D<RFLOAT> >  &sampling_points_vector);
 
 
 

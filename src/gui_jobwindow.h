@@ -27,14 +27,19 @@
 #define HAS_NOT_MPI false
 #define HAS_THREAD true
 #define HAS_NOT_THREAD false
+#define HAS_PARALLEL_DISCIO true
+#define HAS_NOT_PARALLEL_DISCIO false
 #define HAS_RUN true
 #define HAS_NOT_RUN false
 
 #include "src/gui_entries.h"
+
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
+#define DEFAULTMININIMUMDEDICATED 1
+#define DEFAULTALLOWCHANGEMINDEDICATED true
 
 static Fl_Menu_Item sampling_options[] = {
 		      {"30 degrees"},
@@ -48,6 +53,9 @@ static Fl_Menu_Item sampling_options[] = {
 		      {"0.1 degrees"},
 		      {0} // this should be the last entry
 };
+
+static int minimum_nr_dedicated;
+static bool do_allow_change_minimum_dedicated;
 
 class RelionJobWindow : public Fl_Box
 {
@@ -74,6 +82,7 @@ public:
     BooleanEntry do_queue;
 	AnyEntry queuename;
 	AnyEntry qsub;
+	SliderEntry min_dedicated;
 	FileNameEntry qsubscript;
 	bool have_extra1, have_extra2;
 	AnyEntry qsub_extra1;
@@ -206,7 +215,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix);
+			std::string &final_command, RFLOAT angpix);
 
 };
 
@@ -225,6 +234,7 @@ public:
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
 	SliderEntry mindist_autopick;
+	SliderEntry maxstddevnoise_autopick;
 
 	Fl_Group *autopick_ctf_group;
 
@@ -244,7 +254,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -286,7 +296,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -335,7 +345,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -368,7 +378,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -382,6 +392,7 @@ public:
 	AnyEntry fn_out;
 	FileNameEntry fn_cont;
 	FileNameEntry fn_img;
+	BooleanEntry do_parallel_discio;
 
 	// CTF
 	BooleanEntry do_ctf_correction;
@@ -420,7 +431,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -434,6 +445,7 @@ public:
 	FileNameEntry fn_cont;
 	FileNameEntry fn_img;
 	SliderEntry nr_classes;
+	BooleanEntry do_parallel_discio;
 
 	// Reference
 	FileNameEntry fn_ref;
@@ -481,7 +493,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -494,6 +506,7 @@ public:
 	AnyEntry fn_out;
 	FileNameEntry fn_cont;
 	FileNameEntry fn_img;
+	BooleanEntry do_parallel_discio;
 
 	// Reference
 	FileNameEntry fn_ref;
@@ -545,7 +558,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, double angpix, double particle_diameter);
+			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 
@@ -595,7 +608,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			double angpix);
+			RFLOAT angpix);
 
 };
 
@@ -638,7 +651,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			double angpix, double particle_diameter, double black_dust, double white_dust);
+			RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust);
 };
 
 class ResmapJobWindow : public RelionJobWindow
@@ -675,7 +688,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			double angpix);
+			RFLOAT angpix);
 
 };
 

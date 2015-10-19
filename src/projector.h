@@ -189,19 +189,19 @@ public:
     * Depending on whether 2D or 3D Fourier Transforms will be extracted, the map is normalized internally in a different manner
     *
     */
-   void computeFourierTransformMap(MultidimArray<double> &vol_in, MultidimArray<double> &power_spectrum, int current_size = -1, int nr_threads = 1, bool do_gridding = true);
+   void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size = -1, int nr_threads = 1, bool do_gridding = true);
 
    /* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
     * the real-space maps by dividing them by the Fourier Transform of the interpolator
     * Note these corrections are made on the not-oversampled, i.e. originally sized real-space map
     */
-   void griddingCorrect(MultidimArray<double> &vol_in);
+   void griddingCorrect(MultidimArray<RFLOAT> &vol_in);
 
    /*
 	* Get a 2D Fourier Transform from the 2D or 3D data array
 	* Depending on the dimension of the map, this will be a projection or a rotation operation
 	*/
-	void get2DFourierTransform(MultidimArray<Complex > &img_out, Matrix2D<double> &A, bool inv)
+	void get2DFourierTransform(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv)
 	{
 		// Rotation of a 3D Fourier Transform
 		if (data_dim == 3)
@@ -229,17 +229,17 @@ public:
 	/*
 	* Get a 2D slice from the 3D map (forward projection)
 	*/
-	void project(MultidimArray<Complex > &img_out, Matrix2D<double> &A, bool inv);
+	void project(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv);
 
 	/*
 	* Get an in-plane rotated version of the 2D map (mere interpolation)
 	*/
-	void rotate2D(MultidimArray<Complex > &img_out, Matrix2D<double> &A, bool inv);
+	void rotate2D(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv);
 
 	/*
 	* Get a rotated version of the 3D map (mere interpolation)
 	*/
-	void rotate3D(MultidimArray<Complex > &img_out, Matrix2D<double> &A, bool inv);
+	void rotate3D(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv);
 
 
 };
