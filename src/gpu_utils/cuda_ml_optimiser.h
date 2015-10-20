@@ -479,6 +479,8 @@ public:
 	//Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
 	std::vector< cudaStream_t > bpStreams;
+	cudaStream_t stream1;
+	cudaStream_t stream2;
 
 	CudaTranslator translator_coarse1;
 	CudaTranslator translator_coarse2;
@@ -562,6 +564,9 @@ public:
 
 		//Delete this lastly
 		delete allocator;
+
+		HANDLE_ERROR(cudaStreamDestroy(stream1));
+		HANDLE_ERROR(cudaStreamDestroy(stream2));
 
 		for (int i = 0; i <= classStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));

@@ -74,6 +74,13 @@ void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size, cudaStream_t &stream)
 	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( h_ptr, d_ptr, size * sizeof(T), cudaMemcpyDeviceToHost, stream));
 };
 
+template< typename T>
+static inline
+void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t &stream)
+{
+	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( des, src, size * sizeof(T), cudaMemcpyDeviceToDevice, stream));
+};
+
 class OutOfMemoryHandler
 {
 public:
@@ -592,7 +599,7 @@ public:
 	{};
 
 	inline
-	CudaGlobalPtr(const CudaGlobalPtr<T> &ptr, unsigned long start_idx, size_t size):
+	CudaGlobalPtr(const CudaGlobalPtr<T> &ptr, size_t start_idx, size_t size):
 		size(size), h_ptr(&ptr.h_ptr[start_idx]), d_ptr(&ptr.d_ptr[start_idx]), h_do_free(false),
 		d_do_free(false), allocator(ptr.allocator), alloc(0), stream(ptr.stream)
 	{};

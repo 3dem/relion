@@ -445,7 +445,7 @@ __global__ void cuda_kernel_init_value(
 }
 
 template< typename T>
-void deviceInitValue(CudaGlobalPtr<T> data, T value)
+void deviceInitValue(CudaGlobalPtr<T> &data, T value)
 {
 	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
