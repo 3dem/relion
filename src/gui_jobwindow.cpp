@@ -521,21 +521,8 @@ void GeneralJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
-
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-	mic_names.place(current_y, "Input micrographs for CTF:", "micrographs_selected.star", "Input micrographs (*.{star,mrc})", "STAR file with the filenames of all micrographs on which to run CTFFIND, OR a unix-type wildcard to the filenames of the micrograph(s) (e.g. Micrographs/*.mrc).\
-Note that the micrographs should be in a subdirectory (e.g. called Micrographs/) of the project directory, i.e. the directory from where you are launching the GUI. \
-If this is not the case, then make a symbolic link inside the project directory to the directory where your micrographs are stored.");
-
-	output_star_ctf_mics.place(current_y, "Output STAR file:", "micrographs_ctf.star", "Name of the output STAR file with all CTF information for each micrograph");
-
-	// Add a little spacer
-	current_y += STEPY/2;
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
@@ -544,10 +531,23 @@ If this is not the case, then make a symbolic link inside the project directory 
 		char mydefault[]=DEFAULTCTFFINDLOCATION;
 		default_location=mydefault;
 	}
+	char * gctf_default_location = getenv ("RELION_GCTF_EXECUTABLE");
+	if (gctf_default_location == NULL)
+	{
+		char mygctfdefault[]=DEFAULTGCTFLOCATION;
+		gctf_default_location=mygctfdefault;
+	}
 
-	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
 
-	ctf_win.place(current_y, "Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
+	mic_names.place(current_y, "Input micrographs for CTF:", "micrographs_selected.star", "Input micrographs (*.{star,mrc})", "STAR file with the filenames of all micrographs on which to run CTFFIND, OR a unix-type wildcard to the filenames of the micrograph(s) (e.g. Micrographs/*.mrc).\
+\n \n For Gctf, only a linux wildcard can be used (not a STAR file) \n \n\
+Note that the micrographs should be in a subdirectory (e.g. called Micrographs/) of the project directory, i.e. the directory from where you are launching the GUI. \
+If this is not the case, then make a symbolic link inside the project directory to the directory where your micrographs are stored.");
+
+	output_star_ctf_mics.place(current_y, "Output STAR file:", "micrographs_ctf.star", "Name of the output STAR file with all CTF information for each micrograph");
 
 	tab1->end();
 
@@ -570,6 +570,11 @@ If this is not the case, then make a symbolic link inside the project directory 
 	tab3->label("CTFFIND");
 	resetHeight();
 
+	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	box.place(current_y, "FFT box size (pix):", 512, 64, 1024, 8, "CTFFIND's Box parameter");
 
 	resmin.place(current_y, "Minimum resolution (A):", 30, 10, 200, 10, "CTFFIND's ResMin parameter");
@@ -584,7 +589,35 @@ If this is not the case, then make a symbolic link inside the project directory 
 
 	dast.place(current_y, "Amount of astigmatism (A):", 100, 0, 2000, 100,"CTFFIND's dAst parameter");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	ctf_win.place(current_y, "Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
+
 	tab3->end();
+
+
+	tab4->begin();
+	tab4->label("Gctf");
+	resetHeight();
+
+	gctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	gctf_group->end();
+
+	use_gctf.place(current_y, "Use Gctf instead of CTFFIND?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND.", gctf_group);
+
+	gctf_group->begin();
+	fn_gctf_exe.place(current_y, "Gctf executable:", gctf_default_location, "*", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	do_ignore_ctffind_params.place(current_y, "Ignore CTFFIND parameters?", true, "If set to Yes, all parameters on the CTFFIND tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
+\n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
+
+	do_EPA.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
+
+	gctf_group->end();
+	use_gctf.cb_menu_i(); // make default active
+
+	tab4->end();
 
 	// read settings if hidden file exists
 	read(".gui_ctffind.settings", is_continue);
@@ -610,6 +643,10 @@ void CtffindJobWindow::write(std::string fn)
 	dast.writeValue(fh);
 	fn_ctffind_exe.writeValue(fh);
 	ctf_win.writeValue(fh);
+	use_gctf.writeValue(fh);
+	fn_gctf_exe.writeValue(fh);
+	do_ignore_ctffind_params.writeValue(fh);
+	do_EPA.writeValue(fh);
 
 	closeWriteFile(fh);
 }
@@ -636,6 +673,10 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 		dast.readValue(fh);
 		fn_ctffind_exe.readValue(fh);
 		ctf_win.readValue(fh);
+		use_gctf.readValue(fh);
+		fn_gctf_exe.readValue(fh);
+		do_ignore_ctffind_params.readValue(fh);
+		do_EPA.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -663,37 +704,76 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 {
 	commands.clear();
 	std::string command;
-	if (nr_mpi.getValue() > 1)
-		command="`which relion_run_ctffind_mpi`";
+
+	if (use_gctf.getValue())
+	{
+		if (nr_mpi.getValue() > 1)
+		{
+			std::cout << " ERROR: You cannot use multiple MPI processes together with Gctf...." << std::endl;
+			return;
+		}
+
+		command = fn_gctf_exe.getValue();
+		command +=  " --ctfstar " + output_star_ctf_mics.getValue();
+		command +=  " --apix " + floatToString(angpix);
+		command +=  " --cs " + floatToString(cs.getValue());
+		command +=  " --kV " + floatToString(kv.getValue());
+		command +=  " --ac " + floatToString(q0.getValue());
+
+		if (!do_ignore_ctffind_params.getValue())
+		{
+			command += " --boxsize " + floatToString(box.getValue());
+			command += " --resL " + floatToString(resmin.getValue());
+			command += " --resH " + floatToString(resmax.getValue());
+			command += " --defL " + floatToString(dfmin.getValue());
+			command += " --defH " + floatToString(dfmax.getValue());
+			command += " --defS " + floatToString(dfstep.getValue());
+			command += " --astm " + floatToString(dast.getValue());
+		}
+
+		if (do_EPA.getValue())
+			command += " --do_EPA ";
+
+	}
 	else
-		command="`which relion_run_ctffind`";
+	{
+
+		if (nr_mpi.getValue() > 1)
+			command="`which relion_run_ctffind_mpi`";
+		else
+			command="`which relion_run_ctffind`";
 
 
-	// Calculate magnification from user-specified pixel size in Angstroms
-	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
+		// Calculate magnification from user-specified pixel size in Angstroms
+		RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
 
-	command += " --i \"" + mic_names.getValue()+"\"";
-	command += " --o \"" + output_star_ctf_mics.getValue()+"\"";
-	command += " --ctfWin " + floatToString(ctf_win.getValue());
-	command += " --CS " + floatToString(cs.getValue());
-	command += " --HT " + floatToString(kv.getValue());
-	command += " --AmpCnst " + floatToString(q0.getValue());
-	command += " --XMAG " + floatToString(magn);
-	command += " --DStep " + floatToString(dstep.getValue());
-	command += " --Box " + floatToString(box.getValue());
-	command += " --ResMin " + floatToString(resmin.getValue());
-	command += " --ResMax " + floatToString(resmax.getValue());
-	command += " --dFMin " + floatToString(dfmin.getValue());
-	command += " --dFMax " + floatToString(dfmax.getValue());
-	command += " --FStep " + floatToString(dfstep.getValue());
-	command += " --dAst " + floatToString(dast.getValue());
-	command += " --ctffind_exe " + fn_ctffind_exe.getValue();
+		command += " --i \"" + mic_names.getValue()+"\"";
+		command += " --o \"" + output_star_ctf_mics.getValue()+"\"";
+		command += " --ctfWin " + floatToString(ctf_win.getValue());
+		command += " --CS " + floatToString(cs.getValue());
+		command += " --HT " + floatToString(kv.getValue());
+		command += " --AmpCnst " + floatToString(q0.getValue());
+		command += " --XMAG " + floatToString(magn);
+		command += " --DStep " + floatToString(dstep.getValue());
+		command += " --Box " + floatToString(box.getValue());
+		command += " --ResMin " + floatToString(resmin.getValue());
+		command += " --ResMax " + floatToString(resmax.getValue());
+		command += " --dFMin " + floatToString(dfmin.getValue());
+		command += " --dFMax " + floatToString(dfmax.getValue());
+		command += " --FStep " + floatToString(dfstep.getValue());
+		command += " --dAst " + floatToString(dast.getValue());
+		command += " --ctffind_exe " + fn_ctffind_exe.getValue();
 
-	if (is_continue)
-		command += " --only_do_unfinished ";
+		if (is_continue)
+			command += " --only_do_unfinished ";
+	}
 
 	// Other arguments
 	command += " " + other_args.getValue();
+
+	// For Gctf, micrograph names come to the end
+	if (use_gctf.getValue())
+		command += " " + mic_names.getValue();
 
 	commands.push_back(command);
 
@@ -701,11 +781,11 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (last_slash_out < mic_names.getValue().size())
 	{
 		// The output name contains a directory: use that one for output
-		outputname = mic_names.getValue().substr(0, last_slash_out + 1) + "run_ctffind";
+		outputname =  (use_gctf.getValue()) ? mic_names.getValue().substr(0, last_slash_out + 1) + "run_gctf" : mic_names.getValue().substr(0, last_slash_out + 1) + "run_ctffind";
 	}
 	else
 	{
-		outputname = "run_ctffind";
+		outputname = (use_gctf.getValue()) ? "run_gctf" : "run_ctffind";
 	}
 
 	prepareFinalCommand(outputname, commands, final_command);
@@ -3168,7 +3248,7 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
  * Auto-picking : \n \
      Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
  * Sub-tomogram averaging : \n \
-     Bharat et al. (2015) Structure (submitted). \n \n "
+     Bharat et al. (2015) Structure (PMID: 26256537). \n \n "
 , GUIWIDTH - WCOL0 - 50, GUIHEIGHT - 150);
 
 	//cite_text.mydisp->textsize(12);
@@ -3182,6 +3262,8 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
 Please also cite the following EXTERNAL programs: \n \n \
 * CTFFIND for CTF-estimation: \n \
     Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
+* Gctf for CTF-estimation: \n \
+    Zhang (2015) J. Struct. Biol. (submitted) \n \n\
 * ResMap for local-resolution estimation:  \n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)"
 , GUIWIDTH - WCOL0 - 50, GUIHEIGHT - 150);
