@@ -706,7 +706,7 @@ void getAllSquaredDifferencesCoarse(
 						ipart,
 						group_id,
 						exp_iclass,
-						cudaMLO,
+						cudaMLO->classStreams[exp_iclass],
 						do_CC);
 
 				mapAllWeightsToMweights(
@@ -715,7 +715,7 @@ void getAllSquaredDifferencesCoarse(
 						&Mweight(ipart*weightsPerPart),
 						projectorPlan.orientation_num,
 						translation_num,
-						0
+						cudaMLO->classStreams[exp_iclass]
 						);
 
 				/*====================================
@@ -982,7 +982,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						image_size,
 						ipart,
 						exp_iclass,
-						cudaMLO,
+						cudaMLO->classStreams[exp_iclass],
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
@@ -1310,8 +1310,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			CudaGlobalPtr<XFLOAT>   sorted_ipart(unsorted_ipart.getSize(), cudaMLO->allocator);
 			sorted_ipart.device_alloc();
-
-			printf("size: %d\n", unsorted_ipart.getSize());
 
 			sortOnDevice(unsorted_ipart, sorted_ipart);
 
