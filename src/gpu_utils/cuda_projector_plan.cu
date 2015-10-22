@@ -39,6 +39,7 @@ void CudaProjectorPlan::setup(
 		iorientclasses.free_if_set();
 		iorientclasses.setSize(nr_dir * nr_psi * nr_oversampled_rot);
 		iorientclasses.host_alloc();
+		iorientclasses.device_alloc();
 	}
 
 	orientation_num = 0;
@@ -110,7 +111,7 @@ void CudaProjectorPlan::setup(
 		}
 	}
 
-	iorientclasses.put_on_device(orientation_num);
+	iorientclasses.cp_to_device();
 
 	RFLOAT alpha(.0), beta(.0), gamma(.0);
 	RFLOAT ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
