@@ -477,8 +477,8 @@ public:
 	CudaCustomAllocator *allocator;
 
 	//Class streams ( for concurrent scheduling of class-specific kernels)
-	std::vector< cudaStream_t > classStreams;
-	std::vector< cudaStream_t > bpStreams;
+	std::vector< cudaStream_t *> classStreams;
+	std::vector< cudaStream_t *> bpStreams;
 	cudaStream_t stream1;
 	cudaStream_t stream2;
 
@@ -552,6 +552,11 @@ public:
 #endif
 	}
 
+	cudaStream_t getClassStream(unsigned index)
+	{
+		return *classStreams[index];
+	}
+
 	~MlOptimiserCuda()
 	{
 		clearBackprojectDataBundle();
@@ -569,10 +574,16 @@ public:
 		HANDLE_ERROR(cudaStreamDestroy(stream2));
 
 		for (int i = 0; i <= classStreams.size(); i++)
-			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
+		{
+			HANDLE_ERROR(cudaStreamDestroy(*classStreams[i]));
+			delete classStreams[i];
+		}
 
 		for (int i = 0; i <= bpStreams.size(); i++)
-			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
+		{
+			HANDLE_ERROR(cudaStreamDestroy(*bpStreams[i]));
+			delete bpStreams[i];
+		}
 	}
 
 };
