@@ -706,7 +706,7 @@ void getAllSquaredDifferencesCoarse(
 						ipart,
 						group_id,
 						exp_iclass,
-						cudaMLO,
+						cudaMLO->classStreams[exp_iclass],
 						do_CC);
 
 				mapAllWeightsToMweights(
@@ -715,7 +715,7 @@ void getAllSquaredDifferencesCoarse(
 						&Mweight(ipart*weightsPerPart),
 						projectorPlan.orientation_num,
 						translation_num,
-						0
+						cudaMLO->classStreams[exp_iclass]
 						);
 
 				/*====================================
@@ -982,7 +982,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						image_size,
 						ipart,
 						exp_iclass,
-						cudaMLO,
+						cudaMLO->classStreams[exp_iclass],
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 						);
@@ -1183,7 +1183,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
 					dim3 block_dim(block_num);
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->getClassStream(exp_iclass)>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~classMweight,
 																			    ~thisparticle_sumweight,
@@ -1206,7 +1206,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					dim3 block_dim(block_num);
 
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->getClassStream(exp_iclass)>>>(	~pdf_orientation_class,
+					cuda_kernel_sumweightFine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
 																			    ~pdf_offset_class,
 																			    ~thisClassPassWeights.weights,
 																			    ~thisparticle_sumweight,
@@ -1341,7 +1341,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			// Store nr_significant_coarse_samples for this particle
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
 
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->getClassStream(0)));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[0]));
 
 			// Keep track of which coarse samplings were significant were significant for this particle
 			for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
@@ -2187,19 +2187,13 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 	HANDLE_ERROR(cudaStreamCreate(&stream1));
 	HANDLE_ERROR(cudaStreamCreate(&stream2));
 
-	for (int i = 0; i <= nr_classes; i++)
-	{
-		cudaStream_t *newStream = new cudaStream_t();
-		HANDLE_ERROR(cudaStreamCreate(newStream));
-		classStreams.push_back(newStream);
-	}
+	classStreams.resize(nr_classes, 0);
+	for (int i = 0; i < nr_classes; i++)
+		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
 
-	for (int i = 0; i <= nr_classes; i++)
-	{
-		cudaStream_t *newStream = new cudaStream_t();
-		HANDLE_ERROR(cudaStreamCreateWithPriority(newStream, cudaStreamNonBlocking, 1)); //Lower priority stream (1)
-		bpStreams.push_back(newStream);
-	}
+	bpStreams.resize(nr_classes, 0);
+	for (int i = 0; i < nr_classes; i++)
+		HANDLE_ERROR(cudaStreamCreateWithPriority(&bpStreams[i], cudaStreamNonBlocking, 1)); //Lower priority stream (1)
 
 	refIs3D = baseMLO->mymodel.ref_dim == 3;
 
@@ -2208,7 +2202,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
-		cudaBackprojectors[iclass].setStream(*bpStreams[iclass]);
+		cudaBackprojectors[iclass].setStream(bpStreams[iclass]);
 
 	/*======================================================
 	                    CUSTOM ALLOCATOR
