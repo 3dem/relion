@@ -333,12 +333,13 @@ void CudaBackprojector::backproject(
 		XFLOAT *d_eulers,
 		int imgX,
 		int imgY,
-		unsigned long imageCount)
+		unsigned long imageCount,
+		cudaStream_t optStream)
 {
 
 	if(mdlZ==1)
 	{
-		cuda_kernel_backproject2D<<<imageCount,BP_2D_BLOCK_SIZE,0,stream>>>(
+		cuda_kernel_backproject2D<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
 			d_mdlReal,
 			d_mdlImag,
 			d_mdlWeight,
@@ -357,7 +358,7 @@ void CudaBackprojector::backproject(
 	}
 	else
 	{
-		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,stream>>>(
+		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
 				d_mdlReal,
 				d_mdlImag,
 				d_mdlWeight,
