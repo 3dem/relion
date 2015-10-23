@@ -684,7 +684,7 @@ struct DeviceRadixSort
         DoubleBuffer<Key>       d_keys(d_keys_in, d_keys_out);
         DoubleBuffer<NullType>  d_values;
 
-        return DispatchRadixSort<true, false, Key, NullType, OffsetT>::Dispatch(
+        return DispatchRadixSort<true, true, Key, NullType, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
