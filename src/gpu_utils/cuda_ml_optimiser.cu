@@ -1052,7 +1052,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
-		RFLOAT exp_thisparticle_sumweight = 0.;
 
 		RFLOAT old_offset_z;
 		RFLOAT old_offset_x = XX(op.old_offset[ipart]);
@@ -1110,7 +1109,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 //
 //				DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
 
-			exp_thisparticle_sumweight += 1.;
+			op.sum_weight[ipart] += 1.;
 
 		}
 		else
@@ -1120,7 +1119,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
 			CudaGlobalPtr<XFLOAT> thisparticle_sumweight(sumRedSize, cudaMLO->allocator);
-			thisparticle_sumweight.device_alloc();
+			if(exp_ipass!=0)
+				thisparticle_sumweight.device_alloc();
 			long int sumweight_pos=0;
 
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
@@ -1182,16 +1182,20 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
 					dim3 block_dim(block_num);
+
 //					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_sumweightCoarse<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(	~pdf_orientation_class,
-																			    ~pdf_offset_class,
-																			    ~classMweight,
-																			    ~thisparticle_sumweight,
-																			    (XFLOAT)op.min_diff2[ipart],
-																			    sp.nr_dir*sp.nr_psi,
-																			    sp.nr_trans,
-																			    sumweight_pos);
+
+					cuda_kernel_exponentiate_weights<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+							~pdf_orientation_class,
+							~pdf_offset_class,
+							~classMweight,
+							(XFLOAT)op.min_diff2[ipart],
+							sp.nr_dir*sp.nr_psi,
+							sp.nr_trans,
+							sumweight_pos);
+
 //					CUDA_GPU_TAC("cuda_kernel_sumweight");
+
 					sumweight_pos+=block_num;
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -1228,14 +1232,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			if(exp_ipass!=0)
+			{
 				PassWeights[ipart].weights.cp_to_host();
-
-			exp_thisparticle_sumweight += getSumOnDevice(thisparticle_sumweight);
+				op.sum_weight[ipart] += getSumOnDevice(thisparticle_sumweight);
+			}
 		}
-
-		//Store parameters for this particle
-		op.sum_weight[ipart] = exp_thisparticle_sumweight;
-//		std::cerr << "  sumweight =  " << exp_thisparticle_sumweight << std::endl;
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
 		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
@@ -1318,6 +1319,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			sortOnDevice(filtered, sorted);
 			scanOnDevice(sorted, cumulative_sum);
+
+			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
 			CUDA_CPU_TOC("sort");
 
@@ -2572,8 +2575,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 
 					unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
-					op.Mweight.resize(sp.nr_particles, weightsPerPart);
-					op.Mweight.initConstant(-999.);
+					op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);
 
 					CudaGlobalPtr<XFLOAT> Mweight(allocator);
 					Mweight.setSize(sp.nr_particles * weightsPerPart);
