@@ -1369,8 +1369,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 	{
-		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
-		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
+		if (exp_ipass == 0) baseMLO->timer.toc(baseMLO->TIMING_ESP_WEIGHT1);
+		else baseMLO->timer.toc(baseMLO->TIMING_ESP_WEIGHT2);
 	}
 #endif
 }
