@@ -8,10 +8,9 @@
 #include "src/gpu_utils/cuda_settings.h"
 
 
-__global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
+__global__ void cuda_kernel_exponentiate_weights(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,
 									    	  XFLOAT *g_Mweight,
-									    	  XFLOAT *g_thisparticle_sumweight,
 									    	  XFLOAT min_diff2,
 									     	  int nr_coarse_orient,
 									     	  int nr_coarse_trans,
