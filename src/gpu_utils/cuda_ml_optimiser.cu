@@ -1860,6 +1860,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		wdiff2s_sum.device_init(0.f);
 
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
+		CudaGlobalPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, cudaMLO->allocator);
+		std::vector<BackprojectDataBundle *> dataBundles(baseMLO->mymodel.nr_classes);
+
+		int classPos = 0;
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
@@ -1883,7 +1888,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 								PROJECTIONS
 			======================================================*/
 
-			BackprojectDataBundle *dataBundle = new BackprojectDataBundle(
+			dataBundles[exp_iclass] = new BackprojectDataBundle(
 					orientation_num * image_size,
 					orientation_num * 9,
 					0,
@@ -1894,17 +1899,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			generateEulerMatrices(
 					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
 					thisClassProjectionData,
-					&dataBundle->eulers[0],
+					&dataBundles[exp_iclass]->eulers[0],
 					!IS_NOT_INV);
 
 			CUDA_CPU_TOC("generateEulerMatricesProjector");
 
-			dataBundle->eulers.device_alloc_end();
-			dataBundle->reals.device_alloc_end();
-			dataBundle->imags.device_alloc_end();
-			dataBundle->weights.device_alloc_end();
+			dataBundles[exp_iclass]->eulers.device_alloc_end();
+			dataBundles[exp_iclass]->reals.device_alloc_end();
+			dataBundles[exp_iclass]->imags.device_alloc_end();
+			dataBundles[exp_iclass]->weights.device_alloc_end();
 
-			dataBundle->eulers.cp_to_device();
+			dataBundles[exp_iclass]->eulers.cp_to_device();
 
 
 			/*======================================================
@@ -1912,21 +1917,29 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			CUDA_CPU_TIC("pre_wavg_map");
-			CudaGlobalPtr<XFLOAT> sorted_weights(orientation_num * translation_num, 0, cudaMLO->allocator);
 
 			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
-				sorted_weights[i] = -999.;
+				sorted_weights[classPos+i] = -999.;
 
 			for (long unsigned i = 0; i < thisClassFinePassWeights.weights.getSize(); i++)
-				sorted_weights[ (thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
+				sorted_weights[classPos+(thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
 								= thisClassFinePassWeights.weights[i];
 
-			sorted_weights.put_on_device();
+			classPos+=orientation_num*translation_num;
 			CUDA_CPU_TOC("pre_wavg_map");
+		}
+		sorted_weights.put_on_device();
 
+		classPos = 0;
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		{
+			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
+			continue;
 			/*======================================================
 								 KERNEL CALL
 			======================================================*/
+
+			long unsigned orientation_num(ProjectionData[ipart].orientation_num[exp_iclass]);
 
 			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 					cudaMLO->cudaProjectors[exp_iclass],
@@ -1936,20 +1949,20 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			runWavgKernel(
 					projKernel,
-					~dataBundle->eulers,
+					~dataBundles[exp_iclass]->eulers,
 					~Fimgs_real,
 					~Fimgs_imag,
 					~Fimgs_nomask_real,
 					~Fimgs_nomask_imag,
-					~sorted_weights,
+					&sorted_weights.d_ptr[classPos],
 					~ctfs,
 					~Minvsigma2s,
 					~wdiff2s_sum,
 					&wdiff2s_AA(AAXA_pos),
 					&wdiff2s_XA(AAXA_pos),
-					~dataBundle->reals,
-					~dataBundle->imags,
-					~dataBundle->weights,
+					~dataBundles[exp_iclass]->reals,
+					~dataBundles[exp_iclass]->imags,
+					~dataBundles[exp_iclass]->weights,
 					op,
 					baseMLO,
 					orientation_num,
@@ -1959,11 +1972,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					group_id,
 					exp_iclass,
 					part_scale,
-					0);
+					cudaMLO->classStreams[exp_iclass]);
 
 			AAXA_pos+=orientation_num*image_size;
-
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+			classPos+=orientation_num*translation_num;
 
 			/*======================================================
 								BACKPROJECTION
@@ -1977,15 +1989,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TIC("backproject");
 
 			cudaMLO->cudaBackprojectors[exp_iclass].backproject(
-				~dataBundle->reals,
-				~dataBundle->imags,
-				~dataBundle->weights,
-				~dataBundle->eulers,
+				~dataBundles[exp_iclass]->reals,
+				~dataBundles[exp_iclass]->imags,
+				~dataBundles[exp_iclass]->weights,
+				~dataBundles[exp_iclass]->eulers,
 				op.local_Minvsigma2s[0].xdim,
 				op.local_Minvsigma2s[0].ydim,
-				orientation_num);
+				orientation_num,
+				cudaMLO->classStreams[exp_iclass]);
 
-			cudaMLO->backprojectDataBundleStack.push(dataBundle);
+			cudaMLO->backprojectDataBundleStack.push(dataBundles[exp_iclass]);
 //			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->cudaBackprojectors[exp_iclass].getStream()));
 //			delete dataBundle;
 
@@ -1996,7 +2009,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 		} // end loop iclass
-
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		wdiff2s_AA.cp_to_host();
 		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
