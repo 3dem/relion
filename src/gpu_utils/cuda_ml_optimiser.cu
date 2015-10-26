@@ -1227,9 +1227,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
-			if(exp_ipass==0)
-				Mweight.cp_to_host(); //Loads data into Mweights and op.Mweights
-			else
+			if(exp_ipass!=0)
 				PassWeights[ipart].weights.cp_to_host();
 
 			exp_thisparticle_sumweight += getSumOnDevice(thisparticle_sumweight);
@@ -1250,8 +1248,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	} // end loop ipart
 	if (exp_ipass==0)
 	{
-		op.Mcoarse_significant.clear();
-		op.Mcoarse_significant.resize(sp.nr_particles, XSIZE(op.Mweight));
+		CUDA_CPU_TIC("Mcoarse_significant_init");
+		op.Mcoarse_significant.resizeNoCp(1,1,sp.nr_particles, XSIZE(op.Mweight));
+		CUDA_CPU_TOC("Mcoarse_significant_init");
 	}
 
 	CUDA_CPU_TIC("convertPostKernel");
@@ -1261,8 +1260,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
-		RFLOAT frac_weight = 0.;
-		RFLOAT my_significant_weight;
+		XFLOAT frac_weight = 0.;
+		XFLOAT my_significant_weight;
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
@@ -1281,14 +1280,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else if (exp_ipass!=0)
 		{
-			CUDA_CPU_TIC("sort");
 			CudaGlobalPtr<XFLOAT> sorted_weight_new(PassWeights[ipart].weights.getSize(), cudaMLO->allocator);  // make new sorted weights
 			sorted_weight_new.device_alloc();
 			sortOnDevice(PassWeights[ipart].weights, sorted_weight_new);
 			sorted_weight_new.cp_to_host();							// make host-copy
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
-			CUDA_CPU_TOC("sort");
 			for (long int i=sorted_weight_new.getSize()-1; i>=0; i--)
 			{
 //				if (exp_ipass==0) my_nr_significant_coarse_samples++;
@@ -1301,61 +1298,69 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else
 		{
-			long int my_nr_significant_coarse_samples = 0;
-
 			CUDA_CPU_TIC("sort");
+			//Wrap the current ipart data in a new pointer
 			CudaGlobalPtr<XFLOAT> unsorted_ipart(Mweight,
 					ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 					(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
-			CudaGlobalPtr<XFLOAT>   sorted_ipart(unsorted_ipart.getSize(), cudaMLO->allocator);
-			sorted_ipart.device_alloc();
+			CudaGlobalPtr<XFLOAT> filtered(unsorted_ipart.getSize(), cudaMLO->allocator);
+			filtered.device_alloc();
 
-			sortOnDevice(unsorted_ipart, sorted_ipart);
+			MoreThanCubOpt<XFLOAT> moreThanOpt(0.);
+			size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+			filtered.setSize(filteredSize);
 
-			sorted_ipart.cp_to_host();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+			CudaGlobalPtr<XFLOAT> sorted(filteredSize, cudaMLO->allocator);
+			CudaGlobalPtr<XFLOAT> cumulative_sum(filteredSize, cudaMLO->allocator);
+			sorted.device_alloc();
+			cumulative_sum.device_alloc();
+
+			sortOnDevice(filtered, sorted);
+			scanOnDevice(sorted, cumulative_sum);
+
 			CUDA_CPU_TOC("sort");
 
-			for (long int i = sorted_ipart.getSize() - 1; i >= 0; i--)
-			{
-				if (sorted_ipart[i] <= .0) continue;
-
-				my_nr_significant_coarse_samples++;
-				my_significant_weight = sorted_ipart[i];
-
-				frac_weight += my_significant_weight;
-				if (frac_weight > baseMLO->adaptive_fraction * op.sum_weight[ipart])
-					break;
-			}
+			size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
+			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+			long int my_nr_significant_coarse_samples = unsorted_ipart.getSize() - thresholdIdx;
 
 			if (my_nr_significant_coarse_samples == 0)
 			{
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " frac-weight= " << frac_weight << std::endl;
+				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
+				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
-				std::cerr << "written Mweight2.spi" << std::endl;
+
+				unsorted_ipart.dump_device_to_file("error_dump_unsorted");
+				filtered.dump_device_to_file("error_dump_filtered");
+				sorted.dump_device_to_file("error_dump_sorted");
+				cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
+
+				std::cerr << "written error_dump_unsorted, error_dump_filtered, error_dump_sorted and error_dump_cumulative_sum." << std::endl;
+
 				REPORT_ERROR("my_nr_significant_coarse_samples == 0");
 			}
 
 			// Store nr_significant_coarse_samples for this particle
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[0]));
+			CudaGlobalPtr<bool> Mcoarse_significant(
+					&op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min],
+					(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
+					cudaMLO->allocator);
 
-			// Keep track of which coarse samplings were significant were significant for this particle
-			for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
-			{
-				if (DIRECT_A2D_ELEM(op.Mweight, ipart, ihidden) >= my_significant_weight)
-					DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = true;
-				else
-					DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
-			}
+			Mcoarse_significant.device_alloc();
+
+			arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, (XFLOAT) my_significant_weight);
+			Mcoarse_significant.cp_to_host();
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		}
 
 		op.significant_weight.clear();
 		op.significant_weight.resize(sp.nr_particles, 0.);
-		op.significant_weight[ipart] = my_significant_weight;
+		op.significant_weight[ipart] = (RFLOAT) my_significant_weight;
 		//std::cerr << "@sort op.significant_weight[ipart]= " << (XFLOAT)op.significant_weight[ipart] << std::endl;
 
 	} // end loop ipart
@@ -1375,7 +1380,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlOptimiserCuda *cudaMLO,
 						std::vector<IndexedDataArray> &FinePassWeights,
 						std::vector<ProjectionParams> &ProjectionData,
-						std::vector<std::vector<IndexedDataArrayMask> > FPCMasks,// FIXME? by ref?
+						std::vector<std::vector<IndexedDataArrayMask> > &FPCMasks,
 	 	 	 	 	 	std::vector<cudaStager<unsigned long> > &stagerSWS)
 {
 #ifdef TIMING

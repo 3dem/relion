@@ -454,15 +454,19 @@ void deviceInitValue(CudaGlobalPtr<T> &data, T value)
 			data.getSize());
 }
 
-
-
+#define WEIGHT_MAP_BLOCK_SIZE 512
 __global__ void cuda_kernel_allweights_to_mweights(
 		unsigned long * d_iorient,
 		XFLOAT * d_allweights,
-		XFLOAT * d_mweights
+		XFLOAT * d_mweights,
+		unsigned long orientation_num,
+		unsigned long translation_num
 		)
 {
-	d_mweights[d_iorient[blockIdx.x] * blockDim.x + threadIdx.x] = d_allweights[blockIdx.x * blockDim.x + threadIdx.x];
+	size_t idx = blockIdx.x * WEIGHT_MAP_BLOCK_SIZE + threadIdx.x;
+	if (idx < orientation_num*translation_num)
+		d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] =
+				d_allweights[idx/translation_num * translation_num + idx%translation_num];
 }
 
 void mapAllWeightsToMweights(
@@ -474,10 +478,74 @@ void mapAllWeightsToMweights(
 		cudaStream_t stream
 		)
 {
-	cuda_kernel_allweights_to_mweights<<< orientation_num, translation_num, 0, stream >>>(
+	int grid_size = ceil((float)(orientation_num*translation_num)/(float)WEIGHT_MAP_BLOCK_SIZE);
+	cuda_kernel_allweights_to_mweights<<< grid_size, WEIGHT_MAP_BLOCK_SIZE, 0, stream >>>(
 			d_iorient,
 			d_allweights,
-			d_mweights);
+			d_mweights,
+			orientation_num,
+			translation_num);
+}
+
+#define OVER_THRESHOLD_BLOCK_SIZE 512
+template< typename T>
+__global__ void cuda_kernel_array_over_threshold(
+		T *data,
+		bool *passed,
+		T threshold,
+		size_t size)
+{
+	size_t idx = blockIdx.x * OVER_THRESHOLD_BLOCK_SIZE + threadIdx.x;
+	if (idx < size)
+	{
+		if (data[idx] >= threshold)
+			passed[idx] = true;
+		else
+			passed[idx] = false;
+	}
+}
+
+template< typename T>
+void arrayOverThreshold(CudaGlobalPtr<T> &data, CudaGlobalPtr<bool> &passed, T threshold)
+{
+	int grid_size = ceil((float)data.getSize()/(float)OVER_THRESHOLD_BLOCK_SIZE);
+	cuda_kernel_array_over_threshold<T><<< grid_size, OVER_THRESHOLD_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			~passed,
+			threshold,
+			data.getSize());
+}
+
+#define FIND_IN_CUMULATIVE_BLOCK_SIZE 512
+template< typename T>
+__global__ void cuda_kernel_find_threshold_idx_in_cumulative(
+		T *data,
+		T threshold,
+		size_t size_m1, //data size minus 1
+		size_t *idx)
+{
+	size_t i = blockIdx.x * FIND_IN_CUMULATIVE_BLOCK_SIZE + threadIdx.x;
+	if (i < size_m1 && data[i] <= threshold && threshold < data[i+1])
+		idx[0] = i+1;
+}
+
+size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT threshold)
+{
+	CudaGlobalPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
+	idx[0] = data.getSize()-1;
+	idx.put_on_device();
+
+	int grid_size = ceil((float)(data.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
+	cuda_kernel_find_threshold_idx_in_cumulative<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			threshold,
+			data.getSize()-1,
+			~idx);
+
+	idx.cp_to_host();
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
+
+	return idx[0];
 }
 
 void runDiff2KernelCoarse(

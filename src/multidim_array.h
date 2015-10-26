@@ -872,6 +872,89 @@ public:
      * V1.resize(3, 3, 2);
      * @endcode
      */
+    void resizeNoCp(long int Ndim, long int Zdim, long int Ydim, long int Xdim)
+    {
+        if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
+            return;
+
+        if (Xdim <= 0 || Ydim <= 0 || Zdim <= 0 || Ndim <= 0)
+        {
+            clear();
+            return;
+        }
+
+        // data can be NULL while xdim etc are set to non-zero values
+        // (This can happen for reading of images...)
+        // In that case, initialize data to zeros.
+        if (NZYXSIZE(*this) > 0 && data == NULL)
+        {
+            coreAllocate();
+            return;
+        }
+
+        // Ask for memory
+        size_t YXdim=Ydim*Xdim;
+        size_t ZYXdim=Zdim*YXdim;
+        size_t NZYXdim=Ndim*ZYXdim;
+        int    new_mFd = 0;
+        FileName   newMapFile;
+
+        T * new_data;
+
+        try
+        {
+            if (mmapOn)
+            {
+                newMapFile.initRandom(8);
+                newMapFile = newMapFile.addExtension("tmp");
+
+                if ( ( new_mFd = open(newMapFile.c_str(),  O_RDWR | O_CREAT | O_TRUNC,S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP) ) == -1 )
+                    REPORT_ERROR("MultidimArray::resize: Error creating map file.");
+                if ((lseek(new_mFd, NZYXdim*sizeof(T)-1, SEEK_SET) == -1) || (::write(new_mFd,"",1) == -1))
+                {
+                    close(new_mFd);
+                    REPORT_ERROR("MultidimArray::resize: Error 'stretching' the map file.");
+                }
+
+                if ( (new_data = (T*) mmap(0,NZYXdim*sizeof(T), PROT_READ | PROT_WRITE, MAP_SHARED, new_mFd, 0)) == (void*) -1 )
+                    REPORT_ERROR("MultidimArray::resize: mmap failed.");
+            }
+            else
+                new_data = new T [NZYXdim];
+        }
+        catch (std::bad_alloc &)
+        {
+            REPORT_ERROR( "Allocate: No space left");
+        }
+
+        // deallocate old vector
+        coreDeallocate();
+
+        // assign *this vector to the newly created
+        data = new_data;
+        ndim = Ndim;
+        xdim = Xdim;
+        ydim = Ydim;
+        zdim = Zdim;
+        yxdim = Ydim * Xdim;
+        zyxdim = Zdim * yxdim;
+        nzyxdim = Ndim * zyxdim;
+        mFd = new_mFd;
+        mapFile = newMapFile;
+        nzyxdimAlloc = nzyxdim;
+    }
+
+    /** Resize to a given size
+     *
+     * This function resize the actual array to the given size. The origin is
+     * not modified. If the actual array is larger than the pattern then the
+     * values outside the new size are lost, if it is smaller then 0's are
+     * added. An exception is thrown if there is no memory.
+     *
+     * @code
+     * V1.resize(3, 3, 2);
+     * @endcode
+     */
     void resize(long int Ndim, long int Zdim, long int Ydim, long int Xdim)
     {
         if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
