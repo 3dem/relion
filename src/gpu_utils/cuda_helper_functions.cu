@@ -268,11 +268,10 @@ void generateEulerMatrices(
 }
 
 
-long unsigned generateProjectionSetup(
+long unsigned generateProjectionSetupFine(
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		bool coarse,
 		unsigned iclass,
 		ProjectionParams &ProjectionData)
 // FIXME : For coarse iteration this is **SLOW**    HERE ARE SOME NOTES FOR PARALLELIZING IT (GPU OFFLOAD):
@@ -295,28 +294,7 @@ long unsigned generateProjectionSetup(
 		{
 			long int iorientclass = iclass * sp.nr_dir * sp.nr_psi + iorient;
 
-			// Get prior for this direction and skip calculation if prior==0
-			RFLOAT pdf_orientation;
-			if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
-			{
-				pdf_orientation = baseMLO->mymodel.pdf_class[iclass];
-			}
-			else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-			{
-				pdf_orientation = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[iclass], idir);
-			}
-			else
-			{
-				pdf_orientation = op.directions_prior[idir] * op.psi_prior[ipsi];
-			}
-			// In the first pass, always proceed
-			// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
-			// if so, proceed with projecting the reference in that direction
-
-			bool do_proceed = coarse ? true :
-					baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
-
-			if (do_proceed && pdf_orientation > 0.)
+			if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 			{
 				// Now get the oversampled (rot, tilt, psi) triplets
 				// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)

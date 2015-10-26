@@ -2624,11 +2624,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 							FineProjectionData[iframe].class_entries[exp_iclass] = 0;
 
 							CUDA_CPU_TIC("generateProjectionSetup");
-							FineProjectionData[iframe].orientationNumAllClasses += generateProjectionSetup(
+							FineProjectionData[iframe].orientationNumAllClasses += generateProjectionSetupFine(
 									op,
 									sp,
 									baseMLO,
-									false, //not coarse
 									exp_iclass,
 									FineProjectionData[iframe]);
 							CUDA_CPU_TOC("generateProjectionSetup");
