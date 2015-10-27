@@ -1239,7 +1239,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 
 #if defined(DEBUG_CUDA) && defined(__linux__)
-		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
+		if ((op.sum_weight[ipart] == 0. || std::isnan(op.sum_weight[ipart])) && exp_ipass!=0)
 		{
 			printf("DEBUG_ERROR: zero sum of weights.\n");
 			raise(SIGSEGV);
