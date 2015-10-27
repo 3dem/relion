@@ -6,8 +6,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 		XFLOAT *g_Mweight,
 		XFLOAT min_diff2,
 		int nr_coarse_orient,
-		int nr_coarse_trans,
-		long int sumweight_pos)
+		int nr_coarse_trans)
 {
 	// blockid
 	int bid  = blockIdx.x;
@@ -67,8 +66,7 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num,
-		long int job_num,
-		long int sumweight_pos)
+		long int job_num)
 {
 	__shared__ XFLOAT s_weights[SUMW_BLOCK_SIZE];
 

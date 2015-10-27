@@ -1118,8 +1118,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
-			long int sumweight_pos=0;
-
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
 			CUDA_CPU_TIC("get_offset_priors");
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1188,12 +1186,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							~classMweight,
 							(XFLOAT)op.min_diff2[ipart],
 							sp.nr_dir*sp.nr_psi,
-							sp.nr_trans,
-							sumweight_pos);
+							sp.nr_trans);
 
 //					CUDA_GPU_TAC("cuda_kernel_sumweight");
-
-					sumweight_pos+=block_num;
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
 				{
@@ -1218,10 +1213,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							~thisClassPassWeights.trans_idx,
 							~FPCMasks[ipart][exp_iclass].jobOrigin,
 							~FPCMasks[ipart][exp_iclass].jobExtent,
-							FPCMasks[ipart][exp_iclass].jobNum,
-							sumweight_pos);
+							FPCMasks[ipart][exp_iclass].jobNum);
 //					CUDA_GPU_TAC("cuda_kernel_sumweight");
-					sumweight_pos+=block_num;
 				}
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
@@ -1234,14 +1227,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 		}
 
-#if defined(DEBUG_CUDA) && defined(__linux__)
-		if (exp_thisparticle_sumweight == 0. || std::isnan(exp_thisparticle_sumweight))
-		{
-			printf("DEBUG_ERROR: zero sum of weights.\n");
-			raise(SIGSEGV);
-		}
-#endif
-
 	} // end loop ipart
 	if (exp_ipass==0)
 		op.Mcoarse_significant.resizeNoCp(1,1,sp.nr_particles, XSIZE(op.Mweight));
@@ -1253,7 +1238,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
-		XFLOAT frac_weight = 0.;
 		XFLOAT my_significant_weight;
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
@@ -1262,7 +1246,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(Mweight.getStream()));
 
 			my_significant_weight = 0.999;
-			frac_weight = 1.;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) 1.;
 			if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
 				for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
@@ -1319,7 +1302,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
-			long int my_nr_significant_coarse_samples = unsorted_ipart.getSize() - thresholdIdx;
+			long int my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
 
 			if (my_nr_significant_coarse_samples == 0)
 			{
