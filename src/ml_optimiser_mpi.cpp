@@ -165,36 +165,42 @@ void MlOptimiserMpi::initialise()
 	}
 
 
-	if (do_gpu && !node->isMaster()) //Device not initialized on master rank
+	if (do_gpu)
 	{
-		if (!std::isdigit(*gpu_ids.begin()))
-			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-		else if(gpu_ids.length()<nr_threads)
-			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-
-		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-
-		for (int i = 0; i < nr_threads; i ++)
+		// Sequential initialisation of GPUs on all ranks
+		for (int rank = 0; rank < node->size; rank++)
 		{
-			int dev_id;
-			if (!std::isdigit(*gpu_ids.begin()))
+			if (rank == node->rank && !node->isMaster()) //Device not initialized on master rank
 			{
-				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
-				if (node->size > 1)
-					dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
-				else
-					dev_id = i%devCount;
+				if (!std::isdigit(*gpu_ids.begin()))
+					std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+				else if(gpu_ids.length()<nr_threads)
+					REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+
+				int devCount;
+				HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
+				for (int i = 0; i < nr_threads; i ++)
+				{
+					int dev_id;
+					if (!std::isdigit(*gpu_ids.begin()))
+					{
+						// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+						if (node->size > 1)
+							dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
+						else
+							dev_id = i%devCount;
+					}
+					else
+						dev_id = (int)(gpu_ids[i]-'0');
+
+					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
+					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+				}
 			}
-			else
-				dev_id = (int)(gpu_ids[i]-'0');
-
-			std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
-
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+			MPI_Barrier(MPI_COMM_WORLD);
 		}
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
 
 
 #ifdef DEBUG

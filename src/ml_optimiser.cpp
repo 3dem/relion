@@ -5014,7 +5014,9 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 			// Print warning for strange norm-correction values
 			if (!(iter == 1 && do_firstiter_cc) && DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) > 10.)
 			{
-				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) << " for particle " << part_id << " in group " << group_id + 1 << "; Are your groups large enough?" << std::endl;
+				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM)
+						<< " for particle " << part_id << " in group " << group_id + 1
+						<< "; Are your groups large enough?  Or is the reference on the correct greyscale?" << std::endl;
 			}
 
 			//TMP DEBUGGING
