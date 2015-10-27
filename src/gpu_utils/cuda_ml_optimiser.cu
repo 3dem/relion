@@ -2000,7 +2000,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (long int j = 0; j < image_size; j++)
 			{
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
-				if (baseMLO->do_scale_correction &&
+				if (ires > -1 && baseMLO->do_scale_correction &&
 						DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
 				{
 					DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[ipart], ires) += wdiff2s_AA[AAXA_pos+j];
