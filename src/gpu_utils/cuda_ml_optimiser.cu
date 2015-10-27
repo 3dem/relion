@@ -1348,8 +1348,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 	{
-		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
-		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
+		if (exp_ipass == 0) baseMLO->timer.toc(baseMLO->TIMING_ESP_WEIGHT1);
+		else baseMLO->timer.toc(baseMLO->TIMING_ESP_WEIGHT2);
 	}
 #endif
 }
@@ -2464,7 +2464,9 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 			op.significant_weight.resize(sp.nr_particles, -1.);
 
 			// Only perform a second pass when using adaptive oversampling
-			int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
+			//int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
+			// But on the gpu the data-structures are different between passes, so we need to make a symbolic pass to set the weights up for storeWS
+			int nr_sampling_passes = 2;
 
 			/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
 			//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
