@@ -260,6 +260,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GB) assigned to custom allocator (if enabled) for each thread", "-1"));
+	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 
 	if (do_gpu)
 		do_shifts_onthefly = true;
@@ -432,7 +433,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	strict_highres_exp = textToFloat(parser.getOption("--strict_highres_exp", "Resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
 	dont_raise_norm_error = parser.checkOption("--dont_check_norm", "Skip the check whether the images are normalised correctly");
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
-
+	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1
@@ -5014,7 +5015,9 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int exp_current_im
 			// Print warning for strange norm-correction values
 			if (!(iter == 1 && do_firstiter_cc) && DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) > 10.)
 			{
-				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) << " for particle " << part_id << " in group " << group_id + 1 << "; Are your groups large enough?" << std::endl;
+				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM)
+						<< " for particle " << part_id << " in group " << group_id + 1
+						<< "; Are your groups large enough?  Or is the reference on the correct greyscale?" << std::endl;
 			}
 
 			//TMP DEBUGGING

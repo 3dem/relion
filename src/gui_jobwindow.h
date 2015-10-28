@@ -37,6 +37,7 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
+#define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
 #define DEFAULTALLOWCHANGEMINDEDICATED true
@@ -198,6 +199,10 @@ public:
 	SliderEntry ctf_win;
 	SliderEntry cs, kv, q0, angpix, dstep, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
+	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
+	FileNameEntry fn_gctf_exe;
+
+	Fl_Group *gctf_group;
 
 public:
 

@@ -101,6 +101,11 @@ public:
      */
     void maximization();
 
+    /** Perform unregularized reconstruction
+      * With the aim of performing solvent mask corrected FSC inside the auto-refine
+      */
+    void reconstructUnregularisedMapAndCalculateSolventCorrectedFSC();
+
     /**
      *  Write temporary data and weight arrays from the backprojector to disc to allow unregularized reconstructions
      */
