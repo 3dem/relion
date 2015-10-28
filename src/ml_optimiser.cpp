@@ -827,10 +827,10 @@ void MlOptimiser::initialise()
 	if (do_gpu)
 	{
 		do_shifts_onthefly = true;
-		if(gpu_ids.length()<nr_threads && gpu_ids.length()!=1)
+		if (!std::isdigit(*gpu_ids.begin()))
+			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		else if(gpu_ids.length()<nr_threads)
 			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-		else if (gpu_ids.length()==0)
-			std::cout << " I will try my best to assign gpu_ids, since you did not"<< std::endl;
 
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));

@@ -127,7 +127,11 @@ __global__ void cuda_kernel_diff2_coarse(
 				y -= projector.imgY;
 
 			XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+			sincos( x * tx + y * ty , &s, &c );
+#else
 			sincosf( x * tx + y * ty , &s, &c );
+#endif
 
 			XFLOAT real = c * s_real[i + init_pixel % block_sz] - s * s_imag[i + init_pixel % block_sz];
 			XFLOAT imag = c * s_imag[i + init_pixel % block_sz] + s * s_real[i + init_pixel % block_sz];

@@ -9,6 +9,8 @@
 #include <vector>
 #include "src/gpu_utils/cub/device/device_radix_sort.cuh"
 #include "src/gpu_utils/cub/device/device_reduce.cuh"
+#include "src/gpu_utils/cub/device/device_scan.cuh"
+#include "src/gpu_utils/cub/device/device_select.cuh"
 
 template <typename T>
 static std::pair<int, T> getArgMaxOnDevice(CudaGlobalPtr<T> &ptr)
@@ -190,6 +192,192 @@ if (in.getAllocator() == NULL)
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
 
 	in.getAllocator()->free(alloc);
+}
+
+template <typename T>
+static void sortDescendingOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out, cudaStream_t stream=0)
+{
+#ifdef DEBUG_CUDA
+if (in.size == 0 || out.size == 0)
+	printf("DEBUG_ERROR: sortDescendingOnDevice called with pointer of zero size.\n");
+if (in.d_ptr == NULL || out.d_ptr == NULL)
+	printf("DEBUG_ERROR: sortDescendingOnDevice called with null device pointer.\n");
+if (in.getAllocator() == NULL)
+	printf("DEBUG_ERROR: sortDescendingOnDevice called with null allocator.\n");
+#endif
+	size_t temp_storage_size = 0;
+
+	stream = stream == 0 ? in.getStream() : stream;
+
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( NULL, temp_storage_size, ~in, ~out, in.size));
+
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
+	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
+
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, 0, sizeof(T) * 8, stream));
+
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+
+	in.getAllocator()->free(alloc);
+}
+
+#include <thrust/system/cuda/vector.h>
+#include <thrust/system/cuda/execution_policy.h>
+#include <thrust/host_vector.h>
+#include <thrust/generate.h>
+#include <thrust/pair.h>
+#include <thrust/scan.h>
+#include <thrust/device_ptr.h>
+#include <thrust/copy.h>
+
+class AllocatorThrustWrapper
+{
+public:
+    // just allocate bytes
+    typedef char value_type;
+	std::vector<CudaCustomAllocator::Alloc*> allocs;
+	CudaCustomAllocator *allocator;
+
+    AllocatorThrustWrapper(CudaCustomAllocator *allocator):
+		allocator(allocator)
+	{}
+
+    ~AllocatorThrustWrapper()
+    {
+    	for (int i = 0; i < allocs.size(); i ++)
+    		allocator->free(allocs[i]);
+    }
+
+    char* allocate(std::ptrdiff_t num_bytes)
+    {
+    	CudaCustomAllocator::Alloc* alloc = allocator->alloc(num_bytes);
+    	allocs.push_back(alloc);
+    	return (char*) alloc->getPtr();
+    }
+
+    void deallocate(char* ptr, size_t n)
+    {
+    	//Pass
+    }
+};
+
+template <typename T>
+struct MoreThanCubOpt
+{
+	T compare;
+	MoreThanCubOpt(T compare) : compare(compare) {}
+	__device__ __forceinline__
+	bool operator()(const T &a) const {
+		return (a > compare);
+	}
+};
+
+//template <typename T, typename SelectOp>
+//static int filterOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out, SelectOp select_op, cudaStream_t stream=0)
+//{
+//#ifdef DEBUG_CUDA
+//if (in.size == 0 || out.size == 0)
+//	printf("DEBUG_ERROR: filterOnDevice called with pointer of zero size.\n");
+//if (in.d_ptr == NULL || out.d_ptr == NULL)
+//	printf("DEBUG_ERROR: filterOnDevice called with null device pointer.\n");
+//if (in.getAllocator() == NULL)
+//	printf("DEBUG_ERROR: filterOnDevice called with null allocator.\n");
+//#endif
+//	size_t temp_storage_size = 0;
+//
+//	stream = stream == 0 ? in.getStream() : stream;
+//
+//	CudaGlobalPtr<int>  num_selected_out(1, stream, in.getAllocator());
+//	num_selected_out.device_alloc();
+//
+//	DEBUG_HANDLE_ERROR(cub::DeviceSelect::If(NULL, temp_storage_size, ~in, ~out, ~num_selected_out, in.size, select_op, stream));
+//
+//	if(temp_storage_size==0)
+//		temp_storage_size=1;
+//
+//	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
+//
+//	DEBUG_HANDLE_ERROR(cub::DeviceSelect::If(alloc->getPtr(), temp_storage_size, ~in, ~out, ~num_selected_out, in.size, select_op, stream));
+//
+//	num_selected_out.cp_to_host();
+//	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+//
+//	in.getAllocator()->free(alloc);
+//	return num_selected_out[0];
+//}
+
+template <typename T, typename SelectOp>
+static int filterOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out, SelectOp select_op, cudaStream_t stream=0)
+{
+#ifdef DEBUG_CUDA
+if (in.size == 0 || out.size == 0)
+	printf("DEBUG_ERROR: filterOnDevice called with pointer of zero size.\n");
+if (in.d_ptr == NULL || out.d_ptr == NULL)
+	printf("DEBUG_ERROR: filterOnDevice called with null device pointer.\n");
+if (in.getAllocator() == NULL)
+	printf("DEBUG_ERROR: filterOnDevice called with null allocator.\n");
+#endif
+	stream = stream == 0 ? in.getStream() : stream;
+
+	AllocatorThrustWrapper alloc(in.getAllocator());
+
+	thrust::device_ptr<T> d_in =      thrust::device_pointer_cast(~in);
+	thrust::device_ptr<T> d_out =     thrust::device_pointer_cast(~out);
+	thrust::device_ptr<T> d_out_end = thrust::copy_if(thrust::cuda::par(alloc), d_in, d_in + in.getSize(), d_out, select_op);
+
+	return d_out_end - d_out;
+}
+
+//template <typename T>
+//static void scanOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out, cudaStream_t stream=0)
+//{
+//#ifdef DEBUG_CUDA
+//if (in.size == 0 || out.size == 0)
+//	printf("DEBUG_ERROR: scanOnDevice called with pointer of zero size.\n");
+//if (in.d_ptr == NULL || out.d_ptr == NULL)
+//	printf("DEBUG_ERROR: scanOnDevice called with null device pointer.\n");
+//if (in.getAllocator() == NULL)
+//	printf("DEBUG_ERROR: scanOnDevice called with null allocator.\n");
+//#endif
+//	size_t temp_storage_size = 0;
+//
+//	stream = stream == 0 ? in.getStream() : stream;
+//
+//	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( NULL, temp_storage_size, ~in, ~out, in.size));
+//
+//	if(temp_storage_size==0)
+//		temp_storage_size=1;
+//
+//	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
+//
+//	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, stream));
+//
+//	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+//
+//	in.getAllocator()->free(alloc);
+//}
+
+template <typename T>
+static void scanOnDevice(CudaGlobalPtr<T> &in, CudaGlobalPtr<T> &out, cudaStream_t stream=0)
+{
+#ifdef DEBUG_CUDA
+if (in.size == 0 || out.size == 0)
+	printf("DEBUG_ERROR: scanOnDevice called with pointer of zero size.\n");
+if (in.d_ptr == NULL || out.d_ptr == NULL)
+	printf("DEBUG_ERROR: scanOnDevice called with null device pointer.\n");
+if (in.getAllocator() == NULL)
+	printf("DEBUG_ERROR: scanOnDevice called with null allocator.\n");
+#endif
+
+	stream = stream == 0 ? in.getStream() : stream;
+
+	AllocatorThrustWrapper alloc(in.getAllocator());
+
+	thrust::device_ptr<T> d_in = thrust::device_pointer_cast(~in);
+	thrust::device_ptr<T> d_out = thrust::device_pointer_cast(~out);
+	thrust::inclusive_scan(thrust::cuda::par(alloc), d_in, d_in + in.getSize(), d_out);
 }
 
 #endif

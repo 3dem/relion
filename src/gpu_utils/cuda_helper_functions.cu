@@ -268,11 +268,10 @@ void generateEulerMatrices(
 }
 
 
-long unsigned generateProjectionSetup(
+long unsigned generateProjectionSetupFine(
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		bool coarse,
 		unsigned iclass,
 		ProjectionParams &ProjectionData)
 // FIXME : For coarse iteration this is **SLOW**    HERE ARE SOME NOTES FOR PARALLELIZING IT (GPU OFFLOAD):
@@ -295,28 +294,7 @@ long unsigned generateProjectionSetup(
 		{
 			long int iorientclass = iclass * sp.nr_dir * sp.nr_psi + iorient;
 
-			// Get prior for this direction and skip calculation if prior==0
-			RFLOAT pdf_orientation;
-			if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
-			{
-				pdf_orientation = baseMLO->mymodel.pdf_class[iclass];
-			}
-			else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-			{
-				pdf_orientation = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[iclass], idir);
-			}
-			else
-			{
-				pdf_orientation = op.directions_prior[idir] * op.psi_prior[ipsi];
-			}
-			// In the first pass, always proceed
-			// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
-			// if so, proceed with projecting the reference in that direction
-
-			bool do_proceed = coarse ? true :
-					baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant);
-
-			if (do_proceed && pdf_orientation > 0.)
+			if (baseMLO->isSignificantAnyParticleAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 			{
 				// Now get the oversampled (rot, tilt, psi) triplets
 				// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)
@@ -454,15 +432,19 @@ void deviceInitValue(CudaGlobalPtr<T> &data, T value)
 			data.getSize());
 }
 
-
-
+#define WEIGHT_MAP_BLOCK_SIZE 512
 __global__ void cuda_kernel_allweights_to_mweights(
 		unsigned long * d_iorient,
 		XFLOAT * d_allweights,
-		XFLOAT * d_mweights
+		XFLOAT * d_mweights,
+		unsigned long orientation_num,
+		unsigned long translation_num
 		)
 {
-	d_mweights[d_iorient[blockIdx.x] * blockDim.x + threadIdx.x] = d_allweights[blockIdx.x * blockDim.x + threadIdx.x];
+	size_t idx = blockIdx.x * WEIGHT_MAP_BLOCK_SIZE + threadIdx.x;
+	if (idx < orientation_num*translation_num)
+		d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] =
+				d_allweights[idx/translation_num * translation_num + idx%translation_num];
 }
 
 void mapAllWeightsToMweights(
@@ -474,10 +456,74 @@ void mapAllWeightsToMweights(
 		cudaStream_t stream
 		)
 {
-	cuda_kernel_allweights_to_mweights<<< orientation_num, translation_num, 0, stream >>>(
+	int grid_size = ceil((float)(orientation_num*translation_num)/(float)WEIGHT_MAP_BLOCK_SIZE);
+	cuda_kernel_allweights_to_mweights<<< grid_size, WEIGHT_MAP_BLOCK_SIZE, 0, stream >>>(
 			d_iorient,
 			d_allweights,
-			d_mweights);
+			d_mweights,
+			orientation_num,
+			translation_num);
+}
+
+#define OVER_THRESHOLD_BLOCK_SIZE 512
+template< typename T>
+__global__ void cuda_kernel_array_over_threshold(
+		T *data,
+		bool *passed,
+		T threshold,
+		size_t size)
+{
+	size_t idx = blockIdx.x * OVER_THRESHOLD_BLOCK_SIZE + threadIdx.x;
+	if (idx < size)
+	{
+		if (data[idx] >= threshold)
+			passed[idx] = true;
+		else
+			passed[idx] = false;
+	}
+}
+
+template< typename T>
+void arrayOverThreshold(CudaGlobalPtr<T> &data, CudaGlobalPtr<bool> &passed, T threshold)
+{
+	int grid_size = ceil((float)data.getSize()/(float)OVER_THRESHOLD_BLOCK_SIZE);
+	cuda_kernel_array_over_threshold<T><<< grid_size, OVER_THRESHOLD_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			~passed,
+			threshold,
+			data.getSize());
+}
+
+#define FIND_IN_CUMULATIVE_BLOCK_SIZE 512
+template< typename T>
+__global__ void cuda_kernel_find_threshold_idx_in_cumulative(
+		T *data,
+		T threshold,
+		size_t size_m1, //data size minus 1
+		size_t *idx)
+{
+	size_t i = blockIdx.x * FIND_IN_CUMULATIVE_BLOCK_SIZE + threadIdx.x;
+	if (i < size_m1 && data[i] <= threshold && threshold < data[i+1])
+		idx[0] = i+1;
+}
+
+size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT threshold)
+{
+	CudaGlobalPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
+	idx[0] = data.getSize()-1;
+	idx.put_on_device();
+
+	int grid_size = ceil((float)(data.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
+	cuda_kernel_find_threshold_idx_in_cumulative<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			threshold,
+			data.getSize()-1,
+			~idx);
+
+	idx.cp_to_host();
+	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
+
+	return idx[0];
 }
 
 void runDiff2KernelCoarse(
@@ -497,7 +543,7 @@ void runDiff2KernelCoarse(
 		int ipart,
 		int group_id,
 		int exp_iclass,
-		MlOptimiserCuda *cudaMLO,
+		cudaStream_t stream,
 		bool do_CC)
 {
 	if(!do_CC)
@@ -517,7 +563,7 @@ void runDiff2KernelCoarse(
 			if (even_orientation_num != 0)
 			{
 				cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, D2C_EULERS_PER_BLOCK_3D, 4>
-				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D,0,cudaMLO->classStreams[exp_iclass]>>>(
+				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D,0,stream>>>(
 					d_eulers,
 					trans_x,
 					trans_y,
@@ -533,7 +579,7 @@ void runDiff2KernelCoarse(
 			if (rest != 0)
 			{
 				cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, 1, 4>
-				<<<rest,D2C_BLOCK_SIZE_3D,0,cudaMLO->classStreams[exp_iclass]>>>(
+				<<<rest,D2C_BLOCK_SIZE_3D,0,stream>>>(
 					&d_eulers[9*even_orientation_num],
 					trans_x,
 					trans_y,
@@ -564,7 +610,7 @@ void runDiff2KernelCoarse(
 			if (even_orientation_num != 0)
 			{
 				cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
-				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_2D,D2C_BLOCK_SIZE_2D,0,cudaMLO->classStreams[exp_iclass]>>>(
+				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_2D,D2C_BLOCK_SIZE_2D,0,stream>>>(
 					d_eulers,
 					trans_x,
 					trans_y,
@@ -580,7 +626,7 @@ void runDiff2KernelCoarse(
 			if (rest != 0)
 			{
 				cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE_2D, 1, 2>
-				<<<rest,D2C_BLOCK_SIZE_2D,0,cudaMLO->classStreams[exp_iclass]>>>(
+				<<<rest,D2C_BLOCK_SIZE_2D,0,stream>>>(
 					&d_eulers[9*even_orientation_num],
 					trans_x,
 					trans_y,
@@ -597,7 +643,8 @@ void runDiff2KernelCoarse(
 	else
 	{
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_coarse<true><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_CC_coarse<true>
+		<<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),stream>>>(
 				d_eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -608,7 +655,8 @@ void runDiff2KernelCoarse(
 				image_size,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 		else
-			cuda_kernel_diff2_CC_coarse<false><<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_CC_coarse<false>
+		<<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),stream>>>(
 				d_eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -642,7 +690,7 @@ void runDiff2KernelFine(
 		unsigned image_size,
 		int ipart,
 		int exp_iclass,
-		MlOptimiserCuda *cudaMLO,
+		cudaStream_t stream,
 		long unsigned job_num_count,
 		bool do_CC)
 {
@@ -651,7 +699,8 @@ void runDiff2KernelFine(
     if(!do_CC)
     {
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_fine<true><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_fine<true>
+			<<<block_dim,BLOCK_SIZE,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -668,7 +717,8 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_fine<false><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_fine<false>
+			<<<block_dim,BLOCK_SIZE,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -688,7 +738,8 @@ void runDiff2KernelFine(
     else
     {
 		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_fine<true><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_CC_fine<true>
+			<<<block_dim,BLOCK_SIZE,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -706,7 +757,8 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_CC_fine<false><<<block_dim,BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+			cuda_kernel_diff2_CC_fine<false>
+			<<<block_dim,BLOCK_SIZE,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,

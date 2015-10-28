@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <signal.h>
 #include <fstream>
+#include <iostream>
 #include <vector>
 
 #ifdef DEBUG_CUDA
@@ -843,6 +844,45 @@ public:
 #endif
 		return d_ptr;
 	};
+
+	inline
+	void streamSync()
+	{
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+	}
+
+	inline
+	T getDeviceAt(size_t idx)
+	{
+		T value;
+		cudaCpyDeviceToHost<T>(&d_ptr[idx], &value, 1, stream);
+		streamSync();
+		return value;
+	}
+
+
+	void dump_device_to_file(std::string fileName)
+	{
+		T *tmp = new T[size];
+		cudaCpyDeviceToHost<T>(d_ptr, tmp, size, stream);
+
+		std::ofstream f;
+		f.open(fileName.c_str());
+		streamSync();
+		for (unsigned i = 0; i < size; i ++)
+			f << tmp[i] << std::endl;
+		f.close();
+		delete [] tmp;
+	}
+
+	void dump_host_to_file(std::string fileName)
+	{
+		std::ofstream f;
+		f.open(fileName.c_str());
+		for (unsigned i = 0; i < size; i ++)
+			f << h_ptr[i] << std::endl;
+		f.close();
+	}
 
 	/**
 	 * Delete device data

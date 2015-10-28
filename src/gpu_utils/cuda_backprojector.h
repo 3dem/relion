@@ -42,7 +42,8 @@ public:
 			XFLOAT *d_eulers,
 			int imgX,
 			int imgY,
-			unsigned long imageCount);
+			unsigned long imageCount,
+			cudaStream_t optStream);
 
 	void getMdlData(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
 
