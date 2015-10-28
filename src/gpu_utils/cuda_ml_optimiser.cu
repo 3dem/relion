@@ -1546,7 +1546,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			int cpos=fake_class*nr_transes;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
-			dim3 grid_dim_collect2 = block_num;// = splitCudaBlocks(block_num,false);
+			dim3 grid_dim_collect2 = block_num;
 			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUMW_BLOCK_SIZE>>>(
 						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
 						&(oo_otrans_y(cpos) ),          // otrans-size -> make const

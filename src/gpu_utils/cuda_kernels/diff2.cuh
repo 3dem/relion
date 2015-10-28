@@ -172,7 +172,7 @@ __global__ void cuda_kernel_diff2_fine(
 		unsigned long *d_job_num
 		)
 {
-	unsigned long bid = blockIdx.y * gridDim.x + blockIdx.x;
+	unsigned long bid = blockIdx.x;
 	unsigned long tid = threadIdx.x;
 
 //    // Specialize BlockReduce for a 1D block of 128 threads on type XFLOAT
