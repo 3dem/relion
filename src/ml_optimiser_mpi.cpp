@@ -167,6 +167,7 @@ void MlOptimiserMpi::initialise()
 
 	if (do_gpu)
 	{
+		do_shifts_onthefly = true;
 		// Sequential initialisation of GPUs on all ranks
 		for (int rank = 0; rank < node->size; rank++)
 		{
