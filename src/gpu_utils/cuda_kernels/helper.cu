@@ -1,21 +1,18 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 
-__global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
-									     	  XFLOAT *g_pdf_offset,
-									     	  XFLOAT *g_Mweight,
-									     	  XFLOAT *g_thisparticle_sumweight,
-									     	  XFLOAT min_diff2,
-									     	  int nr_coarse_orient,
-									     	  int nr_coarse_trans,
-									     	  long int sumweight_pos)
+__global__ void cuda_kernel_exponentiate_weights_coarse(
+		XFLOAT *g_pdf_orientation,
+		XFLOAT *g_pdf_offset,
+		XFLOAT *g_Mweight,
+		XFLOAT min_diff2,
+		int nr_coarse_orient,
+		int nr_coarse_trans)
 {
-	__shared__ XFLOAT s_sumweight[SUMW_BLOCK_SIZE];
 	// blockid
 	int bid  = blockIdx.x;
 	//threadid
 	int tid = threadIdx.x;
 
-	s_sumweight[tid]=0.;
 	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
 
 	XFLOAT weight;
@@ -49,23 +46,8 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
 
 			// Store the weight
 			g_Mweight[pos] = diff2; // TODO put in shared mem
-
-			// Reduce weights for sum of all weights
-			s_sumweight[tid] += diff2;
 		}
 	}
-	else
-	{
-		s_sumweight[tid] = 0;
-	}
-	__syncthreads();
-	// Further reduction of all samples in this block
-	for(int j=(SUMW_BLOCK_SIZE/2); j>0; j/=2)
-		if(tid<j)
-			s_sumweight[tid] += s_sumweight[tid+j];
-
-	__syncthreads();
-	g_thisparticle_sumweight[bid+sumweight_pos]=s_sumweight[0];
 }
 
 
@@ -73,29 +55,25 @@ __global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
  * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.
  *
  */
-__global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
-									     	  XFLOAT *g_pdf_offset,
-									     	  XFLOAT *g_weights,
-									     	  XFLOAT *g_thisparticle_sumweight,
-									     	  XFLOAT min_diff2,
-									     	  int oversamples_orient,
-									     	  int oversamples_trans,
-									     	  unsigned long *d_rot_id,
-									     	  unsigned long *d_trans_idx,
-									     	  unsigned long *d_job_idx,
-									     	  unsigned long *d_job_num,
-									     	  long int job_num,
-									     	  long int sumweight_pos)
+__global__ void cuda_kernel_exponentiate_weights_fine(
+		XFLOAT *g_pdf_orientation,
+		XFLOAT *g_pdf_offset,
+		XFLOAT *g_weights,
+		XFLOAT min_diff2,
+		int oversamples_orient,
+		int oversamples_trans,
+		unsigned long *d_rot_id,
+		unsigned long *d_trans_idx,
+		unsigned long *d_job_idx,
+		unsigned long *d_job_num,
+		long int job_num)
 {
-	__shared__ XFLOAT s_sumweight[SUMW_BLOCK_SIZE];
 	__shared__ XFLOAT s_weights[SUMW_BLOCK_SIZE];
 
 	// blockid
 	int bid  = blockIdx.x;
 	//threadid
 	int tid = threadIdx.x;
-
-	s_sumweight[tid]=0.;
 
 	long int jobid = bid*SUMW_BLOCK_SIZE+tid;
 
@@ -133,27 +111,8 @@ __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
 			// Store the weight
 			g_weights[pos+itrans] = s_weights[tid]; // TODO put in shared mem
-
-			// Reduce weights for sum of all weights
-			s_sumweight[tid] += s_weights[tid];
 		}
 	}
-	else
-	{
-		s_sumweight[tid]=0.;
-	}
-
-	__syncthreads();
-	// Further reduction of all samples in this block
-	// ProTip: to test reduction order (at this level), change "tid+j" to "2*j-tid-1",
-	// since this will switch from a sliding-block-lik reduction to a fan-like reduction
-	for(int j=(SUMW_BLOCK_SIZE/2); j>0; j/=2)
-	{
-		if(tid<j)
-			s_sumweight[tid] += s_sumweight[tid+j];
-	}
-	__syncthreads();
-	g_thisparticle_sumweight[bid+sumweight_pos]=s_sumweight[0];
 }
 
 __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const

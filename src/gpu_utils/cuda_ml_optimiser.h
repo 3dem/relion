@@ -568,10 +568,10 @@ public:
 		HANDLE_ERROR(cudaStreamDestroy(stream1));
 		HANDLE_ERROR(cudaStreamDestroy(stream2));
 
-		for (int i = 0; i <= classStreams.size(); i++)
+		for (int i = 0; i < classStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
 
-		for (int i = 0; i <= bpStreams.size(); i++)
+		for (int i = 0; i < bpStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
 	}
 

@@ -8,19 +8,16 @@
 #include "src/gpu_utils/cuda_settings.h"
 
 
-__global__ void cuda_kernel_sumweightCoarse(  XFLOAT *g_pdf_orientation,
+__global__ void cuda_kernel_exponentiate_weights_coarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,
 									    	  XFLOAT *g_Mweight,
-									    	  XFLOAT *g_thisparticle_sumweight,
 									    	  XFLOAT min_diff2,
 									     	  int nr_coarse_orient,
-									     	  int nr_coarse_trans,
-									     	  long int sumweight_pos);
+									     	  int nr_coarse_trans);
 
-__global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
+__global__ void cuda_kernel_exponentiate_weights_fine(    XFLOAT *g_pdf_orientation,
 											  XFLOAT *g_pdf_offset,
 											  XFLOAT *g_weights,
-											  XFLOAT *g_thisparticle_sumweight,
 											  XFLOAT min_diff2,
 											  int oversamples_orient,
 											  int oversamples_trans,
@@ -28,8 +25,7 @@ __global__ void cuda_kernel_sumweightFine(    XFLOAT *g_pdf_orientation,
 											  unsigned long *d_trans_idx,
 											  unsigned long *d_job_idx,
 											  unsigned long *d_job_num,
-									     	  long int job_num,
-									     	  long int sumweight_pos);
+									     	  long int job_num);
 
 __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
 										XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
