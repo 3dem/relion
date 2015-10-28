@@ -243,6 +243,9 @@ public:
 	// Filename for a user-provided mask
 	FileName fn_mask;
 
+	// Correct gold-standard FSC for solvent mask?
+	bool do_phase_random_fsc;
+
 	// Filename for a user-provided second solvent mask
 	// This solvent mask will have its own average density and may be useful for example to fill the interior of an icosahedral virus
 	FileName fn_mask2;

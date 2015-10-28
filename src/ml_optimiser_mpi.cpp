@@ -1545,6 +1545,142 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 }
 
+void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
+{
+
+	if (fn_mask == "")
+		return;
+
+	if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
+	{
+		Image<RFLOAT> Iunreg;
+		MultidimArray<RFLOAT> dummy;
+		FileName fn_root;
+		if (iter > -1)
+			fn_root.compose(fn_out+"_it", iter, "", 3);
+		else
+			fn_root = fn_out;
+		fn_root += "_half" + integerToString(node->rank);;
+		fn_root.compose(fn_root+"_class", 1, "", 3);
+
+		// This only works for do_auto_refine, so iclass=0
+		BackProjector BPextra(wsum_model.BPref[0]);
+
+		BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+
+		// Update header information
+		RFLOAT avg, stddev, minval, maxval;
+	    Iunreg().setXmippOrigin();
+		Iunreg().computeStats(avg, stddev, minval, maxval);
+	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
+	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
+	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
+	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
+		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
+		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+		// And write the resulting model to disc
+		Iunreg.write(fn_root+"_unfil.mrc");
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if (node->rank == 0) // Let's do this on the master (hopefully it has more memory)
+	{
+		std::cout << " Calculating solvent-corrected gold-standard FSC ..."<< std::endl;
+
+		// Read in the half-reconstruction from rank2 and perform the postprocessing-like FSC correction
+		Image<RFLOAT> Iunreg1, Iunreg2;
+		FileName fn_root1, fn_root2;
+		if (iter > -1)
+			fn_root1.compose(fn_out+"_it", iter, "", 3);
+		else
+			fn_root1 = fn_out;
+		fn_root2.compose(fn_root1+"_half2_class", 1, "", 3);
+		fn_root1.compose(fn_root1+"_half1_class", 1, "", 3);
+		fn_root1 += "_unfil.mrc";
+		fn_root2 += "_unfil.mrc";
+		Iunreg1.read(fn_root1);
+		Iunreg2.read(fn_root2);
+		Iunreg1().setXmippOrigin();
+		Iunreg2().setXmippOrigin();
+
+		// Now do phase-randomisation FSC-correction for the solvent mask
+		MultidimArray<RFLOAT> fsc_unmasked, fsc_masked, fsc_random_masked, fsc_true;
+
+		// Calculate FSC of the unmasked maps
+		getFSC(Iunreg1(), Iunreg2(), fsc_unmasked);
+
+		Image<RFLOAT> Imask;
+		Imask.read(fn_mask);
+		Imask().setXmippOrigin();
+		Iunreg1() *= Imask();
+		Iunreg2() *= Imask();
+		getFSC(Iunreg1(), Iunreg2(), fsc_masked);
+
+		// To save memory re-read the same input maps again and randomize phases before masking
+		Iunreg1.read(fn_root1);
+		Iunreg2.read(fn_root2);
+		Iunreg1().setXmippOrigin();
+		Iunreg2().setXmippOrigin();
+
+		// Check at which resolution shell the FSC drops below 0.8
+		int randomize_at = -1;
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
+		{
+			if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < 0.8)
+			{
+				randomize_at = i;
+				break;
+			}
+		}
+		if (verb > 0)
+		{
+			std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
+		}
+		if (randomize_at > 0)
+		{
+			randomizePhasesBeyond(Iunreg1(), randomize_at);
+			randomizePhasesBeyond(Iunreg2(), randomize_at);
+			// Mask randomized phases maps and calculated fsc_random_masked
+			Iunreg1() *= Imask();
+			Iunreg2() *= Imask();
+			getFSC(Iunreg1(), Iunreg2(), fsc_random_masked);
+
+		}
+		else
+			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.  You may want to check your mask.");
+
+		// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
+		// FSC_true = FSC_t - FSC_n / ( )
+		fsc_true.resize(fsc_masked);
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+		{
+					// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
+			if (i < randomize_at + 2)
+			{
+				DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
+			}
+			else
+			{
+				RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
+				RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
+				if (fscn > fsct)
+					DIRECT_A1D_ELEM(fsc_true, i) = 0.;
+				else
+					DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+			}
+		}
+		mymodel.fsc_halves_class[0] = fsc_true;
+
+	}
+
+	// Now the master sends the fsc curve to everyone else
+	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[0]), MULTIDIM_SIZE(mymodel.fsc_halves_class[0]), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+
+}
+
 void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 {
 
@@ -1789,8 +1925,12 @@ void MlOptimiserMpi::iterate()
 			if (low_resol_join_halves > 0.)
 				joinTwoHalvesAtLowResolution();
 
+			// Sjors 27-oct-2015
 			// Calculate gold-standard FSC curve
-			compareTwoHalves();
+			if (do_phase_random_fsc && fn_mask != "None")
+				reconstructUnregularisedMapAndCalculateSolventCorrectedFSC();
+			else
+				compareTwoHalves();
 
 			// For automated sampling procedure
 			if (!node->isMaster()) // the master does not have the correct mymodel.current_size, it only handles metadata!
