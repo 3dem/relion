@@ -142,29 +142,6 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, u
 }
 
 /*
- * Splits a designated number of blocks to be run
- * in a cuda-kernel into two components of a dim3.
- */
-dim3 splitCudaBlocks(long int block_num, bool doForceEven)
-{
-	unsigned int orient1, orient2;
-	if(block_num>65535)
-	{
-		orient1 = ceil(sqrt(block_num));
-		if(doForceEven)
-			orient1 += 	(orient1 % 2);
-		orient2 = orient1;
-	}
-	else
-	{
-		orient1 = block_num;
-		orient2 = 1;
-	}
-	dim3 block_dim(orient1,orient2);
-	return(block_dim);
-}
-
-/*
  * Maps weights to a decoupled indexing of translations and orientations
  */
 void mapWeights(
@@ -348,10 +325,7 @@ void runWavgKernel(
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
-	unsigned orientation_chunks = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
-	CUDA_CPU_TIC("splitblocks");
-	dim3 block_dim = splitCudaBlocks(orientation_chunks,false);
-	CUDA_CPU_TOC("splitblocks");
+	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
 
 	CUDA_CPU_TIC("cuda_kernel_wavg");
 
@@ -694,7 +668,7 @@ void runDiff2KernelFine(
 		long unsigned job_num_count,
 		bool do_CC)
 {
-    dim3 block_dim = splitCudaBlocks(job_num_count,false);
+    dim3 block_dim = job_num_count;
 
     if(!do_CC)
     {

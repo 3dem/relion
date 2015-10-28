@@ -36,7 +36,7 @@ __global__ void cuda_kernel_wavg(
 {
 	XFLOAT ref_real, ref_imag;
 
-	int bid = blockIdx.y * gridDim.x + blockIdx.x; //block ID
+	int bid = blockIdx.x; //block ID
 	int tid = threadIdx.x;
 
 	__shared__ XFLOAT s_eulers[9];

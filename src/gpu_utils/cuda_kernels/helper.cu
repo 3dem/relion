@@ -137,7 +137,7 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 								     	)
 {
 	// blockid
-	int bid  =blockIdx.x * gridDim.y + blockIdx.y;
+	int bid = blockIdx.x;
 	//threadid
 	int tid = threadIdx.x;
 
