@@ -97,8 +97,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
 
-			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
-
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
@@ -106,8 +104,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op. metadata_offset + ipart, METADATA_PSI);
-
-			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
 			////////// TODO TODO TODO
 			////////// How does this work now: each particle has a different sampling object?!!!
@@ -2062,7 +2058,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Print warning for strange norm-correction values
 			if (!(baseMLO->iter == 1 && baseMLO->do_firstiter_cc) && DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM) > 10.)
 			{
-				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM) << " for particle " << part_id << " in group " << group_id + 1 << "; Are your groups large enough?" << std::endl;
+				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM)
+						<< " for particle " << part_id << " in group " << group_id + 1
+						<< "; Are your groups large enough? Or is the reference on the correct greyscale?" << std::endl;
 			}
 
 		}

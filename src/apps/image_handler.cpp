@@ -28,9 +28,9 @@
 class image_handler_parameters
 {
 	public:
-   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power;
-	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box;
-	bool do_add_edge, do_flipXY, do_flipmXY, do_shiftCOM, do_stats;
+   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl;
+	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
+    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_shiftCOM, do_stats, do_avg_ampl, do_average;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z;
    	int verb;
 	// I/O Parser
@@ -38,7 +38,9 @@ class image_handler_parameters
 
 	Image<RFLOAT> Iout;
 	Image<RFLOAT> Iop;
+	MultidimArray<RFLOAT> avg_ampl;
 	MetaDataTable MD;
+	FourierTransformer transformer;
 
 	// Image size
 	int xdim, ydim, zdim;
@@ -83,10 +85,15 @@ class image_handler_parameters
 	    new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
 	    new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
 	    filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
+	    do_flipZ = parser.checkOption("--flipZ", "Flip (mirror) a 3D map in the Z-direction?");
 	    do_shiftCOM = parser.checkOption("--shift_com", "Shift image(s) to their center-of-mass (only on positive pixel values)");
 	    shift_x = textToFloat(parser.getOption("--shift_x", "Shift images this many pixels in the X-direction", "0."));
 	    shift_y = textToFloat(parser.getOption("--shift_y", "Shift images this many pixels in the Y-direction", "0."));
 	    shift_z = textToFloat(parser.getOption("--shift_z", "Shift images this many pixels in the Z-direction", "0."));
+	    do_avg_ampl = parser.checkOption("--avg_ampl", "Calculate average amplitude spectrum for all images?");
+	    do_average = parser.checkOption("--average", "Calculate average of all images (without alignment)");
+	    fn_correct_ampl = parser.getOption("--correct_avg_ampl", "Correct all images with this average amplitude spectrum", "");
+	    minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
 
 	    int three_d_section = parser.addSection("3D operations");
 	    fn_sym = parser.getOption("--sym", "Symmetrise 3D map with this point group (e.g. D6)", "");
@@ -202,20 +209,20 @@ class image_handler_parameters
 		}
 		else if (fn_div != "")
 		{
-                    bool is_first = true;
+			bool is_first = true;
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
 			{
-                            if (ABS(DIRECT_A3D_ELEM(Iop(), k, i, j)) < 1e-10)
-                            {
-				if (is_first)
-                                {
-                                    std::cout << "Warning: ignore very small pixel values in divide image..." << std::endl;
-                                    is_first = false;
-                                }
-                                DIRECT_A3D_ELEM(Iout(), k, i, j) = 0.;
-                            }
-                            else
-				DIRECT_A3D_ELEM(Iout(), k, i, j) /= DIRECT_A3D_ELEM(Iop(), k, i, j);
+				if (ABS(DIRECT_A3D_ELEM(Iop(), k, i, j)) < 1e-10)
+				{
+					if (is_first)
+					{
+						std::cout << "Warning: ignore very small pixel values in divide image..." << std::endl;
+						is_first = false;
+					}
+					DIRECT_A3D_ELEM(Iout(), k, i, j) = 0.;
+				}
+				else
+					DIRECT_A3D_ELEM(Iout(), k, i, j) /= DIRECT_A3D_ELEM(Iop(), k, i, j);
 			}
 		}
 		else if (fn_add != "")
@@ -256,6 +263,17 @@ class image_handler_parameters
 			getSpectrum(Iop(), spectrum, AMPLITUDE_SPECTRUM);
 			adaptSpectrum(Iin(), Iout(), spectrum, AMPLITUDE_SPECTRUM);
 		}
+		else if (fn_correct_ampl != "")
+		{
+			MultidimArray<Complex> FT;
+			transformer.FourierTransform(Iin(), FT, false);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
+			{
+				DIRECT_MULTIDIM_ELEM(FT, n) /=  DIRECT_MULTIDIM_ELEM(avg_ampl, n);
+			}
+			transformer.inverseFourierTransform();
+			Iout = Iin;
+		}
 
 		if (fabs(bfactor) > 0.)
 			applyBFactorToMap(Iout(), bfactor, angpix);
@@ -265,6 +283,17 @@ class image_handler_parameters
 
 		if (highpass > 0.)
 			highPassFilterMap(Iout(), highpass, angpix, filter_edge_width);
+
+		if (do_flipZ)
+		{
+			if (ZSIZE(Iout()) < 2)
+				REPORT_ERROR("ERROR: this is not a 3D map, so cannot be flipped in Z");
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			{
+				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), ZSIZE(Iin()) - 1 - k, i, j);
+			}
+		}
 
 		// Shifting
 		if (do_shiftCOM)
@@ -433,10 +462,50 @@ class image_handler_parameters
 					Iop.read(fn_fsc);
 				else if (fn_adjust_power != "")
 					Iop.read(fn_adjust_power);
+				else if (fn_correct_ampl != "")
+				{
+					Iop.read(fn_correct_ampl);
 
+					// Calculate by the radial average in the Fourier domain
+				    MultidimArray<RFLOAT> spectrum, count;
+				    spectrum.initZeros(YSIZE(Iop()));
+				    count.initZeros(YSIZE(Iop()));
+				    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Iop())
+				    {
+				    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+				        spectrum(idx) += dAkij(Iop(), k, i, j);
+				        count(idx) += 1.;
+				    }
+				    FOR_ALL_ELEMENTS_IN_ARRAY1D(spectrum)
+				    {
+				    	if (A1D_ELEM(count, i) > 0.)
+				    		A1D_ELEM(spectrum, i) /= A1D_ELEM(count, i);
+				    }
+
+				    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Iop())
+					{
+				    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+				    	if (idx > minr_ampl_corr)
+				    		dAkij(Iop(), k, i, j) /= spectrum(idx);
+				    	else
+				    		dAkij(Iop(), k, i, j) = 1.;
+					}
+					avg_ampl = Iop();
+					Iop.write("test.mrc");
+
+				}
 				if (fn_mult != "" || fn_div != "" || fn_add != "" || fn_subtract != "" || fn_fsc != "" || fn_adjust_power != "")
 					if (XSIZE(Iop()) != xdim || YSIZE(Iop()) != ydim || ZSIZE(Iop()) != zdim)
 						REPORT_ERROR("Error: operate-image is not of the correct size");
+
+				if (do_avg_ampl)
+				{
+					avg_ampl.initZeros(zdim, ydim, xdim/2+1);
+				}
+				else if (do_average)
+				{
+					avg_ampl.initZeros(zdim, ydim, xdim);
+				}
 
 			}
 
@@ -448,6 +517,25 @@ class image_handler_parameters
 				Iin().computeStats(avg, stddev, minval, maxval);
 				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
 			}
+			else if (do_avg_ampl)
+			{
+				Iin.read(fn_img);
+				MultidimArray<Complex> FT;
+				transformer.FourierTransform(Iin(), FT);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
+				{
+					DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  abs(DIRECT_MULTIDIM_ELEM(FT, n));
+				}
+			}
+			else if (do_average)
+			{
+				Iin.read(fn_img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+				{
+					DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  DIRECT_MULTIDIM_ELEM(Iin(), n);
+				}
+			}
+
 			else if (bin_avg > 0 || (avg_first >= 0 && avg_last >= 0))
 			{
 				// movie-frame averaging operations
@@ -512,6 +600,14 @@ class image_handler_parameters
 			i_img++;
 			if (verb > 0)
 				progress_bar(i_img);
+		}
+
+
+		if (do_avg_ampl || do_average)
+		{
+			avg_ampl /= (RFLOAT)i_img;
+			Iout() = avg_ampl;
+			Iout.write(fn_out);
 		}
 
 		if (verb > 0)
