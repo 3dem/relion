@@ -1311,7 +1311,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			CudaGlobalPtr<XFLOAT>   sorted_ipart(unsorted_ipart.getSize(), cudaMLO->allocator);
 			sorted_ipart.device_alloc();
 
-			//printf("size: %d\n", unsorted_ipart.getSize());
+			printf("size: %d\n", unsorted_ipart.getSize());
 
 			sortOnDevice(unsorted_ipart, sorted_ipart);
 
