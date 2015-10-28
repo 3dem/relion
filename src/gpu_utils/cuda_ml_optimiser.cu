@@ -97,6 +97,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
 
+			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
+
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
@@ -104,6 +106,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op. metadata_offset + ipart, METADATA_PSI);
+
+			printf("METADATA_ROT_PRIOR=%f\n",prior_rot);
 
 			////////// TODO TODO TODO
 			////////// How does this work now: each particle has a different sampling object?!!!
