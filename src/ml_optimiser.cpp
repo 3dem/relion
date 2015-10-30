@@ -1642,7 +1642,7 @@ void MlOptimiser::expectation()
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->clearBackprojectDataBundle();
+				( (MlOptimiserCuda*) cudaMlOptimisers[i])->syncAllBackprojects();
 				( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 				int my_mutex = iclass % NR_CLASS_MUTEXES;

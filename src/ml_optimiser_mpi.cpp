@@ -805,6 +805,7 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
+						( (MlOptimiserCuda*) cudaMlOptimisers[i])->syncAllBackprojects();
 						( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)

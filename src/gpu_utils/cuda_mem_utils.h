@@ -82,19 +82,11 @@ void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t &stream)
 	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( des, src, size * sizeof(T), cudaMemcpyDeviceToDevice, stream));
 };
 
-class OutOfMemoryHandler
-{
-public:
-	//Returns true if any memory was freed
-	virtual void handleOutOfMemory() {};
-};
-
 class CudaCustomAllocator
 {
 	typedef unsigned char BYTE;
 	size_t totalSize;
 	size_t alignmentSize;
-	OutOfMemoryHandler *outOfMemoryHandler;
 
 public:
 	class Alloc
@@ -106,8 +98,19 @@ public:
 		BYTE *ptr;
 		size_t size;
 		bool free;
+		cudaEvent_t readyEvent; //Event record used for auto free
+		bool freeWhenReady; //
 
 	public:
+		Alloc():
+			prev(NULL), next(NULL),
+			ptr(NULL),
+			size(0),
+			free(0),
+			readyEvent(0),
+			freeWhenReady(false)
+		{}
+
 		inline
 		BYTE *getPtr() { return ptr; }
 
@@ -116,37 +119,49 @@ public:
 
 		inline
 		bool isFree() { return free; }
+
+		inline
+		cudaEvent_t getReadyEvent() { return readyEvent; }
+
+		inline
+		void markReadyEvent(cudaStream_t stream = 0)
+		{
+			DEBUG_HANDLE_ERROR(cudaEventCreate(&readyEvent));
+			DEBUG_HANDLE_ERROR(cudaEventRecord(readyEvent, stream));
+		}
+
+		inline
+		void doFreeWhenReady() { freeWhenReady = true; }
+
+		~Alloc()
+		{
+			if (readyEvent != 0)
+				DEBUG_HANDLE_ERROR(cudaEventDestroy(readyEvent));
+		}
 	};
 private:
 	Alloc *first;
-	Alloc *last;
 
 	//Look for the first suited space
 	inline Alloc *getFirstSuitedFree(size_t size)
 	{
-		Alloc *curAlloc = first;
+		freeReadyAllocs();
+
+		Alloc *a = first;
 		//If not the last and too small or not free go to next allocation region
-		while (curAlloc != NULL && ( curAlloc->size <= size || ! curAlloc->free ) )
-			curAlloc = curAlloc->next;
+		while (a != NULL && ( a->size <= size || ! a->free ) )
+			a = a->next;
 
-		return curAlloc;
-	}
-
-	//Look for the first suited space
-	inline Alloc *getLastSuitedFree(size_t size)
-	{
-		Alloc *curAlloc = last;
-		//If not the last and too small or not free go to next allocation region
-		while (curAlloc != NULL && ( curAlloc->size <= size || ! curAlloc->free ) )
-			curAlloc = curAlloc->prev;
-
-		return curAlloc;
+		return a;
 	}
 
 	void raiseOutOfMemoryError(size_t size)
 	{
 		printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace: %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace: %lu B]\n",
 				(unsigned long) size, (unsigned long) getLargestContinuousFreeSpace(), (unsigned long) getTotalFreeSpace());
+
+		printState();
+
 		fflush(stdout);
 		raise(SIGSEGV);
 	}
@@ -154,10 +169,10 @@ private:
 public:
 
 	CudaCustomAllocator(size_t size, size_t alignmentSize):
-		totalSize(size), alignmentSize(alignmentSize), outOfMemoryHandler(NULL), first(0)
+		totalSize(size), alignmentSize(alignmentSize), first(0)
 	{
 #ifndef CUDA_NO_CUSTOM_ALLOCATION
-		first = last = new Alloc();
+		first = new Alloc();
 
 		first->prev = NULL;
 		first->next = NULL;
@@ -180,17 +195,23 @@ public:
 		return nAlloc;
 #else
 		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
-		
+
 		Alloc *curAlloc = getFirstSuitedFree(size);
 
 		//If out of memory
 		if (curAlloc == NULL)
 		{
-			if (outOfMemoryHandler != NULL) //Is there a handler
-			{
-				outOfMemoryHandler->handleOutOfMemory(); //Try to handle
-				curAlloc = getFirstSuitedFree(size); //Is there space now?
-			}
+#ifdef DEBUG_CUDA
+			int spaceDiff = getTotalFreeSpace();
+#endif
+			syncReadyEvents();
+			freeReadyAllocs();
+#ifdef DEBUG_CUDA
+			spaceDiff = ( (int) getTotalFreeSpace() ) - spaceDiff;
+			printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %d B.\n", spaceDiff);
+#endif
+
+			curAlloc = getFirstSuitedFree(size); //Is there space now?
 
 			//Did we manage to recover?
 			if (curAlloc == NULL)
@@ -237,123 +258,93 @@ public:
 	};
 
 	inline
-	Alloc* allocEnd(size_t size)
+	void free(Alloc* a)
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
-		Alloc *nAlloc = new Alloc();
-		nAlloc->size = size;
-		nAlloc->free = false;
-		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
-		return nAlloc;
+		DEBUG_HANDLE_ERROR(cudaFree( a->ptr ));
+		a->free = true;
 #else
-		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
-
-		Alloc *curAlloc = getLastSuitedFree(size);
-
-		//If out of memory
-		if (curAlloc == NULL)
-		{
-			if (outOfMemoryHandler != NULL) //Is there a handler
-			{
-				outOfMemoryHandler->handleOutOfMemory(); //Try to handle
-				curAlloc = getLastSuitedFree(size);//Is there space now?
-			}
-
-			//Did we manage to recover?
-			if (curAlloc == NULL)
-				raiseOutOfMemoryError(size);
-		}
-
-		if (curAlloc->size == size)
-		{
-			curAlloc->free = false;
-
-			printf("ALLOC: ");
-			printState();
-
-			return curAlloc;
-		}
-		else
-		{
-			//Setup new pointer
-			Alloc *newAlloc = new Alloc();
-			newAlloc->prev = curAlloc;
-			newAlloc->ptr = curAlloc->ptr;
-			newAlloc->size = size;
-			newAlloc->free = false;
-
-			//Modify old pointer
-			curAlloc->ptr = &(curAlloc->ptr[size]);
-			curAlloc->size -= size;
-
-			//Insert new allocation region into chain
-			if(curAlloc->next == NULL) //If the first allocation region
-				last = newAlloc;
-			else
-				curAlloc->next->prev = newAlloc;
-			newAlloc->next = curAlloc->next;
-			newAlloc->prev = curAlloc;
-			curAlloc->next = newAlloc;
-
-			return newAlloc;
-		}
-#endif
-	};
-
-
-	inline
-	void free(Alloc* curL)
-	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		DEBUG_HANDLE_ERROR(cudaFree( curL->ptr ));
-		curL->free = true;
-#else
-		curL->free = true;
+		a->free = true;
 
 		//Previous neighbor is free, concatenate
-		if ( curL->prev != NULL && curL->prev->free)
+		if ( a->prev != NULL && a->prev->free)
 		{
 			//Resize and set pointer
-			curL->size += curL->prev->size;
-			curL->ptr = curL->prev->ptr;
+			a->size += a->prev->size;
+			a->ptr = a->prev->ptr;
 
 			//Fetch secondary neighbor
-			Alloc *ppL = curL->prev->prev;
+			Alloc *ppL = a->prev->prev;
 
 			//Remove primary neighbor
 			if (ppL == NULL) //If the previous is first in chain
-				first = curL;
+				first = a;
 			else
-				ppL->next = curL;
+				ppL->next = a;
 
-			delete curL->prev;
+			delete a->prev;
 
 			//Attach secondary neighbor
-			curL->prev = ppL;
+			a->prev = ppL;
 		}
 
 		//Next neighbor is free, concatenate
-		if ( curL->next != NULL && curL->next->free)
+		if ( a->next != NULL && a->next->free)
 		{
 			//Resize and set pointer
-			curL->size += curL->next->size;
+			a->size += a->next->size;
 
 			//Fetch secondary neighbor
-			Alloc *nnL = curL->next->next;
+			Alloc *nnL = a->next->next;
 
 			//Remove primary neighbor
 			if (nnL != NULL)
-				nnL->prev = curL;
-			delete curL->next;
+				nnL->prev = a;
+			delete a->next;
 
 			//Attach secondary neighbor
-			curL->next = nnL;
+			a->next = nnL;
 		}
 
 //		printf("FREE: ");
 //		printState();
 #endif
 	};
+
+	//Free allocs with recorded ready events
+	inline void syncReadyEvents()
+	{
+		Alloc *a = first;
+
+		while (a != NULL)
+		{
+			if (! a->free && a->freeWhenReady && a->readyEvent != 0)
+				DEBUG_HANDLE_ERROR(cudaEventSynchronize(a->readyEvent));
+
+			a = a->next;
+		}
+	}
+
+	//Free allocs with recorded ready events
+	inline void freeReadyAllocs()
+	{
+		Alloc *a = first;
+
+		while (a != NULL)
+		{
+			if (! a->free && a->freeWhenReady && a->readyEvent != 0)
+			{
+				cudaError_t e = cudaEventQuery(a->readyEvent);
+
+				if (e == cudaSuccess)
+					free(a);
+				else if (e != cudaErrorNotReady)
+					HandleError( e, __FILE__, __LINE__ );
+			}
+
+			a = a->next;
+		}
+	}
 
 	size_t getTotalFreeSpace()
 	{
@@ -363,13 +354,13 @@ public:
 		return free;
 #else
 		size_t total = 0;
-		Alloc *cL = first;
+		Alloc *a = first;
 
-		while (cL != NULL)
+		while (a != NULL)
 		{
-			if (cL->free)
-				total += cL->size;
-			cL = cL->next;
+			if (a->free)
+				total += a->size;
+			a = a->next;
 		}
 		return total;
 #endif
@@ -383,13 +374,13 @@ public:
 		return total - free;
 #else
 		size_t total = 0;
-		Alloc *cL = first;
+		Alloc *a = first;
 
-		while (cL != NULL)
+		while (a != NULL)
 		{
-			if (!cL->free)
-				total += cL->size;
-			cL = cL->next;
+			if (!a->free)
+				total += a->size;
+			a = a->next;
 		}
 		return total;
 #endif
@@ -401,13 +392,13 @@ public:
 		return 0;
 #else
 		unsigned total = 0;
-		Alloc *cL = first;
+		Alloc *a = first;
 
-		while (cL != NULL)
+		while (a != NULL)
 		{
-			if (!cL->free)
+			if (!a->free)
 				total ++;
-			cL = cL->next;
+			a = a->next;
 		}
 		return total;
 #endif
@@ -419,13 +410,13 @@ public:
 		return getTotalFreeSpace();
 #else
 		size_t largest = 0;
-		Alloc *cL = first;
+		Alloc *a = first;
 
-		while (cL != NULL)
+		while (a != NULL)
 		{
-			if (cL->free && cL->size > largest)
-				largest = cL->size;
-			cL = cL->next;
+			if (a->free && a->size > largest)
+				largest = a->size;
+			a = a->next;
 		}
 		return largest;
 #endif
@@ -436,39 +427,38 @@ public:
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		printf("Custom allocation is disabled.\n");
 #else
-		Alloc *curL = first;
 		size_t total = 0;
+		Alloc *a = first;
 
-		while (curL != NULL)
+		while (a != NULL)
 		{
-			total += curL->size;
-			if (curL->free)
-				printf("[%luB] ", (unsigned long) curL->size);
+			total += a->size;
+			if (a->free)
+				printf("[%luB] ", (unsigned long) a->size);
+			else if (a->freeWhenReady)
+				printf("<%luB> ", (unsigned long) a->size);
 			else
-				printf("(%luB) ", (unsigned long) curL->size);
+				printf("(%luB) ", (unsigned long) a->size);
 
-			curL = curL->next;
+			a = a->next;
 		}
-		printf("= (%luB)\n", (unsigned long) total);
+		printf("= %luB\n", (unsigned long) total);
 #endif
 		fflush(stdout);
 	}
-
-	void setOutOfMemoryHandler(OutOfMemoryHandler *handler)
-	{ outOfMemoryHandler = handler; }
 
 	~CudaCustomAllocator()
 	{
 #ifndef CUDA_NO_CUSTOM_ALLOCATION
 		DEBUG_HANDLE_ERROR(cudaFree( first->ptr ));
 
-		Alloc *cL = first, *nL;
+		Alloc *a = first, *nL;
 
-		while (cL != NULL)
+		while (a != NULL)
 		{
-			nL = cL->next;
-			delete cL;
-			cL = nL;
+			nL = a->next;
+			delete a;
+			a = nL;
 		}
 #endif
 	}
@@ -618,6 +608,15 @@ public:
 	void setSize(size_t s) { size = s; };
 	size_t getSize() { return size; };
 
+	void markReadyEvent()
+	{
+#ifdef DEBUG_CUDA
+		if (alloc == NULL)
+			printf("DEBUG_WARNING: markReadyEvent called on null allocation.\n");
+#endif
+		alloc->markReadyEvent(stream);
+	}
+
 	void setDevPtr(T *ptr)
 	{
 #ifdef DEBUG_CUDA
@@ -641,27 +640,6 @@ public:
 	 */
 	inline
 	void device_alloc()
-	{
-#ifdef DEBUG_CUDA
-		if (d_do_free)
-			printf("DEBUG_WARNING: Device double allocation.\n");
-#endif
-		d_do_free = true;
-
-		if (CustomAlloc)
-		{
-			alloc = allocator->alloc(size * sizeof(T));
-			d_ptr = (T*) alloc->getPtr();
-		}
-		else
-			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
-	}
-
-	/**
-	 * Allocate memory on device at the end of the custom allocation (if custome allocator provided)
-	 */
-	inline
-	void device_alloc_end()
 	{
 #ifdef DEBUG_CUDA
 		if (d_do_free)
@@ -898,10 +876,12 @@ public:
 
 		if (CustomAlloc)
 		{
-//			DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
-			allocator->free(alloc);
+			if (alloc->getReadyEvent() == 0)
+				allocator->free(alloc);
+			else
+				alloc->doFreeWhenReady();
+
 			alloc = NULL;
-//			DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 		}
 		else
 			DEBUG_HANDLE_ERROR(cudaFree(d_ptr));

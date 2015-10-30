@@ -236,28 +236,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					else  transformer.getFourierAlias(Faux);
 		CUDA_CPU_TOC("Transform");
 
-//TODO CUFFT is not working properly, waiting with this part
-//
-//		cudaMLO->inputImageData->setSize(XSIZE(img_aux), YSIZE(img_aux));
-//		CUDA_CPU_TIC("Memset1");
-//		for (unsigned long i = 0; i < cudaMLO->inputImageData->reals.getSize(); i ++)
-//			cudaMLO->inputImageData->reals[i] = (cufftReal) img_aux.data[i];
-//		CUDA_CPU_TOC("Memset1");
-//		cudaMLO->inputImageData->reals.cp_to_device();
-//		cudaMLO->inputImageData->forward();
-//		cudaMLO->inputImageData->fouriers.cp_to_host();
-//		Faux.resize(ZSIZE(img_aux),YSIZE(img_aux),XSIZE(img_aux)/2+1);
-//		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-//		CUDA_CPU_TIC("Memset2");
-//		XFLOAT corrFactor = 1. / cudaMLO->inputImageData->reals.getSize();
-//		for (unsigned long i = 0; i < cudaMLO->inputImageData->fouriers.getSize(); i ++)
-//		{
-//			Faux.data[i].real = (RFLOAT) cudaMLO->inputImageData->fouriers[i].x * corrFactor;
-//			Faux.data[i].imag = (RFLOAT) cudaMLO->inputImageData->fouriers[i].y * corrFactor;
-//		}
-//		CUDA_CPU_TOC("Memset2");
-
-
 		CUDA_CPU_TOC("FourierTransform1");
 
 
@@ -1674,8 +1652,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	CUDA_CPU_TIC("maximization");
 
-	cudaMLO->clearBackprojectDataBundle();
-
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
@@ -1833,7 +1809,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		CudaGlobalPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, cudaMLO->allocator);
-		std::vector<BackprojectDataBundle *> dataBundles(baseMLO->mymodel.nr_classes);
+
+		std::vector<CudaGlobalPtr<XFLOAT> > reals(baseMLO->mymodel.nr_classes, cudaMLO->allocator);
+		std::vector<CudaGlobalPtr<XFLOAT> > imags(baseMLO->mymodel.nr_classes, cudaMLO->allocator);
+		std::vector<CudaGlobalPtr<XFLOAT> > weights(baseMLO->mymodel.nr_classes, cudaMLO->allocator);
+		std::vector<CudaGlobalPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, cudaMLO->allocator);
 
 		int classPos = 0;
 
@@ -1860,28 +1840,34 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 								PROJECTIONS
 			======================================================*/
 
-			dataBundles[exp_iclass] = new BackprojectDataBundle(
-					orientation_num * image_size,
-					orientation_num * 9,
-					0,
-					cudaMLO->allocator);
+			eulers[exp_iclass].setSize(orientation_num * 9);
+			eulers[exp_iclass].setStream(cudaMLO->cudaBackprojectors[exp_iclass].getStream());
+			eulers[exp_iclass].host_alloc();
 
 			CUDA_CPU_TIC("generateEulerMatricesProjector");
 
 			generateEulerMatrices(
 					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
 					thisClassProjectionData,
-					&dataBundles[exp_iclass]->eulers[0],
+					&eulers[exp_iclass][0],
 					!IS_NOT_INV);
+
+			eulers[exp_iclass].device_alloc();
+			eulers[exp_iclass].cp_to_device();
 
 			CUDA_CPU_TOC("generateEulerMatricesProjector");
 
-			dataBundles[exp_iclass]->eulers.device_alloc_end();
-			dataBundles[exp_iclass]->reals.device_alloc_end();
-			dataBundles[exp_iclass]->imags.device_alloc_end();
-			dataBundles[exp_iclass]->weights.device_alloc_end();
+			reals[exp_iclass].setSize(orientation_num * image_size);
+			reals[exp_iclass].setStream(cudaMLO->cudaBackprojectors[exp_iclass].getStream());
+			reals[exp_iclass].device_alloc();
 
-			dataBundles[exp_iclass]->eulers.cp_to_device();
+			imags[exp_iclass].setSize(orientation_num * image_size);
+			imags[exp_iclass].setStream(cudaMLO->cudaBackprojectors[exp_iclass].getStream());
+			imags[exp_iclass].device_alloc();
+
+			weights[exp_iclass].setSize(orientation_num * image_size);
+			weights[exp_iclass].setStream(cudaMLO->cudaBackprojectors[exp_iclass].getStream());
+			weights[exp_iclass].device_alloc();
 
 
 			/*======================================================
@@ -1921,7 +1907,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			runWavgKernel(
 					projKernel,
-					~dataBundles[exp_iclass]->eulers,
+					~eulers[exp_iclass],
 					~Fimgs_real,
 					~Fimgs_imag,
 					~Fimgs_nomask_real,
@@ -1932,9 +1918,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~wdiff2s_sum,
 					&wdiff2s_AA(AAXA_pos),
 					&wdiff2s_XA(AAXA_pos),
-					~dataBundles[exp_iclass]->reals,
-					~dataBundles[exp_iclass]->imags,
-					~dataBundles[exp_iclass]->weights,
+					~reals[exp_iclass],
+					~imags[exp_iclass],
+					~weights[exp_iclass],
 					op,
 					baseMLO,
 					orientation_num,
@@ -1946,8 +1932,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					part_scale,
 					cudaMLO->classStreams[exp_iclass]);
 
-			AAXA_pos+=orientation_num*image_size;
-			classPos+=orientation_num*translation_num;
+			AAXA_pos += orientation_num*image_size;
+			classPos += orientation_num*translation_num;
 
 			/*======================================================
 								BACKPROJECTION
@@ -1961,18 +1947,19 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TIC("backproject");
 
 			cudaMLO->cudaBackprojectors[exp_iclass].backproject(
-				~dataBundles[exp_iclass]->reals,
-				~dataBundles[exp_iclass]->imags,
-				~dataBundles[exp_iclass]->weights,
-				~dataBundles[exp_iclass]->eulers,
+				~reals[exp_iclass],
+				~imags[exp_iclass],
+				~weights[exp_iclass],
+				~eulers[exp_iclass],
 				op.local_Minvsigma2s[0].xdim,
 				op.local_Minvsigma2s[0].ydim,
 				orientation_num,
 				cudaMLO->classStreams[exp_iclass]);
 
-			cudaMLO->backprojectDataBundleStack.push(dataBundles[exp_iclass]);
-//			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->cudaBackprojectors[exp_iclass].getStream()));
-//			delete dataBundle;
+			reals[exp_iclass].markReadyEvent();
+			imags[exp_iclass].markReadyEvent();
+			weights[exp_iclass].markReadyEvent();
+			eulers[exp_iclass].markReadyEvent();
 
 			CUDA_CPU_TOC("backproject");
 
@@ -2229,10 +2216,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 	printf(" DEBUG: Custom allocator assigned %.2f MB (on device %d), with memory alignment size %d.\n", (float)allocationSize/(1000.*1000.), device_id, memAlignmentSize);
 
 	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
-	allocator->setOutOfMemoryHandler(this);
 #endif
-
-	//inputImageData = new CufftBundle(0, allocator);
 };
 
 void MlOptimiserCuda::resetData()
@@ -2254,13 +2238,16 @@ void MlOptimiserCuda::resetData()
 	coarseProjectionPlans.clear();
 
 #ifdef DEBUG_CUDA
-		if (allocator->getNumberOfAllocs() != 0)
-		{
-			printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-			allocator->printState();
-			fflush(stdout);
-			raise(SIGSEGV);
-		}
+
+	allocator->freeReadyAllocs();
+	if (allocator->getNumberOfAllocs() != 0)
+	{
+		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
+		allocator->printState();
+		fflush(stdout);
+		raise(SIGSEGV);
+	}
+
 #endif
 
 	coarseProjectionPlans.resize(nr_classes, allocator);
