@@ -371,104 +371,15 @@ public:
 	}
 };
 
-
-
-class BackprojectDataBundle
+class MlOptimiserCuda
 {
 public:
-	CudaGlobalPtr<XFLOAT> reals;
-	CudaGlobalPtr<XFLOAT> imags;
-	CudaGlobalPtr<XFLOAT> weights;
-	CudaGlobalPtr<XFLOAT> eulers;
-
-	BackprojectDataBundle(size_t img_data_size, size_t euler_data_size, cudaStream_t stream, CudaCustomAllocator *alloc):
-		reals(img_data_size, stream, alloc),
-		imags(img_data_size, stream, alloc),
-		weights(img_data_size, stream, alloc),
-		eulers(euler_data_size, stream, alloc)
-	{};
-};
-
-
-
-//class CufftBundle
-//{
-//	bool planSet;
-//public:
-//	CudaGlobalPtr<cufftReal> reals;
-//	CudaGlobalPtr<cufftComplex> fouriers;
-//	cufftHandle cufftPlanForward, cufftPlanBackward;
-//	size_t xSize,ySize;
-//
-//	CufftBundle(cudaStream_t stream, CudaCustomAllocator *allocator):
-//		reals(stream, allocator),
-//		fouriers(stream, allocator),
-//		cufftPlanForward(0),
-//		cufftPlanBackward(0),
-//		planSet(false),
-//		xSize(0), ySize(0)
-//	{};
-//
-//	void setSize(size_t x, size_t y)
-//	{
-//		if (x == xSize && y == ySize)
-//			return;
-//
-//		clear();
-//
-//		xSize = x;
-//		ySize = y;
-//
-//		reals.setSize(x*y);
-//		reals.device_alloc();
-//		reals.host_alloc();
-//
-//		fouriers.setSize(y*(x/2+1));
-//		fouriers.device_alloc();
-//		fouriers.host_alloc();
-//
-//		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
-//		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
-//
-//		planSet = true;
-//	}
-//
-//	void forward()
-//	{ HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) ); }
-//
-//	void backward()
-//	{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) ); }
-//
-//	void clear()
-//	{
-//		if(planSet)
-//		{
-//			reals.free();
-//			fouriers.free();
-//			HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanForward));
-//			HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanBackward));
-//			planSet = false;
-//		}
-//	}
-//
-//	~CufftBundle()
-//	{ clear(); }
-//};
-
-
-
-class MlOptimiserCuda : OutOfMemoryHandler
-{
-public:
-
-	//CufftBundle *inputImageData;
 
 	//The CUDA accelerated projector set
 	std::vector< CudaProjector > cudaProjectors;
 
 	//The CUDA accelerated back-projector set
 	std::vector< CudaBackprojector > cudaBackprojectors;
-	std::stack< BackprojectDataBundle *> backprojectDataBundleStack;
 
 	//Used for precalculations of projection setup
 	std::vector< CudaProjectorPlan > coarseProjectionPlans;
@@ -501,62 +412,15 @@ public:
 
 	void doThreadExpectationSomeParticles(int thread_id);
 
-	void storeBpMdlData()
+	void syncAllBackprojects()
 	{
-		for (int iclass = 0; iclass < baseMLO->mymodel.nr_classes; iclass++)
-		{
-			unsigned long s = baseMLO->wsum_model.BPref[iclass].data.nzyxdim;
-			XFLOAT *r = new XFLOAT[s];
-			XFLOAT *i = new XFLOAT[s];
-			XFLOAT *w = new XFLOAT[s];
-
-			cudaBackprojectors[iclass].getMdlData(r, i, w);
-
-			for (unsigned long n = 0; n < s; n++)
-			{
-				baseMLO->wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) r[n];
-				baseMLO->wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) i[n];
-				baseMLO->wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) w[n];
-			}
-
-			delete [] r;
-			delete [] i;
-			delete [] w;
-		}
-	}
-
-	void clearBackprojectDataBundle()
-	{
-		//TODO switch to cuda event synchronization instead of stream
 		for (int i = 0; i < cudaBackprojectors.size(); i ++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
-
-		while (!backprojectDataBundleStack.empty())
-		{
-			delete backprojectDataBundleStack.top();
-			backprojectDataBundleStack.pop();
-		}
 	}
 
-	void handleOutOfMemory()
-	{
-#ifdef DEBUG_CUDA
-		int spaceDiff = allocator->getTotalFreeSpace();
-		allocator->printState();
-#endif
-		clearBackprojectDataBundle();
-#ifdef DEBUG_CUDA
-		spaceDiff = ( (int) allocator->getTotalFreeSpace() ) - spaceDiff;
-		printf("DEBUG_INFO: MlOptimiserCuda::handleOutOfMemory called and %d B was freed.\n", spaceDiff);
-		allocator->printState();
-#endif
-	}
 
 	~MlOptimiserCuda()
 	{
-		clearBackprojectDataBundle();
-		//delete inputImageData;
-
 		cudaProjectors.clear();
 		cudaBackprojectors.clear();
 		coarseProjectionPlans.clear();
