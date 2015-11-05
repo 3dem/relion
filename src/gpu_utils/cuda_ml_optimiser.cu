@@ -2213,8 +2213,6 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id) :
 	int memAlignmentSize;
 	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, dev_id );
 
-	printf(" DEBUG: Custom allocator assigned %.2f MB (on device %d), with memory alignment size %d.\n", (float)allocationSize/(1000.*1000.), device_id, memAlignmentSize);
-
 	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
 #endif
 };
