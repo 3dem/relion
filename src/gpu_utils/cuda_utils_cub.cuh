@@ -29,6 +29,9 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size, ptr.getStream()));
@@ -61,6 +64,9 @@ if (ptr.getAllocator() == NULL)
 	size_t temp_storage_size = 0;
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.size));
+
+	if(temp_storage_size==0)
+		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
@@ -95,6 +101,9 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.size, ptr.getStream()));
@@ -124,6 +133,9 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size, ptr.getStream()));
@@ -152,6 +164,9 @@ if (ptr.getAllocator() == NULL)
 	size_t temp_storage_size = 0;
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size));
+
+	if(temp_storage_size==0)
+		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 

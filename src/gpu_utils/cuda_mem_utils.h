@@ -17,6 +17,7 @@
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 static void HandleError( cudaError_t err, const char *file, int line )
 {
+
     if (err != cudaSuccess)
     {
 #ifdef DEBUG_CUDA
@@ -31,6 +32,18 @@ static void HandleError( cudaError_t err, const char *file, int line )
 		raise(SIGSEGV);
 #endif
     }
+
+#ifdef DEBUG_CUDA
+	cudaError_t peek = cudaPeekAtLastError();
+    if (peek != cudaSuccess)
+    {
+        printf( "DEBUG_ERROR: %s in %s at line %d\n",
+        		cudaGetErrorString( peek ), file, line );
+        fflush(stdout);
+		raise(SIGSEGV);
+    }
+#endif
+
 }
 
 /**
