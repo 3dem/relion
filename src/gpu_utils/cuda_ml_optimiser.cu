@@ -127,14 +127,23 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (baseMLO->do_parallel_disc_io)
 		{
 			CUDA_CPU_TIC("setXmippOrigin");
-			// Read from disc
-			FileName fn_img;
-			std::istringstream split(baseMLO->exp_fn_img);
-			for (int i = 0; i <= istop; i++)
-				getline(split, fn_img);
 
-			img.read(fn_img);
-			img().setXmippOrigin();
+			// If all slaves had preread images into RAM: get those now
+			if (baseMLO->do_preread_images)
+			{
+				img() = baseMLO->mydata.particles[part_id].img;
+			}
+			else
+			{
+				// Read from disc
+				FileName fn_img;
+				std::istringstream split(baseMLO->exp_fn_img);
+				for (int i = 0; i <= istop; i++)
+					getline(split, fn_img);
+
+				img.read(fn_img);
+				img().setXmippOrigin();
+			}
 			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 			{
 				FileName fn_recimg;
