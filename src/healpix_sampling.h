@@ -187,6 +187,10 @@ public:
     void writeNonZeroPriorOrientationsToBild(FileName fn_bild, RFLOAT rot_prior, RFLOAT tilt_prior,
     		std::vector<int> &pointer_dir_nonzeroprior, std::string rgb = "0 0 1", RFLOAT size = 0.025);
 
+    /* Sjors, 9nov2015: new rot-priors for DNA-origami-bound refinements
+     */
+    RFLOAT calculateDeltaRot(Matrix1D<RFLOAT> my_direction, RFLOAT rot_prior);
+
     /* Select all orientations with zero prior probabilities
      * store all these in the vectors pointer_dir_nonzeroprior and pointer_psi_nonzeroprior
      * Also precalculate their prior probabilities and store in directions_prior and psi_prior
