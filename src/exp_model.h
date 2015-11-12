@@ -27,11 +27,11 @@
 #include "src/time.h"
 
 /// Reserve large vectors with some reasonable estimate
-// Larger numbers will still be OK, but memory management might suffer 
+// Larger numbers will still be OK, but memory management might suffer
 #define MAX_NR_PARTICLES_PER_MICROGRAPH 1000
 #define MAX_NR_MICROGRAPHS 2000
 #define MAX_NR_FRAMES_PER_MOVIE 100
- 
+
 ////////////// Hierarchical metadata model for tilt series
 
 class ExpParticle
@@ -49,8 +49,8 @@ public:
 	// Random subset this particle belongs to
 	int random_subset;
 
-        // Pre-read array of the image in RAM
-        MultidimArray<RFLOAT> img;
+	// Pre-read array of the image in RAM
+	MultidimArray<RFLOAT> img;
 
 	// Empty Constructor
 	ExpParticle()
@@ -69,7 +69,7 @@ public:
 	{
 		id = micrograph_id = group_id = -1;
 		random_subset = 0;
-                img.clear();
+		img.clear();
 	}
 
 };
@@ -108,7 +108,7 @@ public:
 		particles_id.clear();
 		particles_order.clear();
 		particles_id.reserve(MAX_NR_FRAMES_PER_MOVIE);
-		particles_order.reserve(MAX_NR_FRAMES_PER_MOVIE); 
+		particles_order.reserve(MAX_NR_FRAMES_PER_MOVIE);
 	}
 
 	void addParticle(long int _particle_id, int _random_subset, int _order);
@@ -140,7 +140,7 @@ public:
 		clear();
 	}
 
-
+	// Copy constructor needed for work with vectors
 	AverageMicrograph(AverageMicrograph const& copy)
 	{
 		id = copy.id;
@@ -148,6 +148,7 @@ public:
 		ori_particles_id = copy.ori_particles_id;
 	}
 
+	// Define assignment operator in terms of the copy constructor
 	AverageMicrograph& operator=(AverageMicrograph const& copy)
 	{
 		id = copy.id;
@@ -155,7 +156,6 @@ public:
 		ori_particles_id = copy.ori_particles_id;
 		return *this;
 	}
-
 
 	// Initialise
 	void clear()
@@ -294,6 +294,11 @@ public:
     // One large MetaDataTable for all images
     MetaDataTable MDimg;
 
+    int nr_bodies;
+
+    // Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
+    std::vector<MetaDataTable> MDbodies;
+
     // One large MetaDataTable for all micrographs
     MetaDataTable MDmic;
 
@@ -385,11 +390,16 @@ public:
 	// After they have been ordered, get rid of the particles_order vector inside the ori_particles
 	void orderParticlesInOriginalParticles();
 
+	// Add a given number of new bodies (for multi-body refinement) to the Experiment,
+	// by copying the relevant entries from MDimg into MDbodies
+	void initialiseBodies(int _nr_bodies);
+
 	// Print help message for possible command-line options
 	void usage();
 
 	// Read from file
-	void read(FileName fn_in, bool do_ignore_original_particle_name = false, bool do_ignore_group_name = false, bool do_preread_images = false);
+	// May23,2015 - Shaoda, Helical refinement
+	void read(FileName fn_in, bool do_ignore_original_particle_name = false, bool do_ignore_group_name = false, bool do_preread_images = false, bool need_tiltpsipriors_for_helical_refine = false);
 
 	// Write
 	void write(FileName fn_root);

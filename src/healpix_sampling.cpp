@@ -20,12 +20,16 @@
 #include "src/healpix_sampling.h"
 //#define DEBUG_SAMPLING
 //#define DEBUG_CHECKSIZES
+//#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+
 void HealpixSampling::clear()
 {
 	is_3D = false;
 	fn_sym = "C1";
 	limit_tilt = psi_step = offset_range = offset_step = 0.;
 	random_perturbation = perturbation_factor = 0.;
+	// Jun19,2015 - Shaoda, Helical refinement
+	helical_offset_step = -1.;
 	orientational_prior_mode = NOPRIOR;
 	directions_ipix.clear();
 	rot_angles.clear();
@@ -40,7 +44,15 @@ void HealpixSampling::clear()
 
 }
 
-void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans, bool do_warnpsi)
+void HealpixSampling::initialise(
+		int prior_mode,
+		int ref_dim,
+		bool do_3d_trans,
+                bool do_warnpsi,
+		bool do_local_searches,
+		bool do_helical_refine,
+		RFLOAT rise_pix,
+		RFLOAT twist_deg)
 {
 
 	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
@@ -50,7 +62,7 @@ void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans,
 		is_3D = (ref_dim == 3);
 
 	// Set flag for x,y,z-translations
-	is_3d_trans = _do_3d_trans;
+	is_3d_trans = do_3d_trans;
 
 	// By default psi_step is approximate sampling of rot,tilt in 3D; and 10 degrees in 2D
 	if (psi_step < 0)
@@ -106,9 +118,10 @@ void HealpixSampling::initialise(int prior_mode, int ref_dim, bool _do_3d_trans,
 		fn_sym = "C1"; // This may not be set yet if restarting a 2D run....
 	}
 
-
 	// Store the not-oversampled translations, and make sure oversampled sampling is 1 pixel
-	setTranslations();
+	//setTranslations();
+	// May06,2015 - Shaoda & Sjors, Helical translational searches
+	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_pix, twist_deg);
 
 	// Store the non-oversampled projection directions
 	setOrientations();
@@ -149,6 +162,9 @@ void HealpixSampling::read(FileName fn_in)
 		!MD.getValue(EMDL_SAMPLING_OFFSET_STEP, offset_step) ||
 		!MD.getValue(EMDL_SAMPLING_PERTURBATION_FACTOR, perturbation_factor))
 		REPORT_ERROR("HealpixSampling::readStar: incorrect sampling_general table");
+    // Jun19,2015 - Shaoda, Helical translational searches, backward compatibility
+    if (!MD.getValue(EMDL_SAMPLING_HELICAL_OFFSET_STEP, helical_offset_step))
+    	helical_offset_step = -1.;
 	if (is_3D)
 	{
 		if (!MD.getValue(EMDL_SAMPLING_HEALPIX_ORDER, healpix_order) ||
@@ -195,6 +211,8 @@ void HealpixSampling::write(FileName fn_out)
 	MD.setValue(EMDL_SAMPLING_PSI_STEP, psi_step);
 	MD.setValue(EMDL_SAMPLING_OFFSET_RANGE, offset_range);
 	MD.setValue(EMDL_SAMPLING_OFFSET_STEP, offset_step);
+	// Jun19,2015 - Shaoda, Helical translational searches
+	MD.setValue(EMDL_SAMPLING_HELICAL_OFFSET_STEP, helical_offset_step);
 	MD.setValue(EMDL_SAMPLING_PERTURB, random_perturbation);
 	MD.setValue(EMDL_SAMPLING_PERTURBATION_FACTOR, perturbation_factor);
 	MD.write(fh);
@@ -218,20 +236,38 @@ void HealpixSampling::write(FileName fn_out)
 
 	// Close the file
 	fh.close();
-
-
-
 }
 
-void HealpixSampling::setTranslations(RFLOAT _offset_step, RFLOAT _offset_range)
+void HealpixSampling::setTranslations(
+		RFLOAT new_offset_step,
+		RFLOAT new_offset_range,
+		bool do_local_searches,
+		bool do_helical_refine,
+		RFLOAT new_helical_offset_step,
+		RFLOAT helical_rise_pix,
+		RFLOAT helical_twist_deg)
 {
-	translations_x.clear();
-	translations_y.clear();
-	translations_z.clear();
-	if (_offset_step > 0. && _offset_range >= 0.)
+	// Ordinary single particles
+	int maxp; // Max half nr samplings in all directions
+	RFLOAT xoff, yoff, zoff, max2, old_offset_step, old_offset_range; // Offset lengths
+
+	// Helical refinement
+	int maxh; // Max half nr samplings in along helical axis
+	RFLOAT h_range, old_helical_offset_step; // Translations along helical axis
+
+	// Check old and new offsets
+	old_offset_step = offset_step;  // can be < 0 ??????
+	old_offset_range = offset_range;  // can be < 0 ??????
+	old_helical_offset_step = helical_offset_step;  // can be < 0
+	//if (!(offset_step > 0.))
+	//{
+	//	std::cerr << " offset_range= " << offset_range << " offset_step= " << offset_step << std::endl;
+	//	REPORT_ERROR("HealpixSampling::setTranslations BUG %% Old translation step and range are uninitialised!");
+	//}
+	if ( (new_offset_step > 0.) && (new_offset_range >= 0.) )
 	{
-		offset_step = _offset_step;
-		offset_range = _offset_range;
+		offset_step = new_offset_step;
+		offset_range = new_offset_range;
 	}
 	else
 	{
@@ -241,32 +277,110 @@ void HealpixSampling::setTranslations(RFLOAT _offset_step, RFLOAT _offset_range)
 			REPORT_ERROR("HealpixSampling::setTranslations BUG %% Trying to set translations with uninitialised offset_step!");
 		}
 	}
+	// Sometimes new offsets are set to -1, that means the old offsets remain unchanged.
+	new_offset_step = offset_step;  // > 0
+	new_offset_range = offset_range;  // >= 0
 
-	int maxr = CEIL(offset_range / offset_step);
-	for (long int ix = -maxr; ix <= maxr; ix++)
+	// Ordinary single particles
+	maxp = CEIL(offset_range / offset_step); // Perpendicular to helical axis (P1, P2)
+	maxh = maxp;
+	// Helical refinement
+	if (do_helical_refine)
 	{
-		RFLOAT xoff = ix * offset_step;
-		for (long int iy = -maxr; iy <= maxr; iy++)
-		{
-			RFLOAT yoff = iy * offset_step;
+		// Assume all helical parameters are valid (this should be checked before in ml_optimiser.cpp)
+		helical_rise_pix = fabs(helical_rise_pix);
+		helical_twist_deg = fabs(helical_twist_deg);
 
+		// Search range (half) along helical axis = (-0.5 * rise, +0.5 * rise)
+		h_range = (helical_rise_pix / 2.);
+
+		// If continue from old run or new offset is not applicable...
+		if (new_helical_offset_step < 0.)
+			new_helical_offset_step = old_helical_offset_step;
+
+		// New_helical_offset_step is not OK.
+		// (1) negative value
+		// (2) larger than before (if there is a valid offset before)
+		// (3) larger than new_offset_step
+		// (4) samplings along helical axis is less than 3
+		if ( (new_helical_offset_step < 0.)
+				|| ( (new_helical_offset_step > old_helical_offset_step) && (old_helical_offset_step > 0.) )
+				|| (new_helical_offset_step > new_offset_step)
+				|| ((helical_rise_pix / new_helical_offset_step) < 3.) )
+		{
+			// First try 'new_offset_step'
+			new_helical_offset_step = new_offset_step;
+			// Change to 'old_helical_offset_step' if the old is smaller
+			if ( (old_helical_offset_step > 0.) && (new_helical_offset_step > old_helical_offset_step) )
+				new_helical_offset_step = old_helical_offset_step;
+			// New_helical_offset_step should be finer than 1/3 the helical rise
+			if ( (helical_rise_pix / new_helical_offset_step) < 3.)
+				new_helical_offset_step = helical_rise_pix / 3.;
+		}
+
+		maxh = CEIL(h_range / new_helical_offset_step); // Out of range samplings will be excluded next
+		if (do_local_searches) // Local searches along helical axis
+		{
+			// Local searches (2*2+1=5 samplings)
+			if (maxh > 2)
+				maxh = 2;
+			// New helical offset step is smaller than 1/3 of the old one, samplings should be increased.
+			if ( (old_helical_offset_step > 0.) && ((old_helical_offset_step / new_helical_offset_step) > 3) )
+				maxh = FLOOR(old_helical_offset_step / new_helical_offset_step); // Use FLOOR here!
+			// Local searches should not be wider than 1/3 of the helical rise
+			if ( ((new_helical_offset_step * maxh) > (helical_rise_pix / 6.)) )
+			{
+				maxh = FLOOR(helical_rise_pix / 6. / new_helical_offset_step); // Use FLOOR here!
+				if (maxh < 1) // At least we should do some searches...
+					maxh = 1;
+			}
+		}
+		// DEBUG - this should not happen
+		if (maxh < 0)
+			maxh = 0;
+		helical_offset_step = new_helical_offset_step;
+	}
+
+	// DEBUG
+	if ( (maxh < 0) || (maxp < 0) )
+	{
+		std::cerr << "maxh= " << maxh << " maxp= " << maxp << std::endl;
+		REPORT_ERROR("HealpixSampling::setTranslations BUG %% No translations to set! ('maxh' or 'maxp' < 0)");
+	}
+
+	translations_x.clear();
+	translations_y.clear();
+	translations_z.clear();
+	for (long int ix = -maxh; ix <= maxh; ix++)
+	{
+		// For helices use a different step size along helical axis X
+		xoff = (do_helical_refine) ? (ix * helical_offset_step) : (ix * offset_step);
+		// For helical refinement, exclude xoff outside the range of (-0.5 * rise, +0.5 * rise)
+		if ( (do_helical_refine) && (ix != 0) && (fabs(xoff) > fabs(helical_rise_pix / 2.)) )
+			continue;
+
+		for (long int iy = -maxp; iy <= maxp; iy++)
+		{
+			yoff = iy * offset_step;
+			// For helices do not limit translations along helical axis X
+			max2 = (do_helical_refine) ? (yoff * yoff) : (xoff * xoff + yoff * yoff);
 			if (is_3d_trans)
 			{
-				for (long int iz = -maxr; iz <= maxr; iz++)
+				for (long int iz = -maxp; iz <= maxp; iz++)
 				{
-					RFLOAT zoff = iz * offset_step;
-					if (xoff*xoff + yoff*yoff + zoff*zoff <= offset_range * offset_range)
+					zoff = iz * offset_step;
+					max2 += zoff * zoff;
+					if (max2 <= (offset_range * offset_range))
 					{
 						translations_x.push_back(xoff);
 						translations_y.push_back(yoff);
 						translations_z.push_back(zoff);
-
 					}
 				}
 			}
 			else
 			{
-				if (xoff*xoff + yoff*yoff <= offset_range * offset_range)
+				if (max2 <= (offset_range * offset_range))
 				{
 					translations_x.push_back(xoff);
 					translations_y.push_back(yoff);
@@ -274,14 +388,14 @@ void HealpixSampling::setTranslations(RFLOAT _offset_step, RFLOAT _offset_range)
 			}
 		}
 	}
-
 #ifdef DEBUG_SETTRANS
 	std::cerr << " is_3d_trans= " << is_3d_trans << std::endl;
 	for (int i = 0; i < translations_x.size(); i++)
 		std::cerr << " translations_x[i]= " << translations_x[i] << std::endl;
 #endif
-
+	return;
 }
+
 /* Set only a single translation */
 void HealpixSampling::addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear)
 {
@@ -296,8 +410,6 @@ void HealpixSampling::addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT
 	if (is_3d_trans)
 		translations_z.push_back(offset_z);
 }
-
-
 
 void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 {
@@ -346,11 +458,10 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 		// Also remove limited tilt angles
 		removePointsOutsideLimitedTiltAngles();
 
-		#ifdef  DEBUG_SAMPLING
+#ifdef  DEBUG_SAMPLING
 		if (ABS(limit_tilt) < 90.)
 			writeAllOrientationsToBild("orients_tilt.bild", "1 1 0 ", 0.022);
 #endif
-
 
 	}
 	else
@@ -430,7 +541,7 @@ void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string r
 	for (unsigned long int ipix = 0; ipix < rot_angles.size(); ipix++)
 	{
 		Euler_angles2direction(rot_angles[ipix], tilt_angles[ipix], v);
-		out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) <<  floatToString(size) << std::endl;
+		out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << std::endl;
 	}
 
 	out.close();
@@ -487,6 +598,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
     	std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     	std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
+		bool do_bimodal_search_psi,
 		RFLOAT sigma_cutoff)
 {
 	pointer_dir_nonzeroprior.clear();
@@ -494,7 +606,6 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 
 	if (is_3D)
 	{
-
 		// Loop over all directions
 		RFLOAT sumprior = 0.;
 		// Keep track of the closest distance to prevent 0 orientations
@@ -502,7 +613,6 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		long int best_idir = -999;
 		for (long int idir = 0; idir < rot_angles.size(); idir++)
 		{
-
 			// Any prior involving BOTH rot and tilt.
 			if ( (sigma_rot > 0.) && (sigma_tilt > 0.) )
 			{
@@ -554,7 +664,6 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			}
 			else if (sigma_rot > 0.)
 			{
-
 				Matrix1D<RFLOAT> my_direction, sym_direction;
 				RFLOAT sym_rot, sym_tilt;
 
@@ -568,9 +677,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					diffang = calculateDeltaRot(sym_direction, prior_rot);
 
 					if (diffang < best_diffang)
-					{
 						best_diffang = diffang;
-					}
 				}
 
 				// Only consider differences within sigma_cutoff * sigma_rot
@@ -595,7 +702,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				RFLOAT sym_rot, sym_tilt;
 
 				// Get the current direction in the loop
-				Euler_angles2direction(tilt_angles[idir], tilt_angles[idir], my_direction);
+				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
 
 				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
 				RFLOAT diffang = ABS(tilt_angles[idir] - prior_tilt);
@@ -610,12 +717,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					if (diffang > 180.)
 						diffang = ABS(diffang - 360.);
 					if (diffang < best_diffang)
-					{
 						best_diffang = diffang;
-					}
 				}
-
-				// TODO: General bimodal tilt search (NOT for helices)?
 
 				// Only consider differences within sigma_cutoff * sigma_tilt
 				if (best_diffang < sigma_cutoff * sigma_tilt)
@@ -632,7 +735,6 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					best_idir = idir;
 					best_ang = diffang;
 				}
-
 			} // end if any prior involving rot and/or tilt
 			else
 			{
@@ -666,14 +768,12 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		std::cin >> c;
 #endif
 
-
 	}
 	else
 	{
 		pointer_dir_nonzeroprior.push_back(0);
 		directions_prior.push_back(1.);
 	}
-
 
 	// Psi-angles
 	pointer_psi_nonzeroprior.clear();
@@ -687,7 +787,10 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		if (sigma_psi > 0.)
 		{
 			RFLOAT diffpsi = ABS(psi_angles[ipsi] - prior_psi);
-			if (diffpsi > 180.) diffpsi = ABS(diffpsi - 360.);
+			if (diffpsi > 180.)
+				diffpsi = ABS(diffpsi - 360.);
+			if (do_bimodal_search_psi && (diffpsi > 90.))
+				diffpsi = ABS(diffpsi - 180.);
 
 			// Only consider differences within sigma_cutoff * sigma_psi
 			if (diffpsi < sigma_cutoff * sigma_psi)
@@ -705,6 +808,351 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					REPORT_ERROR("prior on psi is zero!");
 				}
 
+			}
+
+			// Keep track of the nearest sampling point
+			if (diffpsi < best_diff)
+			{
+				best_ipsi = ipsi;
+				best_diff = diffpsi;
+			}
+		}
+		else
+		{
+			pointer_psi_nonzeroprior.push_back(ipsi);
+			psi_prior.push_back(1.);
+			sumprior += 1.;
+		}
+	}
+	// Normalise the prior probability distribution to have sum 1 over all psi-angles
+	for (long int ipsi = 0; ipsi < psi_prior.size(); ipsi++)
+		psi_prior[ipsi] /= sumprior;
+
+	// If there were no directions at all, just select the single nearest one:
+	if (psi_prior.size() == 0)
+	{
+		if (best_ipsi < 0)
+			REPORT_ERROR("HealpixSampling::selectOrientationsWithNonZeroPriorProbability BUG: best_ipsi < 0");
+		pointer_psi_nonzeroprior.push_back(best_ipsi);
+		psi_prior.push_back(1.);
+	}
+
+#ifdef  DEBUG_SAMPLING
+	std::cerr << " psi_angles.size()= " << psi_angles.size() << " psi_step= " << psi_step << std::endl;
+	std::cerr << " psi_prior.size()= " << psi_prior.size() << " pointer_psi_nonzeroprior.size()= " << pointer_psi_nonzeroprior.size() << " sumprior= " << sumprior << std::endl;
+#endif
+	return;
+}
+
+void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(
+		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,
+		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
+		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
+		bool do_helical_bimodal_search_psi,
+		bool do_helical_bimodal_search_tilt,
+		RFLOAT sigma_cutoff)
+{
+	// Helical references are always along Z axis in 3D helical reconstructions
+	// Therefore tilt priors are usually not far from 90 degrees
+	// Tilt~0 problem: if tilt=0 or 180 degrees, a change in rot is equal to some changes in psi
+	// If tilt priors are estimated around 0 or 180 degrees for a segment, this segment must be rubbish
+	// So tilt~0 problem does not impact helical reconstruction
+	// Because if user provides this rubbish segment, just let it have any orientations and it will give out rubbish
+	// Just throw a warning message for this rubbish segment
+	// If tilt~0 problem is ignored, I can implement 2D Gaussian priors for rot-tilt pairs
+	// This can be more accurate than previous implementation
+	// It also saves time when sigma_rot is much larger than sigma_tilt (during local searches in 3D auto-refine)
+
+	pointer_dir_nonzeroprior.clear();
+	directions_prior.clear();
+
+	if (is_3D)
+	{
+		// If tilt prior is less than 20 or larger than 160 degrees, print a warning message
+		if (fabs(((prior_tilt / 180.) - ROUND(prior_tilt / 180.)) * 180.) < 20.)
+		{
+			std::cerr << " WARNING: A segment is found with tilt prior= " << prior_tilt
+					<< " degrees. It will probably impact searches of orientations in 3D helical reconstruction."<< std::endl;
+		}
+
+		// Loop over all directions
+		RFLOAT sumprior = 0.;
+		// Keep track of the closest distance to prevent 0 orientations
+		RFLOAT best_ang = 9999.;
+		long int best_idir = -999;
+		for (long int idir = 0; idir < rot_angles.size(); idir++)
+		{
+			// Any prior involving BOTH rot and tilt.
+			if ( (sigma_rot > 0.) && (sigma_tilt > 0.) )
+			{
+				Matrix1D<RFLOAT> prior_direction, my_direction, sym_direction, best_direction;
+
+				// Get the direction of the prior
+				Euler_angles2direction(prior_rot, prior_tilt, prior_direction);
+
+				// Get the current direction in the loop
+				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
+
+				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
+				RFLOAT best_dotProduct = dotProduct(prior_direction, my_direction);
+				best_direction = my_direction;
+				for (int j = 0; j < R_repository.size(); j++)
+				{
+					sym_direction =  L_repository[j] * (my_direction.transpose() * R_repository[j]).transpose();
+					RFLOAT my_dotProduct = dotProduct(prior_direction, sym_direction);
+					if (my_dotProduct > best_dotProduct)
+					{
+						best_direction = sym_direction;
+						best_dotProduct = my_dotProduct;
+					}
+				}
+
+				Matrix1D<RFLOAT> my_direction2, sym_direction2, best_direction2;
+				// Assume tilt = (0, +180)
+				// TODO: Check if "(tilt_angles[idir] > 0.01) && (tilt_angles[idir] < 179.99)" is needed
+				if (do_helical_bimodal_search_tilt)
+				{
+					// Get the current direction in the loop
+					Euler_angles2direction(rot_angles[idir], (180. - tilt_angles[idir]), my_direction2);
+
+					// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
+					RFLOAT best_dotProduct2 = dotProduct(prior_direction, my_direction2);
+					best_direction2 = my_direction2;
+					for (int j = 0; j < R_repository.size(); j++)
+					{
+						sym_direction2 =  L_repository[j] * (my_direction2.transpose() * R_repository[j]).transpose();
+						RFLOAT my_dotProduct2 = dotProduct(prior_direction, sym_direction2);
+						if (my_dotProduct2 > best_dotProduct2)
+						{
+							best_direction2 = sym_direction2;
+							best_dotProduct2 = my_dotProduct2;
+						}
+					}
+
+					if (best_dotProduct2 > best_dotProduct)
+					{
+						best_dotProduct = best_dotProduct2;
+						best_direction = best_direction2;
+					}
+				}
+
+				// Calculate the differences from sym_rot, sym_tilt to prior_rot, prior_tilt
+				RFLOAT sym_rot, sym_tilt, diff_rot, diff_tilt, diffang;
+				Euler_direction2angles(best_direction, sym_rot, sym_tilt);
+				diff_rot = ABS(sym_rot - prior_rot);
+				if (diff_rot > 180.)
+					diff_rot = ABS(diff_rot - 360.);
+				diff_tilt = ABS(sym_tilt - prior_tilt);
+				if (diff_tilt > 180.)
+					diff_tilt = ABS(diff_tilt - 360.);
+				diffang = sqrt((diff_rot * diff_rot) + (diff_tilt * diff_tilt));
+				if ( (diff_rot < sigma_cutoff * sigma_rot) && (diff_tilt < sigma_cutoff * sigma_tilt) )
+				{
+					// TODO!!! If tilt is zero then any rot will be OK!!!!!
+					RFLOAT prior = gaussian2D(diff_rot, diff_tilt, sigma_rot, sigma_tilt, 0.);
+					pointer_dir_nonzeroprior.push_back(idir);
+					directions_prior.push_back(prior);
+					sumprior += prior;
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+					std::cout << "rot & tilt OK, diffang = " << diffang << std::endl;
+					std::cout << " rot, tilt = " << rot_angles[idir] << ", " << tilt_angles[idir] << std::endl;
+#endif
+				}
+				else
+				{
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+					std::cout << "rot & tilt FAILED, diffang = " << diffang << std::endl;
+					std::cout << " rot, tilt = " << rot_angles[idir] << ", " << tilt_angles[idir] << std::endl;
+#endif
+				}
+
+				// Keep track of the nearest direction
+				if (diffang < best_ang)
+				{
+					best_idir = idir;
+					best_ang = diffang;
+				}
+
+			}
+			else if (sigma_tilt > 0.)
+			{
+				Matrix1D<RFLOAT> my_direction, sym_direction;
+				RFLOAT sym_rot, sym_tilt;
+
+				// Get the current direction in the loop
+				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
+
+				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
+				RFLOAT diffang = ABS(tilt_angles[idir] - prior_tilt);
+				if (diffang > 180.)
+					diffang = ABS(diffang - 360.);
+				RFLOAT best_tilt = tilt_angles[idir];
+				RFLOAT best_diffang = diffang;
+				for (int j = 0; j < R_repository.size(); j++)
+				{
+					sym_direction =  L_repository[j] * (my_direction.transpose() * R_repository[j]).transpose();
+					Euler_direction2angles(sym_direction, sym_rot, sym_tilt);
+					diffang = ABS(sym_tilt - prior_tilt);
+					if (diffang > 180.)
+						diffang = ABS(diffang - 360.);
+					if (diffang < best_diffang)
+					{
+						best_diffang = diffang;
+						best_tilt = sym_tilt;
+					}
+				}
+
+				Matrix1D<RFLOAT> my_direction2, sym_direction2, best_direction2;
+				// Assume tilt = (0, +180)
+				// TODO: Check if "(tilt_angles[idir] > 0.01) && (tilt_angles[idir] < 179.99)" is needed
+				if (do_helical_bimodal_search_tilt)
+				{
+					Matrix1D<RFLOAT> my_direction2, sym_direction2;
+
+					// Get the current direction in the loop
+					sym_tilt = 180. - tilt_angles[idir]; // Shaoda want the prior on tilt, centered around 90 degrees, so P(87) == P(93)
+					Euler_angles2direction(rot_angles[idir], sym_tilt, my_direction2);
+
+					// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
+					diffang = ABS(sym_tilt - prior_tilt);
+					if (diffang > 180.)
+						diffang = ABS(diffang - 360.);
+					if (diffang < best_diffang)
+					{
+						best_diffang = diffang;
+						best_tilt = sym_tilt;
+					}
+					for (int j = 0; j < R_repository.size(); j++)
+					{
+						sym_direction2 =  L_repository[j] * (my_direction2.transpose() * R_repository[j]).transpose();
+						Euler_direction2angles(sym_direction2, sym_rot, sym_tilt);
+						diffang = ABS(sym_tilt - prior_tilt);
+						if (diffang > 180.)
+							diffang = ABS(diffang - 360.);
+						if (diffang < best_diffang)
+						{
+							best_diffang = diffang;
+							best_tilt = sym_tilt;
+						}
+					}
+				}
+
+				// Only consider differences within sigma_cutoff * sigma_tilt
+				if (best_diffang < sigma_cutoff * sigma_tilt)
+				{
+					RFLOAT prior = gaussian1D(best_diffang, sigma_tilt, 0.);
+					pointer_dir_nonzeroprior.push_back(idir);
+					directions_prior.push_back(prior);
+					sumprior += prior;
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+					std::cout << "rot & tilt OK, diffang = " << diffang << std::endl;
+					std::cout << " rot, tilt = " << rot_angles[idir] << ", " << tilt_angles[idir] << std::endl;
+#endif
+				}
+				else
+				{
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+					std::cout << "rot & tilt FAILED, diffang = " << diffang << std::endl;
+					std::cout << " rot, tilt = " << rot_angles[idir] << ", " << tilt_angles[idir] << std::endl;
+#endif
+				}
+
+				// Keep track of the nearest direction
+				if (best_diffang < best_ang)
+				{
+					best_idir = idir;
+					best_ang = diffang;
+				}
+
+			}
+			else if (sigma_rot > 0.)
+			{
+				REPORT_ERROR("healpix_sampling.cpp::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction() BUG: Rot but not tilt prior exists! It is not reasonable for 3D helical reconstruction!");
+			}
+			else
+			{
+				// If no prior on the directions: just add all of them
+				pointer_dir_nonzeroprior.push_back(idir);
+				directions_prior.push_back(1.);
+				sumprior += 1.;
+			}
+
+		} // end for idir
+
+		//Normalise the prior probability distribution to have sum 1 over all psi-angles
+		for (long int idir = 0; idir < directions_prior.size(); idir++)
+			directions_prior[idir] /= sumprior;
+
+		// If there were no directions at all, just select the single nearest one:
+		if (directions_prior.size() == 0)
+		{
+			if (best_idir < 0)
+				REPORT_ERROR("HealpixSampling::selectOrientationsWithNonZeroPriorProbability BUG: best_idir < 0");
+			pointer_dir_nonzeroprior.push_back(best_idir);
+			directions_prior.push_back(1.);
+		}
+
+#ifdef  DEBUG_SAMPLING
+		writeNonZeroPriorOrientationsToBild("orients_local.bild", prior_rot, prior_tilt, pointer_dir_nonzeroprior, "0 0 1", 0.023);
+		std::cerr << " directions_prior.size()= " << directions_prior.size() << " pointer_dir_nonzeroprior.size()= " << pointer_dir_nonzeroprior.size() << std::endl;
+		std::cerr << " sumprior= " << sumprior << std::endl;
+		char c;
+		std::cerr << "Written orients_local.bild for prior on angles ("<<prior_rot<<","<<prior_tilt<<") Press any key to continue.." << std::endl;
+		std::cin >> c;
+#endif
+
+	}
+	else
+	{
+		pointer_dir_nonzeroprior.push_back(0);
+		directions_prior.push_back(1.);
+	}
+
+	// Psi-angles
+	pointer_psi_nonzeroprior.clear();
+	psi_prior.clear();
+
+	RFLOAT sumprior = 0.;
+	RFLOAT best_diff = 9999.;
+	long int best_ipsi = -999;
+	for (long int ipsi = 0; ipsi < psi_angles.size(); ipsi++)
+	{
+		if (sigma_psi > 0.)
+		{
+			RFLOAT diffpsi = ABS(psi_angles[ipsi] - prior_psi);
+			if (diffpsi > 180.)
+				diffpsi = ABS(diffpsi - 360.);
+			if ( (do_helical_bimodal_search_psi) && (diffpsi > 90.))
+				diffpsi = ABS(diffpsi - 180.);
+
+			// Only consider differences within sigma_cutoff * sigma_psi
+			if (diffpsi < sigma_cutoff * sigma_psi)
+			{
+				RFLOAT prior = gaussian1D(diffpsi, sigma_psi, 0.);
+				pointer_psi_nonzeroprior.push_back(ipsi);
+				psi_prior.push_back(prior);
+				sumprior += prior;
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+				std::cout << "psi OK, diffang = " << diffpsi << std::endl;
+				std::cout << " psi = " << psi_angles[ipsi] << std::endl;
+#endif
+
+				// TMP DEBUGGING
+				if (prior == 0.)
+				{
+					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << " orientational_prior_mode= " << orientational_prior_mode << std::endl;
+					std::cerr << " diffpsi= " << diffpsi << " sigma_cutoff= " << sigma_cutoff << " sigma_psi= " << sigma_psi << std::endl;
+					REPORT_ERROR("prior on psi is zero!");
+				}
+
+			}
+			else
+			{
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+				std::cout << "psi FAILED, diffang = " << diffpsi << std::endl;
+				std::cout << " psi = " << psi_angles[ipsi] << std::endl;
+#endif
 			}
 			// Keep track of the nearest sampling point
 			if (diffpsi < best_diff)
@@ -733,12 +1181,10 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		psi_prior.push_back(1.);
 	}
 
-
 #ifdef  DEBUG_SAMPLING
 	std::cerr << " psi_angles.size()= " << psi_angles.size() << " psi_step= " << psi_step << std::endl;
 	std::cerr << " psi_prior.size()= " << psi_prior.size() << " pointer_psi_nonzeroprior.size()= " << pointer_psi_nonzeroprior.size() << " sumprior= " << sumprior << std::endl;
 #endif
-
 
 }
 
@@ -800,6 +1246,11 @@ void HealpixSampling::getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT
 RFLOAT HealpixSampling::getTranslationalSampling(int adaptive_oversampling)
 {
 	return offset_step / std::pow(2., adaptive_oversampling);
+}
+
+RFLOAT HealpixSampling::getHelicalTranslationalSampling(int adaptive_oversampling)
+{
+	return helical_offset_step / std::pow(2., adaptive_oversampling);
 }
 
 RFLOAT HealpixSampling::getAngularSampling(int adaptive_oversampling)
@@ -939,7 +1390,10 @@ long int HealpixSampling::getPositionOversampledSamplingPoint(long int ipos, int
 void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 		std::vector<RFLOAT > &my_translations_x,
 		std::vector<RFLOAT > &my_translations_y,
-		std::vector<RFLOAT > &my_translations_z)
+		std::vector<RFLOAT > &my_translations_z,
+		bool do_helical_refine,
+		RFLOAT rise_pix,
+		RFLOAT twist_deg)
 {
 
 #ifdef DEBUG_CHECKSIZES
@@ -962,14 +1416,36 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 	else
 	{
 		int nr_oversamples = ROUND(std::pow(2., oversampling_order));
-		if (is_3d_trans)
+		// DEBUG
+		if ( (nr_oversamples < 1) )
 		{
+			std::cerr << "oversampling_order= " << oversampling_order << " nr_oversamples= " << nr_oversamples << std::endl;
+			REPORT_ERROR("HealpixSampling::getTranslations BUG %% 'nr_oversamples' should be a positive integer!");
+		}
+
+		// Helical refinement
+		RFLOAT h_step = offset_step;
+		if (do_helical_refine)
+		{
+			h_step = helical_offset_step;
+			// Assume all helical parameters are correct
+			rise_pix = fabs(rise_pix);
+			twist_deg = fabs(twist_deg);
+		}
+		if (h_step < 0.)
+		{
+			std::cerr << "helical_offset_step (h_step)= " << h_step << std::endl;
+			REPORT_ERROR("HealpixSampling::getTranslations BUG %% 'helical_offset_step (h_step)' should be positive!");
+		}
+
+		for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
+		{
+			RFLOAT over_xoff = translations_x[itrans] - 0.5 * h_step + (0.5 + itrans_overx) * h_step / nr_oversamples;
 			for (int itrans_overy = 0; itrans_overy < nr_oversamples; itrans_overy++)
 			{
 				RFLOAT over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
-				for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
+				if (is_3d_trans)
 				{
-					RFLOAT over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
 					for (int itrans_overz = 0; itrans_overz < nr_oversamples; itrans_overz++)
 					{
 						RFLOAT over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
@@ -978,29 +1454,37 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 						my_translations_z.push_back(over_zoff);
 					}
 				}
-			}
-		}
-		else
-		{
-			for (int itrans_overy = 0; itrans_overy < nr_oversamples; itrans_overy++)
-			{
-				RFLOAT over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
-				for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
+				else
 				{
-					RFLOAT over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
 					my_translations_x.push_back(over_xoff);
 					my_translations_y.push_back(over_yoff);
 				}
 			}
+		}
+
+		// This could rarely happen. Just in case all over-sampled xoff are excluded in helical refinement...
+		// AVOID THIS BY CHOOSING AN INITIAL ANGULAR SAMPLING FINER THAN HALF OF THE TWIST !!!!!!
+		if ( (do_helical_refine) && (my_translations_x.size() < 1) )
+		{
+			my_translations_x.push_back(translations_x[itrans]);
+			my_translations_y.push_back(translations_y[itrans]);
+			if (is_3d_trans)
+				my_translations_z.push_back(translations_z[itrans]);
 		}
 	}
 
 	if (ABS(random_perturbation) > 0.)
 	{
 		RFLOAT myperturb = random_perturbation * offset_step;
+		// Oct31,2015 - Shaoda - TODO: Please consider this!!!
+		RFLOAT myperturb_helical = random_perturbation * helical_offset_step;
 		for (int iover = 0; iover < my_translations_x.size(); iover++)
 		{
-			my_translations_x[iover] += myperturb;
+			// If doing helical refinement, DONT put perturbation onto translations along helical axis???
+			if (do_helical_refine)
+				my_translations_x[iover] += myperturb_helical;
+			else
+				my_translations_x[iover] += myperturb;
 			my_translations_y[iover] += myperturb;
 			if (is_3d_trans)
 				my_translations_z[iover] += myperturb;
@@ -1081,7 +1565,7 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 			for (int i = fact * x; i < fact * (x+1); ++i)
 			{
 				long int overpix = HealPixOver.xyf2nest(i, j, face);
-                // this one always has to be double (also for SINGLE_PRECISION CALCULATIONS) for call to external library
+                                // this one always has to be double (also for SINGLE_PRECISION CALCULATIONS) for call to external library
 				double zz, phi;
 				HealPixOver.pix2ang_z_phi(overpix, zz, phi);
 				rot = RAD2DEG(phi);
@@ -1147,9 +1631,9 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 			RFLOAT overpsi = psi_angles[ipsi] - 0.5 * psi_step + (0.5 + ipsi_over) * psi_step / nr_ipsi_over;
 			oversampled_rot.push_back(rot);
 			oversampled_tilt.push_back(tilt);
-			if (!is_3D && overpsi>180.)
-				overpsi-=360.;
- 			oversampled_psi.push_back(overpsi);
+                        if (!is_3D && overpsi>180.)
+                            overpsi-=360.;			
+                        oversampled_psi.push_back(overpsi);
 		}
 	}
 

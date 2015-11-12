@@ -356,7 +356,6 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 	//MDmovie.write("sorted_movie.star");
 	//MDimg.write("sorted_MDimg.star");
 	//std::cerr << "Written sorted_movie.star and sorted_MDimg.star" << std::endl;
-        std::cerr << "now sorted MDmovie" << std::endl;
 	timer.toc(tsort);
 #endif
 
@@ -625,6 +624,45 @@ void Experiment::orderParticlesInOriginalParticles()
 
 }
 
+void Experiment::initialiseBodies(int _nr_bodies)
+{
+	if (_nr_bodies < 2)
+	{
+		return;
+	}
+	else
+	{
+		nr_bodies = _nr_bodies;
+		MetaDataTable MDbody;
+		MDbody.setIsList(false);
+		bool is_3d = (MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z));
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		{
+			MDbody.addObject();
+			RFLOAT norm, zero=0.;
+			MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, norm);
+			MDbody.setValue(EMDL_ORIENT_ORIGIN_X, zero);
+			MDbody.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+			MDbody.setValue(EMDL_ORIENT_ROT, zero);
+			MDbody.setValue(EMDL_ORIENT_TILT, zero);
+			MDbody.setValue(EMDL_ORIENT_PSI, zero);
+			MDbody.setValue(EMDL_IMAGE_NORM_CORRECTION, norm);
+			if (is_3d)
+			{
+				MDbody.setValue(EMDL_ORIENT_ORIGIN_Z, zero);
+			}
+		}
+		// Now just fill all bodies with that MDbody
+		MDbodies.resize(nr_bodies, MDbody);
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
+		{
+			std::string tablename = "images_body_" + integerToString(ibody+1);
+			MDbodies[ibody].setName(tablename);
+		}
+	}
+
+}
+
 void Experiment::usage()
 {
 	std::cout
@@ -633,7 +671,7 @@ void Experiment::usage()
 }
 
 // Read from file
-void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bool do_ignore_group_name, bool do_preread_images)
+void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bool do_ignore_group_name, bool do_preread_images, bool need_tiltpsipriors_for_helical_refine)
 {
 
 //#define DEBUG_READ
@@ -671,7 +709,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		// Read in header-only information to get the NSIZE of the stack
 		Image<RFLOAT> img;
 		img.read(fn_exp, false); // false means skip data, only read header
-		
+
 		// allocate 1 block of memory
 		particles.reserve(NSIZE(img()));
 		ori_particles.reserve(NSIZE(img()));
@@ -710,7 +748,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 #endif
 
 		// Sort input particles on micrographname
-		bool is_mic_a_movie = false, star_contains_micname;
+		bool is_mic_a_movie=false, star_contains_micname;
 		star_contains_micname = MDimg.containsLabel(EMDL_MICROGRAPH_NAME);
 		if (star_contains_micname)
 		{
@@ -745,7 +783,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 #endif
                 // allocate 1 block of memory
                 particles.reserve(MDimg.numberOfObjects());
-               
+
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
 		long int last_oripart_idx = -1;
 		int nr_frames = 0;
@@ -759,7 +797,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			FileName mic_name=""; // Filename instead of string because will decompose below
 			std::string mic_name_after_at="", group_name="", last_mic_name_after_at="", last_ori_mic_name="";
 			if (is_mic_a_movie)
-				last_mic_name_after_at = (idx > 0) ? last_mic_name.substr(last_mic_name.find("@")+1) : "";			
+				last_mic_name_after_at = (idx > 0) ? last_mic_name.substr(last_mic_name.find("@")+1) : "";
 
 			if (star_contains_micname)
 			{
@@ -795,7 +833,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 						{
 							nr_frames = micrographs.size();
 							ori_particles.reserve(MDimg.numberOfObjects()/nr_frames);
-#ifdef DEBUG_READ							
+#ifdef DEBUG_READ
 							std::cerr << "nr_frames = " << nr_frames << std::endl;
 #endif
 						}
@@ -916,7 +954,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 				ori_part_id = addOriginalParticle(ori_part_name, my_random_subset);
 				// Also add this original_particle to an original_micrograph (only for movies)
 				if (is_mic_a_movie)
-				{	
+				{
 					average_micrographs[avg_mic_idx].ori_particles_id.push_back(ori_part_id);
 				}
 			}
@@ -948,6 +986,26 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		std::cerr << " nr_read= " << nr_read << " particles.size()= " << particles.size() << " ori_particles.size()= " << ori_particles.size()  << " micrographs.size()= " << micrographs.size() << " average_micrographs.size()= " << average_micrographs.size() << " groups.size()= " << groups.size() << std::endl;
 #endif
 
+		// Check for the presence of multiple bodies (for multi-body refinement)
+		bool is_done = false;
+		nr_bodies = 0;
+		while (!is_done)
+		{
+			std::string tablename = "images_body_" + integerToString(nr_bodies+1);
+                        MetaDataTable MDimgin;
+			if (MDimgin.read(fn_exp, tablename) > 0)
+			{
+				nr_bodies++;
+				MDbodies.push_back(MDimgin);
+			}
+			else
+			{
+				is_done = true;
+			}
+		}
+		// Even if we don't do multi-body refinement, then nr_bodies is still 1
+		nr_bodies = XMIPP_MAX(nr_bodies, 1);
+
 	}
 
 #ifdef DEBUG_READ
@@ -964,6 +1022,15 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y);
 	bool have_clas = MDimg.containsLabel(EMDL_PARTICLE_CLASS);
 	bool have_norm = MDimg.containsLabel(EMDL_IMAGE_NORM_CORRECTION);
+	// May23,2015 - Shaoda, Helical refinement
+	if (need_tiltpsipriors_for_helical_refine)
+	{
+		if ( (!have_tilt) || (!have_psi) )
+		{
+			REPORT_ERROR("exp_model.cpp: void Experiment::read(): Priors of tilt and psi angles are needed for all particles in helical refinement!");
+			return;
+		}
+	}
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
 		RFLOAT dzero=0., done=1.;
@@ -991,7 +1058,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 	//std::cerr << "Press any key to continue..." << std::endl;
 	//std::cin >> c;
 #endif
-	
+
 	// Also set the image_size (use the last image for that, still in fn_img)
 	FileName fn_img;
 	Image<RFLOAT> img;
@@ -1046,6 +1113,14 @@ void Experiment::write(FileName fn_root)
 
     // Always write MDimg
     MDimg.write(fh);
+
+    if (nr_bodies > 1)
+    {
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
+		{
+			MDbodies[ibody].write(fh);
+		}
+    }
 
 	fh.close();
 

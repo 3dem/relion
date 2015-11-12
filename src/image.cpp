@@ -19,6 +19,7 @@
  ***************************************************************************/
 #include "src/image.h"
 
+//#define DEBUG_REGULARISE_HELICAL_SEGMENTS
 
 // Get size of datatype
 unsigned long  gettypesize(DataType type)
@@ -71,18 +72,36 @@ int datatypeString2Int(std::string s)
 }
 
 // Some image-specific operations
-void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev, bool do_ramp)
+void normalise(
+		Image<RFLOAT> &I,
+		int bg_radius,
+		RFLOAT white_dust_stddev,
+		RFLOAT black_dust_stddev,
+		bool do_ramp,
+		bool is_helical_segment,
+		RFLOAT helical_mask_tube_outer_radius_pix,
+		RFLOAT tilt_deg,
+		RFLOAT psi_deg)
 {
-	int bg_radius2 = bg_radius * bg_radius;
 	RFLOAT avg, stddev;
 
 	if (2*bg_radius > XSIZE(I()))
 		REPORT_ERROR("normalise ERROR: 2*bg_radius is larger than image size!");
 
+	if ( (is_helical_segment) && ( (2 * (helical_mask_tube_outer_radius_pix + 1)) > XSIZE(I()) ) )
+		REPORT_ERROR("normalise ERROR: Diameter of helical tube is larger than image size!");
+
+	if (is_helical_segment)
+	{
+		if (I().getDim() == 2)
+			tilt_deg = 0.;
+	}
+
 	if (white_dust_stddev > 0. || black_dust_stddev > 0.)
 	{
 		// Calculate initial avg and stddev values
-		calculateBackgroundAvgStddev(I, avg, stddev, bg_radius);
+		calculateBackgroundAvgStddev(I, avg, stddev, bg_radius,
+				is_helical_segment, helical_mask_tube_outer_radius_pix, tilt_deg, psi_deg);
 
 		// Remove white and black noise
 		if (white_dust_stddev > 0.)
@@ -92,10 +111,12 @@ void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT
 	}
 
 	if (do_ramp)
-		subtractBackgroundRamp(I, bg_radius);
+		subtractBackgroundRamp(I, bg_radius,
+				is_helical_segment, helical_mask_tube_outer_radius_pix, tilt_deg, psi_deg);
 
 	// Calculate avg and stddev (also redo if dust was removed!)
-	calculateBackgroundAvgStddev(I, avg, stddev, bg_radius);
+	calculateBackgroundAvgStddev(I, avg, stddev, bg_radius,
+			is_helical_segment, helical_mask_tube_outer_radius_pix, tilt_deg, psi_deg);
 
 	if (stddev < 1e-10)
 	{
@@ -109,38 +130,134 @@ void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT
 	}
 }
 
-void calculateBackgroundAvgStddev(Image<RFLOAT> &I, RFLOAT &avg, RFLOAT &stddev, int bg_radius)
+void calculateBackgroundAvgStddev(
+		Image<RFLOAT> &I,
+		RFLOAT &avg,
+		RFLOAT &stddev,
+		int bg_radius,
+		bool is_helical_segment,
+		RFLOAT helical_mask_tube_outer_radius_pix,
+		RFLOAT tilt_deg,
+		RFLOAT psi_deg)
 {
 	int bg_radius2 = bg_radius * bg_radius;
-	RFLOAT n = 0.;
-	avg = 0.;
-	stddev = 0.;
+	RFLOAT sum, sum2, n, val, d;
+	sum = sum2 = n = 0.;
+	avg = stddev = 0.;
 
-	// Calculate avg in the background pixels
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(I())
+	if (is_helical_segment)
 	{
-		if (k*k + i*i + j*j > bg_radius2)
-		{
-			avg += A3D_ELEM(I(), k, i, j);
-			n += 1.;
-		}
-	}
-	avg /= n;
+		int dim = I().getDim();
+		if ( (dim != 2) && (dim != 3) )
+			REPORT_ERROR("image.cpp::calculateBackgroundAvgStddev(): 2D or 3D image is required!");
+		if (dim == 2)
+			tilt_deg = 0.;
 
-	// Calculate stddev in the background pixels
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(I())
-	{
-		if (k*k + i*i + j*j > bg_radius2)
+    	Matrix1D<RFLOAT> coords;
+    	Matrix2D<RFLOAT> A;
+
+    	// Init coords
+    	coords.clear();
+    	coords.resize(3);
+    	coords.initZeros();
+
+    	// Init rotational matrix A
+    	A.clear();
+    	A.resize(3, 3);
+
+    	// Rotate the particle (so that the helical cylinder spans X axis)
+    	Euler_angles2matrix(0., -tilt_deg, -psi_deg, A, false);  // Beware - negative sign!
+
+#ifdef DEBUG_REGULARISE_HELICAL_SEGMENTS
+    	FileName fn_test;
+    	Image<RFLOAT> img_test;
+    	int angle = ROUND(fabs(psi_deg));
+    	fn_test = integerToString(angle);
+    	if (psi_deg < 0.)
+    		fn_test = fn_test.addExtension("neg");
+    	fn_test = fn_test.addExtension("mrc");
+    	img_test.clear();
+    	img_test().resize(I());
+    	img_test().initZeros();
+    	std::cout << "FileName = " << fn_test.c_str() << std::endl;
+#endif
+
+		// Calculate avg in the background pixels
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(I())
 		{
-			RFLOAT aux = A3D_ELEM(I(), k, i, j) - avg;
-			stddev += aux * aux;
+			// X, Y, Z coordinates
+			if (dim == 3)
+				ZZ(coords) = ((RFLOAT)(k));
+			else
+				ZZ(coords) = 0.;
+			YY(coords) = ((RFLOAT)(i));
+			XX(coords) = ((RFLOAT)(j));
+			// Rotate
+			coords = A * coords;
+
+			// Distance from the point to helical axis (perpendicular to X axis)
+			if (dim == 3)
+				d = sqrt(YY(coords) * YY(coords) + ZZ(coords) * ZZ(coords));
+			else
+				d = ABS(YY(coords));
+
+			if (d > helical_mask_tube_outer_radius_pix)
+			{
+				val = A3D_ELEM(I(), k, i, j);
+				sum += val;
+				sum2 += val * val;
+				n += 1.;
+
+#ifdef DEBUG_REGULARISE_HELICAL_SEGMENTS
+				A3D_ELEM(img_test(), k, i, j) = 1.;  // Mark bg pixels as 1, others as 0
+#endif
+			}
 		}
+		if (n < 0.9)
+		{
+			REPORT_ERROR("image.cpp::calculateBackgroundAvgStddev(): No pixels in background are found. Radius of helical mask is too large.");
+		}
+
+		avg = sum / n;
+		stddev = sqrt( (sum2 / n) - (avg * avg) );
+
+#ifdef DEBUG_REGULARISE_HELICAL_SEGMENTS
+		img_test.write(fn_test);
+#endif
 	}
-	stddev = sqrt(stddev/n);
+	else
+	{
+		// Calculate avg in the background pixels
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(I())
+		{
+			if ( (k*k + i*i + j*j) > bg_radius2)
+			{
+				val = A3D_ELEM(I(), k, i, j);
+				sum += val;
+				sum2 += val * val;
+				n += 1.;
+			}
+		}
+		if (n < 0.9)
+		{
+			REPORT_ERROR("image.cpp::calculateBackgroundAvgStddev(): No pixels in background are found. Radius of circular mask is too large.");
+		}
+
+		avg = sum / n;
+		stddev = sqrt( (sum2 / n) - (avg * avg) );
+	}
+
+	return;
 }
 
 
-void subtractBackgroundRamp(Image<RFLOAT> &I, int bg_radius)
+void subtractBackgroundRamp(
+		Image<RFLOAT> &I,
+		int bg_radius,
+		bool is_helical_segment,
+		RFLOAT helical_mask_tube_outer_radius_pix,
+		RFLOAT tilt_deg,
+		RFLOAT psi_deg)
 {
 
 	int bg_radius2 = bg_radius * bg_radius;
@@ -151,17 +268,59 @@ void subtractBackgroundRamp(Image<RFLOAT> &I, int bg_radius)
     if (I().getDim() == 3)
     	REPORT_ERROR("ERROR %% calculateBackgroundRamp is not implemented for 3D data!");
 
-    FOR_ALL_ELEMENTS_IN_ARRAY2D(I())
-	{
-		if (i*i + j*j > bg_radius2)
-		{
-            point.x = j;
-            point.y = i;
-            point.z = A2D_ELEM(I(), i, j);
-            point.w = 1.;
-            allpoints.push_back(point);
-		}
-	}
+    if (is_helical_segment)  // not implemented for 3D data
+    {
+    	Matrix1D<RFLOAT> coords;
+    	Matrix2D<RFLOAT> A;
+    	if (I().getDim() == 2)
+    		tilt_deg = 0.;
+
+    	// Init coords
+    	coords.clear();
+    	coords.resize(3);
+    	coords.initZeros();
+
+    	// Init rotational matrix A
+    	A.clear();
+    	A.resize(3, 3);
+
+    	// Rotate the particle (so that the helical cylinder spans X axis)
+    	// Since Z = 0, tilt_deg does not matter
+    	Euler_angles2matrix(0., -tilt_deg, -psi_deg, A, false);  // Beware - negative sign!
+
+    	FOR_ALL_ELEMENTS_IN_ARRAY2D(I())  // not implemented for 3D data
+    	{
+    		ZZ(coords) = 0.;
+    		YY(coords) = ((RFLOAT)(i));
+    		XX(coords) = ((RFLOAT)(j));
+    		// Rotate
+    		coords = A * coords;
+    		if (ABS(YY(coords)) > helical_mask_tube_outer_radius_pix)  // not implemented for 3D data
+    		{
+                point.x = j;
+                point.y = i;
+                point.z = A2D_ELEM(I(), i, j);
+                point.w = 1.;
+                allpoints.push_back(point);
+    		}
+    	}
+    	if (allpoints.size() < 5)
+    		REPORT_ERROR("image.cpp::subtractBackgroundRamp(): Less than 5 pixels in background are found. Radius of helical mask is too large.");
+    }
+    else
+    {
+        FOR_ALL_ELEMENTS_IN_ARRAY2D(I())
+    	{
+    		if (i*i + j*j > bg_radius2)
+    		{
+                point.x = j;
+                point.y = i;
+                point.z = A2D_ELEM(I(), i, j);
+                point.w = 1.;
+                allpoints.push_back(point);
+    		}
+    	}
+    }
 
     fitLeastSquaresPlane(allpoints, pA, pB, pC);
 

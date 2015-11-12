@@ -35,6 +35,11 @@ void Preprocessing::read(int argc, char **argv, int rank)
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
+	do_helical_segments = parser.checkOption("--helical_segments", "Perform operations on helical segments");
+	do_premultiply_ctf = parser.checkOption("--premultiply_ctf", "Premultiply the micrograph/frame with its CTF prior to particle extraction");
+	do_ctf_intact_first_peak = parser.checkOption("--ctf_intact_first_peak", "When premultiplying with the CTF, leave frequencies intact until the first peak");
+	do_phase_flip = parser.checkOption("--phase_flip", "Flip CTF-phases in the micrograph/frame prior to particle extraction");
+	angpix  =  textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms (only necessary for phase-flipping if magnification and detector pixel size are not in STAR file)", "1."));
 	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
@@ -54,6 +59,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	do_normalise = parser.checkOption("--norm", "Normalise the background to average zero and stddev one");
 	do_ramp = !parser.checkOption("--no_ramp", "Just subtract the background mean in the normalisation, instead of subtracting a fitted ramping background. ");
 	bg_radius = textToInteger(parser.getOption("--bg_radius", "Radius of the circular mask that will be used to define the background area (in pixels)", "-1"));
+	bg_helical_radius = textToFloat(parser.getOption("--bg_helical_radius", "Radius of the cylindrical mask that will be used to define the background area (in pixels)", "-1."));
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 	do_invert_contrast = parser.checkOption("--invert_contrast", "Invert the contrast in the input images");
@@ -102,16 +108,21 @@ void Preprocessing::initialise()
 		// Get the filenames of all micrographs to be processed by CTFFIND
 		if (fns_coords_in != "")
 		{
+			if (do_phase_flip || do_premultiply_ctf)
+				REPORT_ERROR("Preprocessing::initialise ERROR: provide CTF information in a micrographs_ctf.star input file!");
+
 			fns_coords_in.globFiles(fn_coords);
 		}
 		else if (fn_star_in != "")
 		{
-			MetaDataTable MDmics;
 			MDmics.read(fn_star_in);
 			if (!MDmics.containsLabel(EMDL_MICROGRAPH_NAME))
 				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
 			fn_coords.clear();
 			FileName fn_mic;
+			if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
+				REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
+
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 			{
 				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
@@ -128,7 +139,6 @@ void Preprocessing::initialise()
 				std::cout << "  * " << fn_coords[i] << std::endl;
 	}
 
-
 	if (do_extract || fn_operate_in != "")
 	{
 		// Check whether to do re-scaling
@@ -144,8 +154,46 @@ void Preprocessing::initialise()
 		// Check for bg_radius in case of normalisation
 		if (do_normalise && bg_radius < 0)
 			REPORT_ERROR("ERROR: please provide a radius for a circle that defines the background area when normalising...");
-	}
 
+		// Jun24,2015 - Shaoda, extract helical segments
+		if (do_helical_segments)
+		{
+			MetaDataTable MD;
+			if (do_extract)
+			{
+				for (int ii = 0; ii < fn_coords.size(); ii++)
+				{
+					if (fn_coords[ii].isStarFile() == false)
+						REPORT_ERROR("ERROR: Extraction of helical segments: only STAR files are supported!");
+
+					MD.clear();
+					MD.read(fn_coords[ii]);
+					if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
+							|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
+							|| (!MD.containsLabel(EMDL_ORIENT_TILT))
+							|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+					{
+						REPORT_ERROR("ERROR: Extraction of helical segments: x, y, tilt and psi are missing in STAR files!");
+					}
+				}
+			}
+			if (fn_operate_in != "")
+			{
+				if (fn_operate_in.isStarFile() == false)
+					REPORT_ERROR("ERROR: Operations on helical segments: only STAR files are supported!");
+				MD.clear();
+				MD.read(fn_operate_in);
+				if ( (!MD.containsLabel(EMDL_ORIENT_TILT))
+						|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+				{
+					REPORT_ERROR("ERROR: Operations on helical segments: tilt and psi are missing in STAR files!");
+				}
+			}
+			if ((do_normalise) && (bg_helical_radius < 0))
+				REPORT_ERROR("ERROR: please provide a radius for a tube that defines the background area when normalising helical segments...");
+		}
+
+	}
 }
 
 void Preprocessing::run()
@@ -194,7 +242,10 @@ void Preprocessing::joinAllStarFiles()
 			// Gather the results from ctffind
 			has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
 					HT, CS, AmpCnst, XMAG, DStep);
-
+		}
+		else
+		{
+			has_this_ctf = false;
 		}
 		prev_fn_mic = fn_mic;
 
@@ -202,7 +253,7 @@ void Preprocessing::joinAllStarFiles()
 		if (has_this_ctf && do_rescale)
                     DStep *= (RFLOAT)extract_size/(RFLOAT)scale;
 
-		if (ipos == 0 && has_this_ctf && !do_skip_ctf_logfiles)
+		if (ipos == 0 && has_this_ctf)
 		{
 			// Set has_other_ctfs to true if the first micrograph has a logfile
 			// In that case add all CTF labels to the output MDtable
@@ -292,7 +343,7 @@ void Preprocessing::runExtractParticles()
 		if (verb > 0 && ipos % barstep == 0)
 			progress_bar(ipos);
 
-    	extractParticlesFromFieldOfView(fn_coords[ipos]);
+		extractParticlesFromFieldOfView(ipos);
 	}
 
 	if (verb > 0)
@@ -405,12 +456,12 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 	}
 }
 
-void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
+void Preprocessing::extractParticlesFromFieldOfView(int ipos)
 {
 	MetaDataTable MDin, MDout;
 
 	// Read in the coordinates file
-	readCoordinates(fn_coord, MDin);
+	readCoordinates(fn_coords[ipos], MDin);
 
 	// Correct for bias in the picked coordinates
 	if (ABS(extract_bias_x) > 0 || ABS(extract_bias_y) > 0)
@@ -431,16 +482,16 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 	int npos = MDin.numberOfObjects();
 	if (npos < 10)
 	{
-		std:: cout << "WARNING: there are only " << npos << " particles in " << fn_coord <<". Consider joining multiple micrographs into one group. "<< std::endl;
+		std:: cout << "WARNING: there are only " << npos << " particles in " << fn_coords[ipos] <<". Consider joining multiple micrographs into one group. "<< std::endl;
 	}
 
 	// Check the micrograph exists
 	FileName fn_mic;
-	fn_mic = getMicrographNameFromRootName(fn_coord.withoutExtension());
+	fn_mic = getMicrographNameFromRootName((fn_coords[ipos]).withoutExtension());
 	// Return if the micrograph does not exist
 	if (fn_mic == "")
 	{
-		std::cout << "WARNING: cannot find micrograph for coordinate file " << fn_coord << " with " << npos << " particles" << std::endl;
+		std::cout << "WARNING: cannot find micrograph for coordinate file " << fn_coords[ipos] << " with " << npos << " particles" << std::endl;
 		return;
 	}
 
@@ -452,8 +503,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 	long int ndim;
 	Imic.getDimensions(xdim, ydim, zdim, ndim);
 	dimensionality = (zdim > 1) ? 3 : 2;
-	if (dimensionality == 3 || do_movie_extract )
-            do_ramp = false;
+	if (dimensionality == 3 || do_movie_extract)
+		do_ramp = false;
 
 	// Name of the output stack
 	// Add the same root as the output STAR file (that way one could extract two "families" of different particle stacks)
@@ -481,7 +532,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 
 	for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
 	{
-		extractParticlesFromOneFrame(MDin, fn_mic, iframe, n_frames, fn_output_img_root, my_current_nr_images, my_total_nr_images,
+		extractParticlesFromOneFrame(MDin, fn_mic, ipos, iframe, n_frames, fn_output_img_root, my_current_nr_images, my_total_nr_images,
 				all_avg, all_stddev, all_minval, all_maxval);
 
 		MDout.append(MDin);
@@ -498,7 +549,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 
 // Actually extract particles. This can be from one (average) micrograph or from a single movie frame
 void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
-		FileName fn_mic, int iframe, int n_frames,
+		FileName fn_mic, int my_ipos_coords, int iframe, int n_frames,
 		FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
 		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
@@ -532,6 +583,68 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 	{
 		fn_frame = fn_mic;
 		Imic.read(fn_frame);
+	}
+
+
+	if (do_phase_flip || do_premultiply_ctf)
+	{
+		if (dimensionality != 2)
+			REPORT_ERROR("extractParticlesFromFieldOfView ERROR: cannot do phase flipping as dimensionality is not 2!");
+
+		CTF ctf;
+		ctf.read(MDmics, MDmics, my_ipos_coords);
+
+		RFLOAT mag, dstep, my_angpix;
+		if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		{
+			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			my_angpix = 10000. * dstep / mag;
+		}
+		else
+			my_angpix = angpix;
+
+		// FFTW only does square images
+		long int ori_xsize = XSIZE(Imic());
+		long int ori_ysize = YSIZE(Imic());
+
+		if (ori_xsize > ori_ysize)
+			rewindow(Imic, ori_xsize);
+		else if (ori_ysize > ori_xsize)
+			rewindow(Imic, ori_ysize);
+
+		// Now do the actual phase flipping or CTF-multiplication
+		MultidimArray<Complex> FTmic;
+		FourierTransformer transformer;
+
+		transformer.FourierTransform(Imic(), FTmic, false);
+
+		RFLOAT xs = (RFLOAT)XSIZE(Imic()) * my_angpix;
+		RFLOAT ys = (RFLOAT)YSIZE(Imic()) * my_angpix;
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(FTmic)
+		{
+			RFLOAT x = (RFLOAT)jp / xs;
+			RFLOAT y = (RFLOAT)ip / ys;
+			DIRECT_A2D_ELEM(FTmic, i, j) *= ctf.getCTF(x, y, false, do_phase_flip, do_ctf_intact_first_peak, false); // true=do_only_phase_flip
+		}
+
+		transformer.inverseFourierTransform(FTmic, Imic());
+
+		if (ori_xsize != ori_ysize)
+			Imic().window(FIRST_XMIPP_INDEX(ori_ysize), FIRST_XMIPP_INDEX(ori_xsize),
+					LAST_XMIPP_INDEX(ori_ysize),  LAST_XMIPP_INDEX(ori_xsize));
+	}
+
+	// Jun24,2015 - Shaoda, helical segments
+	if (do_helical_segments)
+	{
+		if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
+				|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
+				|| (!MD.containsLabel(EMDL_ORIENT_TILT))
+				|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+		{
+			REPORT_ERROR("ERROR: Extraction of helical segments: x, y, tilt and psi are missing in STAR files!");
+		}
 	}
 
 	// Now window all particles from the micrograph
@@ -631,7 +744,17 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			}
 
 			// performPerImageOperations will also append the particle to the output stack in fn_stack
-			performPerImageOperations(Ipart, fn_output_img_root, n_frames, my_current_nr_images + ipos, my_total_nr_images, all_avg, all_stddev, all_minval, all_maxval);
+			// Jun24,2015 - Shaoda, extract helical segments
+			RFLOAT tilt_deg, psi_deg;
+			tilt_deg = psi_deg = 0.;
+			if (do_helical_segments)
+			{
+				MD.getValue(EMDL_ORIENT_TILT, tilt_deg);
+				MD.getValue(EMDL_ORIENT_PSI, psi_deg);
+			}
+			performPerImageOperations(Ipart, fn_output_img_root, n_frames, my_current_nr_images + ipos, my_total_nr_images,
+					tilt_deg, psi_deg,
+					all_avg, all_stddev, all_minval, all_maxval);
 
 			// Also store all the particles information in the STAR file
 			FileName fn_img;
@@ -678,9 +801,23 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 			Nimg++;
 		}
 		MD.firstObject(); // reset pointer to the first object in the table
+
+		// Jun25,2015 - Shaoda, helical segments
+		if (do_helical_segments)
+		{
+			if ( (!MD.containsLabel(EMDL_ORIENT_TILT))
+					|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+			{
+				REPORT_ERROR("ERROR: Operations on helical segments: only STAR files with tilt and psi angles are supported!");
+			}
+		}
 	}
 	else
 	{
+		// Jun25,2015 - Shaoda, helical segments
+		if (do_helical_segments)
+			REPORT_ERROR("ERROR: Operations on helical segments: only STAR files are supported!");
+
 		// Read the header of the stack to see how many images there
 		Iout.read(fn_operate_on, false);
 		Nimg = NSIZE(Iout());
@@ -718,7 +855,17 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 			MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
 		}
 
-		performPerImageOperations(Ipart, fn_stack, 1, i, Nimg, all_avg, all_stddev, all_minval, all_maxval);
+		// Jun24,2015 - Shaoda, extract helical segments
+		RFLOAT tilt_deg, psi_deg;
+		tilt_deg = psi_deg = 0.;
+		if (do_helical_segments)
+		{
+			MD.getValue(EMDL_ORIENT_TILT, tilt_deg);
+			MD.getValue(EMDL_ORIENT_PSI, psi_deg);
+		}
+		performPerImageOperations(Ipart, fn_stack, 1, i, Nimg,
+				tilt_deg, psi_deg,
+				all_avg, all_stddev, all_minval, all_maxval);
 
 		// progress bar
 		if (i % barstep == 0) progress_bar(i);
@@ -734,8 +881,18 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 }
 
 
-void Preprocessing::performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
-		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
+void Preprocessing::performPerImageOperations(
+		Image<RFLOAT> &Ipart,
+		FileName fn_output_img_root,
+		int nframes,
+		long int image_nr,
+		long int nr_of_images,
+		RFLOAT tilt_deg,
+		RFLOAT psi_deg,
+		RFLOAT &all_avg,
+		RFLOAT &all_stddev,
+		RFLOAT &all_minval,
+		RFLOAT &all_maxval)
 {
 
 	Ipart().setXmippOrigin();
@@ -744,7 +901,12 @@ void Preprocessing::performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_
 
 	if (do_rewindow) rewindow(Ipart, window);
 
-	if (do_normalise) normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp);
+	// Jun24,2015 - Shaoda, helical segments
+	if (do_normalise)
+	{
+		normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp,
+				do_helical_segments, bg_helical_radius, tilt_deg, psi_deg);
+	}
 
 	if (do_invert_contrast) invert_contrast(Ipart);
 

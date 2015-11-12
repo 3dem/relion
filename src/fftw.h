@@ -715,20 +715,20 @@ void getFSC(MultidimArray< RFLOAT > & m1,
 		    MultidimArray< RFLOAT > & m2,
 		    MultidimArray< RFLOAT > &fsc);
 
-// Get precalculated AB-matrices for on-the-fly shift calculations
+void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< Complex > &FT1,
+		    MultidimArray< Complex > &FT2,
+		    MultidimArray< RFLOAT > &acorr,
+		    MultidimArray< RFLOAT > &dpr);
+
+void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT > &m1,
+		    MultidimArray< RFLOAT > &m2,
+		    MultidimArray< RFLOAT > &acorr,
+		    MultidimArray< RFLOAT > &dpr);
+
+// Get precalculated AB-matrices for on-the-fly shift calculations (without tabulated sine and cosine)
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 									MultidimArray<Complex > &out,
-									TabSine &tab_sin, TabCosine &tab_cos,
 									RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
-
-// Shift an image through phase-shifts in its Fourier Transform
-// Note that in and out may be the same array, in that case in is overwritten with the result
-// if oridim is in pixels, xshift, yshift and zshift should be in pixels as well!
-// or both can be in Angstroms
-void shiftImageInFourierTransform(MultidimArray<Complex > &in,
-								  MultidimArray<Complex > &out,
-								  TabSine &tab_sin, TabCosine &tab_cos,
-								  RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
 
 // Shift an image through phase-shifts in its Fourier Transform (without tabulated sine and cosine)
 // Note that in and out may be the same array, in that case in is overwritten with the result

@@ -49,6 +49,11 @@ void ParticlePolisher::read(int argc, char **argv)
 	perframe_highres = textToFloat(parser.getOption("--perframe_highres", "Highest resolution (in A) to include in the per-frame reconstructions", "-1."));
 	fit_minres = textToFloat(parser.getOption("--autob_lowres", "Lowest resolution (in A) to include in fitting of the B-factor", "20."));
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
+	// Sep24,2015 - Shaoda, Helical reconstruction
+	nr_helical_asu = textToInteger(parser.getOption("--h_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
+	helical_twist = textToFloat(parser.getOption("--h_twist", "Helical twist (in degrees, positive values for right-handedness)", "0."));
+	helical_rise = textToFloat(parser.getOption("--h_rise", "Helical rise (in Angstroms)", "0."));
+
 	fn_mask = parser.getOption("--mask", "Postprocessing mask for B-factor determination of per-frame reconstructions (1=protein, 0=solvent, all values in range [0,1])", "");
 
 	int ctf_section = parser.addSection("CTF options");
@@ -91,10 +96,6 @@ void ParticlePolisher::usage()
 
 void ParticlePolisher::initialise()
 {
-    // Fill tabulated sine and cosine tables
-    tab_sin.initialise(5000);
-    tab_cos.initialise(5000);
-
 #ifndef DEBUG_TILT
     if (verb > 0)
     	std::cout << " + Reading the input STAR file ... " << std::endl;
@@ -121,7 +122,8 @@ void ParticlePolisher::initialise()
 
     if (do_weighting)
     {
-        if (fn_mask == "")
+
+    	if (fn_mask == "")
             REPORT_ERROR("When doing B-factor weighting, you have to provide a mask!");
 
     	// Read in the Imask
@@ -132,7 +134,12 @@ void ParticlePolisher::initialise()
 	if (do_normalise && bg_radius < 0)
 		REPORT_ERROR("ERROR: please provide a radius for a circle that defines the background area when normalising...");
 
-
+	// Sep24,2015 - Shaoda, Helical reconstruction
+	if (nr_helical_asu > 1)
+	{
+		if ( (fabs(helical_twist) < 0.01) || (fabs(helical_twist) > 179.99) || (angpix < 0.001) || ((helical_rise / angpix) < 0.001))
+			REPORT_ERROR("ERROR: Invalid helical twist or rise!");
+	}
 }
 
 // Fit the beam-induced translations for all average micrographs
@@ -240,7 +247,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	{
 		long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
 
-                // Sjors 14sep2015: bug reported by Kailu Yang
+		// Sjors 14sep2015: bug reported by Kailu Yang
 		RFLOAT my_pick_x = x_pick[ipar] - x_off_prior[ipar];
 		RFLOAT my_pick_y = y_pick[ipar] - y_off_prior[ipar];
 
@@ -251,7 +258,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 		for (long int ii = 0; ii < x_pick.size(); ii++)
 		{
 
-                        // Sjors 14sep2015: bug reported by Kailu Yang
+			// Sjors 14sep2015: bug reported by Kailu Yang
 			RFLOAT nb_pick_x = x_pick[ii] - x_off_prior[ii]; // add prior to center at average position
 			RFLOAT nb_pick_y = y_pick[ii] - y_off_prior[ii]; // add prior to center at average position
 			RFLOAT dist2 = (nb_pick_x - my_pick_x) * (nb_pick_x - my_pick_x) + (nb_pick_y - my_pick_y) * (nb_pick_y - my_pick_y);
@@ -614,6 +621,8 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 		}
 
 	}
+
+	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise / angpix);
 
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;
@@ -1096,6 +1105,9 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 		}
 
 	}
+
+
+	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise / angpix);
 
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;

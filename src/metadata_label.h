@@ -138,6 +138,7 @@ enum EMDLabel
     EMDL_MLMODEL_ACCURACY_ROT,
     EMDL_MLMODEL_ACCURACY_TRANS,
     EMDL_MLMODEL_AVE_PMAX,
+    EMDL_MLMODEL_BODY_MASK_NAME,
     EMDL_MLMODEL_CURRENT_RESOLUTION,
     EMDL_MLMODEL_CURRENT_SIZE,
     EMDL_MLMODEL_DATA_VS_PRIOR_REF,
@@ -153,6 +154,7 @@ enum EMDLabel
     EMDL_MLMODEL_LL,
     EMDL_MLMODEL_MINIMUM_RADIUS_NN_INTERPOLATION,
     EMDL_MLMODEL_NORM_CORRECTION_AVG,
+    EMDL_MLMODEL_NR_BODIES,
     EMDL_MLMODEL_NR_CLASSES,
     EMDL_MLMODEL_NR_GROUPS,
     EMDL_MLMODEL_ORIGINAL_SIZE,
@@ -188,6 +190,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES,
     EMDL_OPTIMISER_COARSE_SIZE,
     EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
     EMDL_OPTIMISER_DATA_STARFILE,
     EMDL_OPTIMISER_DO_AUTO_REFINE,
     EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES,
@@ -208,6 +211,16 @@ enum EMDLabel
     EMDL_OPTIMISER_HAS_CONVERGED,
     EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT,
     EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO,
+    EMDL_OPTIMISER_DO_HELICAL_REFINE,
+    EMDL_OPTIMISER_HELICAL_NR_ASU,
+    EMDL_OPTIMISER_HELICAL_TWIST,
+    EMDL_OPTIMISER_HELICAL_RISE,
+    EMDL_OPTIMISER_HELICAL_CENTRAL_PROPORTION,
+	EMDL_OPTIMISER_HELICAL_MASK_TUBE_INNER_DIAMETER,
+	EMDL_OPTIMISER_HELICAL_MASK_TUBE_OUTER_DIAMETER,
+	EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS,
+	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
+	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT_MAX_DEV,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
@@ -254,6 +267,7 @@ enum EMDLabel
     EMDL_ORIENT_PSI_PRIOR,
 
     EMDL_PARTICLE_AUTOPICK_FOM,
+	EMDL_PARTICLE_HELICAL_TUBE_ID,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
     EMDL_PARTICLE_ID,
@@ -273,6 +287,10 @@ enum EMDLabel
     EMDL_POSTPROCESS_FSC_MASKED,
     EMDL_POSTPROCESS_FSC_UNMASKED,
     EMDL_POSTPROCESS_FSC_RANDOM_MASKED,
+    EMDL_POSTPROCESS_AMPLCORR_MASKED,
+    EMDL_POSTPROCESS_AMPLCORR_UNMASKED,
+    EMDL_POSTPROCESS_DPR_MASKED,
+    EMDL_POSTPROCESS_DPR_UNMASKED,
     EMDL_POSTPROCESS_GUINIER_FIT_CORRELATION,
     EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT,
     EMDL_POSTPROCESS_GUINIER_FIT_SLOPE,
@@ -290,6 +308,7 @@ enum EMDLabel
     EMDL_SAMPLING_LIMIT_TILT,
     EMDL_SAMPLING_OFFSET_RANGE,
     EMDL_SAMPLING_OFFSET_STEP,
+	EMDL_SAMPLING_HELICAL_OFFSET_STEP,
     EMDL_SAMPLING_PERTURB,
     EMDL_SAMPLING_PERTURBATION_FACTOR,
     EMDL_SAMPLING_PRIOR_MODE,
@@ -463,6 +482,7 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS, EMDL_DOUBLE, "rlnAccuracyTranslations", "Estimated accuracy (in pixels) with which translations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_AVE_PMAX, EMDL_DOUBLE, "rlnAveragePmax", "Average value (over all images) of the maxima of the probability distributions");
+        EMDL::addLabel(EMDL_MLMODEL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a binary mask for the independent body to be used in multi-body refinement (0=outside; 1=inside body)");
         EMDL::addLabel(EMDL_MLMODEL_CURRENT_RESOLUTION, EMDL_DOUBLE, "rlnCurrentResolution", "Current resolution where SSNR^MAP drops below 1 (in 1/Angstroms)");
         EMDL::addLabel(EMDL_MLMODEL_CURRENT_SIZE, EMDL_INT, "rlnCurrentImageSize", "Current size of the images used in the refinement");
         EMDL::addLabel(EMDL_MLMODEL_DATA_VS_PRIOR_REF, EMDL_DOUBLE, "rlnSsnrMap", "Spectral signal-to-noise ratio as defined for MAP estimation (SSNR^MAP)");
@@ -479,6 +499,7 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_MINIMUM_RADIUS_NN_INTERPOLATION,  EMDL_INT, "rlnMinRadiusNnInterpolation","Minimum radius for NN-interpolation (in Fourier pixels), for smaller radii linear int. is used");
         EMDL::addLabel(EMDL_MLMODEL_NORM_CORRECTION_AVG, EMDL_DOUBLE, "rlnNormCorrectionAverage", "Average value (over all images) of the normalisation correction values");
         EMDL::addLabel(EMDL_MLMODEL_NR_CLASSES, EMDL_INT, "rlnNrClasses", "The number of references (i.e. classes) to be used in refinement");
+        EMDL::addLabel(EMDL_MLMODEL_NR_BODIES, EMDL_INT, "rlnNrBodies", "The number of independent rigid bodies to be refined in multi-body refinement");
         EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own noise spectrum, and intensity-scale correction)");
         EMDL::addLabel(EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION, EMDL_DOUBLE, "rlnSpectralOrientabilityContribution", "Spectral SNR contribution to the orientability of individual particles");
         EMDL::addLabel(EMDL_MLMODEL_ORIGINAL_SIZE, EMDL_INT, "rlnOriginalImageSize", "Original size of the images (in pixels)");
@@ -513,6 +534,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, EMDL_DOUBLE, "rlnChangesOptimalOrientations", "The average change in optimal orientation in the last iteration (in degrees) ");
         EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, EMDL_DOUBLE, "rlnChangesOptimalClasses", "The number of particles that changed their optimal clsas assignment in the last iteration");
         EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, EMDL_BOOL, "rlnCtfDataArePhaseFlipped", "Flag to indicate that the input images have been phase-flipped");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
         EMDL::addLabel(EMDL_OPTIMISER_DATA_STARFILE, EMDL_STRING, "rlnExperimentalDataStarFile", "STAR file with metadata for the experimental images");
         EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_CTF, EMDL_BOOL, "rlnDoCorrectCtf", "Flag to indicate that CTF-correction should be performed");
         EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION, EMDL_BOOL, "rlnDoCorrectMagnification", "Flag to indicate that (per-group) magnification correction should be performed");
@@ -533,6 +555,16 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HAS_CONVERGED, EMDL_BOOL, "rlnHasConverged", "Flag to indicate that the optimization has converged");
         EMDL::addLabel(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, EMDL_BOOL, "rlnHasHighFscAtResolLimit", "Flag to indicate that the FSC at the resolution limit is significant");
         EMDL::addLabel(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, EMDL_INT, "rlnHasLargeSizeIncreaseIterationsAgo", "How many iterations have passed since the last large increase in image size");
+        EMDL::addLabel(EMDL_OPTIMISER_DO_HELICAL_REFINE, EMDL_BOOL, "rlnDoHelicalRefine", "Flag to indicate that helical refinement should be performed");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_NR_ASU, EMDL_INT, "rlnNrHelicalAsymUnits", "How many new helical asymmetric units are there in each box");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST, EMDL_DOUBLE, "rlnHelicalTwist", "The helical twist (rotation per subunit) in degrees");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE, EMDL_DOUBLE, "rlnHelicalRise", "The helical rise (translation per subunit) in Angstroms");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_CENTRAL_PROPORTION, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_MASK_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_MASK_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, EMDL_BOOL, "rlnHelicalBimodalOrientations", "Flag to indicate that bimodal orientations are searched for helical segments in the first few iterations");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT_MAX_DEV, EMDL_DOUBLE, "rlnHelicalSymmetryLocalRefinementMaxDev", "Maximum deviation (0.01% - 33.33%) of helical parameters in local refinement");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");
@@ -579,6 +611,7 @@ private:
         EMDL::addLabel(EMDL_ORIENT_PSI_PRIOR, EMDL_DOUBLE, "rlnAnglePsiPrior", "Center of the prior (in degrees) on the third Euler angle (psi)");
 
         EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Autopicking helical tube ID for a helical segment");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
         EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_LONG, "rlnParticleId", "ID (i.e. a unique number) for a particle");
@@ -598,6 +631,10 @@ private:
         EMDL::addLabel(EMDL_POSTPROCESS_FSC_MASKED, EMDL_DOUBLE, "rlnFourierShellCorrelationMaskedMaps", "FSC value after masking of the original maps");
         EMDL::addLabel(EMDL_POSTPROCESS_FSC_UNMASKED, EMDL_DOUBLE, "rlnFourierShellCorrelationUnmaskedMaps", "FSC value before masking of the original maps");
         EMDL::addLabel(EMDL_POSTPROCESS_FSC_RANDOM_MASKED, EMDL_DOUBLE, "rlnCorrectedFourierShellCorrelationPhaseRandomizedMaskedMaps", "FSC value after masking of the randomized-phases maps");
+        EMDL::addLabel(EMDL_POSTPROCESS_AMPLCORR_MASKED, EMDL_DOUBLE, "rlnAmplitudeCorrelationMaskedMaps", "Correlation coefficient between amplitudes in Fourier shells of masked maps");
+        EMDL::addLabel(EMDL_POSTPROCESS_AMPLCORR_UNMASKED,  EMDL_DOUBLE, "rlnAmplitudeCorrelationUnmaskedMaps", "Correlation coefficient between amplitudes in Fourier shells of unmasked maps");
+        EMDL::addLabel(EMDL_POSTPROCESS_DPR_MASKED, EMDL_DOUBLE, "rlnDifferentialPhaseResidualMaskedMaps", "Differential Phase Residual in Fourier shells of masked maps");
+        EMDL::addLabel(EMDL_POSTPROCESS_DPR_UNMASKED,  EMDL_DOUBLE, "rlnDifferentialPhaseResidualUnmaskedMaps", "Differential Phase Residual in Fourier shells of unmasked maps");
         EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, EMDL_DOUBLE, "rlnFittedInterceptGuinierPlot", "The fitted intercept of the Guinier-plot");
         EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_FIT_SLOPE, EMDL_DOUBLE, "rlnFittedSlopeGuinierPlot", "The fitted slope of the Guinier-plot");
         EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_FIT_CORRELATION, EMDL_DOUBLE, "rlnCorrelationFitGuinierPlot", "The correlation coefficient of the fitted line through the Guinier-plot");
@@ -613,8 +650,10 @@ private:
         EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
         EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER, EMDL_INT, "rlnHealpixOrder", "Healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
         EMDL::addLabel(EMDL_SAMPLING_LIMIT_TILT, EMDL_DOUBLE, "rlnTiltAngleLimit", "Values to which to limit the tilt angles (positive for keeping side views, negative for keeping top views)");
+        // Jun19,2015 - Shaoda, I think all of these 3 offsets are in PIXELS.
         EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE, EMDL_DOUBLE, "rlnOffsetRange", "Search range for the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP, EMDL_DOUBLE, "rlnOffsetStep", "Step size for the searches in the origin offsets (in Angstroms)");
+        EMDL::addLabel(EMDL_SAMPLING_HELICAL_OFFSET_STEP, EMDL_DOUBLE, "rlnHelicalOffsetStep", "Step size for the searches of offsets along helical axis (in Angstroms)");
         EMDL::addLabel(EMDL_SAMPLING_PERTURB, EMDL_DOUBLE, "rlnSamplingPerturbInstance", "Random instance of the random perturbation on the orientational sampling");
         EMDL::addLabel(EMDL_SAMPLING_PERTURBATION_FACTOR, EMDL_DOUBLE, "rlnSamplingPerturbFactor", "Factor for random perturbation on the orientational sampling (between 0 no perturbation and 1 very strong perturbation)");
         EMDL::addLabel(EMDL_SAMPLING_PSI_STEP, EMDL_DOUBLE, "rlnPsiStep", "Step size (in degrees) for the sampling of the in-plane rotation angle (psi)");

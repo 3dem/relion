@@ -72,7 +72,7 @@ void PreprocessingMpi::runExtractParticles()
 		if (verb > 0 && ipos % barstep == 0)
 			progress_bar(ipos);
 
-    	extractParticlesFromFieldOfView(fn_coords[ipos]);
+    	extractParticlesFromFieldOfView(ipos);
 	}
 
 	if (verb > 0)

@@ -105,10 +105,6 @@ public:
 	// Metadatatable with the information from the polished particles
 	MetaDataTable MDshiny;
 
-	// Tabulated sin and cosine functions for shifts in Fourier space
-	TabSine tab_sin;
-	TabCosine tab_cos;
-
 	// Reference volume reconstructed from the initially-polished particles to be used for per-particle CTF-refinement and beamtilt-refinement
 	Projector PPrefvol_half1, PPrefvol_half2;
 
@@ -149,6 +145,13 @@ public:
 
 	// Per-particle CTF optimisation
 	RFLOAT defocus_shift_max, defocus_shift_step;
+
+	// Sep24,2015 - Shaoda, Helical reconstruction
+	int nr_helical_asu;
+
+	RFLOAT helical_twist;
+
+	RFLOAT helical_rise;
 
 
 public:

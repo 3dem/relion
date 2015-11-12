@@ -632,7 +632,7 @@ public:
       */
     int readData(FILE* fimg, long int select_img, DataType datatype, unsigned long pad)
     {
-        //#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
         std::cerr<<"entering readdata"<<std::endl;
         std::cerr<<" readData flag= "<<dataflag<<std::endl;
@@ -1179,7 +1179,6 @@ private:
         long int aux;
         FileName filNamePlusExt(name);
         name.decompose(aux, filNamePlusExt);
-
         // Subtract 1 to have numbering 0...N-1 instead of 1...N
         if (aux > 0)
         	aux--;
@@ -1296,9 +1295,34 @@ private:
 // Some image-specific operations
 
 // For image normalisation
-void normalise(Image<RFLOAT> &I, int bg_radius, RFLOAT white_dust_stddev, RFLOAT black_dust_stddev, bool do_ramp);
-void calculateBackgroundAvgStddev(Image<RFLOAT> &I, RFLOAT &avg, RFLOAT &stddev, int bg_radius);
-void subtractBackgroundRamp(Image<RFLOAT> &I, int bg_radius);
+void normalise(
+		Image<RFLOAT> &I,
+		int bg_radius,
+		RFLOAT white_dust_stddev,
+		RFLOAT black_dust_stddev,
+		bool do_ramp,
+		bool is_helical_segment = false,
+		RFLOAT helical_mask_tube_outer_radius_pix = -1.,
+		RFLOAT tilt_deg = 0.,
+		RFLOAT psi_deg = 0.);
+void calculateBackgroundAvgStddev(
+		Image<RFLOAT> &I,
+		RFLOAT &avg,
+		RFLOAT &stddev,
+		int bg_radius,
+		bool is_helical_segment = false,
+		RFLOAT helical_mask_tube_outer_radius_pix = -1.,
+		RFLOAT tilt_deg = 0.,
+		RFLOAT psi_deg = 0.);
+void subtractBackgroundRamp(
+		Image<RFLOAT> &I,
+		int bg_radius,
+		bool is_helical_segment = false,
+		RFLOAT helical_mask_tube_outer_radius_pix = -1.,
+		RFLOAT tilt_deg = 0.,
+		RFLOAT psi_deg = 0.);
+
+
 
 // For dust removal
 void removeDust(Image<RFLOAT> &I, bool is_white, RFLOAT thresh, RFLOAT avg, RFLOAT stddev);

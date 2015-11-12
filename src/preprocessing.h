@@ -27,6 +27,7 @@
 #include  <stdlib.h>
 #include  <stdio.h>
 #include "src/image.h"
+#include "src/ctf.h"
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/ctffind_runner.h"
@@ -46,7 +47,13 @@ public:
 	// Output rootname
 	FileName fn_in, fn_out;
 
-	////////////////////////////////////// Extract particles from the micrographs
+	/////////////////? Do phase flipping?
+	bool do_phase_flip;
+	bool do_premultiply_ctf;
+	bool do_ctf_intact_first_peak;
+	RFLOAT angpix;
+
+	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
 	bool do_extract;
 
@@ -76,6 +83,9 @@ public:
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;
+
+	// Metadata table with CTF information for all micrographs
+	MetaDataTable MDmics;
 
 	// Dimensionality of the micrographs (2 for normal micrographs, 3 for tomograms)
 	int dimensionality;
@@ -110,8 +120,14 @@ public:
 	// Standard deviations to remove black and white dust
 	RFLOAT white_dust_stddev, black_dust_stddev;
 
-	// Radius of a circle in the extracted images outside of which one calculates background mean and stddev
+	// Radius of a circle in the extracted images outside of which one calculates background mean and stddev (in pixels)
 	int bg_radius;
+
+	// Radius of a cylinder in the extracted helical segments outside of which one calculates background mean and stddev (in pixels)
+	RFLOAT bg_helical_radius;
+
+	// Perform operations on helical segments
+	bool do_helical_segments;
 
 	// Use input stack to perform the image modifications
 	FileName fn_operate_in;
@@ -146,19 +162,31 @@ public:
 	void readCoordinates(FileName fn_coord, MetaDataTable &MD);
 
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
-	void extractParticlesFromFieldOfView(FileName fn_coord);
+	void extractParticlesFromFieldOfView(int ipos);
 
 	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
 	void extractParticlesFromOneFrame(MetaDataTable &MD,
-			FileName fn_mic, int iframe, int n_frames, FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
+			FileName fn_mic, int ipos, int iframe, int n_frames, FileName fn_output_img_root,
+			long int &my_current_nr_images, long int my_total_nr_images,
 			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
 	// Perform per-image operations (e.g. normalise, rescaling, rewindowing and inverting contrast) on an input stack (or STAR file)
 	void runOperateOnInputFile(FileName fn_perimage_in);
 
 	// Here normalisation, windowing etc is performed on an individual image and it is written to disc
-	void performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
-			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
+	// Jun24,2015 - Shaoda, extract helical segments
+	void performPerImageOperations(
+			Image<RFLOAT> &Ipart,
+			FileName fn_output_img_root,
+			int nframes,
+			long int image_nr,
+			long int nr_of_images,
+			RFLOAT tilt_deg,
+			RFLOAT psi_deg,
+			RFLOAT &all_avg,
+			RFLOAT &all_stddev,
+			RFLOAT &all_minval,
+			RFLOAT &all_maxval);
 
 	// Get micrograph name from the rootname
 	// The rootname may have an additional string after the uniqye micrograph name

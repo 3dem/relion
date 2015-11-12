@@ -1830,6 +1830,8 @@ int Displayer::runGui()
 		// If EMDL_IMAGE_NAME is among the labels: make that the default choice!)
 		if (MD.containsLabel(EMDL_IMAGE_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_IMAGE_NAME));
+		if (MD.containsLabel(EMDL_IMAGE_ORI_NAME))
+			win.display_labels.push_back(EMDL::label2Str(EMDL_IMAGE_ORI_NAME));
 		if (MD.containsLabel(EMDL_MLMODEL_REF_IMAGE))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MLMODEL_REF_IMAGE));
 		if (MD.containsLabel(EMDL_CTF_IMAGE))

@@ -452,6 +452,7 @@ class reconstruct_parameters
    			}
    		}
    		std::cerr << "Starting the reconstruction ..." << std::endl;
+   		backprojector.symmetrise();
    		backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
 
    		if (do_reconstruct_ctf)

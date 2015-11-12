@@ -55,6 +55,9 @@ public:
 	// Number of classes
 	int nr_classes;
 
+	// Number of independent bodies for multi-body refinement
+	int nr_bodies;
+
 	// Number of image groups with separate sigma2_noise spectra
 	int nr_groups;
 
@@ -91,6 +94,12 @@ public:
 	// Vector with all reference images
 	std::vector<MultidimArray<RFLOAT> > Iref;
 
+	// Vector with masks for all bodies in multi-body refinement
+	std::vector<MultidimArray<RFLOAT> > masks_bodies;
+
+	// Vector with center-of-mass coordinates for all bodies in multi-body refinement
+	std::vector<Matrix1D<RFLOAT> > com_bodies;
+
 	// One projector for each class;
 	std::vector<Projector > PPref;
 
@@ -113,7 +122,7 @@ public:
 	std::vector<MultidimArray<RFLOAT > > sigma2_class;
 
 	// FSC spectra between random halves of the data
-	std::vector<MultidimArray<RFLOAT > > fsc_halves_class;
+	MultidimArray<RFLOAT > fsc_halves_class;
 
 	// One likelihood vs prior ratio spectrum for each class
 	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;
@@ -188,6 +197,8 @@ public:
 	void clear()
 	{
 		Iref.clear();
+		masks_bodies.clear();
+		com_bodies.clear();
 		PPref.clear();
 		group_names.clear();
 		sigma2_noise.clear();
@@ -200,7 +211,7 @@ public:
 		pdf_class.clear();
 		pdf_direction.clear();
 		nr_particles_group.clear();
-		ref_dim = ori_size = nr_classes = nr_groups = nr_directions = interpolator = r_min_nn = padding_factor = 0;
+		ref_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn = padding_factor = 0;
 		ave_Pmax = avg_norm_correction = LL = sigma2_offset = tau2_fudge_factor = 0.;
 		sigma2_rot = sigma2_tilt = sigma2_psi = 0.;
 		acc_rot.clear();
@@ -242,6 +253,9 @@ public:
 	* because one cannot use an old pdf_orient with size unequal to the new one
 	*/
 	void initialisePdfDirection(int newsize);
+
+	/** Read in the binary masks provided by the user and then make a soft edge on those */
+	void initialiseBodyMasks(FileName fn_masks, FileName fn_root_out);
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector

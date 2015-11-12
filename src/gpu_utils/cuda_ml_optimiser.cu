@@ -535,7 +535,7 @@ void getAllSquaredDifferencesCoarse(
 	op.min_diff2.resize(sp.nr_particles, 99.e99);
 
 	std::vector<MultidimArray<Complex > > dummy;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 
@@ -762,7 +762,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	op.min_diff2.resize(sp.nr_particles, 99.e99);
 	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 	CUDA_CPU_TOC("precalculateShiftedImagesCtfsAndInvSigma2s");
@@ -1374,7 +1374,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	CUDA_CPU_TIC("store_init");
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, op.Fimgs_nomask, op.Fctfs, op.local_Fimgs_shifted, op.local_Fimgs_shifted_nomask,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 

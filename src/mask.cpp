@@ -76,6 +76,165 @@ void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, RFLOAT radius, RFLOAT cosine
 
 }
 
+// May27,2015 - Shaoda, Helical refinement
+void softMaskOutsideMapForHelix(
+		MultidimArray<RFLOAT> &vol,
+		RFLOAT psi_deg,
+		RFLOAT tilt_deg,
+		RFLOAT mask_sphere_radius_pix,
+		RFLOAT mask_cyl_radius_pix,
+		RFLOAT cosine_width,
+		MultidimArray<RFLOAT> *Mnoise)
+{
+	Matrix1D<RFLOAT> coords;
+	Matrix2D<RFLOAT> A;
+	RFLOAT sum_bg, sum, R1, R2, D1, D2, r, d, noise_w, noise_w1, noise_w2, noise_val;
+	int dim = vol.getDim();
+	int boxsize = -1;
+
+	// Center the box
+	vol.setXmippOrigin();
+	// Dimension of a particle (box) should be 2 or 3
+	if ( (dim != 2) && (dim != 3) )
+	{
+		REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): Dimension of particles should be 2 or 3!");
+		return;
+	}
+	// Check the shape of Mnoise
+	if ( (Mnoise != NULL) && ((*Mnoise).sameShape(vol) == false) )
+	{
+		REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): Input particle and Mnoise should have same shape!");
+		return;
+	}
+	// Box size is the minimum value of the 2 or 3 dimensions
+	boxsize = (XSIZE(vol) < YSIZE(vol)) ? XSIZE(vol) : YSIZE(vol);
+	// If it is a 2D particle, tilt angle does not apply
+	if (dim == 2)
+		tilt_deg = 0.;
+	else
+		boxsize = (boxsize < ZSIZE(vol)) ? boxsize : ZSIZE(vol);
+	boxsize = boxsize / 2 - ((boxsize + 1) % 2);
+
+	// Diameter of the cylindrical mask around the helix should not exceed the box size, otherwise noise cannot be estimated
+	if ( (cosine_width < 0.)
+			|| (mask_sphere_radius_pix < 1.) || ( (mask_sphere_radius_pix + cosine_width) > boxsize)
+			|| (mask_cyl_radius_pix < 1.) || ( (mask_cyl_radius_pix + cosine_width) > boxsize)
+			|| (mask_sphere_radius_pix < mask_cyl_radius_pix) )
+	{
+		REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): Invalid radii of spherical and cylindrical masks or soft cosine widths!");
+		return;
+	}
+	// Spherical mask: 0 < R1 < R2
+	R1 = mask_sphere_radius_pix;
+	R2 = R1 + cosine_width;
+	// Cylindrical mask: 0 < D1 < D2
+	D1 = mask_cyl_radius_pix;
+	D2 = D1 + cosine_width;
+
+	// Init coords
+	coords.clear();
+	coords.resize(3);
+	coords.initZeros();
+
+	// Init rotational matrix A
+	A.clear();
+	A.resize(3, 3);
+
+	// Rotate the particle (so that the helical cylinder spans X axis)
+	Euler_angles2matrix(0., -tilt_deg, -psi_deg, A, false);  // Beware - negative sign!
+
+	// Calculate noise weights for all voxels
+	sum_bg = sum = 0.;
+	if (Mnoise == NULL)
+	{
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
+		{
+			// X, Y, Z coordinates
+			if (dim == 3)
+				ZZ(coords) = ((RFLOAT)(k));
+			else
+				ZZ(coords) = 0.;
+			YY(coords) = ((RFLOAT)(i));
+			XX(coords) = ((RFLOAT)(j));
+			// Rotate
+			coords = A * coords;
+
+			// Distance from the point to helical axis (perpendicular to X axis)
+			if (dim == 3)
+				d = sqrt(YY(coords) * YY(coords) + ZZ(coords) * ZZ(coords));
+			else
+				d = ABS(YY(coords));
+			if (d > D2) // Noise areas (get values for noise estimations)
+			{
+				sum_bg += A3D_ELEM(vol, k, i, j);
+				sum += 1.;
+			}
+			else if (d > D1) // Edges of noise areas (get values and weights for noise estimations)
+			{
+				noise_w = 0.5 + 0.5 * cos(PI * (D2 - d) / cosine_width );
+				sum_bg += noise_w * A3D_ELEM(vol, k, i, j);
+				sum += noise_w;
+			}
+		}
+		// Test (this should not happen)
+		if (sum < 0.00001)
+		{
+			REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): No background (noise) areas found in this particle!");
+			return;
+		}
+		sum_bg /= sum;
+	}
+
+	// Apply noisy or average background value
+	noise_val = sum_bg;
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
+	{
+		// X, Y, Z coordinates
+		if (dim == 3)
+			ZZ(coords) = ((RFLOAT)(k));
+		else
+			ZZ(coords) = 0.;
+		YY(coords) = ((RFLOAT)(i));
+		XX(coords) = ((RFLOAT)(j));
+
+		// Rotate
+		coords = A * coords;
+
+		// Distance from the point to helical axis (perpendicular to X axis)
+		if (dim == 3)
+			d = sqrt(YY(coords) * YY(coords) + ZZ(coords) * ZZ(coords));
+		else
+			d = ABS(YY(coords));
+
+		// Distance from the origin
+		r = (RFLOAT)(i * i + j * j);
+		if (dim == 3)
+			r += (RFLOAT)(k * k);
+		r = sqrt(r);
+
+		// Info areas
+		if ( (r < R1) && (d < D1) )
+			continue;
+
+		if (Mnoise != NULL)
+			noise_val = A3D_ELEM(*Mnoise, k, i, j);
+
+		if ( (r > R2) || (d > D2) )  // Noise areas, fill in background values
+			A3D_ELEM(vol, k, i, j) = noise_val;
+		else // Edges of info areas
+		{
+			noise_w1 = noise_w2 = 0.;
+			if (r > R1)
+				noise_w1 = 0.5 + 0.5 * cos(PI * (R2 - r) / cosine_width );
+			if (d > D1)
+				noise_w2 = 0.5 + 0.5 * cos(PI * (D2 - d) / cosine_width );
+			noise_w = (noise_w1 > noise_w2) ? (noise_w1) : (noise_w2);
+			A3D_ELEM(vol, k, i, j) = (1. - noise_w) * A3D_ELEM(vol, k, i, j) + noise_w * noise_val;
+		}
+	}
+	return;
+}
+
 void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, MultidimArray<RFLOAT> &msk, bool invert_mask)
 {
 
