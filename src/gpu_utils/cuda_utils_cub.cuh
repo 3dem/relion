@@ -7,6 +7,19 @@
 #include <stdio.h>
 #include <signal.h>
 #include <vector>
+#include <thrust/system/cuda/vector.h>
+#include <thrust/system/cuda/execution_policy.h>
+#include <thrust/host_vector.h>
+#include <thrust/generate.h>
+#include <thrust/pair.h>
+#include <thrust/scan.h>
+#include <thrust/device_ptr.h>
+#include <thrust/copy.h>
+// Because thrust uses CUB, thrust defines CubLog and CUB tries to redefine it,
+// resulting in warnings. This avoids those warnings.
+#if(defined(CubLog) && defined(__CUDA_ARCH__) && (__CUDA_ARCH__<= 520)) // Intetionally force a warning for new arch
+	#undef CubLog
+#endif
 #include "src/gpu_utils/cub/device/device_radix_sort.cuh"
 #include "src/gpu_utils/cub/device/device_reduce.cuh"
 #include "src/gpu_utils/cub/device/device_scan.cuh"
@@ -235,15 +248,6 @@ if (in.getAllocator() == NULL)
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();
 }
-
-#include <thrust/system/cuda/vector.h>
-#include <thrust/system/cuda/execution_policy.h>
-#include <thrust/host_vector.h>
-#include <thrust/generate.h>
-#include <thrust/pair.h>
-#include <thrust/scan.h>
-#include <thrust/device_ptr.h>
-#include <thrust/copy.h>
 
 class AllocatorThrustWrapper
 {

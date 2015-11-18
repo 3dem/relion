@@ -4,7 +4,7 @@ set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
 endif()
-project(Relion VERSION "1.4.0")
+project(Relion)
 
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
