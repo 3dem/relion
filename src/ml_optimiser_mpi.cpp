@@ -167,6 +167,16 @@ void MlOptimiserMpi::initialise()
 
 	if (do_gpu)
 	{
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
+		// Make device bundles - at present segfault if auto-refine tries to run on a single device
+		if(!do_auto_refine || (devCount>=2))
+			for (int i = 0; i < devCount; i++)
+				cudaMlDeviceBundles.push_back((void *) new MlDeviceBundle(this, i));
+		else
+			raise(SIGSEGV);
+
 		// Sequential initialisation of GPUs on all ranks
 		for (int rank = 0; rank < node->size; rank++)
 		{
@@ -176,9 +186,6 @@ void MlOptimiserMpi::initialise()
 					std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 				else if(gpu_ids.length()<nr_threads)
 					REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
-
-				int devCount;
-				HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 				for (int i = 0; i < nr_threads; i ++)
 				{
@@ -195,8 +202,16 @@ void MlOptimiserMpi::initialise()
 						dev_id = (int)(gpu_ids[i]-'0');
 
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
-					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+
+					int bundle_id;
+					if(!do_auto_refine || (devCount>=2))
+						bundle_id = dev_id;
+					else
+						raise(SIGSEGV);
+
+					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, (MlDeviceBundle *) cudaMlDeviceBundles[bundle_id]));
 				}
+
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 		}
@@ -666,9 +681,12 @@ void MlOptimiserMpi::expectation()
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
 
     		if (do_gpu)
+    		{
+    			for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+    				((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
     			for (int i = 0; i < cudaMlOptimisers.size(); i ++)
-    				((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
-
+    		    	((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+    		}
     		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -805,8 +823,8 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						( (MlOptimiserCuda*) cudaMlOptimisers[i])->syncAllBackprojects();
-						( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{

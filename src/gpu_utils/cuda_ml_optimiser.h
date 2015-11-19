@@ -383,13 +383,22 @@ public:
 
 	//The CUDA accelerated back-projector set
 	std::vector< CudaBackprojector > cudaBackprojectors;
+	std::vector< cudaStream_t > bpStreams;
+
+	//Used for precalculations of projection setup
+	CudaCustomAllocator *allocator;
+
+	//Used for precalculations of projection setup
+	bool generateProjectionPlanOnTheFly;
+	std::vector< CudaProjectorPlan > coarseProjectionPlans;
+
+	MlOptimiser *baseMLO;
 
 	bool refIs3D;
 
 	int device_id;
 
-	// Constructor which uses some general info from any MlOptimiser and assigns this bundle an id.
-	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int id);
+	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id);
 
 	void resetData();
 
@@ -404,6 +413,14 @@ public:
 	{
 		cudaProjectors.clear();
 		cudaBackprojectors.clear();
+		coarseProjectionPlans.clear();
+		cudaBackprojectors.clear();
+		//Delete this lastly
+		delete allocator;
+
+		for (int i = 0; i < bpStreams.size(); i++)
+			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
+
 	}
 
 };
@@ -411,22 +428,12 @@ public:
 class MlOptimiserCuda
 {
 public:
-
-	//The CUDA accelerated projector set
-	std::vector< CudaProjector > cudaProjectors;
-
-	//The CUDA accelerated back-projector set
-	std::vector< CudaBackprojector > cudaBackprojectors;
-
-	//Used for precalculations of projection setup
-	std::vector< CudaProjectorPlan > coarseProjectionPlans;
-
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
 
-	//Class streams ( for concurrent scheduling of class-specific kernels)
+   //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
-	std::vector< cudaStream_t > bpStreams;
+
 	cudaStream_t stream1;
 	cudaStream_t stream2;
 
@@ -439,41 +446,25 @@ public:
 
 	bool refIs3D;
 
-	bool generateProjectionPlanOnTheFly;
-
 	int device_id;
 
-	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id);
+	MlDeviceBundle *devBundle;
+
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* Bundle);
 
 	void resetData();
 
 	void doThreadExpectationSomeParticles(int thread_id);
 
-	void syncAllBackprojects()
-	{
-		for (int i = 0; i < cudaBackprojectors.size(); i ++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
-	}
-
-
 	~MlOptimiserCuda()
 	{
-		cudaProjectors.clear();
-		cudaBackprojectors.clear();
-		coarseProjectionPlans.clear();
-		cudaBackprojectors.clear();
-
-		//Delete this lastly
-		delete allocator;
-
 		HANDLE_ERROR(cudaStreamDestroy(stream1));
 		HANDLE_ERROR(cudaStreamDestroy(stream2));
 
 		for (int i = 0; i < classStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
 
-		for (int i = 0; i < bpStreams.size(); i++)
-			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
+
 	}
 
 };

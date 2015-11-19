@@ -827,13 +827,22 @@ void MlOptimiser::initialise()
 	if (do_gpu)
 	{
 		do_shifts_onthefly = true;
+
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
+		// Make device bundles - at present segfault if auto-refine tries to run on a single device
+		if(!do_auto_refine || (devCount>=2))
+			for (int i = 0; i < devCount; i++)
+				cudaMlDeviceBundles.push_back((void *) new MlDeviceBundle(this, i));
+		else
+			raise(SIGSEGV);
+
 		if (!std::isdigit(*gpu_ids.begin()))
 			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 		else if(gpu_ids.length()<nr_threads)
 			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
 
-		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		for (int i = 0; i < nr_threads; i ++)
 		{
 			int dev_id;
@@ -843,7 +852,14 @@ void MlOptimiser::initialise()
 				dev_id = (int)(gpu_ids[i]-'0');
 
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+
+			int bundle_id;
+			if(!do_auto_refine || (devCount>=2))
+				bundle_id = dev_id;
+			else
+				raise(SIGSEGV);
+
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, (MlDeviceBundle *) cudaMlDeviceBundles[bundle_id]));
 		}
 	}
 
@@ -1574,8 +1590,12 @@ void MlOptimiser::expectation()
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 	if (do_gpu)
+	{
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+	}
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
@@ -1642,8 +1662,8 @@ void MlOptimiser::expectation()
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->syncAllBackprojects();
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 				int my_mutex = iclass % NR_CLASS_MUTEXES;
 				pthread_mutex_lock(&global_mutex2[my_mutex]);

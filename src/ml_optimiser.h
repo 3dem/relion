@@ -92,6 +92,7 @@ public:
 
 	// For GPU-acceleration
 	std::vector<void*> cudaMlOptimisers;
+	std::vector<void*> cudaMlDeviceBundles;
 
 	// I/O Parser
 	IOParser parser;
