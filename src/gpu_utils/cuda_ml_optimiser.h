@@ -371,6 +371,43 @@ public:
 	}
 };
 
+/*
+ * Bundle of device-objects which will be shared across several ranks and
+ */
+class MlDeviceBundle
+{
+public:
+
+	//The CUDA accelerated projector set
+	std::vector< CudaProjector > cudaProjectors;
+
+	//The CUDA accelerated back-projector set
+	std::vector< CudaBackprojector > cudaBackprojectors;
+
+	bool refIs3D;
+
+	int device_id;
+
+	// Constructor which uses some general info from any MlOptimiser and assigns this bundle an id.
+	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int id);
+
+	void resetData();
+
+	void syncAllBackprojects()
+	{
+		for (int i = 0; i < cudaBackprojectors.size(); i ++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
+	}
+
+
+	~MlDeviceBundle()
+	{
+		cudaProjectors.clear();
+		cudaBackprojectors.clear();
+	}
+
+};
+
 class MlOptimiserCuda
 {
 public:
