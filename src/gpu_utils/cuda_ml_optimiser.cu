@@ -649,12 +649,7 @@ void getAllSquaredDifferencesCoarse(
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			CudaProjectorPlan projectorPlan(cudaMLO->devBundle->coarseProjectionPlans[exp_iclass]);
-			projectorPlan.eulers.h_do_free=false;
-			projectorPlan.eulers.d_do_free=false;
-			projectorPlan.iorientclasses.h_do_free=false;
-			projectorPlan.iorientclasses.d_do_free=false;
-			if ( projectorPlan.orientation_num > 0 )
+			if ( cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num > 0 )
 			{
 				/*====================================
 				    	   Kernel Call
@@ -673,11 +668,11 @@ void getAllSquaredDifferencesCoarse(
 						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
-						~projectorPlan.eulers,
+						~cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].eulers,
 						&allWeights(allWeights_pos),
 						op,
 						baseMLO,
-						projectorPlan.orientation_num,
+						cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num,
 						translation_num,
 						image_size,
 						ipart,
@@ -687,10 +682,10 @@ void getAllSquaredDifferencesCoarse(
 						do_CC);
 
 				mapAllWeightsToMweights(
-						~projectorPlan.iorientclasses,
+						~cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].iorientclasses,
 						&allWeights(allWeights_pos),
 						&Mweight(ipart*weightsPerPart),
-						projectorPlan.orientation_num,
+						cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num,
 						translation_num,
 						cudaMLO->classStreams[exp_iclass]
 						);
@@ -698,7 +693,7 @@ void getAllSquaredDifferencesCoarse(
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
-				allWeights_pos += projectorPlan.orientation_num*translation_num;
+				allWeights_pos += cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num*translation_num;
 
 			} // end if class significant
 		} // end loop iclass
