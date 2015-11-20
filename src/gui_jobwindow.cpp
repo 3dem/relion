@@ -19,6 +19,70 @@
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
 
+#define DEBUG
+// Construct continuation output filenames always in the same manner
+void getContinueOutname(std::string &outputname, FileNameEntry &fn_cont)
+{
+	int pos_it = fn_cont.getValue().rfind("_it");
+	int pos_op = fn_cont.getValue().rfind("_optimiser");
+	if (pos_it < 0 || pos_op < 0)
+		std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+	int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
+	outputname += "_ct" + floatToString(it);
+}
+
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies)
+{
+	std::vector<Node> result;
+
+	if (dim < 2 || dim > 3)
+		REPORT_ERROR("getOutputNodesRefine ERROR: invalid dim value");
+
+	FileName fn_out;
+	if (iter < 0)
+	{
+		// 3D auto-refine
+		fn_out = outputname;
+	}
+	else
+	{
+		// 2D or 3D classification
+		fn_out.compose(outputname+"_it", iter, "", 3);
+	}
+
+	// Data and model.star files
+	Node node1(fn_out + "_data.star", NODE_PART_DATA);
+	result.push_back(node1);
+	int nodetype = (dim==2) ? NODE_2DREF : NODE_3DREF;
+	Node node2(fn_out + "_model.star", nodetype);
+	result.push_back(node2);
+
+	//For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
+	if (dim == 3)
+	{
+    	FileName fn_tmp;
+		for (int iclass = 0; iclass < K; iclass++)
+    	{
+    		if (nr_bodies > 1)
+    			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
+    		else
+    			fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+
+    		Node node3(fn_tmp, nodetype);
+    		result.push_back(node3);
+    	}
+	}
+
+	// For auto-refine: also output the half1_class001_unfil.mrc map
+	if (iter < 0)
+	{
+		Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
+		result.push_back(node4);
+	}
+	return result;
+
+}
+
 RelionJobWindow::RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run,
 		int x, int y, int w, int h, const char* title) : Fl_Box(x,y,w,h,title)
 {
@@ -234,12 +298,19 @@ void RelionJobWindow::toggle_new_continue(bool is_continue)
 
 void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
 {
-	fh.open((fn).c_str(), std::ios::out);
+#ifdef DEBUG
+	std::cerr << " opening " << fn << ".job for writing ... ";
+#endif
+
+	fh.open((fn+".job").c_str(), std::ios::out);
     if (!fh)
     {
     	std::cerr << "Cannot write to file: "<<fn<<std::endl;
     	exit(1);
     }
+
+    // Write the job type
+    fh << "job_type == " << type << std::endl;
 
     // is_continue flag
     if (is_continue)
@@ -250,13 +321,24 @@ void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
 
 bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 {
-	fh.open(fn.c_str(), std::ios_base::in);
+#ifdef DEBUG
+	std::cerr << " opening " << fn << ".job for reading ... ";
+#endif
+
+	fh.open((fn+".job").c_str(), std::ios_base::in);
     if (fh.fail())
     	return false;
     else
     {
-		fh.seekg(0, std::ios::beg);
 		std::string line;
+		// Get job type from first line
+		getline(fh, line, '\n');
+		size_t idx = line.find("==");
+		idx++;
+		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
+		if (!(type > 0 && type <= NR_BROWSE_TABS))
+			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + ".job");
+    	// Get is_continue from second line
 		getline(fh, line, '\n');
 		if (line.rfind("is_continue == true") == 0)
 			is_continue = true;
@@ -287,6 +369,9 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh)
 	other_args.writeValue(fh);
 
 	fh.close();
+#ifdef DEBUG
+	std::cerr << " done! " << std::endl;
+#endif
 }
 
 void RelionJobWindow::closeReadFile(std::ifstream& fh)
@@ -307,6 +392,10 @@ void RelionJobWindow::closeReadFile(std::ifstream& fh)
 		qsub_extra2.readValue(fh);
 	qsubscript.readValue(fh);
 	other_args.readValue(fh);
+
+#ifdef DEBUG
+	std::cerr << " done! " << std::endl;
+#endif
 
 }
 
@@ -360,6 +449,27 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	// Save the modified job submission script using a local name
 	if (errno = textbuf->savefile(newfilename.c_str()))
 	    fl_alert("Error writing to file \'%s\':\n%s.", newfilename.c_str(), strerror(errno));
+
+}
+
+void RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
+{
+	// If the outputname contains DATENTIMENRUN, then replace that now for the current time
+	int datentime = outputname.rfind("DATENTIMENRUN");
+	std::cerr << " old outputname = " << outputname << std::endl;
+	if (datentime < outputname.size())
+	{
+		time_t now = time(0);
+		tm *ltm = localtime(&now);
+		std::string replacestr = integerToString(ltm->tm_year%100, 2);
+		replacestr+= integerToString(1 + ltm->tm_mon, 2);
+		replacestr+= integerToString(1 + ltm->tm_mday, 2);
+		replacestr+= integerToString(1 + ltm->tm_hour, 2);
+		replacestr+= integerToString(1 + ltm->tm_min, 2);
+		replacestr+= integerToString(1 + ltm->tm_sec, 2);
+		outputname.replace(datentime, 1+outputname.length(), replacestr + "/run");
+	}
+	std::cerr << " new outputname = " << outputname << std::endl;
 
 }
 
@@ -462,6 +572,8 @@ void XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string
 GeneralJobWindow::GeneralJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD, HAS_NOT_RUN)
 {
 
+	type = PROC_GENERAL;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -478,13 +590,17 @@ The same diameter will also be used for a spherical mask of the reference struct
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_general.settings", is_continue);
+	read(".gui_general", is_continue);
 }
 
 void GeneralJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_general";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_general.settings", fh);
+	openWriteFile(fn, fh);
 
 	angpix.writeValue(fh);
 	particle_diameter.writeValue(fh);
@@ -523,6 +639,8 @@ void GeneralJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
 {
+
+	type = PROC_CTFFIND;
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -587,13 +705,17 @@ If this is not the case, then make a symbolic link inside the project directory 
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_ctffind.settings", is_continue);
+	read(".gui_ctffind", is_continue);
 }
 
 void CtffindJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_ctffind";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_ctffind.settings", fh);
+	openWriteFile(fn, fh);
 
 	mic_names.writeValue(fh);
 	output_star_ctf_mics.writeValue(fh);
@@ -661,13 +783,13 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, RFLOAT angpix)
 {
+
 	commands.clear();
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_run_ctffind_mpi`";
 	else
 		command="`which relion_run_ctffind`";
-
 
 	// Calculate magnification from user-specified pixel size in Angstroms
 	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
@@ -707,14 +829,18 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	{
 		outputname = "run_ctffind";
 	}
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 
 	prepareFinalCommand(outputname, commands, final_command);
 
 }
 
-
 ManualpickJobWindow::ManualpickJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
+	type = PROC_MANUALPICK;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -767,13 +893,17 @@ Particles that are not in this STAR file, but present in the picked coordinates 
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_manualpick.settings", is_continue);
+	read(".gui_manualpick", is_continue);
 }
 
 void ManualpickJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_manualpick";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_manualpick.settings", fh);
+	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
 	fn_out.writeValue(fh);
 	manualpick_rootname.writeValue(fh);
@@ -827,6 +957,7 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
 		RFLOAT angpix, RFLOAT particle_diameter)
 {
+
 	commands.clear();
 	std::string command;
 	command="`which relion_manualpick`";
@@ -862,11 +993,17 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	commands.push_back(command);
 
 	outputname = "run_manualpick";
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	prepareFinalCommand(outputname, commands, final_command);
 }
 
+
 AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
 {
+
+	type = PROC_AUTOPICK;
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -924,13 +1061,17 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_autopick.settings", is_continue);
+	read(".gui_autopick", is_continue);
 }
 
 void AutopickJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_autopick";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_autopick.settings", fh);
+	openWriteFile(fn, fh);
 
 	fn_input_autopick.writeValue(fh);
 	fn_refs_autopick.writeValue(fh);
@@ -984,6 +1125,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
+
 	commands.clear();
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -1026,6 +1168,9 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	outputname = autopick_rootname.getValue();
 
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	prepareFinalCommand(outputname, commands, final_command);
 
 }
@@ -1033,6 +1178,8 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
 {
+	type = PROC_EXTRACT;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -1113,14 +1260,18 @@ The name of the MCR stacks should be the rootname of the micrographs + '_moviero
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_extract.settings", is_continue);
+	read(".gui_extract", is_continue);
 }
 
 
 void ExtractJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_extract";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_extract.settings", fh);
+	openWriteFile(fn, fh);
 
 	// I/O
 	star_mics.writeValue(fh);
@@ -1186,6 +1337,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
 		RFLOAT angpix, RFLOAT particle_diameter)
 {
+
 	commands.clear();
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -1235,11 +1387,17 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 	outputname = extract_rootname.getValue();
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	prepareFinalCommand(outputname, commands, final_command);
 }
 
 SortJobWindow::SortJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD)
 {
+
+	type = PROC_SORT;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -1263,13 +1421,17 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD)
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_sort.settings", is_continue);
+	read(".gui_sort", is_continue);
 }
 
 void SortJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_sort";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_sort.settings", fh);
+	openWriteFile(fn, fh);
 
 	input_star.writeValue(fh);
 	fn_refs.writeValue(fh);
@@ -1301,6 +1463,7 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
+
 	commands.clear();
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -1337,20 +1500,23 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		outputname = "run_sort";
 	}
 
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	prepareFinalCommand(outputname, commands, final_command);
 }
-
-
 
 
 Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
 {
 
+	type = PROC_2DCLASS;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_img.place(current_y, "Input images STAR file:", "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
+	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 
 	fn_out.place(current_y, "Output rootname:", "Class2D/run1", "Output rootname for all files of this run. \
@@ -1485,14 +1651,18 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_class2d.settings", is_continue);
+	read(".gui_class2d", is_continue);
 
 }
 
 void Class2DJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_class2d";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_class2d.settings", fh);
+	openWriteFile(fn, fh);
 
 	// I/O
 	fn_out.writeValue(fh);
@@ -1574,9 +1744,12 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
-	commands.clear();
-	std::string command;
 
+	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
+	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
 	else
@@ -1586,23 +1759,28 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Save the real output name (could be with _ctX for continuation)
 	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
 	outputname = fn_out.getValue();
+
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	if (is_continue)
-	{
-		int pos_it = fn_cont.getValue().rfind("_it");
-		int pos_op = fn_cont.getValue().rfind("_optimiser");
-		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
-		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
-		outputname += "_ct" + floatToString(it);
-	}
+		getContinueOutname(outputname, fn_cont);
+
 	command += " --o " + outputname;
+	pipelineOutputName = outputname;
+	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
+
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
+		Node node(fn_cont.getValue(), NODE_OPTIMISER);
+		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --i " + fn_img.getValue();
+		Node node(fn_img.getValue(), NODE_PART_DATA);
+		pipelineInputNodes.push_back(node);
 		command += " --particle_diameter " + floatToString(particle_diameter);
 		command += " --angpix " + floatToString(angpix);
 	}
@@ -1674,10 +1852,10 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-
-
 Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 {
+
+	type = PROC_3DCLASS;
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1877,14 +2055,18 @@ in the previous iteration will get higher weights than those further away.");
 	tab5->end();
 
 	// read settings if hidden file exists
-	read(".gui_class3d.settings", is_continue);
+	read(".gui_class3d", is_continue);
 
 }
 
 void Class3DJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_class3d";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_class3d.settings", fh);
+	openWriteFile(fn, fh);
 
 	// I/O
 	fn_out.writeValue(fh);
@@ -2000,8 +2182,11 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
+
 	commands.clear();
 	std::string command;
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -2012,27 +2197,35 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Save the real output name (could be with _ctX for continuation)
 	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
 	outputname = fn_out.getValue();
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+	std::cerr << " class23d outputname= " << outputname << std::endl;
 	if (is_continue)
-	{
-		int pos_it = fn_cont.getValue().rfind("_it");
-		int pos_op = fn_cont.getValue().rfind("_optimiser");
-		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
-		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
-		outputname += "_ct" + floatToString(it);
-	}
+		getContinueOutname(outputname, fn_cont);
+
 	command += " --o " + outputname;
+	pipelineOutputName = outputname;
+	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
+
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
+		Node node(fn_cont.getValue(), NODE_OPTIMISER);
+		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --i " + fn_img.getValue();
+		Node node(fn_img.getValue(), NODE_PART_DATA);
+		pipelineInputNodes.push_back(node);
 		command += " --particle_diameter " + floatToString(particle_diameter);
 		command += " --angpix " + floatToString(angpix);
 		if (fn_ref.getValue() != "None")
+		{
 			command += " --ref " + fn_ref.getValue();
+			Node node(fn_ref.getValue(), NODE_3DREF);
+			pipelineInputNodes.push_back(node);
+		}
 		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
 			command += " --firstiter_cc";
 		if (ini_high.getValue() > 0.)
@@ -2073,7 +2266,11 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --strict_highres_exp " + floatToString(highres_limit.getValue());
 	}
 	if (fn_mask.getValue().length() > 0)
+	{
 		command += " --solvent_mask " + fn_mask.getValue();
+		Node node(fn_mask.getValue(), NODE_3DMASK);
+		pipelineInputNodes.push_back(node);
+	}
 
 	// Sampling
 	int iover = 1;
@@ -2125,9 +2322,10 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-
 Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 {
+
+	type = PROC_3DAUTO;
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -2320,14 +2518,18 @@ will be centered at the rotations determined for the corresponding particle wher
 
 	tab6->end();
 	// read settings if hidden file exists
-	read(".gui_auto3d.settings", is_continue);
+	read(".gui_auto3d", is_continue);
 
 }
 
 void Auto3DJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_auto3d";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_auto3d.settings", fh);
+	openWriteFile(fn, fh);
 
 	// I/O
 	fn_out.writeValue(fh);
@@ -2458,8 +2660,11 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
 {
+
 	commands.clear();
 	std::string command;
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -2470,27 +2675,35 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// Save the real output name (could be with _ctX for continuation)
 	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
 	outputname = fn_out.getValue();
+
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	if (is_continue)
-	{
-		int pos_it = fn_cont.getValue().rfind("_it");
-		int pos_op = fn_cont.getValue().rfind("_optimiser");
-		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
-		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
-		outputname += "_ct" + floatToString(it);
-	}
+		getContinueOutname(outputname, fn_cont);
 	command += " --o " + outputname;
+	pipelineOutputName = outputname;
+	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1); // TODO: add nr_bodies....
+
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
+		Node node(fn_cont.getValue(), NODE_OPTIMISER);
+		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --auto_refine --split_random_halves --i " + fn_img.getValue();
+		Node node(fn_img.getValue(), NODE_PART_DATA);
+		pipelineInputNodes.push_back(node);
 		command += " --particle_diameter " + floatToString(particle_diameter);
 		command += " --angpix " + floatToString(angpix);
 		if (fn_ref.getValue() != "None")
+		{
 			command += " --ref " + fn_ref.getValue();
+			Node node(fn_ref.getValue(), NODE_3DREF);
+			pipelineInputNodes.push_back(node);
+		}
 		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
 			command += " --firstiter_cc";
 		if (ini_high.getValue() > 0.)
@@ -2526,7 +2739,13 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			command += " --zero_mask";
 	}
 	if (fn_mask.getValue().length() > 0)
+	{
 		command += " --solvent_mask " + fn_mask.getValue();
+
+		// TODO: what if this is a continuation run: re-put the mask as an input node? Or only if it changes? Also for 3Dclass
+		Node node(fn_mask.getValue(), NODE_3DMASK);
+		pipelineInputNodes.push_back(node);
+	}
 
 	// Sampling
 	int iover = 1;
@@ -2571,6 +2790,8 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	if (is_continue && do_movies.getValue())
 	{
 		command += " --realign_movie_frames " + fn_movie_star.getValue();
+		Node node(fn_movie_star.getValue(), NODE_MOVIE_DATA);
+		pipelineInputNodes.push_back(node);
 		command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
 		command += " --sigma_off " + floatToString(movie_sigma_offset.getValue());
 
@@ -2600,10 +2821,13 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 PostJobWindow::PostJobWindow() : RelionJobWindow(4, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
+
+	type = PROC_POST;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", "", "MRC map files (*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 
 	fn_out.place(current_y, "Output rootname", "postprocess", "Output rootname. All output files will be saved in the same directory as the unfiltered maps, unless the output name contains a forward slash. In that case, the corresponding directory will be created .");
 
@@ -2693,12 +2917,17 @@ In such cases, set this option to Yes and provide an ad-hoc filter as described 
 
 
 	// read settings if hidden file exists
-	read(".gui_post.settings", is_continue);
+	read(".gui_post", is_continue);
 }
+
 void PostJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_post";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_post.settings", fh);
+	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
 	fn_out.writeValue(fh);
 	do_automask.writeValue(fh);
@@ -2716,6 +2945,7 @@ void PostJobWindow::write(std::string fn)
 	low_pass.writeValue(fh);
 	closeWriteFile(fh);
 }
+
 void PostJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
@@ -2745,15 +2975,25 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
 }
+
 void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
 		RFLOAT angpix)
 {
+
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	commands.clear();
 	std::string command;
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
 	command="`which relion_postprocess`";
 
 	// Get the input rootname from the half-map name
 	// run1_half1_class001_unfil.mrc -> run1
+	Node node(fn_in.getValue(), NODE_HALFMAP);
+	pipelineInputNodes.push_back(node);
 	int pos_half = fn_in.getValue().rfind("_half");
 	if (pos_half < fn_in.getValue().size())
 		command += " --i " + fn_in.getValue().substr(0, pos_half);
@@ -2782,6 +3022,12 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command += " --o " + outputname;
 	command += "  --angpix " + floatToString(angpix);
 
+	pipelineOutputName = outputname;
+	Node node1(outputname+".mrc", NODE_FINALMAP);
+	pipelineOutputNodes.push_back(node1);
+	Node node2(outputname+"_masked.mrc", NODE_FINALMAP);
+	pipelineOutputNodes.push_back(node2);
+
 	// Masking
 	if (do_automask.getValue())
 	{
@@ -2789,9 +3035,18 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		command += " --inimask_threshold " + floatToString(inimask_threshold.getValue());
 		command += " --extend_inimask " + floatToString(extend_inimask.getValue());
 		command += " --width_mask_edge " + floatToString(width_mask_edge.getValue());
+
+		Node(outputname + "_automask.mrc", NODE_3DMASK);
+		pipelineOutputNodes.push_back(node);
 	}
+
+	/// TODO: make a CREATE_MASK process and get it out of postprocessing
 	if (do_usermask.getValue())
+	{
 		command += " --mask " + fn_mask.getValue();
+		Node node(fn_mask.getValue(), NODE_3DMASK);
+		pipelineInputNodes.push_back(node);
+	}
 
 	// Sharpening
 	if (fn_mtf.getValue().length() > 0)
@@ -2823,9 +3078,11 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 
 
-
 PolishJobWindow::PolishJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 {
+
+	type = PROC_POLISH;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -2898,13 +3155,17 @@ Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/tw
 
 	tab3->end();
 	// read settings if hidden file exists
-	read(".gui_polish.settings", is_continue);
+	read(".gui_polish", is_continue);
 }
 
 void PolishJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_polish";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_polish.settings", fh);
+	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
 	fn_out.writeValue(fh);
 	movie_runavg_window.writeValue(fh);
@@ -2949,6 +3210,9 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 {
 	commands.clear();
 	std::string command;
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_particle_polish_mpi`";
 	else
@@ -2956,7 +3220,19 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	// General
 	command += " --i " + fn_in.getValue();
+
+	Node node(fn_in.getValue(), NODE_MOVIE_DATA);
+	pipelineInputNodes.push_back(node);
+
 	command += " --o " + fn_out.getValue();
+
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
+	Node node1(fn_out.getValue() + ".star", NODE_MOVIE_DATA); // TODO: output from Shiny in its own directory
+	pipelineOutputNodes.push_back(node1);
+	pipelineOutputName = fn_out.getValue();  // TODO: change OUTPUTNAME to its own output directory!
+
 	command += "  --angpix " + floatToString(angpix);
 	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
 	// If this is not a continue job, then re-start from scratch....
@@ -2981,7 +3257,11 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 
 	if (fn_mask.getValue().length() > 0)
+	{
+		Node node(fn_mask.getValue(), NODE_3DMASK);
+		pipelineInputNodes.push_back(node);
 		command += " --mask " + fn_mask.getValue();
+	}
 
 	// Symmetry group
 	command += " --sym " + sym_name.getValue();
@@ -3014,6 +3294,9 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
+
+	type = PROC_RESMAP;
+
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -3046,13 +3329,17 @@ Note that values larger than zero will be changed to 1 by ResMap, therefore the 
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_resmap.settings", is_continue);
+	read(".gui_resmap", is_continue);
 }
 
 void ResmapJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_resmap";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_resmap.settings", fh);
+	openWriteFile(fn, fh);
 	fn_resmap.writeValue(fh);
 	fn_in.writeValue(fh);
 	pval.writeValue(fh);
@@ -3091,8 +3378,14 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
 		RFLOAT angpix)
 {
+
+	// Change outputname if it contains DATENTIMENRUN
+	changeDateNTimeInOutputname(outputname);
+
 	commands.clear();
 	std::string command;
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
 
 	if (fn_resmap.getValue().length() == 0)
 	{
@@ -3115,6 +3408,14 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		std::cerr << "ResMapJobWindow::getCommands ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
 		exit(1);
 	}
+	Node node(fn_in.getValue(), NODE_HALFMAP);
+	pipelineInputNodes.push_back(node);
+
+	FileName fn_out = fn_in.getValue();
+	fn_out = fn_out.insertBeforeExtension("_resmap");
+	Node node1(fn_out, NODE_RESMAP);
+	pipelineOutputNodes.push_back(node1);
+	pipelineOutputName = fn_in.getValue().substr(0, pos_half) + "_resmap";
 
 	command += " --vis2D --noguiSplit " + fn_half1 + " " + fn_half2;
 	command += " --vxSize=" + floatToString(angpix);
@@ -3123,7 +3424,11 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --maxRes=" + floatToString(maxres.getValue());
 	command += " --stepRes=" + floatToString(stepres.getValue());
 	if (fn_mask.getValue().length() > 0)
+	{
+		Node node2(fn_mask.getValue(), NODE_3DMASK);
+		pipelineInputNodes.push_back(node2);
 		command += " --maskVol=" + fn_mask.getValue();
+	}
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
@@ -3147,6 +3452,9 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 PublishJobWindow::PublishJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
+
+	type = PROC_PUBLISH;
+
 	tab1->begin();
 	tab1->label("cite RELION");
 	resetHeight();
@@ -3169,7 +3477,7 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
  * Sub-tomogram averaging : \n \
      Bharat et al. (2015) Structure (submitted). \n \n "
-, GUIWIDTH - WCOL0 - 50, GUIHEIGHT - 150);
+, GUIWIDTH - WCOL0 - 50, GUIHEIGHT_OLD - 150);
 
 	//cite_text.mydisp->textsize(12);
 
@@ -3184,7 +3492,7 @@ Please also cite the following EXTERNAL programs: \n \n \
     Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
 * ResMap for local-resolution estimation:  \n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)"
-, GUIWIDTH - WCOL0 - 50, GUIHEIGHT - 150);
+, GUIWIDTH - WCOL0 - 50, GUIHEIGHT_OLD - 150);
 
 	tab2->end();
 

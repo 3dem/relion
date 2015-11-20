@@ -32,7 +32,9 @@
 #define HAS_RUN true
 #define HAS_NOT_RUN false
 
+#include <ctime>
 #include "src/gui_entries.h"
+#include "src/pipeliner.h"
 
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
@@ -58,8 +60,19 @@ static Fl_Menu_Item sampling_options[] = {
 static int minimum_nr_dedicated;
 static bool do_allow_change_minimum_dedicated;
 
+
+void getContinueOutname(std::string &outputname, FileNameEntry &fn_cont);
+// Output filenames of relion_refine (use iter=-1 for auto-refine)
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies = 1);
+
 class RelionJobWindow : public Fl_Box
 {
+protected:
+
+	// Which process type is this?
+	int type;
+	bool is_continue;
+
 public:
 	// Position of current cursor to place new elements
 	int start_y, current_y;
@@ -97,13 +110,16 @@ public:
 	bool has_mpi;
 	bool has_thread;
 
-	bool is_continue;
+	// General pipeline I/O (the same for all jobtypes)
+	std::vector<Node> pipelineInputNodes;
+	std::vector<Node> pipelineOutputNodes;
+	std::string pipelineOutputName;
 
 
 public:
 	// Constructor with x, y, w, h and a title
 	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
-			int x = WCOL0, int y = MENUHEIGHT+10, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT-70, const char* title = "");
+			int x = WCOL0, int y = MENUHEIGHT+10, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
 
     // Destructor
     ~RelionJobWindow() {};
@@ -123,6 +139,9 @@ public:
 
 	// Write the job submission script
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
+
+	// See if outputname contains DATENTIMENRUN, and if so, replace with current date and time
+	void changeDateNTimeInOutputname(std::string &outputname);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command);
@@ -396,7 +415,7 @@ public:
 	// I/O
 	AnyEntry fn_out;
 	FileNameEntry fn_cont;
-	FileNameEntry fn_img;
+	InputNodeEntry fn_img;
 	BooleanEntry do_parallel_discio;
 
 	// CTF
@@ -657,6 +676,7 @@ public:
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
 			RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust);
+
 };
 
 class ResmapJobWindow : public RelionJobWindow
@@ -665,7 +685,6 @@ public:
 
 	// I/O
 	FileNameEntry fn_resmap;
-
 	FileNameEntry fn_in;
 
 	// Params

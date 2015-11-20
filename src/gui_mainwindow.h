@@ -22,8 +22,7 @@
 #define GUI_MAINWINDOW_H_
 #include "src/gui_jobwindow.h"
 #include "src/gui_entries.h"
-
-#define NR_BROWSE_TABS 13
+#include "src/pipeliner.h"
 
 #define DO_WRITE true
 #define DONT_WRITE false
@@ -34,8 +33,14 @@
 #define DO_GET_CL true
 #define DONT_GET_CL false
 
+// Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
+#define MAX_JOBS_BROWSER 50
+
 // This class organises the main winfow of the relion GUI
 static Fl_Hold_Browser *browser;
+static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser;
+// For keeping track of which process to use in the process browser on the GUI
+static std::vector<long int> running_processes, finished_processes, scheduled_processes;
 static Fl_Group        *browse_grp[NR_BROWSE_TABS];
 static bool is_main_continue;
 static GeneralJobWindow *job_general;
@@ -55,6 +60,10 @@ static PublishJobWindow *job_publish;
 static Fl_Toggle_Button *toggle_continue;
 // Run button
 static Fl_Button *run_button;
+static std::string fn_settings;
+
+// Store all the history
+static PipeLine pipeline;
 
 class RelionMainWindow : public Fl_Window
 {
@@ -73,17 +82,17 @@ public:
     std::string outputname, final_command;
     std::vector<std::string> commands;
 
-    //FileName for settings file
-    std::string fn_settings;
-
-	// Constructor with w x h size of the window and a title
-	RelionMainWindow(int w, int h, const char* title);
+    // Constructor with w x h size of the window and a title
+	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe);
 
     // Destructor
     ~RelionMainWindow(){};
 
     // Communicate with the different jobtype objects
     void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, int this_job = 0);
+
+    // Add a process to the PipeLine
+    void addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);
 
 private:
 
@@ -102,6 +111,15 @@ private:
 
     static void cb_select_browsegroup(Fl_Widget*, void*);
     inline void cb_select_browsegroup_i();
+
+    static void cb_select_finished_job(Fl_Widget*, void*);
+    inline void cb_select_finished_job_i();
+
+    static void cb_select_running_job(Fl_Widget*, void*);
+    inline void cb_select_running_job_i();
+
+    static void cb_select_scheduled_job(Fl_Widget*, void*);
+    inline void cb_select_scheduled_job_i();
 
     static void cb_toggle_continue(Fl_Widget*, void*);
     inline void cb_toggle_continue_i();

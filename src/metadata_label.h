@@ -267,7 +267,7 @@ enum EMDLabel
     EMDL_ORIENT_PSI_PRIOR,
 
     EMDL_PARTICLE_AUTOPICK_FOM,
-	EMDL_PARTICLE_HELICAL_TUBE_ID,
+    EMDL_PARTICLE_HELICAL_TUBE_ID,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
     EMDL_PARTICLE_ID,
@@ -279,6 +279,15 @@ enum EMDLabel
     EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES,
     EMDL_PARTICLE_NR_FRAMES,
     EMDL_PARTICLE_PMAX,
+
+    EMDL_PIPELINE_NODE_NAME,
+    EMDL_PIPELINE_NODE_TYPE,
+    EMDL_PIPELINE_PROCESS_NAME,
+    EMDL_PIPELINE_PROCESS_TYPE,
+    EMDL_PIPELINE_PROCESS_STATUS,
+    EMDL_PIPELINE_EDGE_FROM,
+    EMDL_PIPELINE_EDGE_TO,
+    EMDL_PIPELINE_EDGE_PROCESS,
 
     EMDL_POSTPROCESS_BFACTOR,
     EMDL_POSTPROCESS_FINAL_RESOLUTION,
@@ -623,6 +632,16 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, EMDL_INT, "rlnNrOfSignificantSamples", "Number of orientational/class assignments (for a particle) with sign.probabilities in the 1st pass of adaptive oversampling"); /**< particle, Number of orientations contributing to weights*/
         EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES, EMDL_INT, "rlnNrOfFrames", "Number of movie frames that were collected for this particle");
         EMDL::addLabel(EMDL_PARTICLE_PMAX, EMDL_DOUBLE, "rlnMaxValueProbDistribution", "Maximum value of the (normalised) probability function for a particle"); /**< particle, Maximum value of probability distribution */
+
+
+        EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (running, scheduled, finished or cancelled)");
+        EMDL::addLabel(EMDL_PIPELINE_EDGE_FROM, EMDL_STRING , "rlnPipeLineEdgeFromNode", "Name of the origin of an edge");
+        EMDL::addLabel(EMDL_PIPELINE_EDGE_TO, EMDL_STRING ,"rlnPipeLineEdgeToNode", "Name of the to-Node in an edge");
+        EMDL::addLabel(EMDL_PIPELINE_EDGE_PROCESS, EMDL_STRING ,"rlnPipeLineEdgeProcess", "Name of the destination of an edge");
 
         EMDL::addLabel(EMDL_POSTPROCESS_FINAL_RESOLUTION, EMDL_DOUBLE, "rlnFinalResolution", "Final estimated resolution after postprocessing (in Angstroms)");
         EMDL::addLabel(EMDL_POSTPROCESS_BFACTOR, EMDL_DOUBLE, "rlnBfactorUsedForSharpening", "Applied B-factor in the sharpening of the map");
