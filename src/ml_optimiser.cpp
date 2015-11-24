@@ -250,6 +250,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	int computation_section = parser.addSection("Computation");
 
+	x_pool = textToInteger(parser.getOption("--pool", "Number of images to pool for each thread task", "1"));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to run in parallel (only useful on multi-core machines)", "1"));
 
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
@@ -398,6 +399,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// Computation stuff
 	// The number of threads is always read from the command line
 	int computation_section = parser.addSection("Computation");
+	x_pool = textToInteger(parser.getOption("--pool", "Number of images to pool for each thread task", "1"));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to run in parallel (only useful on multi-core machines)", "1"));
 	available_memory = textToFloat(parser.getOption("--memory_per_thread", "Available RAM (in Gb) for each thread", "2"));
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
@@ -1149,7 +1151,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		std::cout <<" Using rlnReconstructImageName from the input data.star file!" << std::endl;
 
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
-	nr_pool = nr_threads;
+	nr_pool = x_pool*nr_threads;
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
