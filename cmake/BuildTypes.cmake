@@ -42,6 +42,37 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}"
 
 
 
+
+# -------------------------- 
+#        RELWITHDEBINFO BUILD 
+# -------------------------- 
+
+# -- Compiler flags -------------------------------------------------
+set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${CUDARCH}" CACHE STRING "")
+# -- Linker flags ---------------------------------------------------
+set(RELION_LINKER_FLAGS_RELWITHDEBINFO  " ")
+
+# -- Append compiler and linker flags -------------------------------
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO          "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${RELION_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} ${RELION_LINKER_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+set(CUDA_NVCC_FLAGS_RELWITHDEBINFO        "${RELION_NVCC_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+
+# -- Add preprocessor defintions ------------------------------------
+set(RELION_DEFINITIONS_RELWITHDEBINFO "-DDEBUG_CUDA")
+
+#message(STATUS "Set the extra flags for RELWITHDEBINFO build type")
+#message(STATUS "RELION_NVCC_FLAGS_RELWITHDEBINFO : ${RELION_NVCC_FLAGS_RELWITHDEBINFO}")
+#message(STATUS "CUDA_NVCC_FLAGS_RELWITHDEBINFO : ${CUDA_NVCC_FLAGS_RELWITHDEBINFO}")
+#message(STATUS "CMAKE_CXX_FLAGS_RELWITHDEBINFO : ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+#--------------------------------------------------------------------
+
+
+
+
+
+
+
 # -------------------------- 
 #       Release BUILD 
 # -------------------------- 
