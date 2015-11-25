@@ -428,6 +428,9 @@ public:
 class MlOptimiserCuda
 {
 public:
+	// transformer as holder for reuse of fftw_plans
+	FourierTransformer transformer;
+
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
 

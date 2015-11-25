@@ -9,13 +9,13 @@
 # opted into by specifying this in CMakeLists.txt
 
 # PRECISION OPTION
-if(SINGLE_RELION)
+if(DoublePrec_CPU)
 	# set fftw lib to use single (f=float) precision
-	set(fft "fftw3f")
-else(SINGLE_RELION)
-	# set fftw lib to use double precision
 	set(fft "fftw3")
-endif(SINGLE_RELION)	
+else(DoublePrec_CPU)
+	# set fftw lib to use double precision
+	set(fft "fftw3f")
+endif(DoublePrec_CPU)	
 
 
 #set(USE_CUFFT FALSE)
@@ -43,11 +43,11 @@ endif(CUFFT)
 
 message(STATUS "Looking for ${fft}.h ...")
 if(DEFINED ENV{FFTW_INCLUDE})
-    find_path(FFTW_PATH     NAMES ${fft}.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
-    find_path(FFTW_INCLUDES NAMES ${fft}.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
+    find_path(FFTW_PATH     NAMES fftw3.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
+    find_path(FFTW_INCLUDES NAMES fftw3.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
 else()
-    find_path(FFTW_PATH         NAMES ${fft}.h )
-    find_path(FFTW_INCLUDES     NAMES ${fft}.h )
+    find_path(FFTW_PATH         NAMES fftw3.h )
+    find_path(FFTW_INCLUDES     NAMES fftw3.h )
 endif()
     
 

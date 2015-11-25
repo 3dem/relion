@@ -157,6 +157,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
         recomputePlan=true;
     else
         recomputePlan=!(fReal->sameShape(input));
+
     fFourier.resize(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
     fReal=&input;
 
@@ -188,6 +189,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 
         // Destroy both forward and backward plans if they already exist
         destroyPlans();
+
         // Make new plans
         pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
@@ -255,6 +257,9 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
             break;
         }
 
+        // Destroy both forward and backward plans if they already exist
+        destroyPlans();
+
         pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
         if (fPlanForward!=NULL)
@@ -303,9 +308,11 @@ void FourierTransformer::Transform(int sign)
     if (sign == FFTW_FORWARD)
     {
 #ifdef RELION_SINGLE_PRECISION
-        fftwf_execute(fPlanForward);
+        fftwf_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
+                (fftwf_complex*) MULTIDIM_ARRAY(fFourier));
 #else
-        fftw_execute(fPlanForward);
+        fftw_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
+                (fftw_complex*) MULTIDIM_ARRAY(fFourier));
 #endif
         // Normalisation of the transform
         unsigned long int size=0;
@@ -322,9 +329,11 @@ void FourierTransformer::Transform(int sign)
     else if (sign == FFTW_BACKWARD)
     {
 #ifdef RELION_SINGLE_PRECISION
-        fftwf_execute(fPlanBackward);
+        fftwf_execute_dft_c2r(fPlanBackward,
+                (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
 #else
-        fftw_execute(fPlanBackward);
+        fftw_execute_dft_c2r(fPlanBackward,
+                (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
 #endif
     }
 }

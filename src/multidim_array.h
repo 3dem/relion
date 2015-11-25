@@ -1056,7 +1056,10 @@ public:
     {
         resize(1, Zdim, Ydim, Xdim);
     }
-
+    void resizeNoCp(long int Zdim, long int Ydim, long int Xdim)
+    {
+	    resizeNoCp(1, Zdim, Ydim, Xdim);
+    }
     /** Resize a single 2D image
      *
      * This function assumes n and z are 1

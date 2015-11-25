@@ -41,7 +41,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
 #endif
-	FourierTransformer transformer;
+	//FourierTransformer transformer;
 
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
@@ -228,12 +228,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CUDA_CPU_TIC("FourierTransform1");
 
 		CUDA_CPU_TIC("setReal");
-		transformer.setReal(img_aux);
+		cudaMLO->transformer.setReal(img_aux);
 		CUDA_CPU_TOC("setReal");
+
 		CUDA_CPU_TIC("Transform");
-		transformer.Transform(FFTW_FORWARD);
-					if (true)transformer.getFourierCopy(Faux);
-					else  transformer.getFourierAlias(Faux);
+		cudaMLO->transformer.Transform(FFTW_FORWARD);
+					if (true)cudaMLO->transformer.getFourierCopy(Faux);
+					else  cudaMLO->transformer.getFourierAlias(Faux);
 		CUDA_CPU_TOC("Transform");
 
 		CUDA_CPU_TOC("FourierTransform1");
@@ -283,8 +284,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// Create noisy image for outside the mask
 			MultidimArray<Complex > Fnoise;
 			Mnoise.resize(img());
-			transformer.setReal(Mnoise);
-			transformer.getFourierAlias(Fnoise);
+			cudaMLO->transformer.setReal(Mnoise);
+			cudaMLO->transformer.getFourierAlias(Fnoise);
 			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
 			{
@@ -302,7 +303,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 			// Back to real space Mnoise
 			CUDA_CPU_TIC("inverseFourierTransform");
-			transformer.inverseFourierTransform();
+			cudaMLO->transformer.inverseFourierTransform();
 			CUDA_CPU_TOC("inverseFourierTransform");
 
 			CUDA_CPU_TIC("setXmippOrigin");
@@ -373,7 +374,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CUDA_CPU_TOC("CenterFFT2");
 		CUDA_CPU_TIC("FourierTransform2");
 		// Store the Fourier Transform of the image Fimg
-		transformer.FourierTransform(img(), Faux);
+		cudaMLO->transformer.FourierTransform(img(), Faux);
 		CUDA_CPU_TOC("FourierTransform2");
 
 		CUDA_CPU_TIC("powerClass");
@@ -474,7 +475,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		op.Fctfs.at(ipart) = Fctf;
 
 	} // end loop ipart
-	transformer.clear();
+	//cudaMLO->transformer.clear();
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_FT);
@@ -606,7 +607,7 @@ void getAllSquaredDifferencesCoarse(
 			Fimgs_real.host_alloc();
 			Fimgs_imag.host_alloc();
 
-			std::vector<double> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+			std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 			XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
 			for (long int itrans = 0; itrans < translation_num; itrans++)

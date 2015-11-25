@@ -37,12 +37,21 @@ else(NOT DEFINED CUDA_ARCH)
 endif(NOT DEFINED CUDA_ARCH)
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
-option(CudaDouble "CudaDouble" OFF)
-if(CudaDouble)
+option(DoublePrec_CPU "DoublePrec_CPU" OFF)
+if(DoublePrec_CPU)
+    message(STATUS "Setting cpu precision to double")
+else(DoublePrec_CPU)
+    message(STATUS "Setting cpu precision to single")
+    add_definitions(-DRELION_SINGLE_PRECISION)
+endif(DoublePrec_CPU)
+
+option(DoublePrec_GPU "DoublePrec_GPU" OFF)
+if(DoublePrec_GPU)
+    message(STATUS "Setting gpu precision to double")
     add_definitions(-DCUDA_DOUBLE_PRECISION)
-    message(STATUS "Building cuda files with double precision.")
 	set(CudaTexture FALSE)
-else(CudaDouble)
+else(DoublePrec_GPU)
+    message(STATUS "Setting gpu precision to single")
     # -- Will warn when double prec is inadvertently used in CUDA-code --
     #message(STATUS "ENV CUDA_VERSION :  $ENV{CUDA_VERSION}")
     if((DEFINED ENV{CUDA_VERSION}) AND (($ENV{CUDA_VERSION} VERSION_GREATER "7.5") OR 
@@ -50,7 +59,7 @@ else(CudaDouble)
         #message(STATUS "Cuda version is >= 7.5")
         set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
     endif()
-endif(CudaDouble)
+endif(DoublePrec_GPU)
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
  #This *has* to be AFTER project()
