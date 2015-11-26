@@ -48,7 +48,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CUDA_CPU_TIC("init");
 		FileName fn_img;
 		Image<RFLOAT> img, rec_img;
-		MultidimArray<Complex > Fimg, Faux;
+		MultidimArray<Complex > Fimg;
+		MultidimArray<Complex > Faux(cudaMLO->transformer.fFourier,true);
 		MultidimArray<RFLOAT> Fctf;
 
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
@@ -226,17 +227,41 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CUDA_CPU_TOC("CenterFFT1");
 
 		CUDA_CPU_TIC("FourierTransform1");
+		/* Everything in this CPU_TIC/TOC- block could be replaced by
+		*  cudaMLO->transformer.FourierTransform(img_aux, Faux);
+		*  but for now we keep like this to be able to time it more easily
+		*/
 
+//#ifdef TIMING
+//	// Only time one thread
+////	if (thread_id == 0)
+//		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
+//#endif
 		CUDA_CPU_TIC("setReal");
 		cudaMLO->transformer.setReal(img_aux);
 		CUDA_CPU_TOC("setReal");
-
+//#ifdef TIMING
+//	// Only time one thread
+////	if (thread_id == 0)
+//		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
+//#endif
+//#ifdef TIMING
+//	// Only time one thread
+////	if (thread_id == 0)
+//		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_B);
+//#endif
 		CUDA_CPU_TIC("Transform");
 		cudaMLO->transformer.Transform(FFTW_FORWARD);
-					if (true)cudaMLO->transformer.getFourierCopy(Faux);
-					else  cudaMLO->transformer.getFourierAlias(Faux);
+		CUDA_CPU_TIC("CopyOrAlias");
+		if (true)cudaMLO->transformer.getFourierCopy(Faux);
+		else  cudaMLO->transformer.getFourierAlias(Faux);
+		CUDA_CPU_TOC("CopyOrAlias");
 		CUDA_CPU_TOC("Transform");
-
+//#ifdef TIMING
+//	// Only time one thread
+////	if (thread_id == 0)
+//		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
+//#endif
 		CUDA_CPU_TOC("FourierTransform1");
 
 

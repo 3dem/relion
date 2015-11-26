@@ -555,10 +555,19 @@ public:
      * MultidimArray< RFLOAT > V2(V1);
      * @endcode
      */
-    MultidimArray(const MultidimArray<T>& V)
+    MultidimArray(const MultidimArray<T>& V, bool parent=false)
     {
-    	coreInit();
-        *this = V;
+    	if(parent)
+    	{
+    		coreInit();
+    		copyShape(V);
+    		coreAllocate();
+    	}
+    	else
+    	{
+    		coreInit();
+    		*this = V;
+    	}
     }
 
     /** Copy constructor from a Matrix1D.
