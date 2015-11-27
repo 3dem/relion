@@ -148,6 +148,12 @@ else(X11_FOUND)
 endif(X11_FOUND)
 
 # -----------------------------------------------------------------RELION COMPONENTS--
+option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
+if(BUILD_SHARED_LIBS)
+    message(STATUS "Building shared libs (smaller build size and binaries)")
+else()
+    message(STATUS "Building static libs (larger build size and binaries)")    
+endif()
 ADD_SUBDIRECTORY(src/apps)
 
 # -----------------------------------------------------------------------------TESTS--
