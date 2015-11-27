@@ -57,10 +57,10 @@ void ParticleSorter::initialise()
 	// Read in input metadata file
 	MDin.read(fn_in);
 
-	if (fn_out != "")
-		fn_out = fn_in.withoutExtension() + "_" + fn_out;
-	else
+	if (fn_out == "")
 		fn_out = fn_in.withoutExtension();
+	else
+		fn_out = fn_out.withoutExtension();
 
 	// Read in the references
 	Mrefs.clear();

@@ -378,8 +378,9 @@ class SortJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry input_star;
-	FileNameEntry fn_refs;
+	InputNodeEntry input_star;
+	AnyEntry fn_out;
+	InputNodeEntry fn_refs;
 	BooleanEntry do_ctf;
 	BooleanEntry do_ignore_first_ctfpeak;
 
@@ -467,12 +468,13 @@ public:
 	// I/O
 	AnyEntry fn_out;
 	FileNameEntry fn_cont;
-	FileNameEntry fn_img;
+	InputNodeEntry fn_img;
+	InputNodeEntry fn_ref;
+	InputNodeEntry fn_mask;
 	SliderEntry nr_classes;
 	BooleanEntry do_parallel_discio;
 
 	// Reference
-	FileNameEntry fn_ref;
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -487,7 +489,6 @@ public:
 	SliderEntry nr_iter;
 	SliderEntry tau_fudge;
 	BooleanEntry do_zero_mask;
-	FileNameEntry fn_mask;
 	SliderEntry highres_limit;
 
 	// Sampling
@@ -529,11 +530,12 @@ public:
 	// I/O
 	AnyEntry fn_out;
 	FileNameEntry fn_cont;
-	FileNameEntry fn_img;
+	InputNodeEntry fn_img;
+	InputNodeEntry fn_ref;
+	InputNodeEntry fn_mask;
 	BooleanEntry do_parallel_discio;
 
 	// Reference
-	FileNameEntry fn_ref;
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -546,7 +548,6 @@ public:
 
 	// Optimisation
 	BooleanEntry do_zero_mask;
-	FileNameEntry fn_mask;
 
 	// Sampling
 	textOnlyEntry autosample_text;
@@ -591,8 +592,10 @@ class PostJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry fn_in;
+	InputNodeEntry fn_in;
 	AnyEntry fn_out;
+
+	// TODO: take away auto-masking from postprocessing and do this outside the postprocessing in a new jobtype
 
 	// Masking
 	BooleanEntry do_automask;
@@ -641,7 +644,8 @@ class PolishJobWindow : public RelionJobWindow
 
 public:
 	// I/O
-	FileNameEntry fn_in;
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_mask;
 	AnyEntry fn_out;
 
 	// Movements
@@ -653,7 +657,6 @@ public:
 	BooleanEntry do_bfactor_weighting;
 	SliderEntry perframe_highres;
 	SliderEntry perframe_bfac_lowres;
-	FileNameEntry fn_mask;
 	AnyEntry sym_name;
 
 	Fl_Group *fit_group, *weight_group;
@@ -684,16 +687,16 @@ class ResmapJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry fn_resmap;
-	FileNameEntry fn_in;
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_mask;
 
 	// Params
+	FileNameEntry fn_resmap;
 	SliderEntry pval;
 	SliderEntry minres;
 	SliderEntry maxres;
 	SliderEntry stepres;
 
-	FileNameEntry fn_mask;
 
 public:
 

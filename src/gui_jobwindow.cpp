@@ -53,7 +53,7 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	// Data and model.star files
 	Node node1(fn_out + "_data.star", NODE_PART_DATA);
 	result.push_back(node1);
-	int nodetype = (dim==2) ? NODE_2DREF : NODE_3DREF;
+	int nodetype = (dim==2) ? NODE_REF : NODE_REF;
 	Node node2(fn_out + "_model.star", nodetype);
 	result.push_back(node2);
 
@@ -292,15 +292,11 @@ The command 'relion_refine' will print a list of possible options.");
 
 void RelionJobWindow::toggle_new_continue(bool is_continue)
 {
-	std::cerr << "toggle default is_continue=" << is_continue << std::endl;
 	return;
 }
 
 void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
 {
-#ifdef DEBUG
-	std::cerr << " opening " << fn << ".job for writing ... ";
-#endif
 
 	fh.open((fn+".job").c_str(), std::ios::out);
     if (!fh)
@@ -321,9 +317,6 @@ void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
 
 bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 {
-#ifdef DEBUG
-	std::cerr << " opening " << fn << ".job for reading ... ";
-#endif
 
 	fh.open((fn+".job").c_str(), std::ios_base::in);
     if (fh.fail())
@@ -369,9 +362,6 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh)
 	other_args.writeValue(fh);
 
 	fh.close();
-#ifdef DEBUG
-	std::cerr << " done! " << std::endl;
-#endif
 }
 
 void RelionJobWindow::closeReadFile(std::ifstream& fh)
@@ -392,10 +382,6 @@ void RelionJobWindow::closeReadFile(std::ifstream& fh)
 		qsub_extra2.readValue(fh);
 	qsubscript.readValue(fh);
 	other_args.readValue(fh);
-
-#ifdef DEBUG
-	std::cerr << " done! " << std::endl;
-#endif
 
 }
 
@@ -454,9 +440,10 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 
 void RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
 {
-	// If the outputname contains DATENTIMENRUN, then replace that now for the current time
-	int datentime = outputname.rfind("DATENTIMENRUN");
-	std::cerr << " old outputname = " << outputname << std::endl;
+	// If the outputname contains UNIQDATE, then replace that now for the current time
+	int datentime = outputname.rfind("UNIQDATE");
+	int last_slash = outputname.rfind("/");
+	std::string remainder = (last_slash < datentime) ? "" : outputname.substr(last_slash, outputname.length()+1);
 	if (datentime < outputname.size())
 	{
 		time_t now = time(0);
@@ -464,13 +451,13 @@ void RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
 		std::string replacestr = integerToString(ltm->tm_year%100, 2);
 		replacestr+= integerToString(1 + ltm->tm_mon, 2);
 		replacestr+= integerToString(1 + ltm->tm_mday, 2);
+		replacestr+= "-";
 		replacestr+= integerToString(1 + ltm->tm_hour, 2);
 		replacestr+= integerToString(1 + ltm->tm_min, 2);
 		replacestr+= integerToString(1 + ltm->tm_sec, 2);
-		outputname.replace(datentime, 1+outputname.length(), replacestr + "/run");
+		outputname.replace(datentime, outputname.length()+1 , replacestr);
+		outputname += remainder;
 	}
-	std::cerr << " new outputname = " << outputname << std::endl;
-
 }
 
 
@@ -829,7 +816,7 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	{
 		outputname = "run_ctffind";
 	}
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 
@@ -993,7 +980,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	commands.push_back(command);
 
 	outputname = "run_manualpick";
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	prepareFinalCommand(outputname, commands, final_command);
@@ -1168,7 +1155,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	outputname = autopick_rootname.getValue();
 
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	prepareFinalCommand(outputname, commands, final_command);
@@ -1387,13 +1374,13 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 	outputname = extract_rootname.getValue();
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	prepareFinalCommand(outputname, commands, final_command);
 }
 
-SortJobWindow::SortJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD)
+SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_SORT;
@@ -1401,15 +1388,25 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD)
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	ctf_group->end();
 
-	input_star.place(current_y, "Input particles to be sorted:", "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
+	input_star.place(current_y, "Input particles to be sorted:", NODE_PART_DATA, "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	fn_refs.place(current_y, "References:", "", "Input references (*.{star,mrc,mrcs})", "Input STAR file or MRC (stack of) image(s) with the references to be used for sorting. These should be the same references as used to determine the class number and in-plane orientations as given in the STAR file with the input particles");
+	fn_out.place(current_y, "Output rootname:", "Sort/UNIQDATE/particles", "Output rootname for all files of this run. ");
+	fn_out.deactivate();
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("References");
+	resetHeight();
+
+	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	ctf_group->end();
+
+	fn_refs.place(current_y, "References:", NODE_REF, "", "Input references (*.{star,mrc,mrcs})", "Input STAR file or MRC (stack of) image(s) with the references to be used for sorting. These should be the same references as used to determine the class number and in-plane orientations as given in the STAR file with the input particles");
 	do_ctf.place(current_y, "Are References CTF corrected?", true, "Set to Yes if the references were created with CTF-correction inside RELION. \n ", ctf_group);
 
 	ctf_group->begin();
@@ -1417,8 +1414,7 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD)
 	ctf_group->end();
 	do_ctf.cb_menu_i();
 
-
-	tab1->end();
+	tab2->end();
 
 	// read settings if hidden file exists
 	read(".gui_sort", is_continue);
@@ -1465,6 +1461,9 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 {
 
 	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_particle_sort_mpi`";
@@ -1472,7 +1471,25 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		command="`which relion_particle_sort`";
 
 	command += " --i " + input_star.getValue();
+	Node node(input_star.getValue(), NODE_PART_DATA);
+	pipelineInputNodes.push_back(node);
+
+	// TODO: how to handle 3DREFS????!
 	command += " --ref " + fn_refs.getValue();
+	Node node2(fn_refs.getValue(), NODE_REF);
+	pipelineInputNodes.push_back(node2);
+
+	outputname = fn_out.getValue();
+
+	// Change outputname if it contains UNIQDATE
+	changeDateNTimeInOutputname(outputname);
+
+	command += " --o " + outputname + "_sort.star";
+
+	pipelineOutputName = outputname;
+	Node node3(outputname + "_sort.star", NODE_PART_DATA);
+	pipelineOutputNodes.push_back(node3);
+
 	command += " --angpix " + floatToString(angpix);
 	command += " --particle_diameter " + floatToString(particle_diameter);
 
@@ -1487,21 +1504,6 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
-
-
-	int last_slash = input_star.getValue().rfind("/");
-	if (last_slash < input_star.getValue().size())
-	{
-		// The output name contains a directory: use that one for output
-		outputname = input_star.getValue().substr(0, last_slash + 1) + "run_sort";
-	}
-	else
-	{
-		outputname = "run_sort";
-	}
-
-	// Change outputname if it contains DATENTIMENRUN
-	changeDateNTimeInOutputname(outputname);
 
 	prepareFinalCommand(outputname, commands, final_command);
 }
@@ -1519,9 +1521,6 @@ Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
 	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 
-	fn_out.place(current_y, "Output rootname:", "Class2D/run1", "Output rootname for all files of this run. \
-If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
-
 	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
@@ -1531,20 +1530,16 @@ with X being the iteration from which one continues the previous run.");
 	// Add a little spacer
 	current_y += STEPY/2;
 
+
+	fn_out.place(current_y, "Output rootname:", "Class2D/UNIQDATE/run", "Output rootname for all files of this run. \
+If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
+	fn_out.deactivate();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
-
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
-These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-
 
 
 	tab1->end();
@@ -1584,6 +1579,12 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	tab3->begin();
 	tab3->label("Optimisation");
 	resetHeight();
+
+	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
+These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	nr_iter.place(current_y, "Number of iterations:", 25, 1, 50, 1, "Number of iterations to be performed. \
 Note that the current implementation of 2D class averaging and 3D classification does NOT comprise a convergence criterium. \
@@ -1760,7 +1761,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
 	outputname = fn_out.getValue();
 
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	if (is_continue)
@@ -1861,11 +1862,8 @@ Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_img.place(current_y, "Input images STAR file:", "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
+	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
-
-	fn_out.place(current_y, "Output rootname:", "Class3D/run1", "Output rootname for all files of this run. \
-If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
 
 	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
@@ -1873,24 +1871,39 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
+	fn_ref.place(current_y, "Reference map:", NODE_REF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
+	Make sure this map has the same dimensions and the same pixel size as your input images.");
+
+	fn_mask.place(current_y, "Reference mask (optional):", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "\
+If no mask is provided, a soft spherical mask based on the particle diameter will be used.\n\
+\n\
+Otherwise, provide a Spider/mrc map containing a (soft) mask with the same \
+dimensions as the reference(s), and values between 0 and 1, with 1 being 100% protein and 0 being 100% solvent. \
+The reconstructed reference map will be multiplied by this mask.\n\
+\n\
+In some cases, for example for non-empty icosahedral viruses, it is also useful to use a second mask. For all white (value 1) pixels in this second mask \
+the corresponding pixels in the reconstructed map are set to the average value of these pixels. \
+Thereby, for example, the higher density inside the virion may be set to a constant. \
+Note that this second mask should have one-values inside the virion and zero-values in the capsid and the solvent areas. \
+To use a second mask, use the additional option --solvent_mask2, which may given in the Additional arguments line (in the Running tab).");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	fn_out.place(current_y, "Output rootname:", "Class3D/UNIQDATE/run", "Output rootname for all files of this run. \
+If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
+	fn_out.deactivate();
+
 	// Add a little spacer
 	current_y += STEPY/2;
 	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
-These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
 
 	tab1->end();
 	tab2->begin();
 	tab2->label("Reference");
 	resetHeight();
 
-	fn_ref.place(current_y, "Reference map:", "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
-	Make sure this map has the same dimensions and the same pixel size as your input images.");
 
 	ref_correct_greyscale.place(current_y, "Ref. map is on absolute greyscale?", false, "Probabilities are calculated based on a Gaussian noise model, \
 which contains a squared difference term between the reference and the experimental image. This has a consequence that the \
@@ -1960,6 +1973,12 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	tab4->label("Optimisation");
 	resetHeight();
 
+	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
+These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	nr_iter.place(current_y, "Number of iterations:", 25, 1, 50, 1, "Number of iterations to be performed. \
 Note that the current implementation of 2D class averaging and 3D classification does NOT comprise a convergence criterium. \
 Therefore, the calculations will need to be stopped by the user if further iterations do not yield improvements in resolution or classes. \n\n \
@@ -1980,19 +1999,6 @@ the area outside a circle with the radius of the particle will be set to zeros p
 This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
 between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
 High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
-
-	fn_mask.place(current_y, "Reference mask (optional):", "", "Image Files (*.{spi,vol,msk,mrc})", "\
-If no mask is provided, a soft spherical mask based on the particle diameter will be used.\n\
-\n\
-Otherwise, provide a Spider/mrc map containing a (soft) mask with the same \
-dimensions as the reference(s), and values between 0 and 1, with 1 being 100% protein and 0 being 100% solvent. \
-The reconstructed reference map will be multiplied by this mask.\n\
-\n\
-In some cases, for example for non-empty icosahedral viruses, it is also useful to use a second mask. For all white (value 1) pixels in this second mask \
-the corresponding pixels in the reconstructed map are set to the average value of these pixels. \
-Thereby, for example, the higher density inside the virion may be set to a constant. \
-Note that this second mask should have one-values inside the virion and zero-values in the capsid and the solvent areas. \
-To use a second mask, use the additional option --solvent_mask2, which may given in the Additional arguments line (in the Running tab).");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2197,9 +2203,10 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Save the real output name (could be with _ctX for continuation)
 	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
 	outputname = fn_out.getValue();
-	// Change outputname if it contains DATENTIMENRUN
+
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
-	std::cerr << " class23d outputname= " << outputname << std::endl;
+
 	if (is_continue)
 		getContinueOutname(outputname, fn_cont);
 
@@ -2223,7 +2230,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		if (fn_ref.getValue() != "None")
 		{
 			command += " --ref " + fn_ref.getValue();
-			Node node(fn_ref.getValue(), NODE_3DREF);
+			Node node(fn_ref.getValue(), NODE_REF);
 			pipelineInputNodes.push_back(node);
 		}
 		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
@@ -2268,7 +2275,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (fn_mask.getValue().length() > 0)
 	{
 		command += " --solvent_mask " + fn_mask.getValue();
-		Node node(fn_mask.getValue(), NODE_3DMASK);
+		Node node(fn_mask.getValue(), NODE_MASK);
 		pipelineInputNodes.push_back(node);
 	}
 
@@ -2331,11 +2338,8 @@ Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_img.place(current_y, "Input images STAR file:", "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
+	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
-
-	fn_out.place(current_y, "Output rootname:", "Refine3D/run1", "Output rootname for all files of this run. \
-If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
 
 	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
@@ -2343,6 +2347,32 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run. \n \
 Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
+
+	fn_ref.place(current_y, "Reference map:", NODE_REF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
+	Make sure this map has the same dimensions and the same pixel size as your input images.");
+
+	fn_mask.place(current_y, "Reference mask (optional):", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "\
+If no mask is provided, a soft spherical mask based on the particle diameter will be used.\n\
+\n\
+Otherwise, provide a Spider/mrc map containing a (soft) mask with the same \
+dimensions as the reference(s), and values between 0 and 1, with 1 being 100% protein and 0 being 100% solvent. \
+The reconstructed reference map will be multiplied by this mask.\n\
+\n\
+In some cases, for example for non-empty icosahedral viruses, it is also useful to use a second mask. For all white (value 1) pixels in this second mask \
+the corresponding pixels in the reconstructed map are set to the average value of these pixels. \
+Thereby, for example, the higher density inside the virion may be set to a constant. \
+Note that this second mask should have one-values inside the virion and zero-values in the capsid and the solvent areas. \
+To use a second mask, use the additional option --solvent_mask2, which may given in the Additional arguments line (in the Running tab).");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	fn_out.place(current_y, "Output rootname:", "Refine3D/UNIQDATE/run", "Output rootname for all files of this run. \
+If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
+	fn_out.deactivate();
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2355,9 +2385,6 @@ Otherwise, only the master will read images and send them through the network to
 	tab2->begin();
 	tab2->label("Reference");
 	resetHeight();
-
-	fn_ref.place(current_y, "Reference map:", "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
-	Make sure this map has the same dimensions and the same pixel size as your input images.");
 
 	ref_correct_greyscale.place(current_y, "Ref. map is on absolute greyscale?", false, "Probabilities are calculated based on a Gaussian noise model, \
 which contains a squared difference term between the reference and the experimental image. This has a consequence that the \
@@ -2433,20 +2460,6 @@ the area outside a circle with the radius of the particle will be set to zeros p
 This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
 between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
 High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
-
-	fn_mask.place(current_y, "Reference mask (optional):", "", "Image Files (*.{spi,vol,msk,mrc})", "\
-If no mask is provided, a soft spherical mask based on the particle diameter will be used.\n\
-\n\
-Otherwise, provide a Spider/mrc map containing a (soft) mask with the same \
-dimensions as the reference(s), and values between 0 and 1, with 1 being 100% protein and 0 being 100% solvent. \
-The reconstructed reference map will be multiplied by this mask.\n\
-\n\
-In some cases, for example for non-empty icosahedral viruses, it is also useful to use a second mask. For all white (value 1) pixels in this second mask \
-the corresponding pixels in the reconstructed map are set to the average value of these pixels. \
-Thereby, for example, the higher density inside the virion may be set to a constant. \
-Note that this second mask should have one-values inside the virion and zero-values in the capsid and the solvent areas. \
-To use a second mask, use the additional option --solvent_mask2, which may given in the Additional arguments line (in the Running tab).");
-
 
 	tab4->end();
 	tab5->begin();
@@ -2676,7 +2689,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
 	outputname = fn_out.getValue();
 
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	if (is_continue)
@@ -2701,7 +2714,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		if (fn_ref.getValue() != "None")
 		{
 			command += " --ref " + fn_ref.getValue();
-			Node node(fn_ref.getValue(), NODE_3DREF);
+			Node node(fn_ref.getValue(), NODE_REF);
 			pipelineInputNodes.push_back(node);
 		}
 		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
@@ -2743,7 +2756,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command += " --solvent_mask " + fn_mask.getValue();
 
 		// TODO: what if this is a continuation run: re-put the mask as an input node? Or only if it changes? Also for 3Dclass
-		Node node(fn_mask.getValue(), NODE_3DMASK);
+		Node node(fn_mask.getValue(), NODE_MASK);
 		pipelineInputNodes.push_back(node);
 	}
 
@@ -2827,7 +2840,7 @@ PostJobWindow::PostJobWindow() : RelionJobWindow(4, HAS_NOT_MPI, HAS_NOT_THREAD)
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 
 	fn_out.place(current_y, "Output rootname", "postprocess", "Output rootname. All output files will be saved in the same directory as the unfiltered maps, unless the output name contains a forward slash. In that case, the corresponding directory will be created .");
 
@@ -2980,7 +2993,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		RFLOAT angpix)
 {
 
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	commands.clear();
@@ -3036,7 +3049,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		command += " --extend_inimask " + floatToString(extend_inimask.getValue());
 		command += " --width_mask_edge " + floatToString(width_mask_edge.getValue());
 
-		Node(outputname + "_automask.mrc", NODE_3DMASK);
+		Node(outputname + "_automask.mrc", NODE_MASK);
 		pipelineOutputNodes.push_back(node);
 	}
 
@@ -3044,7 +3057,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	if (do_usermask.getValue())
 	{
 		command += " --mask " + fn_mask.getValue();
-		Node node(fn_mask.getValue(), NODE_3DMASK);
+		Node node(fn_mask.getValue(), NODE_MASK);
 		pipelineInputNodes.push_back(node);
 	}
 
@@ -3087,7 +3100,9 @@ PolishJobWindow::PolishJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input STAR file with aligned movies:", "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
+	fn_in.place(current_y, "Input STAR file with aligned movies:", NODE_MOVIE_DATA, "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
+
+	fn_mask.place(current_y, "Mask for the reconstructions", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
 
 	fn_out.place(current_y, "Output rootname", "shiny", "Output rootname. Note that the program will write out ");
 
@@ -3140,8 +3155,6 @@ Because the power spectrum of per-frame reconstructions is compared to the power
 	do_bfactor_weighting.cb_menu_i();
 
 	current_y += STEPY/2;
-
-	fn_mask.place(current_y, "Mask for the reconstructions", "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
 
 	sym_name.place(current_y, "Symmetry:", "C1", "If the molecule is asymmetric, \
 set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
@@ -3226,7 +3239,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	command += " --o " + fn_out.getValue();
 
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	Node node1(fn_out.getValue() + ".star", NODE_MOVIE_DATA); // TODO: output from Shiny in its own directory
@@ -3258,7 +3271,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	if (fn_mask.getValue().length() > 0)
 	{
-		Node node(fn_mask.getValue(), NODE_3DMASK);
+		Node node(fn_mask.getValue(), NODE_MASK);
 		pipelineInputNodes.push_back(node);
 		command += " --mask " + fn_mask.getValue();
 	}
@@ -3292,7 +3305,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	prepareFinalCommand(outputname, commands, final_command);
 }
 
-ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
+ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_RESMAP;
@@ -3301,20 +3314,18 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", "", "MRC map files (*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 
 	current_y += STEPY /2 ;
 
-	pval.place(current_y, "P-value:", 0.05, 0., 1., 0.01, "This value is typically left at 0.05. If you change it, report the modified value in your paper!");
-	minres.place(current_y, "Highest resolution (A): ", 0., 0., 10., 0.1, "ResMaps minRes parameter. By default (0), the program will start at just above 2x the pixel size");
-	maxres.place(current_y, "Lowest resolution (A): ", 0., 0., 10., 0.1, "ResMaps maxRes parameter. By default (0), the program will stop at 4x the pixel size");
-	stepres.place(current_y, "Resolution step size (A)", 1., 0.1, 3, 0.1, "ResMaps stepSize parameter." );
-
-	current_y += STEPY /2 ;
-	fn_mask.place(current_y, "User-provided mask (optional):", "", "Image Files (*.{spi,vol,msk,mrc})", "A binary (!) mask with values 0 for solvent and 1 for protein. \
+	fn_mask.place(current_y, "User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A binary (!) mask with values 0 for solvent and 1 for protein. \
 Note that values larger than zero will be changed to 1 by ResMap, therefore the continuous masks from the postprocessing may be too wide. If left empty (default), then ResMap will determine its own mask");
 
-	current_y += STEPY /2 ;
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("ResMap");
+	resetHeight();
 
 	// Check for environment variable RELION_RESMAP_TEMPLATE
 	char * default_location = getenv ("RELION_RESMAP_EXECUTABLE");
@@ -3326,7 +3337,14 @@ Note that values larger than zero will be changed to 1 by ResMap, therefore the 
 
 	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
-	tab1->end();
+	current_y += STEPY /2 ;
+
+	pval.place(current_y, "P-value:", 0.05, 0., 1., 0.01, "This value is typically left at 0.05. If you change it, report the modified value in your paper!");
+	minres.place(current_y, "Highest resolution (A): ", 0., 0., 10., 0.1, "ResMaps minRes parameter. By default (0), the program will start at just above 2x the pixel size");
+	maxres.place(current_y, "Lowest resolution (A): ", 0., 0., 10., 0.1, "ResMaps maxRes parameter. By default (0), the program will stop at 4x the pixel size");
+	stepres.place(current_y, "Resolution step size (A)", 1., 0.1, 3, 0.1, "ResMaps stepSize parameter." );
+
+	tab2->end();
 
 	// read settings if hidden file exists
 	read(".gui_resmap", is_continue);
@@ -3379,7 +3397,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		RFLOAT angpix)
 {
 
-	// Change outputname if it contains DATENTIMENRUN
+	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
 	commands.clear();
@@ -3425,7 +3443,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --stepRes=" + floatToString(stepres.getValue());
 	if (fn_mask.getValue().length() > 0)
 	{
-		Node node2(fn_mask.getValue(), NODE_3DMASK);
+		Node node2(fn_mask.getValue(), NODE_MASK);
 		pipelineInputNodes.push_back(node2);
 		command += " --maskVol=" + fn_mask.getValue();
 	}

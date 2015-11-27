@@ -446,14 +446,13 @@ void InputNodeEntry::cb_browse_node_i() {
 
     // Get rid of the .Nodes/type/ directory-name again
     std::string replace = std::string(relname);
-    std::cerr <<" replace=" << replace << std::endl;
     std::string replace2 = replace.substr(fn_dir.length()+1, replace.length());
-    std::cerr <<" replace2=" << replace2 << std::endl;
     char relname2[FL_PATH_MAX];
     strcpy(relname2, replace2.c_str());
 
     inp->value(relname2);
 }
+
 
 // ==============================================================================
 // RadioEntry ================================================================

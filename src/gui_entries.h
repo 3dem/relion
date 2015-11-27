@@ -30,6 +30,7 @@
 #include <FL/Fl_Tabs.H>
 #include <FL/Fl_Slider.H>
 #include <FL/Fl_Group.H>
+#include <FL/fl_ask.H>
 #include <FL/Fl_Tabs.H>
 #include <FL/Fl_Hold_Browser.H>
 #include <FL/Fl_Select_Browser.H>
@@ -62,7 +63,7 @@
 //#define XCOL5 535
 #define GUIWIDTH 800
 #define GUIHEIGHT_OLD 400
-#define GUIHEIGHT_EXT 600
+#define GUIHEIGHT_EXT 700
 #define XCOL0 200
 #define WCOL0 200
 #define XCOL1 ( (XCOL0) + 10  )

@@ -37,13 +37,11 @@ class Process;
  * Nodes could be of the following types:
  */
 
-#define NODE_3DREF       	0 // 3D-reference(s), e.g. map.mrc or refs.star
-#define NODE_2DREF          1 // 2D reference(s), e.g. 1@refs.star, ref.mrc or refs.star
+#define NODE_REF       	0 // 2D or 3D-reference(s), e.g. map.mrc or refs.star or 1@refs.star
 #define NODE_HALFMAP		2 // Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
-#define NODE_2DMASK			3 // 2D mask(s), e.g. mask.mrc or masks.star
-#define NODE_3DMASK			4 // 3D mask(s), e.g. mask.mrc or masks.star
+#define NODE_MASK			3 // 2D or 3D mask(s), e.g. mask.mrc or masks.star
 #define NODE_MOVIE			6 // 2D micrograph movie(s), e.g. Falcon001_movie.mrcs or micrograph_movies.star
-#define NODE_2DMIC			5 // 2D micrograph(s), e.g. Falcon001.mrc or micrographs.star
+#define NODE_MIC			5 // 2D micrograph(s), e.g. Falcon001.mrc or micrographs.star
 #define NODE_TOMO			7 // 3D tomogram(s), e.g. tomo001.mrc or tomograms.star
 #define NODE_MIC_COORDS		8 // (A list of) coordinates for micrographs (*_autopick.star) // TODO: make a STAR file with all autopick.star names?
 #define NODE_MIC_CTFS		9 // (A list of) CTF parameters for micrographs (micrographs_ctf.star)
@@ -66,7 +64,7 @@ class Node
 	{
 		name = _name;
 		type = _type;
-		outputFromProcess = NULL;
+		outputFromProcess = -1;
 	}
 
 	// Destructor
@@ -161,6 +159,11 @@ class PipeLine
 
 	~PipeLine()
 	{
+		clear();
+	}
+
+	void clear()
+	{
 		nodeList.clear();
 		processList.clear();
 	}
@@ -188,14 +191,16 @@ class PipeLine
 	// Add a new Process to the list (no checks are performed)
 	long int addNewProcess(Process &_Process, bool do_overwrite = false);
 
-	// Erase nodes and processes from the pipeline
-	// At the ipos'th position in the nodeList or processList
-	void eraseNode(int ipos);
-	void eraseProcess(int ipos);
+	// Delete a process and its output nodes (and all input edges) from the pipeline
+	void deleteProcess(int ipos, bool recursive = false);
 
 	// Find nodes or process
 	long int findNodeByName(std::string name);
 	long int findProcessByName(std::string name);
+
+	// Touch each individual Node name in the temporary Nodes directory
+	// Return true if Node output file exists and temporary file is written, false otherwise
+	bool touchTemporaryNodeFile(Node &node);
 
 	// Make empty entries of all NodeNames in a hidden directory (useful for file browsing for InputNode I/O)
 	void makeNodeDirectory();
@@ -204,7 +209,7 @@ class PipeLine
 	void checkProcessCompletion();
 
 	// Write out the pipeline to a STAR file
-	void write();
+	void write(std::vector<bool> &deleteNode, std::vector<bool> &deleteProcess);
 
 	// Read in the pipeline from a STAR file
 	void read();
