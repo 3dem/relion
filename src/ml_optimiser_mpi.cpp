@@ -2058,7 +2058,8 @@ void MlOptimiserMpi::iterate()
 			timer.printTimes(false);
 #endif
 
-
+	for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+		((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
     }
 
 	// delete threads etc.
