@@ -11,20 +11,28 @@ project(Relion)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 
-
-
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
+
 if(DEFINED CMAKE_BUILD_TYPE)
-   SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
-build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling Benchmarking.")
+	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
+	
+	if( ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "none" ) AND
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "release" ) AND 
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "debug" ) AND
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "relwithdebinfo" ) AND 
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling" ) )
+	     message( FATAL_ERROR "CMAKE_BUILD_TYPE : '${CMAKE_BUILD_TYPE}' is not a valid build type. "
+		"Valid options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'." )
+	endif()
+	
+	SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
+build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
 else()
-   SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build,
-options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling Benchmarking.")
+	SET(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of
+build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
 endif()
-message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
 
-
-
+message(STATUS "Build type set to '${CMAKE_BUILD_TYPE}'")
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
