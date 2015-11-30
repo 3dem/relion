@@ -54,10 +54,13 @@ else(DoublePrec_GPU)
     message(STATUS "Setting gpu precision to single")
     # -- Will warn when double prec is inadvertently used in CUDA-code --
     #message(STATUS "ENV CUDA_VERSION :  $ENV{CUDA_VERSION}")
-    if((DEFINED ENV{CUDA_VERSION}) AND (($ENV{CUDA_VERSION} VERSION_GREATER "7.5") OR 
-    ($ENV{CUDA_VERSION} VERSION_EQUAL "7.5")))
-        #message(STATUS "Cuda version is >= 7.5")
-        set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
+    if(DEFINED ENV{CUDA_VERSION})
+        if(($ENV{CUDA_VERSION} VERSION_GREATER "7.5") OR ($ENV{CUDA_VERSION} VERSION_EQUAL "7.5"))
+             message(STATUS "Cuda version is >= 7.5")
+            set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
+        else()
+            message(STATUS "Cuda version is < 7.5")
+        endif()
     endif()
 endif(DoublePrec_GPU)
 
