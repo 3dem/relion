@@ -22,37 +22,19 @@ else(DoublePrec_CPU)
 	set(libfft "fftw3f")
 endif(DoublePrec_CPU)	
 
-set(FORCE_OWN_BUILD TRUE)
 ## ---------------------------------------------------------------------- CUFFT? --
-set(USE_CUFFT FALSE)
-if(CUFFT)
-    set(LIB_PATHFFT $ENV{CUDA_HOME}/lib64)
-    set(INC_PATHFFT $ENV{CUDA_HOME}/include)
-    find_library(FFTW_LIBRARIES  NAMES cufftw PATHS ${LIB_PATHFFT})
-    find_library(FFT_LIBRARIES   NAMES cufft  PATHS ${LIB_PATHFFT})
-    list(APPEND FFTW_LIBRARIES ${FFT_LIBRARIES} )
-    set(fft "cufft")
-    
-else(CUFFT)
-    if(NOT FORCE_OWN_BUILD)
-        set(LIB_PATHFFT $ENV{FFTW_LIB})
-        set(INC_PATHFFT $ENV{FFTW_INCLUDE})
-     
-        find_library(FFTW_LIBRARIES  NAMES fftw3f  PATHS ${LIB_PATHFFT})  
-        find_library(FFTWD_LIBRARIES   NAMES fftw3   PATHS ${LIB_PATHFFT}) 
-        list(APPEND FFTW_LIBRARIES ${FFTWD_LIBRARIES} )
-        # PARALLELISM OPTIONS
-    
-        if(NOT NOTHREAD_RELION)
-            find_library(FFTW_THREAD_LIBS  NAMES "fftw3_threads"  PATHS $ENV{FFTW_LIB})	
-       	list(APPEND FFTW_LIBRARIES ${FFTW_THREAD_LIBS} )
-        endif(NOT NOTHREAD_RELION)
-    endif()
-endif(CUFFT)
+if(NOT FORCE_OWN_FFT)
+    set(LIB_PATHFFT $ENV{FFTW_LIB})
+    set(INC_PATHFFT $ENV{FFTW_INCLUDE})
+ 
+    find_library(FFTW_LIBRARIES  NAMES fftw3f  PATHS ${LIB_PATHFFT})  
+    find_library(FFTWD_LIBRARIES   NAMES fftw3   PATHS ${LIB_PATHFFT}) 
+    list(APPEND FFTW_LIBRARIES ${FFTWD_LIBRARIES} )
+endif()
 
     
 ## ------------------------------------------------------------------- SYSTEM LIBS? --
-if(NOT FORCE_OWN_BUILD)
+if(NOT FORCE_OWN_FFT)
     message(STATUS "Looking for fft header ...")
     if(DEFINED ENV{FFTW_INCLUDE})
         find_path(FFTW_PATH     NAMES fftw3.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
@@ -125,3 +107,11 @@ endif()
 message(STATUS "FFTW_PATH: ${FFTW_PATH}")
 message(STATUS "FFTW_INCLUDES: ${FFTW_INCLUDES}")
 message(STATUS "FFTW_LIBRARIES: ${FFTW_LIBRARIES}")
+
+if(FFTW_PATH)
+   set(FFTW_FOUND TRUE)
+endif(FFTW_PATH)
+
+if(FFTW_FIND_REQUIRED AND NOT FFTW_FOUND)
+	message( FATAL_ERROR "FFTW is required." )
+endif(FFTW_FIND_REQUIRED AND NOT FFTW_FOUND)

@@ -10,24 +10,31 @@ project(Relion)
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-#if(true)
-#    file(DOWNLOAD ftp://ftp.fftw.org/pub/fftw/fftw-3.3.4.tar.gz  ${CMAKE_SOURCE_DIR}/external/fftw-3.3.4.tar.gz)
-#endif()
 
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
 if(DEFINED CMAKE_BUILD_TYPE)
-   SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
-build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling Benchmarking.")
+	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
+	
+	if( ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "none" ) AND
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "release" ) AND 
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "debug" ) AND
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "relwithdebinfo" ) AND 
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling" ) )
+	     message( FATAL_ERROR "CMAKE_BUILD_TYPE : '${CMAKE_BUILD_TYPE}' is not a valid build type. "
+		"Valid options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'." )
+	endif()
+	
+	SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
+build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
 else()
-   SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build,
-options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling Benchmarking.")
+	SET(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of
+build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
 endif()
-message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
+
+message(STATUS "Build type set to '${CMAKE_BUILD_TYPE}'")
 
 set(ALLOW_OWN_BUILD TRUE)
 message(STATUS "Allowing download and local build of external libs.")
-
-
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
@@ -135,7 +142,18 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ------------------------------------------------------------------------------FFTW--
+
+option(OWN_FFT "OWN_FFT" OFF)
+if(OWN_FFT)
+    set(FORCE_OWN_FFT TRUE)
+endif(OWN_FFT)
 FIND_PACKAGE(FFTW REQUIRED)
+
+option(OWN_FLTK "OWN_FLTK" OFF)
+if(OWN_FLTK)
+    message(FATAL_ERROR "You cannot have your own FLTK yet, I'm working on it. / Björn")
+    set(FORCE_OWN_FFT TRUE)
+endif(OWN_FLTK)
 
 # --------------------------------------------------------------------------X11/FLTK--
 #--BELOW DOES NOT WORK ON K80-MACHINES YET--
