@@ -10,8 +10,9 @@ project(Relion)
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-
-
+#if(true)
+#    file(DOWNLOAD ftp://ftp.fftw.org/pub/fftw/fftw-3.3.4.tar.gz  ${CMAKE_SOURCE_DIR}/external/fftw-3.3.4.tar.gz)
+#endif()
 
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
 if(DEFINED CMAKE_BUILD_TYPE)
@@ -23,6 +24,8 @@ options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release Profiling
 endif()
 message(STATUS "Set the build type to ${CMAKE_BUILD_TYPE}")
 
+set(ALLOW_OWN_BUILD TRUE)
+message(STATUS "Allowing download and local build of external libs.")
 
 
 

@@ -1,5 +1,7 @@
 include_directories("${CMAKE_SOURCE_DIR}")
-include_directories("${FFTW_INCLUDES}")
+if(FOUND_FFTW)
+    include_directories("${FFTW_INCLUDES}")
+endif()
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
 find_path (X11_INCLUDES Xdbe.h)
@@ -61,7 +63,11 @@ foreach (_target ${RELION_TARGETS})
 	    add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
 	    set(LIB ${relion_lib})
 	endif()
- 	
+	
+	if(BUILD_EXTERNAL_FFTW)
+ 	   add_dependencies(${_target} FFTW3)
+ 	endif()
+	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 	if(BUILD_GUI_TARGETS)
 	       include_directories("${FLTK_INCLUDE_DIR}") 
