@@ -1,19 +1,6 @@
-# Double precision is default, single precision can be 
-# opted into by specifying this in CMakeLists.txt
-
-set(FFTW_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fftw")
-# PRECISION OPTION SPECIFIERS FOR EXTERNAL BUILD.     
- 
-if(DoublePrec_CPU)
-   # set fftw lib to use double precision
-	set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
-	message(STATUS "ext_conf_flags_fft: ${ext_conf_flags_fft}")
-	set(libfft "fftw3")
-else(DoublePrec_CPU)
-	# set fftw lib to use single precision
-	set(ext_conf_flags_fft --enable-shared --enable-float --prefix=${FFTW_EXTERNAL_PATH})
-	set(libfft "fftw3f")
-endif(DoublePrec_CPU)	
+message(STATUS "-------------------------------------------------")   
+message(STATUS "------------- USING LOCAL FFTW LIBS -------------")  
+message(STATUS "-------------------------------------------------") 
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
 
@@ -29,11 +16,19 @@ endif()
  
 if(NOT FFTW_FOUND)
 
+    set(FFTW_LIBRARIES ${FFTW_EXTERNAL_PATH}/lib/lib${libfft}.so )  
+    set(FFTW_PATH      "${FFTW_EXTERNAL_PATH}/includes/fftw3.h" )  
+    set(FFTW_INCLUDES  "${FFTW_EXTERNAL_PATH}/includes/fftw3.h" )
+
     include(ExternalProject)
     set(FFTW_EXTERNAL_LIBS_TAR_DIRECTORY  ${FFTW_EXTERNAL_PATH})
     set(FFTW_EXTERNAL_LIBS_EXTRACT_TARGET ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY})
-    message( STATUS "no fftw found, the following paths are set for libs/headers TO BE built")
+    message( STATUS "no previous fftw found, the following paths are set for libs/headers TO BE built")
+    
     set(FFTW_FFTW3_TAR_FILE ftp://ftp.fftw.org/pub/fftw/fftw-3.3.4.tar.gz)
+    #set(FFTW_FFTW3_TAR_FILE https://drive.google.com/uc?export=download&id=0B942d76zVnSeazZWcExRaXIyVDg) #backup location fftw-3.3.4
+    #set(FFTW_TAR_NAME fftw-3.3.4.tar.gz)
+
     set(FFTW_FFTW3_LIB_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
     set(FFTW_FFTW3_BUILD_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
     
@@ -55,9 +50,5 @@ if(NOT FFTW_FOUND)
     set(NEW_OWN_FFTW TRUE)
     set(FFTW_FOUND TRUE)
     
-    set(FFTW_LIBRARIES "${FFTW_EXTERNAL_PATH}/lib/lib${libfft}.so" )  
-    set(FFTW_PATH      "${FFTW_EXTERNAL_PATH}/includes/fftw3.h" )  
-    set(FFTW_INCLUDES  "${FFTW_EXTERNAL_PATH}/includes/fftw3.h" )
-
 endif()
 

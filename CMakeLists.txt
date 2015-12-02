@@ -1,18 +1,17 @@
 cmake_minimum_required(VERSION 2.8.8)
 set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
-
-if(POLICY CMP0048)
-  cmake_policy(SET CMP0048 NEW)
-endif()
+#
+#if(POLICY CMP0048)
+#  cmake_policy(SET CMP0048 NEW)
+#endif()
 project(Relion)
 
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
-if(DEFINED CMAKE_BUILD_TYPE)
+if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
 	
 	if( ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "none" ) AND
@@ -24,18 +23,15 @@ if(DEFINED CMAKE_BUILD_TYPE)
 		"Valid options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'." )
 	endif()
 	
+	message(STATUS "BUILD TYPE set to '${CMAKE_BUILD_TYPE}'")
 	SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
 build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
 else()
-	SET(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of
-build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
+	SET(CMAKE_BUILD_TYPE "Release")
+	message(STATUS "BUILD TYPE set to the default type:  '${CMAKE_BUILD_TYPE}'")
+	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
 endif()
 
-message(STATUS "Build type set to '${CMAKE_BUILD_TYPE}'")
-
-set(ALLOW_OWN_FFTW FALSE)
-set(ALLOW_OWN_FLTK FALSE)
-message(STATUS "Allowing download and local build of external libs.")
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
@@ -50,7 +46,7 @@ endif(NOT DEFINED CUDA_ARCH)
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
 option(DoublePrec_CPU "DoublePrec_CPU" OFF)
 if(DoublePrec_CPU)
-    message(STATUS "Setting cpu precision to double")
+    message(STATUS "Setting cpu precision to double")    
 else(DoublePrec_CPU)
     message(STATUS "Setting cpu precision to single")
     add_definitions(-DRELION_SINGLE_PRECISION)
@@ -120,11 +116,9 @@ endif(CUFFT)
 # ------------------------------------------------------------------------GUI OR NOT--
 # Skip FLTK/X11-dependent binaries or not
 option(GUI "GUI" ON)
-if(GUI)
-    set(BUILD_GUI_TARGETS TRUE)
-else(GUI)
-    message(STATUS "You want to omit GUI targets")
-endif(GUI)
+if(NOT GUI)
+    message(STATUS "Omitting GUI targets as per your request")
+endif()
 
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
@@ -142,41 +136,42 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# ------------------------------------------------------------------------------FFTW--
-#set(FORCE_OWN_FFTW TRUE)
-option(OWN_FFTW "OWN_FFT" OFF)
-if(OWN_FFT)
-    set(FORCE_OWN_FFTW TRUE)
-    set(ALLOW_OWN_FFTW TRUE)
-endif(OWN_FFT)
-FIND_PACKAGE(FFTW REQUIRED)
-
-set(FORCE_OWN_FLTK TRUE)
 option(OWN_FLTK "OWN_FLTK" OFF)
-if(OWN_FLTK)
-    set(FORCE_OWN_FLTK TRUE)
-    set(ALLOW_OWN_FLTK TRUE)
-endif(OWN_FLTK)
-
 # --------------------------------------------------------------------------X11/FLTK--
-#--BELOW DOES NOT WORK ON K80-MACHINES YET--
 FIND_PACKAGE(X11)
-if(X11_FOUND)
-    set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
-    if(NOT FORCE_OWN_FLTK)
-        FIND_PACKAGE(FLTK)
-    endif()
-    if(FLTK_FOUND AND BUILD_GUI_TARGETS)
-        message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
-    else()
-        if(BUILD_GUI_TARGETS)
+if(GUI)
+
+    if(X11_FOUND)
+        set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
+        if(OWN_FLTK)
             include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+        else()
+            FIND_PACKAGE(FLTK)
         endif()
-    endif()
-else(X11_FOUND)
-    set(BUILD_GUI_TARGETS FALSE)
-    message(STATUS "X11 not found, omitting GUI targets.")
-endif(X11_FOUND)
+        
+        if(FLTK_FOUND)
+            message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
+        else()
+            message( STATUS "\n-- ------------------ YOU HAVE NO FLTK-LIBS ------------------")
+            message( STATUS "CCmake found no fltk-libs on your system, which are required for the GUI. Either ")
+            message( STATUS "     a) Make sure cmake can find them ")
+            message( STATUS "     b) Add the flag -DOWN_FLTK=ON to your cmake command to build a local fltk-lib")
+            message( STATUS "     c) Add the flag -DGUI=OFF to avoid using fltk" )
+            message( STATUS "--------------------------------------------------------")
+        	message( FATAL_ERROR "FLTK is required for GUI." )
+        endif() 
+    else(X11_FOUND)
+        message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
+        message( STATUS "CCmake found no fltk-libs on your system, which are required for the GUI.")
+        message( STATUS " You CAN add the flag -DGUI=OFF to avoid using X11" )
+        message(FATAL_ERROR "X11 is required for GUI.")
+    endif(X11_FOUND)
+    
+endif(GUI)    
+    
+# ------------------------------------------------------------------------------FFTW--
+option(OWN_FFTW "OWN_FFT" OFF)
+FIND_PACKAGE(FFTW REQUIRED)
 
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
