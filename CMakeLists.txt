@@ -33,7 +33,8 @@ endif()
 
 message(STATUS "Build type set to '${CMAKE_BUILD_TYPE}'")
 
-set(ALLOW_OWN_BUILD TRUE)
+set(ALLOW_OWN_FFTW FALSE)
+set(ALLOW_OWN_FLTK FALSE)
 message(STATUS "Allowing download and local build of external libs.")
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
@@ -142,17 +143,19 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ------------------------------------------------------------------------------FFTW--
-
-option(OWN_FFT "OWN_FFT" OFF)
+#set(FORCE_OWN_FFTW TRUE)
+option(OWN_FFTW "OWN_FFT" OFF)
 if(OWN_FFT)
-    set(FORCE_OWN_FFT TRUE)
+    set(FORCE_OWN_FFTW TRUE)
+    set(ALLOW_OWN_FFTW TRUE)
 endif(OWN_FFT)
 FIND_PACKAGE(FFTW REQUIRED)
 
+set(FORCE_OWN_FLTK TRUE)
 option(OWN_FLTK "OWN_FLTK" OFF)
 if(OWN_FLTK)
-    message(FATAL_ERROR "You cannot have your own FLTK yet, I'm working on it. / Björn")
-    set(FORCE_OWN_FFT TRUE)
+    set(FORCE_OWN_FLTK TRUE)
+    set(ALLOW_OWN_FLTK TRUE)
 endif(OWN_FLTK)
 
 # --------------------------------------------------------------------------X11/FLTK--
@@ -160,11 +163,15 @@ endif(OWN_FLTK)
 FIND_PACKAGE(X11)
 if(X11_FOUND)
     set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
-    FIND_PACKAGE(FLTK)
+    if(NOT FORCE_OWN_FLTK)
+        FIND_PACKAGE(FLTK)
+    endif()
     if(FLTK_FOUND AND BUILD_GUI_TARGETS)
         message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
     else()
-        message(STATUS "FLTK not found or intentionally skipped; omitting GUI targets.")
+        if(BUILD_GUI_TARGETS)
+            include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+        endif()
     endif()
 else(X11_FOUND)
     set(BUILD_GUI_TARGETS FALSE)

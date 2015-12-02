@@ -48,6 +48,7 @@ else()
     add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 endif()
 
+
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
@@ -59,8 +60,11 @@ foreach (_target ${RELION_TARGETS})
 	    set(LIB ${relion_lib})
 	endif()
 	
-	if(BUILD_EXTERNAL_FFTW)
+	if(NEW_OWN_FFTW)
  	   add_dependencies(${_target} FFTW3)
+ 	endif()
+	if(NEW_OWN_FLTK)
+ 	   add_dependencies(${_target} FLTK)
  	endif()
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
