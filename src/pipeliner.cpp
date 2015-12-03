@@ -156,11 +156,9 @@ void PipeLine::deleteProcess(int ipos, bool recursive)
 			istart = imax;
 			long int idel = to_delete_processes[i];
 			deleteProcesses[idel] = true;
-			std::cerr << " Deleting process " << processList[idel].name << " from the pipeline. " << std::endl;
 			for (size_t inode = 0; inode < (processList[idel]).outputNodeList.size(); inode++)
 			{
 				long int mynode = (processList[ipos]).outputNodeList[inode];
-				std::cerr << " Deleting node " << nodeList[mynode].name << " from the pipeline. " << std::endl;
 				deleteNodes[mynode] = true;
 				is_done = true;
 				if (recursive)
@@ -205,19 +203,17 @@ long int PipeLine::findProcessByName(std::string name)
 	return -1;
 }
 
-bool PipeLine::touchTemporaryNodeFile(Node &node)
+bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 {
 	FileName fn_dir = ".Nodes/";
 	FileName fnt = node.name;
-	if (exists(fnt))
+	if (exists(fnt) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
 		FileName fn_type = integerToString(node.type) + "/";
 		std::string command = "mkdir -p " + fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
-		std::cerr << command << std::endl;
 		int res = system(command.c_str());
 		command = "touch " + fn_dir + fn_type + fnt;
-		std::cerr << command << std::endl;
 		res = system(command.c_str());
 		return true;
 	}
@@ -230,7 +226,6 @@ void PipeLine::makeNodeDirectory()
 	// Clear existing directory
 	FileName fn_dir = ".Nodes/";
 	std::string command = " rm -rf " + fn_dir;
-	std::cerr << command << std::endl;
 	int res = system(command.c_str());
 
 	for (long int i = 0; i < nodeList.size(); i++)
@@ -260,6 +255,15 @@ void PipeLine::checkProcessCompletion()
 			if (all_exist)
 			{
 				processList[i].status = PROC_FINISHED;
+			}
+		}
+		else if (processList[i].status == PROC_SCHEDULED)
+		{
+			// Also touch the output nodes of the scheduled jobs (even though they don't exist yet. That way can link future jobs together!)
+			for (long int j = 0; j < processList[i].outputNodeList.size(); j++)
+			{
+				int myNode = (processList[i]).outputNodeList[j];
+				touchTemporaryNodeFile(nodeList[myNode], true); // true means touch even if output node does not exist yet
 			}
 		}
 	}

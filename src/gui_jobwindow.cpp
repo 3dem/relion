@@ -450,27 +450,30 @@ void RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
 		tm *ltm = localtime(&now);
 		std::string replacestr = integerToString(ltm->tm_year%100, 2);
 		replacestr+= integerToString(1 + ltm->tm_mon, 2);
-		replacestr+= integerToString(1 + ltm->tm_mday, 2);
+		replacestr+= integerToString(ltm->tm_mday, 2);
 		replacestr+= "-";
-		replacestr+= integerToString(1 + ltm->tm_hour, 2);
-		replacestr+= integerToString(1 + ltm->tm_min, 2);
-		replacestr+= integerToString(1 + ltm->tm_sec, 2);
+		replacestr+= integerToString(ltm->tm_hour, 2);
+		replacestr+= integerToString(ltm->tm_min, 2);
+		replacestr+= integerToString(ltm->tm_sec, 2);
 		outputname.replace(datentime, outputname.length()+1 , replacestr);
 		outputname += remainder;
 	}
 }
 
 
-void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
+void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
 	// Create output directory if the outname contains a "/"
-	int last_slash = outputname.rfind("/");
-	if (last_slash < outputname.size())
+	if (do_makedir)
 	{
-		std::string dirs = outputname.substr(0, last_slash);
-		std::string makedirs = "mkdir -p " + dirs;
-		int res = system(makedirs.c_str());
+		int last_slash = outputname.rfind("/");
+		if (last_slash < outputname.size())
+		{
+			std::string dirs = outputname.substr(0, last_slash);
+			std::string makedirs = "mkdir -p " + dirs;
+			int res = system(makedirs.c_str());
+		}
 	}
 
 	// Prepare full mpi commands or save jobsubmission script to disc
@@ -768,7 +771,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix)
+		std::string &final_command, RFLOAT angpix, bool do_makedir)
 {
 
 	commands.clear();
@@ -820,7 +823,7 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	changeDateNTimeInOutputname(outputname);
 
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -942,7 +945,7 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, RFLOAT particle_diameter)
+		RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -983,7 +986,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -1110,7 +1113,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -1158,7 +1161,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -1322,7 +1325,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, RFLOAT particle_diameter)
+		RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -1377,7 +1380,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
@@ -1457,7 +1460,7 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -1505,7 +1508,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -1743,7 +1746,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -1849,7 +1852,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2186,7 +2189,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -2325,7 +2328,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2671,7 +2674,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter)
+		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
 {
 
 	commands.clear();
@@ -2828,7 +2831,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2990,7 +2993,7 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix)
+		RFLOAT angpix, bool do_makedir)
 {
 
 	// Change outputname if it contains UNIQDATE
@@ -3087,7 +3090,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -3219,7 +3222,7 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust)
+		RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust, bool do_makedir)
 {
 	commands.clear();
 	std::string command;
@@ -3302,7 +3305,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	{
 		outputname = fn_out.getValue();
 	}
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
@@ -3394,7 +3397,7 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix)
+		RFLOAT angpix, bool do_makedir)
 {
 
 	// Change outputname if it contains UNIQDATE
@@ -3464,7 +3467,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		outputname = "run_resmap";
 	}
 
-	prepareFinalCommand(outputname, commands, final_command);
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 

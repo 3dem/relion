@@ -32,6 +32,8 @@
 #define DONT_TOGGLE_CONT false
 #define DO_GET_CL true
 #define DONT_GET_CL false
+#define DO_MKDIR true
+#define DONT_MKDIR false
 
 // Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
 #define MAX_JOBS_BROWSER 50
@@ -80,7 +82,7 @@ public:
 
     // Run button
     Fl_Button *print_CL_button, *cite_button, *display_button;
-    Fl_Button *schedule_button;
+    Fl_Button *schedule_button, *run_scheduled_button;
     Fl_Button *delete_button;
     Fl_Button *cleanup_button;
 
@@ -95,7 +97,7 @@ public:
     ~RelionMainWindow(){};
 
     // Communicate with the different jobtype objects
-    void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, int this_job = 0);
+    void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
 
     // Add a process to the PipeLine
     void addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);
@@ -112,6 +114,11 @@ public:
     // When a job is selected from the job browsers at the bottom: set current_job there, load that one in the current window
     // and update all job lists at the bottom
     void loadJobFromPipeline();
+
+    // Find the first substring corresponding to /??????-??????/
+    // As defined in RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
+    std::string findUniqueDateSubstring(std::string in);
+
 
 private:
 
@@ -158,8 +165,11 @@ private:
     static void cb_schedule(Fl_Widget*, void*);
     inline void cb_schedule_i();
 
+    static void cb_run_scheduled(Fl_Widget*, void*);
+    inline void cb_run_scheduled_i();
+
     static void cb_delete(Fl_Widget*, void*);
-    inline void cb_delete_i();
+    inline void cb_delete_i(bool do_ask = true, bool do_recursive = true);
 
     static void cb_cleanup(Fl_Widget*, void*);
     inline void cb_cleanup_i();
