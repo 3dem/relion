@@ -1,7 +1,6 @@
 include_directories("${CMAKE_SOURCE_DIR}")
-if(FOUND_FFTW)
-    include_directories("${FFTW_INCLUDES}")
-endif()
+
+include_directories("${FFTW_INCLUDES}")
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
 find_path (X11_INCLUDES Xdbe.h)
@@ -84,9 +83,11 @@ foreach (_target ${RELION_TARGETS})
 	message(STATUS "added ${_target}...")
 endforeach()
 
-ADD_CUSTOM_COMMAND(TARGET maingui
-          POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
-)
+if(GUI)
+    ADD_CUSTOM_COMMAND(TARGET maingui
+              POST_BUILD
+              COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
+    )
+endif(GUI)
 
 

@@ -19,19 +19,18 @@ if(NOT OWN_FFTW)
     set(LIB_PATHFFT $ENV{FFTW_LIB})
     set(INC_PATHFFT $ENV{FFTW_INCLUDE})
  
-    find_library(FFTW_LIBRARIES  NAMES ${libfft}  PATHS ${LIB_PATHFFT})  
-    
+    find_library(FFTW_LIBRARIES  NAMES ${libfft}  PATHS ${LIB_PATHFFT} NO_DEFAULT_PATH)  
 
     message(STATUS "Looking for fft header ...")
     if(DEFINED ENV{FFTW_INCLUDE})
         find_path(FFTW_PATH     NAMES fftw3.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
         find_path(FFTW_INCLUDES NAMES fftw3.h  PATHS ${INC_PATHFFT} NO_DEFAULT_PATH)
     else()
-        find_path(FFTW_PATH         NAMES fftw3.h )
-        find_path(FFTW_INCLUDES     NAMES fftw3.h )
+        find_path(FFTW_PATH         NAMES fftw3.h NO_DEFAULT_PATH)
+        find_path(FFTW_INCLUDES     NAMES fftw3.h NO_DEFAULT_PATH)
     endif()
         
-    find_library(FFTW_LIBRARIES PATHS $ENV{FFTW_LIB} $ENV{FFTW_HOME})
+    find_library(FFTW_LIBRARIES PATHS $ENV{FFTW_LIB} $ENV{FFTW_HOME} NO_DEFAULT_PATH)
     
     if(FFTW_PATH)
         set(FFTW_FOUND TRUE)
