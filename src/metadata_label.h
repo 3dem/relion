@@ -119,6 +119,8 @@ enum EMDLabel
     EMDL_IMAGE_STATS_KURT,
     EMDL_IMAGE_WEIGHT,
 
+    EMDL_MASK_NAME,
+
     EMDL_MATRIX_1_1,
     EMDL_MATRIX_1_2,
     EMDL_MATRIX_1_3,
@@ -131,6 +133,7 @@ enum EMDLabel
 
     EMDL_MICROGRAPH_ID,
     EMDL_MICROGRAPH_NAME,
+    EMDL_MICROGRAPH_MOVIE_NAME,
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
@@ -138,7 +141,6 @@ enum EMDLabel
     EMDL_MLMODEL_ACCURACY_ROT,
     EMDL_MLMODEL_ACCURACY_TRANS,
     EMDL_MLMODEL_AVE_PMAX,
-    EMDL_MLMODEL_BODY_MASK_NAME,
     EMDL_MLMODEL_CURRENT_RESOLUTION,
     EMDL_MLMODEL_CURRENT_SIZE,
     EMDL_MLMODEL_DATA_VS_PRIOR_REF,
@@ -472,6 +474,8 @@ private:
         EMDL::addLabel(EMDL_IMAGE_STATS_KURT, EMDL_DOUBLE, "rlnKurtosisExcessValue", "Kurtosis excess (4th moment - 3) for the pixel values in an image");
         EMDL::addLabel(EMDL_IMAGE_WEIGHT, EMDL_DOUBLE, "rlnImageWeight", "Relative weight of an image");
 
+        EMDL::addLabel(EMDL_MASK_NAME, EMDL_STRING, "rlnMaskName", "Name of an image that contains a [0,1] mask");
+
         EMDL::addLabel(EMDL_MATRIX_1_1, EMDL_DOUBLE, "rlnMatrix_1_1", "Matrix element (1,1) of a 3x3 matrix");
         EMDL::addLabel(EMDL_MATRIX_1_2, EMDL_DOUBLE, "rlnMatrix_1_2", "Matrix element (1,2) of a 3x3 matrix");
         EMDL::addLabel(EMDL_MATRIX_1_3, EMDL_DOUBLE, "rlnMatrix_1_3", "Matrix element (1,3) of a 3x3 matrix");
@@ -484,6 +488,7 @@ private:
 
         EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_LONG, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE, EMDL_DOUBLE, "rlnMicrographTiltAxisOutOfPlane", "Out-of-plane angle (in degrees) of the tilt-axis used to collect a micrograph (90=in-plane)");
@@ -491,7 +496,6 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS, EMDL_DOUBLE, "rlnAccuracyTranslations", "Estimated accuracy (in pixels) with which translations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_AVE_PMAX, EMDL_DOUBLE, "rlnAveragePmax", "Average value (over all images) of the maxima of the probability distributions");
-        EMDL::addLabel(EMDL_MLMODEL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a binary mask for the independent body to be used in multi-body refinement (0=outside; 1=inside body)");
         EMDL::addLabel(EMDL_MLMODEL_CURRENT_RESOLUTION, EMDL_DOUBLE, "rlnCurrentResolution", "Current resolution where SSNR^MAP drops below 1 (in 1/Angstroms)");
         EMDL::addLabel(EMDL_MLMODEL_CURRENT_SIZE, EMDL_INT, "rlnCurrentImageSize", "Current size of the images used in the refinement");
         EMDL::addLabel(EMDL_MLMODEL_DATA_VS_PRIOR_REF, EMDL_DOUBLE, "rlnSsnrMap", "Spectral signal-to-noise ratio as defined for MAP estimation (SSNR^MAP)");

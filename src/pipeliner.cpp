@@ -22,26 +22,6 @@
 
 //#define DEBUG
 
-std::string Node::printType()
-{
-    switch ( type )
-    {
-		case NODE_REF: 			return "Reference"; break;
-		case NODE_HALFMAP:		return "Half-map"; break;
-		case NODE_MASK:			return "Mask"; break;
-		case NODE_MOVIE:		return "movie"; break;
-		case NODE_MIC:			return "micrograph"; break;
-		case NODE_TOMO:			return "tomogram"; break;
-		case NODE_MIC_COORDS:	return "Micrograph coords"; break;
-		case NODE_MIC_CTFS:		return "Micrograph CTF-info"; break;
-		case NODE_PART_DATA:	return "Metadata List of particles"; break;
-		case NODE_OPTIMISER:	return "Optimiser"; break;
-		default: return "unrecognized";
-    }
-
-}
-
-
 long int PipeLine::addNode(Node &_Node)
 {
 

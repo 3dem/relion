@@ -74,8 +74,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	run_button->labelsize(16);
 	run_button->callback( cb_run, this);
 
-
-    display_button = new Fl_Button(10, h-50, XCOL0-20, 30, "Display");
+	display_button = new Fl_Button(10, h-50, XCOL0-20, 30, "Display");
 	display_button->color(GUI_RUNBUTTON_COLOR);
 	display_button->callback( cb_display, this);
 
@@ -90,10 +89,16 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
         browse_grp[itype-1] = new Fl_Group(WCOL0, MENUHEIGHT, 550, 600-MENUHEIGHT);
         switch (itype)
     	{
-    	case PROC_GENERAL:
+    	case PROC_IMPORT:
     	{
-            browser->add("General");
-        	job_general = new GeneralJobWindow();
+            browser->add("Import");
+        	job_import = new ImportJobWindow();
+    		break;
+    	}
+    	case PROC_MOTIONCORR:
+    	{
+            browser->add("Motion correction");
+        	job_motioncorr = new MotioncorrJobWindow();
     		break;
     	}
     	case PROC_MANUALPICK:
@@ -445,11 +450,18 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 
 	switch (itype)
 	{
-	case PROC_GENERAL:
+	case PROC_IMPORT:
 	{
-		inputnodes = job_general->pipelineInputNodes;
-		outputnodes= job_general->pipelineOutputNodes;
-		outputname = job_general->pipelineOutputName;
+		inputnodes = job_import->pipelineInputNodes;
+		outputnodes= job_import->pipelineOutputNodes;
+		outputname = job_import->pipelineOutputName;
+		break;
+	}
+	case PROC_MOTIONCORR:
+	{
+		inputnodes = job_motioncorr->pipelineInputNodes;
+		outputnodes= job_motioncorr->pipelineOutputNodes;
+		outputname = job_motioncorr->pipelineOutputName;
 		break;
 	}
 	case PROC_MANUALPICK:
@@ -564,20 +576,30 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 
 	// always write the general settings with the (hidden) empty name
 	if (do_write)
-		job_general->write("");
+		job_import->write("");
 
 	switch (itype)
 	{
-	case PROC_GENERAL:
+	case PROC_IMPORT:
 	{
 		if (do_write)
-			job_general->write(fn_settings);
+			job_import->write(fn_settings);
 		if (do_read)
-			job_general->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_general->toggle_new_continue(is_main_continue);
+			job_import->read(fn_settings, is_main_continue);
 		if (do_commandline)
-			job_general->getCommands(outputname, commands, final_command);
+			job_import->getCommands(outputname, commands, final_command, do_makedir);
+		break;
+	}
+	case PROC_MOTIONCORR:
+	{
+		if (do_write)
+			job_motioncorr->write(fn_settings);
+		if (do_read)
+			job_motioncorr->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_motioncorr->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_motioncorr->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_MANUALPICK:
@@ -589,8 +611,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_manualpick->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_manualpick->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_manualpick->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_CTFFIND:
@@ -602,7 +623,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_ctffind->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_ctffind->getCommands(outputname, commands, final_command, job_general->angpix.getValue(), do_makedir);
+			job_ctffind->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_AUTOPICK:
@@ -614,8 +635,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_autopick->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_autopick->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_autopick->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_EXTRACT:
@@ -627,8 +647,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_extract->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_extract->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_extract->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_SORT:
@@ -640,8 +659,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_sort->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_sort->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_sort->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_2DCLASS:
@@ -653,8 +671,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_class2d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_class2d->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_class2d->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_3DCLASS:
@@ -666,8 +683,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_class3d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_class3d->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_class3d->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_3DAUTO:
@@ -679,8 +695,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_auto3d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_auto3d->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(), do_makedir);
+			job_auto3d->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_POLISH:
@@ -692,9 +707,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_polish->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_polish->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), job_general->particle_diameter.getValue(),
-					job_extract->black_dust.getValue(), job_extract->white_dust.getValue(), do_makedir);
+			job_polish->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_POST:
@@ -706,8 +719,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_post->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_post->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), do_makedir);
+			job_post->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_RESMAP:
@@ -719,8 +731,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_resmap->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_resmap->getCommands(outputname, commands, final_command,
-					job_general->angpix.getValue(), do_makedir);
+			job_resmap->getCommands(outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_PUBLISH:

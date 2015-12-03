@@ -45,7 +45,8 @@ static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, this_from_processes, this_to_processes;
 static Fl_Group        *browse_grp[NR_BROWSE_TABS];
 static bool is_main_continue;
-static GeneralJobWindow *job_general;
+static ImportJobWindow *job_import;
+static MotioncorrJobWindow *job_motioncorr;
 static CtffindJobWindow *job_ctffind;
 static ManualpickJobWindow *job_manualpick;
 static AutopickJobWindow *job_autopick;
@@ -115,7 +116,7 @@ public:
     // and update all job lists at the bottom
     void loadJobFromPipeline();
 
-    // Find the first substring corresponding to /??????-??????/
+    // Find the first substring corresponding to 6-digits-dash-6-digits
     // As defined in RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
     std::string findUniqueDateSubstring(std::string in);
 

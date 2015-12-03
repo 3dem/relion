@@ -149,7 +149,7 @@ void MlModel::read(FileName fn_in)
 		else
 		{
 			// Read in mask for this body
-			if (!MDclass.getValue(EMDL_MLMODEL_BODY_MASK_NAME, fn_tmp2) )
+			if (!MDclass.getValue(EMDL_MASK_NAME, fn_tmp2) )
 				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no body mask name");
 			Image<RFLOAT> It;
 			It.read(fn_tmp2);
@@ -393,7 +393,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 		// Also set he maskname for multi-body refinement
 		if (nr_bodies > 1)
-			MDclass.setValue(EMDL_MLMODEL_BODY_MASK_NAME, fn_tmp2);
+			MDclass.setValue(EMDL_MASK_NAME, fn_tmp2);
 
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
@@ -714,7 +714,7 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 {
 	MetaDataTable MD;
 	MD.read(fn_masks);
-	if (!MD.containsLabel(EMDL_MLMODEL_BODY_MASK_NAME))
+	if (!MD.containsLabel(EMDL_MASK_NAME))
 		REPORT_ERROR("ERROR MlModel::initialiseBodyMasks: body-mask STAR file does not contain rlnBodyMaskName label.");
 
 	nr_bodies = 0;
@@ -724,7 +724,7 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 	Image<RFLOAT> Imask;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		MD.getValue(EMDL_MLMODEL_BODY_MASK_NAME, fn_mask);
+		MD.getValue(EMDL_MASK_NAME, fn_mask);
 		Imask.read(fn_mask);
 		Imask().setXmippOrigin();
 		masks_bodies[nr_bodies] = Imask();

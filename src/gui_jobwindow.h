@@ -39,6 +39,7 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
+#define DEFAULTMOTIONCORRLOCATION "/public/EM/motioncorr/motioncorr"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -54,6 +55,15 @@ static Fl_Menu_Item sampling_options[] = {
 		      {"0.5 degrees"},
 		      {"0.2 degrees"},
 		      {"0.1 degrees"},
+		      {0} // this should be the last entry
+};
+
+static Fl_Menu_Item node_type_options[] = {
+		      {"2D micrograph movie(s) (.mrcs or .star)"},
+		      {"2D micrograph(s) (.mrc or .star)"},
+		      {"3D tomogram(s) (.mrc or .star)"},
+		      {"2D/3D reference image(s) (.mrc or .star)"},
+		      {"2D/3D mask(s) (.mrc or .star)"},
 		      {0} // this should be the last entry
 };
 
@@ -181,20 +191,22 @@ public:
 };
 */
 
-class GeneralJobWindow : public RelionJobWindow
+class ImportJobWindow : public RelionJobWindow
 {
 public:
 
 	// I/O
-	SliderEntry angpix, particle_diameter;
+	FileNameEntry fn_in;
+	AnyEntry fn_out;
+	RadioEntry node_type;
 
 public:
 
 	// Constructor
-	GeneralJobWindow();
+	ImportJobWindow();
 
 	// Destructor
-	~GeneralJobWindow(){};
+	~ImportJobWindow(){};
 
 	// write/read settings to disc
 	void write(std::string fn);
@@ -204,7 +216,41 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+class MotioncorrJobWindow : public RelionJobWindow
+{
+public:
+
+	InputNodeEntry input_star_mics;
+	AnyEntry fn_out;
+	FileNameEntry fn_motioncorr_exe;
+	SliderEntry bin_factor;
+	SliderEntry first_frame;
+	SliderEntry last_frame;
+	AnyEntry other_motioncorr_args;
+	BooleanEntry do_save_movies;
+
+
+public:
+
+	// Constructor
+	MotioncorrJobWindow();
+
+	// Destructor
+	~MotioncorrJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -212,14 +258,13 @@ class CtffindJobWindow : public RelionJobWindow
 {
 public:
 
-	FileNameEntry mic_names;
-	AnyEntry output_star_ctf_mics;
-	FileNameEntry fn_ctffind_exe;
+	InputNodeEntry input_star_mics;
+	AnyEntry fn_out;
+	FileNameEntry fn_ctffind_exe, fn_gctf_exe;
 	SliderEntry ctf_win;
 	SliderEntry cs, kv, q0, angpix, dstep, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
-	FileNameEntry fn_gctf_exe;
 
 	Fl_Group *gctf_group;
 
@@ -239,7 +284,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -278,7 +323,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -320,7 +365,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -369,7 +414,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -403,7 +448,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -456,7 +501,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -518,7 +563,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -583,7 +628,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -634,8 +679,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			RFLOAT angpix, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
 
 };
 
@@ -677,8 +721,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
 
 };
 
@@ -714,8 +757,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			RFLOAT angpix, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
 
 };
 

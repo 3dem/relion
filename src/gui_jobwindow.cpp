@@ -559,91 +559,305 @@ void XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 */
 
-GeneralJobWindow::GeneralJobWindow() : RelionJobWindow(1, HAS_MPI, HAS_NOT_THREAD, HAS_NOT_RUN)
+ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD, HAS_RUN)
 {
 
-	type = PROC_GENERAL;
+	type = PROC_IMPORT;
 
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
-	angpix.place(current_y, "Magnified pixel size (Angstrom):", 1.0, 0.1, 5.0, 0.1, "Magnified pixel size in Angstroms (preferably calculated using a calibrated magnification). \
-However, when an exact calibrated pixel size is not available, one may use a preliminary one throughout the entire RELION processing workflow. This will all be internally consistent. \
-Then, at the postprocessing step (when one has a better idea of the actual pixel size, e.g. through the fitting of an atomic model) one may change to a more accurate pixel size at that stage.");
+	fn_in.place(current_y, "Input file:", "", "Input file (*.*)", "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
 
-	particle_diameter.place(current_y, "Particle mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
-circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
-If set to a value larger than the image size no masking will be performed.\n\n\
-The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	fn_out.place(current_y, "Output file:", "Import/UNIQDATE/", "The name of the output STAR file, which has to have a .star extension. ");
+	fn_out.deactivate();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	node_type.place(current_y, "Node type:", node_type_options, &node_type_options[0], "Select the type of Node this is.");
 
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_general", is_continue);
+	read(".gui_import", is_continue);
 }
 
-void GeneralJobWindow::write(std::string fn)
+void ImportJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_general";
+		fn=".gui_import";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 
-	angpix.writeValue(fh);
-	particle_diameter.writeValue(fh);
+	fn_in.writeValue(fh);
+	fn_out.writeValue(fh);
+	node_type.writeValue(fh);
 
 	closeWriteFile(fh);
 
 }
 
-void GeneralJobWindow::read(std::string fn, bool &_is_continue)
+void ImportJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
-		angpix.readValue(fh);
-		particle_diameter.readValue(fh);
+		fn_in.readValue(fh);
+		fn_out.readValue(fh);
+		node_type.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
 }
-void GeneralJobWindow::toggle_new_continue(bool _is_continue)
-{
-	is_continue = _is_continue;
 
-}
-
-void GeneralJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
+void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
 	commands.clear();
-	outputname = "run_general";
-	final_command="";
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
+	std::string command;
+	command=" relion_star_loopheader ";
+
+	// Save the real output name
+	outputname = fn_out.getValue();
+
+	// Change outputname if it contains UNIQDATE
+	changeDateNTimeInOutputname(outputname);
+
+	FileName outputstar;
+
+	if (node_type.getValue() == "2D micrograph movie(s) (.mrcs or .star)")
+	{
+		outputname += "micrograph_movies";
+		outputstar = outputname+".star";
+		command += "rlnMicrographMovieName ";
+		Node node(outputstar, NODE_MOVIE);
+		pipelineOutputNodes.push_back(node);
+	}
+	else if (node_type.getValue() == "2D micrograph(s) (.mrc or .star)")
+	{
+		outputname += "micrographs";
+		outputstar = outputname+".star";
+		command += "rlnMicrographName ";
+		Node node(outputstar, NODE_MIC);
+		pipelineOutputNodes.push_back(node);
+	}
+	else if (node_type.getValue() == "3D tomogram(s) (.mrc or .star)")
+	{
+		outputname += "tomograms";
+		outputstar = outputname+".star";
+		command += "rlnMicrographName ";
+		Node node(outputstar, NODE_TOMO);
+		pipelineOutputNodes.push_back(node);
+	}
+	else if (node_type.getValue() == "2D/3D reference image(s) (.mrc or .star)")
+	{
+		outputname += "references";
+		outputstar = outputname+".star";
+		command += "rlnReferenceImage ";
+		Node node(outputstar, NODE_REF);
+		pipelineOutputNodes.push_back(node);
+	}
+	else if (node_type.getValue() == "2D/3D mask(s) (.mrc or .star)")
+	{
+		outputname += "masks";
+		outputstar = outputname+".star";
+		command += "rlnMaskName ";
+		Node node(outputstar, NODE_MASK);
+		pipelineOutputNodes.push_back(node);
+	}
+	else
+	{
+		std::cerr << " node_type.getValue()= " << node_type.getValue() << std::endl;
+		REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option.");
+	}
+	command+= " > " + outputstar;
+	commands.push_back(command);
+
+	// Fill actual STAR file with the input entries
+	command = "ls " + fn_in.getValue() + " >> " + outputstar;
+	commands.push_back(command);
+
+	pipelineOutputName = outputname;
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
-CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 {
 
-	type = PROC_CTFFIND;
+	type = PROC_MOTIONCORR;
 
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
-	mic_names.place(current_y, "Input micrographs for CTF:", "micrographs_selected.star", "Input micrographs (*.{star,mrc})", "STAR file with the filenames of all micrographs on which to run CTFFIND, OR a unix-type wildcard to the filenames of the micrograph(s) (e.g. Micrographs/*.mrc).\
-Note that the micrographs should be in a subdirectory (e.g. called Micrographs/) of the project directory, i.e. the directory from where you are launching the GUI. \
-If this is not the case, then make a symbolic link inside the project directory to the directory where your micrographs are stored.");
-
-	output_star_ctf_mics.place(current_y, "Output STAR file:", "micrographs_ctf.star", "Name of the output STAR file with all CTF information for each micrograph");
+	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MIC, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 
 	// Add a little spacer
 	current_y += STEPY/2;
+
+	fn_out.place(current_y, "Output directory:", "MotionCorr/UNIQDATE/", "Output directory for all files of this run. The directory will be created if it does not exist.");
+	fn_out.deactivate();
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("Motioncorr");
+	resetHeight();
+
+	// Check for environment variable RELION_QSUB_TEMPLATE
+	char * default_location = getenv ("RELION_MOTIONCORR_EXECUTABLE");
+	if (default_location == NULL)
+	{
+		char mydefault[]=DEFAULTMOTIONCORRLOCATION;
+		default_location=mydefault;
+	}
+
+	fn_motioncorr_exe.place(current_y, "MOTIONCORR executable:", default_location, "*.*", "Location of the MOTIONCORR executable. You can control the default of this field by setting environment variable RELION_MOTIONCORR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	bin_factor.place(current_y, "Binning factor:", 1, 1, 8, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
+	first_frame.place(current_y, "First frame:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
+	last_frame.place(current_y, "Last frame:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
+	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions in MOTIONCOR");
+	other_motioncorr_args.place(current_y, "Other MOTIONCORR arguments", "", "Additional arguments that need to be passed to MOTIONCORR.");
+
+	tab2->end();
+
+	// read settings if hidden file exists
+	read(".gui_motioncorr", is_continue);
+}
+
+
+
+void MotioncorrJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_motioncorr";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	input_star_mics.writeValue(fh);
+	fn_out.writeValue(fh);
+	fn_motioncorr_exe.writeValue(fh);
+	bin_factor.writeValue(fh);
+	first_frame.writeValue(fh);
+	last_frame.writeValue(fh);
+	do_save_movies.writeValue(fh);
+	other_motioncorr_args.writeValue(fh);
+
+	closeWriteFile(fh);
+}
+
+void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+	// Only read things if the file exists
+	if (openReadFile(fn, fh))
+	{
+		input_star_mics.readValue(fh);
+		fn_out.readValue(fh);
+		fn_motioncorr_exe.readValue(fh);
+		bin_factor.readValue(fh);
+		first_frame.readValue(fh);
+		last_frame.readValue(fh);
+		do_save_movies.readValue(fh);
+		other_motioncorr_args.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+
+void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+
+	input_star_mics.deactivate(is_continue);
+	bin_factor.deactivate(is_continue);
+	fn_motioncorr_exe.deactivate(is_continue);
+
+}
+
+void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir)
+{
+
+	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
+	std::string command;
+	if (nr_mpi.getValue() > 1)
+		command="`which relion_run_motioncorr_mpi`";
+	else
+		command="`which relion_run_motioncorr`";
+
+	// I/O
+
+	command += " --i " + input_star_mics.getValue();
+	Node node(input_star_mics.getValue(), NODE_MOVIE);
+	pipelineInputNodes.push_back(node);
+
+	// Save the real output name
+	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+	outputname = fn_out.getValue();
+
+	// Change outputname if it contains UNIQDATE
+	changeDateNTimeInOutputname(outputname);
+
+	command += " --o " + outputname;
+	pipelineOutputName = outputname;
+	Node node2(outputname + "/corrected_micrographs.star", NODE_MIC);
+	pipelineOutputNodes.push_back(node2);
+	Node node3(outputname + "/corrected_micrographs_movie.star", NODE_MOVIE);
+	pipelineOutputNodes.push_back(node3);
+
+	// Motioncorr-specific stuff
+	command += " --bin_factor " + integerToString(bin_factor.getValue());
+	command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
+	command += " --first_frame " + integerToString(first_frame.getValue());
+	command += " --last_frame " + integerToString(last_frame.getValue());
+	if (do_save_movies.getValue())
+		command += " --save_movies ";
+
+	if ((other_motioncorr_args.getValue()).length() > 0)
+		command += " --other_motioncorr_args \"" + other_motioncorr_args.getValue() + "\"";
+
+	if (is_continue)
+		command += " --only_do_unfinished ";
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
+
+CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
+{
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
@@ -652,10 +866,26 @@ If this is not the case, then make a symbolic link inside the project directory 
 		char mydefault[]=DEFAULTCTFFINDLOCATION;
 		default_location=mydefault;
 	}
+	char * gctf_default_location = getenv ("RELION_GCTF_EXECUTABLE");
+	if (gctf_default_location == NULL)
+	{
+		char mygctfdefault[]=DEFAULTGCTFLOCATION;
+		gctf_default_location=mygctfdefault;
+	}
 
-	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
 
-	ctf_win.place(current_y, "Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
+
+	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MIC, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	fn_out.place(current_y, "Output directory:", "CtfEstimate/UNIQDATE/", "Output directory for all files of this run. The directory will be created if it does not exist.");
+	fn_out.deactivate();
+
 
 	tab1->end();
 
@@ -670,13 +900,20 @@ If this is not the case, then make a symbolic link inside the project directory 
 
 	q0.place(current_y, "Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
 
-	dstep.place(current_y, "Physical pixel size on detector (um):", 14, 1, 32, 1, "Physical pixel size of the detector (in micrometer), e.g. Falcon is 14 um, K2 is 5 um");
+	dstep.place(current_y, "Physical pixel size on detector (um):", 10, 1, 32, 1, "Physical pixel size of the detector (in micrometer), e.g. Falcon is 14 um, K2 is 5 um. If you don't know this value, it doesn't really matter: just leave the default to 10um.");
+
+	angpix.place(current_y, "Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
 
 	tab2->end();
 
 	tab3->begin();
 	tab3->label("CTFFIND");
 	resetHeight();
+
+	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	box.place(current_y, "FFT box size (pix):", 512, 64, 1024, 8, "CTFFIND's Box parameter");
 
@@ -692,27 +929,52 @@ If this is not the case, then make a symbolic link inside the project directory 
 
 	dast.place(current_y, "Amount of astigmatism (A):", 100, 0, 2000, 100,"CTFFIND's dAst parameter");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	ctf_win.place(current_y, "Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
+
 	tab3->end();
 
+
+	tab4->begin();
+	tab4->label("Gctf");
+	resetHeight();
+
+	gctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	gctf_group->end();
+
+	use_gctf.place(current_y, "Use Gctf instead of CTFFIND?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND.", gctf_group);
+
+	gctf_group->begin();
+	fn_gctf_exe.place(current_y, "Gctf executable:", gctf_default_location, "*", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	do_ignore_ctffind_params.place(current_y, "Ignore CTFFIND parameters?", true, "If set to Yes, all parameters on the CTFFIND tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
+\n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
+
+	do_EPA.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
+
+	gctf_group->end();
+	use_gctf.cb_menu_i(); // make default active
+
+	tab4->end();
+
 	// read settings if hidden file exists
-	read(".gui_ctffind", is_continue);
+	read(".gui_ctffind.settings", is_continue);
 }
 
 void CtffindJobWindow::write(std::string fn)
 {
-	// Write hidden file if no name is given
-	if (fn=="")
-		fn=".gui_ctffind";
-
 	std::ofstream fh;
-	openWriteFile(fn, fh);
+	openWriteFile(fn + ".gui_ctffind.settings", fh);
 
-	mic_names.writeValue(fh);
-	output_star_ctf_mics.writeValue(fh);
+	input_star_mics.writeValue(fh);
+	fn_out.writeValue(fh);
 	cs.writeValue(fh);
 	kv.writeValue(fh);
 	q0.writeValue(fh);
 	dstep.writeValue(fh);
+	angpix.writeValue(fh);
 	box.writeValue(fh);
 	resmin.writeValue(fh);
 	resmax.writeValue(fh);
@@ -722,6 +984,10 @@ void CtffindJobWindow::write(std::string fn)
 	dast.writeValue(fh);
 	fn_ctffind_exe.writeValue(fh);
 	ctf_win.writeValue(fh);
+	use_gctf.writeValue(fh);
+	fn_gctf_exe.writeValue(fh);
+	do_ignore_ctffind_params.writeValue(fh);
+	do_EPA.writeValue(fh);
 
 	closeWriteFile(fh);
 }
@@ -733,12 +999,13 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
-		mic_names.readValue(fh);
-		output_star_ctf_mics.readValue(fh);
+		input_star_mics.readValue(fh);
+		fn_out.readValue(fh);
 		cs.readValue(fh);
 		kv.readValue(fh);
 		q0.readValue(fh);
 		dstep.readValue(fh);
+		angpix.readValue(fh);
 		box.readValue(fh);
 		resmin.readValue(fh);
 		resmax.readValue(fh);
@@ -748,6 +1015,10 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 		dast.readValue(fh);
 		fn_ctffind_exe.readValue(fh);
 		ctf_win.readValue(fh);
+		use_gctf.readValue(fh);
+		fn_gctf_exe.readValue(fh);
+		do_ignore_ctffind_params.readValue(fh);
+		do_EPA.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -758,74 +1029,113 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
 
-	mic_names.deactivate(is_continue);
-	output_star_ctf_mics.deactivate(is_continue);
+	input_star_mics.deactivate(is_continue);
+	fn_out.deactivate(is_continue);
 	cs.deactivate(is_continue);
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
 	dstep.deactivate(is_continue);
+	angpix.deactivate(is_continue);
 	fn_ctffind_exe.deactivate(is_continue);
+	fn_gctf_exe.deactivate(is_continue);
 
 	// TODO: check which log files do not have Final values and re-run on those
 	// for that: modify run_ctffind wrapper program
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, bool do_makedir)
+		std::string &final_command, bool do_makedir)
 {
 
 	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
 	std::string command;
-	if (nr_mpi.getValue() > 1)
-		command="`which relion_run_ctffind_mpi`";
-	else
-		command="`which relion_run_ctffind`";
 
-	// Calculate magnification from user-specified pixel size in Angstroms
-	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix * 1e-10));
-
-	command += " --i \"" + mic_names.getValue()+"\"";
-	command += " --o \"" + output_star_ctf_mics.getValue()+"\"";
-	command += " --ctfWin " + floatToString(ctf_win.getValue());
-	command += " --CS " + floatToString(cs.getValue());
-	command += " --HT " + floatToString(kv.getValue());
-	command += " --AmpCnst " + floatToString(q0.getValue());
-	command += " --XMAG " + floatToString(magn);
-	command += " --DStep " + floatToString(dstep.getValue());
-	command += " --Box " + floatToString(box.getValue());
-	command += " --ResMin " + floatToString(resmin.getValue());
-	command += " --ResMax " + floatToString(resmax.getValue());
-	command += " --dFMin " + floatToString(dfmin.getValue());
-	command += " --dFMax " + floatToString(dfmax.getValue());
-	command += " --FStep " + floatToString(dfstep.getValue());
-	command += " --dAst " + floatToString(dast.getValue());
-	command += " --ctffind_exe " + fn_ctffind_exe.getValue();
-
-	if (is_continue)
-		command += " --only_do_unfinished ";
-
-	// Other arguments
-	command += " " + other_args.getValue();
-
-	commands.push_back(command);
-
-	int last_slash_out = mic_names.getValue().rfind("/");
-	if (last_slash_out < mic_names.getValue().size())
-	{
-		// The output name contains a directory: use that one for output
-		outputname = mic_names.getValue().substr(0, last_slash_out + 1) + "run_ctffind";
-	}
-	else
-	{
-		outputname = "run_ctffind";
-	}
+	outputname = fn_out.getValue();
 	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
 
+	pipelineOutputName = outputname;
+	FileName fn_outstar = outputname + "micrographs_ctf.star";
+	Node node(fn_outstar, NODE_MIC);
+	pipelineOutputNodes.push_back(node);
+	Node node2(input_star_mics.getValue(), NODE_MIC);
+	pipelineInputNodes.push_back(node);
+
+	if (use_gctf.getValue())
+	{
+		if (nr_mpi.getValue() > 1)
+		{
+			std::cout << " ERROR: You cannot use multiple MPI processes together with Gctf...." << std::endl;
+			return;
+		}
+
+		command = fn_gctf_exe.getValue();
+		command +=  " --ctfstar " + fn_outstar;
+		command +=  " --apix " + floatToString(angpix.getValue());
+		command +=  " --cs " + floatToString(cs.getValue());
+		command +=  " --kV " + floatToString(kv.getValue());
+		command +=  " --ac " + floatToString(q0.getValue());
+
+		if (!do_ignore_ctffind_params.getValue())
+		{
+			command += " --boxsize " + floatToString(box.getValue());
+			command += " --resL " + floatToString(resmin.getValue());
+			command += " --resH " + floatToString(resmax.getValue());
+			command += " --defL " + floatToString(dfmin.getValue());
+			command += " --defH " + floatToString(dfmax.getValue());
+			command += " --defS " + floatToString(dfstep.getValue());
+			command += " --astm " + floatToString(dast.getValue());
+		}
+
+		if (do_EPA.getValue())
+			command += " --do_EPA ";
+
+		// TODO: continuation of Gctf runs....
+
+	}
+	else
+	{
+
+		if (nr_mpi.getValue() > 1)
+			command="`which relion_run_ctffind_mpi`";
+		else
+			command="`which relion_run_ctffind`";
+
+		// Calculate magnification from user-specified pixel size in Angstroms
+		RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix.getValue() * 1e-10));
+
+		command += " --i " + input_star_mics.getValue();
+		command += " --o " + fn_outstar ;
+		command += " --ctfWin " + floatToString(ctf_win.getValue());
+		command += " --CS " + floatToString(cs.getValue());
+		command += " --HT " + floatToString(kv.getValue());
+		command += " --AmpCnst " + floatToString(q0.getValue());
+		command += " --XMAG " + floatToString(magn);
+		command += " --DStep " + floatToString(dstep.getValue());
+		command += " --Box " + floatToString(box.getValue());
+		command += " --ResMin " + floatToString(resmin.getValue());
+		command += " --ResMax " + floatToString(resmax.getValue());
+		command += " --dFMin " + floatToString(dfmin.getValue());
+		command += " --dFMax " + floatToString(dfmax.getValue());
+		command += " --FStep " + floatToString(dfstep.getValue());
+		command += " --dAst " + floatToString(dast.getValue());
+		command += " --ctffind_exe " + fn_ctffind_exe.getValue();
+
+		if (is_continue)
+			command += " --only_do_unfinished ";
+	}
+
+	// Other arguments
+	command += " " + other_args.getValue();
+	commands.push_back(command);
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
+
+
 
 ManualpickJobWindow::ManualpickJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
@@ -944,9 +1254,12 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	std::string command;
@@ -1113,8 +1426,12 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+		std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	std::string command;
@@ -1324,9 +1641,12 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 
-void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	std::string command;
@@ -1459,9 +1779,12 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 
-void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	pipelineOutputNodes.clear();
@@ -1745,9 +2068,12 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	pipelineOutputNodes.clear();
@@ -2188,9 +2514,12 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	std::string command;
@@ -2673,9 +3002,12 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter, bool do_makedir)
+void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	commands.clear();
 	std::string command;
@@ -2992,9 +3324,12 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 
-void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, bool do_makedir)
+void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
 
 	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
@@ -3221,9 +3556,15 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 
-void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust, bool do_makedir)
+void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+	// TODO
+	double angpix=1.;
+	double particle_diameter = 50;
+	double white_dust = -1;
+	double black_dust = -1;
+
+
 	commands.clear();
 	std::string command;
 	pipelineOutputNodes.clear();
@@ -3396,9 +3737,11 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-		RFLOAT angpix, bool do_makedir)
+void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
+
+	// TODO
+	double angpix = 1;
 
 	// Change outputname if it contains UNIQDATE
 	changeDateNTimeInOutputname(outputname);
