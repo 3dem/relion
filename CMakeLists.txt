@@ -45,7 +45,7 @@ else(NOT DEFINED CUDA_ARCH)
 endif(NOT DEFINED CUDA_ARCH)
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
-option(DoublePrec_CPU "DoublePrec_CPU" OFF)
+option(DoublePrec_CPU "DoublePrec_CPU" ON)
 if(DoublePrec_CPU)
     message(STATUS "Setting cpu precision to double")    
 else(DoublePrec_CPU)
