@@ -172,7 +172,6 @@ void MlOptimiserMpi::initialise()
 
 	if (do_gpu)
 	{
-		do_shifts_onthefly = true;
 		// Sequential initialisation of GPUs on all ranks
 		for (int rank = 0; rank < node->size; rank++)
 		{
@@ -2329,6 +2328,9 @@ void MlOptimiserMpi::iterate()
 		if (node->rank == 1)
 			timer.printTimes(false);
 #endif
+                for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+                    ((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
+
 
     }
 

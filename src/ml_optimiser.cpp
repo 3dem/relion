@@ -1821,8 +1821,8 @@ void MlOptimiser::expectation()
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 	if (do_gpu)
-            for (int i = 0; i < cudaMlOptimisers.size(); i ++)
-                ((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
