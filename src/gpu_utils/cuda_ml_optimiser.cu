@@ -527,7 +527,7 @@ void getAllSquaredDifferencesCoarse(
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	op.min_diff2.clear();
-	op.min_diff2.resize(sp.nr_particles, 99.e99);
+	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
@@ -752,7 +752,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	op.min_diff2.clear();
-	op.min_diff2.resize(sp.nr_particles, 99.e99);
+	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,

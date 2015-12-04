@@ -3585,7 +3585,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int exp_cur
 		exp_Mcoarse_significant.clear();
 
 	exp_min_diff2.clear();
-	exp_min_diff2.resize(exp_nr_particles, 99.e99);
+	exp_min_diff2.resize(exp_nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	precalculateShiftedImagesCtfsAndInvSigma2s(false, my_ori_particle, exp_current_image_size, exp_current_oversampling,
