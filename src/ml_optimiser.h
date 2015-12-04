@@ -90,6 +90,7 @@ public:
 
 	// For GPU-acceleration
 	std::vector<void*> cudaMlOptimisers;
+	std::vector<void*> cudaMlDeviceBundles;
 
 	// I/O Parser
 	IOParser parser;
@@ -460,6 +461,7 @@ public:
 	ThreadTaskDistributor *exp_ipart_ThreadTaskDistributor;
 
 	// Number of threads to run in parallel
+	int x_pool;
 	int nr_threads;
 
 	long int exp_my_first_ori_particle, exp_my_last_ori_particle;
@@ -548,6 +550,7 @@ public:
 		debug2(0),
 		do_always_join_random_halves(0),
 		my_first_ori_particle_id(0),
+		x_pool(1),
 		nr_threads(0),
 		do_shifts_onthefly(0),
 		exp_ipart_ThreadTaskDistributor(0),

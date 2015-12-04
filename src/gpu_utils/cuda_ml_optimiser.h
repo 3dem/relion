@@ -371,114 +371,72 @@ public:
 	}
 };
 
-
-
-class BackprojectDataBundle
+/*
+ * Bundle of device-objects which will be shared across several ranks and
+ */
+class MlDeviceBundle
 {
 public:
-	CudaGlobalPtr<XFLOAT> reals;
-	CudaGlobalPtr<XFLOAT> imags;
-	CudaGlobalPtr<XFLOAT> weights;
-	CudaGlobalPtr<XFLOAT> eulers;
-
-	BackprojectDataBundle(size_t img_data_size, size_t euler_data_size, cudaStream_t stream, CudaCustomAllocator *alloc):
-		reals(img_data_size, stream, alloc),
-		imags(img_data_size, stream, alloc),
-		weights(img_data_size, stream, alloc),
-		eulers(euler_data_size, stream, alloc)
-	{};
-};
-
-
-
-//class CufftBundle
-//{
-//	bool planSet;
-//public:
-//	CudaGlobalPtr<cufftReal> reals;
-//	CudaGlobalPtr<cufftComplex> fouriers;
-//	cufftHandle cufftPlanForward, cufftPlanBackward;
-//	size_t xSize,ySize;
-//
-//	CufftBundle(cudaStream_t stream, CudaCustomAllocator *allocator):
-//		reals(stream, allocator),
-//		fouriers(stream, allocator),
-//		cufftPlanForward(0),
-//		cufftPlanBackward(0),
-//		planSet(false),
-//		xSize(0), ySize(0)
-//	{};
-//
-//	void setSize(size_t x, size_t y)
-//	{
-//		if (x == xSize && y == ySize)
-//			return;
-//
-//		clear();
-//
-//		xSize = x;
-//		ySize = y;
-//
-//		reals.setSize(x*y);
-//		reals.device_alloc();
-//		reals.host_alloc();
-//
-//		fouriers.setSize(y*(x/2+1));
-//		fouriers.device_alloc();
-//		fouriers.host_alloc();
-//
-//		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
-//		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
-//
-//		planSet = true;
-//	}
-//
-//	void forward()
-//	{ HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) ); }
-//
-//	void backward()
-//	{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) ); }
-//
-//	void clear()
-//	{
-//		if(planSet)
-//		{
-//			reals.free();
-//			fouriers.free();
-//			HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanForward));
-//			HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanBackward));
-//			planSet = false;
-//		}
-//	}
-//
-//	~CufftBundle()
-//	{ clear(); }
-//};
-
-
-
-class MlOptimiserCuda : OutOfMemoryHandler
-{
-public:
-
-	//CufftBundle *inputImageData;
 
 	//The CUDA accelerated projector set
 	std::vector< CudaProjector > cudaProjectors;
 
 	//The CUDA accelerated back-projector set
 	std::vector< CudaBackprojector > cudaBackprojectors;
-	std::stack< BackprojectDataBundle *> backprojectDataBundleStack;
-
-	//Used for precalculations of projection setup
-	std::vector< CudaProjectorPlan > coarseProjectionPlans;
+	std::vector< cudaStream_t > bpStreams;
 
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
 
-	//Class streams ( for concurrent scheduling of class-specific kernels)
+	//Used for precalculations of projection setup
+	bool generateProjectionPlanOnTheFly;
+	std::vector< CudaProjectorPlan > coarseProjectionPlans;
+
+	MlOptimiser *baseMLO;
+
+	bool refIs3D;
+
+	int device_id;
+
+	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id);
+
+	void resetData();
+
+	void syncAllBackprojects()
+	{
+		for (int i = 0; i < cudaBackprojectors.size(); i ++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
+	}
+
+
+	~MlDeviceBundle()
+	{
+		cudaProjectors.clear();
+		cudaBackprojectors.clear();
+		coarseProjectionPlans.clear();
+		cudaBackprojectors.clear();
+		//Delete this lastly
+		delete allocator;
+
+		for (int i = 0; i < bpStreams.size(); i++)
+			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
+
+	}
+
+};
+
+class MlOptimiserCuda
+{
+public:
+	// transformer as holder for reuse of fftw_plans
+	FourierTransformer transformer;
+
+	//Used for precalculations of projection setup
+	CudaCustomAllocator *allocator;
+
+   //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
-	std::vector< cudaStream_t > bpStreams;
+
 	cudaStream_t stream1;
 	cudaStream_t stream2;
 
@@ -491,88 +449,25 @@ public:
 
 	bool refIs3D;
 
-	bool generateProjectionPlanOnTheFly;
-
 	int device_id;
 
-	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id);
+	MlDeviceBundle *devBundle;
+
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* Bundle);
 
 	void resetData();
 
 	void doThreadExpectationSomeParticles(int thread_id);
 
-	void storeBpMdlData()
-	{
-		for (int iclass = 0; iclass < baseMLO->mymodel.nr_classes; iclass++)
-		{
-			unsigned long s = baseMLO->wsum_model.BPref[iclass].data.nzyxdim;
-			XFLOAT *r = new XFLOAT[s];
-			XFLOAT *i = new XFLOAT[s];
-			XFLOAT *w = new XFLOAT[s];
-
-			cudaBackprojectors[iclass].getMdlData(r, i, w);
-
-			for (unsigned long n = 0; n < s; n++)
-			{
-				baseMLO->wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) r[n];
-				baseMLO->wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) i[n];
-				baseMLO->wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) w[n];
-			}
-
-			delete [] r;
-			delete [] i;
-			delete [] w;
-		}
-	}
-
-	void clearBackprojectDataBundle()
-	{
-		//TODO switch to cuda event synchronization instead of stream
-		for (int i = 0; i < cudaBackprojectors.size(); i ++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
-
-		while (!backprojectDataBundleStack.empty())
-		{
-			delete backprojectDataBundleStack.top();
-			backprojectDataBundleStack.pop();
-		}
-	}
-
-	void handleOutOfMemory()
-	{
-#ifdef DEBUG_CUDA
-		int spaceDiff = allocator->getTotalFreeSpace();
-		allocator->printState();
-#endif
-		clearBackprojectDataBundle();
-#ifdef DEBUG_CUDA
-		spaceDiff = ( (int) allocator->getTotalFreeSpace() ) - spaceDiff;
-		printf("DEBUG_INFO: MlOptimiserCuda::handleOutOfMemory called and %d B was freed.\n", spaceDiff);
-		allocator->printState();
-#endif
-	}
-
 	~MlOptimiserCuda()
 	{
-		clearBackprojectDataBundle();
-		//delete inputImageData;
-
-		cudaProjectors.clear();
-		cudaBackprojectors.clear();
-		coarseProjectionPlans.clear();
-		cudaBackprojectors.clear();
-
-		//Delete this lastly
-		delete allocator;
-
 		HANDLE_ERROR(cudaStreamDestroy(stream1));
 		HANDLE_ERROR(cudaStreamDestroy(stream2));
 
 		for (int i = 0; i < classStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
 
-		for (int i = 0; i < bpStreams.size(); i++)
-			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
+
 	}
 
 };

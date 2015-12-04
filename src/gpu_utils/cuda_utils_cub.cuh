@@ -7,6 +7,19 @@
 #include <stdio.h>
 #include <signal.h>
 #include <vector>
+#include <thrust/system/cuda/vector.h>
+#include <thrust/system/cuda/execution_policy.h>
+#include <thrust/host_vector.h>
+#include <thrust/generate.h>
+#include <thrust/pair.h>
+#include <thrust/scan.h>
+#include <thrust/device_ptr.h>
+#include <thrust/copy.h>
+// Because thrust uses CUB, thrust defines CubLog and CUB tries to redefine it,
+// resulting in warnings. This avoids those warnings.
+#if(defined(CubLog) && defined(__CUDA_ARCH__) && (__CUDA_ARCH__<= 520)) // Intetionally force a warning for new arch
+	#undef CubLog
+#endif
 #include "src/gpu_utils/cub/device/device_radix_sort.cuh"
 #include "src/gpu_utils/cub/device/device_reduce.cuh"
 #include "src/gpu_utils/cub/device/device_scan.cuh"
@@ -29,12 +42,15 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size, ptr.getStream()));
 
 	max_pair.cp_to_host();
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	ptr.streamSync();
 
 	ptr.getAllocator()->free(alloc);
 
@@ -62,12 +78,15 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.size, ptr.getStream()));
 
 	min_pair.cp_to_host();
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	ptr.streamSync();
 
 	ptr.getAllocator()->free(alloc);
 
@@ -95,12 +114,15 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.size, ptr.getStream()));
 
 	max_val.cp_to_host();
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	ptr.streamSync();
 
 	ptr.getAllocator()->free(alloc);
 
@@ -124,12 +146,15 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size, ptr.getStream()));
 
 	min_val.cp_to_host();
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	ptr.streamSync();
 
 	ptr.getAllocator()->free(alloc);
 
@@ -153,12 +178,15 @@ if (ptr.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size));
 
+	if(temp_storage_size==0)
+		temp_storage_size=1;
+
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
 	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size, ptr.getStream()));
 
 	val.cp_to_host();
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(ptr.getStream()));
+	ptr.streamSync();
 
 	ptr.getAllocator()->free(alloc);
 
@@ -189,9 +217,8 @@ if (in.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, 0, sizeof(T) * 8, stream));
 
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
-
-	in.getAllocator()->free(alloc);
+	alloc->markReadyEvent(stream);
+	alloc->doFreeWhenReady();
 }
 
 template <typename T>
@@ -218,19 +245,9 @@ if (in.getAllocator() == NULL)
 
 	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, 0, sizeof(T) * 8, stream));
 
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
-
-	in.getAllocator()->free(alloc);
+	alloc->markReadyEvent(stream);
+	alloc->doFreeWhenReady();
 }
-
-#include <thrust/system/cuda/vector.h>
-#include <thrust/system/cuda/execution_policy.h>
-#include <thrust/host_vector.h>
-#include <thrust/generate.h>
-#include <thrust/pair.h>
-#include <thrust/scan.h>
-#include <thrust/device_ptr.h>
-#include <thrust/copy.h>
 
 class AllocatorThrustWrapper
 {
@@ -259,7 +276,7 @@ public:
 
     void deallocate(char* ptr, size_t n)
     {
-    	//Pass
+    	//TODO fix this (works fine without it though) /Dari
     }
 };
 
@@ -354,9 +371,8 @@ if (in.getAllocator() == NULL)
 //
 //	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, stream));
 //
-//	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
-//
-//	in.getAllocator()->free(alloc);
+//	alloc->markReadyEvent(stream);
+//	alloc->doFreeWhenReady();
 //}
 
 template <typename T>

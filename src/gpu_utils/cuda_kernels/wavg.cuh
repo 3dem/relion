@@ -45,7 +45,7 @@ __global__ void cuda_kernel_wavg(
 		s_eulers[tid] = g_eulers[bid*9+tid];
 	__syncthreads();
 
-	unsigned pass_num(ceilf(   ((float)image_size) / (float)WAVG_BLOCK_SIZE  )),pixel;
+	unsigned pass_num(ceilfracf(image_size,WAVG_BLOCK_SIZE)),pixel;
 	XFLOAT Fweight;
 
 	__shared__ XFLOAT s_wavgs_real[WAVG_BLOCK_SIZE];
@@ -71,7 +71,7 @@ __global__ void cuda_kernel_wavg(
 		if(pixel<image_size)
 		{
 			int x = pixel % projector.imgX;
-			int y = (int)floorf( (float)pixel / (float)projector.imgX);
+			int y = floorfracf(pixel,projector.imgX);
 
 			if (y > projector.maxR)
 			{

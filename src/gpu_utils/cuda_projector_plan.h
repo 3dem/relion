@@ -11,8 +11,8 @@
 class CudaProjectorPlan
 {
 public:
-	CudaGlobalPtr< long unsigned > iorientclasses;
-	CudaGlobalPtr<XFLOAT> eulers;
+	CudaGlobalPtr< long unsigned,false> iorientclasses;
+	CudaGlobalPtr<XFLOAT,false> eulers;
 	long unsigned orientation_num;
 
 	CudaProjectorPlan(CudaCustomAllocator *allocator):
