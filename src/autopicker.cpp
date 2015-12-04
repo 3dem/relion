@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/autopicker.h"
+#include "src/gpu_utils/cuda_autopicker.h"
 //#define DEBUG
 
 void AutoPicker::read(int argc, char **argv)
@@ -34,6 +35,7 @@ void AutoPicker::read(int argc, char **argv)
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
+	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 
 	int ref_section = parser.addSection("References options");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
@@ -260,6 +262,8 @@ void AutoPicker::initialise()
 
 		}
 	}
+	if (do_gpu)
+		cudaPicker = (void*) new AutoPickerCuda(this, 0);
 
 #ifdef DEBUG
 	std::cerr << "Finishing initialise" << std::endl;
@@ -281,12 +285,10 @@ void AutoPicker::run()
 
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
-
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
 		autoPickOneMicrograph(fn_micrographs[imic]);
-
 	}
 
 	if (verb > 0)
@@ -480,7 +482,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		} //end else if do_read_fom_maps
 		else
 		{
-			Mccf_best.initConstant(-99.e99);
+			Mccf_best.initConstant(-LARGE_NUMBER);
 			bool is_first_psi = true;
 			for (RFLOAT psi = 0. ; psi < 360.; psi+=psi_sampling)
 			{
