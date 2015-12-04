@@ -10,6 +10,27 @@ project(Relion)
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# ------------------------------------------------------------------RPATH SETTINGS--
+# use, i.e. don't skip the full RPATH for the build tree
+SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
+
+# when building, don't use the install RPATH already
+# (but later on when installing)
+SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
+
+SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+
+# add the automatically determined parts of the RPATH
+# which point to directories outside the build tree to the install RPATH
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+
+# the RPATH to be used when installing, but only if it's not a system directory
+LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+IF("${isSystemDir}" STREQUAL "-1")
+   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+ENDIF("${isSystemDir}" STREQUAL "-1")
+
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
 if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
@@ -191,6 +212,7 @@ add_custom_command(TARGET copy_scripts POST_BUILD
                  COMMAND ${CMAKE_COMMAND} -E
                  copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE})
 endforeach()
+
 
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
