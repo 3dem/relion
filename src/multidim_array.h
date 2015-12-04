@@ -555,10 +555,19 @@ public:
      * MultidimArray< RFLOAT > V2(V1);
      * @endcode
      */
-    MultidimArray(const MultidimArray<T>& V)
+    MultidimArray(const MultidimArray<T>& V, bool parent=false)
     {
-    	coreInit();
-        *this = V;
+    	if(parent)
+    	{
+    		coreInit();
+    		copyShape(V);
+    		coreAllocate();
+    	}
+    	else
+    	{
+    		coreInit();
+    		*this = V;
+    	}
     }
 
     /** Copy constructor from a Matrix1D.
@@ -1056,7 +1065,10 @@ public:
     {
         resize(1, Zdim, Ydim, Xdim);
     }
-
+    void resizeNoCp(long int Zdim, long int Ydim, long int Xdim)
+    {
+	    resizeNoCp(1, Zdim, Ydim, Xdim);
+    }
     /** Resize a single 2D image
      *
      * This function assumes n and z are 1
@@ -4056,7 +4068,7 @@ public:
         "\" w l\n";
         fh_gplot << "pause 300 \"\"\n";
         fh_gplot.close();
-        system((static_cast<std::string>("(gnuplot PPP") + fn_tmp +
+        int res = system((static_cast<std::string>("(gnuplot PPP") + fn_tmp +
                 ".gpl; rm PPP" + fn_tmp + ".txt PPP" + fn_tmp + ".gpl) &").c_str());
     }
 
@@ -4074,7 +4086,7 @@ public:
         nam = static_cast< std::string >("PPP" + nam + ".txt");
         write(nam);
 
-        system((static_cast< std::string >("xmipp_edit -i " + nam +
+        int res = system((static_cast< std::string >("xmipp_edit -i " + nam +
                                            " -remove &").c_str()));
     }
 

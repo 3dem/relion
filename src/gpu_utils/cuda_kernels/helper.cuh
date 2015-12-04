@@ -6,7 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include "src/gpu_utils/cuda_settings.h"
-
+#include "src/gpu_utils/cuda_device_utils.cuh"
 
 __global__ void cuda_kernel_exponentiate_weights_coarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,

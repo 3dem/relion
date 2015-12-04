@@ -1,8 +1,11 @@
 # Extra flags defined on each build type (this file is all optional to include)
 #
-set(CUDARCH "-arch=sm_35")
+# Because gcc is compliant with a float128 type, fftw has become as well. nvcc is NOT. 
+# So -D__INTEL_COMPILER just manages to avoid compiling float128-targets (see fftw3.h, for instance).
+set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER")
 
-
+set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
+#message(STATUS "RELION_NVCC_FLAGS: ${RELION_NVCC_FLAGS}")
 
 # -------------------------- 
 #        Debug BUILD 
@@ -16,7 +19,7 @@ set(CUDARCH "-arch=sm_35")
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_DEBUG "-O0" CACHE STRING "")
-set(RELION_NVCC_FLAGS_DEBUG "${CUDARCH}" CACHE STRING "")
+set(RELION_NVCC_FLAGS_DEBUG "${RELION_NVCC_FLAGS}" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_DEBUG  " ")
 
@@ -42,6 +45,37 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}"
 
 
 
+
+# -------------------------- 
+#        RELWITHDEBINFO BUILD 
+# -------------------------- 
+
+# -- Compiler flags -------------------------------------------------
+set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${CUDARCH}" CACHE STRING "")
+# -- Linker flags ---------------------------------------------------
+set(RELION_LINKER_FLAGS_RELWITHDEBINFO  " ")
+
+# -- Append compiler and linker flags -------------------------------
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO          "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${RELION_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} ${RELION_LINKER_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+set(CUDA_NVCC_FLAGS_RELWITHDEBINFO        "${RELION_NVCC_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+
+# -- Add preprocessor defintions ------------------------------------
+set(RELION_DEFINITIONS_RELWITHDEBINFO "-DDEBUG_CUDA")
+
+#message(STATUS "Set the extra flags for RELWITHDEBINFO build type")
+#message(STATUS "RELION_NVCC_FLAGS_RELWITHDEBINFO : ${RELION_NVCC_FLAGS_RELWITHDEBINFO}")
+#message(STATUS "CUDA_NVCC_FLAGS_RELWITHDEBINFO : ${CUDA_NVCC_FLAGS_RELWITHDEBINFO}")
+#message(STATUS "CMAKE_CXX_FLAGS_RELWITHDEBINFO : ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+#--------------------------------------------------------------------
+
+
+
+
+
+
+
 # -------------------------- 
 #       Release BUILD 
 # -------------------------- 
@@ -59,7 +93,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}"
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_RELEASE "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_RELEASE "${CUDARCH} --disable-warnings" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELEASE "${RELION_NVCC_FLAGS} --disable-warnings" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_RELEASE  "")
 
@@ -100,7 +134,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_REL
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_PROFILING "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_PROFILING "${CUDARCH} --disable-warnings -lineinfo" CACHE STRING "")
+set(RELION_NVCC_FLAGS_PROFILING "${RELION_NVCC_FLAGS} --disable-warnings -lineinfo" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_PROFILING  "")
 
@@ -130,7 +164,7 @@ set(CMAKE_CXX_FLAGS_PROFILING "${CMAKE_CXX_FLAGS_PROFILING} ${RELION_DEFINITIONS
 # ----------------------------------
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_BENCHMARKING "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_BENCHMARKING "${CUDARCH} --disable-warnings" CACHE STRING "")
+set(RELION_NVCC_FLAGS_BENCHMARKING "${RELION_NVCC_FLAGS} " CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_BENCHMARKING  "")
 

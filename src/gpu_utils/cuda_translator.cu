@@ -52,7 +52,7 @@ __global__ void cuda_translation_kernel(
 		XFLOAT *g_fftshifts_imag,
 		unsigned long image_size,
 		unsigned long image_idx_offset,
-		RFLOAT scale_correction)
+		XFLOAT scale_correction)
 {
 	int img_idx = blockIdx.x + image_idx_offset;
 	int tid = threadIdx.x;
