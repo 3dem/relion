@@ -1287,7 +1287,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if (filteredSize == 0)
 			{
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 
