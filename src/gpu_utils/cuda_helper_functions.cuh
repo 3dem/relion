@@ -2,6 +2,7 @@
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
@@ -483,21 +484,29 @@ __global__ void cuda_kernel_find_threshold_idx_in_cumulative(
 
 size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT threshold)
 {
-	CudaGlobalPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
-	idx[0] = data.getSize()-1;
-	idx.put_on_device();
-
 	int grid_size = ceil((float)(data.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
-	cuda_kernel_find_threshold_idx_in_cumulative<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, data.getStream() >>>(
-			~data,
-			threshold,
-			data.getSize()-1,
-			~idx);
+	if(grid_size==0)
+	{
+		return(0);
+	}
+	else
+	{
+		CudaGlobalPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
+		idx[0] = data.getSize()-1;
+		idx.put_on_device();
 
-	idx.cp_to_host();
-	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
 
-	return idx[0];
+
+		cuda_kernel_find_threshold_idx_in_cumulative<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, data.getStream() >>>(
+				~data,
+				threshold,
+				data.getSize()-1,
+				~idx);
+		idx.cp_to_host();
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
+
+		return idx[0];
+	}
 }
 
 void runDiff2KernelCoarse(
@@ -750,6 +759,7 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
     }
+
 }
 
 #define WINDOW_FT_BLOCK_SIZE 128

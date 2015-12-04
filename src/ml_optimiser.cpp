@@ -250,6 +250,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	int computation_section = parser.addSection("Computation");
 
+	x_pool = textToInteger(parser.getOption("--pool", "Number of images to pool for each thread task", "1"));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to run in parallel (only useful on multi-core machines)", "1"));
 
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
@@ -398,6 +399,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// Computation stuff
 	// The number of threads is always read from the command line
 	int computation_section = parser.addSection("Computation");
+	x_pool = textToInteger(parser.getOption("--pool", "Number of images to pool for each thread task", "1"));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to run in parallel (only useful on multi-core machines)", "1"));
 	available_memory = textToFloat(parser.getOption("--memory_per_thread", "Available RAM (in Gb) for each thread", "2"));
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
@@ -827,13 +829,22 @@ void MlOptimiser::initialise()
 	if (do_gpu)
 	{
 		do_shifts_onthefly = true;
+
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
+		// Make device bundles - at present segfault if auto-refine tries to run on a single device
+		if(!do_auto_refine || (devCount>=2))
+			for (int i = 0; i < devCount; i++)
+				cudaMlDeviceBundles.push_back((void *) new MlDeviceBundle(this, i));
+		else
+			raise(SIGSEGV);
+
 		if (!std::isdigit(*gpu_ids.begin()))
 			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 		else if(gpu_ids.length()<nr_threads)
 			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
 
-		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		for (int i = 0; i < nr_threads; i ++)
 		{
 			int dev_id;
@@ -843,7 +854,14 @@ void MlOptimiser::initialise()
 				dev_id = (int)(gpu_ids[i]-'0');
 
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id));
+
+			int bundle_id;
+			if(!do_auto_refine || (devCount>=2))
+				bundle_id = dev_id;
+			else
+				raise(SIGSEGV);
+
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, (MlDeviceBundle *) cudaMlDeviceBundles[bundle_id]));
 		}
 	}
 
@@ -1133,7 +1151,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		std::cout <<" Using rlnReconstructImageName from the input data.star file!" << std::endl;
 
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
-	nr_pool = nr_threads;
+	nr_pool = x_pool*nr_threads;
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -1508,7 +1526,8 @@ void MlOptimiser::iterate()
     	if (verb > 0)
     		timer.printTimes(false);
 #endif
-
+    for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+    	((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
     }
 
 	// delete threads etc
@@ -1574,8 +1593,12 @@ void MlOptimiser::expectation()
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 	if (do_gpu)
+	{
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+	}
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
@@ -1642,8 +1665,8 @@ void MlOptimiser::expectation()
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->clearBackprojectDataBundle();
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 				int my_mutex = iclass % NR_CLASS_MUTEXES;
 				pthread_mutex_lock(&global_mutex2[my_mutex]);

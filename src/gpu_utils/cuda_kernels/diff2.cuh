@@ -38,7 +38,7 @@ __global__ void cuda_kernel_diff2_coarse(
 	//Prefetch euler matrices
 	__shared__ XFLOAT s_eulers[eulers_per_block * 9];
 
-	int max_block_pass_euler( ceilf( (float)(eulers_per_block * 9) / (float)block_sz ) * block_sz);
+	int max_block_pass_euler( ceilfracf(eulers_per_block*9, block_sz) * block_sz);
 
 	for (int i = tid; i < max_block_pass_euler; i += block_sz)
 		if (i < eulers_per_block * 9)
@@ -60,7 +60,7 @@ __global__ void cuda_kernel_diff2_coarse(
 
 
 	//Step through data
-	int max_block_pass_pixel( ceilf( (float)image_size / (float)block_sz ) * block_sz );
+	int max_block_pass_pixel( ceilfracf(image_size,block_sz) * block_sz );
 
 	for (int init_pixel = 0; init_pixel < max_block_pass_pixel; init_pixel += block_sz/prefetch_fraction)
 	{
@@ -70,7 +70,7 @@ __global__ void cuda_kernel_diff2_coarse(
 		if(init_pixel + tid/prefetch_fraction < image_size)
 		{
 			int x = (init_pixel + tid/prefetch_fraction) % projector.imgX;
-			int y = (int)floorf( (float)(init_pixel + tid/prefetch_fraction) / (float)projector.imgX);
+			int y = floorfracf( init_pixel + tid/prefetch_fraction, projector.imgX);
 
 			if (y > projector.maxR)
 				y -= projector.imgY;
@@ -113,7 +113,7 @@ __global__ void cuda_kernel_diff2_coarse(
 
 		__syncthreads();
 
-		if (((float) tid / (float) translation_num) < block_sz/translation_num)
+		if (tid/translation_num < block_sz/translation_num) // NOTE int division A/B==C/B !=> A==C
 		for (int i = tid / translation_num;
 				i < block_sz/prefetch_fraction;
 				i += block_sz/translation_num)
@@ -121,7 +121,7 @@ __global__ void cuda_kernel_diff2_coarse(
 			if((init_pixel + i) >= image_size) break;
 
 			int x = (init_pixel + i) % projector.imgX;
-			int y = (int)floorf( (float)(init_pixel + i) / (float)projector.imgX);
+			int y = floorfracf(init_pixel+i, projector.imgX);
 
 			if (y > projector.maxR)
 				y -= projector.imgY;
@@ -197,7 +197,7 @@ __global__ void cuda_kernel_diff2_fine(
 		// index of comparison
 		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
 		unsigned long int iy;
-		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		unsigned pass_num(ceilfracf(image_size,BLOCK_SIZE));
 
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
@@ -206,7 +206,7 @@ __global__ void cuda_kernel_diff2_fine(
 			if(pixel < image_size)
 			{
 				int x = pixel % projector.imgX;
-				int y = (int)floorf( (float)pixel / (float)projector.imgX);
+				int y = floorfracf(pixel, projector.imgX);
 
 				if (y > projector.maxR)
 				{
@@ -309,7 +309,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		s_cuda_kernel_diff2s[i*BLOCK_SIZE + tid] = 0.0f;
 	__syncthreads();
 
-	unsigned pixel_pass_num( ceilf( (float)image_size / (float)BLOCK_SIZE ) );
+	unsigned pixel_pass_num( ceilfracf(image_size,BLOCK_SIZE) );
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 	{
 		unsigned pixel = (pass * BLOCK_SIZE) + tid;
@@ -317,7 +317,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		if(pixel < image_size)
 		{
 			int x = pixel % projector.imgX;
-			int y = (int)floorf( (float)pixel / (float)projector.imgX);
+			int y = floorfracf(pixel,projector.imgX);
 
 			if (y > projector.maxR)
 			{
@@ -353,7 +353,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 	__syncthreads();
 
-	unsigned trans_pass_num( ceilf( (float)translation_num / (float)BLOCK_SIZE ) );
+	unsigned trans_pass_num( ceilfracf(translation_num,BLOCK_SIZE) );
 	for (unsigned pass = 0; pass < trans_pass_num; pass++)
 	{
 		unsigned itrans = (pass * BLOCK_SIZE) + tid;
@@ -419,7 +419,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 		// index of comparison
 		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
 		unsigned long int iy;
-		unsigned pass_num(ceilf(   ((float)image_size) / (float)BLOCK_SIZE  ));
+		unsigned pass_num( ceilfracf(image_size,BLOCK_SIZE) );
 
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
@@ -428,7 +428,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 			if(pixel < image_size)
 			{
 				int x = pixel % projector.imgX;
-				int y = (int)floorf( (float)pixel / (float)projector.imgX);
+				int y = floorfracf(pixel, projector.imgX);
 
 				if (y > projector.maxR)
 				{

@@ -1,3 +1,4 @@
+#include "src/gpu_utils/cuda_device_utils.cuh"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 
 __global__ void cuda_kernel_exponentiate_weights_coarse(
@@ -154,7 +155,7 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
     int job_size = d_job_num[bid];
 	pos += tid;	   					// pos is updated to be thread-resolved
 
-    int pass_num = ceil((float)job_size / (float)SUMW_BLOCK_SIZE);
+    int pass_num = ceilfracf(job_size,SUMW_BLOCK_SIZE);
     for (int pass = 0; pass < pass_num; pass++, pos+=SUMW_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
     {
     	if ((pass*SUMW_BLOCK_SIZE+tid)<job_size) // if there is a translation that needs to be done still for this thread
@@ -216,7 +217,7 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 
 		XFLOAT sum_bg_total = 0.f;
 
-		long int texel_pass_num = ceilf((float)vol_size/(float)SOFTMASK_BLOCK_SIZE);
+		long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE);
 		int texel = tid;
 
 		partial_sum[tid]=0.f;
@@ -231,7 +232,7 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 					img_pixels[tid]=__ldg(&vol[texel]);
 
 					z = 0.f;// floor( (float) texel                  / (float)((xdim)*(ydim)));
-					y = floor( (float)(texel-z*(xdim)*(ydim)) / (float)  xdim         );
+					y = floor( (float)(texel-z*(xdim)*(ydim)) / (float) xdim );
 					x = texel - z*(xdim)*(ydim) - y*xdim;
 
 	//				z-=zinit;
