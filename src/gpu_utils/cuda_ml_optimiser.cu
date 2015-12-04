@@ -527,7 +527,7 @@ void getAllSquaredDifferencesCoarse(
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	op.min_diff2.clear();
-	op.min_diff2.resize(sp.nr_particles, 99.e99);
+	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
@@ -752,7 +752,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	op.min_diff2.clear();
-	op.min_diff2.resize(sp.nr_particles, 99.e99);
+	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
@@ -1287,7 +1287,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if (filteredSize == 0)
 			{
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 
