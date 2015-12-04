@@ -116,10 +116,6 @@ public:
     // and update all job lists at the bottom
     void loadJobFromPipeline();
 
-    // Find the first substring corresponding to 6-digits-dash-6-digits
-    // As defined in RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
-    std::string findUniqueDateSubstring(std::string in);
-
 
 private:
 

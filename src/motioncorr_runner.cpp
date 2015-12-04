@@ -32,9 +32,11 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	bin_factor =  textToInteger(parser.getOption("--bin_factor", "Binning factor (integer) for scaling inside MOTIONCORR", "1"));
-	first_frame =  textToInteger(parser.getOption("--first_frame", "First movie frame used in alignment and corrected movie (start at 1)", "1"));
-	last_frame =  textToInteger(parser.getOption("--last_frame", "Last movie frame used in alignment and corrected movie (0: use all)", "0"));
-	fn_other_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR", "0");
+	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
+	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
+	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
+	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
+	fn_other_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR", "");
 
 	fn_motioncorr_exe = parser.getOption("--motioncorr_exe","Location of MOTIONCORR executable (or through RELION_MOTIONCORR_EXECUTABLE environment variable)","");
 
@@ -64,8 +66,7 @@ void MotioncorrRunner::initialise()
 			fn_motioncorr_exe = (std::string)penv;
 	}
 
-	MDout1.clear();
-	MDout2.clear();
+	MDout.clear();
 
 	FileName fn_avg, fn_mov;
 
@@ -83,13 +84,8 @@ void MotioncorrRunner::initialise()
 
 			// For output STAR file
 			getOutputFileNames(fn_mic, fn_avg, fn_mov);
-			MDout1.addObject(MDin.getObject());
-			MDout1.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
-			if (do_save_movies)
-			{
-				MDout2.addObject();
-				MDout2.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
-			}
+			MDout.addObject(MDin.getObject());
+			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 	else
@@ -100,13 +96,8 @@ void MotioncorrRunner::initialise()
 		for (size_t imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			getOutputFileNames(fn_micrographs[imic], fn_avg, fn_mov);
-			MDout1.addObject();
-			MDout1.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
-			if (do_save_movies)
-			{
-				MDout2.addObject();
-				MDout2.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
-			}
+			MDout.addObject();
+			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 
@@ -124,10 +115,29 @@ void MotioncorrRunner::initialise()
 		fn_micrographs = fns_todo;
 	}
 
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length()-1] != '/')
+		fn_out += "/";
+
+	// Make all output directories if necessary
+	FileName prevdir="";
+	for (size_t i = 0; i < fn_micrographs.size(); i++)
+	{
+		FileName newdir = fn_micrographs[i].beforeLastOf("/");
+		if (newdir != prevdir)
+		{
+			std::string command = " mkdir -p " + fn_out + newdir;
+			int res = system(command.c_str());
+		}
+	}
+
 	// Motioncorr starts counting frames at 0:
-	first_frame -= 1;
-	if (last_frame != 0)
-		last_frame -= 1;
+	first_frame_ali -= 1;
+	first_frame_sum -= 1;
+	if (last_frame_ali != 0)
+		last_frame_ali -= 1;
+	if (last_frame_sum != 0)
+		last_frame_sum -= 1;
 
 	if (verb > 0)
 	{
@@ -143,9 +153,19 @@ void MotioncorrRunner::initialise()
 
 void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov)
 {
+	// If there are any dots in the filename, replace them by underscores
+	FileName fn_root = fn_mic.withoutExtension();
+	size_t pos = 0;
+	while (true)
+	{
+		pos = fn_root.find(".");
+		if (pos == std::string::npos)
+			break;
+		fn_root.replace(pos, 1, "_");
+	}
 
-	fn_avg = fn_out + "/" + fn_mic;
-	fn_mov = fn_avg.withoutExtension() + "_" + fn_movie + ".mrcs";
+	fn_avg = fn_out + fn_root + ".mrc";
+	fn_mov = fn_out + fn_root + "_" + fn_movie + ".mrcs";
 }
 
 
@@ -172,8 +192,7 @@ void MotioncorrRunner::run()
 		progress_bar(fn_micrographs.size());
 
 	// Write out STAR file at the end
-	MDout1.write(fn_out + "/corrected_micrographs.star");
-	MDout2.write(fn_out + "/corrected_micrographs_movie.star");
+	MDout.write(fn_out + "/corrected_micrographs.star");
 
 }
 
@@ -183,14 +202,15 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
 
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
-	FileName fn_log = fn_mic.withoutExtension() + ".log";
+	FileName fn_log = fn_avg.withoutExtension() + ".log";
+	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
 	std::string command = fn_motioncorr_exe + " ";
 
 	command += fn_mic + " -fcs " + fn_avg;
 	command += " -flg " + fn_log;
-	command += " -nst " + integerToString(first_frame) + " -nss " + integerToString(first_frame);
-	command += " -ned " + integerToString(last_frame) + " -nes " + integerToString(last_frame);
+	command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
+	command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
 
 	if (do_save_movies)
 		command += " -dsp 0 -ssc 1 -fct " + fn_mov;
@@ -198,9 +218,15 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
 	if (bin_factor > 1)
 		command += " -bin " + integerToString(bin_factor);
 
-	command += " " + fn_other_args;
+	if (fn_other_args.length() > 0)
+		command += " " + fn_other_args;
+
+	// Save the command that was executed
+	std::ofstream fh;
+	fh.open(fn_cmd.c_str(), std::ios::out);
+	fh << command << std::endl;
+	fh.close();
 
 	int res = system(command.c_str());
-
 
 }

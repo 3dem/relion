@@ -68,8 +68,7 @@ void MotioncorrRunnerMpi::run()
 	// Only the master writes the joined result file
 	if (node->isMaster())
 	{
-		MDout1.write(fn_out + "/corrected_micrographs.star");
-		MDout2.write(fn_out + "/corrected_micrographs_movie.star");
+		MDout.write(fn_out + "/corrected_micrographs.star");
 	}
 
 }

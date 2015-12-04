@@ -333,6 +333,9 @@ void PipeLine::read()
 	// Close file handler
 	in.close();
 
+	// Re-make the .Node directory
+	makeNodeDirectory();
+
 }
 
 void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deleteProcess)

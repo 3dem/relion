@@ -47,7 +47,7 @@ public:
 	std::vector<FileName> fn_micrographs;
 
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
-	int first_frame, last_frame;
+	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;
 
 	// Binning factor for binning inside MOTIONCORR
 	int bin_factor;
@@ -65,7 +65,7 @@ public:
 	bool continue_old;
 
 	// Output STAR file
-	MetaDataTable MDout1, MDout2;
+	MetaDataTable MDout;
 
 public:
 	// Read command line arguments

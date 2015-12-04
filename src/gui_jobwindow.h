@@ -228,8 +228,10 @@ public:
 	AnyEntry fn_out;
 	FileNameEntry fn_motioncorr_exe;
 	SliderEntry bin_factor;
-	SliderEntry first_frame;
-	SliderEntry last_frame;
+	SliderEntry first_frame_ali;
+	SliderEntry last_frame_ali;
+	SliderEntry first_frame_sum;
+	SliderEntry last_frame_sum;
 	AnyEntry other_motioncorr_args;
 	BooleanEntry do_save_movies;
 
@@ -265,6 +267,7 @@ public:
 	SliderEntry cs, kv, q0, angpix, dstep, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
+	AnyEntry other_gctf_args;
 
 	Fl_Group *gctf_group;
 

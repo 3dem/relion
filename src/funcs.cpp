@@ -55,6 +55,33 @@
 #include <fstream>
 #include <typeinfo>
 
+size_t findUniqueDateSubstring(std::string fnt, std::string &uniqdate)
+{
+	size_t slashpos = 0;
+	int i = 0;
+	while (slashpos < fnt.length())
+	{
+		i++;
+		slashpos = fnt.find("/", slashpos+1);
+		if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
+		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
+		    fnt[slashpos+7] == '-' &&
+		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
+		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
+			{
+				uniqdate = fnt.substr(slashpos+1,13);
+				return slashpos;
+			}
+
+		if (i>100)
+			REPORT_ERROR("findUniqueDateSubstring: BUG or found more than 100 directories deep structure?");
+	}
+
+	// Not found
+	uniqdate="";
+	return std::string::npos;
+}
+
 void fitStraightLine(const std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff)
 {
 	// From: http://mathworld.wolfram.com/LeastSquaresFitting.html

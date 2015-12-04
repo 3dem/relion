@@ -420,27 +420,6 @@ void RelionMainWindow::loadJobFromPipeline()
 
 }
 
-std::string RelionMainWindow::findUniqueDateSubstring(std::string fnt)
-{
-	bool found = false;
-	size_t slashpos = 0;
-	int i = 0;
-	while (slashpos < fnt.length() && i < 5)
-	{
-		i++;
-		slashpos = fnt.find("/", slashpos+1);
-		if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
-		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
-		    fnt[slashpos+7] == '-' &&
-		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
-		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
-			return fnt.substr(slashpos+1,13);
-	}
-
-	REPORT_ERROR("RelionMainWindow::findUniqueDateSubstring ERROR: no uniq-date identifier found for: " + fnt);
-}
-
-
 void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
 {
 	int itype = (this_job > 0) ? this_job : browser->value();
@@ -962,7 +941,6 @@ void RelionMainWindow::cb_run_i()
 
 	// Also save a copy of the GUI settings with the current output name
 	fn_settings = outputname;
-	std::cerr << " run fn_settings=" << fn_settings << std::endl;
 	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
 
 	if (commands.size()==0)
@@ -1034,7 +1012,8 @@ void RelionMainWindow::cb_run_scheduled_i()
 		REPORT_ERROR("RelionMainWindow::cb_run_scheduled_i BUG: this is not a scheduled job!");
 
 	// Get the OLD UNIQDATE of the scheduled job!!
-	std::string fn_olduniqdate= findUniqueDateSubstring(fn_settings);
+	std::string fn_olduniqdate, fn_newuniqdate;
+	findUniqueDateSubstring(fn_settings, fn_olduniqdate);
 
 	// Run the scheduled job
 	cb_run_i();
@@ -1043,7 +1022,7 @@ void RelionMainWindow::cb_run_scheduled_i()
 	int run_job = pipeline.processList.size() - 1;
 
 	// Get the NEW UNIQDATE of the running job
-	std::string fn_newuniqdate= findUniqueDateSubstring(fn_settings);
+	findUniqueDateSubstring(fn_settings, fn_newuniqdate);
 
 	// Now replace all OLD UNIQDATEs in the inputNode names of remaining scheduled job with the new UNIQDATEs
 	for (size_t i = 0; i < pipeline.processList.size(); i++)
@@ -1218,7 +1197,6 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 					FileName firstdirs = alldirs.beforeLastOf("/");
 					std::string command = "mkdir -p Trash/" + firstdirs;
 					int res = system(command.c_str());
-					std::cerr << " command= " << command << std::endl;
 					command= "mv -f " + alldirs + " Trash/" + firstdirs+"/.";
 					res = system(command.c_str());
 				}

@@ -704,7 +704,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	tab1->label("I/O");
 	resetHeight();
 
-	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MIC, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
+	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MOVIE, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -732,8 +732,10 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	current_y += STEPY/2;
 
 	bin_factor.place(current_y, "Binning factor:", 1, 1, 8, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
-	first_frame.place(current_y, "First frame:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
-	last_frame.place(current_y, "Last frame:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
+	first_frame_ali.place(current_y, "First frame for alignment:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
+	last_frame_ali.place(current_y, "Last frame for alignment:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
+	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
+	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
 	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions in MOTIONCOR");
 	other_motioncorr_args.place(current_y, "Other MOTIONCORR arguments", "", "Additional arguments that need to be passed to MOTIONCORR.");
 
@@ -758,8 +760,10 @@ void MotioncorrJobWindow::write(std::string fn)
 	fn_out.writeValue(fh);
 	fn_motioncorr_exe.writeValue(fh);
 	bin_factor.writeValue(fh);
-	first_frame.writeValue(fh);
-	last_frame.writeValue(fh);
+	first_frame_ali.writeValue(fh);
+	last_frame_ali.writeValue(fh);
+	first_frame_sum.writeValue(fh);
+	last_frame_sum.writeValue(fh);
 	do_save_movies.writeValue(fh);
 	other_motioncorr_args.writeValue(fh);
 
@@ -777,8 +781,10 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		fn_out.readValue(fh);
 		fn_motioncorr_exe.readValue(fh);
 		bin_factor.readValue(fh);
-		first_frame.readValue(fh);
-		last_frame.readValue(fh);
+		first_frame_ali.readValue(fh);
+		last_frame_ali.readValue(fh);
+		first_frame_sum.readValue(fh);
+		last_frame_sum.readValue(fh);
 		do_save_movies.readValue(fh);
 		other_motioncorr_args.readValue(fh);
 
@@ -835,8 +841,10 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	// Motioncorr-specific stuff
 	command += " --bin_factor " + integerToString(bin_factor.getValue());
 	command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
-	command += " --first_frame " + integerToString(first_frame.getValue());
-	command += " --last_frame " + integerToString(last_frame.getValue());
+	command += " --first_frame_ali " + integerToString(first_frame_ali.getValue());
+	command += " --last_frame_ali " + integerToString(last_frame_ali.getValue());
+	command += " --first_frame_sum " + integerToString(first_frame_sum.getValue());
+	command += " --last_frame_sum " + integerToString(last_frame_sum.getValue());
 	if (do_save_movies.getValue())
 		command += " --save_movies ";
 
@@ -858,6 +866,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
+	type = PROC_CTFFIND;
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
@@ -885,7 +894,6 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 
 	fn_out.place(current_y, "Output directory:", "CtfEstimate/UNIQDATE/", "Output directory for all files of this run. The directory will be created if it does not exist.");
 	fn_out.deactivate();
-
 
 	tab1->end();
 
@@ -953,6 +961,8 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 \n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 
 	do_EPA.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
+
+//	other_gctf_args.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
 	gctf_group->end();
 	use_gctf.cb_menu_i(); // make default active
@@ -1030,7 +1040,6 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	input_star_mics.deactivate(is_continue);
-	fn_out.deactivate(is_continue);
 	cs.deactivate(is_continue);
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
@@ -1061,71 +1070,48 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	Node node(fn_outstar, NODE_MIC);
 	pipelineOutputNodes.push_back(node);
 	Node node2(input_star_mics.getValue(), NODE_MIC);
-	pipelineInputNodes.push_back(node);
+	pipelineInputNodes.push_back(node2);
 
+	if (nr_mpi.getValue() > 1)
+		command="`which relion_run_ctffind_mpi`";
+	else
+		command="`which relion_run_ctffind`";
+
+	// Calculate magnification from user-specified pixel size in Angstroms
+	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix.getValue() * 1e-10));
+
+	command += " --i " + input_star_mics.getValue();
+	command += " --o " + outputname;
+	command += " --CS " + floatToString(cs.getValue());
+	command += " --HT " + floatToString(kv.getValue());
+	command += " --AmpCnst " + floatToString(q0.getValue());
+	command += " --XMAG " + floatToString(magn);
+	command += " --DStep " + floatToString(dstep.getValue());
+	command += " --Box " + floatToString(box.getValue());
+	command += " --ResMin " + floatToString(resmin.getValue());
+	command += " --ResMax " + floatToString(resmax.getValue());
+	command += " --dFMin " + floatToString(dfmin.getValue());
+	command += " --dFMax " + floatToString(dfmax.getValue());
+	command += " --FStep " + floatToString(dfstep.getValue());
+	command += " --dAst " + floatToString(dast.getValue());
 	if (use_gctf.getValue())
 	{
-		if (nr_mpi.getValue() > 1)
-		{
-			std::cout << " ERROR: You cannot use multiple MPI processes together with Gctf...." << std::endl;
-			return;
-		}
-
-		command = fn_gctf_exe.getValue();
-		command +=  " --ctfstar " + fn_outstar;
-		command +=  " --apix " + floatToString(angpix.getValue());
-		command +=  " --cs " + floatToString(cs.getValue());
-		command +=  " --kV " + floatToString(kv.getValue());
-		command +=  " --ac " + floatToString(q0.getValue());
-
-		if (!do_ignore_ctffind_params.getValue())
-		{
-			command += " --boxsize " + floatToString(box.getValue());
-			command += " --resL " + floatToString(resmin.getValue());
-			command += " --resH " + floatToString(resmax.getValue());
-			command += " --defL " + floatToString(dfmin.getValue());
-			command += " --defH " + floatToString(dfmax.getValue());
-			command += " --defS " + floatToString(dfstep.getValue());
-			command += " --astm " + floatToString(dast.getValue());
-		}
-
+		command += " --use_gctf --gctf_exe " + fn_gctf_exe.getValue();
+		command += " --angpix " + floatToString(angpix.getValue());
+		if (do_ignore_ctffind_params.getValue())
+			command += " --ignore_ctffind_params";
 		if (do_EPA.getValue())
-			command += " --do_EPA ";
-
-		// TODO: continuation of Gctf runs....
-
+			command += " --EPA";
 	}
 	else
 	{
-
-		if (nr_mpi.getValue() > 1)
-			command="`which relion_run_ctffind_mpi`";
-		else
-			command="`which relion_run_ctffind`";
-
-		// Calculate magnification from user-specified pixel size in Angstroms
-		RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix.getValue() * 1e-10));
-
-		command += " --i " + input_star_mics.getValue();
-		command += " --o " + fn_outstar ;
-		command += " --ctfWin " + floatToString(ctf_win.getValue());
-		command += " --CS " + floatToString(cs.getValue());
-		command += " --HT " + floatToString(kv.getValue());
-		command += " --AmpCnst " + floatToString(q0.getValue());
-		command += " --XMAG " + floatToString(magn);
-		command += " --DStep " + floatToString(dstep.getValue());
-		command += " --Box " + floatToString(box.getValue());
-		command += " --ResMin " + floatToString(resmin.getValue());
-		command += " --ResMax " + floatToString(resmax.getValue());
-		command += " --dFMin " + floatToString(dfmin.getValue());
-		command += " --dFMax " + floatToString(dfmax.getValue());
-		command += " --FStep " + floatToString(dfstep.getValue());
-		command += " --dAst " + floatToString(dast.getValue());
 		command += " --ctffind_exe " + fn_ctffind_exe.getValue();
-
-		if (is_continue)
-			command += " --only_do_unfinished ";
+		command += " --ctfWin " + floatToString(ctf_win.getValue());
 	}
+
+
+	if (is_continue)
+		command += " --only_do_unfinished ";
 
 	// Other arguments
 	command += " " + other_args.getValue();
