@@ -208,9 +208,11 @@ list(APPEND RELION_SCRIPT_FILES star_printtable
 add_custom_target(copy_scripts ALL)
                                 
 foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
-add_custom_command(TARGET copy_scripts POST_BUILD
-                 COMMAND ${CMAKE_COMMAND} -E
-                 copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE})
+    add_custom_command(TARGET copy_scripts POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E
+                     copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} 
+                     ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
+    install(FILES ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} DESTINATION bin)
 endforeach()
 
 
