@@ -224,7 +224,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		 */
 
 		// Fourier Transform (and downscale) Imic()
-		runCenterFFT(Imic(), true);
+		runCenterFFT(Imic(), true, allocator);
 		transformer.FourierTransform(Imic(), Fmic);
 
 		// Also calculate the FFT of the squared micrograph
@@ -347,7 +347,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 					windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
 					transformer.inverseFourierTransform(Faux2, Maux);
-					runCenterFFT(Maux, false);
+					runCenterFFT(Maux, false, allocator);
 					Maux.setXmippOrigin();
 					// TODO: check whether I need CenterFFT(Maux, false)
 
@@ -388,7 +388,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				}
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
 				transformer.inverseFourierTransform(Faux2, Maux);
-				runCenterFFT(Maux, false);
+				runCenterFFT(Maux, false, allocator);
 #ifdef DEBUG
 				tt()=Maux*normfft;
 				tt.write("Mcc.spi");
