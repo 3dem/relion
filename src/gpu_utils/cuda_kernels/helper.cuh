@@ -60,4 +60,13 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT radius,
 												XFLOAT radius_p,
 												XFLOAT cosine_width	);
+
+__global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
+										 XFLOAT *img_out,
+										 long int image_size,
+										 long int xdim,
+										 long int ydim,
+										 long int xshift,
+										 long int yshift);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

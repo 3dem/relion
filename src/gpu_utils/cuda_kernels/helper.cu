@@ -304,3 +304,41 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 
 		}
 }
+
+__global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
+										 XFLOAT *img_out,
+										 long int image_size,
+										 long int xdim,
+										 long int ydim,
+										 long int xshift,
+										 long int yshift)
+{
+	int pixel = threadIdx.x;
+	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
+
+	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
+	{
+		if(pixel<image_size)
+		{
+			int y = floorfracf(pixel,xdim);
+			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
+
+			int yp = y + yshift;
+			if (yp < 0)
+				yp += ydim;
+			else if (yp >= ydim)
+				yp -= ydim;
+
+			int xp = x + yshift;
+			if (xp < 0)
+				xp += xdim;
+			else if (xp >= xdim)
+				xp -= xdim;
+
+			int n_pixel = yp*xdim + xp;
+
+			img_out[n_pixel] = img_in[pixel];
+		}
+	}
+}
+

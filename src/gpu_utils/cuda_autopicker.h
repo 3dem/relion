@@ -12,7 +12,6 @@
 #include "src/autopicker.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include <stack>
-//#include <cufft.h>
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define XFLOAT double

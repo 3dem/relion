@@ -4,14 +4,15 @@
 #include <math.h>
 #include <ctime>
 #include <iostream>
-#include "src/gpu_utils/cuda_mem_utils.h"
-#include "src/complex.h"
 #include <fstream>
 #include <cuda_runtime.h>
 #include <signal.h>
+#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_helper_functions.cuh"
+#include "src/complex.h"
 
 #include "src/image.h"
-#include "src/autopicker.h"
 #include "src/gpu_utils/cuda_autopicker.h"
 
 #ifdef CUDA_FORCESTL
@@ -97,11 +98,14 @@ void AutoPickerCuda::run()
 	if (basePckr->verb > 0)
 		progress_bar(basePckr->fn_micrographs.size());
 
+	cudaDeviceReset();
+
 }
 
 
 void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 {
+	std::cerr << " cudaAutoPicker being run!" << std::endl;
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
 	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf;
@@ -220,7 +224,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		 */
 
 		// Fourier Transform (and downscale) Imic()
-		CenterFFT(Imic(), true);
+		runCenterFFT(Imic(), true);
 		transformer.FourierTransform(Imic(), Fmic);
 
 		// Also calculate the FFT of the squared micrograph
@@ -343,7 +347,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 					windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
 					transformer.inverseFourierTransform(Faux2, Maux);
-					CenterFFT(Maux, false);
+					runCenterFFT(Maux, false);
 					Maux.setXmippOrigin();
 					// TODO: check whether I need CenterFFT(Maux, false)
 
@@ -384,7 +388,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				}
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
 				transformer.inverseFourierTransform(Faux2, Maux);
-				CenterFFT(Maux, false);
+				runCenterFFT(Maux, false);
 #ifdef DEBUG
 				tt()=Maux*normfft;
 				tt.write("Mcc.spi");
