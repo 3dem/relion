@@ -37,17 +37,18 @@ if (CUDA_FOUND)
     
     find_library(CUFFT_LIBRARIES   NAMES cufft  PATHS $ENV{CUDA_HOME}/lib64)
     list(APPEND EXTRA_LIBS "${CUFFT_LIBRARIES}")
-    install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
+    if(BUILD_SHARED_LIBS)
+        install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
+    endif()
 endif(CUDA_FOUND)
 
 # relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
 if(BUILD_SHARED_LIBS)
     add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+    install (TARGETS relion_lib LIBRARY DESTINATION lib)
 else()
     add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 endif()
-
-install (TARGETS relion_lib LIBRARY DESTINATION lib)
 
 
 foreach (_target ${RELION_TARGETS})
