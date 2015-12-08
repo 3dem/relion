@@ -66,7 +66,7 @@ else(NOT DEFINED CUDA_ARCH)
 endif(NOT DEFINED CUDA_ARCH)
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
-option(DoublePrec_CPU "DoublePrec_CPU" OFF)
+option(DoublePrec_CPU "DoublePrec_CPU" ON)
 if(DoublePrec_CPU)
     message(STATUS "Setting cpu precision to double")    
 else(DoublePrec_CPU)
@@ -158,30 +158,25 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-option(OWN_FLTK "OWN_FLTK" OFF)
+option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
 # --------------------------------------------------------------------------X11/FLTK--
 FIND_PACKAGE(X11)
 if(GUI)
-
     if(X11_FOUND)
         set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
-        if(OWN_FLTK)
-            include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
-        else()
+        if(NOT FORCE_OWN_FLTK)
             FIND_PACKAGE(FLTK)
-        endif()
+		    if(FLTK_FOUND)
+				message(STATUS "X11 and FLTK were found")
+				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
+		    else()
+		        message(STATUS "FLTK was NOT found")
+		    endif() 
+        endif(NOT FORCE_OWN_FLTK)
         
-        if(FLTK_FOUND)
-            message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
-        else()
-            message( STATUS "\n-- ------------------ YOU HAVE NO FLTK-LIBS ------------------")
-            message( STATUS "CCmake found no fltk-libs on your system, which are required for the GUI. Either ")
-            message( STATUS "     a) Make sure cmake can find them ")
-            message( STATUS "     b) Add the flag -DOWN_FLTK=ON to your cmake command to build a local fltk-lib")
-            message( STATUS "     c) Add the flag -DGUI=OFF to avoid using fltk" )
-            message( STATUS "--------------------------------------------------------")
-        	message( FATAL_ERROR "FLTK is required for GUI." )
-        endif() 
+		if(NOT FLTK_FOUND)
+        	include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+        endif(NOT FLTK_FOUND)
     else(X11_FOUND)
         message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
         message( STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
@@ -192,8 +187,15 @@ if(GUI)
 endif(GUI)    
     
 # ------------------------------------------------------------------------------FFTW--
-option(OWN_FFTW "OWN_FFT" OFF)
-FIND_PACKAGE(FFTW REQUIRED)
+option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+
+if(NOT FORCE_OWN_FFTW)
+	FIND_PACKAGE(FFTW)
+endif(NOT FORCE_OWN_FFTW)
+	
+if(NOT FFTW_FOUND)
+	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
+endif(NOT FFTW_FOUND)
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 

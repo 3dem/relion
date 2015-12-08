@@ -1,5 +1,5 @@
 message(STATUS "-------------------------------------------------")   
-message(STATUS "------------- USING LOCAL FFTW LIBS -------------")  
+message(STATUS "------------- WILL USE OWN FFTW LIBS ------------")  
 message(STATUS "-------------------------------------------------") 
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
@@ -10,10 +10,18 @@ find_library(FFTW_LIBRARIES NAMES lib${libfft}.so PATHS ${FFTW_EXTERNAL_PATH}/li
 
 if(FFTW_PATH AND FFTW_INCLUDES AND FFTW_LIBRARIES)
     set(FFTW_FOUND TRUE)
-    message( STATUS "found previously built external (non-system) fft lib")
+    message( STATUS "Found previously built external (non-system) FFTW library")
 endif()
 ## ----------------------------------------------------------------- NEW EXT LIBS? --  
  
+if(DoublePrec_CPU)
+   # set fftw lib to use double precision
+	set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
+else(DoublePrec_CPU)
+	# set fftw lib to use single precision
+	set(ext_conf_flags_fft --enable-shared --enable-float --prefix=${FFTW_EXTERNAL_PATH})
+endif(DoublePrec_CPU)	
+
 if(NOT FFTW_FOUND)
 
     set(FFTW_LIBRARIES ${FFTW_EXTERNAL_PATH}/lib/lib${libfft}.so )  
