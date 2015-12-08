@@ -116,14 +116,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 	int min_distance_pix = ROUND(basePckr->min_particle_distance / basePckr->angpix);
 
-#ifdef DEBUG
-	Image<RFLOAT> tt;
-	tt().resize(micrograph_size, micrograph_size);
-	std::cerr << " fn_mic= " << fn_mic << std::endl;
-#endif
 	// Read in the micrograph
+	CUDA_CPU_TIC("readMicrograph");
 	Imic.read(fn_mic);
+	CUDA_CPU_TOC("readMicrograph");
+	CUDA_CPU_TIC("setXmippOrigin_0");
 	Imic().setXmippOrigin();
+	CUDA_CPU_TOC("setXmippOrigin_0");
 
 	// Let's just check the square size again....
 	RFLOAT my_size, my_xsize, my_ysize;
@@ -140,7 +139,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 	// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
     RFLOAT avg0, stddev0, minval0, maxval0;
+    CUDA_CPU_TIC("computeStats");
 	Imic().computeStats(avg0, stddev0, minval0, maxval0);
+    CUDA_CPU_TOC("computeStats");
+
+    CUDA_CPU_TIC("middlePassFilter");
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imic())
 	{
 		// Remove pixel values that are too far away from the mean
@@ -149,12 +152,15 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 		DIRECT_MULTIDIM_ELEM(Imic(), n) = (DIRECT_MULTIDIM_ELEM(Imic(), n) - avg0) / stddev0;
 	}
+    CUDA_CPU_TOC("middlePassFilter");
 
 	if (basePckr->micrograph_xsize !=basePckr->micrograph_ysize)
 	{
+		CUDA_CPU_TIC("rewindow");
 		// Window non-square micrographs to be a square with the largest side
 		rewindow(Imic, basePckr->micrograph_size);
-
+		CUDA_CPU_TOC("rewindow");
+		CUDA_CPU_TIC("gaussNoiseOutside");
 		// Fill region outside the original window with white Gaussian noise to prevent all-zeros in Mstddev
 		FOR_ALL_ELEMENTS_IN_ARRAY2D(Imic())
 		{
@@ -164,8 +170,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					|| j > LAST_XMIPP_INDEX(basePckr->micrograph_xsize) )
 				A2D_ELEM(Imic(), i, j) = rnd_gaus(0.,1.);
 		}
+		CUDA_CPU_TOC("gaussNoiseOutside");
 	}
 
+	CUDA_CPU_TIC("CTFread");
 	// Read in the CTF information if needed
 	if (basePckr->do_ctf)
 	{
@@ -182,24 +190,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				break;
 			}
 		}
-#ifdef DEBUG
-		std::cerr << " Read CTF info from" << fn_mic.withoutExtension()<<"_ctf.star" << std::endl;
-		Image<RFLOAT> Ictf;
-		Ictf()=Fctf;
-		Ictf.write("Mmic_ctf.spi");
-#endif
 	}
+	CUDA_CPU_TOC("CTFread");
 
+	CUDA_CPU_TIC("mccfResize");
 	Mccf_best.resize(basePckr->micrograph_size, basePckr->micrograph_size);
+	CUDA_CPU_TOC("mccfResize");
+	CUDA_CPU_TIC("mpsifResize");
 	Mpsi_best.resize(basePckr->micrograph_size, basePckr->micrograph_size);
+	CUDA_CPU_TOC("mpsiResize");
 
 	RFLOAT normfft = (RFLOAT)(basePckr->micrograph_size * basePckr->micrograph_size) / (RFLOAT)basePckr->nr_pixels_circular_mask;;
 	if (basePckr->do_read_fom_maps)
 	{
+		CUDA_CPU_TIC("readFromFomMaps_0");
 		FileName fn_tmp=fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_stddevNoise.spi";
 		Image<RFLOAT> It;
 		It.read(fn_tmp);
 		Mstddev = It();
+		CUDA_CPU_TOC("readFromFomMaps_0");
 	}
 	else
 	{
@@ -222,60 +231,67 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		 *                Therefore, I do not need to calculate (X-mu)/sig beforehand!!!
 		 *
 		 */
-
+		CUDA_CPU_TIC("runCenterFFT_0");
 		// Fourier Transform (and downscale) Imic()
-		runCenterFFT(Imic(), true);
+		runCenterFFT(Imic(), true, allocator);
+		CUDA_CPU_TOC("runCenterFFT_0");
+		CUDA_CPU_TIC("FourierTransform_0");
 		transformer.FourierTransform(Imic(), Fmic);
+		CUDA_CPU_TOC("FourierTransform_0");
 
 		// Also calculate the FFT of the squared micrograph
+		CUDA_CPU_TIC("MauxResize");
 		Maux.resize(Imic());
+		CUDA_CPU_TOC("MauxResize");
+		CUDA_CPU_TIC("SquareImic");
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
 		{
 			DIRECT_MULTIDIM_ELEM(Maux, n) = DIRECT_MULTIDIM_ELEM(Imic(), n) * DIRECT_MULTIDIM_ELEM(Imic(), n);
 		}
+		CUDA_CPU_TOC("SquareImic");
 		MultidimArray<Complex > Fmic2;
+		CUDA_CPU_TIC("FourierTransform_1");
 		transformer.FourierTransform(Maux, Fmic2);
-
-#ifdef DEBUG
-		std::cerr << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
-		std::cerr << " nr_pixels_circular_mask= " << nr_pixels_circular_mask << std::endl;
-		windowFourierTransform(Finvmsk, Faux2, micrograph_size);
-		transformer.inverseFourierTransform(Faux2, tt());
-		CenterFFT(tt(), false);
-		tt.write("Minvmask.spi");
-		windowFourierTransform(Fmsk, Faux2, micrograph_size);
-		transformer.inverseFourierTransform(Faux2, tt());
-		CenterFFT(tt(), false);
-		tt.write("Mmask.spi");
-#endif
+		CUDA_CPU_TOC("FourierTransform_1");
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
+
+		CUDA_CPU_TIC("calculateStddevAndMeanUnderMask");
 		basePckr->calculateStddevAndMeanUnderMask(Fmic, Fmic2, basePckr->Finvmsk,basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
+		CUDA_CPU_TOC("calculateStddevAndMeanUnderMask");
 
 		if (basePckr->do_write_fom_maps)
 		{
+			CUDA_CPU_TIC("writeToFomMaps");
 			// TMP output
 			FileName fn_tmp=fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_stddevNoise.spi";
 			Image<RFLOAT> It;
 			It() = Mstddev;
 			It.write(fn_tmp);
+			CUDA_CPU_TOC("writeToFomMaps");
 		}
 
 		// From now on use downsized Fmic, as the cross-correlation with the references can be done at lower resolution
+		CUDA_CPU_TIC("windowFourierTransform_0");
 		windowFourierTransform(Fmic, Faux, basePckr->downsize_mic);
+		CUDA_CPU_TOC("windowFourierTransform_0");
 		Fmic = Faux;
 
 	}// end if do_read_fom_maps
 
 	// Now start looking for the peaks of all references
 	// Clear the output vector with all peaks
+	CUDA_CPU_TIC("initPeaks");
 	std::vector<Peak> peaks;
 	peaks.clear();
+	CUDA_CPU_TOC("initPeaks");
 	for (int iref = 0; iref < basePckr->Mrefs.size(); iref++)
 	{
+		CUDA_CPU_TIC("OneReference");
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
 		if (basePckr->do_read_fom_maps)
 		{
+			CUDA_CPU_TIC("readFromFomMaps");
 			FileName fn_tmp;
 			Image<RFLOAT> It;
 			fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.spi");
@@ -286,57 +302,40 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 			It.read(fn_tmp);
 			Mpsi_best = It();
+			CUDA_CPU_TOC("readFromFomMaps");
 
 		} //end else if do_read_fom_maps
 		else
 		{
+			CUDA_CPU_TIC("mccfInit");
 			Mccf_best.initConstant(-LARGE_NUMBER);
+			CUDA_CPU_TOC("mccfInit");
 			bool is_first_psi = true;
 			for (RFLOAT psi = 0. ; psi < 360.; psi+=basePckr->psi_sampling)
 			{
-
+				CUDA_CPU_TIC("OneRotation");
 				// Get the Euler matrix
+				CUDA_CPU_TIC("Matrix");
 				Matrix2D<RFLOAT> A(3,3);
 				Euler_angles2matrix(0., 0., psi, A);
-
+				CUDA_CPU_TOC("Matrix");
 				// Now get the FT of the rotated (non-ctf-corrected) template
+				CUDA_CPU_TIC("FauxInit");
 				Faux.initZeros(basePckr->downsize_mic, basePckr->downsize_mic/2 + 1);
+				CUDA_CPU_TOC("FauxInit");
+				CUDA_CPU_TIC("get2DFourierTransform");
 				basePckr->PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
-
-#ifdef DEBUG
-				std::cerr << " psi= " << psi << std::endl;
-				windowFourierTransform(Faux, Faux2, micrograph_size);
-				transformer.inverseFourierTransform(Faux2, tt());
-				CenterFFT(tt(), false);
-				tt.write("Mref_rot.spi");
-
-				windowFourierTransform(Fmic, Faux2, micrograph_size);
-				transformer.inverseFourierTransform(Faux2, tt());
-				CenterFFT(tt(), false);
-				tt.write("Mmic.spi");
-
-#endif
+				CUDA_CPU_TOC("get2DFourierTransform");
 
 				// Apply the CTF on-the-fly (so same PPref can be used for many different micrographs)
 				if (basePckr->do_ctf)
 				{
+					CUDA_CPU_TIC("CtfCorr");
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
 					{
 						DIRECT_MULTIDIM_ELEM(Faux, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
-#ifdef DEBUG
-				windowFourierTransform(Faux, Faux2, micrograph_size);
-				transformer.inverseFourierTransform(Faux2, Maux);
-				CenterFFT(Maux, false);
-				Maux.setXmippOrigin();
-				tt().resize(particle_size, particle_size);
-				tt().setXmippOrigin();
-				FOR_ALL_ELEMENTS_IN_ARRAY2D(tt())
-				{
-					A2D_ELEM(tt(), i, j) = A2D_ELEM(Maux, i, j);
-				}
-				tt.write("Mref_rot_ctf.spi");
-#endif
+					CUDA_CPU_TOC("CtfCorr");
 				}
 
 				if (is_first_psi)
@@ -344,11 +343,21 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
-
+					CUDA_CPU_TIC("windowFourierTransform_FP");
 					windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
+					CUDA_CPU_TOC("windowFourierTransform_FP");
+
+					CUDA_CPU_TIC("inverseFourierTransform_FP");
 					transformer.inverseFourierTransform(Faux2, Maux);
-					runCenterFFT(Maux, false);
+					CUDA_CPU_TOC("inverseFourierTransform_FP");
+
+					CUDA_CPU_TIC("runCenterFFT_FP");
+					runCenterFFT(Maux, false, allocator);
+					CUDA_CPU_TOC("runCenterFFT_FP");
+
+					CUDA_CPU_TIC("setXmippOrigin_FP_0");
 					Maux.setXmippOrigin();
+					CUDA_CPU_TOC("setXmippOrigin_FP_0");
 					// TODO: check whether I need CenterFFT(Maux, false)
 
 					sum_ref_under_circ_mask = 0.;
@@ -356,7 +365,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					RFLOAT suma2 = 0.;
 					RFLOAT sumn = 1.;
 					MultidimArray<RFLOAT> Mctfref(basePckr->particle_size, basePckr->particle_size);
+					CUDA_CPU_TIC("setXmippOrigin_FP_1");
 					Mctfref.setXmippOrigin();
+					CUDA_CPU_TOC("setXmippOrigin_FP_1");
+					CUDA_CPU_TIC("suma_FP");
 					FOR_ALL_ELEMENTS_IN_ARRAY2D(Mctfref) // only loop over smaller Mctfref, but take values from large Maux!
 					{
 						if (i*i + j*j < basePckr->particle_radius2)
@@ -367,86 +379,87 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 							sum_ref2_under_circ_mask += A2D_ELEM(Maux, i, j) * A2D_ELEM(Maux, i, j);
 							sumn += 1.;
 						}
-#ifdef DEBUG
-						A2D_ELEM(Mctfref, i, j) = A2D_ELEM(Maux, i, j);
-#endif
 					}
 					sum_ref_under_circ_mask /= sumn;
 					sum_ref2_under_circ_mask /= sumn;
 					expected_Pratio = exp(suma2 / (2. * sumn));
-#ifdef DEBUG
-					std::cerr << " expected_Pratio["<<iref<<"]= " << expected_Pratio << std::endl;
-					tt()=Mctfref;
-					tt.write("Mctfref.spi");
-#endif
+					CUDA_CPU_TOC("suma_FP");
 				}
 
 				// Now multiply template and micrograph to calculate the cross-correlation
+				CUDA_CPU_TIC("convol");
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
 				{
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
+				CUDA_CPU_TOC("convol");
+
+				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
-				transformer.inverseFourierTransform(Faux2, Maux);
-				runCenterFFT(Maux, false);
-#ifdef DEBUG
-				tt()=Maux*normfft;
-				tt.write("Mcc.spi");
-#endif
+				CUDA_CPU_TOC("windowFourierTransform_1");
+
+				CUDA_CPU_TIC("inverseFourierTransform_1");
+				CUDA_CPU_TIC("setReal");
+				transformer.setReal(Maux);
+				CUDA_CPU_TOC("setReal");
+				CUDA_CPU_TIC("setFourier");
+				transformer.setFourier(Faux2);
+				CUDA_CPU_TOC("setFourier");
+				CUDA_CPU_TIC("Transform");
+				transformer.Transform(1); // -1 == forward  ;  +1 == backward
+				CUDA_CPU_TOC("Transform");
+//				transformer.inverseFourierTransform(Faux2, Maux);
+				CUDA_CPU_TOC("inverseFourierTransform_1");
+
+				CUDA_CPU_TIC("runCenterFFT_1");
+				runCenterFFT(Maux, false, allocator);
+				CUDA_CPU_TOC("runCenterFFT_1");
 
 				// Calculate ratio of prabilities P(ref)/P(zero)
 				// Keep track of the best values and their corresponding iref and psi
-
+				// ------------------------------------------------------------------
 				// So now we already had precalculated: Mdiff2 = 1/sig*Sum(X^2) - 2/sig*Sum(X) + mu^2/sig*Sum(1)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
-				{
-					RFLOAT diff2 = - 2. * normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
-					diff2 += 2. * DIRECT_MULTIDIM_ELEM(Mmean, n) * sum_ref_under_circ_mask;
-					if (DIRECT_MULTIDIM_ELEM(Mstddev, n) > 1E-10)
-						diff2 /= DIRECT_MULTIDIM_ELEM(Mstddev, n);
-					diff2 += sum_ref2_under_circ_mask;
-#ifdef DEBUG
-						/*
-						if (diff2 < 0. || n==28800 || n==0)
-						{
-							std::cerr << " n= "<<n<< "diff2= " << diff2 << " old Mdiff2=" <<DIRECT_MULTIDIM_ELEM(Mdiff2, n)
-									<< " -2AX/sig " << - 2. * normfft * DIRECT_MULTIDIM_ELEM(Maux, n) / DIRECT_MULTIDIM_ELEM(Mstddev, n)
-									<< " 2Amu/sig= " << 2. * DIRECT_MULTIDIM_ELEM(Mmean, n) * sum_ref_under_circ_mask[iref] / DIRECT_MULTIDIM_ELEM(Mstddev, n)
-									<< " A2=" <<  sum_ref2_under_circ_mask[iref]
-									<< " stddev= " <<  DIRECT_MULTIDIM_ELEM(Mstddev, n) << " avg= "<< DIRECT_MULTIDIM_ELEM(Mmean, n)
-									<< std::endl;
-						}
-						*/
-#endif
-					diff2 = exp(- diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
+				CUDA_CPU_TIC("probRatio");
 
-					// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
-					diff2 = (diff2 - 1.) / (expected_Pratio - 1.);
-#ifdef DEBUG
-					DIRECT_MULTIDIM_ELEM(Maux, n) = diff2;
-#endif
-					if (diff2 > DIRECT_MULTIDIM_ELEM(Mccf_best, n))
-					{
-						DIRECT_MULTIDIM_ELEM(Mccf_best, n) = diff2;
-						DIRECT_MULTIDIM_ELEM(Mpsi_best, n) = psi;
-					}
-				}
-#ifdef DEBUG
-				std::cerr << " Maux.computeMax()= " << Maux.computeMax() << std::endl;
-				tt()=Maux;
-				tt.write("Mccf.spi");
-			    std::cerr << " Press any key to continue... "  << std::endl;
-			    char c;
-			    std::cin >> c;
-
-#endif
+				runProbRatio(Mccf_best,
+							 Mpsi_best,
+							 Maux,
+							 Mmean,
+							 Mstddev,
+							 normfft,
+							 sum_ref_under_circ_mask,
+							 sum_ref2_under_circ_mask,
+							 expected_Pratio,
+							 psi,
+							 allocator
+							);
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
+//				{
+//					RFLOAT diff2 = - 2. * normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
+//					diff2 += 2. * DIRECT_MULTIDIM_ELEM(Mmean, n) * sum_ref_under_circ_mask;
+//					if (DIRECT_MULTIDIM_ELEM(Mstddev, n) > 1E-10)
+//						diff2 /= DIRECT_MULTIDIM_ELEM(Mstddev, n);
+//					diff2 += sum_ref2_under_circ_mask;
+//					diff2 = exp(- diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
+//
+//					// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
+//					diff2 = (diff2 - 1.) / (expected_Pratio - 1.);
+//					if (diff2 > DIRECT_MULTIDIM_ELEM(Mccf_best, n))
+//					{
+//						DIRECT_MULTIDIM_ELEM(Mccf_best, n) = diff2;
+//						DIRECT_MULTIDIM_ELEM(Mpsi_best, n) = psi;
+//					}
+//				}
+				CUDA_CPU_TOC("probRatio");
 			    is_first_psi = false;
+			    CUDA_CPU_TOC("OneRotation");
 			} // end for psi
 
 
 			if (basePckr->do_write_fom_maps)
 			{
+				CUDA_CPU_TIC("writeFomMaps");
 				// TMP output
 				FileName fn_tmp;
 				Image<RFLOAT> It;
@@ -459,27 +472,44 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				It() = Mpsi_best;
 				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
+				CUDA_CPU_TOC("writeFomMaps");
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+				{
+					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
+				}
+
 			} // end if do_write_fom_maps
 
 		} // end if do_read_fom_maps
 
 		// Now that we have Mccf_best and Mpsi_best, get the peaks
 		std::vector<Peak> my_ref_peaks;
+		CUDA_CPU_TIC("setXmippOriginX3");
 		Mstddev.setXmippOrigin();
 		Mccf_best.setXmippOrigin();
 		Mpsi_best.setXmippOrigin();
+		CUDA_CPU_TOC("setXmippOriginX3");
+
+		CUDA_CPU_TIC("peakSearch");
 		basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
+		CUDA_CPU_TOC("peakSearch");
 
+		CUDA_CPU_TIC("peakPrune");
 		basePckr->prunePeakClusters(my_ref_peaks, min_distance_pix);
+		CUDA_CPU_TOC("peakPrune");
 
+		CUDA_CPU_TIC("peakInsert");
 		// append the peaks of this reference to all the other peaks
 		peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());
-
+		CUDA_CPU_TOC("peakInsert");
+		CUDA_CPU_TOC("OneReference");
 	} // end for iref
 
 
 	//Now that we have done all references, prune the list again...
+	CUDA_CPU_TIC("finalPeakPrune");
 	basePckr->prunePeakClusters(peaks, min_distance_pix);
+	CUDA_CPU_TOC("finalPeakPrune");
 
 	// And remove all too close neighbours
 	basePckr->removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix);

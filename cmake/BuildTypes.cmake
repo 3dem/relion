@@ -51,7 +51,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}"
 # -------------------------- 
 
 # -- Compiler flags -------------------------------------------------
-set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${CUDARCH}" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${RELION_NVCC_FLAGS}" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_RELWITHDEBINFO  " ")
 

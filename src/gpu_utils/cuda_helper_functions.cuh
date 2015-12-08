@@ -288,11 +288,15 @@ void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 template <typename T>
-void runCenterFFT(MultidimArray< T >& v, bool forward)
+void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allocator)
 {
+	CudaGlobalPtr<XFLOAT >  img_in(&v.data[0], v.nzyxdim, allocator);   // with original data pointer
+	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);				// temporary holder
 
-	CudaGlobalPtr<XFLOAT >  img_in(&v.data[0], v.nzyxdim);   // with original data pointer
-	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim);				// temporary holder
+	img_in.device_alloc();
+	img_in.cp_to_device();
+	img_aux.device_alloc();
+	HANDLE_ERROR(cudaStreamSynchronize(0));
 
 	if ( v.getDim() == 1 )
 	{
@@ -328,7 +332,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward)
 	else if ( v.getDim() == 2 )
 	{
 		// 2D
-		std::cerr << "CenterFFT on gpu with dim=2!" <<std::endl;
+		//std::cerr << "CenterFFT on gpu with dim=2!" <<std::endl;
 
 		long int xshift = (int)(XSIZE(v) / 2);
 		long int yshift = (int)(YSIZE(v) / 2);
@@ -339,7 +343,8 @@ void runCenterFFT(MultidimArray< T >& v, bool forward)
 			yshift = -yshift;
 		}
 
-		dim3 dim(1);
+
+		dim3 dim((int)(v.nzyxdim/(long int)CFTT_BLOCK_SIZE));
 		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
 										  img_aux.d_ptr,
 										  v.nzyxdim,
@@ -347,10 +352,12 @@ void runCenterFFT(MultidimArray< T >& v, bool forward)
 										  YSIZE(v),
 										  xshift,
 										  yshift);
+
+		HANDLE_ERROR(cudaStreamSynchronize(0));
 		img_aux.h_ptr = img_in.h_ptr;
 		img_aux.h_do_free=false;
 		img_aux.cp_to_host();
-//		HANDLE_ERROR(cudaDeviceSynchronize());
+
 
 	}
 	else if ( v.getDim() == 3 )
@@ -451,6 +458,57 @@ void runCenterFFT(MultidimArray< T >& v, bool forward)
 		v.printShape();
 		REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
 	}
+}
+
+template <typename T>
+void runProbRatio(MultidimArray< T >& Mccf_best,
+				  MultidimArray< T >& Mpsi_best,
+				  MultidimArray< T >& Maux,
+				  MultidimArray< T >& Mmean,
+				  MultidimArray< T >& Mstddev,
+				  T normfft,
+				  T sum_ref_under_circ_mask,
+				  T sum_ref2_under_circ_mask,
+				  T expected_Pratio,
+				  T psi,
+				  CudaCustomAllocator *allocator)
+{
+
+	CudaGlobalPtr<XFLOAT >  d_Mccf(&Mccf_best.data[0],Mccf_best.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Mpsi(&Mpsi_best.data[0],Mpsi_best.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Maux(&Maux.data[0],Maux.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Mmean(&Mmean.data[0],Mmean.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Mstddev(&Mstddev.data[0],Mstddev.nzyxdim, allocator);
+
+	d_Mccf.put_on_device();
+	d_Mpsi.put_on_device();
+	d_Maux.put_on_device();
+	d_Mmean.put_on_device();
+	d_Mstddev.put_on_device();
+
+	HANDLE_ERROR(cudaStreamSynchronize(0));
+
+	dim3 dim((int)(Maux.nzyxdim/(long int)PROBRATIO_BLOCK_SIZE));
+	cuda_kernel_probRatio<<<dim,PROBRATIO_BLOCK_SIZE>>>(
+			d_Mccf.d_ptr,
+			d_Mpsi.d_ptr,
+			d_Maux.d_ptr,
+			d_Mmean.d_ptr,
+			d_Mstddev.d_ptr,
+			d_Maux.size,
+			-2*normfft,
+			2*sum_ref_under_circ_mask,
+			sum_ref2_under_circ_mask,
+			expected_Pratio,
+			psi
+			);
+
+	HANDLE_ERROR(cudaStreamSynchronize(0));
+
+	d_Mccf.cp_to_host();
+	d_Mpsi.cp_to_host();
+
+	HANDLE_ERROR(cudaStreamSynchronize(0));
 }
 
 #endif //CUDA_HELPER_FUNCTIONS_CUH_

@@ -124,6 +124,12 @@ public:
 	MultidimArray<Complex > Fmsk, Finvmsk;
 
 public:
+
+	AutoPicker():
+		available_memory(0),
+		available_gpu_memory(0)
+	{}
+
 	// Read command line arguments
 	void read(int argc, char **argv);
 

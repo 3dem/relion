@@ -313,11 +313,11 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 long int xshift,
 										 long int yshift)
 {
-	int pixel = threadIdx.x;
-	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
+	long int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
 
-	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
-	{
+//	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
+//	{
 		if(pixel<image_size)
 		{
 			int y = floorfracf(pixel,xdim);
@@ -329,16 +329,71 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 			else if (yp >= ydim)
 				yp -= ydim;
 
-			int xp = x + yshift;
+			int xp = x + xshift;
 			if (xp < 0)
 				xp += xdim;
 			else if (xp >= xdim)
 				xp -= xdim;
 
-			int n_pixel = yp*xdim + xp;
+			long int n_pixel = yp*xdim + xp;
 
-			img_out[n_pixel] = img_in[pixel];
+			img_out[n_pixel] = __ldg(&img_in[pixel]);
 		}
-	}
+//	}
 }
 
+__global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
+										XFLOAT *d_Mpsi,
+										XFLOAT *d_Maux,
+										XFLOAT *d_Mmean,
+										XFLOAT *d_Mstddev,
+										long int image_size,
+										XFLOAT normfft,
+										XFLOAT sum_ref_under_circ_mask,
+										XFLOAT sum_ref2_under_circ_mask,
+										XFLOAT expected_Pratio,
+										XFLOAT psi)
+{
+	/* PLAN TO:
+	 *
+	 * 1) Pre-filter
+	 * 		d_Mstddev[i] = 1 / (2*d_Mstddev[i])   ( if d_Mstddev[pixel] > 1E-10 )
+	 * 		d_Mstddev[i] = 1    				  ( else )
+	 *
+	 * 2) Set
+	 * 		sum_ref2_under_circ_mask /= 2.
+	 *
+	 * 3) Total expression becomes
+	 * 		diff2 = ( exp(k) - 1.f ) / (expected_Pratio - 1.f)
+	 * 	  where
+	 * 	  	k = (normfft * d_Maux[pixel] + d_Mmean[pixel] * sum_ref_under_circ_mask)*d_Mstddev[i] + sum_ref2_under_circ_mask
+	 *
+	 */
+
+	long int pixel = threadIdx.x + blockIdx.x*PROBRATIO_BLOCK_SIZE;
+
+	if(pixel<image_size)
+	{
+		XFLOAT diff2 = normfft * d_Maux[pixel];
+		diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
+
+		if (d_Mstddev[pixel] > 1E-10)
+			diff2 /= d_Mstddev[pixel];
+		diff2 += sum_ref2_under_circ_mask;
+
+#if defined(CUDA_DOUBLE_PRECISION)
+		diff2 = exp(-diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
+#else
+		diff2 = expf(-diff2 / 2.f);
+#endif
+
+		// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
+		diff2 = (diff2 - 1.f) / (expected_Pratio - 1.f);
+		if (diff2 > d_Mccf[pixel])
+		{
+			d_Mccf[pixel] = diff2;
+			d_Mpsi[pixel] = psi;
+		}
+	}
+
+}
