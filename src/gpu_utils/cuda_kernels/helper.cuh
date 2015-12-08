@@ -69,4 +69,16 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 long int xshift,
 										 long int yshift);
 
+__global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
+										XFLOAT *d_Mpsi,
+										XFLOAT *d_Maux,
+										XFLOAT *d_Mmean,
+										XFLOAT *d_Mstddev,
+										long int image_size,
+										XFLOAT normfft,
+										XFLOAT sum_ref_under_circ_mask,
+										XFLOAT sum_ref2_under_circ_mask,
+										XFLOAT expected_Pratio,
+										XFLOAT psi);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

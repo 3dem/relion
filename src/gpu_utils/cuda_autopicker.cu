@@ -421,23 +421,36 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				// So now we already had precalculated: Mdiff2 = 1/sig*Sum(X^2) - 2/sig*Sum(X) + mu^2/sig*Sum(1)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
 				CUDA_CPU_TIC("probRatio");
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
-				{
-					RFLOAT diff2 = - 2. * normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
-					diff2 += 2. * DIRECT_MULTIDIM_ELEM(Mmean, n) * sum_ref_under_circ_mask;
-					if (DIRECT_MULTIDIM_ELEM(Mstddev, n) > 1E-10)
-						diff2 /= DIRECT_MULTIDIM_ELEM(Mstddev, n);
-					diff2 += sum_ref2_under_circ_mask;
-					diff2 = exp(- diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
 
-					// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
-					diff2 = (diff2 - 1.) / (expected_Pratio - 1.);
-					if (diff2 > DIRECT_MULTIDIM_ELEM(Mccf_best, n))
-					{
-						DIRECT_MULTIDIM_ELEM(Mccf_best, n) = diff2;
-						DIRECT_MULTIDIM_ELEM(Mpsi_best, n) = psi;
-					}
-				}
+				runProbRatio(Mccf_best,
+							 Mpsi_best,
+							 Maux,
+							 Mmean,
+							 Mstddev,
+							 normfft,
+							 sum_ref_under_circ_mask,
+							 sum_ref2_under_circ_mask,
+							 expected_Pratio,
+							 psi,
+							 allocator
+							);
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
+//				{
+//					RFLOAT diff2 = - 2. * normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
+//					diff2 += 2. * DIRECT_MULTIDIM_ELEM(Mmean, n) * sum_ref_under_circ_mask;
+//					if (DIRECT_MULTIDIM_ELEM(Mstddev, n) > 1E-10)
+//						diff2 /= DIRECT_MULTIDIM_ELEM(Mstddev, n);
+//					diff2 += sum_ref2_under_circ_mask;
+//					diff2 = exp(- diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
+//
+//					// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
+//					diff2 = (diff2 - 1.) / (expected_Pratio - 1.);
+//					if (diff2 > DIRECT_MULTIDIM_ELEM(Mccf_best, n))
+//					{
+//						DIRECT_MULTIDIM_ELEM(Mccf_best, n) = diff2;
+//						DIRECT_MULTIDIM_ELEM(Mpsi_best, n) = psi;
+//					}
+//				}
 				CUDA_CPU_TOC("probRatio");
 			    is_first_psi = false;
 			    CUDA_CPU_TOC("OneRotation");
@@ -460,10 +473,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
-//				{
-//					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
-//				}
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+				{
+					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
+				}
 
 			} // end if do_write_fom_maps
 
