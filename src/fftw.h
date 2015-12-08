@@ -157,6 +157,8 @@ public:
     fftw_plan fPlanBackward;
 #endif
 
+    bool plans_are_set;
+
 // Public methods
 public:
     /** Default constructor */
