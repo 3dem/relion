@@ -332,7 +332,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	else if ( v.getDim() == 2 )
 	{
 		// 2D
-		std::cerr << "CenterFFT on gpu with dim=2!" <<std::endl;
+		//std::cerr << "CenterFFT on gpu with dim=2!" <<std::endl;
 
 		long int xshift = (int)(XSIZE(v) / 2);
 		long int yshift = (int)(YSIZE(v) / 2);
@@ -343,7 +343,8 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 			yshift = -yshift;
 		}
 
-		dim3 dim(1);
+
+		dim3 dim((int)(v.nzyxdim/(long int)CFTT_BLOCK_SIZE));
 		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
 										  img_aux.d_ptr,
 										  v.nzyxdim,
