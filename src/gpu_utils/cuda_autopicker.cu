@@ -90,7 +90,7 @@ void AutoPickerCuda::setupProjectors()
 				basePckr->PPref[iref].data.yinit,
 				basePckr->PPref[iref].data.zinit,
 				basePckr->PPref[iref].r_max,
-				1); //basePckr->PPref[iref].padding_factor
+				basePckr->PPref[iref].padding_factor);
 
 		cudaProjectors[iref].initMdl(basePckr->PPref[iref].data.data);
 	}
@@ -386,7 +386,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 																  d_Faux_imag.d_ptr,
 																  d_ctf.d_ptr,
 																  psi,
-																  Faux.yxdim,
+																  Faux.ydim,
 																  Faux.xdim,
 																  projKernel
 															);
