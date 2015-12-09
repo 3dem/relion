@@ -290,8 +290,12 @@ void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT
 template <typename T>
 void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allocator)
 {
-	CudaGlobalPtr<XFLOAT >  img_in(&v.data[0], v.nzyxdim, allocator);   // with original data pointer
-	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);				// temporary holder
+	CudaGlobalPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
+	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
+
+	img_in.host_alloc();
+	for (unsigned i = 0; i < img_in.getSize(); i ++)
+		img_in[i] = (XFLOAT) v.data[i];
 
 	img_in.device_alloc();
 	img_in.cp_to_device();
@@ -353,11 +357,13 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 										  xshift,
 										  yshift);
 
-		HANDLE_ERROR(cudaStreamSynchronize(0));
-		img_aux.h_ptr = img_in.h_ptr;
-		img_aux.h_do_free=false;
+		img_aux.host_alloc();
 		img_aux.cp_to_host();
 
+		HANDLE_ERROR(cudaStreamSynchronize(0));
+
+		for (unsigned i = 0; i < img_aux.getSize(); i ++)
+			v.data[i] = (T) img_aux[i];
 
 	}
 	else if ( v.getDim() == 3 )
@@ -474,11 +480,19 @@ void runProbRatio(MultidimArray< T >& Mccf_best,
 				  CudaCustomAllocator *allocator)
 {
 
-	CudaGlobalPtr<XFLOAT >  d_Mccf(&Mccf_best.data[0],Mccf_best.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mpsi(&Mpsi_best.data[0],Mpsi_best.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Maux(&Maux.data[0],Maux.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mmean(&Mmean.data[0],Mmean.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mstddev(&Mstddev.data[0],Mstddev.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Maux(Maux.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Mmean(Mmean.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Mstddev(Mstddev.nzyxdim, allocator);
+
+	CudaGlobalPtr<XFLOAT >  d_Mccf(Mccf_best.nzyxdim, allocator);
+	CudaGlobalPtr<XFLOAT >  d_Mpsi(Mpsi_best.nzyxdim, allocator);
+
+	for (unsigned i = 0; i < Maux.getSize(); i ++)
+		d_Maux[i] = (XFLOAT) Maux.data[i];
+	for (unsigned i = 0; i < Mmean.getSize(); i ++)
+		d_Mmean[i] = (XFLOAT) Mmean.data[i];
+	for (unsigned i = 0; i < Mstddev.getSize(); i ++)
+		d_Mstddev[i] = (XFLOAT) Mstddev.data[i];
 
 	d_Mccf.put_on_device();
 	d_Mpsi.put_on_device();
@@ -503,12 +517,15 @@ void runProbRatio(MultidimArray< T >& Mccf_best,
 			psi
 			);
 
-	HANDLE_ERROR(cudaStreamSynchronize(0));
-
 	d_Mccf.cp_to_host();
 	d_Mpsi.cp_to_host();
 
 	HANDLE_ERROR(cudaStreamSynchronize(0));
+
+	for (unsigned i = 0; i < d_Mccf.getSize(); i ++)
+		Mccf_best.data[i] = (T) d_Mccf[i];
+	for (unsigned i = 0; i < d_Mpsi.getSize(); i ++)
+		Mpsi_best.data[i] = (T) d_Mpsi[i];
 }
 
 #endif //CUDA_HELPER_FUNCTIONS_CUH_
