@@ -436,3 +436,19 @@ __global__ void cuda_kernel_rotateAndCtf( XFLOAT *d_Faux_real,
 		d_Faux_imag[pixel] =ref_imag*d_ctf[pixel];
 	}
 }
+
+__global__ void cuda_kernel_convol( 	  XFLOAT *d_A_real,
+										  XFLOAT *d_A_imag,
+										  XFLOAT *d_B_real,
+										  XFLOAT *d_B_imag,
+										  int image_size)
+{
+	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<image_size)
+	{
+		XFLOAT tr =d_A_real[pixel];
+		XFLOAT ti =d_A_imag[pixel];
+		d_A_real[pixel] =   tr*d_B_real[pixel] + ti*d_B_imag[pixel];
+		d_A_imag[pixel] = - ti*d_B_real[pixel] + tr*d_B_imag[pixel];
+	}
+}

@@ -88,4 +88,10 @@ __global__ void cuda_kernel_rotateAndCtf( XFLOAT *d_Faux_real, XFLOAT *d_Faux_im
 						  	  	  	  	  XFLOAT psi,
 						  	  			  CudaProjectorKernel projector);
 
+__global__ void cuda_kernel_convol( 	  XFLOAT *d_A_real,
+										  XFLOAT *d_A_imag,
+										  XFLOAT *d_B_real,
+										  XFLOAT *d_B_imag,
+										  int image_size);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

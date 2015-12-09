@@ -307,6 +307,19 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
 
+	CudaGlobalPtr<RFLOAT >  d_Fmic_real(Fmic.nzyxdim, allocator);
+	CudaGlobalPtr<RFLOAT >  d_Fmic_imag(Fmic.nzyxdim, allocator);
+
+	d_Fmic_real.host_alloc();
+	d_Fmic_imag.host_alloc();
+	for(int i = 0; i < Fmic.nzyxdim; i++)
+	{
+		d_Fmic_real[i]=Fmic.data[i].real;
+		d_Fmic_imag[i]=Fmic.data[i].imag;
+	}
+	d_Fmic_real.put_on_device();
+	d_Fmic_imag.put_on_device();
+
 	CUDA_CPU_TIC("setupProjectors");
 	setupProjectors();
 	CUDA_CPU_TOC("setupProjectors");
@@ -389,10 +402,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 																  projKernel
 															);
 
-				HANDLE_ERROR(cudaStreamSynchronize(0));
-				d_Faux_real.cp_to_host();
-				d_Faux_imag.cp_to_host();
-
 				if (is_first_psi)
 				{
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
@@ -448,6 +457,27 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
 				CUDA_CPU_TOC("convol");
+
+				dim3 dim2( (int) ceilf(( float)d_Faux_real.size/(float)BLOCK_SIZE));
+				cuda_kernel_convol<<<dim2,BLOCK_SIZE>>>( 	  d_Faux_real.d_ptr,
+															  d_Faux_imag.d_ptr,
+															  d_Fmic_real.d_ptr,
+															  d_Fmic_imag.d_ptr,
+															  Faux.nzyxdim);
+
+
+				d_Faux_real.cp_to_host();
+				d_Faux_imag.cp_to_host();
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+
+				std::cerr << " psi = " << psi << std::endl;
+
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+//				{
+//					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << " " << d_Faux_real[n] << " " << d_Faux_imag[n] << " " << std::endl;
+//
+//				}
+//				exit(0);
 
 				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
