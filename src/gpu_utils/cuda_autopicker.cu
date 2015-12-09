@@ -92,7 +92,7 @@ void AutoPickerCuda::setupProjectors()
 				basePckr->PPref[iref].r_max,
 				basePckr->PPref[iref].padding_factor);
 
-		cudaProjectors[iref].initMdl(basePckr->PPref[iref].data.data);
+		cudaProjectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
 	}
 }
 
@@ -319,9 +319,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 		CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 								cudaProjectors[iref],
-								(int)basePckr->PPref[iref].data.xdim,
-								(int)basePckr->PPref[iref].data.ydim,
-								(int)basePckr->PPref[iref].data.xdim-1);
+								(int)Faux.xdim,
+								(int)Faux.ydim,
+								(int)Faux.xdim-1);
 
 		CUDA_CPU_TIC("OneReference");
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
@@ -380,14 +380,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					CUDA_CPU_TOC("CtfCorr");
 				}
 
-				dim3 dim((int)((int)d_Faux_real.size/(int)BLOCK_SIZE));
+				dim3 dim((int)ceilf((float)d_Faux_real.size/(float)BLOCK_SIZE));
 				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
 																  d_Faux_real.d_ptr,
 																  d_Faux_imag.d_ptr,
 																  d_ctf.d_ptr,
-																  psi,
-																  Faux.ydim,
-																  Faux.xdim,
+																  DEG2RAD(psi),
 																  projKernel
 															);
 

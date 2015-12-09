@@ -86,8 +86,6 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 __global__ void cuda_kernel_rotateAndCtf( XFLOAT *d_Faux_real, XFLOAT *d_Faux_imag,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
-						  	  	  	  	  long int image_size,
-						  	  	  	  	  long int image_xdim,
 						  	  			  CudaProjectorKernel projector);
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
