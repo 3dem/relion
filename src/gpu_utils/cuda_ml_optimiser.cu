@@ -1287,13 +1287,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if (filteredSize == 0)
 			{
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 
-				unsorted_ipart.dump_device_to_file("error_dump_unsorted");
 				filtered.dump_device_to_file("error_dump_filtered");
 
-				std::cerr << "Written error_dump_unsorted and error_dump_filtered." << std::endl;
+				std::cerr << "Written weight data to file error_dump_unsorted." << std::endl;
 
 				REPORT_ERROR("filteredSize == 0");
 			}
