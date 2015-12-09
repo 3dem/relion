@@ -171,6 +171,65 @@ public:
 			}
 		}
 
+	__device__ __forceinline__ void project2Dmodel(
+				int x,
+				int y,
+				XFLOAT e0,
+				XFLOAT e1,
+				XFLOAT e3,
+				XFLOAT e4,
+				XFLOAT &real,
+				XFLOAT &imag)
+		{
+			int r2;
+
+			r2 = x*x + y*y;
+			if (r2 <= maxR2)
+			{
+				XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+				XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+
+#ifndef CUDA_NO_TEXTURES
+				if (xp < 0)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					xp = -xp;
+					yp = -yp;
+					yp -= mdlInitY;
+
+					real =   tex2D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
+					imag = - tex2D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
+				}
+				else
+				{
+					yp -= mdlInitY;
+					real =   tex2D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
+					imag =   tex2D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
+				}
+#else
+				if (xp < 0)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					xp = -xp;
+					yp = -yp;
+
+					real =   no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+					imag = - no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+				}
+				else
+				{
+					real =   no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+					imag =   no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+				}
+#endif
+			}
+			else
+			{
+				real = 0.0f;
+				imag = 0.0f;
+			}
+		}
+
 
 	static CudaProjectorKernel makeKernel(CudaProjector &p, int imgX, int imgY, int imgMaxR)
 	{

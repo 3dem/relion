@@ -11,6 +11,9 @@
 #include "src/mpi.h"
 #include "src/autopicker.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/projector.h"
+#include "src/gpu_utils/cuda_projector.h"
+
 #include <stack>
 
 #ifdef CUDA_DOUBLE_PRECISION
@@ -25,8 +28,9 @@ public:
 
 	AutoPicker *basePckr;
 
-	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
+
+	std::vector< CudaProjector > cudaProjectors;
 
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
@@ -36,6 +40,8 @@ public:
 	//MlDeviceBundle *devBundle;
 
 	AutoPickerCuda(AutoPicker *basePicker, int dev_id);
+
+	void setupProjectors();
 
 	void run();
 
