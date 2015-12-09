@@ -7,6 +7,8 @@
 #include <fstream>
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
+#include "src/gpu_utils/cuda_projector.cuh"
+#include "src/gpu_utils/cuda_projector.h"
 
 __global__ void cuda_kernel_exponentiate_weights_coarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,
@@ -80,5 +82,12 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
 										XFLOAT psi);
+
+__global__ void cuda_kernel_rotateAndCtf( XFLOAT *d_Faux_real, XFLOAT *d_Faux_imag,
+						  	  	  	  	  XFLOAT *d_ctf,
+						  	  	  	  	  XFLOAT psi,
+						  	  	  	  	  long int image_size,
+						  	  	  	  	  long int image_xdim,
+						  	  			  CudaProjectorKernel projector);
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

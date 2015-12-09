@@ -7,13 +7,17 @@
 #include <fstream>
 #include <cuda_runtime.h>
 #include <signal.h>
+#include "src/projector.h"
+#include "src/gpu_utils/cuda_autopicker.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
+#include "src/gpu_utils/cuda_projector.h"
+
 #include "src/complex.h"
 
 #include "src/image.h"
-#include "src/gpu_utils/cuda_autopicker.h"
+
 
 #ifdef CUDA_FORCESTL
 #include "src/gpu_utils/cuda_utils_stl.cuh"
@@ -27,6 +31,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	basePckr(basePicker)
 {
 
+	cudaProjectors.resize(basePckr->Mrefs.size());
 	/*======================================================
 	                    DEVICE SETTINGS
 	======================================================*/
@@ -74,6 +79,22 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 #endif
 };
 
+void AutoPickerCuda::setupProjectors()
+{
+	for (int iref = 0; iref < (basePckr->Mrefs.size()); iref++)
+	{
+		cudaProjectors[iref].setMdlDim(
+				basePckr->PPref[iref].data.xdim,
+				basePckr->PPref[iref].data.ydim,
+				basePckr->PPref[iref].data.zdim,
+				basePckr->PPref[iref].data.yinit,
+				basePckr->PPref[iref].data.zinit,
+				basePckr->PPref[iref].r_max,
+				1); //basePckr->PPref[iref].padding_factor
+
+		cudaProjectors[iref].initMdl(basePckr->PPref[iref].data.data);
+	}
+}
 
 void AutoPickerCuda::run()
 {
@@ -285,8 +306,23 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	std::vector<Peak> peaks;
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
+
+	CUDA_CPU_TIC("setupProjectors");
+	setupProjectors();
+	CUDA_CPU_TOC("setupProjectors");
+
+	CudaGlobalPtr< RFLOAT >   d_ctf(&Fctf.data[0], Fctf.nzyxdim, allocator);
+	d_ctf.put_on_device();
+
 	for (int iref = 0; iref < basePckr->Mrefs.size(); iref++)
 	{
+
+		CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
+								cudaProjectors[iref],
+								(int)basePckr->PPref[iref].data.xdim,
+								(int)basePckr->PPref[iref].data.ydim,
+								(int)basePckr->PPref[iref].data.xdim-1);
+
 		CUDA_CPU_TIC("OneReference");
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
 		if (basePckr->do_read_fom_maps)
@@ -323,6 +359,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				CUDA_CPU_TIC("FauxInit");
 				Faux.initZeros(basePckr->downsize_mic, basePckr->downsize_mic/2 + 1);
 				CUDA_CPU_TOC("FauxInit");
+
+				CudaGlobalPtr<RFLOAT >  d_Faux_real(Faux.nzyxdim, allocator);
+				CudaGlobalPtr<RFLOAT >  d_Faux_imag(Faux.nzyxdim, allocator);
+				d_Faux_real.device_alloc();
+				d_Faux_imag.device_alloc();
+
 				CUDA_CPU_TIC("get2DFourierTransform");
 				basePckr->PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
 				CUDA_CPU_TOC("get2DFourierTransform");
@@ -337,6 +379,21 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					}
 					CUDA_CPU_TOC("CtfCorr");
 				}
+
+				dim3 dim((int)((int)d_Faux_real.size/(int)BLOCK_SIZE));
+				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
+																  d_Faux_real.d_ptr,
+																  d_Faux_imag.d_ptr,
+																  d_ctf.d_ptr,
+																  psi,
+																  Faux.yxdim,
+																  Faux.xdim,
+																  projKernel
+															);
+
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+				d_Faux_real.cp_to_host();
+				d_Faux_imag.cp_to_host();
 
 				if (is_first_psi)
 				{
