@@ -21,13 +21,13 @@
 
 #define DEBUG
 // Construct continuation output filenames always in the same manner
-void getContinueOutname(std::string &outputname, FileNameEntry &fn_cont)
+void getContinueOutname(std::string &outputname, FileName fn_cont)
 {
-	int pos_it = fn_cont.getValue().rfind("_it");
-	int pos_op = fn_cont.getValue().rfind("_optimiser");
+	int pos_it = fn_cont.rfind("_it");
+	int pos_op = fn_cont.rfind("_optimiser");
 	if (pos_it < 0 || pos_op < 0)
-		std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
-	int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
+		std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont << std::endl;
+	int it = (int)textToFloat((fn_cont.substr(pos_it+3, 6)).c_str());
 	outputname += "_ct" + floatToString(it);
 }
 
@@ -42,12 +42,12 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	if (iter < 0)
 	{
 		// 3D auto-refine
-		fn_out = outputname;
+		fn_out = outputname+"run";
 	}
 	else
 	{
 		// 2D or 3D classification
-		fn_out.compose(outputname+"_it", iter, "", 3);
+		fn_out.compose(outputname+"run_it", iter, "", 3);
 	}
 
 	// Data and model.star files
@@ -342,7 +342,7 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
     }
 }
 
-void RelionJobWindow::closeWriteFile(std::ofstream& fh)
+void RelionJobWindow::closeWriteFile(std::ofstream& fh, std::string fn)
 {
 	if (has_mpi)
 		nr_mpi.writeValue(fh);
@@ -362,6 +362,9 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh)
 	other_args.writeValue(fh);
 
 	fh.close();
+	std::string command = "chmod 664 " + fn + ".job";
+	system(command.c_str());
+
 }
 
 void RelionJobWindow::closeReadFile(std::ifstream& fh)
@@ -524,7 +527,7 @@ void XXXXJobWindow::write(std::string fn)
 {
 	std::ofstream fh;
 	openWriteFile(fn + ".gui_general.settings", fh);
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 void XXXXJobWindow::read(std::string fn, bool &_is_continue)
 {
@@ -568,12 +571,12 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input file:", "", "Input file (*.*)", "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
+	fn_in.place(current_y, "Input files:", "", "Input file (*.*)", "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	fn_out.place(current_y, "Output file:", "Import/UNIQDATE/", "The name of the output STAR file, which has to have a .star extension. ");
+	fn_out.place(current_y, "Output directory:", "Import/UNIQDATE/", "The name of the output STAR file, which has to have a .star extension. ");
 	fn_out.deactivate();
 
 	// Add a little spacer
@@ -600,7 +603,7 @@ void ImportJobWindow::write(std::string fn)
 	fn_out.writeValue(fh);
 	node_type.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 
 }
 
@@ -630,11 +633,13 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	std::string command;
 	command=" relion_star_loopheader ";
 
-	// Save the real output name
-	outputname = fn_out.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		// Save the real output name
+		outputname = fn_out.getValue();
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
 
 	FileName outputstar;
 
@@ -653,6 +658,22 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command += "rlnMicrographName ";
 		Node node(outputstar, NODE_MIC);
 		pipelineOutputNodes.push_back(node);
+	}
+	else if (node_type.getValue() == "2D/3D particle coordinates (.box, .star or .*)")
+	{
+		// Copy all coordinate files into the Import directory
+		command = "cp -r " + fn_in.getValue() + " " + outputname;
+		commands.push_back(command);
+		// Get the coordinate-file suffix separately
+		FileName fn_suffix = fn_in.getValue();
+		fn_suffix = fn_suffix.afterLastOf("*");
+		fn_suffix = "coords_suffix" + fn_suffix;
+		Node node(fn_suffix, NODE_MIC_COORD);
+		pipelineOutputNodes.push_back(node);
+		// Make a suffix file, which contains the actual suffix as a suffix
+		command = " touch " + outputname + fn_suffix;
+		commands.push_back(command);
+
 	}
 	else if (node_type.getValue() == "3D tomogram(s) (.mrc or .star)")
 	{
@@ -767,7 +788,7 @@ void MotioncorrJobWindow::write(std::string fn)
 	do_save_movies.writeValue(fh);
 	other_motioncorr_args.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
@@ -821,16 +842,17 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	// I/O
 
 	command += " --i " + input_star_mics.getValue();
-	Node node(input_star_mics.getValue(), NODE_MOVIE);
+	Node node(input_star_mics.getValue(), input_star_mics.type);
 	pipelineInputNodes.push_back(node);
 
-	// Save the real output name
-	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-	outputname = fn_out.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		// Save the real output name
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
 	command += " --o " + outputname;
 	pipelineOutputName = outputname;
 	Node node2(outputname + "/corrected_micrographs.star", NODE_MIC);
@@ -976,7 +998,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 void CtffindJobWindow::write(std::string fn)
 {
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_ctffind.settings", fh);
+	openWriteFile(fn + ".gui_ctffind", fh);
 
 	input_star_mics.writeValue(fh);
 	fn_out.writeValue(fh);
@@ -999,7 +1021,7 @@ void CtffindJobWindow::write(std::string fn)
 	do_ignore_ctffind_params.writeValue(fh);
 	do_EPA.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void CtffindJobWindow::read(std::string fn, bool &_is_continue)
@@ -1061,15 +1083,18 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	pipelineInputNodes.clear();
 	std::string command;
 
-	outputname = fn_out.getValue();
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		outputname = fn_out.getValue();
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
 	pipelineOutputName = outputname;
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
 	Node node(fn_outstar, NODE_MIC);
 	pipelineOutputNodes.push_back(node);
-	Node node2(input_star_mics.getValue(), NODE_MIC);
+
+	Node node2(input_star_mics.getValue(), input_star_mics.type);
 	pipelineInputNodes.push_back(node2);
 
 	if (nr_mpi.getValue() > 1)
@@ -1131,17 +1156,20 @@ ManualpickJobWindow::ManualpickJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input micrographs:", "micrographs_ctf.star", "Input micrographs (*.{star,mrc})", "Input STAR file (with or without CTF information), OR a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
+	fn_in.place(current_y, "Input micrographs:", NODE_MIC, "", "Input micrographs (*.{star,mrc})", "Input STAR file (with or without CTF information), OR a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
 
-	fn_out.place(current_y, "Output STAR file: ", "selected_micrographs_ctf.star", "Output STAR file (*.star)", "The selected micrographs will all be joined in a new STAR file (which has fewer lines than the original input one if micrographs are deselected on the GUI.");
+	current_y += STEPY/2;
 
-	manualpick_rootname.place(current_y, "Picking rootname: ", "manualpick", "Rootname for the coordinate files of all manually picked particles.");
+	fn_out.place(current_y, "Output directory: ", "ManualPick/UNIQDATE/", "The selected micrographs will all be joined in a new STAR file (which has fewer lines than the original input one if micrographs are deselected on the GUI.");
+	fn_out.deactivate();
 
 	tab1->end();
+
 	tab2->begin();
 	tab2->label("Display");
 	resetHeight();
 
+	diameter.place(current_y, "Particle diameter (pix):", 100, 0, 500, 50, "The radius of the circle used around picked particles (in original pixels). Only used for display." );
 	micscale.place(current_y, "Scale for micrographs:", 0.2, 0.1, 1, 0.05, "The micrographs will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
 	sigma_contrast.place(current_y, "Sigma contrast:", 3, 0, 10, 0.5, "The micrographs will be displayed with the black value set to the average of all values MINUS this values times the standard deviation of all values in the micrograph, and the white value will be set \
 to the average PLUS this value times the standard deviation. Use zero to set the minimum value in the micrograph to black, and the maximum value to white ");
@@ -1149,7 +1177,8 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	black_val.place(current_y, "Black value:", 0, 0, 512, 16, "Use non-zero values to set the value of the blackest pixel in the micrograph.");
 
 	current_y += STEPY/2;
-	lowpass.place(current_y, "Lowpass filter (A)", 0, 0, 100, 5, "Lowpass filter that will be applied to the micrograph before displaying (zero for no filter).");
+	lowpass.place(current_y, "Lowpass filter (1/pix)", 0, 0, 1, 0.02, "Lowpass filter that will be applied to the micrograph before displaying (in 1/pixel: ranging from 0-0.5; zero for no filter).");
+	highpass.place(current_y, "Highpass filter (1/pix)", 0, 0, 1, 0.02, "Highpass filter that will be applied to the micrograph before displaying  (in 1/pixel: ranging from 0-0.5; zero for no filter).");
 
 	current_y += STEPY/2;
 	ctfscale.place(current_y, "Scale for CTF image:", 1, 0.1, 2, 0.1, "CTFFINDs CTF image (with the Thonrings) will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
@@ -1192,8 +1221,9 @@ void ManualpickJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
 	fn_out.writeValue(fh);
-	manualpick_rootname.writeValue(fh);
 	lowpass.writeValue(fh);
+	highpass.writeValue(fh);
+	diameter.writeValue(fh);
 	micscale.writeValue(fh);
 	ctfscale.writeValue(fh);
 	sigma_contrast.writeValue(fh);
@@ -1206,7 +1236,7 @@ void ManualpickJobWindow::write(std::string fn)
 	red_value.writeValue(fh);
 
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void ManualpickJobWindow::read(std::string fn, bool &_is_continue)
@@ -1217,8 +1247,9 @@ void ManualpickJobWindow::read(std::string fn, bool &_is_continue)
 	{
 		fn_in.readValue(fh);
 		fn_out.readValue(fh);
-		manualpick_rootname.readValue(fh);
 		lowpass.readValue(fh);
+		highpass.readValue(fh);
+		diameter.readValue(fh);
 		micscale.readValue(fh);
 		ctfscale.readValue(fh);
 		sigma_contrast.readValue(fh);
@@ -1243,29 +1274,66 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 50;
-
 	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
+
 	std::string command;
 	command="`which relion_manualpick`";
 
-	command += " --i \"" + fn_in.getValue() + "\"";
-	command += " --o " + fn_out.getValue();
-	command += " --pickname " + manualpick_rootname.getValue();
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		// I/O
+		// Save the real output name (could be with _ctX for continuation)
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
+
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
+	pipelineOutputName = outputname;
+
+	command += " --i " + fn_in.getValue();
+	Node node(fn_in.getValue(), fn_in.type);
+	pipelineInputNodes.push_back(node);
+
+	command += " --odir " + outputname;
+	command += " --pickname manualpick";
+	FileName fn_suffix = outputname + "coords_suffix_manualpick.star";
+	Node node2(fn_suffix, NODE_MIC_COORD);
+	pipelineOutputNodes.push_back(node2);
+
+	FileName fn_outstar = outputname + "micrographs_selected.star";
+	Node node3(fn_outstar, NODE_MIC);
+	pipelineOutputNodes.push_back(node3);
+	command += " --selection " + fn_outstar;
 
 	command += " --scale " + floatToString(micscale.getValue());
 	command += " --sigma_contrast " + floatToString(sigma_contrast.getValue());
 	command += " --black " + floatToString(black_val.getValue());
 	command += " --white " + floatToString(white_val.getValue());
 
-	command += " --lowpass " + floatToString(lowpass.getValue());
-	command += " --angpix " + floatToString(angpix);
+	if (lowpass.getValue() > 0.)
+	{
+		// Default angpix is 1 already
+		if (lowpass.getValue() > 0.5)
+			REPORT_ERROR(" ManualpickJobWindow::getCommands ERROR: lowpass value should be in range [0, 0.5]");
+		double invpix = 1. / lowpass.getValue();
+		command += " --lowpass " + floatToString(invpix);
+	}
+	if (highpass.getValue() > 0.)
+	{
+		// Default angpix is 1 already
+		if (highpass.getValue() > 0.5)
+			REPORT_ERROR(" ManualpickJobWindow::getCommands ERROR: highpass value should be in range [0, 0.5]");
+		double invpix = 1. / highpass.getValue();
+		command += " --highpass " + floatToString(invpix);
+	}
 
 	command += " --ctf_scale " + floatToString(ctfscale.getValue());
 
-	command += " --particle_diameter " + floatToString(particle_diameter);
+	command += " --particle_diameter " + floatToString(diameter.getValue());
 
 	if (do_color.getValue())
 	{
@@ -1281,9 +1349,9 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 
-	outputname = "run_manualpick";
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
+	// Also make the suffix file
+	command = "touch " + fn_suffix;
+	commands.push_back(command);
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
@@ -1376,7 +1444,7 @@ void AutopickJobWindow::write(std::string fn)
 	mindist_autopick.writeValue(fh);
 	maxstddevnoise_autopick.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void AutopickJobWindow::read(std::string fn, bool &_is_continue)
@@ -1477,26 +1545,22 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
 	tab1->label("I/O");
 	resetHeight();
 
-	star_mics.place(current_y,"micrograph STAR file: ", "selected_micrographs_ctf.star", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
-	pick_suffix.place(current_y,"Coordinate-file suffix: ", "_autopick.star", "Suffix for all the particle coordinate files. The micrograph rootnames will be extracted from each line in the input micrograph STAR file by removing the (.mrc) extension. \
-Then the coordinate filenames are formed by the micrograph rootname + this suffix. For example, a suffix of _autopick.star yields a coordinate filename of mic001_autopick.star for micrograph mic001.mrc. Likewise, a .box suffix would yield mic001.box. \n \n \
-Possible formats for coordinate files are RELION-generated STAR files (.star), EMAN boxer (.box) or ASCII files (with any other extension), where each line has the X and Y coordinates of a particle, possibly preceded by a single-line non-numeric header.");
-	extract_rootname.place(current_y, "Extract rootname:", "particles", "Output rootname. All particle stacks will contain this rootname, and the final particles STAR file will be called this rootname plus a .star extension. This rootname should NOT contain a directory structure. \n \n Also, when extracting movie-particles, this rootname should be THE SAME ONE as the one you used to extract the average particles. \
-On disc, movie particles will be distinguished from the average particles by the movie rootname on the movie tab. If you change the extract rootname upon extration of the movies, then movie processing will NOT work! ");
+    star_mics.place(current_y,"micrograph STAR file: ", NODE_MIC, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
+	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORD, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	fn_out.place(current_y, "Output directory:", "Extract/UNIQDATE/", "Output directory. All particle stacks will be written inside this directory, and the final particles STAR file will be placed here as well.");
+	fn_out.deactivate();
 
 	tab1->end();
+
 	tab2->begin();
 	tab2->label("extract");
 	resetHeight();
-	extract_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	extract_group->end();
 
-	do_extract.place(current_y, "Extract particles from micrographs?", true, "If set to Yes, particles will be extracted from the micrographs using all selected coordinate files. \
-Niko Grigorieff's program CTFFIND will be used for this.", extract_group);
-
-	extract_group->begin();
-
-	extract_size.place(current_y,"Particle box size :", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
+	extract_size.place(current_y,"Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
 	do_invert.place(current_y, "Invert contrast?", false, "If set to Yes, the contrast in the particles will be inverted.");
 
 	// Add a little spacer
@@ -1518,6 +1582,11 @@ Niko Grigorieff's program CTFFIND will be used for this.", extract_group);
 	do_norm.place(current_y, "Normalize particles?", true, "If set to Yes, particles will be normalized in the way RELION prefers it.", norm_group);
 
 	norm_group->begin();
+
+
+	bg_diameter.place(current_y, "Diameter background circle (pix): ", -1, -1, 600, 10, "Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
+The background area is defined as all pixels outside a circle with this given diameter in pixels (before rescaling). When specifying a negative value, a default value of 75% of the Particle box size will be used.");
+
 	white_dust.place(current_y, "Stddev for white dust removal: ", -1, -1, 10, 0.1, "Remove very white pixels from the extracted particles. \
 Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
 
@@ -1525,9 +1594,6 @@ Pixels values higher than this many times the image stddev will be replaced with
 Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
 	norm_group->end();
 	do_norm.cb_menu_i();
-
-	extract_group->end();
-	do_extract.cb_menu_i();
 
 	tab2->end();
 	tab3->begin();
@@ -1568,15 +1634,15 @@ void ExtractJobWindow::write(std::string fn)
 
 	// I/O
 	star_mics.writeValue(fh);
-	pick_suffix.writeValue(fh);
-	extract_rootname.writeValue(fh);
+	coords_suffix.writeValue(fh);
+	fn_out.writeValue(fh);
 
 	// extract
-	do_extract.writeValue(fh);
 	extract_size.writeValue(fh);
 	do_rescale.writeValue(fh);
 	rescale.writeValue(fh);
 	do_norm.writeValue(fh);
+	bg_diameter.writeValue(fh);
 	white_dust.writeValue(fh);
 	black_dust.writeValue(fh);
 	do_invert.writeValue(fh);
@@ -1587,7 +1653,7 @@ void ExtractJobWindow::write(std::string fn)
 	first_movie_frame.writeValue(fh);
 	last_movie_frame.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 {
@@ -1598,15 +1664,15 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 
 		// I/O
 		star_mics.readValue(fh);
-		pick_suffix.readValue(fh);
-		extract_rootname.readValue(fh);
+		coords_suffix.readValue(fh);
+		fn_out.readValue(fh);
 
 		// extract
-		do_extract.readValue(fh);
 		extract_size.readValue(fh);
 		do_rescale.readValue(fh);
 		rescale.readValue(fh);
 		do_norm.readValue(fh);
+		bg_diameter.readValue(fh);
 		white_dust.readValue(fh);
 		black_dust.readValue(fh);
 		do_invert.readValue(fh);
@@ -1630,61 +1696,90 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 50;
 
 	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_preprocess_mpi`";
 	else
 		command="`which relion_preprocess`";
 
-	command += " --o " + extract_rootname.getValue();
-	command += " --mic_star " + star_mics.getValue();
-	command += " --coord_suffix " + pick_suffix.getValue();
-
-	if (do_extract.getValue())
+	if (!is_continue) // for continue jobs, use the same outputname
 	{
-		command += " --extract";
-		command += " --extract_size " + floatToString(extract_size.getValue());
-		if (do_movie_extract.getValue())
-		{
-			command += " --extract_movies";
-			command += " --movie_rootname " + movie_rootname.getValue();
-			command += " --first_movie_frame " + floatToString(first_movie_frame.getValue());
-			command += " --last_movie_frame " + floatToString(last_movie_frame.getValue());
-		}
+		// I/O
+		// Save the real output name (could be with _ctX for continuation)
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
 
-		// Operate stuff
-		RFLOAT bg_radius;
-		bg_radius = (particle_diameter / (2. * angpix));
-		if (do_rescale.getValue())
-		{
-			command += " --scale " + floatToString(rescale.getValue());
-			bg_radius *= rescale.getValue() / extract_size.getValue();
-		}
-		// Get an integer number for the bg_radius
-		bg_radius = (int)(bg_radius);
-		if (do_norm.getValue())
-		{
-			command += " --norm --bg_radius " + floatToString(bg_radius);
-			command += " --white_dust " + floatToString(white_dust.getValue());
-			command += " --black_dust " + floatToString(black_dust.getValue());
-		}
-		if (do_invert.getValue())
-			command += " --invert_contrast ";
-
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
 	}
+	pipelineOutputName = outputname;
+
+	// Input
+	command += " --i " + star_mics.getValue();
+	Node node(star_mics.getValue(), star_mics.type);
+	pipelineInputNodes.push_back(node);
+
+	FileName mysuffix = coords_suffix.getValue();
+	command += " --coord_dir " + mysuffix.beforeLastOf("/");
+	command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
+	Node node2(coords_suffix.getValue(), coords_suffix.type);
+	pipelineInputNodes.push_back(node2);
+
+	// Output
+	FileName fn_ostar;
+	if (do_movie_extract.getValue())
+	{
+		fn_ostar = outputname + "particles_" + movie_rootname.getValue() + ".star";
+		Node node3(fn_ostar, NODE_MOVIE_DATA);
+		pipelineOutputNodes.push_back(node3);
+	}
+	else
+	{
+		fn_ostar = outputname + "particles.star";
+		Node node3(fn_ostar, NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node3);
+	}
+	command += " --part_star " + fn_ostar;
+	command += " --part_dir " + outputname;
+
+	command += " --extract";
+	command += " --extract_size " + floatToString(extract_size.getValue());
+	if (do_movie_extract.getValue())
+	{
+		command += " --extract_movies";
+		command += " --movie_rootname " + movie_rootname.getValue();
+		command += " --first_movie_frame " + floatToString(first_movie_frame.getValue());
+		command += " --last_movie_frame " + floatToString(last_movie_frame.getValue());
+	}
+
+	// Operate stuff
+	// Get an integer number for the bg_radius
+	RFLOAT bg_radius = (bg_diameter.getValue() < 0.) ? 0.75 * extract_size.getValue() : bg_diameter.getValue();
+	bg_radius /= 2.; // Go from diameter to radius
+	if (do_rescale.getValue())
+	{
+		command += " --scale " + floatToString(rescale.getValue());
+		bg_radius *= rescale.getValue() / extract_size.getValue();
+	}
+	if (do_norm.getValue())
+	{
+		// Get an integer number for the bg_radius
+		bg_radius = (int)bg_radius;
+		command += " --norm --bg_radius " + floatToString(bg_radius);
+		command += " --white_dust " + floatToString(white_dust.getValue());
+		command += " --black_dust " + floatToString(black_dust.getValue());
+	}
+	if (do_invert.getValue())
+		command += " --invert_contrast ";
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
-
 	commands.push_back(command);
-	outputname = extract_rootname.getValue();
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
@@ -1703,7 +1798,7 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	fn_out.place(current_y, "Output rootname:", "Sort/UNIQDATE/particles", "Output rootname for all files of this run. ");
+	fn_out.place(current_y, "Output rootname:", "Sort/UNIQDATE/", "Output rootname for all files of this run. ");
 	fn_out.deactivate();
 
 	tab1->end();
@@ -1716,6 +1811,7 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	ctf_group->end();
 
 	fn_refs.place(current_y, "References:", NODE_REF, "", "Input references (*.{star,mrc,mrcs})", "Input STAR file or MRC (stack of) image(s) with the references to be used for sorting. These should be the same references as used to determine the class number and in-plane orientations as given in the STAR file with the input particles");
+
 	do_ctf.place(current_y, "Are References CTF corrected?", true, "Set to Yes if the references were created with CTF-correction inside RELION. \n ", ctf_group);
 
 	ctf_group->begin();
@@ -1743,7 +1839,7 @@ void SortJobWindow::write(std::string fn)
 	do_ctf.writeValue(fh);
 	do_ignore_first_ctfpeak.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 void SortJobWindow::read(std::string fn, bool &_is_continue)
 {
@@ -1768,10 +1864,6 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 50;
-
 	commands.clear();
 	pipelineOutputNodes.clear();
 	pipelineInputNodes.clear();
@@ -1782,28 +1874,30 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	else
 		command="`which relion_particle_sort`";
 
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		// I/O
+		// Save the real output name (could be with _ctX for continuation)
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
+
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
+	pipelineOutputName = outputname;
+
 	command += " --i " + input_star.getValue();
-	Node node(input_star.getValue(), NODE_PART_DATA);
+	Node node(input_star.getValue(), input_star.type);
 	pipelineInputNodes.push_back(node);
 
 	// TODO: how to handle 3DREFS????!
 	command += " --ref " + fn_refs.getValue();
-	Node node2(fn_refs.getValue(), NODE_REF);
+	Node node2(fn_refs.getValue(), fn_refs.type);
 	pipelineInputNodes.push_back(node2);
 
-	outputname = fn_out.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
-	command += " --o " + outputname + "_sort.star";
-
-	pipelineOutputName = outputname;
-	Node node3(outputname + "_sort.star", NODE_PART_DATA);
+	command += " --o " + outputname + "particles_sort.star";
+	Node node3(outputname + "particles_sort.star", NODE_PART_DATA);
 	pipelineOutputNodes.push_back(node3);
-
-	command += " --angpix " + floatToString(angpix);
-	command += " --particle_diameter " + floatToString(particle_diameter);
 
 	if (do_ctf.getValue())
 	{
@@ -1843,7 +1937,7 @@ with X being the iteration from which one continues the previous run.");
 	current_y += STEPY/2;
 
 
-	fn_out.place(current_y, "Output rootname:", "Class2D/UNIQDATE/run", "Output rootname for all files of this run. \
+	fn_out.place(current_y, "Output rootname:", "Class2D/UNIQDATE/", "Output rootname for all files of this run. \
 If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
 	fn_out.deactivate();
 
@@ -2001,7 +2095,7 @@ void Class2DJobWindow::write(std::string fn)
 	offset_range.writeValue(fh);
 	offset_step.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void Class2DJobWindow::read(std::string fn, bool &_is_continue)
@@ -2059,7 +2153,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	// TODO
 	double angpix=1.;
-	double particle_diameter = 50;
+	double particle_diameter = 200;
 
 	commands.clear();
 	pipelineOutputNodes.clear();
@@ -2071,34 +2165,34 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-	// I/O
-	// Save the real output name (could be with _ctX for continuation)
-	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-	outputname = fn_out.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
 	if (is_continue)
-		getContinueOutname(outputname, fn_cont);
+	{
+		getContinueOutname(outputname, fn_cont.getValue());
+	}
+	else
+	{
+		// I/O
+		// Save the real output name (could be with _ctX for continuation)
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
 
-	command += " --o " + outputname;
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
+	command += " --o " + outputname + "run";;
 	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
 
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
-		Node node(fn_cont.getValue(), NODE_OPTIMISER);
-		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --i " + fn_img.getValue();
-		Node node(fn_img.getValue(), NODE_PART_DATA);
+		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 		command += " --particle_diameter " + floatToString(particle_diameter);
-		command += " --angpix " + floatToString(angpix);
 	}
 	// Parallel disc I/O?
 	if (!do_parallel_discio.getValue())
@@ -2205,7 +2299,7 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	fn_out.place(current_y, "Output rootname:", "Class3D/UNIQDATE/run", "Output rootname for all files of this run. \
+	fn_out.place(current_y, "Output rootname:", "Class3D/UNIQDATE/", "Output rootname for all files of this run. \
 If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
 	fn_out.deactivate();
 
@@ -2423,7 +2517,7 @@ void Class3DJobWindow::write(std::string fn)
 	do_local_ang_searches.writeValue(fh);
 	sigma_angles.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void Class3DJobWindow::read(std::string fn, bool &_is_continue)
@@ -2504,7 +2598,6 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 {
 
 	// TODO
-	double angpix=1.;
 	double particle_diameter = 50;
 
 	commands.clear();
@@ -2517,38 +2610,38 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-	// I/O
-	// Save the real output name (could be with _ctX for continuation)
-	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-	outputname = fn_out.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
 	if (is_continue)
-		getContinueOutname(outputname, fn_cont);
+	{
+		getContinueOutname(outputname, fn_cont.getValue());
+	}
+	else
+	{
+		// I/O
+		// Save the real output name (could be with _ctX for continuation)
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
 
-	command += " --o " + outputname;
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
+	command += " --o " + outputname + "run";;
 	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
 
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
-		Node node(fn_cont.getValue(), NODE_OPTIMISER);
-		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --i " + fn_img.getValue();
-		Node node(fn_img.getValue(), NODE_PART_DATA);
+		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 		command += " --particle_diameter " + floatToString(particle_diameter);
-		command += " --angpix " + floatToString(angpix);
 		if (fn_ref.getValue() != "None")
 		{
 			command += " --ref " + fn_ref.getValue();
-			Node node(fn_ref.getValue(), NODE_REF);
+			Node node(fn_ref.getValue(), fn_ref.type);
 			pipelineInputNodes.push_back(node);
 		}
 		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
@@ -2593,7 +2686,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (fn_mask.getValue().length() > 0)
 	{
 		command += " --solvent_mask " + fn_mask.getValue();
-		Node node(fn_mask.getValue(), NODE_MASK);
+		Node node(fn_mask.getValue(), fn_mask.type);
 		pipelineInputNodes.push_back(node);
 	}
 
@@ -2685,7 +2778,7 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	fn_out.place(current_y, "Output rootname:", "Refine3D/UNIQDATE/run", "Output rootname for all files of this run. \
+	fn_out.place(current_y, "Output rootname:", "Refine3D/UNIQDATE/", "Output rootname for all files of this run. \
 If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
 	fn_out.deactivate();
 
@@ -2820,7 +2913,7 @@ lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps ico
 
 	movie_group->begin();
 
-	fn_movie_star.place(current_y, "Input movie frames STAR file:", "", "STAR Files (*.{star})", "Select the output STAR file from the preprocessing \
+	fn_movie_star.place(current_y, "Input movie frames STAR file:", NODE_MOVIE_DATA, "", "STAR Files (*.{star})", "Select the output STAR file from the preprocessing \
 procedure of the movie frames.");
 
 	movie_runavg_window.place(current_y, "Running average window:", 5, 1, 15, 1, "The individual movie frames will be averaged using a running \
@@ -2898,7 +2991,7 @@ void Auto3DJobWindow::write(std::string fn)
 	do_alsorot_movies.writeValue(fh);
 	movie_sigma_angles.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
@@ -2992,7 +3085,6 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 {
 
 	// TODO
-	double angpix=1.;
 	double particle_diameter = 50;
 
 	commands.clear();
@@ -3005,37 +3097,38 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	else
 		command="`which relion_refine`";
 
-	// I/O
-	// Save the real output name (could be with _ctX for continuation)
-	// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-	outputname = fn_out.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
 	if (is_continue)
-		getContinueOutname(outputname, fn_cont);
-	command += " --o " + outputname;
+	{
+		getContinueOutname(outputname, fn_cont.getValue());
+	}
+	else
+	{
+		// I/O
+		// Save the real output name (could be with _ctX for continuation)
+		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
+		outputname = fn_out.getValue();
+
+		// Change outputname if it contains UNIQDATE
+		changeDateNTimeInOutputname(outputname);
+	}
+	command += " --o " + outputname + "run";
 	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1); // TODO: add nr_bodies....
 
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
-		Node node(fn_cont.getValue(), NODE_OPTIMISER);
-		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --auto_refine --split_random_halves --i " + fn_img.getValue();
-		Node node(fn_img.getValue(), NODE_PART_DATA);
+		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 		command += " --particle_diameter " + floatToString(particle_diameter);
-		command += " --angpix " + floatToString(angpix);
 		if (fn_ref.getValue() != "None")
 		{
 			command += " --ref " + fn_ref.getValue();
-			Node node(fn_ref.getValue(), NODE_REF);
+			Node node(fn_ref.getValue(), fn_ref.type);
 			pipelineInputNodes.push_back(node);
 		}
 		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
@@ -3077,7 +3170,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command += " --solvent_mask " + fn_mask.getValue();
 
 		// TODO: what if this is a continuation run: re-put the mask as an input node? Or only if it changes? Also for 3Dclass
-		Node node(fn_mask.getValue(), NODE_MASK);
+		Node node(fn_mask.getValue(), fn_mask.type);
 		pipelineInputNodes.push_back(node);
 	}
 
@@ -3124,7 +3217,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	if (is_continue && do_movies.getValue())
 	{
 		command += " --realign_movie_frames " + fn_movie_star.getValue();
-		Node node(fn_movie_star.getValue(), NODE_MOVIE_DATA);
+		Node node(fn_movie_star.getValue(), fn_movie_star.type);
 		pipelineInputNodes.push_back(node);
 		command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
 		command += " --sigma_off " + floatToString(movie_sigma_offset.getValue());
@@ -3193,7 +3286,7 @@ If you don't know what value to use, display one of the unfiltered half-maps in 
 
 	do_usermask.place(current_y, "Provide your own mask?", false, "If set to Yes, the program will mask the unfiltered half-reconstructions using a user-provided mask below. This also allows you to save execution time, by providing a previously determined automask for the same particle.", usermask_group);
 	usermask_group->begin();
-	fn_mask.place(current_y, "User-provided mask:", "", "Image Files (*.{spi,vol,msk,mrc})", "Use this to skip auto-masking by providing your own mask. You may also save execution time by providing a previously determined automask for the same particle.");
+	fn_mask.place(current_y, "User-provided mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Use this to skip auto-masking by providing your own mask. You may also save execution time by providing a previously determined automask for the same particle.");
 	usermask_group->end();
 	do_usermask.cb_menu_i();
 
@@ -3277,7 +3370,7 @@ void PostJobWindow::write(std::string fn)
 	fn_mtf.writeValue(fh);
 	do_skip_fsc_weighting.writeValue(fh);
 	low_pass.writeValue(fh);
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void PostJobWindow::read(std::string fn, bool &_is_continue)
@@ -3329,7 +3422,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	// Get the input rootname from the half-map name
 	// run1_half1_class001_unfil.mrc -> run1
-	Node node(fn_in.getValue(), NODE_HALFMAP);
+	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 	int pos_half = fn_in.getValue().rfind("_half");
 	if (pos_half < fn_in.getValue().size())
@@ -3381,7 +3474,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	if (do_usermask.getValue())
 	{
 		command += " --mask " + fn_mask.getValue();
-		Node node(fn_mask.getValue(), NODE_MASK);
+		Node node(fn_mask.getValue(), fn_mask.type);
 		pipelineInputNodes.push_back(node);
 	}
 
@@ -3514,7 +3607,7 @@ void PolishJobWindow::write(std::string fn)
 	fn_mask.writeValue(fh);
 	sym_name.writeValue(fh);
 
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 void PolishJobWindow::read(std::string fn, bool &_is_continue)
 {
@@ -3564,7 +3657,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// General
 	command += " --i " + fn_in.getValue();
 
-	Node node(fn_in.getValue(), NODE_MOVIE_DATA);
+	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
 	command += " --o " + fn_out.getValue();
@@ -3601,7 +3694,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	if (fn_mask.getValue().length() > 0)
 	{
-		Node node(fn_mask.getValue(), NODE_MASK);
+		Node node(fn_mask.getValue(), fn_mask.type);
 		pipelineInputNodes.push_back(node);
 		command += " --mask " + fn_mask.getValue();
 	}
@@ -3695,7 +3788,7 @@ void ResmapJobWindow::write(std::string fn)
 	maxres.writeValue(fh);
 	stepres.writeValue(fh);
 	fn_mask.writeValue(fh);
-	closeWriteFile(fh);
+	closeWriteFile(fh, fn);
 }
 
 void ResmapJobWindow::read(std::string fn, bool &_is_continue)
@@ -3758,7 +3851,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		std::cerr << "ResMapJobWindow::getCommands ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
 		exit(1);
 	}
-	Node node(fn_in.getValue(), NODE_HALFMAP);
+	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
 	FileName fn_out = fn_in.getValue();
@@ -3775,7 +3868,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --stepRes=" + floatToString(stepres.getValue());
 	if (fn_mask.getValue().length() > 0)
 	{
-		Node node2(fn_mask.getValue(), NODE_MASK);
+		Node node2(fn_mask.getValue(), fn_mask.type);
 		pipelineInputNodes.push_back(node2);
 		command += " --maskVol=" + fn_mask.getValue();
 	}
@@ -3803,7 +3896,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 PublishJobWindow::PublishJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
-	type = PROC_PUBLISH;
+	type = -1;
 
 	tab1->begin();
 	tab1->label("cite RELION");

@@ -131,7 +131,8 @@ public:
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
 			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool do_class = false, MetaDataTable *MDdata = NULL,
-			int _nr_regroup = -1, bool _is_data = false, MetaDataTable *MDgroups = NULL);
+			int _nr_regroup = -1, bool _is_data = false, MetaDataTable *MDgroups = NULL,
+			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="");
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
 			int _particle_radius, FileName _fn_coords = "",
@@ -188,6 +189,12 @@ public:
 
 	// Flag to indicate whether this is a viewer for class averages from 2D/3D relion_refine classification runs
 	bool do_class;
+
+	// Allow saving of selection files?
+	bool do_allow_save;
+
+	// Filenames with the selected class averages and the particles from the selected classes
+	FileName fn_selected_imgs, fn_selected_parts;
 
 	// Flag to indicate whether this is a viewer for a data.star (to also allow regrouping)
 	bool is_data;
@@ -360,9 +367,9 @@ public:
 	std::vector<std::string> sort_labels;
 
 	// Input for the display parameters
-	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *angpix_input;
-	Fl_Input *col_input, *ori_scale_input, *particle_radius_input, *pick_rootname_input, *nr_groups_input;
-	Fl_Check_Button *sort_button, *reverse_sort_button, *pick_button, *apply_orient_button, *read_whole_stack_button, *regroup_button;
+	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
+	Fl_Input *col_input, *ori_scale_input;
+	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
 	Fl_Choice *display_choice, *sort_choice;
 
 	// Constructor with w x h size of the window and a title
@@ -444,6 +451,12 @@ public:
 	// Flag for looking at classes
 	bool do_class;
 
+	// Allow saving of selected particles or images?
+	bool do_allow_save;
+
+	// Filenames for selected particles and selected images
+	FileName fn_selected_imgs, fn_selected_parts;
+
 	// Number of groups for regrouping (negative number is no regrouping)
 	int nr_regroups;
 
@@ -464,6 +477,9 @@ public:
 
 	// Lowpass filter for picker images
 	RFLOAT lowpass;
+
+	// Highpass filter for picker images
+	RFLOAT highpass;
 
 	// Pixel size to calculate lowpass filter in Angstroms
 	RFLOAT angpix;

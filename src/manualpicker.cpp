@@ -37,6 +37,7 @@ int last_ctf_viewed;
 bool   global_has_ctf;
 RFLOAT global_angpix;
 RFLOAT global_lowpass;
+RFLOAT global_highpass;
 RFLOAT global_particle_diameter;
 RFLOAT global_sigma_contrast;
 RFLOAT global_black_val;
@@ -47,11 +48,11 @@ RFLOAT global_ctfsigma;
 RFLOAT global_blue_value;
 RFLOAT global_red_value;
 int    global_total_count;
+FileName global_fn_odir;
 FileName global_pickname;
 FileName global_fn_color;
 FileName global_color_label;
 bool global_do_color;
-
 
 void cb_viewmic(Fl_Widget* w, void* data)
 {
@@ -64,7 +65,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	if (last_pick_viewed > 0 && last_pick_viewed < count_displays.size())
 	{
 		MetaDataTable MDcoord;
-		FileName fn_coord = global_fn_mics[last_pick_viewed].withoutExtension() + "_" + global_pickname + ".star";
+		FileName fn_coord = getOutputFileWithNewUniqueDate(global_fn_mics[last_pick_viewed].withoutExtension() + "_" + global_pickname + ".star", global_fn_odir);
 		int my_nr_picked;
 		if (exists(fn_coord))
 		{
@@ -81,7 +82,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		count_displays[last_pick_viewed]->redraw();
 	}
 
-	FileName fn_coord = global_fn_mics[imic].withoutExtension() + "_" + global_pickname + ".star";
+	FileName fn_coord = getOutputFileWithNewUniqueDate(global_fn_mics[imic].withoutExtension() + "_" + global_pickname + ".star", global_fn_odir);
 
 	int rad = ROUND(global_particle_diameter/(2. * global_angpix));
 	std::string command;
@@ -93,6 +94,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	command += " --sigma_contrast "  + floatToString(global_sigma_contrast);
 	command += " --particle_radius " + floatToString(rad);
 	command += " --lowpass " + floatToString(global_lowpass);
+	command += " --highpass " + floatToString(global_highpass);
 	command += " --angpix " + floatToString(global_angpix);
 
 	if (global_color_label != "")
@@ -297,12 +299,12 @@ int manualpickerGuiWindow::fill()
 void manualpickerGuiWindow::readOutputStarfile()
 {
 
-	if (exists(fn_out))
+	if (exists(fn_sel))
 	{
 		for (int imic = 0; imic < selected.size(); imic++)
 			selected[imic] = false;
 		MetaDataTable MDout;
-		MDout.read(fn_out);
+		MDout.read(fn_sel);
 		FileName fn_mic, fn_mic_in;
 		for (int imic = 0; imic < selected.size(); imic++)
 		{
@@ -357,7 +359,7 @@ void manualpickerGuiWindow::writeOutputStarfile()
 		}
 	}
 
-	MDout.write(fn_out);
+	MDout.write(fn_sel);
 
 }
 void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
@@ -370,7 +372,7 @@ void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
 void manualpickerGuiWindow::cb_menubar_save_i()
 {
 	writeOutputStarfile();
-	std::cout << " Saved " << fn_out << std::endl;
+	std::cout << " Saved " << fn_sel << std::endl;
 }
 
 void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
@@ -399,7 +401,7 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	for (int imic = 0; imic < global_fn_mics.size(); imic++)
 	{
 		MetaDataTable MDcoord;
-		FileName fn_coord = global_fn_mics[imic].withoutExtension() + "_" + global_pickname + ".star";
+		FileName fn_coord = getOutputFileWithNewUniqueDate(global_fn_mics[imic].withoutExtension() + "_" + global_pickname + ".star", global_fn_odir);
 		int my_nr_picked;
 		if (exists(fn_coord))
 		{
@@ -428,6 +430,8 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	}
 	std::cout << " Total number of picked particles: " << global_total_count << " from " << nr_sel_mic << " selected micrographs." << std::endl;
 
+	// Also save micrograph selection file
+	cb_menubar_save_i();
 }
 
 
@@ -438,9 +442,10 @@ void ManualPicker::read(int argc, char **argv)
 
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "Micrograph STAR file OR filenames from which to pick particles, e.g. \"Micrographs/*.mrc\"");
-	fn_out = parser.getOption("--o", "Name for output STAR file", "micrographs_selected.star");
+	global_fn_odir = parser.getOption("--odir", "Output directory for coordinate files (default is to store next to micrographs)", "ASINPUT");
+	fn_sel = parser.getOption("--selection", "STAR file with selected micrographs", "micrographs_selected.star");
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
-	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
+	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1."));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
 
 	int mic_section = parser.addSection("Displaying options");
@@ -449,6 +454,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_white_val = textToFloat(parser.getOption("--white", "Pixel value for white (default is auto-contrast)", "0"));
 	global_sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean (default is auto-contrast)", "0"));
 	global_lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
+	global_highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 
 	global_ctfscale = textToFloat(parser.getOption("--ctf_scale", "Relative scale for the CTF-image display", "1"));
 	global_ctfsigma = textToFloat(parser.getOption("--ctf_sigma_contrast", "Sigma-contrast for the CTF-image display", "3"));
@@ -471,6 +477,13 @@ void ManualPicker::usage()
 
 void ManualPicker::initialise()
 {
+
+	// check if the output directory is unique
+	if (global_fn_odir == "ASINPUT")
+	{
+		global_fn_odir = fn_in.beforeLastOf("/") + "/";
+	}
+
 	// If we down-scale the micrograph: always low-pass filter to get better displays
 
 	if (global_micscale < 1.)
@@ -505,7 +518,7 @@ void ManualPicker::run()
 
 	// Transfer all parameters to the gui
 	win.MDin = MDin;
-	win.fn_out = fn_out;
+	win.fn_sel = fn_sel;
 	win.fill();
 
 }

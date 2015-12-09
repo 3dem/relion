@@ -44,8 +44,11 @@ public:
 	// Verbosity
 	int verb;
 
-	// Output rootname
-	FileName fn_in, fn_out;
+	// Name for directory of output Particle stacks and Particle STAR file
+	FileName fn_part_dir, fn_part_star;
+
+	// Does the input micrograph STAR file have CTF information?
+	bool star_has_ctf;
 
 	/////////////////? Do phase flipping?
 	bool do_phase_flip;
@@ -63,6 +66,9 @@ public:
 	// Extract particles from movies instead of single micrographs
 	bool do_movie_extract;
 
+	// Movie identifier for extraction from movies (e.g. movie for movies called _movie.mrcs or _movie.mrc)
+	FileName movie_name;
+
 	// First frame to extract from movies
 	int movie_first_frame;
 
@@ -75,14 +81,14 @@ public:
 	// Rootname to identify movies, e.g. mic001_movie.mrcs will be the movie of mic001.mrc if fn_movie="movie"
 	FileName fn_movie;
 
-	// Filenames (may include wildcards) for all coordinate files to be used for particle extraction
-	FileName fns_coords_in;
-
-	// Alternative niput: STAR file with all (selected) micrographs and their rootname for the picked coordinates files
-	FileName fn_star_in, fn_pick_suffix;
+	// STAR file with all (selected) micrographs, the suffix of the coordinates files, and the directory where the coordinate files are
+	FileName fn_star_in, fn_coord_suffix, fn_coord_dir ;
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;
+
+	// Filenames of all the micrographs to use for particle extraction
+	std::vector<FileName> fn_mics;
 
 	// Metadata table with CTF information for all micrographs
 	MetaDataTable MDmics;
@@ -135,9 +141,6 @@ public:
 	// Name of output stack (only when fn_operate in is given)
 	FileName fn_operate_out;
 
-	//////////////////////////////////// Output STAR file
-	bool do_join_starfile;
-
 public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
@@ -162,7 +165,7 @@ public:
 	void readCoordinates(FileName fn_coord, MetaDataTable &MD);
 
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
-	void extractParticlesFromFieldOfView(int ipos);
+	void extractParticlesFromFieldOfView(FileName fn_mic, long int imic);
 
 	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
 	void extractParticlesFromOneFrame(MetaDataTable &MD,
@@ -171,7 +174,7 @@ public:
 			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
 	// Perform per-image operations (e.g. normalise, rescaling, rewindowing and inverting contrast) on an input stack (or STAR file)
-	void runOperateOnInputFile(FileName fn_perimage_in);
+	void runOperateOnInputFile();
 
 	// Here normalisation, windowing etc is performed on an individual image and it is written to disc
 	// Jun24,2015 - Shaoda, extract helical segments
@@ -188,13 +191,10 @@ public:
 			RFLOAT &all_minval,
 			RFLOAT &all_maxval);
 
-	// Get micrograph name from the rootname
-	// The rootname may have an additional string after the uniqye micrograph name
-	// That way, multiple "families" of distinct particle types may be extracted from the same micrographs
-	FileName getMicrographNameFromRootName(FileName fn_root);
 
-	// The inverse of the function above
-	FileName getRootNameFromMicrographName(FileName fn_mic);
+	// Get the coordinate filename and the output filename for the particle stack from the micrograph filename
+	FileName getCoordinateFileName(FileName fn_mic);
+	FileName getOutputFileNameRoot(FileName fn_mic);
 
 };
 

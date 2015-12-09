@@ -22,6 +22,7 @@
 #define MANUALPICKER_H_
 #include "src/metadata_table.h"
 #include "src/args.h"
+#include "src/funcs.h"
 #include "src/filename.h"
 #include "src/gui_entries.h"
 #include <FL/Fl.H>
@@ -61,7 +62,7 @@ class manualpickerGuiWindow : public Fl_Window
 public:
 
 	// Input, picking & output names
-	FileName fn_in, fn_out;
+	FileName fn_in, fn_sel;
 
 	// MetaDataTable of input micrographs
 	MetaDataTable MDin;
@@ -99,7 +100,7 @@ public:
 	MetaDataTable MDin;
 
 	// Input, picking & output names
-	FileName fn_in, fn_out;
+	FileName fn_in, fn_sel;
 
 
 public:

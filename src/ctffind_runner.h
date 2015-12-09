@@ -130,9 +130,6 @@ public:
 	// Execute Gctf for many micrographs
 	void executeGctf(std::string &allmicnames);
 
-	// function to remove everything before the UNIQDATE label in the input filename
-	FileName getOutputFile(FileName fn_input);
-
 };
 
 // Get micrograph metadata

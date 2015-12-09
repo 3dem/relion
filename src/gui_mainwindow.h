@@ -63,12 +63,13 @@ static PublishJobWindow *job_publish;
 static Fl_Toggle_Button *toggle_continue;
 // Run button
 static Fl_Button *run_button;
-static std::string fn_settings;
+static FileName fn_settings;
 
 // Store all the history
 static PipeLine pipeline;
 // Which is the current job being displayed?
 static int current_job;
+FileName global_outputname;
 
 
 class RelionMainWindow : public Fl_Window
@@ -88,7 +89,7 @@ public:
     Fl_Button *cleanup_button;
 
     // For job submission
-    std::string outputname, final_command;
+    std::string final_command;
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title

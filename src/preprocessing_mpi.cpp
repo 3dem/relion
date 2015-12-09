@@ -43,40 +43,53 @@ void PreprocessingMpi::runExtractParticles()
 {
 
 	// Each node does part of the work
-	long int my_first_coord, my_last_coord, my_nr_coords;
-	divide_equally(fn_coords.size(), node->size, node->rank, my_first_coord, my_last_coord);
-	my_nr_coords = my_last_coord - my_first_coord + 1;
+	long int nr_mics = MDmics.numberOfObjects();
+	long int my_first_mic, my_last_mic, my_nr_mics;
+	divide_equally(nr_mics, node->size, node->rank, my_first_mic, my_last_mic);
+	my_nr_mics = my_last_mic - my_first_mic + 1;
 
 	int barstep;
 	if (verb > 0)
 	{
 		std::cout << " Extracting particles from the micrographs ..." << std::endl;
-		init_progress_bar(my_nr_coords);
-		barstep = XMIPP_MAX(1, my_nr_coords / 60);
+		init_progress_bar(my_nr_mics);
+		barstep = XMIPP_MAX(1, my_nr_mics / 60);
 
-		// Make a Particles directory
-		int res = system("mkdir -p Particles");
 	}
 
-	FileName fn_olddir = "";
-	for (long int ipos = my_first_coord; ipos <= my_last_coord; ipos++)
-    {
-		FileName fn_dir = "Particles/" + fn_coords[ipos].beforeLastOf("/");
-		if (fn_dir != fn_olddir)
+	FileName fn_mic, fn_olddir = "";
+	long int imic = 0;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
+	{
+		if (imic >= my_first_mic && imic <= my_last_mic)
 		{
-			// Make a Particles directory
-			int res = system(("mkdir -p " + fn_dir).c_str());
-			fn_olddir = fn_dir;
+			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+
+			// Check new-style outputdirectory exists and make it if not!
+			FileName fn_dir = fn_part_dir + fn_mic.beforeLastOf("/");
+			if (fn_dir != fn_olddir)
+			{
+				// Make a Particles directory
+				int res = system(("mkdir -p " + fn_dir).c_str());
+				fn_olddir = fn_dir;
+			}
+
+			if (verb > 0 && imic % barstep == 0)
+				progress_bar(imic);
+
+			extractParticlesFromFieldOfView(fn_mic, imic);
 		}
-
-		if (verb > 0 && ipos % barstep == 0)
-			progress_bar(ipos);
-
-    	extractParticlesFromFieldOfView(ipos);
+		imic++;
 	}
+
+	// Wait until all nodes have finished to make final star file
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (verb > 0)
-		progress_bar(my_nr_coords);
+		progress_bar(my_nr_mics);
+
+	if (node->isMaster())
+		Preprocessing::joinAllStarFiles();
 
 }
 
@@ -90,16 +103,10 @@ void PreprocessingMpi::run()
 	{
 		runExtractParticles();
 
-		// Wait until all nodes have finished to make final star file
-		MPI_Barrier(MPI_COMM_WORLD);
 	}
-
-	if (do_join_starfile && node->isMaster())
-		Preprocessing::joinAllStarFiles();
-
 	// The following has not been parallelised....
-	if (fn_operate_in != "" && node->isMaster())
-		Preprocessing::runOperateOnInputFile(fn_operate_in);
+	else if (fn_operate_in != "" && node->isMaster())
+		Preprocessing::runOperateOnInputFile();
 
 	if (verb > 0)
 		std::cout << " Done!" <<std::endl;

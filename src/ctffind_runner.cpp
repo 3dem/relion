@@ -147,7 +147,7 @@ void CtffindRunner::initialise()
 	for (size_t i = 0; i < fn_micrographs.size(); i++)
 	{
 		// Remove the UNIQDATE part of the filename if present
-		FileName output = getOutputFile(fn_micrographs[i]);
+		FileName output = getOutputFileWithNewUniqueDate(fn_micrographs[i], fn_out);
 		// Create output directory if neccesary
 		FileName newdir = output.beforeLastOf("/");
 		if (newdir != prevdir)
@@ -179,14 +179,6 @@ void CtffindRunner::initialise()
 		for(unsigned  int  i = 0; i < fn_micrographs.size(); ++i)
 			std::cout << "  * " << fn_micrographs[i] << std::endl;
 	}
-}
-
-FileName CtffindRunner::getOutputFile(FileName fn_input)
-{
-	std::string uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_input, uniqdate);
-	std::string fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+15) : fn_input;
-	return fn_out + fn_nouniqdate;
 }
 
 void CtffindRunner::run()
@@ -239,7 +231,7 @@ void CtffindRunner::joinCtffindResults()
 	MetaDataTable MDctf;
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
     {
-		FileName outputfile= getOutputFile(fn_micrographs[imic]);
+		FileName outputfile= getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
 		FileName fn_microot = outputfile.without(".mrc");
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
@@ -270,7 +262,7 @@ void CtffindRunner::addToGctfJobList(long int i, std::string  &allmicnames)
 {
 
 	Image<double> Itmp;
-	FileName outputfile = getOutputFile(fn_micrographs[i]);
+	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs[i], fn_out);
 	Itmp.read(outputfile, false); // false means only read header!
 	if (XSIZE(Itmp()) != xdim || YSIZE(Itmp()) != ydim)
 		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs[i] + " is different from the first micrograph!");
@@ -312,7 +304,7 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 	// Cleanup all the symbolic links again
 	for (size_t i = 0; i < fn_micrographs.size(); i++)
 	{
-		FileName output = getOutputFile(fn_micrographs[i]);
+		FileName output = getOutputFileWithNewUniqueDate(fn_micrographs[i], fn_out);
 		remove(output.c_str());
 	}
 
@@ -328,7 +320,7 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 void CtffindRunner::executeCtffind(long int imic)
 {
 
-	FileName fn_mic = getOutputFile(fn_micrographs[imic]);
+	FileName fn_mic = getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
 	FileName fn_root = fn_mic.withoutExtension();
 	FileName fn_script = fn_root + "_ctffind3.com";
 	FileName fn_log = fn_root + "_ctffind3.log";

@@ -413,3 +413,39 @@ bool exists(const FileName &fn)
     fclose(aux);
     return true;
 }
+
+size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
+{
+	size_t slashpos = 0;
+	int i = 0;
+	while (slashpos < fnt.length())
+	{
+		i++;
+		slashpos = fnt.find("/", slashpos+1);
+		if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
+		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
+		    fnt[slashpos+7] == '-' &&
+		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
+		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
+			{
+				uniqdate = fnt.substr(slashpos+1,13);
+				return slashpos;
+			}
+
+		if (i>100)
+			REPORT_ERROR("findUniqueDateSubstring: BUG or found more than 100 directories deep structure?");
+	}
+
+	// Not found
+	uniqdate="";
+	return std::string::npos;
+}
+
+FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir)
+{
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_input, uniqdate);
+	FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+15) : fn_input;
+	return fn_new_outputdir + fn_nouniqdate;
+}
+

@@ -60,12 +60,6 @@
 #include "src/macros.h"
 #include "src/error.h"
 
-#define FILENAMENUMBERLENGTH 6
-
-// Finds the 6-digit UNIQDATE substring from a larger string, as used in relion-2.0 pipeline
-// This function returns the position of the slash right before the UNIQDATE entry, and the entry itself is in
-size_t findUniqueDateSubstring(std::string fnt, std::string &uniqdate);
-
 /** Structure of the points to do least-squares straight-line fitting
  */
 struct fit_point2D

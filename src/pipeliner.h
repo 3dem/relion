@@ -40,7 +40,7 @@ class Process;
 #define NODE_MOVIE			0 // 2D micrograph movie(s), e.g. Falcon001_movie.mrcs or micrograph_movies.star
 #define NODE_MIC			1 // 2D micrograph(s), possibly with CTF information as well, e.g. Falcon001.mrc or micrographs.star
 #define NODE_TOMO			2 // 3D tomogram(s), e.g. tomo001.mrc or tomograms.star
-#define NODE_MIC_COORD		4 // (A list of) coordinates for micrographs (*_autopick.star) // TODO: make a STAR file with all autopick.star names?
+#define NODE_MIC_COORD		4 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)
 #define NODE_PART_DATA		5 // A metadata (STAR) file with particles (e.g. particles.star or run1_data.star)
 #define NODE_MOVIE_DATA		6 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
 #define NODE_REF       	    7 // 2D or 3D-reference(s), e.g. map.mrc or refs.star or 1@refs.star
@@ -93,8 +93,8 @@ class Node
 #define PROC_CTFFIND	    3 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
 #define PROC_MANUALPICK		4 // Manually pick particle coordinates from micrographs
 #define PROC_AUTOPICK		5 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
-#define PROC_SORT           6 // Sort particles based on their Z-scores
-#define PROC_EXTRACT		7 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_EXTRACT		6 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_SORT           7 // Sort particles based on their Z-scores
 #define PROC_2DCLASS		8 // 2D classification (from input particles)
 #define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
 #define PROC_CLASSSELECT    10// Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
@@ -104,8 +104,7 @@ class Node
 #define PROC_POLISH			12 // Particle-polishing (from movie-particles)
 #define PROC_POST			13 // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP			14 // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define PROC_PUBLISH		15 // TODO: remove! Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define NR_BROWSE_TABS PROC_PUBLISH
+#define NR_BROWSE_TABS PROC_RESMAP
 
 // Status a Process may have
 #define PROC_RUNNING   0

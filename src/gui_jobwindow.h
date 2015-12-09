@@ -61,6 +61,7 @@ static Fl_Menu_Item sampling_options[] = {
 static Fl_Menu_Item node_type_options[] = {
 		      {"2D micrograph movie(s) (.mrcs or .star)"},
 		      {"2D micrograph(s) (.mrc or .star)"},
+		      {"2D/3D particle coordinates (.box, .star or .*)"},
 		      {"3D tomogram(s) (.mrc or .star)"},
 		      {"2D/3D reference image(s) (.mrc or .star)"},
 		      {"2D/3D mask(s) (.mrc or .star)"},
@@ -71,7 +72,7 @@ static int minimum_nr_dedicated;
 static bool do_allow_change_minimum_dedicated;
 
 
-void getContinueOutname(std::string &outputname, FileNameEntry &fn_cont);
+void getContinueOutname(std::string &outputname, FileName fn_cont);
 // Output filenames of relion_refine (use iter=-1 for auto-refine)
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies = 1);
 
@@ -144,7 +145,7 @@ public:
 	// write/read settings to disc
 	void openWriteFile(std::string fn, std::ofstream &fh);
 	bool openReadFile(std::string fn, std::ifstream &fh);
-	void closeWriteFile(std::ofstream& fh);
+	void closeWriteFile(std::ofstream& fh, std::string fn);
 	void closeReadFile(std::ifstream& fh);
 
 	// Write the job submission script
@@ -302,6 +303,7 @@ public:
 	BooleanEntry do_ctf_autopick;
 	BooleanEntry do_ignore_first_ctfpeak_autopick;
 	SliderEntry lowpass_autopick;
+	SliderEntry highpass_autopick;
 	SliderEntry psi_sampling_autopick;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
@@ -335,10 +337,11 @@ class ManualpickJobWindow : public RelionJobWindow
 {
 public:
 
-	FileNameEntry fn_in;
-	FileNameEntry fn_out;
-	AnyEntry manualpick_rootname;
+	InputNodeEntry fn_in;
+	AnyEntry fn_out;
 	SliderEntry lowpass;
+	SliderEntry highpass;
+	SliderEntry diameter;
 	SliderEntry micscale;
 	SliderEntry ctfscale;
 	SliderEntry sigma_contrast;
@@ -378,16 +381,16 @@ class ExtractJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry star_mics;
-	AnyEntry pick_suffix;
-	AnyEntry extract_rootname;
+	InputNodeEntry star_mics;
+	InputNodeEntry coords_suffix;
+	AnyEntry fn_out;
 
 	// extract
-	BooleanEntry do_extract;
 	SliderEntry extract_size;
 	BooleanEntry do_rescale;
 	SliderEntry rescale;
 	BooleanEntry do_norm;
+	SliderEntry bg_diameter;
 	SliderEntry white_dust;
 	SliderEntry black_dust;
 	BooleanEntry do_invert;
@@ -398,7 +401,7 @@ public:
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
 
-	Fl_Group *extract_group, *rescale_group, *norm_group, *movie_extract_group;
+	Fl_Group *rescale_group, *norm_group, *movie_extract_group;
 
 public:
 
@@ -606,7 +609,7 @@ public:
 
 	// Movies
 	BooleanEntry do_movies;
-	FileNameEntry fn_movie_star;
+	InputNodeEntry fn_movie_star;
 	SliderEntry movie_runavg_window;
 	SliderEntry movie_sigma_offset;
 	BooleanEntry do_alsorot_movies;
@@ -651,7 +654,7 @@ public:
 	SliderEntry extend_inimask;
 	SliderEntry width_mask_edge;
 	BooleanEntry do_usermask;
-	FileNameEntry fn_mask;
+	InputNodeEntry fn_mask;
 
 	// Sharpening
 	BooleanEntry do_auto_bfac;

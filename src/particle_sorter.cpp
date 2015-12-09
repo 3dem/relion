@@ -29,8 +29,8 @@ void ParticleSorter::read(int argc, char **argv)
 	fn_in = parser.getOption("--i", "Input STAR file ");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
 	fn_out = parser.getOption("--o", "Output rootname (if empty the input file will be overwritten)", "");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
-	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1"));
+	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circ. mask for the experimental images (in Angstroms, default=automatic)", "-1"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the references (prevent Einstein-from-noise!)","-1"));
 	do_invert = parser.checkOption("--invert", "Density in particles is inverted w.r.t. density in template");
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
@@ -56,6 +56,17 @@ void ParticleSorter::initialise()
 
 	// Read in input metadata file
 	MDin.read(fn_in);
+
+	// Check the pixel size
+	if (MDin.containsLabel(EMDL_CTF_MAGNIFICATION) && MDin.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	{
+		RFLOAT mag, dstep;
+		MDin.getValue(EMDL_CTF_MAGNIFICATION, mag);
+		MDin.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+		angpix = 10000. * dstep / mag;
+		if (verb > 0)
+			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+	}
 
 	if (fn_out == "")
 		fn_out = fn_in.withoutExtension();
@@ -108,9 +119,40 @@ void ParticleSorter::initialise()
 
 	particle_size = XSIZE(Mrefs[0]);
 
-	// Get the squared particle radius (in integer pixels)
-	particle_radius2 = ROUND(particle_diameter/(2. * angpix));
-	particle_radius2*= particle_radius2;
+	// Automated determination of bg_radius
+	if (particle_diameter < 0.)
+	{
+		RFLOAT sumr=0.;
+		for (int iref = 0; iref < Mrefs.size(); iref++)
+		{
+			RFLOAT cornerval = DIRECT_MULTIDIM_ELEM(Mrefs[iref], 0);
+			// Look on the central X-axis, which first and last values are NOT equal to the corner value
+			int last_corner=99999, first_corner=99999;
+			for (long int j=STARTINGX(Mrefs[iref]); j<=FINISHINGX(Mrefs[iref]); j++)
+			{
+				if (first_corner == 99999)
+				{
+					if (A3D_ELEM(Mrefs[iref], 0,0,j) != cornerval)
+						first_corner = j;
+				}
+				else if (last_corner  == 99999)
+				{
+					if (A3D_ELEM(Mrefs[iref], 0,0,j) == cornerval)
+						last_corner = j - 1;
+				}
+			}
+			sumr += (last_corner - first_corner);
+		}
+		sumr /= 2. * Mrefs.size(); // factor 2 to go from diameter to radius; Mref.size() for averaging
+		particle_radius2 = sumr*sumr;
+		std::cout << " Automatically set the background radius to " << sumr << " pixels " << std::endl;
+	}
+	else
+	{
+		// Get the squared particle radius (in integer pixels)
+		particle_radius2 = ROUND(particle_diameter/(2. * angpix));
+		particle_radius2*= particle_radius2;
+	}
 
 	// Invert references if necessary (do this AFTER automasking them!)
 	if (do_invert)

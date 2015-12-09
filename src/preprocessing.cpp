@@ -24,14 +24,11 @@ void Preprocessing::read(int argc, char **argv, int rank)
 
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	fn_out = parser.getOption("--o", "Output rootname", "particles");
-	// Dont allow for directories here!
-	fn_out = fn_out.removeDirectories();
-
-	int particle_section = parser.addSection("Particle selection");
-	fns_coords_in = parser.getOption("--coord_files", "The coordinate files for all particles to be output (may contain wildcards e.g. \"mics/*.box\" or \"mics/???.star\" )","");
-	fn_star_in = parser.getOption("--mic_star", "The STAR file with all (selected) micrographs to extract particles from","");
-	fn_pick_suffix = parser.getOption("--coord_suffix", "The suffix for the coordinate files, e.g. \"_picked.star\" or \".box\"","");
+	fn_star_in = parser.getOption("--i", "The STAR file with all (selected) micrographs to extract particles from","");
+	fn_coord_suffix = parser.getOption("--coord_suffix", "The suffix for the coordinate files, e.g. \"_picked.star\" or \".box\"","");
+	fn_coord_dir = parser.getOption("--coord_dir", "The directory where the coordinate files are (default is same as micrographs)", "ASINPUT");
+	fn_part_dir = parser.getOption("--part_dir", "Output directory for particle stacks", "Particles/");
+	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "particles.star");
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
@@ -43,14 +40,14 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
-	do_movie_extract = parser.checkOption("--extract_movies", "Extract particles from movie stacks (e.g. from DDDs)");
+	do_movie_extract = parser.checkOption("--extract_movies", "Extract particles from movie stacks?");
+	movie_name = parser.getOption("--movie_name", "Movie-identifier to extract particles from movie stacks (e.g. _movie.mrcs)", "movie");
 	avg_n_frames = textToInteger(parser.getOption("--avg_movie_frames", "Average over this number of individual movie frames", "1"));
 	movie_first_frame = textToInteger(parser.getOption("--first_movie_frame", "Extract from this movie frame onwards", "1"));
 	movie_first_frame--; // (start counting at 0, not 1)
 	movie_last_frame = textToInteger(parser.getOption("--last_movie_frame", "Extract until this movie frame (default=all movie frames)", "0"));
 	movie_last_frame--; // (start counting at 0, not 1)
 	fn_movie = parser.getOption("--movie_rootname", "Common name to relate movies to the single micrographs (e.g. mic001_movie.mrcs related to mic001.mrc)", "movie");
-	do_skip_ctf_logfiles = parser.checkOption("--skip_ctf_logs", "Do not harvest information from CTFFIND logfiles?");
 
 	int perpart_section = parser.addSection("Particle operations");
 	do_project_3d = parser.checkOption("--project3d", "Project sub-tomograms along Z to generate 2D particles");
@@ -63,13 +60,11 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 	do_invert_contrast = parser.checkOption("--invert_contrast", "Invert the contrast in the input images");
-	fn_operate_in = parser.getOption("--operate_on", "The operations above are applied to all extracted particles. Use this option to operate on an input stack/STAR file", "");
+	fn_operate_in = parser.getOption("--operate_on", "Use this option to operate on an input stack/STAR file", "");
+	fn_operate_out = parser.getOption("--operate_out", "Output rootname when operating on an input stack/STAR file", "preprocessed");
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
-
-	if (!( checkParameter(argc, argv, "--o") || checkParameter(argc, argv, "--operate_on") ))
-		REPORT_ERROR("Provide either --o or --operate_on");
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -85,58 +80,54 @@ void Preprocessing::usage()
 void Preprocessing::initialise()
 {
 
-	if (fns_coords_in == "" && fn_star_in == "" && fn_operate_in == "" && !do_join_starfile)
-		REPORT_ERROR("Provide either --extract, --join_starfile or --operate_on");
+	if (!do_extract && fn_operate_in == "")
+		REPORT_ERROR("Provide either --extract or --operate_on");
 
 	// Set up which coordinate files to extract particles from (or to join STAR file for)
-	do_join_starfile = false;
-	if (fns_coords_in != "" || fn_star_in != "")
+	if (do_extract)
 	{
-		do_join_starfile = true;
-		if (do_extract && verb > 0)
+		if (verb > 0)
 		{
+			if (fn_star_in=="" || fn_coord_suffix=="")
+				REPORT_ERROR("Preprocessing::initialise ERROR: please provide --i and --coord_suffix to extract particles");
+
 			if (extract_size < 0)
 				REPORT_ERROR("Preprocessing::initialise ERROR: please provide the size of the box to extract particle using --extract_size ");
-
-			std::cout << " Extract particles based on the following coordinate files: " << std::endl;
-		}
-		else if (!do_extract && verb > 0)
-		{
-			std::cout << " Creating output STAR file for particles based on the following coordinate files: " << std::endl;
 		}
 
-		// Get the filenames of all micrographs to be processed by CTFFIND
-		if (fns_coords_in != "")
-		{
-			if (do_phase_flip || do_premultiply_ctf)
-				REPORT_ERROR("Preprocessing::initialise ERROR: provide CTF information in a micrographs_ctf.star input file!");
 
-			fns_coords_in.globFiles(fn_coords);
-		}
-		else if (fn_star_in != "")
+
+		// Read in the micrographs STAR file
+		MDmics.read(fn_star_in);
+		if (!MDmics.containsLabel(EMDL_MICROGRAPH_NAME))
+			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
+		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
+			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
+
+		star_has_ctf = MDmics.containsLabel(EMDL_CTF_DEFOCUSU);
+
+		// Make sure the directory names end with a '/'
+		if (fn_coord_dir != "ASINPUT" && fn_coord_dir[fn_coord_dir.length()-1] != '/')
+			fn_coord_dir+="/";
+		if (fn_part_dir[fn_part_dir.length()-1] != '/')
+			fn_part_dir+="/";
+
+		// Loop over all micrographs in the input STAR file and warn of coordinate file or micrograph file do not exist
+		if (verb > 0)
 		{
-			MDmics.read(fn_star_in);
-			if (!MDmics.containsLabel(EMDL_MICROGRAPH_NAME))
-				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
-			fn_coords.clear();
 			FileName fn_mic;
-			if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
-				REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
-
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 			{
 				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-				fn_mic = fn_mic.withoutExtension() + fn_pick_suffix;
-				if (exists(fn_mic))
-					fn_coords.push_back(fn_mic);
-				else if (verb > 0)
-					std::cout << "Warning: coordinate file " << fn_mic << " does not exist..." << std::endl;
+				FileName fn_coord = getCoordinateFileName(fn_mic);
+				if (do_movie_extract)
+					fn_mic = fn_mic.withoutExtension() + "_" + movie_name + ".mrcs";
+				if (!exists(fn_coord))
+					std::cout << "Warning: coordinate file " << fn_coord << " does not exist..." << std::endl;
+				if (!exists(fn_mic))
+					std::cout << "Warning: micrograph file " << fn_mic << " does not exist..." << std::endl;
 			}
 		}
-
-		if (verb > 0)
-			for(unsigned  int  i = 0; i < fn_coords.size(); ++i)
-				std::cout << "  * " << fn_coords[i] << std::endl;
 	}
 
 	if (do_extract || fn_operate_in != "")
@@ -154,45 +145,6 @@ void Preprocessing::initialise()
 		// Check for bg_radius in case of normalisation
 		if (do_normalise && bg_radius < 0)
 			REPORT_ERROR("ERROR: please provide a radius for a circle that defines the background area when normalising...");
-
-		// Jun24,2015 - Shaoda, extract helical segments
-		if (do_helical_segments)
-		{
-			MetaDataTable MD;
-			if (do_extract)
-			{
-				for (int ii = 0; ii < fn_coords.size(); ii++)
-				{
-					if (fn_coords[ii].isStarFile() == false)
-						REPORT_ERROR("ERROR: Extraction of helical segments: only STAR files are supported!");
-
-					MD.clear();
-					MD.read(fn_coords[ii]);
-					if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
-							|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
-							|| (!MD.containsLabel(EMDL_ORIENT_TILT))
-							|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
-					{
-						REPORT_ERROR("ERROR: Extraction of helical segments: x, y, tilt and psi are missing in STAR files!");
-					}
-				}
-			}
-			if (fn_operate_in != "")
-			{
-				if (fn_operate_in.isStarFile() == false)
-					REPORT_ERROR("ERROR: Operations on helical segments: only STAR files are supported!");
-				MD.clear();
-				MD.read(fn_operate_in);
-				if ( (!MD.containsLabel(EMDL_ORIENT_TILT))
-						|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
-				{
-					REPORT_ERROR("ERROR: Operations on helical segments: tilt and psi are missing in STAR files!");
-				}
-			}
-			if ((do_normalise) && (bg_helical_radius < 0))
-				REPORT_ERROR("ERROR: please provide a radius for a tube that defines the background area when normalising helical segments...");
-		}
-
 	}
 }
 
@@ -201,12 +153,8 @@ void Preprocessing::run()
 
 	if (do_extract)
 		runExtractParticles();
-
-	if (do_join_starfile)
-		joinAllStarFiles();
-
-	if (fn_operate_in != "")
-		runOperateOnInputFile(fn_operate_in);
+	else if (fn_operate_in != "")
+		runOperateOnInputFile();
 
 	if (verb > 0)
 		std::cout << " Done!" <<std::endl;
@@ -218,121 +166,58 @@ void Preprocessing::joinAllStarFiles()
 
 	MetaDataTable MDout, MDonestack;
 
-	// Fix order of the labels in the output file
-	MDout.addLabel(EMDL_MICROGRAPH_NAME);
-	MDout.addLabel(EMDL_IMAGE_COORD_X);
-	MDout.addLabel(EMDL_IMAGE_COORD_Y);
-	MDout.addLabel(EMDL_IMAGE_NAME);
-
 	std::cout << " Joining all metadata in one STAR file..." << std::endl;
-	bool has_other_ctfs, has_this_ctf = false;
-	RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
-	has_other_ctfs = false;
-	FileName prev_fn_mic="";
-	for (long int ipos = 0; ipos < fn_coords.size(); ipos++)
-    {
-		FileName fn_mic = getMicrographNameFromRootName((fn_coords[ipos]).withoutExtension());
-		// If the micrograph did not exist, particles were not extracted: just continue with the next one
-		if (fn_mic == "")
-			continue;
+	FileName fn_mic;
+	// Re-scaled detector pixel size
+	RFLOAT DStep;
 
-		if (fn_mic != prev_fn_mic && !do_skip_ctf_logfiles)
-		{
-			FileName fn_microot = getRootNameFromMicrographName(fn_mic);
-			// Gather the results from ctffind
-			has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
-					HT, CS, AmpCnst, XMAG, DStep);
-		}
-		else
-		{
-			has_this_ctf = false;
-		}
-		prev_fn_mic = fn_mic;
+	for (long int current_object1 = MDmics.firstObject();
+	              current_object1 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
+	              current_object1 = MDmics.nextObject())
+	{
+		// Micrograph filename
+		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
-			// Re-scaled detector pixel size
-		if (has_this_ctf && do_rescale)
-                    DStep *= (RFLOAT)extract_size/(RFLOAT)scale;
-
-		if (ipos == 0 && has_this_ctf)
-		{
-			// Set has_other_ctfs to true if the first micrograph has a logfile
-			// In that case add all CTF labels to the output MDtable
-			has_other_ctfs = true;
-			MDout.addLabel(EMDL_CTF_DEFOCUSU);
-			MDout.addLabel(EMDL_CTF_DEFOCUSV);
-			MDout.addLabel(EMDL_CTF_DEFOCUS_ANGLE);
-			MDout.addLabel(EMDL_CTF_VOLTAGE);
-			MDout.addLabel(EMDL_CTF_CS);
-			MDout.addLabel(EMDL_CTF_Q0);
-			MDout.addLabel(EMDL_CTF_MAGNIFICATION);
-			MDout.addLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
-			MDout.addLabel(EMDL_CTF_FOM);
-		}
-
-		if (!has_this_ctf && has_other_ctfs)
-			REPORT_ERROR("joinAllStarFiles%ERROR: Exiting because of missing CTFFIND logfiles for micrograph " + fn_mic);
-
-		if (has_this_ctf && !has_other_ctfs)
-			REPORT_ERROR("joinAllStarFiles%ERROR: Exiting because of missing CTFFIND logfiles ...");
-
-
-		FileName fn_star = "Particles/" + fn_mic.withoutExtension() + "_" + fn_out + ".star";
+		// Get the filename of the STAR file for just this micrograph
+		FileName fn_star = getOutputFileNameRoot(fn_mic) + ".star";
 		MDonestack.read(fn_star);
 
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDonestack)
+		for (long int current_object2 = MDonestack.firstObject();
+		              current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
+		              current_object2 = MDonestack.nextObject())
 		{
-			// This was RFLOAT, right?
-			//MDonestack.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
-
-			if (has_this_ctf)
-			{
-				MDonestack.setValue(EMDL_CTF_DEFOCUSU, defU);
-				MDonestack.setValue(EMDL_CTF_DEFOCUSV, defV);
-				MDonestack.setValue(EMDL_CTF_DEFOCUS_ANGLE, defAng);
-				MDonestack.setValue(EMDL_CTF_VOLTAGE, HT);
-				MDonestack.setValue(EMDL_CTF_Q0, AmpCnst);
-				MDonestack.setValue(EMDL_CTF_CS, CS);
-				MDonestack.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
-				MDonestack.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
-				MDonestack.setValue(EMDL_CTF_FOM, CC);
-			}
-
-			// Add the entire line to the joined STAR-file
-			MDout.addObject(MDonestack.getObject());
-
-			// Remove the individual star file to clean up
-			//remove(fn_star.c_str());
+			MDout.addObject( MDonestack.getObject());
 		}
-
-    }
+	}
 
 	// Write out the joined star file
-	FileName fn_tmp;
-	if (do_movie_extract)
-		fn_tmp = fn_out + "_" + fn_movie + ".star";
-	else
-		fn_tmp = fn_out + ".star";
-	MDout.write(fn_tmp);
-	std::cout << " Written out STAR file with all particles in " << fn_tmp << std::endl;
+	MDout.write(fn_part_star);
+	std::cout << " Written out STAR file with all particles in " << fn_part_star<< std::endl;
 
 }
 
 void Preprocessing::runExtractParticles()
 {
 
+	long int nr_mics = MDmics.numberOfObjects();
+
 	int barstep;
 	if (verb > 0)
 	{
 		std::cout << " Extracting particles from the micrographs ..." << std::endl;
-		init_progress_bar(fn_coords.size());
-		barstep = XMIPP_MAX(1, fn_coords.size() / 60);
+		init_progress_bar(nr_mics);
+		barstep = XMIPP_MAX(1, nr_mics / 60);
 	}
 
-	FileName fn_olddir = "";
-	for (long int ipos = 0; ipos < fn_coords.size(); ipos++)
-    {
+	FileName fn_mic, fn_olddir = "";
+	long int imic = 0;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
+	{
+		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
-		FileName fn_dir = "Particles/" + fn_coords[ipos].beforeLastOf("/");
+		// Check new-style outputdirectory exists and make it if not!
+		FileName fn_dir = getOutputFileNameRoot(fn_mic);
+		fn_dir = fn_dir.beforeLastOf("/");
 		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
@@ -340,14 +225,19 @@ void Preprocessing::runExtractParticles()
 			fn_olddir = fn_dir;
 		}
 
-		if (verb > 0 && ipos % barstep == 0)
-			progress_bar(ipos);
+		if (verb > 0 && imic % barstep == 0)
+			progress_bar(imic);
 
-		extractParticlesFromFieldOfView(ipos);
+		extractParticlesFromFieldOfView(fn_mic, imic);
+
+		imic++;
 	}
 
 	if (verb > 0)
 		progress_bar(fn_coords.size());
+
+	// Now combine all metadata in a single STAR file
+	joinAllStarFiles();
 
 }
 
@@ -362,21 +252,23 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
     if (is_star)
 	{
 		MD.read(fn_coord);
-		/*
-		bool has_z = MD.containsLabel(EMDL_IMAGE_COORD_Z);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+		if (do_helical_segments)
 		{
-			Matrix1D<int> onepos(3);
-			MD.getValue(EMDL_IMAGE_COORD_X, XX(onepos));
-			MD.getValue(EMDL_IMAGE_COORD_Y, YY(onepos));
-			if (has_z)
-				MD.getValue(EMDL_IMAGE_COORD_Z, ZZ(onepos));
-			all_pos.push_back(onepos);
+			if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
+					|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
+					|| (!MD.containsLabel(EMDL_ORIENT_TILT))
+					|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+			{
+				REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments: x, y, tilt or psi are missing in STAR file: " + fn_coord);
+			}
 		}
-		*/
 	}
 	else
 	{
+
+		if (do_helical_segments)
+			REPORT_ERROR("Preprocessing::readCoordinates ERROR: only STAR files are allowed for helical segments.");
+
 		std::ifstream in(fn_coord.data(), std::ios_base::in);
 		if (in.fail())
 			REPORT_ERROR( (std::string) "Preprocessing::readCoordinates ERROR: File " + fn_coord + " does not exists" );
@@ -456,12 +348,12 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 	}
 }
 
-void Preprocessing::extractParticlesFromFieldOfView(int ipos)
+void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int imic)
 {
-	MetaDataTable MDin, MDout;
-
 	// Read in the coordinates file
-	readCoordinates(fn_coords[ipos], MDin);
+	MetaDataTable MDin, MDout;
+	FileName fn_coord = getCoordinateFileName(fn_mic);
+	readCoordinates(fn_coord, MDin);
 
 	// Correct for bias in the picked coordinates
 	if (ABS(extract_bias_x) > 0 || ABS(extract_bias_y) > 0)
@@ -482,22 +374,22 @@ void Preprocessing::extractParticlesFromFieldOfView(int ipos)
 	int npos = MDin.numberOfObjects();
 	if (npos < 10)
 	{
-		std:: cout << "WARNING: there are only " << npos << " particles in " << fn_coords[ipos] <<". Consider joining multiple micrographs into one group. "<< std::endl;
+		std:: cout << "WARNING: there are only " << npos << " particles in " << fn_coord <<". Consider joining multiple micrographs into one group. "<< std::endl;
 	}
 
-	// Check the micrograph exists
-	FileName fn_mic;
-	fn_mic = getMicrographNameFromRootName((fn_coords[ipos]).withoutExtension());
-	// Return if the micrograph does not exist
-	if (fn_mic == "")
+	// Get movie or normal micrograph name and check it exists
+	// This implicitly assumes that the movie is next to the micrograph....
+	// TODO: That may not necessarily be true?
+	FileName fn_img = (do_movie_extract) ? fn_mic.withoutExtension() + "_" + movie_name + ".mrcs" : fn_mic;
+	if (!exists(fn_img))
 	{
-		std::cout << "WARNING: cannot find micrograph for coordinate file " << fn_coords[ipos] << " with " << npos << " particles" << std::endl;
+		std::cout << "WARNING: cannot find micrograph file " << fn_img << " which has " << npos << " particles" << std::endl;
 		return;
 	}
 
 	// Read the header of the micrograph to see how many frames there are.
 	Image<RFLOAT> Imic;
-	Imic.read(fn_mic, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
+	Imic.read(fn_img, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
 
 	int xdim, ydim, zdim;
 	long int ndim;
@@ -506,11 +398,11 @@ void Preprocessing::extractParticlesFromFieldOfView(int ipos)
 	if (dimensionality == 3 || do_movie_extract)
 		do_ramp = false;
 
-	// Name of the output stack
+	// Name of the output particle stack
 	// Add the same root as the output STAR file (that way one could extract two "families" of different particle stacks)
-	FileName fn_output_img_root = "Particles/" + fn_mic.withoutExtension() + "_" + fn_out;
-	// Name of this micrographs STAR file
-	FileName fn_star = fn_output_img_root + ".star";
+	FileName fn_output_img_root = getOutputFileNameRoot(fn_mic);
+    // Name of this micrographs STAR file
+    FileName fn_star = fn_output_img_root + ".star";
 
 	// Just to be sure...
 	if (do_movie_extract && ndim < 2)
@@ -532,24 +424,22 @@ void Preprocessing::extractParticlesFromFieldOfView(int ipos)
 
 	for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
 	{
-		extractParticlesFromOneFrame(MDin, fn_mic, ipos, iframe, n_frames, fn_output_img_root, my_current_nr_images, my_total_nr_images,
+		extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, my_current_nr_images, my_total_nr_images,
 				all_avg, all_stddev, all_minval, all_maxval);
 
-		MDout.append(MDin);
+        MDout.append(MDin);
 		// Keep track of total number of images extracted thus far
 		my_current_nr_images += npos;
 
 	}
-
-	MDout.setName("images");
-	MDout.write(fn_star);
-
+    MDout.setName("images");
+    MDout.write(fn_star);
 
 }
 
 // Actually extract particles. This can be from one (average) micrograph or from a single movie frame
 void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
-		FileName fn_mic, int my_ipos_coords, int iframe, int n_frames,
+		FileName fn_mic, int imic, int iframe, int n_frames,
 		FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
 		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
@@ -585,20 +475,20 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		Imic.read(fn_frame);
 	}
 
+	CTF ctf;
+	if (star_has_ctf || do_phase_flip || do_premultiply_ctf)
+		ctf.read(MDmics, MDmics, imic);
 
 	if (do_phase_flip || do_premultiply_ctf)
 	{
 		if (dimensionality != 2)
 			REPORT_ERROR("extractParticlesFromFieldOfView ERROR: cannot do phase flipping as dimensionality is not 2!");
 
-		CTF ctf;
-		ctf.read(MDmics, MDmics, my_ipos_coords);
-
 		RFLOAT mag, dstep, my_angpix;
 		if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 		{
-			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag, imic);
+			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, imic);
 			my_angpix = 10000. * dstep / mag;
 		}
 		else
@@ -767,13 +657,33 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				FileName fn_part, fn_mic;
 				long int dum;
 				fn_frame.decompose(dum, fn_mic);
-				fn_part.compose(ipos + 1,  "Particles/" + getRootNameFromMicrographName(fn_mic)); // start image counting in stacks at 1!
+				FileName fn_mic_ori = fn_output_img_root.without("_"+movie_name);
+				fn_part.compose(ipos + 1,  fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
 				// for automated re-alignment of particles in relion_refine: have rlnParticleName equal to rlnImageName in non-movie star file
-				fn_part += "_" + fn_out + ".mrcs";
 				MD.setValue(EMDL_PARTICLE_ORI_NAME, fn_part);
 			}
 			MD.setValue(EMDL_IMAGE_NAME, fn_img);
 			MD.setValue(EMDL_MICROGRAPH_NAME, fn_frame);
+
+			// Also fill in the CTF parameters
+			if (star_has_ctf)
+			{
+				ctf.write(MD);
+				RFLOAT mag, dstep;
+				if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION))
+				{
+					MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag, imic);
+					MD.setValue(EMDL_CTF_MAGNIFICATION, mag);
+				}
+				if (MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+				{
+					MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, imic);
+					if (do_rescale)
+						dstep *= (RFLOAT)extract_size/(RFLOAT)scale;
+					MD.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				}
+			}
+
 		}
 		ipos++;
 	}
@@ -782,19 +692,19 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 }
 
 
-void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
+void Preprocessing::runOperateOnInputFile()
 {
 	Image<RFLOAT> Ipart, Iout;
 	MetaDataTable MD;
 	long int Nimg;
 
-	FileName fn_stack = fn_out+".mrcs";
-	FileName fn_star = fn_out+".star";
+	FileName fn_stack = fn_operate_out.withoutExtension()+".mrcs";
+	FileName fn_star = fn_operate_out.withoutExtension()+".star";
 
-	if (fn_operate_on.isStarFile())
+	if (fn_operate_in.isStarFile())
 	{
 		// Readt STAR file and get total number of images
-		MD.read(fn_operate_on);
+		MD.read(fn_operate_in);
 		Nimg = 0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
@@ -819,7 +729,7 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 			REPORT_ERROR("ERROR: Operations on helical segments: only STAR files are supported!");
 
 		// Read the header of the stack to see how many images there
-		Iout.read(fn_operate_on, false);
+		Iout.read(fn_operate_in, false);
 		Nimg = NSIZE(Iout());
 	}
 
@@ -835,7 +745,7 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 
 		// Read in individual miages from the stack
 		Ipart.clear();
-		if (fn_operate_on.isStarFile())
+		if (fn_operate_in.isStarFile())
 		{
 			MD.getValue(EMDL_IMAGE_NAME, fn_tmp);
 			Ipart.read(fn_tmp);
@@ -848,7 +758,7 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 		}
 		else
 		{
-			Ipart.read(fn_operate_on, true, i);
+			Ipart.read(fn_operate_in, true, i);
 			// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
 			fn_tmp.compose(i+1,fn_stack);
 			MD.addObject();
@@ -960,56 +870,27 @@ void Preprocessing::performPerImageOperations(
 
 }
 
-FileName Preprocessing::getMicrographNameFromRootName(FileName fn_root)
+// Get the coordinate filename from the micrograph filename
+FileName Preprocessing::getCoordinateFileName(FileName fn_mic)
 {
-	FileName fn_mic, fn_mic_nos;
-	//Search the unique part of the micrograph name (i.e. coord name may have additional text after the micrograph name without extension...
-	// e.g. fn_root="mic001_all.pos" may correspond to mic001.mrc
-	for (int i = 0; i < fn_root.length(); i++)
-	{
-		if (do_movie_extract)
-		{
-			fn_mic = fn_root.substr(0, fn_root.length() - i) + "_" + fn_movie + ".mrcs";
-			// For movies also allow name without the s of .mrcs
-			fn_mic_nos = fn_root.substr(0, fn_root.length() - i) + "_" + fn_movie + ".mrc";
-		}
-		else
-			fn_mic = fn_root.substr(0, fn_root.length() - i) + ".mrc";
-		std::vector<FileName> fn_mics;
-		if (fn_mic.globFiles(fn_mics) == 1)
-		{
-			fn_mic = fn_mics[0];
-			break;
-		}
-		else if (do_movie_extract && fn_mic_nos.globFiles(fn_mics) == 1)
-		{
-			// For movies also allow name without the s of .mrcs
-			fn_mic = fn_mics[0];
-			break;
-		}
-		if (i == fn_root.length() - 1)
-		{
-			return "";
-		}
-	}
 
-	return fn_mic;
-
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
+	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
+	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
+	FileName fn_coord = fn_coord_dir + fn_mic_nouniqdate + fn_coord_suffix;
+	return fn_coord;
 }
 
-FileName Preprocessing::getRootNameFromMicrographName(FileName fn_mic)
+// Get the coordinate filename from the micrograph filename
+FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 {
-	if (do_movie_extract)
-	{
-		if (fn_mic.contains(".mrcs"))
-			return fn_mic.without("_" + fn_movie + ".mrcs");
-		else if (fn_mic.contains(".mrc"))
-			return fn_mic.without("_" + fn_movie + ".mrc");
-		else
-			REPORT_ERROR("Preprocessing::getRootNameFromMicrographName ERROR: movie name does not end in \"_\" + movie-identifier + \".mrc\" or \".mrcs\"");
-	}
-	else
-		return fn_mic.without(".mrc");
 
-
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
+	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
+	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
+	FileName fn_part = fn_part_dir + fn_mic_nouniqdate;
+	return fn_part;
 }
+
