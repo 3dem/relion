@@ -639,6 +639,15 @@ public:
 		d_ptr = ptr;
 	};
 
+	void setDevPtr(const CudaGlobalPtr<T> &ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (ptr.d_ptr == NULL)
+			printf("DEBUG_WARNING: Device pointer is not set.\n");
+#endif
+		setHstPtr(ptr.d_ptr);
+	};
+
 	void setHstPtr(T *ptr)
 	{
 #ifdef DEBUG_CUDA
@@ -646,6 +655,15 @@ public:
 			printf("DEBUG_WARNING: Host pointer set without freeing the old one.\n");
 #endif
 		h_ptr = ptr;
+	};
+
+	void setHstPtr(const CudaGlobalPtr<T> &ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (ptr.h_ptr == NULL)
+			printf("DEBUG_WARNING: Host pointer is not set.\n");
+#endif
+		setHstPtr(ptr.h_ptr);
 	};
 
 	/**
@@ -922,15 +940,15 @@ public:
 	inline
 	void free_host_if_set()
 	{
-		if (d_do_free)
-			free_device();
+		if (h_do_free)
+			free_host();
 	}
 
 	inline
 	void free_device_if_set()
 	{
-		if (h_do_free)
-			free_host();
+		if (d_do_free)
+			free_device();
 	}
 
 	/**
