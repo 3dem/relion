@@ -1289,7 +1289,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 
-				filtered.dump_device_to_file("error_dump_filtered");
+				unsorted_ipart.dump_device_to_file("error_dump_filtered");
 
 				std::cerr << "Written weight data to file error_dump_unsorted." << std::endl;
 
