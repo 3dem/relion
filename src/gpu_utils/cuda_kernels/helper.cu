@@ -398,8 +398,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 
 }
 
-__global__ void cuda_kernel_rotateAndCtf( XFLOAT *d_Faux_real,
-										  XFLOAT *d_Faux_imag,
+__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  CudaProjectorKernel projector)
@@ -432,23 +431,21 @@ __global__ void cuda_kernel_rotateAndCtf( XFLOAT *d_Faux_real,
 									 ca,
 		 	 	 	 	 	 	 	 ref_real,ref_imag);
 
-		d_Faux_real[pixel] =ref_real*d_ctf[pixel];
-		d_Faux_imag[pixel] =ref_imag*d_ctf[pixel];
+		d_Faux[pixel].x =ref_real*d_ctf[pixel];
+		d_Faux[pixel].y =ref_imag*d_ctf[pixel];
 	}
 }
 
-__global__ void cuda_kernel_convol( 	  XFLOAT *d_A_real,
-										  XFLOAT *d_A_imag,
-										  XFLOAT *d_B_real,
-										  XFLOAT *d_B_imag,
-										  int image_size)
+__global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
+									 CUDACOMPLEX *d_B,
+									 int image_size)
 {
 	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
 	if(pixel<image_size)
 	{
-		XFLOAT tr =d_A_real[pixel];
-		XFLOAT ti =d_A_imag[pixel];
-		d_A_real[pixel] =   tr*d_B_real[pixel] + ti*d_B_imag[pixel];
-		d_A_imag[pixel] = - ti*d_B_real[pixel] + tr*d_B_imag[pixel];
+		XFLOAT tr =d_A[pixel].x;
+		XFLOAT ti =d_A[pixel].y;
+		d_A[pixel].x =   tr*d_B[pixel].x + ti*d_B[pixel].y;
+		d_A[pixel].y = - ti*d_B[pixel].x + tr*d_B[pixel].y;
 	}
 }

@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <signal.h>
 #include "src/projector.h"
+#include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_autopicker.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
@@ -307,18 +308,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
 
-	CudaGlobalPtr<RFLOAT >  d_Fmic_real(Fmic.nzyxdim, allocator);
-	CudaGlobalPtr<RFLOAT >  d_Fmic_imag(Fmic.nzyxdim, allocator);
-
-	d_Fmic_real.host_alloc();
-	d_Fmic_imag.host_alloc();
-	for(int i = 0; i < Fmic.nzyxdim; i++)
-	{
-		d_Fmic_real[i]=Fmic.data[i].real;
-		d_Fmic_imag[i]=Fmic.data[i].imag;
-	}
-	d_Fmic_real.put_on_device();
-	d_Fmic_imag.put_on_device();
+	CudaGlobalPtr< CUDACOMPLEX >  	d_Fmic     ((CUDACOMPLEX*)&Fmic.data[0], Fmic.nzyxdim, allocator);
+	d_Fmic.put_on_device();
 
 	CUDA_CPU_TIC("setupProjectors");
 	setupProjectors();
@@ -373,10 +364,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				Faux.initZeros(basePckr->downsize_mic, basePckr->downsize_mic/2 + 1);
 				CUDA_CPU_TOC("FauxInit");
 
-				CudaGlobalPtr<RFLOAT >  d_Faux_real(Faux.nzyxdim, allocator);
-				CudaGlobalPtr<RFLOAT >  d_Faux_imag(Faux.nzyxdim, allocator);
-				d_Faux_real.device_alloc();
-				d_Faux_imag.device_alloc();
+
+				CudaGlobalPtr<CUDACOMPLEX >  d_Faux((CUDACOMPLEX*)&Faux.data[0],Faux.nzyxdim, allocator);
+				d_Faux.device_alloc();
 
 				CUDA_CPU_TIC("get2DFourierTransform");
 				basePckr->PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
@@ -393,10 +383,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					CUDA_CPU_TOC("CtfCorr");
 				}
 
-				dim3 dim((int)ceilf((float)d_Faux_real.size/(float)BLOCK_SIZE));
+				dim3 dim((int)ceilf((float)d_Faux.size/(float)BLOCK_SIZE));
 				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
-																  d_Faux_real.d_ptr,
-																  d_Faux_imag.d_ptr,
+																  d_Faux.d_ptr,
 																  d_ctf.d_ptr,
 																  DEG2RAD(psi),
 																  projKernel
@@ -458,26 +447,23 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				}
 				CUDA_CPU_TOC("convol");
 
-				dim3 dim2( (int) ceilf(( float)d_Faux_real.size/(float)BLOCK_SIZE));
-				cuda_kernel_convol<<<dim2,BLOCK_SIZE>>>( 	  d_Faux_real.d_ptr,
-															  d_Faux_imag.d_ptr,
-															  d_Fmic_real.d_ptr,
-															  d_Fmic_imag.d_ptr,
+				dim3 dim2( (int) ceilf(( float)d_Faux.size/(float)BLOCK_SIZE));
+				cuda_kernel_convol<<<dim2,BLOCK_SIZE>>>( 	  d_Faux.d_ptr,
+															  d_Fmic.d_ptr,
 															  Faux.nzyxdim);
 
 
-				d_Faux_real.cp_to_host();
-				d_Faux_imag.cp_to_host();
+				d_Faux.cp_to_host();
 				HANDLE_ERROR(cudaStreamSynchronize(0));
 
 				std::cerr << " psi = " << psi << std::endl;
 
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
-//				{
-//					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << " " << d_Faux_real[n] << " " << d_Faux_imag[n] << " " << std::endl;
-//
-//				}
-//				exit(0);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+				{
+					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << " " << d_Faux[n].x << " " << d_Faux[n].y << " " << std::endl;
+
+				}
+				exit(0);
 
 				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);

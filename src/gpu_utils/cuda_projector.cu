@@ -5,7 +5,7 @@
 void CudaProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
-		int maxr, int paddingFactor)
+		int maxr, int paddingFactor, int channels)
 {
 	if (xdim == mdlX &&
 		ydim == mdlY &&
@@ -36,7 +36,12 @@ void CudaProjector::setMdlDim(
 	mdlImag = new cudaTextureObject_t();
 
 	// create channel to describe data type (bits,bits,bits,bits,type)
-	cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+	cudaChannelFormatDesc desc;
+
+	if(channels==1)
+		desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+	if(channels==2)
+		desc = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
 
 	struct cudaResourceDesc resDesc_real, resDesc_imag;
 	struct cudaTextureDesc  texDesc;
