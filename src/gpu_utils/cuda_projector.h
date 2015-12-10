@@ -47,7 +47,7 @@ public:
 	void setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
-			int maxr, int paddingFactor);
+			int maxr, int paddingFactor,int channels=1);
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);

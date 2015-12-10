@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <signal.h>
 #include "src/projector.h"
+#include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_autopicker.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
@@ -92,7 +93,7 @@ void AutoPickerCuda::setupProjectors()
 				basePckr->PPref[iref].r_max,
 				basePckr->PPref[iref].padding_factor);
 
-		cudaProjectors[iref].initMdl(basePckr->PPref[iref].data.data);
+		cudaProjectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
 	}
 }
 
@@ -307,6 +308,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
 
+	CudaGlobalPtr< CUDACOMPLEX >  	d_Fmic     ((CUDACOMPLEX*)&Fmic.data[0], Fmic.nzyxdim, allocator);
+	d_Fmic.put_on_device();
+
 	CUDA_CPU_TIC("setupProjectors");
 	setupProjectors();
 	CUDA_CPU_TOC("setupProjectors");
@@ -319,9 +323,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 		CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 								cudaProjectors[iref],
-								(int)basePckr->PPref[iref].data.xdim,
-								(int)basePckr->PPref[iref].data.ydim,
-								(int)basePckr->PPref[iref].data.xdim-1);
+								(int)Faux.xdim,
+								(int)Faux.ydim,
+								(int)Faux.xdim-1);
 
 		CUDA_CPU_TIC("OneReference");
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
@@ -360,10 +364,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				Faux.initZeros(basePckr->downsize_mic, basePckr->downsize_mic/2 + 1);
 				CUDA_CPU_TOC("FauxInit");
 
-				CudaGlobalPtr<RFLOAT >  d_Faux_real(Faux.nzyxdim, allocator);
-				CudaGlobalPtr<RFLOAT >  d_Faux_imag(Faux.nzyxdim, allocator);
-				d_Faux_real.device_alloc();
-				d_Faux_imag.device_alloc();
+
+				CudaGlobalPtr<CUDACOMPLEX >  d_Faux((CUDACOMPLEX*)&Faux.data[0],Faux.nzyxdim, allocator);
+				d_Faux.device_alloc();
 
 				CUDA_CPU_TIC("get2DFourierTransform");
 				basePckr->PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
@@ -380,20 +383,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					CUDA_CPU_TOC("CtfCorr");
 				}
 
-				dim3 dim((int)((int)d_Faux_real.size/(int)BLOCK_SIZE));
+				dim3 dim((int)ceilf((float)d_Faux.size/(float)BLOCK_SIZE));
 				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
-																  d_Faux_real.d_ptr,
-																  d_Faux_imag.d_ptr,
+																  d_Faux.d_ptr,
 																  d_ctf.d_ptr,
-																  psi,
-																  Faux.ydim,
-																  Faux.xdim,
+																  DEG2RAD(psi),
 																  projKernel
 															);
-
-				HANDLE_ERROR(cudaStreamSynchronize(0));
-				d_Faux_real.cp_to_host();
-				d_Faux_imag.cp_to_host();
 
 				if (is_first_psi)
 				{
@@ -450,6 +446,24 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
 				CUDA_CPU_TOC("convol");
+
+				dim3 dim2( (int) ceilf(( float)d_Faux.size/(float)BLOCK_SIZE));
+				cuda_kernel_convol<<<dim2,BLOCK_SIZE>>>( 	  d_Faux.d_ptr,
+															  d_Fmic.d_ptr,
+															  Faux.nzyxdim);
+
+
+				d_Faux.cp_to_host();
+				HANDLE_ERROR(cudaStreamSynchronize(0));
+
+				std::cerr << " psi = " << psi << std::endl;
+
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+				{
+					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << " " << d_Faux[n].x << " " << d_Faux[n].y << " " << std::endl;
+
+				}
+				exit(0);
 
 				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);

@@ -9,8 +9,10 @@
 
 #ifdef RELION_SINGLE_PRECISION
 #define RFLOAT float
+#define CUDACOMPLEX float2
 #else
 #define RFLOAT double
+#define CUDACOMPLEX double2
 #endif
 
 #define MAX_RESOL_SHARED_MEM 32
