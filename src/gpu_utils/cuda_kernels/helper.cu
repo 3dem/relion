@@ -1,5 +1,6 @@
 #include "src/gpu_utils/cuda_device_utils.cuh"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
+#include "src/gpu_utils/cuda_settings.h"
 
 __global__ void cuda_kernel_exponentiate_weights_coarse(
 		XFLOAT *g_pdf_orientation,
@@ -418,21 +419,33 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 			else
 				x = projector.maxR;
 		}
-		XFLOAT ref_real;
-		XFLOAT ref_imag;
-		XFLOAT sa, ca;
 
+		XFLOAT sa, ca;
 		sincos(psi, &sa, &ca);
 
-		projector.project2Dmodel(	 x,y,
-									 ca,
-									-sa,
-									 sa,
-									 ca,
-		 	 	 	 	 	 	 	 ref_real,ref_imag);
+#if(COMPLEXTEXTURE)
+			CUDACOMPLEX val;
+			projector.project2DComplexModel(	 x,y,
+										 ca,
+										-sa,
+										 sa,
+										 ca,
+										 val			   );
+			d_Faux[pixel].x =val.x*d_ctf[pixel];
+			d_Faux[pixel].y =val.y*d_ctf[pixel];
+#else
+			XFLOAT ref_real, ref_imag;
+			projector.project2Dmodel(	 x,y,
+										 ca,
+										-sa,
+										 sa,
+										 ca,
+										 ref_real, ref_imag);
 
-		d_Faux[pixel].x =ref_real*d_ctf[pixel];
-		d_Faux[pixel].y =ref_imag*d_ctf[pixel];
+			d_Faux[pixel].x =ref_real*d_ctf[pixel];
+			d_Faux[pixel].y =ref_imag*d_ctf[pixel];
+#endif
+
 	}
 }
 

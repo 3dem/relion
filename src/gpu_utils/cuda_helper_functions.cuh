@@ -293,7 +293,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	CudaGlobalPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
 	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
 
-	img_in.host_alloc();
+//	img_in.host_alloc();
 	for (unsigned i = 0; i < img_in.getSize(); i ++)
 		img_in[i] = (XFLOAT) v.data[i];
 
@@ -357,7 +357,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 										  xshift,
 										  yshift);
 
-		img_aux.host_alloc();
+//		img_aux.host_alloc();
 		img_aux.cp_to_host();
 
 		HANDLE_ERROR(cudaStreamSynchronize(0));

@@ -25,6 +25,23 @@ public:
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
+	PROJECTOR_PTR_TYPE mdlComplex;
+
+	CudaProjectorKernel(
+			int mdlX, int mdlY, int mdlZ,
+			int imgX, int imgY,
+			int mdlInitY, int mdlInitZ,
+			int padding_factor,
+			int maxR,
+			PROJECTOR_PTR_TYPE mdlComplex
+			):
+			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
+			imgX(imgX), imgY(imgY),
+			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
+			padding_factor(padding_factor),
+			maxR(maxR), maxR2(maxR*maxR),
+			mdlComplex(mdlComplex)
+		{};
 
 	CudaProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
@@ -34,13 +51,13 @@ public:
 			int maxR,
 			PROJECTOR_PTR_TYPE mdlReal, PROJECTOR_PTR_TYPE mdlImag
 			):
-			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
-			imgX(imgX), imgY(imgY),
-			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
-			padding_factor(padding_factor),
-			maxR(maxR), maxR2(maxR*maxR),
-			mdlReal(mdlReal), mdlImag(mdlImag)
-		{};
+				mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
+				imgX(imgX), imgY(imgY),
+				mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
+				padding_factor(padding_factor),
+				maxR(maxR), maxR2(maxR*maxR),
+				mdlReal(mdlReal), mdlImag(mdlImag)
+			{};
 
 	__device__ __forceinline__ void project3Dmodel(
 			int x,
@@ -230,28 +247,69 @@ public:
 			}
 		}
 
+#if(COMPLEXTEXTURE)
+	__device__ __forceinline__ void project2DComplexModel(
+				int x,
+				int y,
+				XFLOAT e0,
+				XFLOAT e1,
+				XFLOAT e3,
+				XFLOAT e4,
+				CUDACOMPLEX &val)
+		{
+			int r2;
+
+			r2 = x*x + y*y;
+			if (r2 <= maxR2)
+			{
+				XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+				XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+
+				if (xp < 0)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					xp = -xp;
+					yp = -yp;
+					yp -= mdlInitY;
+
+					val =   tex2D<CUDACOMPLEX>(mdlComplex, xp + 0.5f, yp + 0.5f);
+				}
+				else
+				{
+					yp -= mdlInitY;
+					val =   tex2D<CUDACOMPLEX>(mdlComplex, xp + 0.5f, yp + 0.5f);
+				}
+			}
+			else
+			{
+				val.x=(XFLOAT)0;
+				val.y=(XFLOAT)0;
+			}
+		}
+#endif
 
 	static CudaProjectorKernel makeKernel(CudaProjector &p, int imgX, int imgY, int imgMaxR)
 	{
 		int maxR = p.mdlMaxR >= imgMaxR ? imgMaxR : p.mdlMaxR;
 
 		CudaProjectorKernel k(
-				p.mdlX, p.mdlY, p.mdlZ,
-		        imgX, imgY,
-		        p.mdlInitY, p.mdlInitZ,
-			    p.padding_factor,
-			    maxR,
-
-#ifndef CUDA_NO_TEXTURES
-			    *p.mdlReal,
-			    *p.mdlImag
+					p.mdlX, p.mdlY, p.mdlZ,
+					imgX, imgY,
+					p.mdlInitY, p.mdlInitZ,
+					p.padding_factor,
+					maxR,
+#if(COMPLEXTEXTURE)
+					*p.mdlComplex
 #else
-				p.mdlReal,
-				p.mdlImag
+#ifndef CUDA_NO_TEXTURES
+					*p.mdlReal,
+					*p.mdlImag
+#else
+					p.mdlReal,
+					p.mdlImag
 #endif
-
+#endif
 				);
-
 		return k;
 	}
 };
