@@ -14,6 +14,7 @@
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
 #include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_fft.h"
 
 #include "src/complex.h"
 
@@ -135,6 +136,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	RFLOAT sum_ref_under_circ_mask, sum_ref2_under_circ_mask;
 	int my_skip_side = basePckr->autopick_skip_side + basePckr->particle_size/2;
 	CTF ctf;
+
+	CudaFFT cudaTransformer(0, allocator);
 
 	int min_distance_pix = ROUND(basePckr->min_particle_distance / basePckr->angpix);
 
@@ -458,29 +461,58 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 				std::cerr << " psi = " << psi << std::endl;
 
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
-				{
-					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << " " << d_Faux[n].x << " " << d_Faux[n].y << " " << std::endl;
-
-				}
-				exit(0);
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+//				{
+//					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << " " << d_Faux[n].x << " " << d_Faux[n].y << " " << std::endl;
+//
+//				}
+//				exit(0);
 
 				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
 				CUDA_CPU_TOC("windowFourierTransform_1");
 
-				CUDA_CPU_TIC("inverseFourierTransform_1");
-				CUDA_CPU_TIC("setReal");
-				transformer.setReal(Maux);
-				CUDA_CPU_TOC("setReal");
-				CUDA_CPU_TIC("setFourier");
-				transformer.setFourier(Faux2);
-				CUDA_CPU_TOC("setFourier");
-				CUDA_CPU_TIC("Transform");
-				transformer.Transform(1); // -1 == forward  ;  +1 == backward
-				CUDA_CPU_TOC("Transform");
+//				CUDA_CPU_TIC("inverseFourierTransform_1");
+//				CUDA_CPU_TIC("setReal");
+//				transformer.setReal(Maux);
+//				CUDA_CPU_TOC("setReal");
+//				CUDA_CPU_TIC("setFourier");
+//				transformer.setFourier(Faux2);
+//				CUDA_CPU_TOC("setFourier");
+//				CUDA_CPU_TIC("Transform");
+//				transformer.Transform(1); // -1 == forward  ;  +1 == backward
+//				CUDA_CPU_TOC("Transform");
 //				transformer.inverseFourierTransform(Faux2, Maux);
-				CUDA_CPU_TOC("inverseFourierTransform_1");
+//				CUDA_CPU_TOC("inverseFourierTransform_1");
+
+				CUDA_CPU_TIC("CudaInverseFourierTransform_1");
+				cudaTransformer.setSize(Maux.xdim, Maux.ydim);
+
+				if (&cudaTransformer.fouriers[0] == NULL)
+					cudaTransformer.fouriers.host_alloc();
+				for (int i = 0; i < Faux2.nzyxdim; i ++)
+				{
+					cudaTransformer.fouriers[i].x = Faux2.data[i].real;
+					cudaTransformer.fouriers[i].y = Faux2.data[i].imag;
+				}
+				cudaTransformer.fouriers.cp_to_device();
+
+				cudaTransformer.backward();
+
+				if (&cudaTransformer.reals[0] == NULL)
+					cudaTransformer.reals.host_alloc();
+				cudaTransformer.reals.cp_to_host();
+				cudaTransformer.reals.streamSync();
+				for (int i = 0; i < Faux2.nzyxdim; i ++)
+					Maux.data[i] = (RFLOAT) cudaTransformer.reals[i];
+
+				CUDA_CPU_TOC("CudaInverseFourierTransform_1");
+
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
+//				{
+//					std::cerr << Maux.data[n] << " " << cudaTransformer.reals[n] << " " << std::endl;
+//				}
+//				exit(0);
 
 				CUDA_CPU_TIC("runCenterFFT_1");
 				runCenterFFT(Maux, false, allocator);
@@ -544,10 +576,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
-				{
-					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
-				}
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+//				{
+//					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
+//				}
 
 			} // end if do_write_fom_maps
 
