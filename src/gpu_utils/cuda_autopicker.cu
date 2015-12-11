@@ -368,7 +368,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				CUDA_CPU_TOC("FauxInit");
 
 
-				CudaGlobalPtr<CUDACOMPLEX >  d_Faux((CUDACOMPLEX*)&Faux.data[0],Faux.nzyxdim, allocator);
+				CudaGlobalPtr<CUDACOMPLEX >  d_Faux(Faux.nzyxdim, allocator);
+				d_Faux.host_alloc();
 				d_Faux.device_alloc();
 
 				CUDA_CPU_TIC("get2DFourierTransform");
