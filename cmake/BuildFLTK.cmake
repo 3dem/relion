@@ -1,5 +1,5 @@
 message(STATUS "-------------------------------------------------")   
-message(STATUS "------------- WILL USE OWN FLTK LIBS ------------")  
+message(STATUS "-------- WILL USE LOCALY BUILT FLTK LIBS --------")  
 message(STATUS "-------------------------------------------------") 
 
 set(FLTK_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fltk")

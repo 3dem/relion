@@ -134,7 +134,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_REL
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_PROFILING "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_PROFILING "${RELION_NVCC_FLAGS} --disable-warnings -lineinfo" CACHE STRING "")
+set(RELION_NVCC_FLAGS_PROFILING "${RELION_NVCC_FLAGS} -lineinfo" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_PROFILING  "")
 

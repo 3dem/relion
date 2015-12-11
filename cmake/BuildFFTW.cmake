@@ -1,5 +1,5 @@
 message(STATUS "-------------------------------------------------")   
-message(STATUS "------------- WILL USE OWN FFTW LIBS ------------")  
+message(STATUS "-------- WILL USE LOCALY BUILT FFTW LIBS --------")  
 message(STATUS "-------------------------------------------------") 
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
