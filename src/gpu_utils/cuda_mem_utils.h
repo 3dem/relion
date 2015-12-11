@@ -96,6 +96,22 @@ void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t &stream)
 	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( des, src, size * sizeof(T), cudaMemcpyDeviceToDevice, stream));
 };
 
+template< typename T>
+static inline
+void cudaMemInit( T *ptr, int value, size_t size)
+{
+	DEBUG_HANDLE_ERROR(cudaMemset( ptr, value, size * sizeof(T)));
+};
+
+template< typename T>
+static inline
+void cudaMemInit( T *ptr, int value, size_t size, cudaStream_t &stream)
+{
+	DEBUG_HANDLE_ERROR(cudaMemsetAsync( ptr, value, size * sizeof(T), stream));
+};
+
+
+
 
 
 
@@ -838,7 +854,7 @@ public:
 		if (d_ptr == 0)
 			printf("DEBUG_WARNING: Memset requested before allocation in device_init().\n");
 #endif
-		DEBUG_HANDLE_ERROR(cudaMemsetAsync( d_ptr, value, size * sizeof(T), stream));
+		cudaMemInit<T>( d_ptr, value, size, stream);
 	}
 
 	/**

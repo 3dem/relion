@@ -281,8 +281,58 @@ void windowFourierTransform2(
 		XFLOAT *d_out_real,
 		XFLOAT *d_out_imag,
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
-		unsigned oX, unsigned oY, unsigned oZ  //Output dimensions
-		);
+		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
+		cudaStream_t stream = 0);
+
+#define WINDOW_FT_BLOCK_SIZE 128
+template<bool check_max_r2>
+__global__ void cuda_kernel_window_fourier_transform(
+		CUDACOMPLEX *g_in,
+		CUDACOMPLEX *g_out,
+		unsigned iX, unsigned iY, unsigned iZ, unsigned iYX, //Input dimensions
+		unsigned oX, unsigned oY, unsigned oZ, unsigned oYX, //Output dimensions
+		unsigned max_idx,
+		unsigned max_r2 = 0
+		)
+{
+	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
+	if (n >= max_idx) return;
+
+	int k, i, kp, ip, jp;
+
+	if (check_max_r2)
+	{
+		k = n / (iX * iY);
+		i = (n % (iX * iY)) / iX;
+
+		kp = k < iX ? k : k - iZ;
+		ip = i < iX ? i : i - iY;
+		jp = n % iX;
+
+		if (kp*kp + ip*ip + jp*jp > max_r2)
+			return;
+	}
+	else
+	{
+		k = n / (oX * oY);
+		i = (n % (oX * oY)) / oX;
+
+		kp = k < oX ? k : k - oZ;
+		ip = i < oX ? i : i - oY;
+		jp = n % oX;
+	}
+
+	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp].x = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp].x;
+	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp].y = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp].y;
+}
+
+void windowFourierTransform2(
+		CUDACOMPLEX *d_in,
+		CUDACOMPLEX *d_out,
+		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
+		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
+		cudaStream_t stream = 0);
+
 
 void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);

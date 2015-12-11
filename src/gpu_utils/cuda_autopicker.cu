@@ -472,6 +472,30 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
 				CUDA_CPU_TOC("windowFourierTransform_1");
 
+				CudaGlobalPtr<CUDACOMPLEX >  d_in((CUDACOMPLEX*)&Faux.data[0],Faux.nzyxdim, allocator);
+				CudaGlobalPtr<CUDACOMPLEX >  d_out(Faux2.nzyxdim, allocator);
+
+				d_in.put_on_device();
+				d_out.device_alloc();
+
+				windowFourierTransform2(
+						~d_in,
+						~d_out,
+						Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
+						Faux2.xdim, Faux2.ydim, Faux2.zdim  //Output dimensions
+						);
+
+				d_out.host_alloc();
+				d_out.cp_to_host();
+
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux2)
+//				{
+//					std::cerr << Faux2.data[n].real << " " << Faux2.data[n].imag << " " << d_out[n].x << " " << d_out[n].y << " " << std::endl;
+//
+//				}
+//				exit(0);
+
+
 //				CUDA_CPU_TIC("inverseFourierTransform_1");
 //				CUDA_CPU_TIC("setReal");
 //				transformer.setReal(Maux);

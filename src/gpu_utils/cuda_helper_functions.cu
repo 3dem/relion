@@ -675,7 +675,8 @@ void windowFourierTransform2(
 		XFLOAT *d_out_real,
 		XFLOAT *d_out_imag,
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
-		unsigned oX, unsigned oY, unsigned oZ  //Output dimensions
+		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
+		cudaStream_t stream
 		)
 {
 	if (iX > 1 && iY/2 + 1 != iX)
@@ -684,12 +685,15 @@ void windowFourierTransform2(
 	if (oY == iX)
 		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
 
+	cudaMemInit<XFLOAT>( d_out_real, 0, (size_t) oX*oY*oZ, stream );
+	cudaMemInit<XFLOAT>( d_out_imag, 0, (size_t) oX*oY*oZ, stream );
+
 	if (oY > iX)
 	{
 		long int max_r2 = (iX - 1) * (iX - 1);
 
 		unsigned grid_dim = ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE);
-		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE >>>(
+		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream  >>>(
 				d_in_real,
 				d_in_imag,
 				d_out_real,
@@ -702,11 +706,51 @@ void windowFourierTransform2(
 	else
 	{
 		unsigned grid_dim = ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE);
-		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE >>>(
+		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream  >>>(
 				d_in_real,
 				d_in_imag,
 				d_out_real,
 				d_out_imag,
+				iX, iY, iZ, iX * iY, //Input dimensions
+				oX, oY, oZ, oX * oY, //Output dimensions
+				oX*oY*oZ);
+	}
+}
+
+void windowFourierTransform2(
+		CUDACOMPLEX *d_in,
+		CUDACOMPLEX *d_out,
+		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
+		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
+		cudaStream_t stream)
+{
+	if (iX > 1 && iY/2 + 1 != iX)
+		REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
+
+	if (oY == iX)
+		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
+
+	cudaMemInit<CUDACOMPLEX>( d_out, 0, (size_t) oX*oY*oZ, stream );
+
+	if (oY > iX)
+	{
+		long int max_r2 = (iX - 1) * (iX - 1);
+
+		unsigned grid_dim = ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE);
+		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
+				d_in,
+				d_out,
+				iX, iY, iZ, iX * iY, //Input dimensions
+				oX, oY, oZ, oX * oY, //Output dimensions
+				iX*iY*iZ,
+				max_r2 );
+	}
+	else
+	{
+		unsigned grid_dim = ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE);
+		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
+				d_in,
+				d_out,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ);
