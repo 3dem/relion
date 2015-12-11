@@ -422,29 +422,16 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 
 		XFLOAT sa, ca;
 		sincos(psi, &sa, &ca);
+		CUDACOMPLEX val;
 
-#if(COMPLEXTEXTURE)
-			CUDACOMPLEX val;
-			projector.project2DComplexModel(	 x,y,
-										 ca,
-										-sa,
-										 sa,
-										 ca,
-										 val			   );
-			d_Faux[pixel].x =val.x*d_ctf[pixel];
-			d_Faux[pixel].y =val.y*d_ctf[pixel];
-#else
-			XFLOAT ref_real, ref_imag;
-			projector.project2Dmodel(	 x,y,
-										 ca,
-										-sa,
-										 sa,
-										 ca,
-										 ref_real, ref_imag);
-
-			d_Faux[pixel].x =ref_real*d_ctf[pixel];
-			d_Faux[pixel].y =ref_imag*d_ctf[pixel];
-#endif
+		projector.project2Dmodel(	 x,y,
+									 ca,
+									-sa,
+									 sa,
+									 ca,
+									 val.x,val.y);
+		d_Faux[pixel].x =val.x*d_ctf[pixel];
+		d_Faux[pixel].y =val.y*d_ctf[pixel];
 
 	}
 }

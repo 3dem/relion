@@ -96,8 +96,6 @@ __global__ void cuda_kernel_diff2_coarse(
 						s_eulers[i*9+1],
 						s_eulers[i*9+3],
 						s_eulers[i*9+4],
-						s_eulers[i*9+6],
-						s_eulers[i*9+7],
 						s_ref_real[eulers_per_block * (tid/prefetch_fraction) + i],
 						s_ref_imag[eulers_per_block * (tid/prefetch_fraction) + i]);
 			}
@@ -228,7 +226,6 @@ __global__ void cuda_kernel_diff2_fine(
 						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
-						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
 						ref_real, ref_imag);
 
 				XFLOAT diff_real;
@@ -335,7 +332,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 			else
 				projector.project2Dmodel(
 					x,y,
-					e0,e1,e3,e4,e6,e7,
+					e0,e1,e3,e4,
 					ref_real, ref_imag);
 
 			for (int itrans = 0; itrans < translation_num; itrans ++)
@@ -449,7 +446,6 @@ __global__ void cuda_kernel_diff2_CC_fine(
 						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
-						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
 						ref_real, ref_imag);
 
 				XFLOAT diff_real;
