@@ -1,5 +1,6 @@
 #include "src/gpu_utils/cuda_device_utils.cuh"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
+#include "src/gpu_utils/cuda_settings.h"
 
 __global__ void cuda_kernel_exponentiate_weights_coarse(
 		XFLOAT *g_pdf_orientation,
@@ -303,4 +304,148 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 			}
 
 		}
+}
+
+__global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
+										 XFLOAT *img_out,
+										 long int image_size,
+										 long int xdim,
+										 long int ydim,
+										 long int xshift,
+										 long int yshift)
+{
+	long int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
+
+//	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
+//	{
+		if(pixel<image_size)
+		{
+			int y = floorfracf(pixel,xdim);
+			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
+
+			int yp = y + yshift;
+			if (yp < 0)
+				yp += ydim;
+			else if (yp >= ydim)
+				yp -= ydim;
+
+			int xp = x + xshift;
+			if (xp < 0)
+				xp += xdim;
+			else if (xp >= xdim)
+				xp -= xdim;
+
+			long int n_pixel = yp*xdim + xp;
+
+			img_out[n_pixel] = __ldg(&img_in[pixel]);
+		}
+//	}
+}
+
+__global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
+										XFLOAT *d_Mpsi,
+										XFLOAT *d_Maux,
+										XFLOAT *d_Mmean,
+										XFLOAT *d_Mstddev,
+										long int image_size,
+										XFLOAT normfft,
+										XFLOAT sum_ref_under_circ_mask,
+										XFLOAT sum_ref2_under_circ_mask,
+										XFLOAT expected_Pratio,
+										XFLOAT psi)
+{
+	/* PLAN TO:
+	 *
+	 * 1) Pre-filter
+	 * 		d_Mstddev[i] = 1 / (2*d_Mstddev[i])   ( if d_Mstddev[pixel] > 1E-10 )
+	 * 		d_Mstddev[i] = 1    				  ( else )
+	 *
+	 * 2) Set
+	 * 		sum_ref2_under_circ_mask /= 2.
+	 *
+	 * 3) Total expression becomes
+	 * 		diff2 = ( exp(k) - 1.f ) / (expected_Pratio - 1.f)
+	 * 	  where
+	 * 	  	k = (normfft * d_Maux[pixel] + d_Mmean[pixel] * sum_ref_under_circ_mask)*d_Mstddev[i] + sum_ref2_under_circ_mask
+	 *
+	 */
+
+	long int pixel = threadIdx.x + blockIdx.x*PROBRATIO_BLOCK_SIZE;
+
+	if(pixel<image_size)
+	{
+		XFLOAT diff2 = normfft * d_Maux[pixel];
+		diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
+
+		if (d_Mstddev[pixel] > 1E-10)
+			diff2 /= d_Mstddev[pixel];
+		diff2 += sum_ref2_under_circ_mask;
+
+#if defined(CUDA_DOUBLE_PRECISION)
+		diff2 = exp(-diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
+#else
+		diff2 = expf(-diff2 / 2.f);
+#endif
+
+		// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
+		diff2 = (diff2 - 1.f) / (expected_Pratio - 1.f);
+		if (diff2 > d_Mccf[pixel])
+		{
+			d_Mccf[pixel] = diff2;
+			d_Mpsi[pixel] = psi;
+		}
+	}
+
+}
+
+//__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+//						  	  	  	  	  XFLOAT *d_ctf,
+//						  	  	  	  	  XFLOAT psi,
+//						  	  			  CudaProjectorKernel projector)
+//{
+//
+//	int image_size=projector.imgX*projector.imgY;
+//	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+//	if(pixel<image_size)
+//	{
+//		int y = floorfracf(pixel,projector.imgX);
+//		int x = pixel % projector.imgX;
+//
+//		if (y > projector.maxR)
+//		{
+//			if (y >= projector.imgY - projector.maxR)
+//				y = y - projector.imgY;
+//			else
+//				x = projector.maxR;
+//		}
+//
+//		XFLOAT sa, ca;
+//		sincos(psi, &sa, &ca);
+//		CUDACOMPLEX val;
+//
+//		projector.project2Dmodel(	 x,y,
+//									 ca,
+//									-sa,
+//									 sa,
+//									 ca,
+//									 val.x,val.y);
+//		d_Faux[pixel].x =val.x*d_ctf[pixel];
+//		d_Faux[pixel].y =val.y*d_ctf[pixel];
+//
+//	}
+//}
+
+__global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
+									 CUDACOMPLEX *d_B,
+									 int image_size)
+{
+	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<image_size)
+	{
+		XFLOAT tr =d_A[pixel].x;
+		XFLOAT ti =d_A[pixel].y;
+		d_A[pixel].x =   tr*d_B[pixel].x + ti*d_B[pixel].y;
+		d_A[pixel].y = - ti*d_B[pixel].x + tr*d_B[pixel].y;
+	}
 }

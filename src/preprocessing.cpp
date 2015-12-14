@@ -468,8 +468,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_coord)
 	long int my_current_nr_images = 0;
 	RFLOAT all_avg = 0;
 	RFLOAT all_stddev = 0;
-	RFLOAT all_minval = 99.e99;
-	RFLOAT all_maxval = -99.e99;
+	RFLOAT all_minval = LARGE_NUMBER;
+	RFLOAT all_maxval = -LARGE_NUMBER;
 
 	// To deal with default movie_last_frame value
 	if (movie_last_frame < 0)
@@ -688,8 +688,8 @@ void Preprocessing::runOperateOnInputFile(FileName fn_operate_on)
 
 	RFLOAT all_avg = 0;
 	RFLOAT all_stddev = 0;
-	RFLOAT all_minval = 99.e99;
-	RFLOAT all_maxval = -99.e99;
+	RFLOAT all_minval = LARGE_NUMBER;
+	RFLOAT all_maxval = -LARGE_NUMBER;
 	init_progress_bar(Nimg);
 	int barstep = XMIPP_MAX(1, Nimg / 120);
 	for (long int i = 0; i < Nimg; i++)

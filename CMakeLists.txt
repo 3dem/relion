@@ -10,6 +10,27 @@ project(Relion)
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# ------------------------------------------------------------------RPATH SETTINGS--
+# use, i.e. don't skip the full RPATH for the build tree
+SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
+
+# when building, don't use the install RPATH already
+# (but later on when installing)
+SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
+
+SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+
+# add the automatically determined parts of the RPATH
+# which point to directories outside the build tree to the install RPATH
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+
+# the RPATH to be used when installing, but only if it's not a system directory
+LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+IF("${isSystemDir}" STREQUAL "-1")
+   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+ENDIF("${isSystemDir}" STREQUAL "-1")
+
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
 if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
@@ -45,7 +66,7 @@ else(NOT DEFINED CUDA_ARCH)
 endif(NOT DEFINED CUDA_ARCH)
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
-option(DoublePrec_CPU "DoublePrec_CPU" OFF)
+option(DoublePrec_CPU "DoublePrec_CPU" ON)
 if(DoublePrec_CPU)
     message(STATUS "Setting cpu precision to double")    
 else(DoublePrec_CPU)
@@ -137,33 +158,28 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-option(OWN_FLTK "OWN_FLTK" OFF)
+option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
 # --------------------------------------------------------------------------X11/FLTK--
 FIND_PACKAGE(X11)
 if(GUI)
-
     if(X11_FOUND)
         set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
-        if(OWN_FLTK)
-            include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
-        else()
+        if(NOT FORCE_OWN_FLTK)
             FIND_PACKAGE(FLTK)
-        endif()
+		    if(FLTK_FOUND)
+				message(STATUS "X11 and FLTK were found")
+				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
+		    else()
+		        message(STATUS "FLTK was NOT found")
+		    endif() 
+        endif(NOT FORCE_OWN_FLTK)
         
-        if(FLTK_FOUND)
-            message(STATUS "Both X11 and FLTK found, will compile GUI targets.")
-        else()
-            message( STATUS "\n-- ------------------ YOU HAVE NO FLTK-LIBS ------------------")
-            message( STATUS "CCmake found no fltk-libs on your system, which are required for the GUI. Either ")
-            message( STATUS "     a) Make sure cmake can find them ")
-            message( STATUS "     b) Add the flag -DOWN_FLTK=ON to your cmake command to build a local fltk-lib")
-            message( STATUS "     c) Add the flag -DGUI=OFF to avoid using fltk" )
-            message( STATUS "--------------------------------------------------------")
-        	message( FATAL_ERROR "FLTK is required for GUI." )
-        endif() 
+		if(NOT FLTK_FOUND)
+        	include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+        endif(NOT FLTK_FOUND)
     else(X11_FOUND)
         message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
-        message( STATUS "CCmake found no fltk-libs on your system, which are required for the GUI.")
+        message( STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
         message( STATUS " You CAN add the flag -DGUI=OFF to avoid using X11" )
         message(FATAL_ERROR "X11 is required for GUI.")
     endif(X11_FOUND)
@@ -171,8 +187,36 @@ if(GUI)
 endif(GUI)    
     
 # ------------------------------------------------------------------------------FFTW--
-option(OWN_FFTW "OWN_FFT" OFF)
-FIND_PACKAGE(FFTW REQUIRED)
+option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+
+if(NOT FORCE_OWN_FFTW)
+	FIND_PACKAGE(FFTW)
+endif(NOT FORCE_OWN_FFTW)
+	
+if(NOT FFTW_FOUND)
+	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
+endif(NOT FFTW_FOUND)
+
+# ----------------------------------------------------------------------COPY SCRIPTS--
+
+list(APPEND RELION_SCRIPT_FILES star_printtable 
+                                star_plottable
+                                star_loopheader
+                                star_datablock_stack
+                                star_datablock_singlefiles
+                                star_datablock_ctfdat
+                                qsub.csh)
+
+add_custom_target(copy_scripts ALL)
+                                
+foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
+    add_custom_command(TARGET copy_scripts POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E
+                     copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} 
+                     ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
+    install(FILES ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} DESTINATION bin)
+endforeach()
+
 
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)

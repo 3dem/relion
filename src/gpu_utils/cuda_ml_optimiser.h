@@ -431,9 +431,6 @@ public:
 	// transformer as holder for reuse of fftw_plans
 	FourierTransformer transformer;
 
-	//Used for precalculations of projection setup
-	CudaCustomAllocator *allocator;
-
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
 
@@ -466,8 +463,6 @@ public:
 
 		for (int i = 0; i < classStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
-
-
 	}
 
 };

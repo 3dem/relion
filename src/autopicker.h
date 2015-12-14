@@ -30,6 +30,12 @@ class AutoPicker
 {
 public:
 
+	// For GPU-acceleration
+	void* cudaPicker;
+	// Available memory (in Gigabyte)
+	RFLOAT available_memory;
+	RFLOAT available_gpu_memory;
+
 	// I/O Parser
 	IOParser parser;
 
@@ -84,6 +90,9 @@ public:
 	// Correct the references for CTF effects?
 	bool do_ctf;
 
+	// use GPU hardware?
+	bool do_gpu;
+
 	// Keep the CTFs unchanged until the first peak?
 	bool intact_ctf_first_peak;
 
@@ -115,6 +124,12 @@ public:
 	MultidimArray<Complex > Fmsk, Finvmsk;
 
 public:
+
+	AutoPicker():
+		available_memory(0),
+		available_gpu_memory(0)
+	{}
+
 	// Read command line arguments
 	void read(int argc, char **argv);
 
@@ -128,8 +143,6 @@ public:
 	void run();
 
 	void autoPickOneMicrograph(FileName &fn_mic);
-
-private:
 
 	// Uses Roseman2003 formulae to calculate stddev under the mask through FFTs
 	// The FFTs of the micrograph (Fmic), micrograph-squared (Fmic2) and the mask (Fmsk) need to be provided at downsize_mic
@@ -148,7 +161,6 @@ private:
 
 	// Only keep those peaks that are at the given distance apart from each other
 	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance);
-
 
 };
 

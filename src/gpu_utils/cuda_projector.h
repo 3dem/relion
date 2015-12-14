@@ -15,9 +15,17 @@ class CudaProjector
 	    padding_factor;
 
 #ifndef CUDA_NO_TEXTURES
+
+#if(COMPLEXTEXTURE)
+	XFLOAT *texArrayComplex2D;
+	cudaArray_t *texArrayComplex;
+	cudaTextureObject_t *mdlComplex;
+#else
 	XFLOAT *texArrayReal2D, *texArrayImag2D;
 	cudaArray_t *texArrayReal, *texArrayImag;
 	cudaTextureObject_t *mdlReal, *mdlImag;
+#endif
+
 	size_t pitch2D;
 #else
 	XFLOAT *mdlReal, *mdlImag;
@@ -31,12 +39,19 @@ public:
 			padding_factor(0)
 	{
 #ifndef CUDA_NO_TEXTURES
+
+#if(COMPLEXTEXTURE)
+		texArrayComplex2D = 0;
+		texArrayComplex = 0;
+		mdlComplex = 0;
+#else
 		texArrayReal2D = 0;
 		texArrayImag2D = 0;
 		texArrayReal = 0;
 		texArrayImag = 0;
 		mdlReal = 0;
 		mdlImag = 0;
+#endif
 		pitch2D = 0;
 #else
 		mdlReal = 0;
