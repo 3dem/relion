@@ -388,12 +388,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				}
 
 				dim3 dim((int)ceilf((float)d_Faux.size/(float)BLOCK_SIZE));
-				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
-																  d_Faux.d_ptr,
-																  d_ctf.d_ptr,
-																  DEG2RAD(psi),
-																  projKernel
-															);
+//				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
+//																  d_Faux.d_ptr,
+//																  d_ctf.d_ptr,
+//																  DEG2RAD(psi),
+//																  projKernel
+//															);
 
 				if (is_first_psi)
 				{

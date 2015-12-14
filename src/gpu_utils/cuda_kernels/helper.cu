@@ -399,42 +399,42 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 
 }
 
-__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
-						  	  	  	  	  XFLOAT *d_ctf,
-						  	  	  	  	  XFLOAT psi,
-						  	  			  CudaProjectorKernel projector)
-{
-
-	int image_size=projector.imgX*projector.imgY;
-	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
-	if(pixel<image_size)
-	{
-		int y = floorfracf(pixel,projector.imgX);
-		int x = pixel % projector.imgX;
-
-		if (y > projector.maxR)
-		{
-			if (y >= projector.imgY - projector.maxR)
-				y = y - projector.imgY;
-			else
-				x = projector.maxR;
-		}
-
-		XFLOAT sa, ca;
-		sincos(psi, &sa, &ca);
-		CUDACOMPLEX val;
-
-		projector.project2Dmodel(	 x,y,
-									 ca,
-									-sa,
-									 sa,
-									 ca,
-									 val.x,val.y);
-		d_Faux[pixel].x =val.x*d_ctf[pixel];
-		d_Faux[pixel].y =val.y*d_ctf[pixel];
-
-	}
-}
+//__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+//						  	  	  	  	  XFLOAT *d_ctf,
+//						  	  	  	  	  XFLOAT psi,
+//						  	  			  CudaProjectorKernel projector)
+//{
+//
+//	int image_size=projector.imgX*projector.imgY;
+//	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+//	if(pixel<image_size)
+//	{
+//		int y = floorfracf(pixel,projector.imgX);
+//		int x = pixel % projector.imgX;
+//
+//		if (y > projector.maxR)
+//		{
+//			if (y >= projector.imgY - projector.maxR)
+//				y = y - projector.imgY;
+//			else
+//				x = projector.maxR;
+//		}
+//
+//		XFLOAT sa, ca;
+//		sincos(psi, &sa, &ca);
+//		CUDACOMPLEX val;
+//
+//		projector.project2Dmodel(	 x,y,
+//									 ca,
+//									-sa,
+//									 sa,
+//									 ca,
+//									 val.x,val.y);
+//		d_Faux[pixel].x =val.x*d_ctf[pixel];
+//		d_Faux[pixel].y =val.y*d_ctf[pixel];
+//
+//	}
+//}
 
 __global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
 									 CUDACOMPLEX *d_B,
