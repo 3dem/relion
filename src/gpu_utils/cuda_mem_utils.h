@@ -887,6 +887,19 @@ public:
 	}
 
 	/**
+	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
+	 */
+	inline
+	void cp_on_device(T * devPtr)
+	{
+#ifdef DEBUG_CUDA
+		if (h_ptr != 0)
+			printf("DEBUG_WARNING: Host pointer already set in call to cp_to_device(hostPtr).\n");
+#endif
+		cudaCpyDeviceToDevice(d_ptr, devPtr, size, stream);
+	}
+
+	/**
 	 * alloc and copy
 	 */
 	inline

@@ -132,6 +132,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
 	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf;
+	CudaGlobalPtr<XFLOAT > d_Maux;
 	FourierTransformer transformer;
 	RFLOAT sum_ref_under_circ_mask, sum_ref2_under_circ_mask;
 	int my_skip_side = basePckr->autopick_skip_side + basePckr->particle_size/2;
@@ -540,7 +541,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 //				exit(0);
 
 				CUDA_CPU_TIC("runCenterFFT_1");
-				runCenterFFT(Maux, false, allocator);
+//				runCenterFFT(Maux, false, allocator);
+				runCenterFFT(cudaTransformer.reals,
+						     (int)cudaTransformer.xSize,
+						     (int)cudaTransformer.ySize,
+							 false,
+							 allocator);
 				CUDA_CPU_TOC("runCenterFFT_1");
 
 				// Calculate ratio of prabilities P(ref)/P(zero)
@@ -552,7 +558,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 				runProbRatio(Mccf_best,
 							 Mpsi_best,
-							 Maux,
+							 cudaTransformer.reals,
 							 Mmean,
 							 Mstddev,
 							 normfft,
