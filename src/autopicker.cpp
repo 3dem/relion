@@ -28,9 +28,10 @@ void AutoPicker::read(int argc, char **argv)
 
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "Micrograph STAR file OR filenames from which to autopick particles, e.g. \"Micrographs/*.mrc\"");
-	fn_out = parser.getOption("--o", "Output rootname", "autopick");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
-	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)"));
+	fn_out = parser.getOption("--pickname", "Rootname for coordinate STAR files", "autopick");
+	fn_odir = parser.getOption("--odir", "Output directory for coordinate files (default is to store next to micrographs)", "AutoPick/");
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1"));
+	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms, default=automatic)", "-1"));
 	decrease_radius = textToInteger(parser.getOption("--shrink_particle_mask", "Shrink the particle mask by this many pixels (to detect Einstein-from-noise classes)", "2"));
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
@@ -41,6 +42,7 @@ void AutoPicker::read(int argc, char **argv)
 	do_invert = parser.checkOption("--invert", "Density in micrograph is inverted w.r.t. density in template");
 	psi_sampling = textToFloat(parser.getOption("--ang", "Angular sampling (in degrees); use 360 for no rotations", "10"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the references (prevent Einstein-from-noise!)","-1"));
+	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrographs","-1"));
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 
@@ -92,6 +94,21 @@ void AutoPicker::initialise()
 			MDmic.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 			fn_micrographs.push_back(fn_mic);
 		}
+
+        RFLOAT mag, dstep;
+        if (MDmic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+        {
+			MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			angpix = 10000. * dstep / mag;
+			if (verb > 0)
+				std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+        }
+        else if (verb > 0)
+        {
+        	std::cout << " Warning: input STAR file does not contain information about pixel size!" << std::endl;
+        	std::cout << " Warning: use --angpix to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
+        }
 	}
 	else
 	{
@@ -151,6 +168,47 @@ void AutoPicker::initialise()
 	}
 
 	particle_size = XSIZE(Mrefs[0]);
+
+	// Automated determination of bg_radius (same code as in particle_sorter.cpp!)
+	if (particle_diameter < 0.)
+	{
+		RFLOAT sumr=0.;
+		for (int iref = 0; iref < Mrefs.size(); iref++)
+		{
+			RFLOAT cornerval = DIRECT_MULTIDIM_ELEM(Mrefs[iref], 0);
+			// Look on the central X-axis, which first and last values are NOT equal to the corner value
+			int last_corner=99999, first_corner=99999;
+			for (long int j=STARTINGX(Mrefs[iref]); j<=FINISHINGX(Mrefs[iref]); j++)
+			{
+				if (first_corner == 99999)
+				{
+					if (A3D_ELEM(Mrefs[iref], 0,0,j) != cornerval)
+						first_corner = j;
+				}
+				else if (last_corner  == 99999)
+				{
+					if (A3D_ELEM(Mrefs[iref], 0,0,j) == cornerval)
+						last_corner = j - 1;
+				}
+			}
+			sumr += (last_corner - first_corner);
+		}
+		particle_diameter = sumr / Mrefs.size();
+		particle_radius2 = particle_diameter*particle_diameter/4.;
+		// diameter was in Angstroms
+		particle_diameter *= angpix;
+		std::cout << " Automatically set the background diameter to " << particle_diameter << " Angstroms " << std::endl;
+		std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+	}
+	else
+	{
+		// Get the squared particle radius (in integer pixels)
+		particle_radius2 = ROUND(particle_diameter/(2. * angpix));
+		particle_radius2*= particle_radius2;
+	}
+
+
+
 
 	// Get the squared particle radius (in integer pixels)
 	particle_radius2 = ROUND(particle_diameter/(2. * angpix));
@@ -294,11 +352,22 @@ void AutoPicker::run()
 	}
 
 
+	FileName fn_olddir="";
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
 
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
+
+		// Check new-style outputdirectory exists and make it if not!
+		FileName fn_dir = getOutputRootName(fn_micrographs[imic]);
+		fn_dir = fn_dir.beforeLastOf("/");
+		if (fn_dir != fn_olddir)
+		{
+			// Make a Particles directory
+			int res = system(("mkdir -p " + fn_dir).c_str());
+			fn_olddir = fn_dir;
+		}
 
 		autoPickOneMicrograph(fn_micrographs[imic]);
 	}
@@ -1329,7 +1398,7 @@ void AutoPicker::exportHelicalTubes(
 		}
 	}
 
-	fn_tmp = fn_mic_in.withoutExtension() + "_" + fn_star_out + ".star";
+	fn_tmp = getOutputRootName(fn_mic_in) + "_" + fn_star_out + ".star";
 	MDout.write(fn_tmp);
 
 	return;
@@ -1429,7 +1498,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_pixels_circular_mask;;
 	if (do_read_fom_maps)
 	{
-		FileName fn_tmp=fn_mic.withoutExtension()+"_"+fn_out+"_stddevNoise.spi";
+		FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_stddevNoise.spi";
 		Image<RFLOAT> It;
 		It.read(fn_tmp);
 		Mstddev = It();
@@ -1456,9 +1525,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		 *
 		 */
 
-		// Fourier Transform (and downscale) Imic()
+        // Fourier Transform (and downscale) Imic()
 		CenterFFT(Imic(), true);
 		transformer.FourierTransform(Imic(), Fmic);
+
+		if (highpass > 0.)
+        {
+			lowPassFilterMap(Fmic, XSIZE(Imic()), highpass, angpix, 2, true); // true means highpass instead of lowpass!
+        	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
+        }
 
 		// Also calculate the FFT of the squared micrograph
 		Maux.resize(Imic());
@@ -1488,7 +1563,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		if (do_write_fom_maps)
 		{
 			// TMP output
-			FileName fn_tmp=fn_mic.withoutExtension()+"_"+fn_out+"_stddevNoise.spi";
+			FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_stddevNoise.spi";
 			Image<RFLOAT> It;
 			It() = Mstddev;
 			It.write(fn_tmp);
@@ -1513,11 +1588,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Image<RFLOAT> It_float;
 			Image<int> It_int;
 
-			fn_tmp = fn_mic.withoutExtension()+"_"+fn_out+"_combinedCCF.mrc";
+			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCCF.mrc";
 			It_float.read(fn_tmp);
 			Mccf_best_combined = It_float();
 
-			fn_tmp = fn_mic.withoutExtension()+"_"+fn_out+"_combinedCLASS.mrc";
+			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCLASS.mrc";
 			It_int.read(fn_tmp);
 			Mclass_best_combined = It_int();
 		}
@@ -1542,12 +1617,12 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				FileName fn_tmp;
 				Image<RFLOAT> It;
 
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+fn_out+"_ref", iref,"_bestCCF.spi");
+				fn_tmp.compose(getOutputRootName(fn_mic)+"_"+fn_out+"_ref", iref,"_bestCCF.spi");
 				It.read(fn_tmp);
 				Mccf_best = It();
 				It.MDMainHeader.getValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);  // Retrieve expected_Pratio from the header of the image
 
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+fn_out+"_ref", iref,"_bestPSI.spi");
+				fn_tmp.compose(getOutputRootName(fn_mic)+"_"+fn_out+"_ref", iref,"_bestPSI.spi");
 				It.read(fn_tmp);
 				Mpsi_best = It();
 			}
@@ -1715,11 +1790,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 				It() = Mccf_best;
 				It.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);  // Store expected_Pratio in the header of the image
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+fn_out+"_ref", iref,"_bestCCF.spi");
+				fn_tmp.compose(getOutputRootName(fn_mic)+"_"+fn_out+"_ref", iref,"_bestCCF.spi");
 				It.write(fn_tmp);
 
 				It() = Mpsi_best;
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+fn_out+"_ref", iref,"_bestPSI.spi");
+				fn_tmp.compose(getOutputRootName(fn_mic)+"_"+fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 			} // end if do_write_fom_maps
 
@@ -1754,6 +1829,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
 			prunePeakClusters(my_ref_peaks, min_distance_pix);
 			peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());  // append the peaks of this reference to all the other peaks
+
 		}
 
 	} // end for iref
@@ -1789,11 +1865,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Image<int> It_int;
 
 			It_float() = Mccf_best_combined;
-			fn_tmp = fn_mic.withoutExtension()+"_"+fn_out+"_combinedCCF.mrc";
+			fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + "_combinedCCF.mrc";
 			It_float.write(fn_tmp);
 
 			It_int() = Mclass_best_combined;
-			fn_tmp = fn_mic.withoutExtension()+"_"+fn_out+"_combinedCLASS.mrc";
+			fn_tmp = getOutputRootName(fn_mic) + + "_" + fn_out + "_combinedCLASS.mrc";
 			It_int.write(fn_tmp);
 		} // end if do_write_fom_maps
 
@@ -1803,7 +1879,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Image<RFLOAT> It;
 
 			It() = Mccfplot;
-			fn_tmp = fn_mic.withoutExtension()+"_"+fn_out+"_combinedPLOT.mrc";
+			fn_tmp =  getOutputRootName(fn_mic) + "_" + fn_out + "_combinedPLOT.mrc";
 			It.write(fn_tmp);
 		}
 	}
@@ -1811,10 +1887,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	{
 		//Now that we have done all references, prune the list again...
 		prunePeakClusters(peaks, min_distance_pix);
-
 		// And remove all too close neighbours
 		removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix);
-
 		// Write out a STAR file with the coordinates
 		MetaDataTable MDout;
 		for (int ipeak =0; ipeak < peaks.size(); ipeak++)
@@ -1826,9 +1900,21 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, peaks[ipeak].fom);
 			MDout.setValue(EMDL_ORIENT_PSI, peaks[ipeak].psi);
 		}
-		FileName fn_tmp = fn_mic.withoutExtension() + "_" + fn_out + ".star";
+		FileName fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
 		MDout.write(fn_tmp);
 	}
+}
+
+FileName AutoPicker::getOutputRootName(FileName fn_mic)
+{
+
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
+	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
+	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
+	FileName fn_part = fn_odir + fn_mic_nouniqdate;
+	return fn_part;
+
 }
 
 void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &_Fmic, const MultidimArray<Complex > &_Fmic2,

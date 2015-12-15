@@ -350,7 +350,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     fn_data = parser.getOption("--i", "Input images (in a star-file or a stack)");
     fn_out = parser.getOption("--o", "Output rootname");
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
-    mymodel.pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)"));
+    mymodel.pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
     particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
@@ -1091,26 +1091,11 @@ void MlOptimiser::initialiseGeneral(int rank)
     				REPORT_ERROR("MlOptimiser::initialiseGeneral: ERROR inconsistent magnification and detector pixel sizes in images in input STAR file");
     			}
 			}
-    	}
-    	if (mydata.MDmic.containsLabel(EMDL_CTF_MAGNIFICATION) && mydata.MDmic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-    	{
-    		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDmic)
-			{
-    			mydata.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
-    			mydata.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-    			my_angpix = 10000. * dstep / mag;
-    			if (!has_magn)
-    			{
-    				first_angpix = my_angpix;
-    				has_magn = true;
-    			}
-    			else if (ABS(first_angpix - my_angpix) > 0.01)
-    				REPORT_ERROR("MlOptimiser::initialiseGeneral: ERROR inconsistent magnification and detector pixel sizes in micrographs in input STAR file");
-			}
+
     	}
     	if (has_magn && ABS(first_angpix - mymodel.pixel_size) > 0.01)
     	{
-    		if (verb > 0)
+    		if (verb > 0 && mymodel.pixel_size > 0.)
     			std::cout << "MlOptimiser::initialiseGeneral: WARNING modifying pixel size from " << mymodel.pixel_size <<" to "<<first_angpix << " based on magnification information in the input STAR file" << std::endl;
     		mymodel.pixel_size = first_angpix;
     	}

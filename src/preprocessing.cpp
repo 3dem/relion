@@ -29,6 +29,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_coord_dir = parser.getOption("--coord_dir", "The directory where the coordinate files are (default is same as micrographs)", "ASINPUT");
 	fn_part_dir = parser.getOption("--part_dir", "Output directory for particle stacks", "Particles/");
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "particles.star");
+	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input STAR file)", "-1."));
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
@@ -36,7 +37,6 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	do_premultiply_ctf = parser.checkOption("--premultiply_ctf", "Premultiply the micrograph/frame with its CTF prior to particle extraction");
 	do_ctf_intact_first_peak = parser.checkOption("--ctf_intact_first_peak", "When premultiplying with the CTF, leave frequencies intact until the first peak");
 	do_phase_flip = parser.checkOption("--phase_flip", "Flip CTF-phases in the micrograph/frame prior to particle extraction");
-	angpix  =  textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms (only necessary for phase-flipping if magnification and detector pixel size are not in STAR file)", "1."));
 	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
@@ -105,6 +105,32 @@ void Preprocessing::initialise()
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
 
 		star_has_ctf = MDmics.containsLabel(EMDL_CTF_DEFOCUSU);
+
+		// Get pixel size from the manually set value (pixel size is only used for ctf-premultiplictaion or phase flipping...)
+		if (set_angpix > 0.)
+		{
+			if (verb > 0)
+				std::cout << " Setting pixel size in output STAR file to " << set_angpix << " Angstroms" << std::endl;
+
+			angpix = set_angpix;
+		}
+		// Otherwise get pixel size from the input STAR file
+		else if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		{
+
+			RFLOAT mag, dstep;
+			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			angpix = 10000. * dstep / mag;
+
+			if (verb > 0)
+				std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+
+        }
+        else
+        {
+        	REPORT_ERROR("Preprocessing::extractParticlesFromOneFrame ERROR: cannot phase-flip of CTF-premultiply without providing CTF info in the input STAR file!");
+        }
 
 		// Make sure the directory names end with a '/'
 		if (fn_coord_dir != "ASINPUT" && fn_coord_dir[fn_coord_dir.length()-1] != '/')
@@ -180,13 +206,24 @@ void Preprocessing::joinAllStarFiles()
 
 		// Get the filename of the STAR file for just this micrograph
 		FileName fn_star = getOutputFileNameRoot(fn_mic) + ".star";
-		MDonestack.read(fn_star);
-
-		for (long int current_object2 = MDonestack.firstObject();
-		              current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
-		              current_object2 = MDonestack.nextObject())
+		if (exists(fn_star))
 		{
-			MDout.addObject( MDonestack.getObject());
+
+			MDonestack.read(fn_star);
+
+			for (long int current_object2 = MDonestack.firstObject();
+						  current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
+						  current_object2 = MDonestack.nextObject())
+			{
+				MDout.addObject( MDonestack.getObject());
+				if (set_angpix > 0.)
+				{
+					RFLOAT mag = 10000;
+					RFLOAT dstep = mag * set_angpix / 10000;
+					MDout.setValue(EMDL_CTF_MAGNIFICATION, mag);
+					MDout.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				}
+			}
 		}
 	}
 
@@ -353,6 +390,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	// Read in the coordinates file
 	MetaDataTable MDin, MDout;
 	FileName fn_coord = getCoordinateFileName(fn_mic);
+	if (!exists(fn_coord))
+		return;
 	readCoordinates(fn_coord, MDin);
 
 	// Correct for bias in the picked coordinates
@@ -484,16 +523,6 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		if (dimensionality != 2)
 			REPORT_ERROR("extractParticlesFromFieldOfView ERROR: cannot do phase flipping as dimensionality is not 2!");
 
-		RFLOAT mag, dstep, my_angpix;
-		if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-		{
-			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag, imic);
-			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, imic);
-			my_angpix = 10000. * dstep / mag;
-		}
-		else
-			my_angpix = angpix;
-
 		// FFTW only does square images
 		long int ori_xsize = XSIZE(Imic());
 		long int ori_ysize = YSIZE(Imic());
@@ -509,8 +538,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 
 		transformer.FourierTransform(Imic(), FTmic, false);
 
-		RFLOAT xs = (RFLOAT)XSIZE(Imic()) * my_angpix;
-		RFLOAT ys = (RFLOAT)YSIZE(Imic()) * my_angpix;
+		RFLOAT xs = (RFLOAT)XSIZE(Imic()) * angpix;
+		RFLOAT ys = (RFLOAT)YSIZE(Imic()) * angpix;
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(FTmic)
 		{
 			RFLOAT x = (RFLOAT)jp / xs;

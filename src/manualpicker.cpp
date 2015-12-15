@@ -442,7 +442,7 @@ void ManualPicker::read(int argc, char **argv)
 
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "Micrograph STAR file OR filenames from which to pick particles, e.g. \"Micrographs/*.mrc\"");
-	global_fn_odir = parser.getOption("--odir", "Output directory for coordinate files (default is to store next to micrographs)", "ASINPUT");
+	global_fn_odir = parser.getOption("--odir", "Output directory for coordinate files (default is to store next to micrographs)", "ManualPick/");
 	fn_sel = parser.getOption("--selection", "STAR file with selected micrographs", "micrographs_selected.star");
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1."));
@@ -477,12 +477,6 @@ void ManualPicker::usage()
 
 void ManualPicker::initialise()
 {
-
-	// check if the output directory is unique
-	if (global_fn_odir == "ASINPUT")
-	{
-		global_fn_odir = fn_in.beforeLastOf("/") + "/";
-	}
 
 	// If we down-scale the micrograph: always low-pass filter to get better displays
 

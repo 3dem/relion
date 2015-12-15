@@ -67,6 +67,11 @@ void ParticleSorter::initialise()
 		if (verb > 0)
 			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
 	}
+    else if (verb > 0)
+    {
+    	std::cout << " Warning: input STAR file does not contain information about pixel size!" << std::endl;
+    	std::cout << " Warning: use --angpix to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
+    }
 
 	if (fn_out == "")
 		fn_out = fn_in.withoutExtension();
@@ -119,7 +124,7 @@ void ParticleSorter::initialise()
 
 	particle_size = XSIZE(Mrefs[0]);
 
-	// Automated determination of bg_radius
+	// Automated determination of bg_radius (same code as in autopicker.cpp!)
 	if (particle_diameter < 0.)
 	{
 		RFLOAT sumr=0.;
@@ -146,6 +151,7 @@ void ParticleSorter::initialise()
 		sumr /= 2. * Mrefs.size(); // factor 2 to go from diameter to radius; Mref.size() for averaging
 		particle_radius2 = sumr*sumr;
 		std::cout << " Automatically set the background radius to " << sumr << " pixels " << std::endl;
+		std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
 	}
 	else
 	{

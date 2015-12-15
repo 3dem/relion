@@ -261,6 +261,7 @@ public:
     Fl_Button* browse;
 
     const char* pattern;
+    const char* directory;
 
     // Constructor (with 4 column widths)
 	FileNameEntry() {};
@@ -273,14 +274,16 @@ public:
     		const char* title,
     		const char* defaultvalue,
     		const char* _pattern = "",
+    		const char* _directory = NULL,
     		const char* help = NULL);
 
 	// places on one the window
 	void place(int &y,
 				const char * title,
-				const char* defaultvalue = NULL,
-				const char* pattern = "",
-				const char* helptext = NULL,
+				const char* defaultvalue,
+				const char* pattern,
+	    		const char* _directory,
+				const char* helptext,
 				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
 
     // Clear this entry

@@ -161,7 +161,7 @@ public:
 	int verb;
 
 	// Input & Output rootname
-	FileName fn_in, fn_ref, fns_autopick, fn_out;
+	FileName fn_in, fn_ref, fns_autopick, fn_odir, fn_out;
 
 	// Pixel size (for low-pass filter and particle diameter)
 	RFLOAT angpix;
@@ -173,8 +173,11 @@ public:
 	RFLOAT particle_diameter;
 	int particle_radius2, decrease_radius;
 
-	// Low pass filetr cutoff (in Angstroms)
+	// Low pass filter cutoff (in Angstroms)
 	RFLOAT lowpass;
+
+	// High pass filter cutoff (in Angstroms)
+	RFLOAT highpass;
 
 	// Original size of the reference images
 	int particle_size;
@@ -301,6 +304,9 @@ public:
 			int skip_side);
 
 	void autoPickOneMicrograph(FileName &fn_mic);
+
+	// Get the output coordinate filename given the micrograph filename
+	FileName getOutputRootName(FileName fn_mic);
 
 private:
 

@@ -28,7 +28,7 @@ void ParticlePolisher::read(int argc, char **argv)
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with the aligned movie frames, e.g. run1_ct25_data.star");
 	fn_out = parser.getOption("--o", "Output rootname", "shiny");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 	running_average_width = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "5"));
 	do_start_all_over = parser.checkOption("--dont_read_old_files", "Do not read intermediate results from disc, but re-do all calculations from scratch");
 
@@ -110,16 +110,22 @@ void ParticlePolisher::initialise()
 #endif
 
 	// Get the pixel size from the input STAR file
-	if (exp_model.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && exp_model.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	if (angpix < 0.)
 	{
-		RFLOAT mag, dstep;
-		exp_model.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
-		exp_model.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-		angpix = 10000. * dstep / mag;
-		if (verb > 0)
-			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+		if (exp_model.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && exp_model.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		{
+			RFLOAT mag, dstep;
+			exp_model.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			exp_model.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			angpix = 10000. * dstep / mag;
+			if (verb > 0)
+				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+		}
+		else
+		{
+			REPORT_ERROR("ParticlePolisher::initialise ERROR: The input STAR file does not contain information about the pixel size. Please provide --angpix");
+		}
 	}
-
     if (do_weighting)
     {
 

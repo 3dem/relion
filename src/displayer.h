@@ -44,7 +44,7 @@
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,40,150))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
 
 #define SELECTED true
 #define NOTSELECTED false
@@ -361,6 +361,12 @@ public:
 
 	// Allow regrouping from _data.star
 	bool is_data;
+
+	// Allow saving of the selection?
+	bool do_allow_save;
+
+	// FileName for selected class average images and particles
+	FileName fn_imgs, fn_parts;
 
 	// Label option to display or to sort on
 	std::vector<std::string> display_labels;

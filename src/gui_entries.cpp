@@ -241,6 +241,7 @@ void FileNameEntry::initialise(int x, int y, int height,
 		                     const char* title,
 		                     const char* defaultvalue,
 		                     const char* _pattern,
+		                     const char* _directory,
 		                     const char* helptext)
 {
 
@@ -252,6 +253,7 @@ void FileNameEntry::initialise(int x, int y, int height,
 
 	// Store the pattern for the file chooser
 	pattern = _pattern;
+	directory = _directory;
 
     // The Browse button
     browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
@@ -264,6 +266,7 @@ void FileNameEntry::place(int &y,
 		const char * title,
 		const char* defaultvalue,
 		const char* pattern,
+		const char* directory,
 		const char* helptext,
 		int x, int h, int wcol2, int wcol3, int wcol4 )
 {
@@ -272,7 +275,7 @@ void FileNameEntry::place(int &y,
 	clear();
 
 	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, pattern, helptext);
+	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, pattern, directory, helptext);
 
 	// Update the Y-coordinate
     y += h + 2;
@@ -314,7 +317,7 @@ void FileNameEntry::cb_browse_i() {
     Fl::scheme("gtk+");
     Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
 
-    G_chooser->directory(NULL);
+    G_chooser->directory(directory);
     G_chooser->color(GUI_BACKGROUND_COLOR);
     G_chooser->show();
 

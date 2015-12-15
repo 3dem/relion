@@ -37,19 +37,19 @@ class Process;
  * Nodes could be of the following types:
  */
 
-#define NODE_MOVIE			0 // 2D micrograph movie(s), e.g. Falcon001_movie.mrcs or micrograph_movies.star
-#define NODE_MIC			1 // 2D micrograph(s), possibly with CTF information as well, e.g. Falcon001.mrc or micrographs.star
-#define NODE_TOMO			2 // 3D tomogram(s), e.g. tomo001.mrc or tomograms.star
-#define NODE_MIC_COORD		4 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)
-#define NODE_PART_DATA		5 // A metadata (STAR) file with particles (e.g. particles.star or run1_data.star)
-#define NODE_MOVIE_DATA		6 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
-#define NODE_REF       	    7 // 2D or 3D-reference(s), e.g. map.mrc or refs.star or 1@refs.star
-#define NODE_MASK			8 // 2D or 3D mask(s), e.g. mask.mrc or masks.star
-#define NODE_MODEL		    9 // A model STAR-file for class selection
-#define NODE_OPTIMISER		10// A optimiser STAR-file for job continuation
-#define NODE_HALFMAP		11// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
-#define NODE_FINALMAP		12// Sharpened final map from post-processing (cannot be used as input)
-#define NODE_RESMAP			13// Resmap with local resolution (cannot be used as input)
+#define NODE_MOVIES			0 // 2D micrograph movie(s), e.g. Falcon001_movie.mrcs or micrograph_movies.star
+#define NODE_MICS			1 // 2D micrograph(s), possibly with CTF information as well, e.g. Falcon001.mrc or micrographs.star
+#define NODE_MIC_COORDS		2 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)
+#define NODE_PART_DATA		3 // A metadata (STAR) file with particles (e.g. particles.star or run1_data.star)
+#define NODE_MOVIE_DATA		4 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
+#define NODE_2DREFS       	5 // A STAR file with one or multiple 2D references, e.g. autopick_references.star
+#define NODE_3DREF       	6 // A single 3D-reference, e.g. map.mrc
+#define NODE_MASK			7 // 3D mask, e.g. mask.mrc or masks.star
+#define NODE_MODEL		    8 // A model STAR-file for class selection
+#define NODE_OPTIMISER		9 // An optimiser STAR-file for job continuation
+#define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
+#define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
+#define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
 
 class Node
 {
@@ -88,23 +88,22 @@ class Node
 
 // This order defines the order of the process browser in the GUI!
 // TODO:#define PROC_IMPORT      	1 // Import any node into the pipeline (by reading them from external files)
-#define PROC_IMPORT         1 // Import any file as a Node of a given type
-#define PROC_MOTIONCORR 	2 // Import any file as a Node of a given type
-#define PROC_CTFFIND	    3 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK		4 // Manually pick particle coordinates from micrographs
-#define PROC_AUTOPICK		5 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
-#define PROC_EXTRACT		6 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_SORT           7 // Sort particles based on their Z-scores
-#define PROC_2DCLASS		8 // 2D classification (from input particles)
-#define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_CLASSSELECT    10// Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_IMPORT         0 // Import any file as a Node of a given type
+#define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
+#define PROC_CTFFIND	    2 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK		3 // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_SORT           6 // Sort particles based on their Z-scores
+#define PROC_2DCLASS		7 // 2D classification (from input particles)
+#define PROC_3DCLASS		8 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_CLASSSELECT    9 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
 // TODO #define PROC_MASKCREATE     10
-// TODO #define PROC_UNBIN          11
-#define PROC_3DAUTO	        11  // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			12 // Particle-polishing (from movie-particles)
-#define PROC_POST			13 // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			14 // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define NR_BROWSE_TABS PROC_RESMAP
+#define PROC_3DAUTO	        10  // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH			11 // Particle-polishing (from movie-particles)
+#define PROC_POST			12 // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP			13 // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define NR_BROWSE_TABS      14
 
 // Status a Process may have
 #define PROC_RUNNING   0

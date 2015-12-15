@@ -20,18 +20,7 @@
 #include "src/gui_jobwindow.h"
 
 #define DEBUG
-// Construct continuation output filenames always in the same manner
-void getContinueOutname(std::string &outputname, FileName fn_cont)
-{
-	int pos_it = fn_cont.rfind("_it");
-	int pos_op = fn_cont.rfind("_optimiser");
-	if (pos_it < 0 || pos_op < 0)
-		std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont << std::endl;
-	int it = (int)textToFloat((fn_cont.substr(pos_it+3, 6)).c_str());
-	outputname += "_ct" + floatToString(it);
-}
-
-std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies)
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies, bool do_movies, bool do_also_rot)
 {
 	std::vector<Node> result;
 
@@ -51,33 +40,37 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	}
 
 	// Data and model.star files
-	Node node1(fn_out + "_data.star", NODE_PART_DATA);
+	int node_type = (do_movies) ? NODE_MOVIE_DATA : NODE_PART_DATA;
+	Node node1(fn_out + "_data.star", node_type);
 	result.push_back(node1);
-	int nodetype = (dim==2) ? NODE_REF : NODE_REF;
-	Node node2(fn_out + "_model.star", nodetype);
-	result.push_back(node2);
 
-	//For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
-	if (dim == 3)
+	if (!do_movies || do_also_rot)
 	{
-    	FileName fn_tmp;
-		for (int iclass = 0; iclass < K; iclass++)
-    	{
-    		if (nr_bodies > 1)
-    			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
-    		else
-    			fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+		Node node2(fn_out + "_model.star", NODE_MODEL);
+		result.push_back(node2);
 
-    		Node node3(fn_tmp, nodetype);
-    		result.push_back(node3);
-    	}
-	}
+		// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
+		if (dim == 3)
+		{
+			FileName fn_tmp;
+			for (int iclass = 0; iclass < K; iclass++)
+			{
+				if (nr_bodies > 1)
+					fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
+				else
+					fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
 
-	// For auto-refine: also output the half1_class001_unfil.mrc map
-	if (iter < 0)
-	{
-		Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
-		result.push_back(node4);
+				Node node3(fn_tmp, NODE_3DREF);
+				result.push_back(node3);
+			}
+		}
+
+		// For auto-refine: also output the half1_class001_unfil.mrc map
+		if (iter < 0)
+		{
+			Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
+			result.push_back(node4);
+		}
 	}
 	return result;
 
@@ -252,7 +245,7 @@ Any occurrences of XXXextra2XXX will be changed by this value.");
 		default_location=mydefault;
 	}
 
-	qsubscript.place(current_y, "Standard submission script:", default_location, "Script Files (*.{csh,sh,bash,script})",
+	qsubscript.place(current_y, "Standard submission script:", default_location, "Script Files (*.{csh,sh,bash,script})", NULL,
 "The template for your standard queue job submission script. \
 Its default location may be changed by setting the environment variable RELION_QSUB_TEMPLATE. \
 In the template script a number of variables will be replaced: \n \
@@ -571,13 +564,7 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input files:", "", "Input file (*.*)", "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output directory:", "Import/UNIQDATE/", "The name of the output STAR file, which has to have a .star extension. ");
-	fn_out.deactivate();
+	fn_in.place(current_y, "Input files:", "Micrographs/*.mrc", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -600,7 +587,6 @@ void ImportJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	fn_in.writeValue(fh);
-	fn_out.writeValue(fh);
 	node_type.writeValue(fh);
 
 	closeWriteFile(fh, fn);
@@ -615,7 +601,6 @@ void ImportJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		fn_in.readValue(fh);
-		fn_out.readValue(fh);
 		node_type.readValue(fh);
 
 		closeReadFile(fh);
@@ -631,35 +616,37 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	pipelineInputNodes.clear();
 
 	std::string command;
-	command=" relion_star_loopheader ";
 
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		// Save the real output name
-		outputname = fn_out.getValue();
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
+	// Save the real output name
+	outputname = "Import/UNIQDATE/";
+	// Change outputname if it contains UNIQDATE
+	changeDateNTimeInOutputname(outputname);
 
 	FileName outputstar;
 
-	if (node_type.getValue() == "2D micrograph movie(s) (.mrcs or .star)")
+	if (node_type.getValue() == "2D micrograph movies (*.mrcs)")
 	{
-		outputname += "micrograph_movies";
+		outputname += "movies";
 		outputstar = outputname+".star";
-		command += "rlnMicrographMovieName ";
-		Node node(outputstar, NODE_MOVIE);
+		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
+		commands.push_back(command);
+		command = "ls " + fn_in.getValue() + " >> " + outputstar;
+		commands.push_back(command);
+		Node node(outputstar, NODE_MOVIES);
 		pipelineOutputNodes.push_back(node);
 	}
-	else if (node_type.getValue() == "2D micrograph(s) (.mrc or .star)")
+	else if (node_type.getValue() == "2D micrographs/tomograms (*.mrc)")
 	{
 		outputname += "micrographs";
 		outputstar = outputname+".star";
-		command += "rlnMicrographName ";
-		Node node(outputstar, NODE_MIC);
+		command = "relion_star_loopheader rlnMicrographName > " + outputstar;;
+		commands.push_back(command);
+		command = "ls " + fn_in.getValue() + " >> " + outputstar;
+		commands.push_back(command);
+		Node node(outputstar, NODE_MICS);
 		pipelineOutputNodes.push_back(node);
 	}
-	else if (node_type.getValue() == "2D/3D particle coordinates (.box, .star or .*)")
+	else if (node_type.getValue() == "2D/3D particle coordinates (*.box, *_pick.star)")
 	{
 		// Copy all coordinate files into the Import directory
 		command = "cp -r " + fn_in.getValue() + " " + outputname;
@@ -668,35 +655,28 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		FileName fn_suffix = fn_in.getValue();
 		fn_suffix = fn_suffix.afterLastOf("*");
 		fn_suffix = "coords_suffix" + fn_suffix;
-		Node node(fn_suffix, NODE_MIC_COORD);
+		Node node(fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
 		// Make a suffix file, which contains the actual suffix as a suffix
 		command = " touch " + outputname + fn_suffix;
 		commands.push_back(command);
-
 	}
-	else if (node_type.getValue() == "3D tomogram(s) (.mrc or .star)")
+	else if (node_type.getValue() == "3D reference (.mrc)")
 	{
-		outputname += "tomograms";
-		outputstar = outputname+".star";
-		command += "rlnMicrographName ";
-		Node node(outputstar, NODE_TOMO);
+		FileName fnt = "/" + fn_in.getValue();
+		fnt = fnt.afterLastOf("/");
+		command = "cp " + fn_in.getValue() + " " + outputname + fnt;
+		commands.push_back(command);
+		Node node(outputname + fnt, NODE_3DREF);
 		pipelineOutputNodes.push_back(node);
 	}
-	else if (node_type.getValue() == "2D/3D reference image(s) (.mrc or .star)")
+	else if (node_type.getValue() == "3D mask (.mrc)")
 	{
-		outputname += "references";
-		outputstar = outputname+".star";
-		command += "rlnReferenceImage ";
-		Node node(outputstar, NODE_REF);
-		pipelineOutputNodes.push_back(node);
-	}
-	else if (node_type.getValue() == "2D/3D mask(s) (.mrc or .star)")
-	{
-		outputname += "masks";
-		outputstar = outputname+".star";
-		command += "rlnMaskName ";
-		Node node(outputstar, NODE_MASK);
+		FileName fnt = "/" + fn_in.getValue();
+		fnt = fnt.afterLastOf("/");
+		command = "cp " + fn_in.getValue() + " " + outputname + fnt;
+		commands.push_back(command);
+		Node node(outputname + fnt, NODE_MASK);
 		pipelineOutputNodes.push_back(node);
 	}
 	else
@@ -704,12 +684,6 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		std::cerr << " node_type.getValue()= " << node_type.getValue() << std::endl;
 		REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option.");
 	}
-	command+= " > " + outputstar;
-	commands.push_back(command);
-
-	// Fill actual STAR file with the input entries
-	command = "ls " + fn_in.getValue() + " >> " + outputstar;
-	commands.push_back(command);
 
 	pipelineOutputName = outputname;
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
@@ -725,14 +699,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	tab1->label("I/O");
 	resetHeight();
 
-	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MOVIE, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output directory:", "MotionCorr/UNIQDATE/", "Output directory for all files of this run. The directory will be created if it does not exist.");
-	fn_out.deactivate();
-
+	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	tab1->end();
 
 	tab2->begin();
@@ -747,7 +714,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 		default_location=mydefault;
 	}
 
-	fn_motioncorr_exe.place(current_y, "MOTIONCORR executable:", default_location, "*.*", "Location of the MOTIONCORR executable. You can control the default of this field by setting environment variable RELION_MOTIONCORR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	fn_motioncorr_exe.place(current_y, "MOTIONCORR executable:", default_location, "*.*", NULL, "Location of the MOTIONCORR executable. You can control the default of this field by setting environment variable RELION_MOTIONCORR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -778,7 +745,6 @@ void MotioncorrJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star_mics.writeValue(fh);
-	fn_out.writeValue(fh);
 	fn_motioncorr_exe.writeValue(fh);
 	bin_factor.writeValue(fh);
 	first_frame_ali.writeValue(fh);
@@ -799,7 +765,6 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star_mics.readValue(fh);
-		fn_out.readValue(fh);
 		fn_motioncorr_exe.readValue(fh);
 		bin_factor.readValue(fh);
 		first_frame_ali.readValue(fh);
@@ -822,6 +787,12 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	input_star_mics.deactivate(is_continue);
 	bin_factor.deactivate(is_continue);
 	fn_motioncorr_exe.deactivate(is_continue);
+	first_frame_ali.deactivate(is_continue);
+	last_frame_ali.deactivate(is_continue);
+	first_frame_sum.deactivate(is_continue);
+	last_frame_sum.deactivate(is_continue);
+	do_save_movies.deactivate(is_continue);
+	other_motioncorr_args.deactivate(is_continue);
 
 }
 
@@ -849,16 +820,14 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	{
 		// Save the real output name
 		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
+		outputname = "MotionCorr/UNIQDATE/";
 		// Change outputname if it contains UNIQDATE
 		changeDateNTimeInOutputname(outputname);
 	}
 	command += " --o " + outputname;
 	pipelineOutputName = outputname;
-	Node node2(outputname + "/corrected_micrographs.star", NODE_MIC);
+	Node node2(outputname + "/corrected_micrographs.star", NODE_MICS);
 	pipelineOutputNodes.push_back(node2);
-	Node node3(outputname + "/corrected_micrographs_movie.star", NODE_MOVIE);
-	pipelineOutputNodes.push_back(node3);
 
 	// Motioncorr-specific stuff
 	command += " --bin_factor " + integerToString(bin_factor.getValue());
@@ -909,13 +878,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	resetHeight();
 
 
-	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MIC, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output directory:", "CtfEstimate/UNIQDATE/", "Output directory for all files of this run. The directory will be created if it does not exist.");
-	fn_out.deactivate();
+	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 
 	tab1->end();
 
@@ -930,8 +893,6 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 
 	q0.place(current_y, "Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
 
-	dstep.place(current_y, "Physical pixel size on detector (um):", 10, 1, 32, 1, "Physical pixel size of the detector (in micrometer), e.g. Falcon is 14 um, K2 is 5 um. If you don't know this value, it doesn't really matter: just leave the default to 10um.");
-
 	angpix.place(current_y, "Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
 
 	tab2->end();
@@ -940,7 +901,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	tab3->label("CTFFIND");
 	resetHeight();
 
-	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", NULL, "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -977,7 +938,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	use_gctf.place(current_y, "Use Gctf instead of CTFFIND?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND.", gctf_group);
 
 	gctf_group->begin();
-	fn_gctf_exe.place(current_y, "Gctf executable:", gctf_default_location, "*", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	fn_gctf_exe.place(current_y, "Gctf executable:", gctf_default_location, "*", NULL, "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	do_ignore_ctffind_params.place(current_y, "Ignore CTFFIND parameters?", true, "If set to Yes, all parameters on the CTFFIND tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
 \n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
@@ -997,15 +958,17 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 
 void CtffindJobWindow::write(std::string fn)
 {
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_motioncorr";
+
 	std::ofstream fh;
-	openWriteFile(fn + ".gui_ctffind", fh);
+	openWriteFile(fn, fh);
 
 	input_star_mics.writeValue(fh);
-	fn_out.writeValue(fh);
 	cs.writeValue(fh);
 	kv.writeValue(fh);
 	q0.writeValue(fh);
-	dstep.writeValue(fh);
 	angpix.writeValue(fh);
 	box.writeValue(fh);
 	resmin.writeValue(fh);
@@ -1032,11 +995,9 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star_mics.readValue(fh);
-		fn_out.readValue(fh);
 		cs.readValue(fh);
 		kv.readValue(fh);
 		q0.readValue(fh);
-		dstep.readValue(fh);
 		angpix.readValue(fh);
 		box.readValue(fh);
 		resmin.readValue(fh);
@@ -1065,7 +1026,6 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	cs.deactivate(is_continue);
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
-	dstep.deactivate(is_continue);
 	angpix.deactivate(is_continue);
 	fn_ctffind_exe.deactivate(is_continue);
 	fn_gctf_exe.deactivate(is_continue);
@@ -1085,13 +1045,13 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	if (!is_continue) // for continue jobs, use the same outputname
 	{
-		outputname = fn_out.getValue();
+		outputname = "CtfFind/UNIQDATE/";
 		// Change outputname if it contains UNIQDATE
 		changeDateNTimeInOutputname(outputname);
 	}
 	pipelineOutputName = outputname;
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
-	Node node(fn_outstar, NODE_MIC);
+	Node node(fn_outstar, NODE_MICS);
 	pipelineOutputNodes.push_back(node);
 
 	Node node2(input_star_mics.getValue(), input_star_mics.type);
@@ -1102,8 +1062,8 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_run_ctffind`";
 
-	// Calculate magnification from user-specified pixel size in Angstroms
-	RFLOAT magn = ROUND((dstep.getValue() * 1e-6) / (angpix.getValue() * 1e-10));
+	// Just use 10000 for magnification, so dstep==angpix
+	RFLOAT magn = 10000.;
 
 	command += " --i " + input_star_mics.getValue();
 	command += " --o " + outputname;
@@ -1111,7 +1071,7 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	command += " --HT " + floatToString(kv.getValue());
 	command += " --AmpCnst " + floatToString(q0.getValue());
 	command += " --XMAG " + floatToString(magn);
-	command += " --DStep " + floatToString(dstep.getValue());
+	command += " --DStep " + floatToString(angpix.getValue());
 	command += " --Box " + floatToString(box.getValue());
 	command += " --ResMin " + floatToString(resmin.getValue());
 	command += " --ResMax " + floatToString(resmax.getValue());
@@ -1156,13 +1116,7 @@ ManualpickJobWindow::ManualpickJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input micrographs:", NODE_MIC, "", "Input micrographs (*.{star,mrc})", "Input STAR file (with or without CTF information), OR a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
-
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output directory: ", "ManualPick/UNIQDATE/", "The selected micrographs will all be joined in a new STAR file (which has fewer lines than the original input one if micrographs are deselected on the GUI.");
-	fn_out.deactivate();
-
+	fn_in.place(current_y, "Input micrographs:", NODE_MICS, "", "Input micrographs (*.{star,mrc})", "Input STAR file (with or without CTF information), OR a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
 	tab1->end();
 
 	tab2->begin();
@@ -1177,8 +1131,9 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	black_val.place(current_y, "Black value:", 0, 0, 512, 16, "Use non-zero values to set the value of the blackest pixel in the micrograph.");
 
 	current_y += STEPY/2;
-	lowpass.place(current_y, "Lowpass filter (1/pix)", 0, 0, 1, 0.02, "Lowpass filter that will be applied to the micrograph before displaying (in 1/pixel: ranging from 0-0.5; zero for no filter).");
-	highpass.place(current_y, "Highpass filter (1/pix)", 0, 0, 1, 0.02, "Highpass filter that will be applied to the micrograph before displaying  (in 1/pixel: ranging from 0-0.5; zero for no filter).");
+	lowpass.place(current_y, "Lowpass filter (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the micrographs. Give a negative value to skip the lowpass filter.");
+	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. ");
+	angpix.place(current_y, "Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
 
 	current_y += STEPY/2;
 	ctfscale.place(current_y, "Scale for CTF image:", 1, 0.1, 2, 0.1, "CTFFINDs CTF image (with the Thonrings) will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
@@ -1197,7 +1152,7 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	color_label.place(current_y, "MetaDataLabel for color:", "rlnParticleSelectZScore", "The Metadata label of the value to plot from red<>blue. Useful examples might be: \n \
 rlnParticleSelectZScore \n rlnClassNumber \n rlnAutopickFigureOfMerit \n rlnAngleTilt \n rlnLogLikeliContribution \n rlnMaxValueProbDistribution \n rlnNrOfSignificantSamples\n");
 
-	fn_color.place(current_y, "STAR file with color label: ", "", "STAR file (*.star)", "The program will figure out which particles in this STAR file are on the current micrograph and color their circles according to the value in the corresponding column. \
+	fn_color.place(current_y, "STAR file with color label: ", "", "STAR file (*.star)", NULL, "The program will figure out which particles in this STAR file are on the current micrograph and color their circles according to the value in the corresponding column. \
 Particles that are not in this STAR file, but present in the picked coordinates file will be colored green. If this field is left empty, then the color label (e.g. rlnAutopickFigureOfMerit) should be present in the coordinates STAR file.");
 
 	blue_value.place(current_y, "Blue value: ", 0., 0., 4., 0.1, "The value of this entry will be blue. There will be a linear scale from blue to red, according to this value and the one given below.");
@@ -1220,9 +1175,9 @@ void ManualpickJobWindow::write(std::string fn)
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
-	fn_out.writeValue(fh);
 	lowpass.writeValue(fh);
 	highpass.writeValue(fh);
+	angpix.writeValue(fh);
 	diameter.writeValue(fh);
 	micscale.writeValue(fh);
 	ctfscale.writeValue(fh);
@@ -1246,9 +1201,9 @@ void ManualpickJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		fn_in.readValue(fh);
-		fn_out.readValue(fh);
 		lowpass.readValue(fh);
 		highpass.readValue(fh);
+		angpix.readValue(fh);
 		diameter.readValue(fh);
 		micscale.readValue(fh);
 		ctfscale.readValue(fh);
@@ -1278,17 +1233,12 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	pipelineOutputNodes.clear();
 	pipelineInputNodes.clear();
 
-
 	std::string command;
 	command="`which relion_manualpick`";
 
 	if (!is_continue) // for continue jobs, use the same outputname
 	{
-		// I/O
-		// Save the real output name (could be with _ctX for continuation)
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
-
+		outputname = "ManualPick/UNIQDATE/";
 		// Change outputname if it contains UNIQDATE
 		changeDateNTimeInOutputname(outputname);
 	}
@@ -1300,12 +1250,13 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	command += " --odir " + outputname;
 	command += " --pickname manualpick";
+
 	FileName fn_suffix = outputname + "coords_suffix_manualpick.star";
-	Node node2(fn_suffix, NODE_MIC_COORD);
+	Node node2(fn_suffix, NODE_MIC_COORDS);
 	pipelineOutputNodes.push_back(node2);
 
 	FileName fn_outstar = outputname + "micrographs_selected.star";
-	Node node3(fn_outstar, NODE_MIC);
+	Node node3(fn_outstar, NODE_MICS);
 	pipelineOutputNodes.push_back(node3);
 	command += " --selection " + fn_outstar;
 
@@ -1315,21 +1266,11 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command += " --white " + floatToString(white_val.getValue());
 
 	if (lowpass.getValue() > 0.)
-	{
-		// Default angpix is 1 already
-		if (lowpass.getValue() > 0.5)
-			REPORT_ERROR(" ManualpickJobWindow::getCommands ERROR: lowpass value should be in range [0, 0.5]");
-		double invpix = 1. / lowpass.getValue();
-		command += " --lowpass " + floatToString(invpix);
-	}
+		command += " --lowpass " + floatToString(lowpass.getValue());
 	if (highpass.getValue() > 0.)
-	{
-		// Default angpix is 1 already
-		if (highpass.getValue() > 0.5)
-			REPORT_ERROR(" ManualpickJobWindow::getCommands ERROR: highpass value should be in range [0, 0.5]");
-		double invpix = 1. / highpass.getValue();
-		command += " --highpass " + floatToString(invpix);
-	}
+		command += " --highpass " + floatToString(highpass.getValue());
+	if (angpix.getValue() > 0.)
+		command += " --angpix " + floatToString(angpix.getValue());
 
 	command += " --ctf_scale " + floatToString(ctfscale.getValue());
 
@@ -1349,8 +1290,9 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 
-	// Also make the suffix file
-	command = "touch " + fn_suffix;
+	// Also make the suffix file (do this after previous command was pushed back!)
+	// Inside it, store the name of the micrograph STAR file, so we can display these later
+	command = "echo " + fn_in.getValue() + " > " + fn_suffix;
 	commands.push_back(command);
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
@@ -1366,8 +1308,11 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_input_autopick.place(current_y, "Input micrographs for autopick:", "micrographs_ctf.star", "Input micrographs (*.{star,mrc})", "Input STAR file (with CTF information), or a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
-	autopick_rootname.place(current_y, "Autopick rootname:", "autopick", "Output coordinate files will end in rootname.star");
+	fn_input_autopick.place(current_y, "Input micrographs for autopick:", NODE_MICS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
+	fn_refs_autopick.place(current_y, "References:", NODE_2DREFS, "", "Input references (*.{star})", "Input STAR file with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	tab1->end();
 	tab2->begin();
@@ -1378,9 +1323,13 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 	autopick_ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	autopick_ctf_group->end();
 
-	fn_refs_autopick.place(current_y, "References:", "", "Input references (*.{star,mrc,mrcs})", "Input STAR file or MRC (stack of) image(s) with the references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 
-	lowpass_autopick.place(current_y, "Lowpass filter references (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise....");
+	lowpass.place(current_y, "Lowpass filter refences (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
+	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. ");
+	angpix.place(current_y, "Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	psi_sampling_autopick.place(current_y, "Angular sampling (deg)", 5, 1, 30, 1, "Angular sampling in degrees for exhaustive searches of the in-plane rotations for all references.");
 
@@ -1432,11 +1381,12 @@ void AutopickJobWindow::write(std::string fn)
 
 	fn_input_autopick.writeValue(fh);
 	fn_refs_autopick.writeValue(fh);
-	autopick_rootname.writeValue(fh);
 	do_invert_refs.writeValue(fh);
 	do_ctf_autopick.writeValue(fh);
 	do_ignore_first_ctfpeak_autopick.writeValue(fh);
-	lowpass_autopick.writeValue(fh);
+	lowpass.writeValue(fh);
+	highpass.writeValue(fh);
+	angpix.writeValue(fh);
 	psi_sampling_autopick.writeValue(fh);
 	do_write_fom_maps.writeValue(fh);
 	do_read_fom_maps.writeValue(fh);
@@ -1456,11 +1406,12 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 
 		fn_input_autopick.readValue(fh);
 		fn_refs_autopick.readValue(fh);
-		autopick_rootname.readValue(fh);
 		do_invert_refs.readValue(fh);
 		do_ctf_autopick.readValue(fh);
 		do_ignore_first_ctfpeak_autopick.readValue(fh);
-		lowpass_autopick.readValue(fh);
+		lowpass.readValue(fh);
+		highpass.readValue(fh);
+		angpix.readValue(fh);
 		psi_sampling_autopick.readValue(fh);
 		do_write_fom_maps.readValue(fh);
 		do_read_fom_maps.readValue(fh);
@@ -1483,22 +1434,39 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 50;
 
 	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_autopick_mpi`";
 	else
 		command="`which relion_autopick`";
 
+	// for continue jobs, use the same outputname
+	if (!is_continue)
+	{
+		outputname = "AutoPick/UNIQDATE/";
+		changeDateNTimeInOutputname(outputname);
+	}
+	pipelineOutputName = outputname;
+
+	// Input
 	command += " --i " + fn_input_autopick.getValue();
-	command += " --o " + autopick_rootname.getValue();
-	command += " --particle_diameter " + floatToString(particle_diameter);
-	command += " --angpix " + floatToString(angpix);
+	Node node(fn_input_autopick.getValue(), fn_input_autopick.type);
+	pipelineInputNodes.push_back(node);
 	command += " --ref " + fn_refs_autopick.getValue();
+	Node node2(fn_refs_autopick.getValue(), fn_refs_autopick.type);
+	pipelineInputNodes.push_back(node2);
+
+	// Output
+	Node node3( outputname + "coords_suffix_autopick.star", NODE_MIC_COORDS);
+	pipelineOutputNodes.push_back(node3);
+
+	command += " --odir " + outputname;
+	command += " --pickname autopick";
 
 	if (do_invert_refs.getValue())
 		command += " --invert ";
@@ -1510,7 +1478,13 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 			command += " --ctf_intact_first_peak ";
 	}
 	command += " --ang " + floatToString(psi_sampling_autopick.getValue());
-	command += " --lowpass " + floatToString(lowpass_autopick.getValue());
+
+	if (lowpass.getValue() > 0.)
+		command += " --lowpass " + floatToString(lowpass.getValue());
+	if (highpass.getValue() > 0.)
+		command += " --highpass " + floatToString(highpass.getValue());
+	if (angpix.getValue() > 0.)
+		command += " --angpix " + floatToString(angpix.getValue());
 
 	if (do_write_fom_maps.getValue())
 		command += " --write_fom_maps ";
@@ -1527,10 +1501,9 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	commands.push_back(command);
 
-	outputname = autopick_rootname.getValue();
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
+	// Also touch the suffix file. Do this after the first command had completed
+	command = "echo " + fn_input_autopick.getValue() + " > " +  outputname + "coords_suffix_autopick.star";
+	commands.push_back(command.c_str());
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
@@ -1545,14 +1518,19 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
 	tab1->label("I/O");
 	resetHeight();
 
-    star_mics.place(current_y,"micrograph STAR file: ", NODE_MIC, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
-	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORD, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
+    star_mics.place(current_y,"micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
+	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	fn_out.place(current_y, "Output directory:", "Extract/UNIQDATE/", "Output directory. All particle stacks will be written inside this directory, and the final particles STAR file will be placed here as well.");
-	fn_out.deactivate();
+	set_angpix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	set_angpix_group->end();
+	do_set_angpix.place(current_y, "Manually set pixel size? ", false, "If set to Yes, the rlnMagnification and rlnDetectorPixelSize will be set in the resulting STAR file. Only use this option if CTF information is NOT coming from the input coordinate STAR file(s). For example, because you decided not to estimate the CTF for your micrographs.", set_angpix_group);
+	set_angpix_group->begin();
+	angpix.place(current_y, "Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms in the micrograph (so before any re-scaling).  If you provide input CTF parameters, then leave this value to the default of -1.");
+	set_angpix_group->end();
+	do_set_angpix.cb_menu_i();
 
 	tab1->end();
 
@@ -1562,17 +1540,6 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
 
 	extract_size.place(current_y,"Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
 	do_invert.place(current_y, "Invert contrast?", false, "If set to Yes, the contrast in the particles will be inverted.");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	rescale_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	rescale_group->end();
-	do_rescale.place(current_y, "Rescale particles?", false, "If set to Yes, particles will be re-scaled. Note that the particle diameter below will be in the down-scaled images.", rescale_group);
-	rescale_group->begin();
-	rescale.place(current_y, "Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number");
-	rescale_group->end();
-	do_rescale.cb_menu_i();
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1595,6 +1562,17 @@ Pixels values higher than this many times the image stddev will be replaced with
 	norm_group->end();
 	do_norm.cb_menu_i();
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	rescale_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	rescale_group->end();
+	do_rescale.place(current_y, "Rescale particles?", false, "If set to Yes, particles will be re-scaled. Note that the particle diameter below will be in the down-scaled images.", rescale_group);
+	rescale_group->begin();
+	rescale.place(current_y, "Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number");
+	rescale_group->end();
+	do_rescale.cb_menu_i();
+
 	tab2->end();
 	tab3->begin();
 	tab3->label("movies");
@@ -1611,7 +1589,7 @@ The name of the MCR stacks should be the rootname of the micrographs + '_moviero
 
 	first_movie_frame.place(current_y, "First movie frame to extract: ", 1, 1, 20, 1, "Extract from this movie frame onwards. The first frame is number 1.");
 
-	last_movie_frame.place(current_y, "Last movie frame to extract: ", 0, 0, 64, 1, "Extract until this movie frame. Zero means: extract all frames in the movie");
+	last_movie_frame.place(current_y, "Last movie frame to extract: ", 0, 0, 64, 1, "Extract until this movie frame. Zero means: extract all frames in the movie. You may want to specify the last frame number though, as it will be useful to detect movies which accidentally have fewer frames.");
 
 	movie_extract_group->end();
 	do_movie_extract.cb_menu_i();
@@ -1635,7 +1613,8 @@ void ExtractJobWindow::write(std::string fn)
 	// I/O
 	star_mics.writeValue(fh);
 	coords_suffix.writeValue(fh);
-	fn_out.writeValue(fh);
+	do_set_angpix.writeValue(fh);
+	angpix.writeValue(fh);
 
 	// extract
 	extract_size.writeValue(fh);
@@ -1665,7 +1644,8 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		// I/O
 		star_mics.readValue(fh);
 		coords_suffix.readValue(fh);
-		fn_out.readValue(fh);
+		do_set_angpix.readValue(fh);
+		angpix.readValue(fh);
 
 		// extract
 		extract_size.readValue(fh);
@@ -1683,7 +1663,6 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		first_movie_frame.readValue(fh);
 		last_movie_frame.readValue(fh);
 
-
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -1691,6 +1670,22 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	// For continuation: deactivate everything exceptthe movie stuff
+	star_mics.deactivate(is_continue);
+	coords_suffix.deactivate(is_continue);
+	do_set_angpix.deactivate(is_continue);
+	angpix.deactivate(is_continue);
+	extract_size.deactivate(is_continue);
+	do_rescale.deactivate(is_continue);
+	rescale.deactivate(is_continue);
+	do_norm.deactivate(is_continue);
+	bg_diameter.deactivate(is_continue);
+	white_dust.deactivate(is_continue);
+	black_dust.deactivate(is_continue);
+	do_invert.deactivate(is_continue);
+
+
 }
 
 void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -1712,7 +1707,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		// I/O
 		// Save the real output name (could be with _ctX for continuation)
 		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
+		outputname = "Extract/UNIQDATE/";
 
 		// Change outputname if it contains UNIQDATE
 		changeDateNTimeInOutputname(outputname);
@@ -1725,7 +1720,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	pipelineInputNodes.push_back(node);
 
 	FileName mysuffix = coords_suffix.getValue();
-	command += " --coord_dir " + mysuffix.beforeLastOf("/");
+	command += " --coord_dir " + mysuffix.beforeLastOf("/") + "/";
 	command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
 	Node node2(coords_suffix.getValue(), coords_suffix.type);
 	pipelineInputNodes.push_back(node2);
@@ -1777,6 +1772,11 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (do_invert.getValue())
 		command += " --invert_contrast ";
 
+	if (do_set_angpix.getValue())
+	{
+		command += " --set_angpix " + floatToString(angpix.getValue());
+	}
+
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
 	commands.push_back(command);
@@ -1795,22 +1795,14 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 
 	input_star.place(current_y, "Input particles to be sorted:", NODE_PART_DATA, "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
 
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output rootname:", "Sort/UNIQDATE/", "Output rootname for all files of this run. ");
-	fn_out.deactivate();
-
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("References");
+	tab2->label("CTF");
 	resetHeight();
 
 	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	ctf_group->end();
-
-	fn_refs.place(current_y, "References:", NODE_REF, "", "Input references (*.{star,mrc,mrcs})", "Input STAR file or MRC (stack of) image(s) with the references to be used for sorting. These should be the same references as used to determine the class number and in-plane orientations as given in the STAR file with the input particles");
 
 	do_ctf.place(current_y, "Are References CTF corrected?", true, "Set to Yes if the references were created with CTF-correction inside RELION. \n ", ctf_group);
 
@@ -1835,12 +1827,12 @@ void SortJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star.writeValue(fh);
-	fn_refs.writeValue(fh);
 	do_ctf.writeValue(fh);
 	do_ignore_first_ctfpeak.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
+
 void SortJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
@@ -1848,7 +1840,6 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star.readValue(fh);
-		fn_refs.readValue(fh);
 		do_ctf.readValue(fh);
 		do_ignore_first_ctfpeak.readValue(fh);
 
@@ -1856,6 +1847,7 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 		_is_continue = is_continue;
 	}
 }
+
 void SortJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
@@ -1876,12 +1868,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	if (!is_continue) // for continue jobs, use the same outputname
 	{
-		// I/O
-		// Save the real output name (could be with _ctX for continuation)
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
-
-		// Change outputname if it contains UNIQDATE
+		outputname = "Sort/UNIQDATE/";
 		changeDateNTimeInOutputname(outputname);
 	}
 	pipelineOutputName = outputname;
@@ -1890,9 +1877,30 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	Node node(input_star.getValue(), input_star.type);
 	pipelineInputNodes.push_back(node);
 
-	// TODO: how to handle 3DREFS????!
-	command += " --ref " + fn_refs.getValue();
-	Node node2(fn_refs.getValue(), fn_refs.type);
+	// Determine the --ref automatically, from the particle input filename
+	FileName fn_ref, fn_in = input_star.getValue();
+	int node_type;
+	if (fn_in.contains("_data.star") && (fn_in.contains("Class2D/") || fn_in.contains("Class3D/")) )
+	{
+		fn_ref = fn_in.without("_data.star") + "_model.star";
+		node_type= NODE_MODEL;
+	}
+	else if (fn_in.contains("_data.star") && fn_in.contains("Refine3D/"))
+	{
+		if (fn_in.contains("_it0"))
+			fn_ref = fn_in.without("_data.star") + "_half1_model.star";
+		else
+			fn_ref = fn_in.without("_data.star") + "_model.star";
+		node_type= NODE_MODEL;
+	}
+	else if (fn_in.contains("Extract/"))
+	{
+		// TODO!
+		REPORT_ERROR("BUG: TODO!!");
+		node_type= NODE_2DREFS;
+	}
+	command += " --ref " + fn_ref;
+	Node node2(fn_ref, node_type);
 	pipelineInputNodes.push_back(node2);
 
 	command += " --o " + outputname + "particles_sort.star";
@@ -1927,26 +1935,11 @@ Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
 	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 
-	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration \
+	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Class2D",  "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-
-	fn_out.place(current_y, "Output rootname:", "Class2D/UNIQDATE/", "Output rootname for all files of this run. \
-If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
-	fn_out.deactivate();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
-
 
 	tab1->end();
 
@@ -2008,6 +2001,11 @@ Too small values yield too-low resolution structures; too high values result in 
 	// Add a little spacer
 	current_y += STEPY/2;
 
+	particle_diameter.place(current_y, "Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
+circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
+If set to a value larger than the image size no masking will be performed.\n\n\
+The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
+
 	do_zero_mask.place(current_y, "Mask individual particles with zeros?", true, "If set to Yes, then in the individual particles, \
 the area outside a circle with the radius of the particle will be set to zeros prior to taking the Fourier transform. \
 This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
@@ -2020,6 +2018,13 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	highres_limit.place(current_y, "Limit resolution E-step to (A): ", -1, -1, 20, 1, "If set to a positive number, then the expectation step (i.e. the alignment) will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is useful to prevent overfitting, as the classification runs in RELION are not to be guaranteed to be 100% overfitting-free (unlike the 3D auto-refine with its gold-standard FSC). In particular for very difficult data sets, e.g. of very small or featureless particles, this has been shown to give much better class averages. \
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
 
 	tab3->end();
 
@@ -2072,7 +2077,6 @@ void Class2DJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	// I/O
-	fn_out.writeValue(fh);
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	nr_classes.writeValue(fh);
@@ -2086,6 +2090,7 @@ void Class2DJobWindow::write(std::string fn)
 	// Optimisation
 	nr_iter.writeValue(fh);
 	tau_fudge.writeValue(fh);
+	particle_diameter.writeValue(fh);
 	do_zero_mask.writeValue(fh);
 	highres_limit.writeValue(fh);
 
@@ -2106,7 +2111,6 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 	{
 
 		// I/O
-		fn_out.readValue(fh);
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		nr_classes.readValue(fh);
@@ -2120,6 +2124,7 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		// Optimisation
 		nr_iter.readValue(fh);
 		tau_fudge.readValue(fh);
+		particle_diameter.readValue(fh);
 		do_zero_mask.readValue(fh);
 		highres_limit.readValue(fh);
 
@@ -2151,10 +2156,6 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 200;
-
 	commands.clear();
 	pipelineOutputNodes.clear();
 	pipelineInputNodes.clear();
@@ -2165,20 +2166,10 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-	if (is_continue)
-	{
-		getContinueOutname(outputname, fn_cont.getValue());
-	}
-	else
-	{
-		// I/O
-		// Save the real output name (could be with _ctX for continuation)
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
 
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
+	// For relion_refine jobs: also make a new process for continuation runs (as users may actually change things there)
+	outputname = "Class2D/UNIQDATE/";
+	changeDateNTimeInOutputname(outputname);
 	command += " --o " + outputname + "run";;
 	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
@@ -2186,13 +2177,14 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
+		Node node(fn_cont.getValue(), NODE_OPTIMISER);
+		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
-		command += " --particle_diameter " + floatToString(particle_diameter);
 	}
 	// Parallel disc I/O?
 	if (!do_parallel_discio.getValue())
@@ -2215,6 +2207,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Optimisation
 	command += " --iter " + floatToString(nr_iter.getValue());
 	command += " --tau2_fudge " + floatToString(tau_fudge.getValue());
+    command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 	if (!is_continue)
 	{
 		command += " --K " + floatToString(nr_classes.getValue());
@@ -2274,13 +2267,13 @@ Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 
-	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration \
+	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Class3D/", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	fn_ref.place(current_y, "Reference map:", NODE_REF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
+	fn_ref.place(current_y, "Reference map:", NODE_3DREF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
 	Make sure this map has the same dimensions and the same pixel size as your input images.");
 
 	fn_mask.place(current_y, "Reference mask (optional):", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "\
@@ -2295,18 +2288,6 @@ the corresponding pixels in the reconstructed map are set to the average value o
 Thereby, for example, the higher density inside the virion may be set to a constant. \
 Note that this second mask should have one-values inside the virion and zero-values in the capsid and the solvent areas. \
 To use a second mask, use the additional option --solvent_mask2, which may given in the Additional arguments line (in the Running tab).");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output rootname:", "Class3D/UNIQDATE/", "Output rootname for all files of this run. \
-If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
-	fn_out.deactivate();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
 	tab1->end();
 	tab2->begin();
@@ -2403,6 +2384,11 @@ Too small values yield too-low resolution structures; too high values result in 
 	// Add a little spacer
 	current_y += STEPY/2;
 
+	particle_diameter.place(current_y, "Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
+circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
+If set to a value larger than the image size no masking will be performed.\n\n\
+The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
+
 	do_zero_mask.place(current_y, "Mask individual particles with zeros?", true, "If set to Yes, then in the individual particles, \
 the area outside a circle with the radius of the particle will be set to zeros prior to taking the Fourier transform. \
 This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
@@ -2415,6 +2401,12 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	highres_limit.place(current_y, "Limit resolution E-step to (A): ", -1, -1, 20, 1, "If set to a positive number, then the expectation step (i.e. the alignment) will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is useful to prevent overfitting, as the classification runs in RELION are not to be guaranteed to be 100% overfitting-free (unlike the 3D auto-refine with its gold-standard FSC). In particular for very difficult data sets, e.g. of very small or featureless particles, this has been shown to give much better class averages. \
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
+
+
+	// Add a little spacer
+	current_y += STEPY/2;
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
 	tab4->end();
 
@@ -2484,7 +2476,6 @@ void Class3DJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	// I/O
-	fn_out.writeValue(fh);
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	nr_classes.writeValue(fh);
@@ -2505,6 +2496,7 @@ void Class3DJobWindow::write(std::string fn)
 	// Optimisation
 	nr_iter.writeValue(fh);
 	tau_fudge.writeValue(fh);
+	particle_diameter.writeValue(fh);
 	do_zero_mask.writeValue(fh);
 	fn_mask.writeValue(fh);
 	highres_limit.writeValue(fh);
@@ -2528,7 +2520,6 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 	{
 
 		// I/O
-		fn_out.readValue(fh);
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		nr_classes.readValue(fh);
@@ -2549,6 +2540,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		// Optimisation
 		nr_iter.readValue(fh);
 		tau_fudge.readValue(fh);
+		particle_diameter.readValue(fh);
 		do_zero_mask.readValue(fh);
 		fn_mask.readValue(fh);
 		highres_limit.readValue(fh);
@@ -2597,9 +2589,6 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double particle_diameter = 50;
-
 	commands.clear();
 	std::string command;
 	pipelineOutputNodes.clear();
@@ -2610,20 +2599,9 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-	if (is_continue)
-	{
-		getContinueOutname(outputname, fn_cont.getValue());
-	}
-	else
-	{
-		// I/O
-		// Save the real output name (could be with _ctX for continuation)
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
-
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
+	// Continuation runs get their own UNIQDATE...
+	outputname = "Class3D/UNIQDATE/";
+	changeDateNTimeInOutputname(outputname);
 	command += " --o " + outputname + "run";;
 	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
@@ -2631,13 +2609,14 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
+		Node node(fn_cont.getValue(), NODE_OPTIMISER);
+		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
-		command += " --particle_diameter " + floatToString(particle_diameter);
 		if (fn_ref.getValue() != "None")
 		{
 			command += " --ref " + fn_ref.getValue();
@@ -2673,6 +2652,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Optimisation
 	command += " --iter " + floatToString(nr_iter.getValue());
 	command += " --tau2_fudge " + floatToString(tau_fudge.getValue());
+    command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 	if (!is_continue)
 	{
 		command += " --K " + floatToString(nr_classes.getValue());
@@ -2752,14 +2732,14 @@ Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 
-	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration \
+	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run. \n \
 Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
 
-	fn_ref.place(current_y, "Reference map:", NODE_REF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
+	fn_ref.place(current_y, "Reference map:", NODE_3DREF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
 	Make sure this map has the same dimensions and the same pixel size as your input images.");
 
 	fn_mask.place(current_y, "Reference mask (optional):", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "\
@@ -2774,22 +2754,6 @@ the corresponding pixels in the reconstructed map are set to the average value o
 Thereby, for example, the higher density inside the virion may be set to a constant. \
 Note that this second mask should have one-values inside the virion and zero-values in the capsid and the solvent areas. \
 To use a second mask, use the additional option --solvent_mask2, which may given in the Additional arguments line (in the Running tab).");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	fn_out.place(current_y, "Output rootname:", "Refine3D/UNIQDATE/", "Output rootname for all files of this run. \
-If this rootname contains a directory structure (e.g. 20110724/run1), the directory (20110724) will be created if it does not exist.");
-	fn_out.deactivate();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
 
 	tab1->end();
@@ -2866,11 +2830,24 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	tab4->label("Optimisation");
 	resetHeight();
 
+	particle_diameter.place(current_y, "Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
+circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
+If set to a value larger than the image size no masking will be performed.\n\n\
+The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
+
 	do_zero_mask.place(current_y, "Mask individual particles with zeros?", true, "If set to Yes, then in the individual particles, \
 the area outside a circle with the radius of the particle will be set to zeros prior to taking the Fourier transform. \
 This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
 between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
 High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
+
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
 
 	tab4->end();
 	tab5->begin();
@@ -2956,7 +2933,6 @@ void Auto3DJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	// I/O
-	fn_out.writeValue(fh);
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	do_parallel_discio.writeValue(fh);
@@ -2974,6 +2950,7 @@ void Auto3DJobWindow::write(std::string fn)
 	ctf_intact_first_peak.writeValue(fh);
 
 	// Optimisation
+	particle_diameter.writeValue(fh);
 	do_zero_mask.writeValue(fh);
 	fn_mask.writeValue(fh);
 
@@ -3002,7 +2979,6 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 	{
 
 		// I/O
-		fn_out.readValue(fh);
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		do_parallel_discio.readValue(fh);
@@ -3020,6 +2996,7 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		ctf_intact_first_peak.readValue(fh);
 
 		// Optimisation
+		particle_diameter.readValue(fh);
 		do_zero_mask.readValue(fh);
 		fn_mask.readValue(fh);
 
@@ -3084,9 +3061,6 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double particle_diameter = 50;
-
 	commands.clear();
 	std::string command;
 	pipelineOutputNodes.clear();
@@ -3097,34 +3071,27 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	else
 		command="`which relion_refine`";
 
-	if (is_continue)
-	{
-		getContinueOutname(outputname, fn_cont.getValue());
-	}
-	else
-	{
-		// I/O
-		// Save the real output name (could be with _ctX for continuation)
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = fn_out.getValue();
+	// continuation runs with Refine3D all get their own uniqdate
+	outputname = "Refine3D/UNIQDATE/";
+	changeDateNTimeInOutputname(outputname);
 
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
 	command += " --o " + outputname + "run";
 	pipelineOutputName = outputname;
-	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1); // TODO: add nr_bodies....
+
+	// TODO: add bodies!! (probably in next version)
+	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, do_movies.getValue(), do_alsorot_movies.getValue() );
 
 	if (is_continue)
 	{
 		command += " --continue " + fn_cont.getValue();
+		Node node(fn_cont.getValue(), NODE_OPTIMISER);
+		pipelineInputNodes.push_back(node);
 	}
 	else
 	{
 		command += " --auto_refine --split_random_halves --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
-		command += " --particle_diameter " + floatToString(particle_diameter);
 		if (fn_ref.getValue() != "None")
 		{
 			command += " --ref " + fn_ref.getValue();
@@ -3158,6 +3125,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 
 	// Optimisation
+    command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 	if (!is_continue)
 	{
 		// Always flatten the solvent
@@ -3246,6 +3214,110 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 }
 
+
+ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
+{
+
+	type = PROC_CLASSSELECT;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	fn_in.place(current_y, "Input _model.star file:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run.");
+
+	tab1->end();
+
+	// read settings if hidden file exists
+	read(".gui_classselect", is_continue);
+}
+
+
+
+void ClassSelectJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_classselect";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	fn_in.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+
+void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+	// Only read things if the file exists
+	if (openReadFile(fn, fh))
+	{
+		fn_in.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+
+void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+}
+
+void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir)
+{
+
+	commands.clear();
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
+	std::string command;
+	command="`which relion_display`";
+
+	// I/O
+	command += " --gui --i " + fn_in.getValue();
+	Node node(fn_in.getValue(), fn_in.type);
+	pipelineInputNodes.push_back(node);
+
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		outputname = "ClassSelect/UNIQDATE/";
+		changeDateNTimeInOutputname(outputname);
+	}
+	pipelineOutputName = outputname;
+
+	FileName fn_parts = outputname+"particles.star";
+	command += " --allow_save --fn_parts " + fn_parts;
+	Node node2(fn_parts, NODE_PART_DATA);
+	pipelineOutputNodes.push_back(node2);
+
+	// Only save the 2D class averages for 2D jobs
+	FileName fnt = fn_in.getValue();
+	if (fnt.contains("Class2D/"))
+	{
+		FileName fn_imgs = outputname+"class_averages.star";
+		command += " --fn_imgs " + fn_imgs;
+		Node node3(fn_imgs, NODE_2DREFS);
+		pipelineOutputNodes.push_back(node3);
+	}
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
+
+
+
 PostJobWindow::PostJobWindow() : RelionJobWindow(4, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
@@ -3256,12 +3328,8 @@ PostJobWindow::PostJobWindow() : RelionJobWindow(4, HAS_NOT_MPI, HAS_NOT_THREAD)
 	resetHeight();
 	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 
-	fn_out.place(current_y, "Output rootname", "postprocess", "Output rootname. All output files will be saved in the same directory as the unfiltered maps, unless the output name contains a forward slash. In that case, the corresponding directory will be created .");
-
-	//ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	//ctf_group->end();
-
 	tab1->end();
+
 	tab2->begin();
 	tab2->label("Mask");
 	resetHeight();
@@ -3297,7 +3365,7 @@ If you don't know what value to use, display one of the unfiltered half-maps in 
 	//ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	//ctf_group->end();
 
-	fn_mtf.place(current_y, "MTF of the detector (STAR file)", "", "STAR Files (*.star)", "The MTF of the detector is used in the (later) post-processing and particle polishing stages of refinement.  \
+	fn_mtf.place(current_y, "MTF of the detector (STAR file)", "", "STAR Files (*.star)", NULL, "The MTF of the detector is used in the (later) post-processing and particle polishing stages of refinement.  \
 If you know the MTF of your detector, provide it here. Curves for some well-known detectors may be downloaded from the RELION Wiki. Also see there for the exact format \
 \n If you do not know the MTF of your detector and do not want to measure it, then by leaving this entry empty, you include the MTF of your detector in your overall estimated B-factor upon sharpening the map.\
 Although that is probably slightly less accurate, the overall quality of your map will probably not suffer very much.");
@@ -3356,7 +3424,6 @@ void PostJobWindow::write(std::string fn)
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
-	fn_out.writeValue(fh);
 	do_automask.writeValue(fh);
 	inimask_threshold.writeValue(fh);
 	extend_inimask.writeValue(fh);
@@ -3380,7 +3447,6 @@ void PostJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		fn_in.readValue(fh);
-		fn_out.readValue(fh);
 		do_automask.readValue(fh);
 		inimask_threshold.readValue(fh);
 		extend_inimask.readValue(fh);
@@ -3433,21 +3499,13 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		exit(1);
 	}
 
-	// Get the output name. If the specified fn_out contains a directory, then make this directory and use it for output
-	// If it doesn't contain a directory, then use the directory as in fn_in.
-	int last_slash_out = fn_out.getValue().rfind("/");
-	int last_slash_in = fn_in.getValue().rfind("/");
-	if (last_slash_out < fn_out.getValue().size())
+	if (!is_continue) // for continue jobs, use the same outputname
 	{
-		// The output name contains a directory: use that one for output
-		outputname = fn_out.getValue();
+		outputname = "PostProcess/UNIQDATE/";
+		changeDateNTimeInOutputname(outputname);
 	}
-	else if  (last_slash_in < fn_in.getValue().size())
-	{
-		// Otherwise: the input name contains a directory: use that one for output
-		std::string dirs = fn_in.getValue().substr(0, last_slash_in + 1);
-		outputname = dirs + fn_out.getValue();
-	}
+	pipelineOutputName = outputname;
+
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname;
 	command += "  --angpix " + floatToString(angpix);
@@ -3466,8 +3524,8 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		command += " --extend_inimask " + floatToString(extend_inimask.getValue());
 		command += " --width_mask_edge " + floatToString(width_mask_edge.getValue());
 
-		Node(outputname + "_automask.mrc", NODE_MASK);
-		pipelineOutputNodes.push_back(node);
+		Node node3(outputname + "_automask.mrc", NODE_MASK);
+		pipelineOutputNodes.push_back(node3);
 	}
 
 	/// TODO: make a CREATE_MASK process and get it out of postprocessing
@@ -3520,8 +3578,6 @@ PolishJobWindow::PolishJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 	fn_in.place(current_y, "Input STAR file with aligned movies:", NODE_MOVIE_DATA, "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
 
 	fn_mask.place(current_y, "Mask for the reconstructions", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
-
-	fn_out.place(current_y, "Output rootname", "shiny", "Output rootname. Note that the program will write out ");
 
 	tab1->end();
 	tab2->begin();
@@ -3597,7 +3653,6 @@ void PolishJobWindow::write(std::string fn)
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
-	fn_out.writeValue(fh);
 	movie_runavg_window.writeValue(fh);
 	do_fit_movement.writeValue(fh);
 	sigma_nb.writeValue(fh);
@@ -3616,7 +3671,6 @@ void PolishJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		fn_in.readValue(fh);
-		fn_out.readValue(fh);
 		movie_runavg_window.readValue(fh);
 		do_fit_movement.readValue(fh);
 		sigma_nb.readValue(fh);
@@ -3654,22 +3708,30 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	else
 		command="`which relion_particle_polish`";
 
+	if (!is_continue) // for continue jobs, use the same outputname
+	{
+		outputname = "Polish/UNIQDATE/";
+		changeDateNTimeInOutputname(outputname);
+	}
+	pipelineOutputName = outputname;
+
+	// TODO: get running average width from the movie-continuation job!!
+
 	// General
 	command += " --i " + fn_in.getValue();
 
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
-	command += " --o " + fn_out.getValue();
+	// TODO!!
+	command += " --o " + outputname+"/shiny";
 
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
+	/*
 	Node node1(fn_out.getValue() + ".star", NODE_MOVIE_DATA); // TODO: output from Shiny in its own directory
 	pipelineOutputNodes.push_back(node1);
 	pipelineOutputName = fn_out.getValue();  // TODO: change OUTPUTNAME to its own output directory!
+	*/
 
-	command += "  --angpix " + floatToString(angpix);
 	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
 	// If this is not a continue job, then re-start from scratch....
 	if (!is_continue)
@@ -3703,28 +3765,18 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --sym " + sym_name.getValue();
 
 	// Normalisation
-	RFLOAT bg_rad = ROUND(particle_diameter / (2. * angpix));
-	command += " --bg_radius " + floatToString(bg_rad);
-	command += " --white_dust " + floatToString(white_dust);
-	command += " --black_dust " + floatToString(black_dust);
+	/// TODO!!!!
+
+	///RFLOAT bg_rad = ROUND(particle_diameter / (2. * angpix));
+	///command += " --bg_radius " + floatToString(bg_rad);
+	//command += " --white_dust " + floatToString(white_dust);
+	//command += " --black_dust " + floatToString(black_dust);
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
 
-	// Place the job submission script and the stdout and stderr files in the same directory as the input data.star
-
-	int last_slash = fn_in.getValue().rfind("/");
-	if (last_slash < fn_in.getValue().size())
-	{
-		std::string dirs = fn_in.getValue().substr(0, last_slash + 1); // +1 includes the slash
-		outputname = dirs + fn_out.getValue();
-	}
-	else
-	{
-		outputname = fn_out.getValue();
-	}
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
@@ -3758,7 +3810,7 @@ Note that values larger than zero will be changed to 1 by ResMap, therefore the 
 		default_location = mydefault;
 	}
 
-	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", NULL, "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	current_y += STEPY /2 ;
 

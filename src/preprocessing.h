@@ -141,6 +141,9 @@ public:
 	// Name of output stack (only when fn_operate in is given)
 	FileName fn_operate_out;
 
+	// Manually set pixel size (rlnMagnification and rlnDetectorPixelSize) in the output STAR file
+	RFLOAT set_angpix;
+
 public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);

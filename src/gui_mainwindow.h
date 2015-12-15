@@ -39,10 +39,10 @@
 #define MAX_JOBS_BROWSER 50
 
 // This class organises the main winfow of the relion GUI
-static Fl_Hold_Browser *browser;
-static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *this_from_job_browser, *this_to_job_browser;
+static Fl_Choice *add_new_job, *display_io_node;
+static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 // For keeping track of which process to use in the process browser on the GUI
-static std::vector<long int> running_processes, finished_processes, scheduled_processes, this_from_processes, this_to_processes;
+static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static Fl_Group        *browse_grp[NR_BROWSE_TABS];
 static bool is_main_continue;
 static ImportJobWindow *job_import;
@@ -55,15 +55,17 @@ static SortJobWindow *job_sort;
 static Class2DJobWindow *job_class2d;
 static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
+static ClassSelectJobWindow *job_classselect;
 static PostJobWindow *job_post;
 static PolishJobWindow *job_polish;
 static ResmapJobWindow *job_resmap;
 static PublishJobWindow *job_publish;
-//Toggle continue button
-static Fl_Toggle_Button *toggle_continue;
 // Run button
 static Fl_Button *run_button;
 static FileName fn_settings;
+
+// A manualpicker jobwindow for display of micrographs....
+static ManualpickJobWindow global_manualpickjob;
 
 // Store all the history
 static PipeLine pipeline;
@@ -71,6 +73,23 @@ static PipeLine pipeline;
 static int current_job;
 FileName global_outputname;
 
+static Fl_Menu_Item new_job_options[] = {
+		{"Import"},
+		{"Motion correction"},
+		{"CTF estimation"},
+		{"Manual picking"},
+		{"Auto-picking"},
+		{"Particle extraction"},
+		{"Particle sorting"},
+		{"2D classification"},
+		{"3D classification"},
+		{"Class selection"},
+		{"3D auto-refine"},
+		{"Particle polishing"},
+		{"Post-processing"},
+		{"Local-resolution"},
+		{0} // this should be the last entry
+};
 
 class RelionMainWindow : public Fl_Window
 {
@@ -83,7 +102,7 @@ public:
 	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
 
     // Run button
-    Fl_Button *print_CL_button, *cite_button, *display_button;
+    Fl_Button *print_CL_button, *cite_button;
     Fl_Button *schedule_button, *run_scheduled_button;
     Fl_Button *delete_button;
     Fl_Button *cleanup_button;
@@ -134,7 +153,7 @@ private:
      */
 
     static void cb_select_browsegroup(Fl_Widget*, void*);
-    inline void cb_select_browsegroup_i(bool change_current_job = true);
+    inline void cb_select_browsegroup_i();
 
     static void cb_select_finished_job(Fl_Widget*, void*);
     inline void cb_select_finished_job_i();
@@ -145,17 +164,19 @@ private:
     static void cb_select_scheduled_job(Fl_Widget*, void*);
     inline void cb_select_scheduled_job_i();
 
-    static void cb_select_from_job(Fl_Widget*, void*);
-    inline void cb_select_from_job_i();
+    static void cb_select_input_job(Fl_Widget*, void*);
+    inline void cb_select_input_job_i();
 
-    static void cb_select_to_job(Fl_Widget*, void*);
-    inline void cb_select_to_job_i();
+    static void cb_select_output_job(Fl_Widget*, void*);
+    inline void cb_select_output_job_i();
 
-    static void cb_toggle_continue(Fl_Widget*, void*);
-    inline void cb_toggle_continue_i();
+    static void cb_display_io_node(Fl_Widget*, void*);
+    inline void cb_display_io_node_i();
 
     static void cb_display(Fl_Widget*, void*);
     inline void cb_display_i();
+
+    inline void cb_toggle_continue_i();
 
     static void cb_run(Fl_Widget*, void*);
     inline void cb_run_i();

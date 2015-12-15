@@ -55,8 +55,21 @@ void PipeLine::addNewInputEdge(Node &_Node, long int myProcess)
 	long int newsize = nodeList.size();
 
 	// 2. Set the input_for_process in the inputForProcessList of this Node
-	(nodeList[myNode]).inputForProcessList.push_back(myProcess);
-	(processList[myProcess]).inputNodeList.push_back(myNode);
+	// But only if it doesn't exist yet
+	bool found = false;
+	for (size_t i = 0; i < (nodeList[myNode]).inputForProcessList.size(); i++)
+	{
+		if ((nodeList[myNode]).inputForProcessList[i] == myProcess)
+		{
+			found=true;
+			break;
+		}
+	}
+	if (!found)
+	{
+		(nodeList[myNode]).inputForProcessList.push_back(myProcess);
+		(processList[myProcess]).inputNodeList.push_back(myNode);
+	}
 
 	if (newsize > oldsize)
 	{
@@ -83,11 +96,15 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 {
 
 	// 1. Check whether Node with that name already exists in the Node list
+	long int old_size = nodeList.size();
 	long int myNode = addNode(_Node);
 
-	// 1. Set the output_from_process in the inputForProcessList of this Node
+	// 2. Set the output_from_process of this Node
 	nodeList[myNode].outputFromProcess = myProcess;
-	processList[myProcess].outputNodeList.push_back(myNode);
+
+	// 3. Only for new Nodes, add this Node to the outputNodeList of myProcess
+	if (myNode == old_size)
+		processList[myProcess].outputNodeList.push_back(myNode);
 
 }
 

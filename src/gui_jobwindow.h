@@ -59,12 +59,11 @@ static Fl_Menu_Item sampling_options[] = {
 };
 
 static Fl_Menu_Item node_type_options[] = {
-		      {"2D micrograph movie(s) (.mrcs or .star)"},
-		      {"2D micrograph(s) (.mrc or .star)"},
-		      {"2D/3D particle coordinates (.box, .star or .*)"},
-		      {"3D tomogram(s) (.mrc or .star)"},
-		      {"2D/3D reference image(s) (.mrc or .star)"},
-		      {"2D/3D mask(s) (.mrc or .star)"},
+		      {"2D micrograph movies (*.mrcs)"},
+	          {"2D micrographs/tomograms (*.mrc)"},
+		      {"2D/3D particle coordinates (*.box, *_pick.star)"},
+		      {"3D reference (.mrc)"},
+		      {"3D mask (.mrc)"},
 		      {0} // this should be the last entry
 };
 
@@ -72,9 +71,8 @@ static int minimum_nr_dedicated;
 static bool do_allow_change_minimum_dedicated;
 
 
-void getContinueOutname(std::string &outputname, FileName fn_cont);
 // Output filenames of relion_refine (use iter=-1 for auto-refine)
-std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies = 1);
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies = 1, bool do_movies = false, bool do_also_rot = false);
 
 class RelionJobWindow : public Fl_Box
 {
@@ -198,7 +196,6 @@ public:
 
 	// I/O
 	FileNameEntry fn_in;
-	AnyEntry fn_out;
 	RadioEntry node_type;
 
 public:
@@ -226,7 +223,6 @@ class MotioncorrJobWindow : public RelionJobWindow
 public:
 
 	InputNodeEntry input_star_mics;
-	AnyEntry fn_out;
 	FileNameEntry fn_motioncorr_exe;
 	SliderEntry bin_factor;
 	SliderEntry first_frame_ali;
@@ -262,10 +258,9 @@ class CtffindJobWindow : public RelionJobWindow
 public:
 
 	InputNodeEntry input_star_mics;
-	AnyEntry fn_out;
 	FileNameEntry fn_ctffind_exe, fn_gctf_exe;
 	SliderEntry ctf_win;
-	SliderEntry cs, kv, q0, angpix, dstep, dast;
+	SliderEntry cs, kv, q0, angpix, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
 	AnyEntry other_gctf_args;
@@ -296,14 +291,14 @@ class AutopickJobWindow : public RelionJobWindow
 {
 public:
 
-	FileNameEntry fn_input_autopick;
-	FileNameEntry fn_refs_autopick;
-	AnyEntry autopick_rootname;
+	InputNodeEntry fn_input_autopick;
+	InputNodeEntry fn_refs_autopick;
 	BooleanEntry do_invert_refs;
 	BooleanEntry do_ctf_autopick;
 	BooleanEntry do_ignore_first_ctfpeak_autopick;
-	SliderEntry lowpass_autopick;
-	SliderEntry highpass_autopick;
+	SliderEntry lowpass;
+	SliderEntry highpass;
+	SliderEntry angpix;
 	SliderEntry psi_sampling_autopick;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
@@ -338,9 +333,9 @@ class ManualpickJobWindow : public RelionJobWindow
 public:
 
 	InputNodeEntry fn_in;
-	AnyEntry fn_out;
 	SliderEntry lowpass;
 	SliderEntry highpass;
+	SliderEntry angpix;
 	SliderEntry diameter;
 	SliderEntry micscale;
 	SliderEntry ctfscale;
@@ -383,10 +378,11 @@ public:
 	// I/O
 	InputNodeEntry star_mics;
 	InputNodeEntry coords_suffix;
-	AnyEntry fn_out;
 
 	// extract
 	SliderEntry extract_size;
+	BooleanEntry do_set_angpix;
+	SliderEntry angpix;
 	BooleanEntry do_rescale;
 	SliderEntry rescale;
 	BooleanEntry do_norm;
@@ -401,7 +397,7 @@ public:
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
 
-	Fl_Group *rescale_group, *norm_group, *movie_extract_group;
+	Fl_Group *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group;
 
 public:
 
@@ -430,8 +426,6 @@ public:
 
 	// I/O
 	InputNodeEntry input_star;
-	AnyEntry fn_out;
-	InputNodeEntry fn_refs;
 	BooleanEntry do_ctf;
 	BooleanEntry do_ignore_first_ctfpeak;
 
@@ -459,13 +453,11 @@ public:
 };
 
 
-
 class Class2DJobWindow : public RelionJobWindow
 {
 public:
 
 	// I/O
-	AnyEntry fn_out;
 	FileNameEntry fn_cont;
 	InputNodeEntry fn_img;
 	BooleanEntry do_parallel_discio;
@@ -478,6 +470,7 @@ public:
 	// Optimisation
 	SliderEntry nr_iter;
 	SliderEntry tau_fudge;
+	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
 	SliderEntry highres_limit;
 
@@ -517,7 +510,6 @@ class Class3DJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	AnyEntry fn_out;
 	FileNameEntry fn_cont;
 	InputNodeEntry fn_img;
 	InputNodeEntry fn_ref;
@@ -539,6 +531,7 @@ public:
 	// Optimisation
 	SliderEntry nr_iter;
 	SliderEntry tau_fudge;
+	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
 	SliderEntry highres_limit;
 
@@ -579,7 +572,6 @@ class Auto3DJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	AnyEntry fn_out;
 	FileNameEntry fn_cont;
 	InputNodeEntry fn_img;
 	InputNodeEntry fn_ref;
@@ -598,6 +590,7 @@ public:
 	BooleanEntry ctf_intact_first_peak;
 
 	// Optimisation
+	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
 
 	// Sampling
@@ -638,13 +631,39 @@ public:
 
 };
 
+class ClassSelectJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_in;
+
+public:
+
+	// Constructor
+	ClassSelectJobWindow();
+
+	// Destructor
+	~ClassSelectJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
 class PostJobWindow : public RelionJobWindow
 {
 public:
 
 	// I/O
 	InputNodeEntry fn_in;
-	AnyEntry fn_out;
 
 	// TODO: take away auto-masking from postprocessing and do this outside the postprocessing in a new jobtype
 
@@ -696,7 +715,6 @@ public:
 	// I/O
 	InputNodeEntry fn_in;
 	InputNodeEntry fn_mask;
-	AnyEntry fn_out;
 
 	// Movements
 	SliderEntry movie_runavg_window;

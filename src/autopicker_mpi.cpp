@@ -56,10 +56,21 @@ void AutoPickerMpi::run()
 		barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 	}
 
+	FileName fn_olddir="";
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
     {
     	if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
+
+		// Check new-style outputdirectory exists and make it if not!
+		FileName fn_dir = getOutputRootName(fn_micrographs[imic]);
+		fn_dir = fn_dir.beforeLastOf("/");
+		if (fn_dir != fn_olddir)
+		{
+			// Make a Particles directory
+			int res = system(("mkdir -p " + fn_dir).c_str());
+			fn_olddir = fn_dir;
+		}
 
     	autoPickOneMicrograph(fn_micrographs[imic]);
 	}

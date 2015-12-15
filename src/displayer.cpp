@@ -533,7 +533,6 @@ int multiViewerCanvas::handle(int ev)
 						{ 0 }
 					};
 
-				    do_allow_save = false;
 					if (!do_allow_save)
 				    {
 						rclick_menu[9].deactivate();
@@ -904,10 +903,8 @@ void multiViewerCanvas::showSelectedParticles(bool save_selected)
 void multiViewerCanvas::saveSelected(bool save_selected)
 {
 	if (fn_selected_imgs == "")
-	{
-		std::cout << " Not saving selected images, as no filename was provided..." << std::endl;
 		return;
-	}
+
 	// Now save the MetaData
 	MetaDataTable MDout;
 	int nsel = 0;
@@ -1635,6 +1632,15 @@ void displayerGuiWindow::cb_display_i()
 		cl += " --class ";
 	}
 
+	if (do_allow_save)
+	{
+		cl += " --allow_save ";
+		if (fn_parts != "")
+			cl += " --fn_parts " + fn_parts;
+		if (fn_imgs != "")
+			cl += " --fn_imgs " + fn_imgs;
+	}
+
 
 	// send job in the background
 	cl += " &";
@@ -1668,6 +1674,7 @@ void Displayer::read(int argc, char **argv)
 	reverse_sort = parser.checkOption("--reverse", "Use reverse order (from high to low) in the sorting");
 	do_class = parser.checkOption("--class", "Use this to analyse classes in input model.star file");
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
+	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
 	fn_selected_imgs = parser.getOption("--fn_imgs", "Name of the STAR file in which to save selected images.", "");
 	fn_selected_parts = parser.getOption("--fn_parts", "Name of the STAR file in which to save particles from selected classes.", "");
 
@@ -1677,7 +1684,7 @@ void Displayer::read(int argc, char **argv)
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A) to calculate lowpass filter", "1"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A) to calculate lowpass filter", "-1"));
 	fn_color = parser.getOption("--color_star", "STAR file with a column for red-blue coloring (a subset of) the particles", "");
 	color_label = parser.getOption("--color_label", "MetaDataLabel to color particles on (e.g. rlnParticleSelectZScore)", "");
 	color_blue_value = textToFloat(parser.getOption("--blue", "Value of the blue color", "1."));
@@ -1748,53 +1755,91 @@ void Displayer::initialise()
     		std::cout <<" Warning: cannot find model.star file for " << fn_in << " needed for regrouping..." << std::endl;
 
     }
+
+    // Check if input STAR file contains pixel-size information
+
+    if ((lowpass > 0 || highpass > 0) && angpix < 0)
+    {
+
+		if (fn_in.isStarFile())
+		{
+			MetaDataTable MD;
+			MD.read(fn_in);
+			RFLOAT mag, dstep;
+			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				angpix = 10000. * dstep / mag;
+				if (verb > 0)
+					std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+			}
+			else if (verb > 0 && (lowpass > 0 || highpass > 0))
+			{
+				REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
+			}
+		}
+		else
+		{
+			REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, so please also provide --angpix.");
+		}
+    }
+
 }
 
 int Displayer::runGui()
 {
 	Fl::scheme("gtk+");
-    // Shall I make a browser window in this GUI or in the general relion GUI?
-    // Perhaps here is better..., then there will be no fn_in yet....
-    // Update entire window each time the entry of the browser changes...
-    Fl_File_Chooser chooser(".",                        // directory
-                            "All recognised formats (*.{star,mrc,mrcs})\tSTAR Files (*.star)\tMRC stack (*.mrcs)\tMRC image (*.mrc)\tAll Files (*)*", // filter
-                            Fl_File_Chooser::SINGLE,     // chooser type
-                            "Choose file to display");        // title
-    chooser.show();
-    // Block until user picks something.
-    while(chooser.shown())
-        { Fl::wait(); }
 
-    // User hit cancel?
-    if ( chooser.value() == NULL )
-    	exit(0);
-    FileName _fn_in(chooser.value());
+	if (fn_in == "")
+	{
+		// Shall I make a browser window in this GUI or in the general relion GUI?
+		// Perhaps here is better..., then there will be no fn_in yet....
+		// Update entire window each time the entry of the browser changes...
+		Fl_File_Chooser chooser(".",                        // directory
+								"All recognised formats (*.{star,mrc,mrcs})\tSTAR Files (*.star)\tMRC stack (*.mrcs)\tMRC image (*.mrc)\tAll Files (*)*", // filter
+								Fl_File_Chooser::SINGLE,     // chooser type
+								"Choose file to display");        // title
+		chooser.show();
+		// Block until user picks something.
+		while(chooser.shown())
+			{ Fl::wait(); }
+
+		// User hit cancel?
+		if ( chooser.value() == NULL )
+			exit(0);
+		FileName _fn_in(chooser.value());
+		fn_in = _fn_in;
+	}
 
 	// make a bigger window for STAR files...
-	int windowheight = _fn_in.isStarFile() ? 350 : 300;
+	int windowheight = fn_in.isStarFile() ? 350 : 300;
 
 	displayerGuiWindow win(500, windowheight, "Relion display GUI");
 	win.is_class = false;
 	win.is_data = false;
 	win.is_star = false;
 	win.is_multi = false;
+	win.do_allow_save = do_allow_save;
+	win.fn_imgs = fn_selected_imgs;
+	win.fn_parts = fn_selected_parts;
 
 	// If this is a STAR file, decide what to do
-	if (_fn_in.isStarFile())
+	if (fn_in.isStarFile())
 	{
 		MetaDataTable MD;
 		win.is_star = true;
 		win.is_multi = true;
-		win.is_data = _fn_in.contains("_data.star");
-		if (_fn_in.contains("_model.star"))
+		win.is_data = fn_in.contains("_data.star");
+		if (fn_in.contains("_model.star"))
 		{
 			win.fn_data = fn_in.without("_model.star") + "_data.star";
 			win.is_class = true;
-			MD.read(_fn_in, "model_classes");
+			MD.read(fn_in, "model_classes");
 		}
 		else
 		{
-			MD.read(_fn_in);
+			MD.read(fn_in);
 		}
 
 		// Get which labels are stored in this metadatatable and generate choice menus for display and sorting
@@ -1824,11 +1869,11 @@ int Displayer::runGui()
 	{
 		// Try reading as an image/stack header
 		Image<RFLOAT> img;
-		img.read(_fn_in, false);
+		img.read(fn_in, false);
 		win.is_multi = (ZSIZE(img()) * NSIZE(img()) > 1);
 	}
 
-	win.fill(_fn_in);
+	win.fill(fn_in);
 }
 
 
