@@ -1238,7 +1238,7 @@ void ParticlePolisher::applyOptimisedBeamTiltsAndDefocus()
 		Matrix1D<RFLOAT> my_tilts(2);
 		for (int igroup = 0; igroup < fn_beamtilt_groups.size(); igroup++)
 		{
-			RFLOAT mindiff2 = 99.e99;
+			RFLOAT mindiff2 = LARGE_NUMBER;
 			RFLOAT best_tilt_x, best_tilt_y;
 			if (verb > 0)
 				std::cout << " + Beamtilt group " << fn_beamtilt_groups[igroup] << std::endl;
@@ -1440,7 +1440,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 			RFLOAT ori_defocusU = ctf.DeltafU;
 			RFLOAT ori_defocusV = ctf.DeltafV;
 			RFLOAT best_defocus_shift;
-			RFLOAT mindiff_thispart = 99.e99;
+			RFLOAT mindiff_thispart = LARGE_NUMBER;
 			// Optimise per-particle CTF defocus
 			// For now only non-anisotropically
 			if (defocus_shift_max > 0.)
@@ -1561,7 +1561,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 	// Set optimal defocus shift averaged over all particles in this micrograph:
 	if (defocus_shift_max > 0.)
 	{
-		RFLOAT mindiff2=99.e99, best_defocus_shift;
+		RFLOAT mindiff2=LARGE_NUMBER, best_defocus_shift;
 		int n_defocus = 0;
 		for (RFLOAT defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
 				defocus_shift <= nr_sampled_defocus_shifts*defocus_shift_step;

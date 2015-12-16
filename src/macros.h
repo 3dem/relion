@@ -62,9 +62,11 @@
 
 #ifdef RELION_SINGLE_PRECISION
 #define RFLOAT float
+#define LARGE_NUMBER 99e36
 #define MY_MPI_DOUBLE MPI_FLOAT
 #else
 #define RFLOAT double
+#define LARGE_NUMBER 99e99
 #define MY_MPI_DOUBLE MPI_DOUBLE
 #endif
 

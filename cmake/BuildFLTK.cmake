@@ -1,5 +1,5 @@
 message(STATUS "-------------------------------------------------")   
-message(STATUS "------------- USING LOCAL FLTK LIBS -------------")  
+message(STATUS "-------- WILL USE LOCALY BUILT FLTK LIBS --------")  
 message(STATUS "-------------------------------------------------") 
 
 set(FLTK_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fltk")
@@ -14,7 +14,7 @@ find_path(FLTK_INCLUDES     NAMES Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include/F
 
 if(FLTK_INCLUDE_DIR AND FLTK_LIBRARIES)
     set(FLTK_FOUND TRUE)
-    message( STATUS "found previously built external (non-system) fltk lib")
+    message( STATUS "Found previously built external (non-system) FLTK library")
 endif()
 ## ----------------------------------------------------------------- NEW EXT LIBS? --  
  

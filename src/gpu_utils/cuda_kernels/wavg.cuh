@@ -93,7 +93,6 @@ __global__ void cuda_kernel_wavg(
 						x,y,
 					s_eulers[0], s_eulers[1],
 					s_eulers[3], s_eulers[4],
-					s_eulers[6], s_eulers[7],
 					ref_real, ref_imag);
 
 			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
