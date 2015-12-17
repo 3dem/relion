@@ -572,7 +572,13 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					std::cerr << " expected_Pratio["<<iref<<"]= " << expected_Pratio << std::endl;
 					tt()=Mctfref;
 					tt.write("Mctfref.spi");
+
 #endif
+					std::cerr << "suma2 " << suma2 << std::endl;
+					std::cerr << "sum_ref_under_circ_mask " << sum_ref_under_circ_mask << std::endl;
+					std::cerr << "sum_ref2_under_circ_mask " << sum_ref2_under_circ_mask << std::endl;
+					std::cerr << "expected_Pratio " << expected_Pratio << std::endl;
+
 				}
 
 				// Now multiply template and micrograph to calculate the cross-correlation
@@ -580,6 +586,14 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				{
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
+
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+//				{
+//					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << std::endl;
+//
+//				}
+//				exit(0);
+
 				windowFourierTransform(Faux, Faux2, micrograph_size);
 				transformer.inverseFourierTransform(Faux2, Maux);
 				CenterFFT(Maux, false);

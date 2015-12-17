@@ -343,13 +343,11 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	CudaGlobalPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
 	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
 
-	for (unsigned i = 0; i < img_in.getSize(); i ++)
+	for (unsigned i = 0; i < v.nzyxdim; i ++)
 		img_in[i] = (XFLOAT) v.data[i];
 
-	img_in.device_alloc();
-	img_in.cp_to_device();
+	img_in.put_on_device();
 	img_aux.device_alloc();
-	HANDLE_ERROR(cudaStreamSynchronize(0));
 
 	if ( v.getDim() == 1 )
 	{
@@ -397,7 +395,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		}
 
 
-		dim3 dim((int)(v.nzyxdim/(long int)CFTT_BLOCK_SIZE));
+		dim3 dim(ceilf((float)(v.nzyxdim/(float)CFTT_BLOCK_SIZE)));
 		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
 										  img_aux.d_ptr,
 										  v.nzyxdim,
@@ -410,7 +408,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 
 		HANDLE_ERROR(cudaStreamSynchronize(0));
 
-		for (unsigned i = 0; i < img_aux.getSize(); i ++)
+		for (unsigned i = 0; i < v.nzyxdim; i ++)
 			v.data[i] = (T) img_aux[i];
 
 	}
@@ -525,8 +523,8 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
 	img_aux.device_alloc();
 
-	long int xshift = (int)(xSize / 2);
-	long int yshift = (int)(ySize / 2);
+	int xshift = (xSize / 2);
+	int yshift = (ySize / 2);
 
 	if (!forward)
 	{
@@ -534,7 +532,7 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 		yshift = -yshift;
 	}
 
-	dim3 dim((int)(img_in.size/(long int)CFTT_BLOCK_SIZE));
+	dim3 dim(ceilf((float)(img_in.size/(float)CFTT_BLOCK_SIZE)));
 	cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
 													  img_aux.d_ptr,
 													  img_in.size,
@@ -549,11 +547,11 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 
 }
 template <typename T>
-void runProbRatio(MultidimArray< T >& Mccf_best,
-				  MultidimArray< T >& Mpsi_best,
-				  CudaGlobalPtr< T >& d_Maux,
-				  MultidimArray< T >& Mmean,
-				  MultidimArray< T >& Mstddev,
+void runProbRatio(CudaGlobalPtr< XFLOAT >& d_Mccf_best,
+				  CudaGlobalPtr< XFLOAT >& d_Mpsi_best,
+				  CudaGlobalPtr< XFLOAT >& d_Maux,
+				  CudaGlobalPtr< XFLOAT >& d_Mmean,
+				  CudaGlobalPtr< XFLOAT >& d_Mstddev,
 				  T normfft,
 				  T sum_ref_under_circ_mask,
 				  T sum_ref2_under_circ_mask,
@@ -562,32 +560,10 @@ void runProbRatio(MultidimArray< T >& Mccf_best,
 				  CudaCustomAllocator *allocator)
 {
 
-//	CudaGlobalPtr<XFLOAT >  d_Maux(Maux.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mmean(Mmean.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mstddev(Mstddev.nzyxdim, allocator);
-
-	CudaGlobalPtr<XFLOAT >  d_Mccf(Mccf_best.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mpsi(Mpsi_best.nzyxdim, allocator);
-
-//	for (unsigned i = 0; i < Maux.getSize(); i ++)
-//		d_Maux[i] = (XFLOAT) Maux.data[i];
-	for (unsigned i = 0; i < Mmean.getSize(); i ++)
-		d_Mmean[i] = (XFLOAT) Mmean.data[i];
-	for (unsigned i = 0; i < Mstddev.getSize(); i ++)
-		d_Mstddev[i] = (XFLOAT) Mstddev.data[i];
-
-	d_Mccf.put_on_device();
-	d_Mpsi.put_on_device();
-//	d_Maux.put_on_device();
-	d_Mmean.put_on_device();
-	d_Mstddev.put_on_device();
-
-	HANDLE_ERROR(cudaStreamSynchronize(0));
-
-	dim3 dim((int)(d_Maux.size/(long int)PROBRATIO_BLOCK_SIZE));
+	dim3 dim(ceilf((float)(d_Maux.size/(float)PROBRATIO_BLOCK_SIZE)));
 	cuda_kernel_probRatio<<<dim,PROBRATIO_BLOCK_SIZE>>>(
-			d_Mccf.d_ptr,
-			d_Mpsi.d_ptr,
+			d_Mccf_best.d_ptr,
+			d_Mpsi_best.d_ptr,
 			d_Maux.d_ptr,
 			d_Mmean.d_ptr,
 			d_Mstddev.d_ptr,
@@ -599,15 +575,6 @@ void runProbRatio(MultidimArray< T >& Mccf_best,
 			psi
 			);
 
-	d_Mccf.cp_to_host();
-	d_Mpsi.cp_to_host();
-
-	HANDLE_ERROR(cudaStreamSynchronize(0));
-
-	for (unsigned i = 0; i < d_Mccf.getSize(); i ++)
-		Mccf_best.data[i] = (T) d_Mccf[i];
-	for (unsigned i = 0; i < d_Mpsi.getSize(); i ++)
-		Mpsi_best.data[i] = (T) d_Mpsi[i];
 }
 
 #endif //CUDA_HELPER_FUNCTIONS_CUH_
