@@ -1286,6 +1286,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
 			if (filteredSize == 0)
 			{
+				std::cerr << std::endl;
+				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 
@@ -1315,6 +1317,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if (my_nr_significant_coarse_samples == 0)
 			{
+				std::cerr << std::endl;
+				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
@@ -2105,6 +2109,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 		if (op.sum_weight[ipart]==0)
 		{
+			std::cerr << std::endl;
+			std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 			std::cerr << " part_id= " << part_id << std::endl;
 			std::cerr << " ipart= " << ipart << std::endl;
 			std::cerr << " op.min_diff2[ipart]= " << op.min_diff2[ipart] << std::endl;
@@ -2229,7 +2235,9 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 
 	if (allocationSize > free)
 	{
-		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_thread\", not available on device. (Defaulting to less)\n");
+		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
+		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
+		printf("  Total available size %zu MB\n", free/(1000*1000));
 		allocationSize = (float)free * .7; //Lets leave some for other processes for now
 	}
 
