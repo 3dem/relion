@@ -402,7 +402,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				{
 
 					d_Faux.cp_to_host();
-					HANDLE_ERROR(cudaStreamSynchronize(0));
+//					HANDLE_ERROR(cudaStreamSynchronize(0));
 
 					for (int i = 0; i < d_Faux.size ; i ++)
 					{
@@ -410,27 +410,42 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						Faux.data[i].imag = d_Faux[i].y;
 					}
 
+					cudaTransformer.setSize(Maux.xdim, Maux.ydim);
+
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
 					CUDA_CPU_TIC("windowFourierTransform_FP");
-					windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
+					windowFourierTransform2(~d_Faux,
+											~cudaTransformer.fouriers,
+											Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
+											basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
+											);
 					CUDA_CPU_TOC("windowFourierTransform_FP");
 
 					CUDA_CPU_TIC("inverseFourierTransform_FP");
-					transformer.inverseFourierTransform(Faux2, Maux);
+					cudaTransformer.backward();
 					CUDA_CPU_TOC("inverseFourierTransform_FP");
 
 					CUDA_CPU_TIC("runCenterFFT_FP");
-					runCenterFFT(Maux, false, allocator);
+					runCenterFFT(cudaTransformer.reals,
+								 (int)cudaTransformer.xSize,
+								 (int)cudaTransformer.ySize,
+								 false,
+								 allocator);
 					CUDA_CPU_TOC("runCenterFFT_FP");
+
+					cudaTransformer.reals.host_alloc();
+					cudaTransformer.reals.cp_to_host();
+//					HANDLE_ERROR(cudaStreamSynchronize(0));
+
+					for (int i = 0; i < cudaTransformer.reals.size ; i ++)
+						Maux.data[i] = cudaTransformer.reals[i];
 
 					CUDA_CPU_TIC("setXmippOrigin_FP_0");
 					Maux.setXmippOrigin();
 					CUDA_CPU_TOC("setXmippOrigin_FP_0");
 					// TODO: check whether I need CenterFFT(Maux, false)
-
-					cudaTransformer.setSize(Maux.xdim, Maux.ydim);
 
 					sum_ref_under_circ_mask = 0.;
 					sum_ref2_under_circ_mask = 0.;
@@ -490,7 +505,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						~d_Faux,
 						~cudaTransformer.fouriers,
 						Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
-						Faux2.xdim, Faux2.ydim, Faux2.zdim  //Output dimensions
+						basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
 						);
 				CUDA_CPU_TOC("windowFourierTransform_1");
 
@@ -534,14 +549,14 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				CUDA_CPU_TOC("probRatio");
 			    is_first_psi = false;
 			    CUDA_CPU_TOC("OneRotation");
-			    HANDLE_ERROR(cudaStreamSynchronize(0));
+//			    HANDLE_ERROR(cudaStreamSynchronize(0));
 			} // end for psi
 
 
 			d_Mccf_best.cp_to_host();
 			d_Mpsi_best.cp_to_host();
 
-			HANDLE_ERROR(cudaStreamSynchronize(0));
+//			HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			for (int i = 0; i < Mccf_best.nzyxdim; i ++)
 				Mccf_best.data[i] = d_Mccf_best[i];
@@ -562,11 +577,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
-//				{
-//					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
-//				}
-
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+				{
+					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
+				}
+				exit(0);
 			} // end if do_write_fom_maps
 
 		} // end if do_read_fom_maps

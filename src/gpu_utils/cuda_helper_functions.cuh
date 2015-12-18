@@ -341,13 +341,13 @@ template <typename T>
 void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allocator)
 {
 	CudaGlobalPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
-	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
+//	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
 
 	for (unsigned i = 0; i < v.nzyxdim; i ++)
 		img_in[i] = (XFLOAT) v.data[i];
 
 	img_in.put_on_device();
-	img_aux.device_alloc();
+//	img_aux.device_alloc();
 
 	if ( v.getDim() == 1 )
 	{
@@ -395,21 +395,20 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		}
 
 
-		dim3 dim(ceilf((float)(v.nzyxdim/(float)CFTT_BLOCK_SIZE)));
+		dim3 dim(ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE))));
 		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
-										  img_aux.d_ptr,
 										  v.nzyxdim,
 										  XSIZE(v),
 										  YSIZE(v),
 										  xshift,
 										  yshift);
 
-		img_aux.cp_to_host();
+		img_in.cp_to_host();
 
-		HANDLE_ERROR(cudaStreamSynchronize(0));
+//		HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		for (unsigned i = 0; i < v.nzyxdim; i ++)
-			v.data[i] = (T) img_aux[i];
+			v.data[i] = (T) img_in[i];
 
 	}
 	else if ( v.getDim() == 3 )
@@ -520,8 +519,8 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 				  bool forward,
 				  CudaCustomAllocator *allocator)
 {
-	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
-	img_aux.device_alloc();
+//	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	img_aux.device_alloc();
 
 	int xshift = (xSize / 2);
 	int yshift = (ySize / 2);
@@ -532,17 +531,16 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 		yshift = -yshift;
 	}
 
-	dim3 dim(ceilf((float)(img_in.size/(float)CFTT_BLOCK_SIZE)));
+	dim3 dim(ceilf((float)(img_in.size/(float)(2*CFTT_BLOCK_SIZE))));
 	cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
-													  img_aux.d_ptr,
 													  img_in.size,
 													  xSize,
 													  ySize,
 													  xshift,
 													  yshift);
 
-	HANDLE_ERROR(cudaStreamSynchronize(0));
-	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
+//	HANDLE_ERROR(cudaStreamSynchronize(0));
+//	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
 
 
 }
