@@ -371,15 +371,15 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	 *
 	 */
 
-	int pixel = threadIdx.x + blockIdx.x*PROBRATIO_BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*(int)PROBRATIO_BLOCK_SIZE;
 
 	if(pixel<image_size)
 	{
 		XFLOAT diff2 = normfft * d_Maux[pixel];
 		diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
 
-		if (d_Mstddev[pixel] > 1E-10)
-			diff2 /= d_Mstddev[pixel];
+//		if (d_Mstddev[pixel] > (XFLOAT)1E-10)
+		diff2 *= d_Mstddev[pixel];
 		diff2 += sum_ref2_under_circ_mask;
 
 #if defined(CUDA_DOUBLE_PRECISION)

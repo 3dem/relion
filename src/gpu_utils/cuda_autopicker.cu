@@ -453,9 +453,21 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						}
 					}
 
+
 					sum_ref_under_circ_mask /= sumn;
 					sum_ref2_under_circ_mask /= sumn;
 					expected_Pratio = exp(suma2 / (2. * sumn));
+
+					for(int i = 0; i < d_Mstddev.size ; i ++)
+					{
+						if (d_Mstddev[i] > (XFLOAT)1E-10)
+							d_Mstddev[i] = 1 / d_Mstddev[i];
+						else
+							d_Mstddev[i] = 1;
+
+					}
+					d_Mstddev.cp_to_device();
+
 					CUDA_CPU_TOC("suma_FP");
 
 					std::cerr << "suma2 " << suma2 << std::endl;
