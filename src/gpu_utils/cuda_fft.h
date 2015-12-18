@@ -25,8 +25,13 @@ class CudaFFT
 {
 	bool planSet;
 public:
+#ifdef CUDA_DOUBLE_PRECISION
+	CudaGlobalPtr<cufftDoubleReal> reals;
+	CudaGlobalPtr<cufftDoubleComplex> fouriers;
+#else
 	CudaGlobalPtr<cufftReal> reals;
 	CudaGlobalPtr<cufftComplex> fouriers;
+#endif
 	cufftHandle cufftPlanForward, cufftPlanBackward;
 	size_t xSize,ySize;
 
@@ -54,7 +59,22 @@ public:
 
 		fouriers.setSize(y*(x/2+1));
 		fouriers.device_alloc();
+#ifdef CUDA_DOUBLE_PRECISION
+		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_D2Z) );
+		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_Z2D) );
 
+		planSet = true;
+	}
+
+	void forward()
+	{ HANDLE_CUFFT_ERROR( cufftExecD2Z(cufftPlanForward, ~reals, ~fouriers) ); }
+
+	void backward()
+	{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~reals) ); }
+
+	void backward(CudaGlobalPtr<cufftDoubleReal> &dst)
+		{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~dst) ); }
+#else
 		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
 		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
 
@@ -69,7 +89,7 @@ public:
 
 	void backward(CudaGlobalPtr<cufftReal> &dst)
 		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~dst) ); }
-
+#endif
 	void clear()
 	{
 		if(planSet)
