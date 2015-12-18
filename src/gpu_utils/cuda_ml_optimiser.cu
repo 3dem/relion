@@ -538,10 +538,56 @@ void getAllSquaredDifferencesCoarse(
 
 	CUDA_CPU_TOC("diff_pre_gpu");
 
+	std::vector<CudaProjectorPlan> projectorPlans(0, cudaMLO->devBundle->allocator);
+
+	//If particle specific sampling plan required
+	if (cudaMLO->devBundle->generateProjectionPlanOnTheFly)
+	{
+		CUDA_CPU_TIC("generateProjectionSetupCoarse");
+
+		projectorPlans.resize(sp.iclass_max - sp.iclass_min + 1, cudaMLO->devBundle->allocator);
+
+		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		{
+			if (baseMLO->mymodel.pdf_class[iclass - sp.iclass_min] > 0.)
+			{
+				projectorPlans[iclass - sp.iclass_min].setup(
+						baseMLO->sampling,
+						op.directions_prior,
+						op.psi_prior,
+						op.pointer_dir_nonzeroprior,
+						op.pointer_psi_nonzeroprior,
+						NULL, //Mcoarse_significant
+						baseMLO->mymodel.pdf_class,
+						baseMLO->mymodel.pdf_direction,
+						sp.nr_dir,
+						sp.nr_psi,
+						sp.idir_min,
+						sp.idir_max,
+						sp.ipsi_min,
+						sp.ipsi_max,
+						sp.itrans_min,
+						sp.itrans_max,
+						0, //current_oversampling
+						1, //nr_oversampled_rot
+						iclass,
+						true, //coarse
+						!IS_NOT_INV,
+						baseMLO->do_skip_align,
+						baseMLO->do_skip_rotate,
+						baseMLO->mymodel.orientational_prior_mode
+						);
+			}
+		}
+		CUDA_CPU_TOC("generateProjectionSetupCoarse");
+	}
+	else
+		projectorPlans = cudaMLO->devBundle->coarseProjectionPlans;
+
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	CudaGlobalPtr<XFLOAT> allWeights(cudaMLO->devBundle->allocator);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		allWeights.setSize(cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles + allWeights.getSize());
+		allWeights.setSize(projectorPlans[exp_iclass - sp.iclass_min].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles + allWeights.getSize());
 
 	allWeights.device_alloc();
 	allWeights.host_alloc();
@@ -675,7 +721,7 @@ void getAllSquaredDifferencesCoarse(
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			if ( cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num > 0 )
+			if ( projectorPlans[exp_iclass - sp.iclass_min].orientation_num > 0 )
 			{
 				/*====================================
 				    	   Kernel Call
@@ -694,24 +740,24 @@ void getAllSquaredDifferencesCoarse(
 						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
-						~cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].eulers,
+						~projectorPlans[exp_iclass - sp.iclass_min].eulers,
 						&allWeights(allWeights_pos),
 						op,
 						baseMLO,
-						cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num,
+						projectorPlans[exp_iclass - sp.iclass_min].orientation_num,
 						translation_num,
 						image_size,
 						ipart,
 						group_id,
 						exp_iclass,
-						cudaMLO->classStreams[exp_iclass],
+						cudaMLO->classStreams[exp_iclass - sp.iclass_min],
 						do_CC);
 
 				mapAllWeightsToMweights(
-						~cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].iorientclasses,
+						~projectorPlans[exp_iclass - sp.iclass_min].iorientclasses,
 						&allWeights(allWeights_pos),
 						&Mweight(ipart*weightsPerPart),
-						cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num,
+						projectorPlans[exp_iclass - sp.iclass_min].orientation_num,
 						translation_num,
 						cudaMLO->classStreams[exp_iclass]
 						);
@@ -719,10 +765,13 @@ void getAllSquaredDifferencesCoarse(
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
-				allWeights_pos += cudaMLO->devBundle->coarseProjectionPlans[exp_iclass].orientation_num*translation_num;
+				allWeights_pos += projectorPlans[exp_iclass - sp.iclass_min].orientation_num*translation_num;
 
 			} // end if class significant
 		} // end loop iclass
+
+		allWeights.cp_to_host();
+		allWeights.streamSync();
 
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 
@@ -1137,16 +1186,31 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						myprior_z = ZZ(op.prior[ipart]);
 				}
 
+				std::vector<RFLOAT> tdiff2s(sp.nr_trans);
+				RFLOAT tdiff2_min(LARGE_NUMBER);
+
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
-					RFLOAT offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
-					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
-					RFLOAT tdiff2 = (offset_x - myprior_x) * (offset_x - myprior_x) + (offset_y - myprior_y) * (offset_y - myprior_y);
+					RFLOAT offset_x = old_offset_x - myprior_x + baseMLO->sampling.translations_x[itrans];
+					RFLOAT offset_y = old_offset_y - myprior_y + baseMLO->sampling.translations_y[itrans];
+					RFLOAT tdiff2 = offset_x * offset_x + offset_y * offset_y;
+
 					if (baseMLO->mymodel.data_dim == 3)
 					{
-						RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
-						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+						RFLOAT offset_z = old_offset_z - myprior_z + baseMLO->sampling.translations_z[itrans];
+						tdiff2 += offset_z * offset_z;
 					}
+
+					tdiff2s[itrans] = tdiff2;
+
+					if (tdiff2 < tdiff2_min)
+						tdiff2_min = tdiff2;
+				}
+
+				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
+				{
+					RFLOAT tdiff2 = tdiff2s[itrans] - tdiff2_min;
+
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
 					if (baseMLO->mymodel.sigma2_offset < 0.0001)
@@ -2282,7 +2346,7 @@ void MlDeviceBundle::resetData()
 
 #endif
 
-	coarseProjectionPlans.resize(nr_classes, NULL);
+	coarseProjectionPlans.resize(nr_classes, allocator);
 
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -2567,58 +2631,6 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 #endif
 				if (ipass == 0)
 				{
-#ifdef TIMING
-	// Only time one thread
-	if (thread_id == 0)
-		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_C);
-#endif
-					 //If particle specific sampling plan required
-					if (devBundle->generateProjectionPlanOnTheFly)
-					{
-						CUDA_CPU_TIC("generateProjectionSetupCoarse");
-
-						for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
-						{
-							if (baseMLO->mymodel.pdf_class[iclass] > 0.)
-							{
-								devBundle->coarseProjectionPlans[iclass].setup(
-										baseMLO->sampling,
-										op.directions_prior,
-										op.psi_prior,
-										op.pointer_dir_nonzeroprior,
-										op.pointer_psi_nonzeroprior,
-										NULL, //Mcoarse_significant
-										baseMLO->mymodel.pdf_class,
-										baseMLO->mymodel.pdf_direction,
-										sp.nr_dir,
-										sp.nr_psi,
-										sp.idir_min,
-										sp.idir_max,
-										sp.ipsi_min,
-										sp.ipsi_max,
-										sp.itrans_min,
-										sp.itrans_max,
-										0, //current_oversampling
-										1, //nr_oversampled_rot
-										iclass,
-										true, //coarse
-										!IS_NOT_INV,
-										baseMLO->do_skip_align,
-										baseMLO->do_skip_rotate,
-										baseMLO->mymodel.orientational_prior_mode
-										);
-							}
-							else
-								devBundle->coarseProjectionPlans[iclass].clear();
-						}
-						CUDA_CPU_TOC("generateProjectionSetupCoarse");
-					}
-#ifdef TIMING
-	// Only time one thread
-	if (thread_id == 0)
-		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_C);
-#endif
-
 					unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 					op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);

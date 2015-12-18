@@ -848,12 +848,6 @@ void MlOptimiser::initialise()
 
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
-			int bundle_id;
-			if(!do_auto_refine || (devCount>=2))
-				bundle_id = dev_id;
-			else
-				raise(SIGSEGV);
-
 			//Only make a new bundle of not existing on device
 			MlDeviceBundle * bundle(NULL);
 
