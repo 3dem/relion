@@ -331,14 +331,22 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
 
-	CudaGlobalPtr< CUDACOMPLEX >  	d_Fmic     ((CUDACOMPLEX*)&Fmic.data[0], Fmic.nzyxdim, allocator);
+	CudaGlobalPtr< CUDACOMPLEX >  	d_Fmic( Fmic.nzyxdim, allocator);
+	for(int i = 0; i< d_Fmic.size ; i++)
+	{
+		d_Fmic[i].x=Fmic.data[i].real;
+		d_Fmic[i].y=Fmic.data[i].imag;
+	}
 	d_Fmic.put_on_device();
 
 	CUDA_CPU_TIC("setupProjectors");
 	setupProjectors();
 	CUDA_CPU_TOC("setupProjectors");
 
-	CudaGlobalPtr< RFLOAT >   d_ctf(&Fctf.data[0], Fctf.nzyxdim, allocator);
+	CudaGlobalPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);
+	for(int i = 0; i< d_ctf.size ; i++)
+		d_ctf[i]=Fctf.data[i];
+
 	d_ctf.put_on_device();
 
 	for (int iref = 0; iref < basePckr->Mrefs.size(); iref++)
@@ -364,17 +372,15 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		} //end else if do_read_fom_maps
 		else
 		{
+			CUDA_CPU_TIC("mccfInit");
 			deviceInitValue(d_Mccf_best, (XFLOAT)-LARGE_NUMBER);
-
+			CUDA_CPU_TOC("mccfInit");
 			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 									cudaProjectors[iref],
 									(int)Faux.xdim,
 									(int)Faux.ydim,
 									(int)Faux.xdim-1);
 
-			CUDA_CPU_TIC("mccfInit");
-			Mccf_best.initConstant(-LARGE_NUMBER);
-			CUDA_CPU_TOC("mccfInit");
 			bool is_first_psi = true;
 			for (RFLOAT psi = 0. ; psi < 360.; psi+=basePckr->psi_sampling)
 			{
@@ -385,13 +391,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				d_Faux.device_alloc();
 
 				dim3 dim((int)ceilf((float)d_Faux.size/(float)BLOCK_SIZE));
-//				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
-//																  d_Faux.d_ptr,
-//																  d_ctf.d_ptr,
-//																  DEG2RAD(psi),
-//																  projKernel
-//															);
-
+				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
+																  d_Faux.d_ptr,
+																  d_ctf.d_ptr,
+																  DEG2RAD(psi),
+																  projKernel
+															);
 
 				if (is_first_psi)
 				{
@@ -481,7 +486,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				cudaTransformer.backward();
 
 				CUDA_CPU_TIC("runCenterFFT_1");
-
 				runCenterFFT(cudaTransformer.reals,
 							 (int)cudaTransformer.xSize,
 							 (int)cudaTransformer.ySize,
@@ -489,7 +493,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 							 allocator);
 				CUDA_CPU_TOC("runCenterFFT_1");
 
-				cudaTransformer.reals.streamSync();
+//				cudaTransformer.reals.streamSync();
 
 				CUDA_CPU_TOC("CudaInverseFourierTransform_1");
 
@@ -500,22 +504,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
 				CUDA_CPU_TIC("probRatio");
 
-				runProbRatio(d_Mccf_best,
-							 d_Mpsi_best,
-							 cudaTransformer.reals,
-							 d_Mmean,
-							 d_Mstddev,
-							 normfft,
-							 sum_ref_under_circ_mask,
-							 sum_ref2_under_circ_mask,
-							 expected_Pratio,
-							 psi,
-							 allocator
-							);
+				int PR_blocks (ceilf((float)(cudaTransformer.reals.size/(float)PROBRATIO_BLOCK_SIZE)));
+				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
+						d_Mccf_best.d_ptr,
+						d_Mpsi_best.d_ptr,
+						cudaTransformer.reals.d_ptr,
+						d_Mmean.d_ptr,
+						d_Mstddev.d_ptr,
+						cudaTransformer.reals.size,
+						(XFLOAT) -2*normfft,
+						(XFLOAT) 2*sum_ref_under_circ_mask,
+						(XFLOAT) sum_ref2_under_circ_mask,
+						(XFLOAT) expected_Pratio,
+						(XFLOAT) psi
+						);
 
 				CUDA_CPU_TOC("probRatio");
 			    is_first_psi = false;
 			    CUDA_CPU_TOC("OneRotation");
+			    HANDLE_ERROR(cudaStreamSynchronize(0));
 			} // end for psi
 
 
@@ -536,11 +543,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				It() = Mccf_best;
 				// Store expected_Pratio in the header of the image..
 				It.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);;
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.mrc");
+				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.spi");
 				It.write(fn_tmp);
 
 				It() = Mpsi_best;
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.mrc");
+				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
 //				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)

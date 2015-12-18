@@ -83,10 +83,10 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT expected_Pratio,
 										XFLOAT psi);
 
-//__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux_real,
-//						  	  	  	  	  XFLOAT *d_ctf,
-//						  	  	  	  	  XFLOAT psi,
-//						  	  			  CudaProjectorKernel projector);
+__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+						  	  	  	  	  XFLOAT *d_ctf,
+						  	  	  	  	  XFLOAT psi,
+						  	  			  CudaProjectorKernel projector);
 
 __global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
 									 CUDACOMPLEX *d_B,

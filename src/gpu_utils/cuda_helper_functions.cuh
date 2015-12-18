@@ -546,36 +546,6 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 
 
 }
-template <typename T>
-void runProbRatio(CudaGlobalPtr< XFLOAT >& d_Mccf_best,
-				  CudaGlobalPtr< XFLOAT >& d_Mpsi_best,
-				  CudaGlobalPtr< XFLOAT >& d_Maux,
-				  CudaGlobalPtr< XFLOAT >& d_Mmean,
-				  CudaGlobalPtr< XFLOAT >& d_Mstddev,
-				  T normfft,
-				  T sum_ref_under_circ_mask,
-				  T sum_ref2_under_circ_mask,
-				  T expected_Pratio,
-				  T psi,
-				  CudaCustomAllocator *allocator)
-{
-
-	dim3 dim(ceilf((float)(d_Maux.size/(float)PROBRATIO_BLOCK_SIZE)));
-	cuda_kernel_probRatio<<<dim,PROBRATIO_BLOCK_SIZE>>>(
-			d_Mccf_best.d_ptr,
-			d_Mpsi_best.d_ptr,
-			d_Maux.d_ptr,
-			d_Mmean.d_ptr,
-			d_Mstddev.d_ptr,
-			d_Maux.size,
-			-2*normfft,
-			2*sum_ref_under_circ_mask,
-			sum_ref2_under_circ_mask,
-			expected_Pratio,
-			psi
-			);
-
-}
 
 #endif //CUDA_HELPER_FUNCTIONS_CUH_
 

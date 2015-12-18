@@ -587,13 +587,6 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
 
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
-//				{
-//					std::cerr << Faux.data[n].real << " " << Faux.data[n].imag << std::endl;
-//
-//				}
-//				exit(0);
-
 				windowFourierTransform(Faux, Faux2, micrograph_size);
 				transformer.inverseFourierTransform(Faux2, Maux);
 				CenterFFT(Maux, false);
