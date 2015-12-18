@@ -64,29 +64,28 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT cosine_width	);
 
 __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
-										 XFLOAT *img_out,
-										 long int image_size,
-										 long int xdim,
-										 long int ydim,
-										 long int xshift,
-										 long int yshift);
+										 int image_size,
+										 int xdim,
+										 int ydim,
+										 int xshift,
+										 int yshift);
 
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,
 										XFLOAT *d_Mmean,
 										XFLOAT *d_Mstddev,
-										long int image_size,
+										int image_size,
 										XFLOAT normfft,
 										XFLOAT sum_ref_under_circ_mask,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
 										XFLOAT psi);
 
-//__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux_real,
-//						  	  	  	  	  XFLOAT *d_ctf,
-//						  	  	  	  	  XFLOAT psi,
-//						  	  			  CudaProjectorKernel projector);
+__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+						  	  	  	  	  XFLOAT *d_ctf,
+						  	  	  	  	  XFLOAT psi,
+						  	  			  CudaProjectorKernel projector);
 
 __global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
 									 CUDACOMPLEX *d_B,
