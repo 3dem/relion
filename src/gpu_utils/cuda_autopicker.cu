@@ -125,6 +125,95 @@ void AutoPickerCuda::run()
 
 }
 
+void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &_Fmic, const MultidimArray<Complex > &_Fmic2,
+		MultidimArray<Complex > &_Fmsk, int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &_Mstddev, MultidimArray<RFLOAT> &_Mmean)
+{
+
+	MultidimArray<Complex > Faux, Faux2;
+	MultidimArray<RFLOAT> Maux(basePckr->micrograph_size,basePckr->micrograph_size);
+	FourierTransformer transformer;
+
+	_Mstddev.initZeros(basePckr->micrograph_size, basePckr->micrograph_size);
+	RFLOAT normfft = (RFLOAT)(basePckr->micrograph_size * basePckr->micrograph_size) / (RFLOAT)nr_nonzero_pixels_mask;
+
+	// Calculate convolution of micrograph and mask, to get average under mask at all points
+	CUDA_CPU_TIC("PRE-resize");
+	Faux.resize(_Fmic);
+	CUDA_CPU_TOC("PRE-resize");
+#ifdef DEBUG
+	Image<RFLOAT> tt;
+#endif
+
+	CUDA_CPU_TIC("PRE-multi_0");
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+	{
+		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
+	}
+	CUDA_CPU_TOC("PRE-multi_0");
+	CUDA_CPU_TIC("PRE-window_0");
+	windowFourierTransform(Faux, Faux2,basePckr->micrograph_size);
+	CUDA_CPU_TOC("PRE-window_0");
+
+	CUDA_CPU_TIC("PRE-Transform_0");
+	transformer.inverseFourierTransform(Faux2, Maux);
+	CUDA_CPU_TOC("PRE-Transform_0");
+	Maux *= normfft;
+	_Mmean = Maux;
+
+	CUDA_CPU_TIC("PRE-CenterFFT_0");
+	CenterFFT(_Mmean, false);
+	CUDA_CPU_TOC("PRE-CenterFFT_0");
+#ifdef DEBUG
+	tt()=Maux;
+	CenterFFT(tt(), false);
+	tt.write("Mavg_mic.spi");
+#endif
+	CUDA_CPU_TIC("PRE-multi_1");
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(_Mstddev)
+	{
+		// store minus average-squared already in _Mstddev
+		DIRECT_MULTIDIM_ELEM(_Mstddev, n) = -DIRECT_MULTIDIM_ELEM(Maux, n) * DIRECT_MULTIDIM_ELEM(Maux, n);
+	}
+	CUDA_CPU_TOC("PRE-multi_1");
+	// Calculate convolution of micrograph-squared and mask
+	CUDA_CPU_TIC("PRE-multi_2");
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
+	{
+		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic2, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
+	}
+	CUDA_CPU_TOC("PRE-multi_2");
+
+	CUDA_CPU_TIC("PRE-window_1");
+	windowFourierTransform(Faux, Faux2, basePckr->micrograph_size);
+	CUDA_CPU_TOC("PRE-window_1");
+
+	CUDA_CPU_TIC("PRE-Transform_1");
+	transformer.inverseFourierTransform(Faux2, Maux);
+	CUDA_CPU_TOC("PRE-Transform_1");
+
+	CUDA_CPU_TIC("PRE-multi_3");
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(_Mstddev)
+	{
+		// we already stored minus average-squared in _Mstddev
+		DIRECT_MULTIDIM_ELEM(_Mstddev, n) += normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
+		if (DIRECT_MULTIDIM_ELEM(_Mstddev, n) > 0.)
+			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = sqrt(DIRECT_MULTIDIM_ELEM(_Mstddev, n) );
+		else
+			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = 0.;
+	}
+	CUDA_CPU_TOC("PRE-multi_3");
+
+	CUDA_CPU_TIC("PRE-CenterFFT_1");
+	CenterFFT(_Mstddev, false);
+	CUDA_CPU_TOC("PRE-CenterFFT_1");
+
+#ifdef DEBUG
+	tt()=_Mstddev;
+	tt.write("Msig_mic.spi");
+#endif
+
+
+}
 
 void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 {
@@ -291,7 +380,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
 
 		CUDA_CPU_TIC("calculateStddevAndMeanUnderMask");
-		basePckr->calculateStddevAndMeanUnderMask(Fmic, Fmic2, basePckr->Finvmsk,basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
+		calculateStddevAndMeanUnderMask(Fmic, Fmic2, basePckr->Finvmsk,basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
 		CUDA_CPU_TOC("calculateStddevAndMeanUnderMask");
 
 		if (basePckr->do_write_fom_maps)
