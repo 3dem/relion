@@ -722,6 +722,7 @@ void windowFourierTransform2(
 		CudaGlobalPtr<CUDACOMPLEX > &d_out,
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
+		long int pos,
 		cudaStream_t stream)
 {
 	if (iX > 1 && iY/2 + 1 != iX)
@@ -730,11 +731,11 @@ void windowFourierTransform2(
 	if (oY == iX)
 		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
 
-	cudaMemInit<CUDACOMPLEX>( ~d_out, 0, (size_t) oX*oY*oZ, stream );
+	cudaMemInit<CUDACOMPLEX>( &d_out.d_ptr[0], 0, (size_t) oX*oY*oZ, stream );
 
 	if(oX==iX)
 	{
-		d_in.cp_on_device(~d_out);
+		d_in.cp_on_device(&d_in.d_ptr[pos], &d_out.d_ptr[0], oX*oY*oZ);
 		return;
 	}
 
@@ -744,8 +745,8 @@ void windowFourierTransform2(
 
 		unsigned grid_dim = ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE);
 		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
-				~d_in,
-				~d_out,
+				&d_in.d_ptr[pos],
+				&d_out.d_ptr[0],
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
@@ -755,8 +756,8 @@ void windowFourierTransform2(
 	{
 		unsigned grid_dim = ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE);
 		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
-				~d_in,
-				~d_out,
+				&d_in.d_ptr[pos],
+				&d_out.d_ptr[0],
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ);

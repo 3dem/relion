@@ -177,7 +177,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 
 	CUDA_CPU_TIC("PRE-multi_0");
 	int Bsize( (int) ceilf(( float)d_Fmic.size/(float)BLOCK_SIZE));
-	cuda_kernel_convol_B<<<Bsize,BLOCK_SIZE>>>( 	  d_Fmic.d_ptr,
+	cuda_kernel_convol_B<<<Bsize,BLOCK_SIZE>>>(   d_Fmic.d_ptr,
 												  d_Fmsk.d_ptr,
 												  d_Fmic.size);
 	CUDA_CPU_TOC("PRE-multi_0");
@@ -186,7 +186,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	windowFourierTransform2(d_Fmic,
 							cudaTransformer.fouriers,
 							_Fmic.xdim, _Fmic.ydim, _Fmic.zdim,
-							basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1);
+							basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1, 0);
 	CUDA_CPU_TOC("PRE-window_0");
 
 	CUDA_CPU_TIC("PRE-Transform_0");
@@ -239,7 +239,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	windowFourierTransform2(d_Fmsk,
 								cudaTransformer.fouriers,
 								_Fmsk.xdim, _Fmsk.ydim, _Fmsk.zdim,
-								basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1);
+								basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1, 0);
 	CUDA_CPU_TOC("PRE-window_1");
 
 
@@ -531,17 +531,22 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 									(int)Faux.xdim-1);
 
 			bool is_first_psi = true;
-			for (RFLOAT psi = 0. ; psi < 360.; psi+=basePckr->psi_sampling)
+
+			int Npsi = 360 / basePckr->psi_sampling;
+			int Cpsi = 0;
+			int FauxStride = Faux.nzyxdim;
+
+			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(FauxStride*Npsi, allocator);
+			d_FauxNpsi.host_alloc();
+			d_FauxNpsi.device_alloc();
+
+			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
 			{
 				CUDA_CPU_TIC("OneRotation");
 
-				CudaGlobalPtr<CUDACOMPLEX >  d_Faux(Faux.nzyxdim, allocator);
-				d_Faux.host_alloc();
-				d_Faux.device_alloc();
-
-				dim3 dim((int)ceilf((float)d_Faux.size/(float)BLOCK_SIZE));
+				dim3 dim((int)ceilf((float)FauxStride/(float)BLOCK_SIZE));
 				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
-																  d_Faux.d_ptr,
+															      &d_FauxNpsi.d_ptr[Cpsi],
 																  d_ctf.d_ptr,
 																  DEG2RAD(psi),
 																  projKernel
@@ -550,13 +555,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				if (is_first_psi)
 				{
 
-					d_Faux.cp_to_host();
+					d_FauxNpsi.cp_to_host(FauxStride);
 //					HANDLE_ERROR(cudaStreamSynchronize(0));
 
-					for (int i = 0; i < d_Faux.size ; i ++)
+					for (int i = 0; i < FauxStride ; i ++)
 					{
-						Faux.data[i].real = d_Faux[i].x;
-						Faux.data[i].imag = d_Faux[i].y;
+						Faux.data[i].real = d_FauxNpsi[i].x;
+						Faux.data[i].imag = d_FauxNpsi[i].y;
 					}
 
 					cudaTransformer.setSize(Maux.xdim, Maux.ydim);
@@ -565,10 +570,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
 					CUDA_CPU_TIC("windowFourierTransform_FP");
-					windowFourierTransform2(d_Faux,
+					windowFourierTransform2(d_FauxNpsi,
 											cudaTransformer.fouriers,
 											Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
-											basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
+											basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
+											(long int) Cpsi
 											);
 					CUDA_CPU_TOC("windowFourierTransform_FP");
 
@@ -637,8 +643,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 				// Now multiply template and micrograph to calculate the cross-correlation
 				CUDA_CPU_TIC("convol");
-				dim3 dim2( (int) ceilf(( float)d_Faux.size/(float)BLOCK_SIZE));
-				cuda_kernel_convol_A<<<dim2,BLOCK_SIZE>>>( 	  d_Faux.d_ptr,
+				dim3 dim2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE));
+				cuda_kernel_convol_A<<<dim2,BLOCK_SIZE>>>( 	  &d_FauxNpsi.d_ptr[Cpsi],
 															  d_Fmic.d_ptr,
 															  Faux.nzyxdim);
 				CUDA_CPU_TOC("convol");
@@ -646,10 +652,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform2(
-						d_Faux,
+						d_FauxNpsi,
 						cudaTransformer.fouriers,
 						Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
-						basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
+						basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
+						(long int) Cpsi
 						);
 				CUDA_CPU_TOC("windowFourierTransform_1");
 
