@@ -408,7 +408,7 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  CudaProjectorKernel projector)
 {
-
+	int proj = blockIdx.y;
 	int image_size=projector.imgX*projector.imgY;
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
 	if(pixel<image_size)
@@ -425,7 +425,7 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 		}
 
 		XFLOAT sa, ca;
-		sincos(psi, &sa, &ca);
+		sincos(proj*psi, &sa, &ca);
 		CUDACOMPLEX val;
 
 		projector.project2Dmodel(	 x,y,
@@ -434,8 +434,11 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 									 sa,
 									 ca,
 									 val.x,val.y);
-		d_Faux[pixel].x =val.x*d_ctf[pixel];
-		d_Faux[pixel].y =val.y*d_ctf[pixel];
+
+		long int out_pixel = proj*image_size + pixel;
+
+		d_Faux[out_pixel].x =val.x*d_ctf[pixel];
+		d_Faux[out_pixel].y =val.y*d_ctf[pixel];
 
 	}
 }

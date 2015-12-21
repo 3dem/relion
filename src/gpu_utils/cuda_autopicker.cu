@@ -548,22 +548,26 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			int Cpsi = 0;
 			int FauxStride = Faux.nzyxdim;
 
-			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(FauxStride*Npsi, allocator);
-			d_FauxNpsi.host_alloc();
+			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(FauxStride, allocator);
+
+			d_FauxNpsi.size=Npsi*FauxStride;
 			d_FauxNpsi.device_alloc();
+
+			CUDA_CPU_TIC("Projection");
+			dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),Npsi);
+			cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
+															  &d_FauxNpsi.d_ptr[Cpsi],
+															  d_ctf.d_ptr,
+															  DEG2RAD(basePckr->psi_sampling),
+															  projKernel
+														);
+			CUDA_CPU_TOC("Projection");
+
+			d_FauxNpsi.streamSync();
 
 			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
 			{
 				CUDA_CPU_TIC("OneRotation");
-
-				dim3 dim((int)ceilf((float)FauxStride/(float)BLOCK_SIZE));
-				cuda_kernel_rotateAndCtf<<<dim,BLOCK_SIZE>>>(
-															      &d_FauxNpsi.d_ptr[Cpsi],
-																  d_ctf.d_ptr,
-																  DEG2RAD(psi),
-																  projKernel
-															);
-
 				if (is_first_psi)
 				{
 
