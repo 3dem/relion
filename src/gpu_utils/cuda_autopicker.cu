@@ -158,6 +158,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	FourierTransformer transformer;
 
 	CudaFFT cudaTransformer(0, allocator);
+	cudaTransformer.batchSize = 1;
 	cudaTransformer.setSize(basePckr->micrograph_size,basePckr->micrograph_size);
 
 	CudaGlobalPtr< XFLOAT > d_Mstddev(basePckr->micrograph_size*basePckr->micrograph_size, allocator);
@@ -299,7 +300,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	CTF ctf;
 
 	CudaFFT cudaTransformer(0, allocator);
-
+	cudaTransformer.batchSize = 1;
 	int min_distance_pix = ROUND(basePckr->min_particle_distance / basePckr->angpix);
 
 	// Read in the micrograph

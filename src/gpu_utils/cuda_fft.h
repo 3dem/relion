@@ -34,6 +34,7 @@ public:
 #endif
 	cufftHandle cufftPlanForward, cufftPlanBackward;
 	size_t xSize,ySize;
+	int batchSize;
 
 	CudaFFT(cudaStream_t stream, CudaCustomAllocator *allocator):
 		reals(stream, allocator),
@@ -75,8 +76,12 @@ public:
 	void backward(CudaGlobalPtr<cufftDoubleReal> &dst)
 		{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~dst) ); }
 #else
-		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
-		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
+//		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
+//		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
+
+		int rankDim[2] = {x, y};
+		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, rankDim, NULL, x*y, x*y, NULL, x*y, x*y, CUFFT_R2C, batchSize));
+		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, rankDim, NULL, x*y, x*y, NULL, x*y, x*y, CUFFT_C2R, batchSize));
 
 		planSet = true;
 	}
