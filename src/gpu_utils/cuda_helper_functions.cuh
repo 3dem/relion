@@ -518,7 +518,7 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 				  int xSize,
 				  int ySize,
 				  bool forward,
-				  CudaCustomAllocator *allocator)
+				  int num = 1)
 {
 //	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
 //	img_aux.device_alloc();
@@ -532,8 +532,8 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 		yshift = -yshift;
 	}
 
-	dim3 dim(ceilf((float)(img_in.size/(float)(2*CFTT_BLOCK_SIZE))));
-	cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
+	dim3 blocks(ceilf((float)(img_in.size/(float)(2*CFTT_BLOCK_SIZE))),num);
+	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
 													  img_in.size,
 													  xSize,
 													  ySize,

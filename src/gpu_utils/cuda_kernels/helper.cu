@@ -317,6 +317,7 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 	__shared__ XFLOAT buffer[CFTT_BLOCK_SIZE];
 	int tid = threadIdx.x;
 	int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+	long int image_offset = image_size*blockIdx.y;
 //	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
 
 //	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
@@ -340,9 +341,9 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 
 			int n_pixel = yp*xdim + xp;
 
-			buffer[tid] = img_in[n_pixel];
-			img_in[n_pixel] = img_in[pixel];
-			img_in[pixel] = buffer[tid];
+			buffer[tid]                    = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer[tid];
 		}
 //	}
 }
