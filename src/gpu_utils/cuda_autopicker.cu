@@ -218,6 +218,8 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	cudaTransformer.reals.host_alloc();
 	cudaTransformer.reals.cp_to_host();
 	_Mmean.resizeNoCp(1,cudaTransformer.ySize,cudaTransformer.xSize);
+
+	cudaTransformer.reals.streamSync();
 	for(int i =0; i< _Mmean.nzyxdim; i++)
 		_Mmean.data[i] = cudaTransformer.reals[i];
 
@@ -264,6 +266,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	CUDA_CPU_TOC("PRE-CenterFFT_1");
 
 	d_Mstddev.cp_to_host();
+	d_Mstddev.streamSync();
 	for(int i =0; i< d_Mstddev.size; i++)
 		_Mstddev.data[i] = d_Mstddev[i];
 
@@ -418,24 +421,33 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		// Fourier Transform (and downscale) Imic()
 		runCenterFFT(Imic(), true, allocator);
 		CUDA_CPU_TOC("runCenterFFT_0");
+
+
 		CUDA_CPU_TIC("FourierTransform_0");
 		transformer.FourierTransform(Imic(), Fmic);
 		CUDA_CPU_TOC("FourierTransform_0");
+
 
 		// Also calculate the FFT of the squared micrograph
 		CUDA_CPU_TIC("MauxResize");
 		Maux.resize(Imic());
 		CUDA_CPU_TOC("MauxResize");
 		CUDA_CPU_TIC("SquareImic");
+
+
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
 		{
 			DIRECT_MULTIDIM_ELEM(Maux, n) = DIRECT_MULTIDIM_ELEM(Imic(), n) * DIRECT_MULTIDIM_ELEM(Imic(), n);
 		}
+
+
 		CUDA_CPU_TOC("SquareImic");
 		MultidimArray<Complex > Fmic2;
 		CUDA_CPU_TIC("FourierTransform_1");
 		transformer.FourierTransform(Maux, Fmic2);
 		CUDA_CPU_TOC("FourierTransform_1");
+
+
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
 
@@ -592,8 +604,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 					cudaTransformer.reals.host_alloc();
 					cudaTransformer.reals.cp_to_host();
-//					HANDLE_ERROR(cudaStreamSynchronize(0));
 
+					cudaTransformer.reals.streamSync();
 					for (int i = 0; i < cudaTransformer.reals.size ; i ++)
 						Maux.data[i] = cudaTransformer.reals[i];
 
@@ -700,17 +712,16 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				CUDA_CPU_TOC("probRatio");
 			    is_first_psi = false;
 			    CUDA_CPU_TOC("OneRotation");
-//			    HANDLE_ERROR(cudaStreamSynchronize(0));
 			} // end for psi
 
 
 			d_Mccf_best.cp_to_host();
 			d_Mpsi_best.cp_to_host();
 
-//			HANDLE_ERROR(cudaStreamSynchronize(0));
-
 			for (int i = 0; i < Mccf_best.nzyxdim; i ++)
 				Mccf_best.data[i] = d_Mccf_best[i];
+
+			d_Mpsi_best.streamSync();
 
 			if (basePckr->do_write_fom_maps)
 			{
