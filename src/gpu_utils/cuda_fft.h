@@ -42,23 +42,26 @@ public:
 		cufftPlanForward(0),
 		cufftPlanBackward(0),
 		planSet(false),
-		xSize(0), ySize(0)
+		xSize(0), ySize(0),
+		batchSize(1)
 	{};
 
-	void setSize(size_t x, size_t y)
+	void setSize(size_t x, size_t y, int batch = 1)
 	{
 		if (x == xSize && y == ySize)
 			return;
 
 		clear();
 
+		batchSize = batch;
+
 		xSize = x;
 		ySize = y;
 
-		reals.setSize(x*y);
+		reals.setSize(x*y*batchSize);
 		reals.device_alloc();
 
-		fouriers.setSize(y*(x/2+1));
+		fouriers.setSize(y*(x/2+1)*batchSize);
 		fouriers.device_alloc();
 #ifdef CUDA_DOUBLE_PRECISION
 		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_D2Z) );

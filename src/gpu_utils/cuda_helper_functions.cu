@@ -731,11 +731,11 @@ void windowFourierTransform2(
 	if (oY == iX)
 		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
 
-	cudaMemInit<CUDACOMPLEX>( &d_out.d_ptr[0], 0, (size_t) oX*oY*oZ, stream );
+	cudaMemInit<CUDACOMPLEX>( &d_out.d_ptr[0], 0, (size_t) oX*oY*oZ, stream );  // marker - multiply size by Npsi
 
 	if(oX==iX)
 	{
-		d_in.cp_on_device(&d_in.d_ptr[pos], &d_out.d_ptr[0], oX*oY*oZ);
+		d_in.cp_on_device(&d_in.d_ptr[pos], &d_out.d_ptr[0], oX*oY*oZ); // marker - multiply size by Npsi
 		return;
 	}
 
@@ -743,7 +743,7 @@ void windowFourierTransform2(
 	{
 		long int max_r2 = (iX - 1) * (iX - 1);
 
-		unsigned grid_dim = ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE);
+		dim3 grid_dim(ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE),1); // marker - Npsi y-blocks
 		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
 				&d_in.d_ptr[pos],
 				&d_out.d_ptr[0],
@@ -754,7 +754,7 @@ void windowFourierTransform2(
 	}
 	else
 	{
-		unsigned grid_dim = ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE);
+		dim3 grid_dim(ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE),1); // marker - Npsi y-blocks
 		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
 				&d_in.d_ptr[pos],
 				&d_out.d_ptr[0],

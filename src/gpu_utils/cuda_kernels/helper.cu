@@ -317,6 +317,7 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 	__shared__ XFLOAT buffer[CFTT_BLOCK_SIZE];
 	int tid = threadIdx.x;
 	int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+	long int image_offset = image_size*blockIdx.y;
 //	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
 
 //	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
@@ -340,9 +341,9 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 
 			int n_pixel = yp*xdim + xp;
 
-			buffer[tid] = img_in[n_pixel];
-			img_in[n_pixel] = img_in[pixel];
-			img_in[pixel] = buffer[tid];
+			buffer[tid]                    = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer[tid];
 		}
 //	}
 }
@@ -357,7 +358,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT sum_ref_under_circ_mask,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
-										XFLOAT psi)
+										int Npsi)
 {
 	/* PLAN TO:
 	 *
@@ -376,31 +377,36 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	 */
 
 	int pixel = threadIdx.x + blockIdx.x*(int)PROBRATIO_BLOCK_SIZE;
-
 	if(pixel<image_size)
 	{
-		XFLOAT diff2 = normfft * d_Maux[pixel];
-		diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
+		XFLOAT Kccf = d_Mccf[pixel];
+		XFLOAT Kpsi;
+		for(int psi = 0; psi < Npsi; psi++ )
+		{
+			XFLOAT diff2 = normfft * d_Maux[pixel + image_size*psi];
+			diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
 
-//		if (d_Mstddev[pixel] > (XFLOAT)1E-10)
-		diff2 *= d_Mstddev[pixel];
-		diff2 += sum_ref2_under_circ_mask;
+	//		if (d_Mstddev[pixel] > (XFLOAT)1E-10)
+			diff2 *= d_Mstddev[pixel];
+			diff2 += sum_ref2_under_circ_mask;
 
 #if defined(CUDA_DOUBLE_PRECISION)
-		diff2 = exp(-diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
+			diff2 = exp(-diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
 #else
-		diff2 = expf(-diff2 / 2.f);
+			diff2 = expf(-diff2 / 2.f);
 #endif
 
-		// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
-		diff2 = (diff2 - 1.f) / (expected_Pratio - 1.f);
-		if (diff2 > d_Mccf[pixel])
-		{
-			d_Mccf[pixel] = diff2;
-			d_Mpsi[pixel] = psi;
+			// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
+			diff2 = (diff2 - 1.f) / (expected_Pratio - 1.f);
+			if (diff2 > Kccf)
+			{
+				Kccf = diff2;
+				Kpsi = psi* (360/Npsi);
+			}
 		}
+		d_Mccf[pixel] = Kccf;
+		d_Mpsi[pixel] = Kpsi;
 	}
-
 }
 
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
@@ -457,6 +463,21 @@ __global__ void cuda_kernel_convol_A( CUDACOMPLEX *d_A,
 	}
 }
 
+__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
+									 	 	CUDACOMPLEX *d_B,
+									 	 	int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int A_off = blockIdx.y*image_size;
+	if(pixel<image_size)
+	{
+		XFLOAT tr =   d_A[pixel + A_off].x;
+		XFLOAT ti = - d_A[pixel + A_off].y;
+		d_A[pixel + A_off].x =   tr*d_B[pixel].x - ti*d_B[pixel].y;
+		d_A[pixel + A_off].y =   ti*d_B[pixel].x + tr*d_B[pixel].y;
+	}
+}
+
 __global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
 									 	 CUDACOMPLEX *d_B,
 									 	 int image_size)
@@ -468,6 +489,21 @@ __global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
 		XFLOAT ti = d_A[pixel].y;
 		d_A[pixel].x =   tr*d_B[pixel].x + ti*d_B[pixel].y;
 		d_A[pixel].y =   ti*d_B[pixel].x - tr*d_B[pixel].y;
+	}
+}
+
+__global__ void cuda_kernel_batch_convol_B(	 CUDACOMPLEX *d_A,
+									 	 	 CUDACOMPLEX *d_B,
+									 	 	 int image_size)
+{
+	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int A_off = blockIdx.y*image_size;
+	if(pixel<image_size)
+	{
+		XFLOAT tr = d_A[pixel + A_off].x;
+		XFLOAT ti = d_A[pixel + A_off].y;
+		d_A[pixel + A_off].x =   tr*d_B[pixel].x + ti*d_B[pixel].y;
+		d_A[pixel + A_off].y =   ti*d_B[pixel].x - tr*d_B[pixel].y;
 	}
 }
 
@@ -490,6 +526,17 @@ __global__ void cuda_kernel_multi( XFLOAT *A,
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
 	if(pixel<image_size)
 		OUT[pixel] = A[pixel]*B[pixel]*S;
+}
+
+__global__ void cuda_kernel_batch_multi( XFLOAT *A,
+								   XFLOAT *B,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<image_size)
+		OUT[pixel + blockIdx.y*image_size] = A[pixel + blockIdx.y*image_size]*B[pixel + blockIdx.y*image_size]*S;
 }
 
 __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
