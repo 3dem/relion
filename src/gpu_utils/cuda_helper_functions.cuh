@@ -327,8 +327,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 }
 
 void windowFourierTransform2(
-		CUDACOMPLEX *d_in,
-		CUDACOMPLEX *d_out,
+		CudaGlobalPtr<CUDACOMPLEX > &d_in,
+		CudaGlobalPtr<CUDACOMPLEX > &d_out,
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
 		cudaStream_t stream = 0);

@@ -87,8 +87,41 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  CudaProjectorKernel projector);
 
-__global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
-									 CUDACOMPLEX *d_B,
-									 int image_size);
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A
+ */
+__global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 int image_size);
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B
+ */
+__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 int image_size);
+/*
+ * Multiplies scalar array A by a scalar S
+ *
+ *  OUT[i] = A[i]*S
+ */
+__global__ void cuda_kernel_multi( XFLOAT *A,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size);
+/*
+ * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
+ *
+ *  OUT[i] = A[i]*B[i]*S
+ */
+__global__ void cuda_kernel_multi( XFLOAT *A,
+								   XFLOAT *B,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size);
+
+__global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
+											 XFLOAT *aux,
+											 XFLOAT S,
+											 int image_size);
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
