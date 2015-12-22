@@ -48,7 +48,7 @@ public:
 
 	void setSize(size_t x, size_t y, int batch = 1)
 	{
-		if (x == xSize && y == ySize)
+		if (x == xSize && y == ySize)// && batch == batchSize)
 			return;
 
 		clear();
@@ -82,9 +82,27 @@ public:
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
 
-		int rankDim[2] = {x, y};
-		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, rankDim, NULL, x*y, x*y, NULL, x*y, x*y, CUFFT_R2C, batchSize));
-		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, rankDim, NULL, x*y, x*y, NULL, x*y, x*y, CUFFT_C2R, batchSize));
+//		int RrankDim[2] = {ySize,ySize};
+////		int Rsize = xSize*xSize;
+//		int CrankDim[2] = {ySize, ySize/2+1};
+//		int Csize = xSize*xSize/2+1;
+
+
+	    int idist = ySize*xSize;
+	    int odist = ySize*(xSize/2+1);
+
+	    int inembed[] = {ySize, xSize};
+	    int onembed[] = {ySize, xSize/2+1};
+
+	    int istride = 1;
+	    int ostride = 1;
+
+	    int nR[2] = {ySize, xSize};
+	    int nC[2] = {ySize, xSize/2 +1};
+		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batchSize));
+		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batchSize));
+//		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,   2, nR, 0,0,0,0,0,0, CUFFT_R2C, batchSize));
+//		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward,  2, nC, 0,0,0,0,0,0, CUFFT_C2R, batchSize));
 
 		planSet = true;
 	}

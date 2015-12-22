@@ -401,7 +401,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 			if (diff2 > Kccf)
 			{
 				Kccf = diff2;
-				Kpsi = psi* (360/Npsi);
+				Kpsi = psi*(360/Npsi);
 			}
 		}
 		d_Mccf[pixel] = Kccf;

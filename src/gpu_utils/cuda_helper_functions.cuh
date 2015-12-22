@@ -297,7 +297,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 		)
 {
 	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
-	long int image_offset = oX*oY*oZ*blockIdx.y;
+	long int oOFF = oX*oY*oZ*blockIdx.y;
+	long int iOFF = iX*iY*iZ*blockIdx.y;
 	if (n >= max_idx) return;
 
 	int k, i, kp, ip, jp;
@@ -324,8 +325,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 		jp = n % oX;
 	}
 
-	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset].x = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset].x;
-	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset].y = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset].y;
+	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + oOFF].x = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + iOFF].x;
+	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + oOFF].y = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + iOFF].y;
 }
 
 void windowFourierTransform2(
@@ -333,7 +334,7 @@ void windowFourierTransform2(
 		CudaGlobalPtr<CUDACOMPLEX > &d_out,
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
-		long int pos = 0,
+		long int Npsi = 1,
 		cudaStream_t stream = 0);
 
 
@@ -534,9 +535,9 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 		yshift = -yshift;
 	}
 
-	dim3 blocks(ceilf((float)(img_in.size/(float)(2*CFTT_BLOCK_SIZE))),num);
+	dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),num);
 	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
-													  img_in.size,
+												      xSize*ySize,
 													  xSize,
 													  ySize,
 													  xshift,

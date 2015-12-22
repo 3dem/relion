@@ -892,10 +892,6 @@ public:
 	inline
 	void cp_on_device(T * dstDevPtr)
 	{
-#ifdef DEBUG_CUDA
-		if (h_ptr != 0)
-			printf("DEBUG_WARNING: Host pointer already set in call to cp_to_device(hostPtr).\n");
-#endif
 		cudaCpyDeviceToDevice(d_ptr, dstDevPtr, size, stream);
 	}
 
@@ -905,10 +901,6 @@ public:
 	inline
 	void cp_on_device(T * srcDevPtr, T * dstDevPtr, int thisSize)
 	{
-#ifdef DEBUG_CUDA
-		if (h_ptr != 0)
-			printf("DEBUG_WARNING: Host pointer already set in call to cp_to_device(hostPtr).\n");
-#endif
 		cudaCpyDeviceToDevice(srcDevPtr, dstDevPtr, thisSize, stream);
 	}
 
