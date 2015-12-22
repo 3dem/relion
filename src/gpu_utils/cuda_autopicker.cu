@@ -569,98 +569,94 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			d_FauxNpsi.streamSync();
 
+
+			/*
+			 *    FIRST PSI WAS USED FOR PREP CALCS - THIS IS NOW A DEDICATED SECTION
+			 *    -------------------------------------------------------------------
+			 */
+
+			CUDA_CPU_TIC("PREP_CALCS");
+
+			d_FauxNpsi.cp_to_host(FauxStride);
+			for (int i = 0; i < FauxStride ; i ++)
+			{
+				Faux.data[i].real = d_FauxNpsi[i].x;
+				Faux.data[i].imag = d_FauxNpsi[i].y;
+			}
+
+			FPcudaTransformer.setSize(Maux.xdim, Maux.ydim);
+			CUDA_CPU_TIC("windowFourierTransform_FP");
+			windowFourierTransform2(d_FauxNpsi,
+									FPcudaTransformer.fouriers,
+									Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
+									basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
+									0 //pos for batched array(s) - which this is not
+									);
+			CUDA_CPU_TOC("windowFourierTransform_FP");
+
+			CUDA_CPU_TIC("inverseFourierTransform_FP");
+			FPcudaTransformer.backward();
+			CUDA_CPU_TOC("inverseFourierTransform_FP");
+
+			CUDA_CPU_TIC("runCenterFFT_FP");
+			runCenterFFT(FPcudaTransformer.reals,
+						 (int)FPcudaTransformer.xSize,
+						 (int)FPcudaTransformer.ySize,
+						 false,
+						 1);
+			CUDA_CPU_TOC("runCenterFFT_FP");
+
+			FPcudaTransformer.reals.host_alloc();
+			FPcudaTransformer.reals.cp_to_host();
+
+			cudaTransformer.reals.streamSync();
+			for (int i = 0; i < FPcudaTransformer.reals.size ; i ++)
+				Maux.data[i] = FPcudaTransformer.reals[i];
+
+			CUDA_CPU_TIC("setXmippOrigin_FP_0");
+			Maux.setXmippOrigin();
+			CUDA_CPU_TOC("setXmippOrigin_FP_0");
+			// TODO: check whether I need CenterFFT(Maux, false)
+
+			sum_ref_under_circ_mask = 0.;
+			sum_ref2_under_circ_mask = 0.;
+			RFLOAT suma2 = 0.;
+			RFLOAT sumn = 1.;
+			MultidimArray<RFLOAT> Mctfref(basePckr->particle_size, basePckr->particle_size);
+			CUDA_CPU_TIC("setXmippOrigin_FP_1");
+			Mctfref.setXmippOrigin();
+			CUDA_CPU_TOC("setXmippOrigin_FP_1");
+			CUDA_CPU_TIC("suma_FP");
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mctfref) // only loop over smaller Mctfref, but take values from large Maux!
+			{
+				if (i*i + j*j < basePckr->particle_radius2)
+				{
+					suma2 += A2D_ELEM(Maux, i, j) * A2D_ELEM(Maux, i, j);
+					suma2 += 2. * A2D_ELEM(Maux, i, j) * rnd_gaus(0., 1.);
+					sum_ref_under_circ_mask += A2D_ELEM(Maux, i, j);
+					sum_ref2_under_circ_mask += A2D_ELEM(Maux, i, j) * A2D_ELEM(Maux, i, j);
+					sumn += 1.;
+				}
+			}
+			sum_ref_under_circ_mask /= sumn;
+			sum_ref2_under_circ_mask /= sumn;
+			expected_Pratio = exp(suma2 / (2. * sumn));
+
+			for(int i = 0; i < d_Mstddev.size ; i ++)
+			{
+				if (d_Mstddev[i] > (XFLOAT)1E-10)
+					d_Mstddev[i] = 1 / d_Mstddev[i];
+				else
+					d_Mstddev[i] = 1;
+
+			}
+			d_Mstddev.cp_to_device();
+			CUDA_CPU_TOC("suma_FP");
+			CUDA_CPU_TOC("PREP_CALCS");
+
 			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
 			{
 				CUDA_CPU_TIC("OneRotation");
-				if (is_first_psi) //marker - remove case and run on small set initially
-				{
-
-					d_FauxNpsi.cp_to_host(FauxStride);
-//					HANDLE_ERROR(cudaStreamSynchronize(0));
-
-					for (int i = 0; i < FauxStride ; i ++)
-					{
-						Faux.data[i].real = d_FauxNpsi[i].x;
-						Faux.data[i].imag = d_FauxNpsi[i].y;
-					}
-
-					FPcudaTransformer.setSize(Maux.xdim, Maux.ydim);
-
-					// Calculate the expected ratio of probabilities for this CTF-corrected reference
-					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
-					// Do this also if we're not recalculating the fom maps...
-					CUDA_CPU_TIC("windowFourierTransform_FP");
-					windowFourierTransform2(d_FauxNpsi,
-											FPcudaTransformer.fouriers,
-											Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
-											basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
-											(long int) Cpsi
-											);
-					CUDA_CPU_TOC("windowFourierTransform_FP");
-
-					CUDA_CPU_TIC("inverseFourierTransform_FP");
-					FPcudaTransformer.backward();
-					CUDA_CPU_TOC("inverseFourierTransform_FP");
-
-					CUDA_CPU_TIC("runCenterFFT_FP");
-					runCenterFFT(FPcudaTransformer.reals,
-								 (int)FPcudaTransformer.xSize,
-								 (int)FPcudaTransformer.ySize,
-								 false,
-								 1);
-					CUDA_CPU_TOC("runCenterFFT_FP");
-
-					FPcudaTransformer.reals.host_alloc();
-					FPcudaTransformer.reals.cp_to_host();
-
-					cudaTransformer.reals.streamSync();
-					for (int i = 0; i < FPcudaTransformer.reals.size ; i ++)
-						Maux.data[i] = FPcudaTransformer.reals[i];
-
-					CUDA_CPU_TIC("setXmippOrigin_FP_0");
-					Maux.setXmippOrigin();
-					CUDA_CPU_TOC("setXmippOrigin_FP_0");
-					// TODO: check whether I need CenterFFT(Maux, false)
-
-					sum_ref_under_circ_mask = 0.;
-					sum_ref2_under_circ_mask = 0.;
-					RFLOAT suma2 = 0.;
-					RFLOAT sumn = 1.;
-					MultidimArray<RFLOAT> Mctfref(basePckr->particle_size, basePckr->particle_size);
-					CUDA_CPU_TIC("setXmippOrigin_FP_1");
-					Mctfref.setXmippOrigin();
-					CUDA_CPU_TOC("setXmippOrigin_FP_1");
-					CUDA_CPU_TIC("suma_FP");
-					FOR_ALL_ELEMENTS_IN_ARRAY2D(Mctfref) // only loop over smaller Mctfref, but take values from large Maux!
-					{
-						if (i*i + j*j < basePckr->particle_radius2)
-						{
-							suma2 += A2D_ELEM(Maux, i, j) * A2D_ELEM(Maux, i, j);
-							suma2 += 2. * A2D_ELEM(Maux, i, j) * rnd_gaus(0., 1.);
-							sum_ref_under_circ_mask += A2D_ELEM(Maux, i, j);
-							sum_ref2_under_circ_mask += A2D_ELEM(Maux, i, j) * A2D_ELEM(Maux, i, j);
-							sumn += 1.;
-						}
-					}
-
-
-					sum_ref_under_circ_mask /= sumn;
-					sum_ref2_under_circ_mask /= sumn;
-					expected_Pratio = exp(suma2 / (2. * sumn));
-
-					for(int i = 0; i < d_Mstddev.size ; i ++)
-					{
-						if (d_Mstddev[i] > (XFLOAT)1E-10)
-							d_Mstddev[i] = 1 / d_Mstddev[i];
-						else
-							d_Mstddev[i] = 1;
-
-					}
-					d_Mstddev.cp_to_device();
-
-					CUDA_CPU_TOC("suma_FP");
-				}
-
 				cudaTransformer.setSize(Maux.xdim, Maux.ydim);
 
 				// Now multiply template and micrograph to calculate the cross-correlation
