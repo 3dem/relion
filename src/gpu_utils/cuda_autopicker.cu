@@ -27,8 +27,6 @@
 #include "src/gpu_utils/cuda_utils_cub.cuh"
 #endif
 
-static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	basePckr(basePicker)
 {
@@ -216,7 +214,6 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 				 1);
 	CUDA_CPU_TOC("PRE-CenterFFT_0");
 
-	cudaTransformer.reals.host_alloc();
 	cudaTransformer.reals.cp_to_host();
 	_Mmean.resizeNoCp(1,cudaTransformer.ySize,cudaTransformer.xSize);
 
@@ -312,6 +309,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	Imic().setXmippOrigin();
 	CUDA_CPU_TOC("setXmippOrigin_0");
 
+	size_t downsize_Fmic_x = basePckr->downsize_mic / 2 + 1;
+	size_t downsize_Fmic_y = basePckr->downsize_mic;
+
 	// Let's just check the square size again....
 	RFLOAT my_size, my_xsize, my_ysize;
 	my_xsize = XSIZE(Imic());
@@ -373,7 +373,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			if (fn_tmp==fn_mic)
 			{
 				ctf.read(basePckr->MDmic, basePckr->MDmic);
-				Fctf.resize(basePckr->downsize_mic, basePckr->downsize_mic/2 + 1);
+				Fctf.resize(downsize_Fmic_y, downsize_Fmic_x);
 				ctf.getFftwImage(Fctf, basePckr->micrograph_size, basePckr->micrograph_size, basePckr->angpix, false, false, basePckr->intact_ctf_first_peak, true);
 				break;
 			}
@@ -540,33 +540,27 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("mccfInit");
 			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 									cudaProjectors[iref],
-									(int)Faux.xdim,
-									(int)Faux.ydim,
-									(int)Faux.xdim-1);
-
-			bool is_first_psi = true;
+									(int)downsize_Fmic_x,
+									(int)downsize_Fmic_y,
+									(int)downsize_Fmic_x-1);
 
 			int Npsi = 360 / basePckr->psi_sampling;
-			int Cpsi = 0;
-			int FauxStride = Faux.nzyxdim;
+			int FauxStride = downsize_Fmic_x*downsize_Fmic_y;
 
-			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(FauxStride, allocator);
+			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(allocator);
 
-			d_FauxNpsi.size=Npsi*FauxStride;
+			d_FauxNpsi.setSize(Npsi*FauxStride);
 			d_FauxNpsi.device_alloc();
 
 			CUDA_CPU_TIC("Projection");
 			dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),Npsi);
 			cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
-															  d_FauxNpsi.d_ptr,
-															  d_ctf.d_ptr,
+															  ~d_FauxNpsi,
+															  ~d_ctf,
 															  DEG2RAD(basePckr->psi_sampling),
 															  projKernel
 														);
 			CUDA_CPU_TOC("Projection");
-
-			d_FauxNpsi.streamSync();
-
 
 			/*
 			 *    FIRST PSI WAS USED FOR PREP CALCS - THIS IS NOW A DEDICATED SECTION
@@ -575,27 +569,18 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			CUDA_CPU_TIC("PREP_CALCS");
 
-			d_FauxNpsi.cp_to_host(FauxStride);
-			for (int i = 0; i < FauxStride ; i ++)
-			{
-				Faux.data[i].real = d_FauxNpsi[i].x;
-				Faux.data[i].imag = d_FauxNpsi[i].y;
-			}
-
-			FPcudaTransformer.setSize(Maux.xdim, Maux.ydim);
+			FPcudaTransformer.setSize(Imic().xdim, Imic().ydim);
 			CUDA_CPU_TIC("windowFourierTransform_FP");
 			windowFourierTransform2(d_FauxNpsi,
 									FPcudaTransformer.fouriers,
-									Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
+									downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
 									basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
 									);
 			CUDA_CPU_TOC("windowFourierTransform_FP");
-			HANDLE_ERROR(cudaPeekAtLastError());
 
 			CUDA_CPU_TIC("inverseFourierTransform_FP");
 			FPcudaTransformer.backward();
 			CUDA_CPU_TOC("inverseFourierTransform_FP");
-			HANDLE_ERROR(cudaPeekAtLastError());
 
 			CUDA_CPU_TIC("runCenterFFT_FP");
 			runCenterFFT(FPcudaTransformer.reals,
@@ -604,14 +589,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						 false,
 						 1);
 			CUDA_CPU_TOC("runCenterFFT_FP");
-			HANDLE_ERROR(cudaPeekAtLastError());
-
-			FPcudaTransformer.reals.host_alloc();
-			HANDLE_ERROR(cudaPeekAtLastError());
 
 			FPcudaTransformer.reals.cp_to_host();
 
-			cudaTransformer.reals.streamSync();
+			Maux.resizeNoCp(Imic().zdim,Imic().ydim,Imic().xdim);
+
+			FPcudaTransformer.reals.streamSync();
 			for (int i = 0; i < FPcudaTransformer.reals.size ; i ++)
 				Maux.data[i] = FPcudaTransformer.reals[i];
 
@@ -659,7 +642,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");
 
-			cudaTransformer.setSize(Maux.xdim, Maux.ydim, Npsi);
+			cudaTransformer.setSize(Imic().xdim, Imic().ydim, Npsi);
 			HANDLE_ERROR(cudaDeviceSynchronize());
 
 //			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
@@ -679,7 +662,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				windowFourierTransform2(
 						d_FauxNpsi,
 						cudaTransformer.fouriers,
-						Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
+						downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
 						basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
 						Npsi
 						);

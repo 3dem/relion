@@ -60,9 +60,11 @@ public:
 
 		reals.setSize(x*y*batchSize);
 		reals.device_alloc();
+		reals.host_alloc();
 
 		fouriers.setSize(y*(x/2+1)*batchSize);
 		fouriers.device_alloc();
+		fouriers.host_alloc();
 
 	    int idist = ySize*xSize;
 	    int odist = ySize*(xSize/2+1);
@@ -74,7 +76,7 @@ public:
 	    int ostride = 1;
 
 	    int nR[2] = {ySize, xSize};
-	    int nC[2] = {ySize, xSize/2 +1};
+//	    int nC[2] = {ySize, xSize/2 +1};
 #ifdef CUDA_DOUBLE_PRECISION
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batchSize));
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batchSize));
