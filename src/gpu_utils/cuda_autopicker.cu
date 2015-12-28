@@ -187,7 +187,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	windowFourierTransform2(d_Fmic,
 							cudaTransformer.fouriers,
 							_Fmic.xdim, _Fmic.ydim, _Fmic.zdim,
-							basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1, 0);
+							basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1);
 	CUDA_CPU_TOC("PRE-window_0");
 
 	CUDA_CPU_TIC("PRE-Transform_0");
@@ -242,7 +242,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	windowFourierTransform2(d_Fmsk,
 								cudaTransformer.fouriers,
 								_Fmsk.xdim, _Fmsk.ydim, _Fmsk.zdim,
-								basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1, 0);
+								basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1);
 	CUDA_CPU_TOC("PRE-window_1");
 
 
@@ -587,8 +587,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			windowFourierTransform2(d_FauxNpsi,
 									FPcudaTransformer.fouriers,
 									Faux.xdim, Faux.ydim, Faux.zdim, //Input dimensions
-									basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
-									1 // number of batched inputs - this is precalc is NOT batched
+									basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
 									);
 			CUDA_CPU_TOC("windowFourierTransform_FP");
 			HANDLE_ERROR(cudaPeekAtLastError());
@@ -736,8 +735,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			HANDLE_ERROR(cudaDeviceSynchronize());
 
 			for (int i = 0; i < Mccf_best.nzyxdim; i ++)
+			{
 				Mccf_best.data[i] = d_Mccf_best[i];
-
+				Mpsi_best.data[i] = d_Mpsi_best[i];
+			}
+			d_Mccf_best.streamSync();
 			d_Mpsi_best.streamSync();
 
 			if (basePckr->do_write_fom_maps)
