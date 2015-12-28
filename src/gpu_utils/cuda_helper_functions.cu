@@ -736,7 +736,7 @@ void windowFourierTransform2(
 
 	if(oX==iX)
 	{
-		d_in.cp_on_device(d_in.d_ptr, d_out.d_ptr, oX*oY*oZ*Npsi);
+		cudaCpyDeviceToDevice(~d_in, ~d_out, oX*oY*oZ*Npsi, d_in.getStream());
 		return;
 	}
 

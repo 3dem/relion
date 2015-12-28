@@ -294,9 +294,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	int my_skip_side = basePckr->autopick_skip_side + basePckr->particle_size/2;
 	CTF ctf;
 
-	//smaller transformer (separate plan & batch-size) for the first psi prep-stuff
+	CudaFFT micTransformer(0, allocator);
 	CudaFFT FPcudaTransformer(0, allocator);
-	//General transformer for the rest
 	CudaFFT cudaTransformer(0, allocator);
 
 	int min_distance_pix = ROUND(basePckr->min_particle_distance / basePckr->angpix);
@@ -388,6 +387,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	Mpsi_best.resize(basePckr->micrograph_size, basePckr->micrograph_size);
 	CUDA_CPU_TOC("mpsiResize");
 
+	CudaGlobalPtr< CUDACOMPLEX > d_Fmic(allocator);
+	CudaGlobalPtr<XFLOAT > d_Mmean(allocator);
+	CudaGlobalPtr<XFLOAT > d_Mstddev(allocator);
+
 	RFLOAT normfft = (RFLOAT)(basePckr->micrograph_size * basePckr->micrograph_size) / (RFLOAT)basePckr->nr_pixels_circular_mask;;
 	if (basePckr->do_read_fom_maps)
 	{
@@ -419,34 +422,52 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		 *                Therefore, I do not need to calculate (X-mu)/sig beforehand!!!
 		 *
 		 */
+
+		micTransformer.setSize(Imic().xdim, Imic().ydim);
+
+		CUDA_CPU_TIC("Imic_insert");
+		for(int i = 0; i< Imic().nzyxdim ; i++)
+			micTransformer.reals[i] = (XFLOAT) Imic().data[i];
+		micTransformer.reals.cp_to_device();
+		CUDA_CPU_TIC("Imic_insert");
+
+
 		CUDA_CPU_TIC("runCenterFFT_0");
-		// Fourier Transform (and downscale) Imic()
-		runCenterFFT(Imic(), true, allocator);
+		runCenterFFT(micTransformer.reals, micTransformer.xSize, micTransformer.ySize, true, 1);
 		CUDA_CPU_TOC("runCenterFFT_0");
 
 
 		CUDA_CPU_TIC("FourierTransform_0");
-		transformer.FourierTransform(Imic(), Fmic);
+		micTransformer.forward();
+		int FMultiBsize = ( (int) ceilf(( float)micTransformer.fouriers.getSize()*2/(float)BLOCK_SIZE));
+		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+				(XFLOAT*)~micTransformer.fouriers,
+				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
+				micTransformer.fouriers.getSize()*2);
 		CUDA_CPU_TOC("FourierTransform_0");
 
+		CUDA_CPU_TIC("F_cp");
+		CudaGlobalPtr< CUDACOMPLEX > Ftmp(allocator);
+		Ftmp.setSize(micTransformer.fouriers.getSize());
+		Ftmp.device_alloc();
+		micTransformer.fouriers.cp_on_device(Ftmp);
+		CUDA_CPU_TOC("F_cp");
 
 		// Also calculate the FFT of the squared micrograph
-		CUDA_CPU_TIC("MauxResize");
-		Maux.resize(Imic());
-		CUDA_CPU_TOC("MauxResize");
 		CUDA_CPU_TIC("SquareImic");
 
-
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
-		{
-			DIRECT_MULTIDIM_ELEM(Maux, n) = DIRECT_MULTIDIM_ELEM(Imic(), n) * DIRECT_MULTIDIM_ELEM(Imic(), n);
-		}
-
-
+		cuda_kernel_square<<<FMultiBsize,BLOCK_SIZE>>>(
+				~micTransformer.reals,
+				micTransformer.reals.getSize());
 		CUDA_CPU_TOC("SquareImic");
-		MultidimArray<Complex > Fmic2;
+
 		CUDA_CPU_TIC("FourierTransform_1");
-		transformer.FourierTransform(Maux, Fmic2);
+
+		micTransformer.forward();
+		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+				(XFLOAT*)~micTransformer.fouriers,
+				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
+				micTransformer.fouriers.getSize()*2);
 		CUDA_CPU_TOC("FourierTransform_1");
 
 
@@ -454,8 +475,72 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
 
 		CUDA_CPU_TIC("calculateStddevAndMeanUnderMask");
-		calculateStddevAndMeanUnderMask(Fmic, Fmic2, basePckr->Finvmsk,basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
+
+
+
+
+		//TODO REMOVED THIS
+		MultidimArray<Complex > _Fmic, _Fmic2;
+		_Fmic.resize(micTransformer.yFSize, micTransformer.xFSize);
+		_Fmic2.resize(micTransformer.yFSize, micTransformer.xFSize);
+
+		Ftmp.host_alloc();
+		Ftmp.cp_to_host();
+		micTransformer.fouriers.cp_to_host();
+		micTransformer.fouriers.streamSync();
+		for (int i = 0; i < Ftmp.getSize(); i ++)
+		{
+			_Fmic.data[i].real = Ftmp[i].x;
+			_Fmic.data[i].imag = Ftmp[i].y;
+			_Fmic2.data[i].real = micTransformer.fouriers[i].x;
+			_Fmic2.data[i].imag = micTransformer.fouriers[i].y;
+		}
+
+
+
+
+
+		calculateStddevAndMeanUnderMask(_Fmic, _Fmic2, basePckr->Finvmsk,basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
+//		basePckr->calculateStddevAndMeanUnderMask(_Fmic, _Fmic2, basePckr->Finvmsk, basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
+
+
+
+
+
+
+		//TODO REMOVED THIS
+		d_Mmean.setSize(Mmean.nzyxdim);
+		d_Mstddev.setSize(Mstddev.nzyxdim);
+		d_Mmean.host_alloc();
+		d_Mstddev.host_alloc();
+		for(int i = 0; i < d_Mmean.size; i++)
+		{
+			d_Mmean[i] = Mmean.data[i];
+			d_Mstddev[i] = Mstddev.data[i];
+		}
+		d_Mmean.put_on_device();
+		d_Mstddev.put_on_device();
+
+
+
+
+
+
+
 		CUDA_CPU_TOC("calculateStddevAndMeanUnderMask");
+
+		// From now on use downsized Fmic, as the cross-correlation with the references can be done at lower resolution
+		CUDA_CPU_TIC("windowFourierTransform_0");
+
+		d_Fmic.setSize(downsize_Fmic_x * downsize_Fmic_y);
+		d_Fmic.device_alloc();
+		windowFourierTransform2(
+				Ftmp,
+				d_Fmic,
+				Imic().xdim/2+1, Imic().ydim, 1, //Input dimensions
+				downsize_Fmic_x, downsize_Fmic_y, 1  //Output dimensions
+				);
+		CUDA_CPU_TOC("windowFourierTransform_0");
 
 		if (basePckr->do_write_fom_maps)
 		{
@@ -468,24 +553,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("writeToFomMaps");
 		}
 
-		// From now on use downsized Fmic, as the cross-correlation with the references can be done at lower resolution
-		CUDA_CPU_TIC("windowFourierTransform_0");
-		windowFourierTransform(Fmic, Faux, basePckr->downsize_mic);
-		CUDA_CPU_TOC("windowFourierTransform_0");
-		Fmic = Faux;
-
 	}// end if do_read_fom_maps
-
-	CudaGlobalPtr<XFLOAT >  d_Mmean(Mmean.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mstddev(Mstddev.nzyxdim, allocator);
-
-	for(int i = 0; i < d_Mmean.size; i++)
-	{
-		d_Mmean[i] = Mmean.data[i];
-		d_Mstddev[i] = Mstddev.data[i];
-	}
-	d_Mmean.put_on_device();
-	d_Mstddev.put_on_device();
 
 	// Now start looking for the peaks of all references
 	// Clear the output vector with all peaks
@@ -493,14 +561,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	std::vector<Peak> peaks;
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
-
-	CudaGlobalPtr< CUDACOMPLEX >  	d_Fmic( Fmic.nzyxdim, allocator);
-	for(int i = 0; i< d_Fmic.size ; i++)
-	{
-		d_Fmic[i].x=Fmic.data[i].real;
-		d_Fmic[i].y=Fmic.data[i].imag;
-	}
-	d_Fmic.put_on_device();
 
 	CUDA_CPU_TIC("setupProjectors");
 	setupProjectors();

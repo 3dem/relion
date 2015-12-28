@@ -123,6 +123,16 @@ __global__ void cuda_kernel_multi( XFLOAT *A,
 								   XFLOAT *OUT,
 								   XFLOAT S,
 		  	  	  	  	  	  	   int image_size);
+
+/*
+ * In place multiplies scalar array A by a scalar S
+ *
+ *  A[i] = A[i]*S
+ */
+__global__ void cuda_kernel_multi(
+		XFLOAT *A,
+		XFLOAT S,
+		int image_size);
 /*
  * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
  *
@@ -138,5 +148,14 @@ __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
 											 XFLOAT *aux,
 											 XFLOAT S,
 											 int image_size);
+
+/*
+ * In place squares array in place
+ *
+ *  A[i] = A[i]*A[i]
+ */
+__global__ void cuda_kernel_square(
+		XFLOAT *A,
+		int image_size);
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

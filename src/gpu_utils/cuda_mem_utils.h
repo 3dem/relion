@@ -879,8 +879,8 @@ public:
 	void cp_to_device(T * hostPtr)
 	{
 #ifdef DEBUG_CUDA
-		if (h_ptr != 0)
-			printf("DEBUG_WARNING: Host pointer already set in call to cp_to_device(hostPtr).\n");
+		if (hostPtr == NULL)
+			printf("DEBUG_WARNING: Null-pointer given in cp_to_device(hostPtr).\n");
 #endif
 		h_ptr = hostPtr;
 		cp_to_device();
@@ -892,6 +892,10 @@ public:
 	inline
 	void cp_on_device(T * dstDevPtr)
 	{
+#ifdef DEBUG_CUDA
+		if (dstDevPtr == NULL)
+			printf("DEBUG_WARNING: Null-pointer given in cp_on_device(dstDevPtr).\n");
+#endif
 		cudaCpyDeviceToDevice(d_ptr, dstDevPtr, size, stream);
 	}
 
@@ -899,9 +903,13 @@ public:
 	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
 	 */
 	inline
-	void cp_on_device(T * srcDevPtr, T * dstDevPtr, int thisSize)
+	void cp_on_device(CudaGlobalPtr<T> devPtr)
 	{
-		cudaCpyDeviceToDevice(srcDevPtr, dstDevPtr, thisSize, stream);
+#ifdef DEBUG_CUDA
+		if (devPtr.size == 0)
+			printf("DEBUG_WARNING: Zero size on provided pointer in cp_on_device.\n");
+#endif
+		cp_on_device(devPtr.d_ptr);
 	}
 
 	/**

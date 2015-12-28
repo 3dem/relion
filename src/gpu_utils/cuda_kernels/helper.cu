@@ -517,6 +517,16 @@ __global__ void cuda_kernel_multi( XFLOAT *A,
 		OUT[pixel] = A[pixel]*S;
 }
 
+__global__ void cuda_kernel_multi(
+		XFLOAT *A,
+		XFLOAT S,
+		int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<image_size)
+		A[pixel] = A[pixel]*S;
+}
+
 __global__ void cuda_kernel_multi( XFLOAT *A,
 								   XFLOAT *B,
 								   XFLOAT *OUT,
@@ -553,6 +563,15 @@ __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
 		else
 			Mstddev[pixel] = 0;
 	}
+}
+
+__global__ void cuda_kernel_square(
+		XFLOAT *A,
+		int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<image_size)
+		A[pixel] = A[pixel]*A[pixel];
 }
 
 

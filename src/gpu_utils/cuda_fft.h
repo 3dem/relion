@@ -33,7 +33,7 @@ public:
 	CudaGlobalPtr<cufftComplex> fouriers;
 #endif
 	cufftHandle cufftPlanForward, cufftPlanBackward;
-	size_t xSize,ySize;
+	size_t xSize,ySize,xFSize,yFSize;
 	int batchSize;
 
 	CudaFFT(cudaStream_t stream, CudaCustomAllocator *allocator):
@@ -43,12 +43,13 @@ public:
 		cufftPlanBackward(0),
 		planSet(false),
 		xSize(0), ySize(0),
+		xFSize(0), yFSize(0),
 		batchSize(1)
 	{};
 
 	void setSize(size_t x, size_t y, int batch = 1)
 	{
-		if (x == xSize && y == ySize)// && batch == batchSize)
+		if (x == xSize && y == ySize && batch == batchSize)
 			return;
 
 		clear();
@@ -57,6 +58,8 @@ public:
 
 		xSize = x;
 		ySize = y;
+		xFSize = x/2 + 1;
+		yFSize = y;
 
 		reals.setSize(x*y*batchSize);
 		reals.device_alloc();
