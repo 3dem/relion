@@ -84,6 +84,9 @@ public:
 	// Original size of the micrographs
 	int micrograph_size, micrograph_xsize, micrograph_ysize;
 
+	// decreased size micrograph
+	int workSize;
+
 	// Is density in micrograph inverted wrt templates?
 	bool do_invert;
 

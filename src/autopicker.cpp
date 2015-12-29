@@ -163,6 +163,9 @@ void AutoPicker::initialise()
 	micrograph_ysize = YSIZE(Imic());
 	micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
 
+	workSize = ROUND(0.5*micrograph_size);
+	workSize -= workSize%2; //make even
+
 	if (lowpass < 0.)
 	{
 		downsize_mic = micrograph_size;
@@ -384,10 +387,10 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 #endif
 	}
 
-	Mccf_best.resize(micrograph_size, micrograph_size);
-	Mpsi_best.resize(micrograph_size, micrograph_size);
+	Mccf_best.resize(workSize, workSize);
+	Mpsi_best.resize(workSize, workSize);
 
-	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_pixels_circular_mask;;
+	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_pixels_circular_mask;;
 	if (do_read_fom_maps)
 	{
 		FileName fn_tmp=fn_mic.withoutExtension()+"_"+fn_out+"_stddevNoise.spi";
@@ -422,13 +425,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		transformer.FourierTransform(Imic(), Fmic);
 
 		// Also calculate the FFT of the squared micrograph
-		Maux.resize(Imic());
+		Maux.resize(micrograph_size,micrograph_size);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux)
 		{
 			DIRECT_MULTIDIM_ELEM(Maux, n) = DIRECT_MULTIDIM_ELEM(Imic(), n) * DIRECT_MULTIDIM_ELEM(Imic(), n);
 		}
 		MultidimArray<Complex > Fmic2;
 		transformer.FourierTransform(Maux, Fmic2);
+
+		Maux.resize(workSize,workSize);
 
 #ifdef DEBUG
 		std::cerr << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
@@ -539,7 +544,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
 
-					windowFourierTransform(Faux, Faux2, micrograph_size);
+					windowFourierTransform(Faux, Faux2, workSize);
 					transformer.inverseFourierTransform(Faux2, Maux);
 					CenterFFT(Maux, false);
 					Maux.setXmippOrigin();
@@ -587,7 +592,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
 
-				windowFourierTransform(Faux, Faux2, micrograph_size);
+				windowFourierTransform(Faux, Faux2, workSize);
 				transformer.inverseFourierTransform(Faux2, Maux);
 				CenterFFT(Maux, false);
 #ifdef DEBUG
@@ -711,11 +716,11 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 {
 
 	MultidimArray<Complex > Faux, Faux2;
-	MultidimArray<RFLOAT> Maux(micrograph_size, micrograph_size);
+	MultidimArray<RFLOAT> Maux(workSize, workSize);
 	FourierTransformer transformer;
 
-	_Mstddev.initZeros(micrograph_size, micrograph_size);
-	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_nonzero_pixels_mask;
+	_Mstddev.initZeros(workSize, workSize);
+	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_nonzero_pixels_mask;
 
 	// Calculate convolution of micrograph and mask, to get average under mask at all points
 	Faux.resize(_Fmic);
@@ -727,7 +732,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	{
 		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
 	}
-	windowFourierTransform(Faux, Faux2, micrograph_size);
+	windowFourierTransform(Faux, Faux2, workSize);
 	transformer.inverseFourierTransform(Faux2, Maux);
 	Maux *= normfft;
 	_Mmean = Maux;
@@ -750,7 +755,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	{
 		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic2, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
 	}
-	windowFourierTransform(Faux, Faux2, micrograph_size);
+	windowFourierTransform(Faux, Faux2, workSize);
 	transformer.inverseFourierTransform(Faux2, Maux);
 
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(_Mstddev)
