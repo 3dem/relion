@@ -95,6 +95,14 @@ __global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
 									 	 int image_size);
 
 /*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A, writes to C
+ */
+__global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 CUDACOMPLEX *d_C,
+									 	 int image_size);
+
+/*
  * Multiplies many complex arrays A (in-place) by a single B, pixel-by-pixel, after conjugating A
  */
 __global__ void cuda_kernel_batch_convol_A(	 CUDACOMPLEX *d_A,
@@ -106,6 +114,14 @@ __global__ void cuda_kernel_batch_convol_A(	 CUDACOMPLEX *d_A,
  */
 __global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
 									 	 CUDACOMPLEX *d_B,
+									 	 int image_size);
+
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B, writes to C
+ */
+__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 CUDACOMPLEX *d_C,
 									 	 int image_size);
 /*
  * Multiplies many complex arrays A (in-place) by a single one B, pixel-by-pixel, after conjugating B
