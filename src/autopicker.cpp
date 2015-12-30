@@ -163,7 +163,7 @@ void AutoPicker::initialise()
 	micrograph_ysize = YSIZE(Imic());
 	micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
 
-	workSize = ROUND(0.1*micrograph_size);
+	workSize = ROUND(micrograph_size);
 	workSize -= workSize%2; //make even
 
 	if (lowpass < 0.)
