@@ -163,7 +163,7 @@ void AutoPicker::initialise()
 	micrograph_ysize = YSIZE(Imic());
 	micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
 
-	workSize = ROUND(0.5*micrograph_size);
+	workSize = ROUND(0.1*micrograph_size);
 	workSize -= workSize%2; //make even
 
 	if (lowpass < 0.)
@@ -650,6 +650,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			    is_first_psi = false;
 			} // end for psi
 
+//			CenterFFT(Mccf_best, true);
+			transformer.FourierTransform(Mccf_best, Faux2);
+//			CenterFFT(Faux2, false);
+			Faux.resize(1,micrograph_size,micrograph_size/2+1);
+			windowFourierTransform(Faux2, Faux, micrograph_size);
+			Mccf_best.resize(1,micrograph_size,micrograph_size);
+			transformer.inverseFourierTransform(Faux, Mccf_best);
+//			CenterFFT(Mccf_best, false);
+
 
 			if (do_write_fom_maps)
 			{
@@ -665,11 +674,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				It() = Mpsi_best;
 				fn_tmp.compose(fn_mic.withoutExtension()+"_"+fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
-				{
-					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
-				}
-				exit(0);
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+//				{
+//					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
+//				}
+//				exit(0);
 			} // end if do_write_fom_maps
 
 		} // end if do_read_fom_maps
