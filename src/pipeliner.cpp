@@ -236,7 +236,7 @@ void PipeLine::checkProcessCompletion()
 {
 	for (long int i=0; i < processList.size(); i++)
 	{
-		// Only check running processes for file existance
+		// Only check running processes for file existence
 		if (processList[i].status == PROC_RUNNING)
 		{
 			bool all_exist = true;

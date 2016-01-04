@@ -40,6 +40,8 @@
 
 // This class organises the main winfow of the relion GUI
 static Fl_Choice *add_new_job, *display_io_node;
+static Fl_Text_Display *text_current_job;
+static Fl_Text_Buffer *textbuff_current_job;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
@@ -101,15 +103,13 @@ class RelionMainWindow : public Fl_Window
 public:
 
 	// For Tabs
-	Fl_Menu_Bar *menubar;
+	Fl_Menu_Bar *menubar, *menubar2;
 	Fl_Tabs *tabs;
 	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
 
     // Run button
     Fl_Button *print_CL_button, *cite_button;
-    Fl_Button *schedule_button, *run_scheduled_button;
-    Fl_Button *delete_button;
-    Fl_Button *cleanup_button;
+    Fl_Button *schedule_button;
 
     // For job submission
     std::string final_command;
@@ -196,6 +196,9 @@ private:
 
     static void cb_cleanup(Fl_Widget*, void*);
     inline void cb_cleanup_i();
+
+    static void cb_mark_as_finished(Fl_Widget*, void*);
+    inline void cb_mark_as_finished_i();
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();

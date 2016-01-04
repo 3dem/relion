@@ -199,9 +199,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 #define XJOBCOL2 (JOBCOLWIDTH + 25)
 #define XJOBCOL3 (2*JOBCOLWIDTH + 40)
 
-
     // Add browsers for finished, running and scheduled jobs
-    int JOBHEIGHT = GUIHEIGHT_EXT-GUIHEIGHT_OLD-MENUHEIGHT-30-50;
+    int JOBHEIGHT = GUIHEIGHT_EXT-GUIHEIGHT_OLD-50-2*MENUHEIGHT;
     int JOBHALFHEIGHT = (JOBHEIGHT)/2;
     Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
     Fl_Text_Buffer *textbuff2 = new Fl_Text_Buffer();
@@ -213,11 +212,11 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     textbuff3->text("Scheduled jobs");
     textbuff4->text("Input to this job");
     textbuff5->text("Output from this job");
-    Fl_Text_Display* textdisp1 = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_OLD, JOBCOLWIDTH, 25);
-	Fl_Text_Display* textdisp2 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_OLD, JOBCOLWIDTH, 25);
-	Fl_Text_Display* textdisp3 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_OLD+JOBHALFHEIGHT+25, JOBCOLWIDTH, 25);
-	Fl_Text_Display* textdisp4 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_OLD, JOBCOLWIDTH, 25);
-	Fl_Text_Display* textdisp5 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_OLD+JOBHALFHEIGHT+25, JOBCOLWIDTH, 25);
+    Fl_Text_Display* textdisp1 = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_OLD+10, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdisp2 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_OLD+10, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdisp3 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_OLD+10+JOBHALFHEIGHT+25, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdisp4 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_OLD+10, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdisp5 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_OLD+10+JOBHALFHEIGHT+25, JOBCOLWIDTH, 25);
 	textdisp1->buffer(textbuff1);
 	textdisp2->buffer(textbuff2);
 	textdisp3->buffer(textbuff3);
@@ -229,11 +228,11 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	textdisp4->color(GUI_BACKGROUND_COLOR);
 	textdisp5->color(GUI_BACKGROUND_COLOR);
 
-    finished_job_browser  = new Fl_Select_Browser(XJOBCOL1, GUIHEIGHT_OLD+25, JOBCOLWIDTH, JOBHEIGHT+25);
-    running_job_browser   = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_OLD+25, JOBCOLWIDTH, JOBHALFHEIGHT);
-    scheduled_job_browser = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_OLD+25+JOBHALFHEIGHT+25, JOBCOLWIDTH, JOBHALFHEIGHT);
-    input_job_browser    = new Fl_Select_Browser(XJOBCOL3, GUIHEIGHT_OLD+25, JOBCOLWIDTH, JOBHALFHEIGHT);
-    output_job_browser   = new Fl_Select_Browser(XJOBCOL3, GUIHEIGHT_OLD+25+JOBHALFHEIGHT+25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    finished_job_browser  = new Fl_Select_Browser(XJOBCOL1, GUIHEIGHT_OLD+10+25, JOBCOLWIDTH, JOBHEIGHT+25);
+    running_job_browser   = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_OLD+10+25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    scheduled_job_browser = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_OLD+10+25+JOBHALFHEIGHT+25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    input_job_browser    = new Fl_Select_Browser(XJOBCOL3, GUIHEIGHT_OLD+10+25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    output_job_browser   = new Fl_Select_Browser(XJOBCOL3, GUIHEIGHT_OLD+10+25+JOBHALFHEIGHT+25, JOBCOLWIDTH, JOBHALFHEIGHT);
 
     // Fill the actual browsers
     fillRunningJobLists();
@@ -253,28 +252,25 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     input_job_browser->end();
     output_job_browser->end();
 
-    delete_button = new Fl_Button(XJOBCOL1 , GUIHEIGHT_EXT-50, 100, 30, "Delete");
-    delete_button->color(GUI_RUNBUTTON_COLOR);
-    delete_button->labelfont(FL_ITALIC);
-    delete_button->labelsize(14);
-    delete_button->callback( cb_delete, this);
+    menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT-40, 100, MENUHEIGHT);
+    menubar2->color(GUI_BUTTON_COLOR);
+    menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+    menubar2->add("Job actions/Run scheduled", 0, cb_run_scheduled, this);
+    menubar2->add("Job actions/Delete", 0, cb_delete, this);
+    menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
 
-    cleanup_button = new Fl_Button(130 , GUIHEIGHT_EXT-50, 100, 30, "Clean up");
-    cleanup_button->color(GUI_RUNBUTTON_COLOR);
-    cleanup_button->labelfont(FL_ITALIC);
-    cleanup_button->labelsize(14);
-    cleanup_button->callback( cb_cleanup, this);
-
-    run_scheduled_button = new Fl_Button(XJOBCOL2 , GUIHEIGHT_EXT-50, 100, 30, "Run scheduled");
-    run_scheduled_button->color(GUI_RUNBUTTON_COLOR);
-    run_scheduled_button->labelfont(FL_ITALIC);
-    run_scheduled_button->labelsize(12);
-    run_scheduled_button->callback( cb_run_scheduled, this);
+    // Text display with the name of the current job
+    text_current_job = new Fl_Text_Display(XJOBCOL2-50 , GUIHEIGHT_EXT-40+3, 250, MENUHEIGHT-6);
+    textbuff_current_job = new Fl_Text_Buffer();
+    text_current_job->label("Current job: ");
+    text_current_job->align(FL_ALIGN_LEFT);
+    text_current_job->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
+    text_current_job->buffer(textbuff_current_job);
 
     // Left-hand side browsers for input/output nodes and processes
-	display_io_node  = new Fl_Choice(XJOBCOL3, GUIHEIGHT_EXT-50, JOBCOLWIDTH, 30);
+	display_io_node  = new Fl_Choice(XJOBCOL3, GUIHEIGHT_EXT-40+3, 250, MENUHEIGHT-6);
     display_io_node->label("Display:");
-    display_io_node->color(GUI_RUNBUTTON_COLOR);
+    display_io_node->color(GUI_BUTTON_COLOR);
 	display_io_node->callback(cb_display_io_node, this);
 
     // Set and activate current selection from side-browser
@@ -454,6 +450,9 @@ void RelionMainWindow::loadJobFromPipeline()
 	// If an old job was loaded from the pipeline: set this to be a continuation job
     is_main_continue = true;
     cb_toggle_continue_i();
+
+	textbuff_current_job->text(pipeline.processList[current_job].name.c_str());
+	text_current_job->buffer(textbuff_current_job);
 
 }
 
@@ -860,6 +859,10 @@ void RelionMainWindow::cb_select_browsegroup_i()
     is_main_continue = false;
     cb_toggle_continue_i(); // make default active
 
+    textbuff_current_job->text("New job");
+	text_current_job->buffer(textbuff_current_job);
+	//current_job = -1;
+
 }
 
 
@@ -1173,7 +1176,10 @@ void RelionMainWindow::cb_run_scheduled_i()
 	int scheduled_job = current_job;
 
 	if (pipeline.processList[scheduled_job].status != PROC_SCHEDULED)
-		REPORT_ERROR("RelionMainWindow::cb_run_scheduled_i BUG: this is not a scheduled job!");
+	{
+		std::cout << " You can only perform this action on scheduled jobs ... " << std::endl;
+		return;
+	}
 
 	// Get the OLD UNIQDATE of the scheduled job!!
 	FileName fn_olduniqdate, fn_newuniqdate;
@@ -1269,6 +1275,12 @@ void RelionMainWindow::cb_delete(Fl_Widget* o, void* v) {
 
 void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 {
+
+	if (current_job < 0)
+	{
+		std::cout << " You can only delete existing jobs ... " << std::endl;
+		return;
+	}
 
 	std::vector<bool> deleteProcesses, deleteNodes;
 	deleteProcesses.resize(pipeline.processList.size(), false);
@@ -1389,6 +1401,12 @@ void RelionMainWindow::cb_cleanup(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_cleanup_i()
 {
 
+	if (current_job < 0)
+	{
+		std::cout << " You can only clean up existing jobs ... " << std::endl;
+		return;
+	}
+
 	std::string ask;
 	ask = "Are you sure you want to delete intermediate files from " + pipeline.processList[current_job].name + "?";
 	int proceed = proceed =  fl_choice(ask.c_str(), "Don't delete", "Delete", NULL);
@@ -1398,6 +1416,34 @@ void RelionMainWindow::cb_cleanup_i()
 	}
 
 }
+// Run button call-back functions
+void RelionMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_mark_as_finished_i();
+}
+
+void RelionMainWindow::cb_mark_as_finished_i()
+{
+
+	if (current_job < 0)
+	{
+		std::cout << " You can only mark existing jobs as finished ... " << std::endl;
+		return;
+	}
+
+	pipeline.processList[current_job].status = PROC_FINISHED;
+
+	// Write new pipeline to disc and read in again
+	std::vector<bool> dummy;
+	pipeline.write(dummy, dummy);
+	pipeline.read();
+
+	// Update all job lists in the main GUI
+	updateJobLists();
+
+}
+
 
 // Save button call-back function
 void RelionMainWindow::cb_menubar_save(Fl_Widget* o, void* v)
