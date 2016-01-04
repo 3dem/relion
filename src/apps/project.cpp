@@ -36,7 +36,7 @@ class project_parameters
 {
 public:
 
-	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym;
+	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym, fn_mask;
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step;
 	int padding_factor;
 	int r_max, r_min_nn, interpolator;
@@ -62,6 +62,7 @@ public:
        	ctf_phase_flipped = parser.checkOption("--ctf_phase_flip", "Flip phases of the CTF in the output projections");
        	do_ctf_intact_1st_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
        	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
+		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
        	fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
        	rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
        	tilt = textToFloat(parser.getOption("--tilt", "Second Euler angle (for a single projection)", "0"));
@@ -97,7 +98,7 @@ public:
 	void project()
 	{
 
-            MetaDataTable DFo, MDang;
+		MetaDataTable DFo, MDang;
     	Matrix2D<RFLOAT> A3D;
     	FileName fn_expimg;
 
@@ -110,11 +111,40 @@ public:
     	vol.read(fn_map);
     	std::cerr << " Done reading map!" << std::endl;
 
+    	if (fn_mask != "")
+    	{
+    		Image<RFLOAT> msk;
+    		msk.read(fn_mask);
+    		if (!msk().sameShape(vol()))
+    			REPORT_ERROR("project ERROR: mask and map have different sizes!");
+    		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(vol())
+    		DIRECT_MULTIDIM_ELEM(vol(), n) *= DIRECT_MULTIDIM_ELEM(msk(), n);
+    	}
+
     	if (!do_only_one)
     	{
     		std::cerr << " Reading STAR file with all angles " << fn_ang << std::endl;
                 MDang.read(fn_ang);
     		std::cerr << " Done reading STAR file!" << std::endl;
+    	}
+
+
+    	if (angpix < 0.)
+    	{
+    		if (do_only_one)
+    			REPORT_ERROR("project ERROR: please provide pixel size in Angstroms through --angpix");
+            if (MDang.containsLabel(EMDL_CTF_MAGNIFICATION) && MDang.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+            {
+                    RFLOAT mag, dstep;
+                    MDang.getValue(EMDL_CTF_MAGNIFICATION, mag);
+                    MDang.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+                    angpix = 10000. * dstep / mag;
+                    std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+            }
+            else
+            {
+            		REPORT_ERROR("project ERROR: please provide pixel size in Angstroms through --angpix");
+            }
     	}
 
     	// Now that we have the size of the volume, check r_max

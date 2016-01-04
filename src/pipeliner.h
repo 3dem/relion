@@ -97,13 +97,14 @@ class Node
 #define PROC_SORT           6 // Sort particles based on their Z-scores
 #define PROC_2DCLASS		7 // 2D classification (from input particles)
 #define PROC_3DCLASS		8 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_CLASSSELECT    9 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
-// TODO #define PROC_MASKCREATE     10
-#define PROC_3DAUTO	        10  // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			11 // Particle-polishing (from movie-particles)
-#define PROC_POST			12 // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			13 // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define NR_BROWSE_TABS      14
+#define PROC_3DAUTO	        9 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH			10// Particle-polishing (from movie-particles)
+#define PROC_CLASSSELECT    11// Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_MASKCREATE     12// Process to create masks from input maps
+#define PROC_SUBTRACT       13// Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST			14// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP			15// Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define NR_BROWSE_TABS      16
 
 // Status a Process may have
 #define PROC_RUNNING   0

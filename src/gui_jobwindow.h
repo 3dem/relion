@@ -149,8 +149,8 @@ public:
 	// Write the job submission script
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
 
-	// See if outputname contains DATENTIMENRUN, and if so, replace with current date and time
-	void changeDateNTimeInOutputname(std::string &outputname);
+	// Initialise pipeiline stuff for each job, return outputname
+	void initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue = false);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
@@ -631,6 +631,53 @@ public:
 
 };
 
+class PolishJobWindow : public RelionJobWindow
+{
+
+public:
+	// I/O
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_mask;
+
+	// Movements
+	SliderEntry movie_runavg_window;
+	BooleanEntry do_fit_movement;
+	SliderEntry sigma_nb;
+
+	// Damage-model
+	BooleanEntry do_bfactor_weighting;
+	SliderEntry perframe_highres;
+	SliderEntry perframe_bfac_lowres;
+	SliderEntry average_frame_bfactor;
+	AnyEntry sym_name;
+
+	// Normalisation
+	SliderEntry bg_diameter;
+	SliderEntry white_dust;
+	SliderEntry black_dust;
+
+	Fl_Group *fit_group, *weight_group;
+
+
+public:
+	// Constructor
+	PolishJobWindow();
+
+	// Destructor
+	~PolishJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
 class ClassSelectJobWindow : public RelionJobWindow
 {
 public:
@@ -658,43 +705,26 @@ public:
 
 };
 
-class PostJobWindow : public RelionJobWindow
+class MaskCreateJobWindow : public RelionJobWindow
 {
 public:
 
 	// I/O
 	InputNodeEntry fn_in;
-
-	// TODO: take away auto-masking from postprocessing and do this outside the postprocessing in a new jobtype
-
-	// Masking
-	BooleanEntry do_automask;
+	SliderEntry lowpass_filter;
+	SliderEntry angpix;
 	SliderEntry inimask_threshold;
 	SliderEntry extend_inimask;
 	SliderEntry width_mask_edge;
-	BooleanEntry do_usermask;
-	InputNodeEntry fn_mask;
 
-	// Sharpening
-	BooleanEntry do_auto_bfac;
-	SliderEntry autob_lowres;
-	BooleanEntry do_adhoc_bfac;
-	SliderEntry adhoc_bfac;
-	FileNameEntry fn_mtf;
-
-	// Filtering
-	BooleanEntry do_skip_fsc_weighting;
-	SliderEntry low_pass;
-
-	Fl_Group *automask_group, *usermask_group, *autobfac_group, *adhocbfac_group, *skipweight_group;
 
 public:
 
 	// Constructor
-	PostJobWindow();
+	MaskCreateJobWindow();
 
 	// Destructor
-	~PostJobWindow(){};
+	~MaskCreateJobWindow(){};
 
 	// write/read settings to disc
 	void write(std::string fn);
@@ -708,34 +738,73 @@ public:
 
 };
 
-class PolishJobWindow : public RelionJobWindow
+class SubtractJobWindow : public RelionJobWindow
 {
+public:
+
+	// I/O
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_data;
+	InputNodeEntry fn_mask;
+
+	// CTF
+	BooleanEntry do_ctf_correction;
+	BooleanEntry ctf_phase_flipped;
+	BooleanEntry ctf_intact_first_peak;
+
+	Fl_Group *ctf_group;
 
 public:
+
+	// Constructor
+	SubtractJobWindow();
+
+	// Destructor
+	~SubtractJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+
+
+class PostJobWindow : public RelionJobWindow
+{
+public:
+
 	// I/O
 	InputNodeEntry fn_in;
 	InputNodeEntry fn_mask;
+	SliderEntry angpix;
 
-	// Movements
-	SliderEntry movie_runavg_window;
-	BooleanEntry do_fit_movement;
-	SliderEntry sigma_nb;
+	// Sharpening
+	BooleanEntry do_auto_bfac;
+	SliderEntry autob_lowres;
+	BooleanEntry do_adhoc_bfac;
+	SliderEntry adhoc_bfac;
+	FileNameEntry fn_mtf;
 
-	// Damage-model
-	BooleanEntry do_bfactor_weighting;
-	SliderEntry perframe_highres;
-	SliderEntry perframe_bfac_lowres;
-	AnyEntry sym_name;
+	// Filtering
+	BooleanEntry do_skip_fsc_weighting;
+	SliderEntry low_pass;
 
-	Fl_Group *fit_group, *weight_group;
-
+	Fl_Group *autobfac_group, *adhocbfac_group, *skipweight_group;
 
 public:
+
 	// Constructor
-	PolishJobWindow();
+	PostJobWindow();
 
 	// Destructor
-	~PolishJobWindow(){};
+	~PostJobWindow(){};
 
 	// write/read settings to disc
 	void write(std::string fn);

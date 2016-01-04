@@ -27,7 +27,7 @@ void ParticlePolisher::read(int argc, char **argv)
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with the aligned movie frames, e.g. run1_ct25_data.star");
-	fn_out = parser.getOption("--o", "Output rootname", "shiny");
+	fn_out = parser.getOption("--o", "Output directory", "Polish/");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 	running_average_width = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "5"));
 	do_start_all_over = parser.checkOption("--dont_read_old_files", "Do not read intermediate results from disc, but re-do all calculations from scratch");
@@ -138,7 +138,14 @@ void ParticlePolisher::initialise()
     }
 
 	if (do_normalise && bg_radius < 0)
-		REPORT_ERROR("ERROR: please provide a radius for a circle that defines the background area when normalising...");
+	{
+		int image_size;
+		exp_model.MDexp.getValue(EMDL_IMAGE_SIZE, image_size);
+		bg_radius = ROUND(0.375 * image_size);
+
+		if (verb > 0)
+			std::cout << " + Using default particle diameter of 75% of the box size, so bg_radius= " << bg_radius << std::endl;
+	}
 
 	// Sep24,2015 - Shaoda, Helical reconstruction
 	if (nr_helical_asu > 1)
@@ -146,6 +153,12 @@ void ParticlePolisher::initialise()
 		if ( (fabs(helical_twist) < 0.01) || (fabs(helical_twist) > 179.99) || (angpix < 0.001) || ((helical_rise / angpix) < 0.001))
 			REPORT_ERROR("ERROR: Invalid helical twist or rise!");
 	}
+
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length()-1] != '/')
+		fn_out += "/";
+
+	fn_olddir = "";
 }
 
 // Fit the beam-induced translations for all average micrographs
@@ -187,7 +200,7 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 	}
 
 	// Write out the STAR file with all the fitted movements
-	FileName fn_tmp = fn_in.withoutExtension() + "_" + fn_out + ".star";
+	FileName fn_tmp = fn_out + "fitted_tracks.star";
 	exp_model.MDimg.write(fn_tmp);
 	std::cout << " + Written out all fitted movements in STAR file: " << fn_tmp << std::endl;
 
@@ -334,7 +347,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 {
 
-	FileName fn_star = fn_in.withoutExtension() + "_" + fn_out + "_bfactors.star";
+	FileName fn_star = fn_out + "bfactors.star";
 	if (!do_start_all_over && readStarFileBfactors(fn_star))
 	{
 		if (verb > 0)
@@ -402,7 +415,7 @@ void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 
 
     // Also write a STAR file with the relative contributions of each frame to all frequencies
-    fn_star = fn_in.withoutExtension() + "_" + fn_out + "_relweights.star";
+    fn_star = fn_out + "relweights.star";
     writeStarFileRelativeWeights(fn_star);
 
 
@@ -506,7 +519,7 @@ void ParticlePolisher::calculateAverageAllSingleFrameReconstructions(int this_ha
 {
 
 	FileName fn_sum;
-	fn_sum = fn_in.withoutExtension() + "_" + fn_out + "_avgframes_half" + integerToString(this_half) + "_class001_unfil.mrc";
+	fn_sum = fn_out + "avgframes_half" + integerToString(this_half) + "_class001_unfil.mrc";
 
 	if (!do_start_all_over && exists(fn_sum))
 	{
@@ -519,7 +532,7 @@ void ParticlePolisher::calculateAverageAllSingleFrameReconstructions(int this_ha
 	for (long int this_frame = first_frame; this_frame <= last_frame; this_frame++)
 	{
     	FileName fn_vol;
-    	fn_vol.compose(fn_in.withoutExtension() + "_" + fn_out + "_frame", this_frame, "", 3);
+    	fn_vol.compose(fn_out + "frame", this_frame, "", 3);
     	fn_vol += "_half" + integerToString(this_half) + "_class001_unfil.mrc";
 
     	if (this_frame == first_frame)
@@ -542,7 +555,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 {
 
 	FileName fn_vol;
-	fn_vol.compose(fn_in.withoutExtension() + "_" + fn_out + "_frame", this_frame, "", 3);
+	fn_vol.compose(fn_out + "frame", this_frame, "", 3);
 	fn_vol += "_half" + integerToString(this_half) + "_class001_unfil.mrc";
 	if (!do_start_all_over && exists(fn_vol))
 	{
@@ -550,8 +563,6 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 			std::cout << std::endl << " + " << fn_vol << " already exists: skipping per-frame reconstruction." << std::endl;
 		return;
 	}
-
-
 
 	int image_size, current_size;
 	// get image size from metadatatable
@@ -570,7 +581,6 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 	MultidimArray<Complex > Faux, F2D, F2Dp, Fsub;
 	MultidimArray<RFLOAT> Fweight, Fctf;
 	Image<RFLOAT> img, vol;
-	FourierTransformer transformer;
 	RFLOAT xtrans, ytrans;
 	RFLOAT rot, tilt, psi;
 	int i_half;
@@ -592,6 +602,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 			exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 			img.read(fn_img);
 			CenterFFT(img(), true);
+			FourierTransformer transformer;
 			transformer.FourierTransform(img(), F2Dp);
 			windowFourierTransform(F2Dp, F2D, current_size);
 
@@ -652,9 +663,9 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 	FileName fn_root_half;
 	// Make sure that the first call to this function is with this_frame < 0!!!
 	if (this_frame < 0)
-		fn_root_half = fn_in.withoutExtension() + "_" + fn_out+"_avgframes";
+		fn_root_half = fn_out+"avgframes";
 	else
-		fn_root_half.compose(fn_in.withoutExtension() + "_" + fn_out+"_frame",this_frame,"", 3);
+		fn_root_half.compose(fn_out+"frame",this_frame,"", 3);
 
 	FileName fn_half1, fn_half2;
 	Image<RFLOAT> I1, I2;
@@ -730,10 +741,10 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 void ParticlePolisher::polishParticlesAllMicrographs()
 {
 
-	if (!do_start_all_over && exists(fn_out + ".star"))
+	if (!do_start_all_over && exists(fn_out + "shiny.star"))
 	{
 		if (verb > 0)
-			std::cout << std::endl << " + " << fn_out << ".star already exists: skipping polishing of the particles." << std::endl;
+			std::cout << std::endl << " + " << fn_out << "shiny.star already exists: skipping polishing of the particles." << std::endl;
 
 		return;
 	}
@@ -762,6 +773,19 @@ void ParticlePolisher::polishParticlesAllMicrographs()
 	{
 		progress_bar(my_nr_micrographs);
 	}
+
+}
+
+void ParticlePolisher::changeParticleStackName(FileName &fn_part)
+{
+
+	long int nr;
+	FileName fn_stack;
+	fn_part.decompose(nr, fn_stack);
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_part, uniqdate);
+	FileName fn_part_nouniqdate = (slashpos!= std::string::npos) ? fn_part.substr(slashpos+15) : fn_part;
+	fn_part = fn_out + fn_part_nouniqdate;
 
 }
 
@@ -805,13 +829,8 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 			// Also change this particle's image_name
 			FileName fn_part, fn_img;
 			exp_model.MDimg.getValue(EMDL_PARTICLE_ORI_NAME, fn_part, part_id);
-			fn_part = fn_part.withoutExtension();
-			std::string mic_name;
-			long int nr;
-			fn_part.decompose(nr, mic_name);
-			fn_part = mic_name + "_" + fn_out + ".mrcs";
+			changeParticleStackName(fn_part);
 			fn_img.compose(ipar + 1, fn_part);
-
 			MDshiny.setValue(EMDL_IMAGE_NAME, fn_img);
 		}
 	}
@@ -824,11 +843,10 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 	MDshiny.deactivateLabel(EMDL_ORIENT_PSI_PRIOR);
 
 	// Write output metadatatable
-	MDshiny.write(fn_out + ".star");
-	std::cout << " + Written out all polished particles and their corresponding STAR file: " << fn_out << ".star" << std::endl;
+	MDshiny.write(fn_out + "shiny.star");
+	std::cout << " + Written out all polished particles and their corresponding STAR file: " << fn_out << "shiny.star" << std::endl;
 
 }
-
 
 void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 {
@@ -937,12 +955,21 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		all_stddev += stddev*stddev;
 
 		// write the new average (i.e. the shiny, or polished particle)
-		fn_part = fn_part.withoutExtension();
-		std::string mic_name;
-		long int nr;
-		fn_part.decompose(nr, mic_name);
-		fn_part = mic_name + "_" + fn_out + ".mrcs";
+		changeParticleStackName(fn_part);
 		fn_img.compose(ipar + 1, fn_part);
+
+		// Only make directory if needed
+		if (ipar == 0)
+		{
+			FileName fn_dir = fn_part.beforeLastOf("/");
+			std::cerr << "making directory " << fn_dir << std::endl;
+			if (fn_dir != fn_olddir)
+			{
+				// Make a Particles directory
+				int res = system(("mkdir -p " + fn_dir).c_str());
+				fn_olddir = fn_dir;
+			}
+		}
 
 		// When last particle, also write the correct header
 		if (ipar == exp_model.average_micrographs[imic].ori_particles_id.size() - 1)
@@ -971,25 +998,25 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 		std::cout << "+ Reconstructing two halves of shiny particles ..." << std::endl;
 
 	// Re-read the shiny particles' MetaDataTable into exp_model
-	exp_model.read(fn_out + ".star", true);
+	exp_model.read(fn_out + "shiny.star", true);
 
 	// Do the reconstructions for both halves
 	reconstructShinyParticlesOneHalf(1);
 	reconstructShinyParticlesOneHalf(2);
 
 
-	FileName fn_post = (ipass == 1) ? "_post" : "_post2";
-	if (!do_start_all_over && exists(fn_in.withoutExtension() + "_" + fn_out + fn_post + "_masked.mrc")
-					       && exists(fn_in.withoutExtension() + "_" + fn_out + fn_post + ".star") )
+	FileName fn_post = (ipass == 1) ? "shiny_post" : "shiny_post2";
+	if (!do_start_all_over && exists(fn_out + fn_post + "_masked.mrc")
+					       && exists(fn_out + fn_post + ".star") )
 	{
 		if (verb > 0)
-			std::cout << std::endl << " + " << fn_in.withoutExtension() << "_" << fn_out << fn_post << "_masked.mrc already exists: re-reading map into memory." << std::endl;
+			std::cout << std::endl << " + " << fn_out << fn_post << "_masked.mrc already exists: re-reading map into memory." << std::endl;
 
 		if (verb > 0)
-			std::cout << std::endl << " + " << fn_in.withoutExtension() << "_" << fn_out << fn_post << ".star already exists: re-reading resolution from it." << std::endl;
+			std::cout << std::endl << " + " << fn_out << fn_post << ".star already exists: re-reading resolution from it." << std::endl;
 
 		MetaDataTable MD;
-		MD.read(fn_in.withoutExtension() + "_" + fn_out + fn_post + ".star", "general");
+		MD.read(fn_out + fn_post + ".star", "general");
 		MD.getValue(EMDL_POSTPROCESS_FINAL_RESOLUTION, maxres_model);
 	}
 	else
@@ -998,8 +1025,8 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 		Postprocessing prm;
 
 		prm.clear();
-		prm.fn_in = fn_in.withoutExtension() + "_" + fn_out;
-		prm.fn_out = prm.fn_in + fn_post;
+		prm.fn_in = fn_out + "shiny";
+		prm.fn_out = fn_out + fn_post;
 		prm.angpix = angpix;
 		prm.do_auto_mask = false;
 		prm.fn_mask = fn_mask;
@@ -1017,7 +1044,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 	MultidimArray<RFLOAT> dum;
 	Image<RFLOAT> refvol;
 	FileName fn_vol;
-	fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half1_class001_unfil.mrc";
+	fn_vol = fn_out + "shiny_half1_class001_unfil.mrc";
 	refvol.read(fn_vol);
 	PPrefvol_half1.ori_size = XSIZE(refvol());
 	PPrefvol_half1.padding_factor = 2;
@@ -1025,7 +1052,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 	PPrefvol_half1.r_min_nn = 10;
 	PPrefvol_half1.data_dim = 2;
 	PPrefvol_half1.computeFourierTransformMap(refvol(), dum);
-	fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half2_class001_unfil.mrc";
+	fn_vol = fn_out + "shiny_half2_class001_unfil.mrc";
 	refvol.read(fn_vol);
 	PPrefvol_half2.ori_size = XSIZE(refvol());
 	PPrefvol_half2.padding_factor = 2;
@@ -1039,7 +1066,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 {
 
-	FileName fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half" + integerToString(this_half) + "_class001_unfil.mrc";
+	FileName fn_vol = fn_out + "shiny_half" + integerToString(this_half) + "_class001_unfil.mrc";
 	if (!do_start_all_over && exists(fn_vol))
 	{
 		if (verb > 0)
@@ -1171,7 +1198,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocus()
 
     // Write the new MDTable to disc
 	if (verb > 0)
-		exp_model.MDimg.write(fn_out + ".star");
+		exp_model.MDimg.write(fn_out + "shiny.star");
 
 }
 
@@ -1611,8 +1638,8 @@ void ParticlePolisher::run()
 		fitMovementsAllMicrographs();
 
 	// Perform single-frame reconstructions and estimate dose-dependent B-factors
-        if (do_weighting)
-	     calculateAllSingleFrameReconstructionsAndBfactors();
+	if (do_weighting)
+		calculateAllSingleFrameReconstructionsAndBfactors();
 
 	// Write out the intermediately polished particles
 	polishParticlesAllMicrographs();

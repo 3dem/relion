@@ -322,7 +322,7 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 		size_t idx = line.find("==");
 		idx++;
 		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
-		if (!(type > 0 && type <= NR_BROWSE_TABS))
+		if (!(type >= 0 && type < NR_BROWSE_TABS))
 			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + ".job");
     	// Get is_continue from second line
 		getline(fh, line, '\n');
@@ -410,8 +410,8 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	replaceStringAll(textbuf, "XXXdedicatedXXX", floatToString(ndedi) );
 	replaceStringAll(textbuf, "XXXnodesXXX", floatToString(nnodes) );
 	replaceStringAll(textbuf, "XXXnameXXX", outputname);
-	replaceStringAll(textbuf, "XXXerrfileXXX", outputname + ".err");
-	replaceStringAll(textbuf, "XXXoutfileXXX", outputname + ".out");
+	replaceStringAll(textbuf, "XXXerrfileXXX", outputname + "run.err");
+	replaceStringAll(textbuf, "XXXoutfileXXX", outputname + "run.out");
 	replaceStringAll(textbuf, "XXXqueueXXX", queuename.getValue() );
 	if (have_extra1)
 		replaceStringAll(textbuf, "XXXextra1XXX", qsub_extra1.getValue() );
@@ -434,28 +434,29 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 
 }
 
-void RelionJobWindow::changeDateNTimeInOutputname(std::string &outputname)
+void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue)
 {
-	// If the outputname contains UNIQDATE, then replace that now for the current time
-	int datentime = outputname.rfind("UNIQDATE");
-	int last_slash = outputname.rfind("/");
-	std::string remainder = (last_slash < datentime) ? "" : outputname.substr(last_slash, outputname.length()+1);
-	if (datentime < outputname.size())
+
+	pipelineOutputNodes.clear();
+	pipelineInputNodes.clear();
+
+	if (!is_continue || newname_for_continue) // for continue jobs, use the same outputname
 	{
+
 		time_t now = time(0);
 		tm *ltm = localtime(&now);
-		std::string replacestr = integerToString(ltm->tm_year%100, 2);
-		replacestr+= integerToString(1 + ltm->tm_mon, 2);
-		replacestr+= integerToString(ltm->tm_mday, 2);
-		replacestr+= "-";
-		replacestr+= integerToString(ltm->tm_hour, 2);
-		replacestr+= integerToString(ltm->tm_min, 2);
-		replacestr+= integerToString(ltm->tm_sec, 2);
-		outputname.replace(datentime, outputname.length()+1 , replacestr);
-		outputname += remainder;
+		std::string uniqstr = integerToString(ltm->tm_year%100, 2);
+		uniqstr+= integerToString(1 + ltm->tm_mon, 2);
+		uniqstr+= integerToString(ltm->tm_mday, 2);
+		uniqstr+= "-";
+		uniqstr+= integerToString(ltm->tm_hour, 2);
+		uniqstr+= integerToString(ltm->tm_min, 2);
+		uniqstr+= integerToString(ltm->tm_sec, 2);
+		outputname = defaultname + "/" + uniqstr + "/";
 	}
-}
+	pipelineOutputName = outputname;
 
+}
 
 void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
@@ -476,7 +477,7 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	if (do_queue.getValue())
 	{
 		// Make the submission script and write it to disc
-		std::string output_script = outputname + "_submit.script";
+		std::string output_script = outputname + "run_submit.script";
 		saveJobSubmissionScript(output_script, outputname, commands);
 		final_command = qsub.getValue() + " " + output_script + " &";
 	}
@@ -492,6 +493,8 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
 			else
 				one_command = commands[icom];
+			// Save stdout and stderr to a .out and .err files
+			one_command += " >> " + outputname + "run.out 2>> " + outputname + "run.err";
 			final_command += one_command;
 			if (icom == commands.size() - 1)
 				final_command += " & "; // end by putting composite job in the background
@@ -564,7 +567,7 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input files:", "Micrographs/*.mrc", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
+	fn_in.place(current_y, "Input files:", "Micrographs/*.mrcs", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -612,22 +615,14 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Import");
 
 	std::string command;
-
-	// Save the real output name
-	outputname = "Import/UNIQDATE/";
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
 	FileName outputstar;
 
 	if (node_type.getValue() == "2D micrograph movies (*.mrcs)")
 	{
-		outputname += "movies";
-		outputstar = outputname+".star";
+		outputstar = outputname+"movies.star";
 		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
 		commands.push_back(command);
 		command = "ls " + fn_in.getValue() + " >> " + outputstar;
@@ -637,8 +632,7 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else if (node_type.getValue() == "2D micrographs/tomograms (*.mrc)")
 	{
-		outputname += "micrographs";
-		outputstar = outputname+".star";
+		outputstar = outputname+"micrographs.star";
 		command = "relion_star_loopheader rlnMicrographName > " + outputstar;;
 		commands.push_back(command);
 		command = "ls " + fn_in.getValue() + " >> " + outputstar;
@@ -685,7 +679,6 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option.");
 	}
 
-	pipelineOutputName = outputname;
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
@@ -801,8 +794,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "MotionCorr");
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -816,14 +808,6 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	Node node(input_star_mics.getValue(), input_star_mics.type);
 	pipelineInputNodes.push_back(node);
 
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		// Save the real output name
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = "MotionCorr/UNIQDATE/";
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
 	command += " --o " + outputname;
 	pipelineOutputName = outputname;
 	Node node2(outputname + "/corrected_micrographs.star", NODE_MICS);
@@ -1039,17 +1023,9 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "CtfFind");
 	std::string command;
 
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		outputname = "CtfFind/UNIQDATE/";
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
 	Node node(fn_outstar, NODE_MICS);
 	pipelineOutputNodes.push_back(node);
@@ -1230,19 +1206,10 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "ManualPick");
 
 	std::string command;
 	command="`which relion_manualpick`";
-
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		outputname = "ManualPick/UNIQDATE/";
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
 
 	command += " --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
@@ -1436,22 +1403,13 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "AutoPick");
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_autopick_mpi`";
 	else
 		command="`which relion_autopick`";
-
-	// for continue jobs, use the same outputname
-	if (!is_continue)
-	{
-		outputname = "AutoPick/UNIQDATE/";
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
 
 	// Input
 	command += " --i " + fn_input_autopick.getValue();
@@ -1462,7 +1420,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	pipelineInputNodes.push_back(node2);
 
 	// Output
-	Node node3( outputname + "coords_suffix_autopick.star", NODE_MIC_COORDS);
+	Node node3(outputname + "coords_suffix_autopick.star", NODE_MIC_COORDS);
 	pipelineOutputNodes.push_back(node3);
 
 	command += " --odir " + outputname;
@@ -1693,26 +1651,13 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Extract");
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_preprocess_mpi`";
 	else
 		command="`which relion_preprocess`";
-
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		// I/O
-		// Save the real output name (could be with _ctX for continuation)
-		// This name will also be used for the stderr and stdout outputs and the submit script and gui settings filenames
-		outputname = "Extract/UNIQDATE/";
-
-		// Change outputname if it contains UNIQDATE
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
 
 	// Input
 	command += " --i " + star_mics.getValue();
@@ -1857,21 +1802,13 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Sort");
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_particle_sort_mpi`";
 	else
 		command="`which relion_particle_sort`";
-
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		outputname = "Sort/UNIQDATE/";
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
 
 	command += " --i " + input_star.getValue();
 	Node node(input_star.getValue(), input_star.type);
@@ -2157,8 +2094,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Class2D", true); // true means: also make a new process for continuation runs (as users may actually change things there)
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -2166,12 +2102,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-
-	// For relion_refine jobs: also make a new process for continuation runs (as users may actually change things there)
-	outputname = "Class2D/UNIQDATE/";
-	changeDateNTimeInOutputname(outputname);
 	command += " --o " + outputname + "run";;
-	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
 
 	if (is_continue)
@@ -2591,19 +2522,14 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.clear();
 	std::string command;
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Class3D", true);
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
 	else
 		command="`which relion_refine`";
 
-	// Continuation runs get their own UNIQDATE...
-	outputname = "Class3D/UNIQDATE/";
-	changeDateNTimeInOutputname(outputname);
 	command += " --o " + outputname + "run";;
-	pipelineOutputName = outputname;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
 
 	if (is_continue)
@@ -2798,11 +2724,7 @@ Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/tw
 	ctf_group->end();
 
 	resetHeight();
-	do_ctf_correction.place(current_y, "Do CTF-correction?", true, "If set to Yes, CTFs will be corrected inside the MAP refinement. \
-The resulting algorithm intrinsically implements the optimal linear, or Wiener filter. \
-Note that CTF parameters for all images need to be given in the input STAR file. \
-The command 'relion_refine --print_metadata_labels' will print a list of all possible metadata labels for that STAR file. \
-See the RELION Wiki for more details.\n\n Also make sure that the correct pixel size (in Angstrom) is given above!)", ctf_group);
+	do_ctf_correction.place(current_y, "Do CTF-correction?", true, "If set to Yes, CTFs will be applied to the projections of the map. This requires that CTF information is present in the input STAR file.", ctf_group);
 
 	ctf_group->begin();
 
@@ -2822,7 +2744,6 @@ Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) ofte
 Therefore, this option is not generally recommended: try increasing amplitude contrast (in your input STAR file) first!");
 
 	ctf_group->end();
-
 	do_ctf_correction.cb_menu_i(); // To make default effective
 
 	tab3->end();
@@ -3063,21 +2984,14 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.clear();
 	std::string command;
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Refine3D", true);
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
 	else
 		command="`which relion_refine`";
 
-	// continuation runs with Refine3D all get their own uniqdate
-	outputname = "Refine3D/UNIQDATE/";
-	changeDateNTimeInOutputname(outputname);
-
 	command += " --o " + outputname + "run";
-	pipelineOutputName = outputname;
-
 	// TODO: add bodies!! (probably in next version)
 	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, do_movies.getValue(), do_alsorot_movies.getValue() );
 
@@ -3214,6 +3128,224 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 }
 
+PolishJobWindow::PolishJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
+{
+
+	type = PROC_POLISH;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	fn_in.place(current_y, "Input STAR file with aligned movies:", NODE_MOVIE_DATA, "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
+
+	fn_mask.place(current_y, "Mask for the reconstructions", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
+
+	tab1->end();
+	tab2->begin();
+	tab2->label("Movement");
+	resetHeight();
+
+	fit_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	fit_group->end();
+
+
+	do_fit_movement.place(current_y, "Linear fit particle movements?", true, "If set to Yes, then the program will fit linear tracks (in X-Y and in time) through \
+the estimated movie tracks in the input STAR file. For small particles (e.g. < 1MDa) this will lead to more robust beam-induced movement modelling. Because particles that are close to each other on a \
+micrograph often move in similar directions, the estimated tracks from neighbouring particles may also be included in the fitting of each particle. Again, in particular for smaller particles \
+this may improve the robustness of the fits.", fit_group);
+
+	fit_group->begin();
+
+	movie_runavg_window.place(current_y, "Running average window:", 5, 1, 15, 1, "Provide the same value as the one that was used to estimate the movement tracks in the movie-processing tab of the auto-refine job.");
+
+	sigma_nb.place(current_y, "Stddev on particle distance (pix)", 100, 0, 1000, 50, "This value determines how much neighbouring particles contribute to the fit of the movements of each particle. \
+This value is the standard deviation of a Gaussian on the inter-particle distance. Larger values mean that particles that are further away still contribute more. Particles beyond 3 standard deviations are excluded \
+from the fit. Very large values will lead to all fitted tracks pointing in the same direction. A value of zero means that each particle is fitted independently.");
+	fit_group->end();
+	do_fit_movement.cb_menu_i();
+
+	tab2->end();
+	tab3->begin();
+	tab3->label("Damage");
+	resetHeight();
+
+	weight_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	weight_group->end();
+
+	do_bfactor_weighting.place(current_y, "Perform B-factor weighting?", true, "If set to Yes, then the program will estimate a resolution-dependent weight for each movie frames by calculating independent half-reconstructions for each movie frame separately. \
+Gold-standard FSCs between these are then converted into relative Guinier plots, through which straight lines are fitted. Linear fits are often suitable beyond 20A resolution. Small particles may not yield such high resolutions for the individual-frame reconstructions. \
+Therefore, in some cases it may be better to skip this step. It is however recommended to always try and perform B-factor weighting, and to inspect the output bfactors.star and guinier.star files, as adequate weighting may significantly improve resolution in the final map.", weight_group);
+
+	weight_group->begin();
+	perframe_highres.place(current_y, "Highres-limit per-frame maps (A)", 6, 1, 25, 1, "To estimate the resolution and dose dependency of the radiation damage, the program \
+will calculate reconstructions from all first movie frames, second movie frames, etc. These per-frame reconstructions will have lower resolution than the reconstruction from all-frames. \
+To speed up the calculations (and reduce memory requirements), the per-frame reconstructions may be limited in resolution using this parameter. One can inspect the output STAR files of the per-frame reconstructions \
+to check afterwards that this value was not chosen lower than the actual resolution of these reconstructions");
+
+	perframe_bfac_lowres.place(current_y, "Lowres-limit B-factor estimation (A)", 20 , 1, 40, 1, "This value describes the lowest resolution that is included in the B-factor estimation of the per-frame reconstructions. \
+Because the power spectrum of per-frame reconstructions is compared to the power spectrum of the reconstruction from all frames, a much lower value than the 10A described in the Rosenthal and Henderson (2003) paper in JMB can be used. Probably a value around 20A is still OK.");
+
+	average_frame_bfactor.place(current_y, "Average frames B-factor estimation", 1 , 1, 7, 1, "B-factors for each movie frame will be estimated from reconstructions of all particles for that movie frame. Single-frame reconstructions sometimes give not enough signal to estimate reliable B-factors. \
+This option allows one to calculate the B-factors from running averages of movie frames. The value specified should be an odd number. Calculating B-factors from multiple movie frames improves the SNR in the reconstructions, but limits the estimation of sudden changes in B-factors throughout the movie, for example in the first few frames when beam-induced movement is very rapid. \
+Therefore, one should not use higher values than strictly necessary.");
+
+	weight_group->end();
+	do_bfactor_weighting.cb_menu_i();
+
+	current_y += STEPY/2;
+
+	sym_name.place(current_y, "Symmetry:", "C1", "If the molecule is asymmetric, \
+set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
+* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
+* I2: Crowther 222 \n \
+* I3: 52-setting (as used in SPIDER?)\n \
+* I4: A different 52 setting \n \
+The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
+RELION uses XMIPP's libraries for symmetry operations. \
+Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
+
+	tab3->end();
+
+
+	tab4->begin();
+	tab4->label("Normalise");
+	resetHeight();
+
+	bg_diameter.place(current_y, "Diameter background circle (pix): ", -1, -1, 600, 10, "Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
+The background area is defined as all pixels outside a circle with this given diameter in pixels (before rescaling). When specifying a negative value, a default value of 75% of the Particle box size will be used.");
+
+	white_dust.place(current_y, "Stddev for white dust removal: ", -1, -1, 10, 0.1, "Remove very white pixels from the extracted particles. \
+Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
+
+	black_dust.place(current_y, "Stddev for black dust removal: ", -1, -1, 10, 0.1, "Remove very black pixels from the extracted particles. \
+Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
+
+	tab4->end();
+
+	// read settings if hidden file exists
+	read(".gui_polish", is_continue);
+}
+
+void PolishJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_polish";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+	fn_in.writeValue(fh);
+	fn_mask.writeValue(fh);
+	movie_runavg_window.writeValue(fh);
+	do_fit_movement.writeValue(fh);
+	sigma_nb.writeValue(fh);
+	do_bfactor_weighting.writeValue(fh);
+	perframe_highres.writeValue(fh);
+	perframe_bfac_lowres.writeValue(fh);
+	average_frame_bfactor.writeValue(fh);
+	sym_name.writeValue(fh);
+	bg_diameter.writeValue(fh);
+	white_dust.writeValue(fh);
+	black_dust.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+void PolishJobWindow::read(std::string fn, bool &_is_continue)
+{
+	std::ifstream fh;
+	// Only read things if the file exists
+	if (openReadFile(fn, fh))
+	{
+		fn_in.readValue(fh);
+		fn_mask.readValue(fh);
+		movie_runavg_window.readValue(fh);
+		do_fit_movement.readValue(fh);
+		sigma_nb.readValue(fh);
+		do_bfactor_weighting.readValue(fh);
+		perframe_highres.readValue(fh);
+		perframe_bfac_lowres.readValue(fh);
+		average_frame_bfactor.readValue(fh);
+		sym_name.readValue(fh);
+		bg_diameter.readValue(fh);
+		white_dust.readValue(fh);
+		black_dust.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+void PolishJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+}
+
+void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+{
+	commands.clear();
+	std::string command;
+	initialisePipeline(outputname, "Polish");
+
+	if (nr_mpi.getValue() > 1)
+		command="`which relion_particle_polish_mpi`";
+	else
+		command="`which relion_particle_polish`";
+
+	// General
+	command += " --i " + fn_in.getValue();
+	Node node(fn_in.getValue(), fn_in.type);
+	pipelineInputNodes.push_back(node);
+
+	command += " --mask " + fn_mask.getValue();
+	Node node2(fn_mask.getValue(), fn_mask.type);
+	pipelineInputNodes.push_back(node2);
+
+	// TODO!!
+	command += " --o " + outputname;
+	Node node3(outputname + "shiny.star", NODE_PART_DATA);
+	pipelineOutputNodes.push_back(node3);
+
+	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
+
+	// If this is not a continue job, then re-start from scratch....
+	if (!is_continue)
+		command += " --dont_read_old_files ";
+
+	// Beam-induced movement fitting options
+	if (do_fit_movement.getValue())
+		command += " --sigma_nb " + floatToString(sigma_nb.getValue());
+	else
+		command += " --no_fit ";
+
+	// Damage
+	if (do_bfactor_weighting.getValue())
+	{
+		command += " --perframe_highres " + floatToString(perframe_highres.getValue());
+		command += " --autob_lowres " + floatToString(perframe_bfac_lowres.getValue());
+		command += " --bfactor_running_avg " + floatToString(average_frame_bfactor.getValue());
+	}
+	else
+	{
+		command += " --skip_bfactor_weighting ";
+	}
+
+	// Symmetry group
+	command += " --sym " + sym_name.getValue();
+
+	// Normalisation
+	command += " --bg_radius " + floatToString(FLOOR(bg_diameter.getValue()/2.));
+	command += " --white_dust " + floatToString(white_dust.getValue());
+	command += " --black_dust " + floatToString(black_dust.getValue());
+
+	// Other arguments for extraction
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
 
 ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
@@ -3273,8 +3405,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 {
 
 	commands.clear();
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "ClassSelect");
 
 	std::string command;
 	command="`which relion_display`";
@@ -3283,13 +3414,6 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 	command += " --gui --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
-
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		outputname = "ClassSelect/UNIQDATE/";
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
 
 	FileName fn_parts = outputname+"particles.star";
 	command += " --allow_save --fn_parts " + fn_parts;
@@ -3316,9 +3440,265 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 }
 
 
+MaskCreateJobWindow::MaskCreateJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
+{
+
+	type = PROC_MASKCREATE;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	fn_in.place(current_y, "Input 3D map:", NODE_3DREF, "", "MRC map files (*.mrc)", "Provide an input MRC map from which to start binarizing the map.");
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("Mask");
+	resetHeight();
+
+	lowpass_filter.place(current_y, "Lowpass filter map (A)", -1, 10, 100, 5, "Lowpass filter that will be applied to the input map, prior to binarization. To calculate solvent masks, a lowpass filter of 15-20A may work well.");
+	angpix.place(current_y, "Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms of the input map (to calculate the low-pass filter)");
+
+	// Add a little spacer
+    current_y += STEPY/2;
+
+	inimask_threshold.place(current_y, "Initial binarisation threshold:", 0.02, 0., 0.5, 0.01, "This threshold is used to make an initial binary mask from the average of the two unfiltered half-reconstructions. \
+If you don't know what value to use, display one of the unfiltered half-maps in a 3D surface rendering viewer and find the lowest threshold that gives no noise peaks outside the reconstruction.");
+	extend_inimask.place(current_y, "Extend binary map this many pixels:", 3, 0, 20, 1, "The initial binary mask is extended this number of pixels in all directions." );
+	width_mask_edge.place(current_y, "Add a soft-edge of this many pixels:", 3, 0, 20, 1, "The extended binary mask is further extended with a raised-cosine soft edge of the specified width." );
+
+	tab2->end();
+
+	// read settings if hidden file exists
+	read(".gui_maskcreate", is_continue);
+}
 
 
-PostJobWindow::PostJobWindow() : RelionJobWindow(4, HAS_NOT_MPI, HAS_NOT_THREAD)
+
+void MaskCreateJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_maskcreate";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	fn_in.writeValue(fh);
+	lowpass_filter.writeValue(fh);
+	angpix.writeValue(fh);
+	inimask_threshold.writeValue(fh);
+	extend_inimask.writeValue(fh);
+	width_mask_edge.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+
+void MaskCreateJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+	// Only read things if the file exists
+	if (openReadFile(fn, fh))
+	{
+		fn_in.readValue(fh);
+		lowpass_filter.readValue(fh);
+		angpix.readValue(fh);
+		inimask_threshold.readValue(fh);
+		extend_inimask.readValue(fh);
+		width_mask_edge.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+
+void MaskCreateJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+}
+
+void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir)
+{
+
+	commands.clear();
+	initialisePipeline(outputname, "MaskCreate");
+
+	std::string command;
+	command="`which relion_mask_create`";
+
+	// I/O
+	command += " --i " + fn_in.getValue();
+	Node node(fn_in.getValue(), fn_in.type);
+	pipelineInputNodes.push_back(node);
+
+	command += " --o " + outputname + "mask.mrc";
+	Node node2(outputname + "mask.mrc", NODE_MASK);
+	pipelineOutputNodes.push_back(node2);
+
+	// TODO: implement low-pass filter!
+	if (lowpass_filter.getValue() > 0)
+	{
+		command += " --lowpass " + floatToString(lowpass_filter.getValue());
+		command += " --angpix " + floatToString(angpix.getValue());
+	}
+	command += " --ini_threshold " + floatToString(inimask_threshold.getValue());
+	command += " --extend_inimask " + floatToString(extend_inimask.getValue());
+	command += " --width_soft_edge " + floatToString(width_mask_edge.getValue());
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
+
+
+SubtractJobWindow::SubtractJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
+{
+
+	type = PROC_SUBTRACT;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	fn_data.place(current_y, "Particles to subtract from:", NODE_PART_DATA, "", "STAR files (*.star)", "A copy of the entire set of particles in this STAR file will be made that contains the subtracted particle images.");
+
+    current_y += STEPY/2;
+
+    fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same data set, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
+    fn_mask.place(current_y, "Mask to apply to this map:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is white (1) and the rest of the protein and the solvent is black (0).");
+
+
+	tab1->end();
+
+
+	tab2->begin();
+	tab2->label("CTF");
+	resetHeight();
+
+	do_ctf_correction.place(current_y, "Do apply CTFs?", true, "If set to Yes, CTFs will be applied to the projections to subtract from the experimental particles", ctf_group);
+
+	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	ctf_group->begin();
+
+	ctf_phase_flipped.place(current_y, "Have data been phase-flipped?", false, "Set this to Yes if the experimental particles have been \
+ctf-phase corrected during the pre-processing steps. \
+Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
+as this can be done inside the internal CTF-correction. \
+However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
+
+	ctf_intact_first_peak.place(current_y, "Ignore CTFs until first peak?", false, "Set this to Yes when you have used the same option in the generation of the input map to be projected.");
+
+	ctf_group->end();
+	do_ctf_correction.cb_menu_i(); // To make default effective
+
+	tab2->end();
+
+	// read settings if hidden file exists
+	read(".gui_subtract", is_continue);
+}
+
+
+
+void SubtractJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_subtract";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	fn_data.writeValue(fh);
+	fn_in.writeValue(fh);
+	fn_mask.writeValue(fh);
+
+	do_ctf_correction.writeValue(fh);
+	ctf_phase_flipped.writeValue(fh);
+	ctf_intact_first_peak.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+
+void SubtractJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+	// Only read things if the file exists
+	if (openReadFile(fn, fh))
+	{
+
+		fn_data.readValue(fh);
+		fn_in.readValue(fh);
+		fn_mask.readValue(fh);
+
+		do_ctf_correction.readValue(fh);
+		ctf_phase_flipped.readValue(fh);
+		ctf_intact_first_peak.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+
+void SubtractJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+}
+
+void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir)
+{
+
+	commands.clear();
+	initialisePipeline(outputname, "Subtract");
+
+	std::string command;
+	command="`which relion_project`";
+
+	// I/O
+	command += " --i " + fn_in.getValue();
+	Node node(fn_in.getValue(), fn_in.type);
+	pipelineInputNodes.push_back(node);
+	command += " --mask " + fn_mask.getValue();
+	Node node2(fn_mask.getValue(), fn_mask.type);
+	pipelineInputNodes.push_back(node2);
+
+	command += " --o " + outputname + "subtracted";
+	Node node3(outputname + "subtracted.star", NODE_PART_DATA);
+	pipelineOutputNodes.push_back(node3);
+
+	if (do_ctf_correction.getValue())
+	{
+		command += " --ctf --angpix -1";
+		if (ctf_phase_flipped.getValue())
+			command += " --ctf_phase_flip";
+		if (ctf_intact_first_peak.getValue())
+			command += " --ctf_intact_first_peak";
+	}
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
+
+
+
+
+PostJobWindow::PostJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_POST;
@@ -3327,43 +3707,17 @@ PostJobWindow::PostJobWindow() : RelionJobWindow(4, HAS_NOT_MPI, HAS_NOT_THREAD)
 	tab1->label("I/O");
 	resetHeight();
 	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	fn_mask.place(current_y, "Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
+
+	current_y += STEPY/2;
+
+	angpix.place(current_y, "Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Mask");
+	tab2->label("Sharpen");
 	resetHeight();
-	automask_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	automask_group->end();
-
-	do_automask.place(current_y, "Perform auto-masking?", true, "If set to Yes, the program will automatically calculate a mask around the reconstructed particle. \
- A nicely fitting mask will result in an optimal resolution-estimation, as a maximal amount of noise will be removed from the resolution-estimation process. \
-The effect of the masking on the FSC-curve will be measured using the randomised phase-approach as in Shaoxia Chen et al, (2013) Ultramicroscopy", automask_group);
-
-	automask_group->begin();
-
-	inimask_threshold.place(current_y, "Initial binarisation threshold:", 0.02, 0., 0.5, 0.01, "This threshold is used to make an initial binary mask from the average of the two unfiltered half-reconstructions. \
-If you don't know what value to use, display one of the unfiltered half-maps in a 3D surface rendering viewer and find the lowest threshold that gives no noise peaks outside the reconstruction.");
-	extend_inimask.place(current_y, "Extend binary map this many pixels:", 3, 0, 20, 1, "The initial binary mask is extended this number of pixels in all directions." );
-	width_mask_edge.place(current_y, "Add a soft-edge of this many pixels:", 3, 0, 20, 1, "The extended binary mask is further extended with a raised-cosine soft edge of the specified width." );
-	automask_group->end();
-	do_automask.cb_menu_i();
-
-	usermask_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	usermask_group->end();
-
-	do_usermask.place(current_y, "Provide your own mask?", false, "If set to Yes, the program will mask the unfiltered half-reconstructions using a user-provided mask below. This also allows you to save execution time, by providing a previously determined automask for the same particle.", usermask_group);
-	usermask_group->begin();
-	fn_mask.place(current_y, "User-provided mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Use this to skip auto-masking by providing your own mask. You may also save execution time by providing a previously determined automask for the same particle.");
-	usermask_group->end();
-	do_usermask.cb_menu_i();
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("Sharpen");
-	resetHeight();
-	//ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	//ctf_group->end();
 
 	fn_mtf.place(current_y, "MTF of the detector (STAR file)", "", "STAR Files (*.star)", NULL, "The MTF of the detector is used in the (later) post-processing and particle polishing stages of refinement.  \
 If you know the MTF of your detector, provide it here. Curves for some well-known detectors may be downloaded from the RELION Wiki. Also see there for the exact format \
@@ -3392,9 +3746,9 @@ This option is useful if your map does not extend beyond the 10A needed for the 
 	adhocbfac_group->end();
 	do_adhoc_bfac.cb_menu_i();
 
-	tab3->end();
-	tab4->begin();
-	tab4->label("Filter");
+	tab2->end();
+	tab3->begin();
+	tab3->label("Filter");
 	resetHeight();
 	skipweight_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	skipweight_group->end();
@@ -3408,7 +3762,7 @@ In such cases, set this option to Yes and provide an ad-hoc filter as described 
 	skipweight_group->end();
 	do_skip_fsc_weighting.cb_menu_i();
 
-	tab4->end();
+	tab3->end();
 
 
 	// read settings if hidden file exists
@@ -3424,12 +3778,8 @@ void PostJobWindow::write(std::string fn)
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
-	do_automask.writeValue(fh);
-	inimask_threshold.writeValue(fh);
-	extend_inimask.writeValue(fh);
-	width_mask_edge.writeValue(fh);
-	do_usermask.writeValue(fh);
 	fn_mask.writeValue(fh);
+	angpix.writeValue(fh);
 	do_auto_bfac.writeValue(fh);
 	autob_lowres.writeValue(fh);
 	do_adhoc_bfac.writeValue(fh);
@@ -3447,12 +3797,8 @@ void PostJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		fn_in.readValue(fh);
-		do_automask.readValue(fh);
-		inimask_threshold.readValue(fh);
-		extend_inimask.readValue(fh);
-		width_mask_edge.readValue(fh);
-		do_usermask.readValue(fh);
 		fn_mask.readValue(fh);
+		angpix.readValue(fh);
 		do_auto_bfac.readValue(fh);
 		autob_lowres.readValue(fh);
 		do_adhoc_bfac.readValue(fh);
@@ -3472,19 +3818,17 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 50;
-
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
 
 	commands.clear();
+	initialisePipeline(outputname, "PostProcess");
 	std::string command;
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
 
 	command="`which relion_postprocess`";
+
+	// Input mask
+	command += " --mask " + fn_mask.getValue();
+	Node node3(fn_mask.getValue(), fn_mask.type);
+	pipelineInputNodes.push_back(node3);
 
 	// Get the input rootname from the half-map name
 	// run1_half1_class001_unfil.mrc -> run1
@@ -3499,42 +3843,13 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		exit(1);
 	}
 
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		outputname = "PostProcess/UNIQDATE/";
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
-
 	// The output name contains a directory: use it for output
-	command += " --o " + outputname;
-	command += "  --angpix " + floatToString(angpix);
-
-	pipelineOutputName = outputname;
-	Node node1(outputname+".mrc", NODE_FINALMAP);
+	command += " --o " + outputname + "postprocess";
+	command += "  --angpix " + floatToString(angpix.getValue());
+	Node node1(outputname+"postprocess.mrc", NODE_FINALMAP);
 	pipelineOutputNodes.push_back(node1);
-	Node node2(outputname+"_masked.mrc", NODE_FINALMAP);
+	Node node2(outputname+"postprocess_masked.mrc", NODE_FINALMAP);
 	pipelineOutputNodes.push_back(node2);
-
-	// Masking
-	if (do_automask.getValue())
-	{
-		command += " --auto_mask ";
-		command += " --inimask_threshold " + floatToString(inimask_threshold.getValue());
-		command += " --extend_inimask " + floatToString(extend_inimask.getValue());
-		command += " --width_mask_edge " + floatToString(width_mask_edge.getValue());
-
-		Node node3(outputname + "_automask.mrc", NODE_MASK);
-		pipelineOutputNodes.push_back(node3);
-	}
-
-	/// TODO: make a CREATE_MASK process and get it out of postprocessing
-	if (do_usermask.getValue())
-	{
-		command += " --mask " + fn_mask.getValue();
-		Node node(fn_mask.getValue(), fn_mask.type);
-		pipelineInputNodes.push_back(node);
-	}
 
 	// Sharpening
 	if (fn_mtf.getValue().length() > 0)
@@ -3565,220 +3880,6 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
-
-PolishJobWindow::PolishJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
-{
-
-	type = PROC_POLISH;
-
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-	fn_in.place(current_y, "Input STAR file with aligned movies:", NODE_MOVIE_DATA, "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
-
-	fn_mask.place(current_y, "Mask for the reconstructions", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
-
-	tab1->end();
-	tab2->begin();
-	tab2->label("Movement");
-	resetHeight();
-
-	fit_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	fit_group->end();
-
-
-	do_fit_movement.place(current_y, "Linear fit particle movements?", true, "If set to Yes, then the program will fit linear tracks (in X-Y and in time) through \
-the estimated movie tracks in the input STAR file. For small particles (e.g. < 1MDa) this will lead to more robust beam-induced movement modelling. Because particles that are close to each other on a \
-micrograph often move in similar directions, the estimated tracks from neighbouring particles may also be included in the fitting of each particle. Again, in particular for smaller particles \
-this may improve the robustness of the fits.", fit_group);
-
-	fit_group->begin();
-
-	movie_runavg_window.place(current_y, "Running average window:", 5, 1, 15, 1, "Provide the same value as the one that was used to estimate the movement tracks in the movie-processing tab of the auto-refine job.");
-
-	sigma_nb.place(current_y, "Stddev on particle distance (pix)", 100, 0, 1000, 50, "This value determines how much neighbouring particles contribute to the fit of the movements of each particle. \
-This value is the standard deviation of a Gaussian on the inter-particle distance. Larger values mean that particles that are further away still contribute more. Particles beyond 3 standard deviations are excluded \
-from the fit. Very large values will lead to all fitted tracks pointing in the same direction. A value of zero means that each particle is fitted independently.");
-	fit_group->end();
-	do_fit_movement.cb_menu_i();
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("Damage");
-	resetHeight();
-
-	weight_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	weight_group->end();
-
-	do_bfactor_weighting.place(current_y, "Perform B-factor weighting?", true, "If set to Yes, then the program will estimate a resolution-dependent weight for each movie frames by calculating independent half-reconstructions for each movie frame separately. \
-Gold-standard FSCs between these are then converted into relative Guinier plots, through which straight lines are fitted. Linear fits are often suitable beyond 20A resolution. Small particles may not yield such high resolutions for the individual-frame reconstructions. \
-Therefore, in some cases it may be better to skip this step. It is however recommended to always try and perform B-factor weighting, and to inspect the output bfactors.star and guinier.star files, as adequate weighting may significantly improve resolution in the final map.", weight_group);
-
-	weight_group->begin();
-	perframe_highres.place(current_y, "Highres-limit per-frame maps (A)", 6, 1, 25, 1, "To estimate the resolution and dose dependency of the radiation damage, the program \
-will calculate reconstructions from all first movie frames, second movie frames, etc. These per-frame reconstructions will have lower resolution than the reconstruction from all-frames. \
-To speed up the calculations (and reduce memory requirements), the per-frame reconstructions may be limited in resolution using this parameter. One can inspect the output STAR files of the per-frame reconstructions \
-to check afterwards that this value was not chosen lower than the actual resolution of these reconstructions");
-
-	perframe_bfac_lowres.place(current_y, "Lowres-limit B-factor estimation (A)", 20 , 1, 40, 1, "This value describes the lowest resolution that is included in the B-factor estimation of the per-frame reconstructions. \
-Because the power spectrum of per-frame reconstructions is compared to the power spectrum of the reconstruction from all frames, a much lower value than the 10A described in the Rosenthal and Henderson (2003) paper in JMB can be used. Probably a value around 20A is still OK.");
-
-	weight_group->end();
-	do_bfactor_weighting.cb_menu_i();
-
-	current_y += STEPY/2;
-
-	sym_name.place(current_y, "Symmetry:", "C1", "If the molecule is asymmetric, \
-set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
-* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
-* I2: Crowther 222 \n \
-* I3: 52-setting (as used in SPIDER?)\n \
-* I4: A different 52 setting \n \
-The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
-RELION uses XMIPP's libraries for symmetry operations. \
-Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
-
-	tab3->end();
-	// read settings if hidden file exists
-	read(".gui_polish", is_continue);
-}
-
-void PolishJobWindow::write(std::string fn)
-{
-	// Write hidden file if no name is given
-	if (fn=="")
-		fn=".gui_polish";
-
-	std::ofstream fh;
-	openWriteFile(fn, fh);
-	fn_in.writeValue(fh);
-	movie_runavg_window.writeValue(fh);
-	do_fit_movement.writeValue(fh);
-	sigma_nb.writeValue(fh);
-	do_bfactor_weighting.writeValue(fh);
-	perframe_highres.writeValue(fh);
-	perframe_bfac_lowres.writeValue(fh);
-	fn_mask.writeValue(fh);
-	sym_name.writeValue(fh);
-
-	closeWriteFile(fh, fn);
-}
-void PolishJobWindow::read(std::string fn, bool &_is_continue)
-{
-	std::ifstream fh;
-	// Only read things if the file exists
-	if (openReadFile(fn, fh))
-	{
-		fn_in.readValue(fh);
-		movie_runavg_window.readValue(fh);
-		do_fit_movement.readValue(fh);
-		sigma_nb.readValue(fh);
-		do_bfactor_weighting.readValue(fh);
-		perframe_highres.readValue(fh);
-		perframe_bfac_lowres.readValue(fh);
-		fn_mask.readValue(fh);
-		sym_name.readValue(fh);
-
-		closeReadFile(fh);
-		_is_continue = is_continue;
-	}
-}
-void PolishJobWindow::toggle_new_continue(bool _is_continue)
-{
-	is_continue = _is_continue;
-}
-
-void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
-{
-	// TODO
-	double angpix=1.;
-	double particle_diameter = 50;
-	double white_dust = -1;
-	double black_dust = -1;
-
-
-	commands.clear();
-	std::string command;
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
-
-	if (nr_mpi.getValue() > 1)
-		command="`which relion_particle_polish_mpi`";
-	else
-		command="`which relion_particle_polish`";
-
-	if (!is_continue) // for continue jobs, use the same outputname
-	{
-		outputname = "Polish/UNIQDATE/";
-		changeDateNTimeInOutputname(outputname);
-	}
-	pipelineOutputName = outputname;
-
-	// TODO: get running average width from the movie-continuation job!!
-
-	// General
-	command += " --i " + fn_in.getValue();
-
-	Node node(fn_in.getValue(), fn_in.type);
-	pipelineInputNodes.push_back(node);
-
-	// TODO!!
-	command += " --o " + outputname+"/shiny";
-
-	/*
-	Node node1(fn_out.getValue() + ".star", NODE_MOVIE_DATA); // TODO: output from Shiny in its own directory
-	pipelineOutputNodes.push_back(node1);
-	pipelineOutputName = fn_out.getValue();  // TODO: change OUTPUTNAME to its own output directory!
-	*/
-
-	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
-	// If this is not a continue job, then re-start from scratch....
-	if (!is_continue)
-		command += " --dont_read_old_files ";
-
-	// Beam-induced movement fitting options
-	if (do_fit_movement.getValue())
-		command += " --sigma_nb " + floatToString(sigma_nb.getValue());
-	else
-		command += " --no_fit ";
-
-	// Damage
-	if (do_bfactor_weighting.getValue())
-	{
-		command += " --perframe_highres " + floatToString(perframe_highres.getValue());
-		command += " --autob_lowres " + floatToString(perframe_bfac_lowres.getValue());
-	}
-	else
-	{
-		command += " --skip_bfactor_weighting ";
-	}
-
-	if (fn_mask.getValue().length() > 0)
-	{
-		Node node(fn_mask.getValue(), fn_mask.type);
-		pipelineInputNodes.push_back(node);
-		command += " --mask " + fn_mask.getValue();
-	}
-
-	// Symmetry group
-	command += " --sym " + sym_name.getValue();
-
-	// Normalisation
-	/// TODO!!!!
-
-	///RFLOAT bg_rad = ROUND(particle_diameter / (2. * angpix));
-	///command += " --bg_radius " + floatToString(bg_rad);
-	//command += " --white_dust " + floatToString(white_dust);
-	//command += " --black_dust " + floatToString(black_dust);
-
-	// Other arguments for extraction
-	command += " " + other_args.getValue();
-
-	commands.push_back(command);
-
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
-}
 
 ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
@@ -3874,20 +3975,15 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// TODO
 	double angpix = 1;
 
-	// Change outputname if it contains UNIQDATE
-	changeDateNTimeInOutputname(outputname);
-
 	commands.clear();
-	std::string command;
-	pipelineOutputNodes.clear();
-	pipelineInputNodes.clear();
+	initialisePipeline(outputname, "Resmap");
 
+	std::string command;
 	if (fn_resmap.getValue().length() == 0)
 	{
 		std::cerr << "ResmapJobWindow::getCommands ERROR: please provide an executable for the ResMap program." << std::endl;
 		exit(1);
 	}
-
 	command = fn_resmap.getValue();
 
 	// Get the two half-reconstruction names from the single one
@@ -3906,11 +4002,10 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
-	FileName fn_out = fn_in.getValue();
-	fn_out = fn_out.insertBeforeExtension("_resmap");
-	Node node1(fn_out, NODE_RESMAP);
-	pipelineOutputNodes.push_back(node1);
-	pipelineOutputName = fn_in.getValue().substr(0, pos_half) + "_resmap";
+	Node node2(fn_mask.getValue(), fn_mask.type);
+	pipelineInputNodes.push_back(node2);
+	command += " --maskVol=" + fn_mask.getValue();
+
 
 	command += " --vis2D --noguiSplit " + fn_half1 + " " + fn_half2;
 	command += " --vxSize=" + floatToString(angpix);
@@ -3918,28 +4013,20 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --minRes=" + floatToString(minres.getValue());
 	command += " --maxRes=" + floatToString(maxres.getValue());
 	command += " --stepRes=" + floatToString(stepres.getValue());
-	if (fn_mask.getValue().length() > 0)
-	{
-		Node node2(fn_mask.getValue(), fn_mask.type);
-		pipelineInputNodes.push_back(node2);
-		command += " --maskVol=" + fn_mask.getValue();
-	}
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
 
-	int last_slash = fn_in.getValue().rfind("/");
-	if (last_slash < fn_in.getValue().size())
-	{
-		// The output name contains a directory: use that one for output
-		outputname = fn_in.getValue().substr(0, last_slash + 1) + "run_resmap";
-	}
-	else
-	{
-		outputname = "run_resmap";
-	}
+	// Copy the resmap file to the ResMap directory
+	FileName fn_out = fn_in.getValue();
+	fn_out = fn_out.insertBeforeExtension("_resmap");
+	std::string command2 = "cp " + fn_out + " " + outputname + "resmap.mrc";
+
+	commands.push_back(command2);
+	Node node3(outputname + "resmap.mrc", NODE_RESMAP);
+	pipelineOutputNodes.push_back(node3);
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }

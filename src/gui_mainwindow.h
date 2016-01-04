@@ -56,6 +56,8 @@ static Class2DJobWindow *job_class2d;
 static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
 static ClassSelectJobWindow *job_classselect;
+static MaskCreateJobWindow *job_maskcreate;
+static SubtractJobWindow *job_subtract;
 static PostJobWindow *job_post;
 static PolishJobWindow *job_polish;
 static ResmapJobWindow *job_resmap;
@@ -83,9 +85,11 @@ static Fl_Menu_Item new_job_options[] = {
 		{"Particle sorting"},
 		{"2D classification"},
 		{"3D classification"},
-		{"Class selection"},
 		{"3D auto-refine"},
 		{"Particle polishing"},
+		{"Class selection"},
+		{"Mask creation"},
+		{"Image subtraction"},
 		{"Post-processing"},
 		{"Local-resolution"},
 		{0} // this should be the last entry

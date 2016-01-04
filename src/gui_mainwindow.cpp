@@ -24,6 +24,26 @@
 RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
 {
 
+
+	FileName fn_lock=".gui_projectdir";
+	if (!exists(fn_lock))
+	{
+		std::cout << " Only run the relion GUI from your ProjectDirectory. Do you want to start a new project here [y/n]? ";
+		char c;
+		std::cin >> c;
+		if (c == 'y' || c == 'Y')
+		{
+			std::string command = " touch .gui_projectdir ";
+			int res= system(command.c_str());
+		}
+		else
+		{
+			std::cout << " Exiting ... " << std::endl;
+			exit(0);
+		}
+	}
+
+
 	// First setup the old part of the GUI
 	h = GUIHEIGHT_OLD;
 
@@ -130,11 +150,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
         	job_class3d = new Class3DJobWindow();
         	break;
     	}
-    	case PROC_CLASSSELECT:
-    	{
-			job_classselect = new ClassSelectJobWindow();
-			break;
-		}
     	case PROC_3DAUTO:
     	{
 			job_auto3d = new Auto3DJobWindow();
@@ -143,6 +158,21 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     	case PROC_POLISH:
 		{
 			job_polish = new PolishJobWindow();
+			break;
+		}
+    	case PROC_CLASSSELECT:
+    	{
+			job_classselect = new ClassSelectJobWindow();
+			break;
+		}
+    	case PROC_MASKCREATE:
+    	{
+			job_maskcreate = new MaskCreateJobWindow();
+			break;
+		}
+    	case PROC_SUBTRACT:
+    	{
+    		job_subtract = new SubtractJobWindow();
 			break;
 		}
     	case PROC_POST:
@@ -501,6 +531,14 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 		oname = job_class3d->pipelineOutputName;
 		break;
 	}
+	case PROC_3DAUTO:
+	{
+
+		inputnodes = job_auto3d->pipelineInputNodes;
+		outputnodes= job_auto3d->pipelineOutputNodes;
+		oname = job_auto3d->pipelineOutputName;
+		break;
+	}
 	case PROC_CLASSSELECT:
 	{
 		inputnodes = job_classselect->pipelineInputNodes;
@@ -508,12 +546,18 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 		oname = job_classselect->pipelineOutputName;
 		break;
 	}
-	case PROC_3DAUTO:
+	case PROC_MASKCREATE:
 	{
-
-		inputnodes = job_auto3d->pipelineInputNodes;
-		outputnodes= job_auto3d->pipelineOutputNodes;
-		oname = job_auto3d->pipelineOutputName;
+		inputnodes = job_maskcreate->pipelineInputNodes;
+		outputnodes= job_maskcreate->pipelineOutputNodes;
+		oname = job_maskcreate->pipelineOutputName;
+		break;
+	}
+	case PROC_SUBTRACT:
+	{
+		inputnodes = job_subtract->pipelineInputNodes;
+		outputnodes= job_subtract->pipelineOutputNodes;
+		oname = job_subtract->pipelineOutputName;
 		break;
 	}
 	case PROC_POLISH:
@@ -526,7 +570,6 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 	}
 	case PROC_POST:
 	{
-
 		inputnodes = job_post->pipelineInputNodes;
 		outputnodes= job_post->pipelineOutputNodes;
 		oname = job_post->pipelineOutputName;
@@ -696,6 +739,30 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_classselect->toggle_new_continue(is_main_continue);
 		if (do_commandline)
 			job_classselect->getCommands(global_outputname, commands, final_command, do_makedir);
+		break;
+	}
+	case PROC_MASKCREATE:
+	{
+		if (do_write)
+			job_maskcreate->write(fn_settings);
+		if (do_read)
+			job_maskcreate->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_maskcreate->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_maskcreate->getCommands(global_outputname, commands, final_command, do_makedir);
+		break;
+	}
+	case PROC_SUBTRACT:
+	{
+		if (do_write)
+			job_subtract->write(fn_settings);
+		if (do_read)
+			job_subtract->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_subtract->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_subtract->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_3DAUTO:

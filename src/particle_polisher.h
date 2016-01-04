@@ -148,10 +148,11 @@ public:
 
 	// Sep24,2015 - Shaoda, Helical reconstruction
 	int nr_helical_asu;
-
 	RFLOAT helical_twist;
-
 	RFLOAT helical_rise;
+
+	// Make output directories only if it doesn't exist yet
+	FileName fn_olddir;
 
 
 public:
@@ -195,6 +196,9 @@ public:
 	// Calculate the average of all single-frame rconstructions (for a given half)
 	void calculateAverageAllSingleFrameReconstructions(int ihalf);
 
+	// Change the name of the particle stack to the output directory
+	void changeParticleStackName(FileName &fn_part);
+
 	// Movie frame re-alignment for a single micrograph
 	void polishParticlesOneMicrograph(long int imic);
 
@@ -224,6 +228,8 @@ public:
 
 	// Initialise some arrays for parallelisation purposes
 	void initialiseSquaredDifferenceVectors();
+
+
 };
 
 
