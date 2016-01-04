@@ -54,6 +54,7 @@ void AutoPicker::read(int argc, char **argv)
 
 	int expert_section = parser.addSection("Expert options");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves emory and time)", "1.0"));
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -163,9 +164,6 @@ void AutoPicker::initialise()
 	micrograph_ysize = YSIZE(Imic());
 	micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
 
-	workSize = ROUND(micrograph_size);
-	workSize -= workSize%2; //make even
-
 	if (lowpass < 0.)
 	{
 		downsize_mic = micrograph_size;
@@ -173,6 +171,34 @@ void AutoPicker::initialise()
 	else
 	{
 		downsize_mic = 2 * ROUND(micrograph_size * angpix / lowpass);
+	}
+
+	/*
+	 * Here we set the size of the micrographs during cross-correlation calculation. The final size is still the same size as
+	 * the input micrographs, we simply adjust the frequencies used in fourier space by cropping the frequency-space images in
+	 * intermediate calculations.
+	 */
+	std::cout << "workFrac is " << workFrac << std::endl;
+	if(workFrac>1) // set size directly
+	{
+		if(workFrac<micrograph_size)
+			workSize = ROUND(workFrac);
+		else
+			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
+	}
+	else if(workFrac<=1) // set size as fraction of original
+	{
+		if(workFrac>0)
+			workSize = ROUND(workFrac*(RFLOAT)micrograph_size);
+		else
+			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
+	}
+	workSize -= workSize%2; //make even in case it is not already
+	std::cout << "New workSize is " << workSize << std::endl;
+	if(workFrac<downsize_mic)
+	{
+		printf(" WARNING: workFrac<downsize_mic, meaning you have chosen to \n use lower resolution than available in the micrograph. \n"
+			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
 	}
 
 	if (min_particle_distance < 0)

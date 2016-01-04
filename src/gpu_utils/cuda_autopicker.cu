@@ -722,9 +722,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");
 
+			CUDA_CPU_TIC("setSize_cudaTr");
 			cudaTransformer.setSize(basePckr->workSize,basePckr->workSize, Npsi);
 			HANDLE_ERROR(cudaDeviceSynchronize());
-
+			CUDA_CPU_TOC("setSize_cudaTr");
 //			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
 //			{
 				CUDA_CPU_TIC("OneRotation");
@@ -792,38 +793,51 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			    CUDA_CPU_TOC("OneRotation");
 //			} // end for psi
 
-			d_Mccf_best.cp_on_device(cudaTransformer.reals);
+			cudaFFT extraMicTransformer(0,allocator);
+			if(basePckr->workSize!=basePckr->micrograph_size) // if we've been working with a smaller copy, resize it back (in fourier space)
+			{
+				extraMicTransformer.setSize(basePckr->micrograph_size,basePckr->micrograph_size, 2);
+				cudaTransformer.setSize(basePckr->workSize,basePckr->workSize,2); //set batchSize to 2 (ccf and psi) to avoid excessive transform calcs
+				d_Mccf_best.cp_on_device(cudaTransformer.reals);
+				d_Mpsi_best.cp_on_device(&(cudaTransformer.reals.d_ptr[d_Mccf_best.size]));
 
-			cudaTransformer.forward();
-			int FMultiBsize = ( (int) ceilf(( float)(cudaTransformer.fouriers.getSize()*2)/(float)BLOCK_SIZE));
-			cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
-					(XFLOAT*)~cudaTransformer.fouriers,
-					(XFLOAT)1/((XFLOAT)(cudaTransformer.reals.getSize())),
-					cudaTransformer.fouriers.getSize()*2);
+				cudaTransformer.forward();
+				int FMultiBsize = ( (int) ceilf(( float)(cudaTransformer.fouriers.getSize()*2*2)/(float)BLOCK_SIZE));
+				cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+						(XFLOAT*)~cudaTransformer.fouriers,
+						(XFLOAT)1/((XFLOAT)(cudaTransformer.reals.getSize())),
+						cudaTransformer.fouriers.getSize()*2*2);
 
-			windowFourierTransform2(    cudaTransformer.fouriers,
-			    						micTransformer.fouriers,
-			    						basePckr->workSize/2+1, basePckr->workSize, 1,     //Input dimensions
-			    						basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
-			    						);
-			micTransformer.backward();
+				windowFourierTransform2(    cudaTransformer.fouriers,
+											extraMicTransformer.fouriers,
+											basePckr->workSize/2+1, basePckr->workSize, 1,     //Input dimensions
+											basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
+											2
+											);
+				extraMicTransformer.backward();
 
 
 
-			HANDLE_ERROR(cudaDeviceSynchronize());
-			micTransformer.reals.cp_to_host();
-			d_Mpsi_best.cp_to_host();
-			HANDLE_ERROR(cudaDeviceSynchronize());
+				HANDLE_ERROR(cudaDeviceSynchronize());
+				extraMicTransformer.reals.cp_to_host();
+				extraMicTransformer.reals.streamSync();
 
-			Mccf_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
-			for (int i = 0; i < Mccf_best.nzyxdim; i ++)
-				Mccf_best.data[i] = micTransformer.reals[i];
+				Mccf_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
+				for (int i = 0; i < Mccf_best.nzyxdim; i ++)
+					Mccf_best.data[i] = extraMicTransformer.reals[i];
+			}
+			else // otherwise just get and prepare for further use.
+			{
+				d_Mccf_best.cp_to_host();
+				d_Mccf_best.streamSync();
+				for (int i = 0; i < Mccf_best.nzyxdim; i ++)
+					Mccf_best.data[i] = d_Mccf_best[i];
+			}
 
+			d_Mpsi_best.cp_to_host(); // FIXME: Mpsi made the correct size as well
+			d_Mpsi_best.streamSync();
 			for (int i = 0; i < Mpsi_best.nzyxdim; i ++)
 				Mpsi_best.data[i] = d_Mpsi_best[i];
-
-			micTransformer.reals.streamSync();
-			d_Mpsi_best.streamSync();
 
 			if (basePckr->do_write_fom_maps)
 			{

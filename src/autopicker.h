@@ -86,6 +86,7 @@ public:
 
 	// decreased size micrograph
 	int workSize;
+	float workFrac;
 
 	// Is density in micrograph inverted wrt templates?
 	bool do_invert;
