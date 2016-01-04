@@ -793,7 +793,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			    CUDA_CPU_TOC("OneRotation");
 //			} // end for psi
 
-			cudaFFT extraMicTransformer(0,allocator);
+			CudaFFT extraMicTransformer(0,allocator);
 			if(basePckr->workSize!=basePckr->micrograph_size) // if we've been working with a smaller copy, resize it back (in fourier space)
 			{
 				extraMicTransformer.setSize(basePckr->micrograph_size,basePckr->micrograph_size, 2);
@@ -823,21 +823,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				extraMicTransformer.reals.streamSync();
 
 				Mccf_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
+				Mpsi_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
 				for (int i = 0; i < Mccf_best.nzyxdim; i ++)
+				{
 					Mccf_best.data[i] = extraMicTransformer.reals[i];
+					Mpsi_best.data[i] = extraMicTransformer.reals[Mccf_best.nzyxdim + i];
+				}
+
 			}
 			else // otherwise just get and prepare for further use.
 			{
 				d_Mccf_best.cp_to_host();
+				d_Mpsi_best.cp_to_host();
 				d_Mccf_best.streamSync();
 				for (int i = 0; i < Mccf_best.nzyxdim; i ++)
+				{
 					Mccf_best.data[i] = d_Mccf_best[i];
+					Mpsi_best.data[i] = d_Mpsi_best[i];
+				}
 			}
-
-			d_Mpsi_best.cp_to_host(); // FIXME: Mpsi made the correct size as well
-			d_Mpsi_best.streamSync();
-			for (int i = 0; i < Mpsi_best.nzyxdim; i ++)
-				Mpsi_best.data[i] = d_Mpsi_best[i];
 
 			if (basePckr->do_write_fom_maps)
 			{
