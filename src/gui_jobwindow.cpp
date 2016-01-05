@@ -1479,6 +1479,19 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
     star_mics.place(current_y,"micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
 	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 
+	reextract_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	reextract_group->end();
+
+	do_reextract.place(current_y, "Re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.", reextract_group);
+
+	reextract_group->begin();
+
+	fndata_reextract.place(current_y,"Refined particles STAR file: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the refined particle coordinates, e.g. from a previous 2D or 3D classification or auto-refine run.");
+	do_recenter.place(current_y, "Re-center refined coordinates? ", true, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
+
+	reextract_group->end();
+	do_reextract.cb_menu_i();
+
 	// Add a little spacer
 	current_y += STEPY/2;
 
@@ -1573,6 +1586,9 @@ void ExtractJobWindow::write(std::string fn)
 	coords_suffix.writeValue(fh);
 	do_set_angpix.writeValue(fh);
 	angpix.writeValue(fh);
+	do_reextract.writeValue(fh);
+	fndata_reextract.writeValue(fh);
+	do_recenter.writeValue(fh);
 
 	// extract
 	extract_size.writeValue(fh);
@@ -1604,6 +1620,9 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		coords_suffix.readValue(fh);
 		do_set_angpix.readValue(fh);
 		angpix.readValue(fh);
+		do_reextract.readValue(fh);
+		fndata_reextract.readValue(fh);
+		do_recenter.readValue(fh);
 
 		// extract
 		extract_size.readValue(fh);
@@ -1634,6 +1653,9 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	coords_suffix.deactivate(is_continue);
 	do_set_angpix.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+	do_reextract.deactivate(is_continue);
+	fndata_reextract.deactivate(is_continue);
+	do_recenter.deactivate(is_continue);
 	extract_size.deactivate(is_continue);
 	do_rescale.deactivate(is_continue);
 	rescale.deactivate(is_continue);
@@ -1664,11 +1686,25 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	Node node(star_mics.getValue(), star_mics.type);
 	pipelineInputNodes.push_back(node);
 
-	FileName mysuffix = coords_suffix.getValue();
-	command += " --coord_dir " + mysuffix.beforeLastOf("/") + "/";
-	command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
-	Node node2(coords_suffix.getValue(), coords_suffix.type);
-	pipelineInputNodes.push_back(node2);
+
+	if (do_reextract.getValue())
+	{
+		command += " --reextract_data_star " + fndata_reextract.getValue();
+		Node node2(fndata_reextract.getValue(), fndata_reextract.type);
+		pipelineInputNodes.push_back(node2);
+		if (do_recenter.getValue())
+		{
+			command += " --recenter";
+		}
+	}
+	else
+	{
+		FileName mysuffix = coords_suffix.getValue();
+		command += " --coord_dir " + mysuffix.beforeLastOf("/") + "/";
+		command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
+		Node node2(coords_suffix.getValue(), coords_suffix.type);
+		pipelineInputNodes.push_back(node2);
+	}
 
 	// Output
 	FileName fn_ostar;
@@ -1721,6 +1757,10 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	{
 		command += " --set_angpix " + floatToString(angpix.getValue());
 	}
+
+	if (is_continue)
+		command += " --only_extract_unfinished ";
+
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();

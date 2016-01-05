@@ -60,6 +60,9 @@ public:
 	// Perform particle extraction?
 	bool do_extract;
 
+	// Only extract particles when the STAR file for that micrograph doesn't exist yet
+	bool only_extract_unfinished;
+
 	// Skip gathering CTF information from the ctffind logfiles (e.g. when the info is already there from Gctf)?
 	bool do_skip_ctf_logfiles;
 
@@ -83,6 +86,15 @@ public:
 
 	// STAR file with all (selected) micrographs, the suffix of the coordinates files, and the directory where the coordinate files are
 	FileName fn_star_in, fn_coord_suffix, fn_coord_dir ;
+
+	// STAR file with refined particle coordinates (to re-extract particles, for example with different binning)
+	FileName fn_data;
+
+	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
+	bool do_recenter;
+
+	// MetadataTable with all refined particle coordinates (given through fn_data)
+	//MetaDataTable MDdata;
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;
@@ -197,6 +209,7 @@ public:
 
 	// Get the coordinate filename and the output filename for the particle stack from the micrograph filename
 	FileName getCoordinateFileName(FileName fn_mic);
+	MetaDataTable getCoordinateMetaDataTable(FileName fn_mic);
 	FileName getOutputFileNameRoot(FileName fn_mic);
 
 };

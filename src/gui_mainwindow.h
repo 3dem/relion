@@ -39,13 +39,16 @@
 #define MAX_JOBS_BROWSER 50
 
 // This class organises the main winfow of the relion GUI
-static Fl_Choice *add_new_job, *display_io_node;
+static Fl_Hold_Browser *browser;
+static Fl_Group *browse_grp[NR_BROWSE_TABS];
+static Fl_Choice *display_io_node;
 static Fl_Text_Display *text_current_job;
 static Fl_Text_Buffer *textbuff_current_job;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
+static Fl_Box *image_box;
+static Fl_JPEG_Image *jpeg_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
-static Fl_Group        *browse_grp[NR_BROWSE_TABS];
 static bool is_main_continue;
 static ImportJobWindow *job_import;
 static MotioncorrJobWindow *job_motioncorr;
@@ -67,6 +70,8 @@ static PublishJobWindow *job_publish;
 // Run button
 static Fl_Button *run_button;
 static FileName fn_settings;
+// Initial screen
+static bool show_initial_screen;
 
 // A manualpicker jobwindow for display of micrographs....
 static ManualpickJobWindow global_manualpickjob;
@@ -208,6 +213,9 @@ private:
 
     static void cb_menubar_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_menubar_reactivate_runbutton_i();
+
+    static void cb_show_initial_screen(Fl_Widget*, void*);
+    inline void cb_show_initial_screen_i();
 
     static void cb_menubar_about(Fl_Widget*, void*);
     inline void cb_menubar_about_i();

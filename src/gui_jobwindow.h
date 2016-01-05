@@ -378,6 +378,9 @@ public:
 	// I/O
 	InputNodeEntry star_mics;
 	InputNodeEntry coords_suffix;
+	BooleanEntry do_reextract;
+	InputNodeEntry fndata_reextract;
+	BooleanEntry do_recenter;
 
 	// extract
 	SliderEntry extract_size;
@@ -397,7 +400,7 @@ public:
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
 
-	Fl_Group *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group;
+	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group;
 
 public:
 

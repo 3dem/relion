@@ -24,6 +24,7 @@
 RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
 {
 
+	show_initial_screen = true;
 
 	FileName fn_lock=".gui_projectdir";
 	if (!exists(fn_lock))
@@ -43,9 +44,15 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 		}
 	}
 
-
 	// First setup the old part of the GUI
 	h = GUIHEIGHT_OLD;
+
+	// Initial screen picture with some density and some explanation
+	//fl_register_images(); // initialize image lib
+	image_box = new Fl_Box(0,100,w,h); // widget that will contain image
+	// TODO: control file location and use better figure
+	jpeg_image = new Fl_JPEG_Image("/lmb/home/scheres/bg.jpg"); // load jpeg image into ram
+	image_box->image(jpeg_image); // attach jpg image to box
 
 	// Read in the pipeline STAR file if it exists
 	pipeline.name = fn_pipe;
@@ -64,20 +71,14 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	cite_button = NULL;
 
     color(GUI_BACKGROUND_COLOR);
-    menubar = new Fl_Menu_Bar(0, 0, w, MENUHEIGHT);
+    menubar = new Fl_Menu_Bar(-3, 0, w+6, MENUHEIGHT);
     menubar->add("File/Save job settings",  FL_ALT+'s', cb_menubar_save, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
     menubar->add("File/Reactivate Run",  FL_ALT+'r', cb_menubar_reactivate_runbutton, this);
+    menubar->add("File/Show initial screen",  FL_ALT+'a', cb_show_initial_screen, this);
     menubar->add("File/About",  FL_ALT+'a', cb_menubar_about, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
     current_y = MENUHEIGHT + 10;
-
-    // New-job selector
-    add_new_job = new Fl_Choice(WCOL0, 4, 200, 22);
-    add_new_job->label("New job: ");
-    add_new_job->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
-    add_new_job->menu(new_job_options);
-    add_new_job->callback(cb_select_browsegroup, this);
 
     // Add run buttons on the menubar as well
 	print_CL_button = new Fl_Button(GUIWIDTH - 330, h-50, 100, 30, "Print command");
@@ -98,6 +99,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	run_button->callback( cb_run, this);
 
     // Fill browser in the right order
+    browser = new Fl_Hold_Browser(10,MENUHEIGHT+10,WCOL0-20,h-MENUHEIGHT-70);
     current_job = -1;
     for (int itype = 0; itype < NR_BROWSE_TABS; itype++)
     {
@@ -107,81 +109,98 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     	{
     	case PROC_IMPORT:
     	{
-        	job_import = new ImportJobWindow();
+    		browser->add("Import");
+    		job_import = new ImportJobWindow();
+    		browse_grp[itype]->end();
     		break;
     	}
     	case PROC_MOTIONCORR:
     	{
-        	job_motioncorr = new MotioncorrJobWindow();
+    		browser->add("Motion correction");
+    		job_motioncorr = new MotioncorrJobWindow();
     		break;
     	}
     	case PROC_CTFFIND:
     	{
+    		browser->add("CTF estimation");
 			job_ctffind = new CtffindJobWindow();
 			break;
     	}
     	case PROC_MANUALPICK:
     	{
+    		browser->add("Manual picking");
         	job_manualpick = new ManualpickJobWindow();
     		break;
     	}
     	case PROC_AUTOPICK:
     	{
+    		browser->add("Auto-picking");
 			job_autopick = new AutopickJobWindow();
 			break;
     	}
     	case PROC_EXTRACT:
     	{
+    		browser->add("Particle extraction");
 			job_extract = new ExtractJobWindow();
 			break;
     	}
     	case PROC_SORT:
     	{
+    		browser->add("Particle sorting");
         	job_sort = new SortJobWindow();
         	break;
     	}
     	case PROC_2DCLASS:
 		{
+    		browser->add("2D classification");
 			job_class2d = new Class2DJobWindow();
 			break;
 		}
     	case PROC_3DCLASS:
     	{
+    		browser->add("3D classification");
         	job_class3d = new Class3DJobWindow();
         	break;
     	}
     	case PROC_3DAUTO:
     	{
+    		browser->add("3D auto-refine");
 			job_auto3d = new Auto3DJobWindow();
 			break;
 		}
     	case PROC_POLISH:
 		{
+    		browser->add("Particle polishing");
 			job_polish = new PolishJobWindow();
 			break;
 		}
     	case PROC_CLASSSELECT:
     	{
+    		browser->add("Class selection");
 			job_classselect = new ClassSelectJobWindow();
 			break;
 		}
     	case PROC_MASKCREATE:
     	{
+    		browser->add("Mask creation");
 			job_maskcreate = new MaskCreateJobWindow();
 			break;
 		}
     	case PROC_SUBTRACT:
     	{
+    		browser->add("Image subtraction");
     		job_subtract = new SubtractJobWindow();
 			break;
 		}
     	case PROC_POST:
 		{
+    		browser->add("Post-processing");
 			job_post = new PostJobWindow();
 			break;
 		}
     	case PROC_RESMAP:
 		{
+    		browser->add("Local resolution");
 			job_resmap = new ResmapJobWindow();
 			break;
 		}
@@ -192,6 +211,9 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     	} // end switch
     	browse_grp[itype]->end();
     }
+    browser->callback(cb_select_browsegroup);
+    browser->end();
+    browser->select(1); // just start from the beginning
 
     // Pipeline part of the GUI
 #define JOBCOLWIDTH (250)
@@ -424,12 +446,13 @@ void RelionMainWindow::loadJobFromPipeline()
 
 	if (pipeline.processList[current_job].status == PROC_SCHEDULED)
 		fn_settings = ".ScheduledJobs/" + fn_settings;
+
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
 	{
 		if ( t == itype )
 		{
 			browse_grp[t]->show();
-			add_new_job->picked(&new_job_options[t]);
+			browser->value(itype+1);
 		}
 		else
 		{
@@ -437,7 +460,7 @@ void RelionMainWindow::loadJobFromPipeline()
 		}
 	}
 
-	// the add_new_job->picked has reset current_job to -1....
+	// the new job browser has reset current_job to -1....
 	current_job = this_job;
 
 	// Re-read the settings for this job
@@ -458,7 +481,7 @@ void RelionMainWindow::loadJobFromPipeline()
 
 void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
 {
-	int itype = (this_job > 0) ? this_job : add_new_job->value();
+	int itype = (this_job > 0) ? this_job : (browser->value() - 1); // browser starts counting at 1 ...
 	std::vector<Node> inputnodes;
 	std::vector<Node> outputnodes;
 	std::string oname;
@@ -608,7 +631,8 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 
 void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job)
 {
-	int itype = (this_job > 0) ? this_job : add_new_job->value();
+	int itype = (this_job > 0) ? this_job : (browser->value() - 1); // browser starts counting at 1 ....
+	show_initial_screen = false;
 
 	// always write the general settings with the (hidden) empty name
 	if (do_write)
@@ -826,7 +850,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 {
 	RelionMainWindow* T=(RelionMainWindow*)v;
-	// When clicking the add_new_job option at the menubar: reset current_job to -1 (i.e. a new job, not yet in the pipeline)
+	// When clicking the job browser on the left: reset current_job to -1 (i.e. a new job, not yet in the pipeline)
 	current_job = -1;
 	T->cb_select_browsegroup_i();
 	run_button->activate();
@@ -839,7 +863,8 @@ void RelionMainWindow::cb_select_browsegroup_i()
 	// Show the 'selected' group, hide the others
     for ( int t=0; t<NR_BROWSE_TABS; t++ )
     {
-    	if ( t == (add_new_job->value()) )
+    	// During the initial screen: show a nice picture with some explanations
+    	if ( t == (browser->value() - 1) && !show_initial_screen ) // browser starts counting at 1...
         {
         	browse_grp[t]->show();
         }
@@ -1154,7 +1179,7 @@ void RelionMainWindow::cb_schedule_i()
 
 	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
 
-	// Now save the job (as Running) to the PipeLine
+	// Now save the job (as Scheduled) to the PipeLine
 	addToPipeLine(PROC_SCHEDULED, true); // true means: allow to overwrite an existing process...
 
 	// Update all job lists in the main GUI
@@ -1469,6 +1494,19 @@ void RelionMainWindow::cb_menubar_reactivate_runbutton(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_menubar_reactivate_runbutton_i()
 {
 	run_button->activate();
+}
+
+void RelionMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
+{
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_show_initial_screen_i();
+}
+
+void RelionMainWindow::cb_show_initial_screen_i()
+{
+	show_initial_screen = true;
+	cb_select_browsegroup_i();
 }
 
 
