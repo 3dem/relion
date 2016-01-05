@@ -286,12 +286,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	int my_skip_side = basePckr->autopick_skip_side + basePckr->particle_size/2;
 	CTF ctf;
 
-	CudaFFT micTransformer(0, allocator);
-	CudaFFT FPcudaTransformer(0, allocator);
-	CudaFFT cudaTransformer(0, allocator);
+	int Npsi = 360 / basePckr->psi_sampling;
 
 	int min_distance_pix = ROUND(basePckr->min_particle_distance / basePckr->angpix);
-
 	// Read in the micrograph
 	CUDA_CPU_TIC("readMicrograph");
 	Imic.read(fn_mic);
@@ -315,6 +312,32 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		std::cerr << " micrograph_size= " << basePckr->micrograph_size << " micrograph_xsize= " << basePckr->micrograph_xsize << " micrograph_ysize= " << basePckr->micrograph_ysize << std::endl;
 		REPORT_ERROR("AutoPicker::autoPickOneMicrograph ERROR: No differently sized micrographs are allowed in one run, sorry you will have to run separately for each size...");
 	}
+
+	CudaFFT micTransformer(0, allocator);
+	CudaFFT extraMicTransformer(0,allocator);
+	CudaFFT FPcudaTransformer(0, allocator);
+	CudaFFT cudaTransformer(0, allocator);
+	CudaFFT extraCudaTransformer(0, allocator);
+	if(!basePckr->do_read_fom_maps)
+	{
+		CUDA_CPU_TIC("setSize_micTr");
+		micTransformer.setSize(Imic().xdim, Imic().ydim,1);
+		CUDA_CPU_TOC("setSize_micTr");
+		CUDA_CPU_TIC("setSize_micTr");
+		extraMicTransformer.setSize(Imic().xdim, Imic().ydim,2);
+		CUDA_CPU_TOC("setSize_micTr");
+
+		CUDA_CPU_TIC("setSize_FPudaTr");
+		FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize, 1);
+		CUDA_CPU_TOC("setSize_FPcudaTr");
+		CUDA_CPU_TIC("setSize_cudaTr");
+		cudaTransformer.setSize(basePckr->workSize,basePckr->workSize, Npsi);
+		CUDA_CPU_TOC("setSize_cudaTr");
+		CUDA_CPU_TIC("setSize_extraCudaTr");
+		extraCudaTransformer.setSize(basePckr->workSize,basePckr->workSize, 2);
+		CUDA_CPU_TOC("setSize_extraCudaTr");
+	}
+	HANDLE_ERROR(cudaDeviceSynchronize());
 
 	// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
     RFLOAT avg0, stddev0, minval0, maxval0;
@@ -373,10 +396,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	CUDA_CPU_TOC("CTFread");
 
 	CUDA_CPU_TIC("mccfResize");
-	Mccf_best.resize(basePckr->workSize,basePckr->workSize);
+	Mccf_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
 	CUDA_CPU_TOC("mccfResize");
 	CUDA_CPU_TIC("mpsifResize");
-	Mpsi_best.resize(basePckr->workSize,basePckr->workSize);
+	Mpsi_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
 	CUDA_CPU_TOC("mpsiResize");
 
 	CudaGlobalPtr< CUDACOMPLEX > d_Fmic(allocator);
@@ -414,8 +437,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		 *                Therefore, I do not need to calculate (X-mu)/sig beforehand!!!
 		 *
 		 */
-
-		micTransformer.setSize(Imic().xdim, Imic().ydim);
 
 		CUDA_CPU_TIC("Imic_insert");
 		for(int i = 0; i< Imic().nzyxdim ; i++)
@@ -624,7 +645,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 									(int)downsize_Fmic_y,
 									(int)downsize_Fmic_x-1);
 
-			int Npsi = 360 / basePckr->psi_sampling;
 			int FauxStride = downsize_Fmic_x*downsize_Fmic_y;
 
 			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(allocator);
@@ -649,7 +669,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			CUDA_CPU_TIC("PREP_CALCS");
 
-			FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize);
+//			FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize);
 			CUDA_CPU_TIC("windowFourierTransform_FP");
 			windowFourierTransform2(d_FauxNpsi,
 									FPcudaTransformer.fouriers,
@@ -722,10 +742,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");
 
-			CUDA_CPU_TIC("setSize_cudaTr");
-			cudaTransformer.setSize(basePckr->workSize,basePckr->workSize, Npsi);
-			HANDLE_ERROR(cudaDeviceSynchronize());
-			CUDA_CPU_TOC("setSize_cudaTr");
 //			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
 //			{
 				CUDA_CPU_TIC("OneRotation");
@@ -793,22 +809,27 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			    CUDA_CPU_TOC("OneRotation");
 //			} // end for psi
 
-			CudaFFT extraMicTransformer(0,allocator);
+
 			if(basePckr->workSize!=basePckr->micrograph_size) // if we've been working with a smaller copy, resize it back (in fourier space)
 			{
-				extraMicTransformer.setSize(basePckr->micrograph_size,basePckr->micrograph_size, 2);
-				cudaTransformer.setSize(basePckr->workSize,basePckr->workSize,2); //set batchSize to 2 (ccf and psi) to avoid excessive transform calcs
-				d_Mccf_best.cp_on_device(cudaTransformer.reals);
-				d_Mpsi_best.cp_on_device(&(cudaTransformer.reals.d_ptr[d_Mccf_best.size]));
+				CUDA_CPU_TIC("resize_output");
+//				CUDA_CPU_TIC("setSize_EMT");
+//				extraMicTransformer.setSize(basePckr->micrograph_size,basePckr->micrograph_size, 2);
+//				CUDA_CPU_TOC("setSize_EMT");
+//				CUDA_CPU_TIC("setSize_CT");
+//				cudaTransformer.setSize(basePckr->workSize,basePckr->workSize,2); //set batchSize to 2 (ccf and psi) to avoid excessive transform calcs
+//				CUDA_CPU_TOC("setSize_CT");
+				d_Mccf_best.cp_on_device(extraCudaTransformer.reals);
+				d_Mpsi_best.cp_on_device(&(extraCudaTransformer.reals.d_ptr[d_Mccf_best.size]));
 
-				cudaTransformer.forward();
-				int FMultiBsize = ( (int) ceilf(( float)(cudaTransformer.fouriers.getSize()*2*2)/(float)BLOCK_SIZE));
+				extraCudaTransformer.forward();
+				int FMultiBsize = ( (int) ceilf(( float)(extraCudaTransformer.fouriers.getSize()*2*2)/(float)BLOCK_SIZE));
 				cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
-						(XFLOAT*)~cudaTransformer.fouriers,
-						(XFLOAT)1/((XFLOAT)(cudaTransformer.reals.getSize())),
-						cudaTransformer.fouriers.getSize()*2*2);
+						(XFLOAT*)~extraCudaTransformer.fouriers,
+						(XFLOAT)1/((XFLOAT)(extraCudaTransformer.reals.getSize())),
+						extraCudaTransformer.fouriers.getSize()*2*2);
 
-				windowFourierTransform2(    cudaTransformer.fouriers,
+				windowFourierTransform2(    extraCudaTransformer.fouriers,
 											extraMicTransformer.fouriers,
 											basePckr->workSize/2+1, basePckr->workSize, 1,     //Input dimensions
 											basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1,  //Output dimensions
@@ -816,23 +837,40 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 											);
 				extraMicTransformer.backward();
 
+				CudaGlobalPtr < RFLOAT > d_aux(allocator); // NOTE - RFLOAT (NOT XFLOAT)
+				d_aux.size = basePckr->micrograph_size*basePckr->micrograph_size*2;
+				d_aux.device_alloc();
 
+				FMultiBsize = ( (int) ceilf(( float)(extraMicTransformer.reals.getSize())/(float)BLOCK_SIZE));
+				cuda_kernel_cast<<<FMultiBsize,BLOCK_SIZE>>>(
+						(XFLOAT*)~extraMicTransformer.reals,
+						(RFLOAT*)~d_aux,
+						d_aux.size);
 
-				HANDLE_ERROR(cudaDeviceSynchronize());
-				extraMicTransformer.reals.cp_to_host();
-				extraMicTransformer.reals.streamSync();
+//				cudaCpyDeviceToHost(&d_aux.d_ptr[0],                 &Mccf_best.data[0],Mccf_best.nzyxdim, 0);
+//				cudaCpyDeviceToHost(&d_aux.d_ptr[Mccf_best.nzyxdim], &Mccf_best.data[0],Mpsi_best.nzyxdim, 0);
 
-				Mccf_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
-				Mpsi_best.resize(basePckr->micrograph_size,basePckr->micrograph_size);
-				for (int i = 0; i < Mccf_best.nzyxdim; i ++)
-				{
-					Mccf_best.data[i] = extraMicTransformer.reals[i];
-					Mpsi_best.data[i] = extraMicTransformer.reals[Mccf_best.nzyxdim + i];
-				}
-
+				d_aux.cp_to_host(&Mccf_best.data[0],basePckr->micrograph_size*basePckr->micrograph_size);
+				d_aux.streamSync();
+				d_aux.d_ptr=&d_aux.d_ptr[Mccf_best.nzyxdim];
+				d_aux.cp_to_host(&Mpsi_best.data[0],basePckr->micrograph_size*basePckr->micrograph_size);
+				d_aux.streamSync();
+////				HANDLE_ERROR(cudaDeviceSynchronize());
+//				extraMicTransformer.reals.cp_to_host();
+//				extraMicTransformer.reals.streamSync();
+////
+//				CUDA_CPU_TIC("output");
+//				for (int i = 0; i < Mccf_best.nzyxdim; i ++)
+//				{
+//					Mccf_best.data[i] = extraMicTransformer.reals[i];
+//					Mpsi_best.data[i] = extraMicTransformer.reals[Mccf_best.nzyxdim + i];
+//				}
+//				CUDA_CPU_TOC("output");
+				CUDA_CPU_TOC("resize_output");
 			}
 			else // otherwise just get and prepare for further use.
 			{
+				CUDA_CPU_TIC("output");
 				d_Mccf_best.cp_to_host();
 				d_Mpsi_best.cp_to_host();
 				d_Mccf_best.streamSync();
@@ -841,6 +879,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					Mccf_best.data[i] = d_Mccf_best[i];
 					Mpsi_best.data[i] = d_Mpsi_best[i];
 				}
+				CUDA_CPU_TOC("output");
 			}
 
 			if (basePckr->do_write_fom_maps)

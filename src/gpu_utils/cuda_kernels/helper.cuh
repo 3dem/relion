@@ -174,4 +174,18 @@ __global__ void cuda_kernel_square(
 		XFLOAT *A,
 		int image_size);
 
+/*
+ * Casts on device so we can copy_to_host directly into a multidimarray.
+ */
+template <typename T1, typename T2 >
+__global__ void cuda_kernel_cast(
+		T1 *IN,
+		T2 *OUT,
+		int size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<size)
+		OUT[pixel] = IN[pixel];
+}
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

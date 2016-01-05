@@ -195,7 +195,7 @@ void AutoPicker::initialise()
 	}
 	workSize -= workSize%2; //make even in case it is not already
 	std::cout << "New workSize is " << workSize << std::endl;
-	if(workFrac<downsize_mic)
+	if(workSize<downsize_mic)
 	{
 		printf(" WARNING: workFrac<downsize_mic, meaning you have chosen to \n use lower resolution than available in the micrograph. \n"
 			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");

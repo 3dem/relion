@@ -965,6 +965,21 @@ public:
 	}
 
 	/**
+	 * Copy a number (thisSize) of bytes from device to a specific host pointer
+	 */
+	inline
+	void cp_to_host(T* hstPtr, int thisSize)
+	{
+#ifdef DEBUG_CUDA
+		if (d_ptr == 0)
+			printf("DEBUG_WARNING: cp_to_host() called before device allocation.\n");
+		if (h_ptr == 0)
+			printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
+#endif
+		cudaCpyDeviceToHost<T>(d_ptr, hstPtr, thisSize, stream);
+	}
+
+	/**
 	 * Copy a number (size) of bytes from device to the host pointer
 	 */
 	inline
