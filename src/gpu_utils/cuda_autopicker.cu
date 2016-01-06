@@ -902,7 +902,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 //				{
 //					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
 //				}
-				exit(0);
+//				exit(0);
 			} // end if do_write_fom_maps
 
 		} // end if do_read_fom_maps

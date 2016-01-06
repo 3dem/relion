@@ -178,7 +178,7 @@ void AutoPicker::initialise()
 	 * the input micrographs, we simply adjust the frequencies used in fourier space by cropping the frequency-space images in
 	 * intermediate calculations.
 	 */
-	std::cout << "workFrac is " << workFrac << std::endl;
+
 	if(workFrac>1) // set size directly
 	{
 		if(workFrac<micrograph_size)
@@ -190,11 +190,13 @@ void AutoPicker::initialise()
 	{
 		if(workFrac>0)
 			workSize = ROUND(workFrac*(RFLOAT)micrograph_size);
+		else if(workFrac==0)
+			workSize = downsize_mic;
 		else
 			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
 	}
 	workSize -= workSize%2; //make even in case it is not already
-	std::cout << "New workSize is " << workSize << std::endl;
+
 	if(workSize<downsize_mic)
 	{
 		printf(" WARNING: workFrac<downsize_mic, meaning you have chosen to \n use lower resolution than available in the micrograph. \n"
@@ -605,10 +607,10 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					tt.write("Mctfref.spi");
 
 #endif
-					std::cerr << "suma2 " << suma2 << std::endl;
-					std::cerr << "sum_ref_under_circ_mask " << sum_ref_under_circ_mask << std::endl;
-					std::cerr << "sum_ref2_under_circ_mask " << sum_ref2_under_circ_mask << std::endl;
-					std::cerr << "expected_Pratio " << expected_Pratio << std::endl;
+//					std::cerr << "suma2 " << suma2 << std::endl;
+//					std::cerr << "sum_ref_under_circ_mask " << sum_ref_under_circ_mask << std::endl;
+//					std::cerr << "sum_ref2_under_circ_mask " << sum_ref2_under_circ_mask << std::endl;
+//					std::cerr << "expected_Pratio " << expected_Pratio << std::endl;
 
 				}
 
