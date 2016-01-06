@@ -58,7 +58,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	angpix = textToFloat(parser.getOption("--angpix", "Magnified pixel size in Angstroms", "1."));
 	do_ignore_ctffind_params = parser.checkOption("--ignore_ctffind_params", "Use Gctf default parameters instead of CTFFIND parameters");
 	do_EPA = parser.checkOption("--EPA", "Use equi-phase averaging to calculate Thon rinds in Gctf");
-
+	do_validation = parser.checkOption("--do_validation", "Use validation inside Gctf to analyse quality of the fit?");
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -126,9 +126,9 @@ void CtffindRunner::initialise()
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			FileName fn_microot = fn_micrographs[imic].without(".mrc");
-			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
-					HT, CS, AmpCnst, XMAG, DStep, false)) // false: dont die if not found Final values
+					HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore, false)) // false: dont die if not found Final values
 				fns_todo.push_back(fn_micrographs[imic]);
 		}
 
@@ -233,9 +233,9 @@ void CtffindRunner::joinCtffindResults()
     {
 		FileName outputfile= getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
 		FileName fn_microot = outputfile.without(".mrc");
-		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
-				HT, CS, AmpCnst, XMAG, DStep);
+				HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore);
 
 		if (!has_this_ctf)
 			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for");
@@ -253,6 +253,13 @@ void CtffindRunner::joinCtffindResults()
 	    MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
 	    MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
 	    MDctf.setValue(EMDL_CTF_FOM, CC);
+	    if (maxres > 0.)
+	    	MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+	    if (bfac > 0.)
+	    	MDctf.setValue(EMDL_CTF_BFACTOR, bfac);
+	    if (valscore > 0.)
+	    	MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+
     }
 	MDctf.write(fn_out+"micrographs_ctf.star");
 }
@@ -295,6 +302,9 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 
 	if (do_EPA)
 		command += " --do_EPA ";
+
+	if (do_validation)
+		command += " --do_validation ";
 
 	command += allmicnames;
 
@@ -381,11 +391,15 @@ void CtffindRunner::executeCtffind(long int imic)
 
 }
 
-bool getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
-		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep, bool die_if_not_found)
+bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
+		RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found)
 {
 
 	FileName fn_log = fn_microot + "_ctffind3.log";
+	if (do_use_gctf && !exists(fn_log)) // also test _gctf.log file
+		fn_log = fn_microot + "_gctf.log";
+
 	std::ifstream in(fn_log.data(), std::ios_base::in);
     if (in.fail())
     	return false;
@@ -428,6 +442,33 @@ bool getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &
             defAng = textToFloat(words[2]);
             CC = textToFloat(words[3]);
         }
+
+    	if (do_use_gctf && line.find("Resolution limit estimated by EPA:") != std::string::npos)
+    	{
+            tokenize(line, words);
+             if (words.size() < 7)
+             	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
+             maxres = textToFloat(words[6]);
+    	}
+
+    	if (do_use_gctf && line.find("Estimated Bfactor:") != std::string::npos)
+    	{
+            tokenize(line, words);
+             if (words.size() < 4)
+             	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
+             bfac = textToFloat(words[3]);
+    	}
+
+    	if (do_use_gctf && line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
+    	{
+            tokenize(line, words);
+             if (words.size() < 2)
+             	REPORT_ERROR("ERROR: Unexpected number of words on OVERALL_VALIDATION_SCORE line in " + fn_log);
+             valscore = textToFloat(words[1]);
+    	}
+
+
+
     }
     if (!Cs_is_found && die_if_not_found)
     	REPORT_ERROR("ERROR: cannot find line with Cs[mm], HT[kV], etc values in " + fn_log);

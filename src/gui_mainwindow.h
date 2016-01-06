@@ -69,6 +69,7 @@ static ResmapJobWindow *job_resmap;
 static PublishJobWindow *job_publish;
 // Run button
 static Fl_Button *run_button;
+static Fl_Button *schedule_button;
 static FileName fn_settings;
 // Initial screen
 static bool show_initial_screen;
@@ -114,7 +115,6 @@ public:
 
     // Run button
     Fl_Button *print_CL_button, *cite_button;
-    Fl_Button *schedule_button;
 
     // For job submission
     std::string final_command;
@@ -201,6 +201,9 @@ private:
 
     static void cb_cleanup(Fl_Widget*, void*);
     inline void cb_cleanup_i();
+
+    static void cb_set_alias(Fl_Widget*, void*);
+    inline void cb_set_alias_i();
 
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();

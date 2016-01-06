@@ -686,7 +686,14 @@ class ClassSelectJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	InputNodeEntry fn_in;
+	InputNodeEntry fn_model;
+	InputNodeEntry fn_data;
+
+	BooleanEntry do_recenter;
+	BooleanEntry do_regroup;
+	SliderEntry nr_groups;
+
+	Fl_Group *regroup_group;
 
 public:
 

@@ -66,6 +66,8 @@ enum EMDLabel
     EMDL_COMMENT, // The EMDL_COMMENT is handled specially as well
 
     EMDL_CTF_BFACTOR, ///< B-factor
+    EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
+    EMDL_CTF_VALIDATIONSCORE, ///< Gctf-based validation score for CTF fit
     EMDL_CTF_SCALEFACTOR, ///< linear scale-factor
     EMDL_CTF_SAMPLING_RATE, ///< Sampling rate
     EMDL_CTF_VOLTAGE, ///< Microscope voltage (kV)
@@ -284,6 +286,7 @@ enum EMDLabel
 
     EMDL_PIPELINE_NODE_NAME,
     EMDL_PIPELINE_NODE_TYPE,
+    EMDL_PIPELINE_PROCESS_ALIAS,
     EMDL_PIPELINE_PROCESS_NAME,
     EMDL_PIPELINE_PROCESS_TYPE,
     EMDL_PIPELINE_PROCESS_STATUS,
@@ -422,7 +425,9 @@ private:
         EMDL::addLabel(EMDL_AREA_ID, EMDL_LONG, "rlnAreaId", "ID (i.e. a unique number) of an area (i.e. field-of-view)");
         EMDL::addLabel(EMDL_AREA_NAME, EMDL_STRING, "rlnAreaName", "Name of an area (i.e. field-of-view)");
 
-    	EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnBfactor", "B-factor (in A^2) that describes power spectrum fall-off");
+    	EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+    	EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");
+    	EMDL::addLabel(EMDL_CTF_VALIDATIONSCORE, EMDL_DOUBLE, "rlnCtfValidationScore", "Gctf-based validation score for the quality of the CTF fit");
     	EMDL::addLabel(EMDL_CTF_SCALEFACTOR, EMDL_DOUBLE, "rlnCtfScalefactor", "Linear scale-factor on the CTF (values between 0 and 1)");
         EMDL::addLabel(EMDL_CTF_VOLTAGE, EMDL_DOUBLE, "rlnVoltage", "Voltage of the microscope (in kV)");
         EMDL::addLabel(EMDL_CTF_DEFOCUSU, EMDL_DOUBLE, "rlnDefocusU", "Defocus in U-direction (in Angstroms, positive values for underfocus)");
@@ -640,6 +645,7 @@ private:
 
         EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (running, scheduled, finished or cancelled)");

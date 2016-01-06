@@ -414,6 +414,24 @@ bool exists(const FileName &fn)
     return true;
 }
 
+std::string getUniqDateString()
+{
+
+	time_t now = time(0);
+	tm *ltm = localtime(&now);
+	std::string uniqstr = integerToString(ltm->tm_year%100, 2);
+	uniqstr+= integerToString(1 + ltm->tm_mon, 2);
+	uniqstr+= integerToString(ltm->tm_mday, 2);
+	uniqstr+= "-";
+	uniqstr+= integerToString(ltm->tm_hour, 2);
+	uniqstr+= integerToString(ltm->tm_min, 2);
+	uniqstr+= integerToString(ltm->tm_sec, 2);
+
+	return uniqstr;
+
+
+}
+
 size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
 {
 	size_t slashpos = 0;

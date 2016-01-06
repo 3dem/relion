@@ -295,14 +295,15 @@ void PipeLine::read()
     MDproc.readStar(in, "pipeline_processes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
-		std::string name;
+		std::string name, alias;
 		int type, status;
 		if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, name) ||
+			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
 			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_processes table");
 
-		Process newProcess(name, type, status);
+		Process newProcess(name, type, status, alias);
 		processList.push_back(newProcess);
 	}
 
@@ -377,6 +378,7 @@ void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deletePro
     	{
 			MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
     	}

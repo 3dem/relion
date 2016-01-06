@@ -176,7 +176,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 		}
     	case PROC_CLASSSELECT:
     	{
-    		browser->add("Class selection");
+    		browser->add("Particle selection");
 			job_classselect = new ClassSelectJobWindow();
 			break;
 		}
@@ -277,6 +277,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT-40, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+    menubar2->add("Job actions/Rename", 0, cb_set_alias, this);
     menubar2->add("Job actions/Run scheduled", 0, cb_run_scheduled, this);
     menubar2->add("Job actions/Delete", 0, cb_delete, this);
     menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
@@ -325,19 +326,29 @@ void RelionMainWindow::fillRunningJobLists()
     	{
 
     		finished_processes.push_back(i);
-    		finished_job_browser->add(pipeline.processList[i].name.c_str());
+    		if (pipeline.processList[i].alias != "None")
+    			finished_job_browser->add(pipeline.processList[i].alias.c_str());
+    		else
+    			finished_job_browser->add(pipeline.processList[i].name.c_str());
     		break;
     	}
     	case PROC_RUNNING:
     	{
     		running_processes.push_back(i);
-    		running_job_browser->add(pipeline.processList[i].name.c_str());
+    		if (pipeline.processList[i].alias != "None")
+    			running_job_browser->add(pipeline.processList[i].alias.c_str());
+    		else
+    			running_job_browser->add(pipeline.processList[i].name.c_str());
     		break;
     	}
     	case PROC_SCHEDULED:
     	{
     		scheduled_processes.push_back(i);
-    		scheduled_job_browser->add(pipeline.processList[i].name.c_str());
+    		if (pipeline.processList[i].alias != "None")
+    		    scheduled_job_browser->add(pipeline.processList[i].alias.c_str());
+    		else
+    		    scheduled_job_browser->add(pipeline.processList[i].name.c_str());
+
     		break;
     	}
     	default:
@@ -390,7 +401,10 @@ void RelionMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					input_processes.push_back(myproc);
-					input_job_browser->add(pipeline.processList[myproc].name.c_str());
+					if (pipeline.processList[myproc].alias != "None")
+						input_job_browser->add(pipeline.processList[myproc].alias.c_str());
+					else
+						input_job_browser->add(pipeline.processList[myproc].name.c_str());
 				}
 			}
 		}
@@ -423,7 +437,10 @@ void RelionMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					output_processes.push_back(myproc);
-					output_job_browser->add(pipeline.processList[myproc].name.c_str());
+					if (pipeline.processList[myproc].alias != "None")
+						output_job_browser->add(pipeline.processList[myproc].alias.c_str());
+					else
+						output_job_browser->add(pipeline.processList[myproc].name.c_str());
 				}
 			}
 		}
@@ -1080,13 +1097,14 @@ void RelionMainWindow::cb_toggle_continue_i()
 		run_button->label("Continue now");
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
-
+		schedule_button->deactivate();
 	}
 	else
 	{
 		run_button->label("Run now!");
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(16);
+		schedule_button->activate();
 	}
 
 	jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
@@ -1206,18 +1224,26 @@ void RelionMainWindow::cb_run_scheduled_i()
 		return;
 	}
 
-	// Get the OLD UNIQDATE of the scheduled job!!
-	FileName fn_olduniqdate, fn_newuniqdate;
-	findUniqueDateSubstring(fn_settings, fn_olduniqdate);
+    fn_settings = pipeline.processList[scheduled_job].name;
+
+    // Get the OLD UNIQDATE of the scheduled job!!
+    FileName fn_olduniqdate, fn_newuniqdate, fn_newsettings;
+    findUniqueDateSubstring(fn_settings, fn_olduniqdate);
+
+    // Set a new uniqname for this job
+    fn_newsettings = fn_settings.beforeFirstOf(fn_olduniqdate) + getUniqDateString() + "/";
+
+    is_main_continue = false;
+    cb_toggle_continue_i(); // make the continue=false active
+	fn_settings = fn_newsettings;
+    global_outputname = fn_newsettings;
+    findUniqueDateSubstring(fn_newsettings, fn_newuniqdate);
 
 	// Run the scheduled job
 	cb_run_i();
 
-	// Re-set the input and output nodes
+	// Store run_job id (the last one in the list) for later on..
 	int run_job = pipeline.processList.size() - 1;
-
-	// Get the NEW UNIQDATE of the running job
-	findUniqueDateSubstring(fn_settings, fn_newuniqdate);
 
 	// Now replace all OLD UNIQDATEs in the inputNode names of remaining scheduled job with the new UNIQDATEs
 	for (size_t i = 0; i < pipeline.processList.size(); i++)
@@ -1441,6 +1467,48 @@ void RelionMainWindow::cb_cleanup_i()
 	}
 
 }
+
+
+// Run button call-back functions
+void RelionMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_set_alias_i();
+}
+
+void RelionMainWindow::cb_set_alias_i()
+{
+	std::string alias;
+	bool is_done = false;
+	while (!is_done)
+	{
+		alias =  fl_input("Rename to (provide 'None' to use original name): ", pipeline.processList[current_job].name.c_str());
+		bool is_unique = true;
+		for (size_t i = 0; i < pipeline.processList.size(); i++)
+		{
+			if ( pipeline.processList[i].alias == alias && alias != "None")
+			{
+				is_unique = false;
+				break;
+			}
+		}
+		if (!is_unique)
+			 fl_message("Alias is not unique, please provide another one");
+		else
+			is_done = true;
+	}
+
+	pipeline.processList[current_job].alias = alias;
+
+	// Write new pipeline to disc and read in again
+	std::vector<bool> dummy;
+	pipeline.write(dummy, dummy);
+	pipeline.read();
+
+}
+
+
+
 // Run button call-back functions
 void RelionMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v) {
 

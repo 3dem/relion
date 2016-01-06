@@ -164,7 +164,7 @@ bool DisplayBox::unSelect()
 
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool _do_class,
-		MetaDataTable *_MDdata, int _nr_regroup, bool _is_data, MetaDataTable *_MDgroups,
+		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
 		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts)
 {
     // Scroll bars
@@ -191,8 +191,9 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		canvas.do_allow_save = do_allow_save;
 		canvas.fn_selected_imgs= fn_selected_imgs;
 		canvas.fn_selected_parts = fn_selected_parts;
-		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol);
+		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter);
 		canvas.nr_regroups = _nr_regroup;
+		canvas.do_recenter = _do_recenter;
 		if (canvas.nr_regroups > 0)
 			canvas.MDgroups = _MDgroups;
 		if (_do_class)
@@ -273,7 +274,7 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 
 }
 int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol)
+		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter)
 {
 
 	ncol = _ncol;
@@ -361,6 +362,10 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
                                         MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
                                         MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
                                         selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+				}
+				if (_do_recenter)
+				{
+					selfTranslateCenterOfMassToCenter(img());
 				}
 
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
@@ -880,7 +885,7 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 	if (MDout.containsLabel(EMDL_SORTED_IDX))
 		MDout.sort(EMDL_SORTED_IDX);
 
-	std::cout <<" Regrouped particles into " << new_group_id - 1 << " groups" << std::endl;
+	std::cout <<" Regrouped particles into " << new_group_id << " groups" << std::endl;
 	MDdata = MDout;
 
 }
@@ -905,7 +910,7 @@ void multiViewerCanvas::saveSelected(bool save_selected)
 	if (fn_selected_imgs == "")
 		return;
 
-	// Now save the MetaData
+	// Now save the selected images in a MetaData file.
 	MetaDataTable MDout;
 	int nsel = 0;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
@@ -921,6 +926,32 @@ void multiViewerCanvas::saveSelected(bool save_selected)
 		// Maintain the original image ordering
 		if (MDout.containsLabel(EMDL_SORTED_IDX))
 			MDout.sort(EMDL_SORTED_IDX);
+
+		// If the images were re-centered to the center-of-mass, then output the recentered images, and change the names of the images in the MDout.
+		if (do_recenter)
+		{
+			FileName fn_stack = fn_selected_imgs.withoutExtension()+".mrcs";
+			FileName fn_img, fn_out;
+			Image<RFLOAT> img;
+			long int i = 0;
+			long int nr_images = MDout.numberOfObjects();
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+			{
+				i++;
+				MDout.getValue(EMDL_MLMODEL_REF_IMAGE, fn_img);
+				img.read(fn_img);
+				selfTranslateCenterOfMassToCenter(img());
+				fn_out.compose(i, fn_stack);
+				MDout.setValue(EMDL_MLMODEL_REF_IMAGE, fn_out);
+
+                if (i == 1)
+                	img.write(fn_stack, -1, (nr_images > 1), WRITE_OVERWRITE);
+                else
+                	img.write(fn_stack, -1, false, WRITE_APPEND);
+
+			}
+		}
+
 
 		MDout.write(fn_selected_imgs);
 		std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected images." << std::endl;
@@ -1641,6 +1672,15 @@ void displayerGuiWindow::cb_display_i()
 			cl += " --fn_imgs " + fn_imgs;
 	}
 
+	if (nr_regroups > 0)
+	{
+		cl += " --regroup " + integerToString(nr_regroups);
+	}
+
+	if (do_recenter)
+	{
+		cl += " --recenter";
+	}
 
 	// send job in the background
 	cl += " &";
@@ -1677,6 +1717,7 @@ void Displayer::read(int argc, char **argv)
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
 	fn_selected_imgs = parser.getOption("--fn_imgs", "Name of the STAR file in which to save selected images.", "");
 	fn_selected_parts = parser.getOption("--fn_parts", "Name of the STAR file in which to save particles from selected classes.", "");
+	do_recenter = parser.checkOption("--recenter", "Recenter the selected images to the center-of-mass of all positive pixel values. ");
 
 	int pick_section  = parser.addSection("Picking options");
 	do_pick = parser.checkOption("--pick", "Pick coordinates in input image");
@@ -1726,7 +1767,7 @@ void Displayer::initialise()
     		fn_data = fn_in.without("_model.star") + "_data.star";
     	MDdata.read(fn_data);
 
-    	// If regouping, also read the model_groups table into memory
+    	// If regrouping, also read the model_groups table into memory
     	if (nr_regroups > 0)
     		MDgroups.read(fn_in, "model_groups");
     }
@@ -1821,6 +1862,8 @@ int Displayer::runGui()
 	win.is_star = false;
 	win.is_multi = false;
 	win.do_allow_save = do_allow_save;
+	win.nr_regroups = nr_regroups;
+	win.do_recenter = do_recenter;
 	win.fn_imgs = fn_selected_imgs;
 	win.fn_parts = fn_selected_parts;
 
@@ -1926,7 +1969,7 @@ int Displayer::run()
 
         basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
         win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-        		do_class, &MDdata, nr_regroups, fn_in.contains("_data.star"), &MDgroups, do_allow_save, fn_selected_imgs, fn_selected_parts);
+        		do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups, do_allow_save, fn_selected_imgs, fn_selected_parts);
 
     }
     else

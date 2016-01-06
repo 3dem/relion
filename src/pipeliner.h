@@ -118,17 +118,19 @@ class Process
 
 	public:
 	std::string name;
+	std::string alias;
 	int type;
 	int status;
 	std::vector<long int> inputNodeList;  // List of Nodes of input to this process
 	std::vector<long int> outputNodeList; // List of Nodes of output from this process
 
 	// Constructor
-	Process(std::string _name, int _type, int _status)
+	Process(std::string _name, int _type, int _status, std::string _alias="None")
 	{
 		name = _name;
 		type = _type;
 		status = _status;
+		alias = _alias;
 	}
 
 	// Destructor

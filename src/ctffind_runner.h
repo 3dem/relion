@@ -62,6 +62,9 @@ public:
 	// When using Gctf, use equi-phase averaging?
 	bool do_EPA;
 
+	// When using Gctf, do validation test?
+	bool do_validation;
+
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
 
@@ -130,11 +133,12 @@ public:
 	// Execute Gctf for many micrographs
 	void executeGctf(std::string &allmicnames);
 
+	// Get micrograph metadata
+	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
+			RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found = true);
 };
 
-// Get micrograph metadata
-bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
-		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep, bool die_if_not_found = true);
 
 
 #endif /* CTFFIND_RUNNER_H_ */

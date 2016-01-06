@@ -456,6 +456,10 @@ public:
     }
 };
 
+
+// Get a unique string based on the current time
+std::string getUniqDateString();
+
 // The following 2 functions are for the pipelining of RELION-2.0
 // Finds the 6-digit UNIQDATE substring from a larger string, as used in relion-2.0 pipeline
 // This function returns the position of the slash right before the UNIQDATE entry, and the entry itself is in

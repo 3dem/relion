@@ -131,7 +131,7 @@ public:
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
 			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool do_class = false, MetaDataTable *MDdata = NULL,
-			int _nr_regroup = -1, bool _is_data = false, MetaDataTable *MDgroups = NULL,
+			int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
 			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="");
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
@@ -171,7 +171,7 @@ public:
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
 	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol);
+			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false);
 	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 
 private:
@@ -201,6 +201,9 @@ public:
 
 	// Number of groups for regrouping the selected particles (for model.star)
 	int nr_regroups;
+
+	// Save selected images recentered to their center-of-mass?
+	bool do_recenter;
 
 	// pointer to the MetaDataTable for the individually aligned particles when do_class (the data.star file)
 	MetaDataTable *MDdata;
@@ -365,6 +368,12 @@ public:
 	// Allow saving of the selection?
 	bool do_allow_save;
 
+	// Number of regroups
+	int nr_regroups;
+
+	// Recenter images?
+	bool do_recenter;
+
 	// FileName for selected class average images and particles
 	FileName fn_imgs, fn_parts;
 
@@ -465,6 +474,9 @@ public:
 
 	// Number of groups for regrouping (negative number is no regrouping)
 	int nr_regroups;
+
+	// Re-center class averages to their center-of-mass?
+	bool do_recenter;
 
 	// Flag for reading whole stacks instead of individual images
 	bool do_read_whole_stacks;
