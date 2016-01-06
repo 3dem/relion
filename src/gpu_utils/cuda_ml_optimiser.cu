@@ -1078,6 +1078,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	// Ready the "prior-containers" for all classes (remake every ipart)
 	CudaGlobalPtr<XFLOAT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, cudaMLO->devBundle->allocator);
 	CudaGlobalPtr<XFLOAT>  pdf_offset((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans, cudaMLO->devBundle->allocator);
+
+	RFLOAT pdf_orientation_mean(0);
+	unsigned pdf_orientation_count(0);
+
 	pdf_orientation.device_alloc();
 	pdf_offset.device_alloc();
 
@@ -1086,12 +1090,30 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		for (long int idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
 			for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
+			{
+				RFLOAT pdf(0);
+
 				if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
-					pdf_orientation[iorientclass] = baseMLO->mymodel.pdf_class[exp_iclass];
+					pdf = baseMLO->mymodel.pdf_class[exp_iclass];
 				else if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-					pdf_orientation[iorientclass] = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
+					pdf = DIRECT_MULTIDIM_ELEM(baseMLO->mymodel.pdf_direction[exp_iclass], idir);
 				else
-					pdf_orientation[iorientclass] = op.directions_prior[idir] * op.psi_prior[ipsi];
+					pdf = op.directions_prior[idir] * op.psi_prior[ipsi];
+
+				pdf_orientation[iorientclass] = pdf;
+				pdf_orientation_mean += pdf;
+				pdf_orientation_count ++;
+			}
+
+
+	pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
+
+	//If mean is non-zero bring all values closer to 1 to improve numerical accuracy
+	//This factor is over all classes and is thus removed in the final normalization
+	if (pdf_orientation_mean != 0.)
+		for (int i = 0; i < pdf_orientation.getSize(); i ++)
+			pdf_orientation[i] /= pdf_orientation_mean;
+
 	pdf_orientation.cp_to_device();
 	CUDA_CPU_TOC("get_orient_priors");
 
