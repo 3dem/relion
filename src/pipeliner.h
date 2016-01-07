@@ -95,11 +95,11 @@ class Node
 #define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
 #define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
 #define PROC_SORT           6 // Sort particles based on their Z-scores
-#define PROC_2DCLASS		7 // 2D classification (from input particles)
-#define PROC_3DCLASS		8 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO	        9 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			10// Particle-polishing (from movie-particles)
-#define PROC_CLASSSELECT    11// Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS		8 // 2D classification (from input particles)
+#define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO	        10 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH			11// Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE     12// Process to create masks from input maps
 #define PROC_SUBTRACT       13// Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST			14// Post-processing (from unfiltered half-maps and a possibly a 3D mask)

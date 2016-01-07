@@ -153,6 +153,12 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
         	job_sort = new SortJobWindow();
         	break;
     	}
+    	case PROC_CLASSSELECT:
+    	{
+    		browser->add("Particle selection");
+			job_classselect = new ClassSelectJobWindow();
+			break;
+		}
     	case PROC_2DCLASS:
 		{
     		browser->add("2D classification");
@@ -175,12 +181,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 		{
     		browser->add("Particle polishing");
 			job_polish = new PolishJobWindow();
-			break;
-		}
-    	case PROC_CLASSSELECT:
-    	{
-    		browser->add("Particle selection");
-			job_classselect = new ClassSelectJobWindow();
 			break;
 		}
     	case PROC_MASKCREATE:
@@ -557,6 +557,13 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 		oname = job_sort->pipelineOutputName;
 		break;
 	}
+	case PROC_CLASSSELECT:
+	{
+		inputnodes = job_classselect->pipelineInputNodes;
+		outputnodes= job_classselect->pipelineOutputNodes;
+		oname = job_classselect->pipelineOutputName;
+		break;
+	}
 	case PROC_2DCLASS:
 	{
 
@@ -581,11 +588,12 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 		oname = job_auto3d->pipelineOutputName;
 		break;
 	}
-	case PROC_CLASSSELECT:
+	case PROC_POLISH:
 	{
-		inputnodes = job_classselect->pipelineInputNodes;
-		outputnodes= job_classselect->pipelineOutputNodes;
-		oname = job_classselect->pipelineOutputName;
+
+		inputnodes = job_polish->pipelineInputNodes;
+		outputnodes= job_polish->pipelineOutputNodes;
+		oname = job_polish->pipelineOutputName;
 		break;
 	}
 	case PROC_MASKCREATE:
@@ -600,14 +608,6 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 		inputnodes = job_subtract->pipelineInputNodes;
 		outputnodes= job_subtract->pipelineOutputNodes;
 		oname = job_subtract->pipelineOutputName;
-		break;
-	}
-	case PROC_POLISH:
-	{
-
-		inputnodes = job_polish->pipelineInputNodes;
-		outputnodes= job_polish->pipelineOutputNodes;
-		oname = job_polish->pipelineOutputName;
 		break;
 	}
 	case PROC_POST:
@@ -748,6 +748,18 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_sort->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
 	}
+	case PROC_CLASSSELECT:
+	{
+		if (do_write)
+			job_classselect->write(fn_settings);
+		if (do_read)
+			job_classselect->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_classselect->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_classselect->getCommands(global_outputname, commands, final_command, do_makedir);
+		break;
+	}
 	case PROC_2DCLASS:
 	{
 		if (do_write)
@@ -772,16 +784,28 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_class3d->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
 	}
-	case PROC_CLASSSELECT:
+	case PROC_3DAUTO:
 	{
 		if (do_write)
-			job_classselect->write(fn_settings);
+			job_auto3d->write(fn_settings);
 		if (do_read)
-			job_classselect->read(fn_settings, is_main_continue);
+			job_auto3d->read(fn_settings, is_main_continue);
 		if (do_toggle_continue)
-			job_classselect->toggle_new_continue(is_main_continue);
+			job_auto3d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_classselect->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_auto3d->getCommands(global_outputname, commands, final_command, do_makedir);
+		break;
+	}
+	case PROC_POLISH:
+	{
+		if (do_write)
+			job_polish->write(fn_settings);
+		if (do_read)
+			job_polish->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_polish->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_polish->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_MASKCREATE:
@@ -806,30 +830,6 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_subtract->toggle_new_continue(is_main_continue);
 		if (do_commandline)
 			job_subtract->getCommands(global_outputname, commands, final_command, do_makedir);
-		break;
-	}
-	case PROC_3DAUTO:
-	{
-		if (do_write)
-			job_auto3d->write(fn_settings);
-		if (do_read)
-			job_auto3d->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_auto3d->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			job_auto3d->getCommands(global_outputname, commands, final_command, do_makedir);
-		break;
-	}
-	case PROC_POLISH:
-	{
-		if (do_write)
-			job_polish->write(fn_settings);
-		if (do_read)
-			job_polish->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_polish->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			job_polish->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_POST:
