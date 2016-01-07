@@ -191,7 +191,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 		}
     	case PROC_SUBTRACT:
     	{
-    		browser->add("Image subtraction");
+    		browser->add("Particle subtraction");
     		job_subtract = new SubtractJobWindow();
 			break;
 		}
