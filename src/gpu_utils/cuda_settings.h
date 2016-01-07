@@ -1,6 +1,8 @@
 #ifndef CUDA_SETTINGS_H_
 #define CUDA_SETTINGS_H_
 
+#define COMPLEXTEXTURE false
+
 #ifdef CUDA_DOUBLE_PRECISION
 #define XFLOAT double
 #else
@@ -8,9 +10,11 @@
 #endif
 
 #ifdef RELION_SINGLE_PRECISION
-#define RFLOAT float
+	#define RFLOAT float
+	#define CUDACOMPLEX float2
 #else
 #define RFLOAT double
+	#define CUDACOMPLEX double2
 #endif
 
 #define MAX_RESOL_SHARED_MEM 32
@@ -28,6 +32,8 @@
 #define WAVG_BLOCK_SIZE 256
 #define SUMW_BLOCK_SIZE 32
 #define SOFTMASK_BLOCK_SIZE 1024
+#define CFTT_BLOCK_SIZE 128
+#define PROBRATIO_BLOCK_SIZE 128
 
 #define PROJDIFF_CHUNK_SIZE 14
 
@@ -38,6 +44,5 @@
 									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE XFLOATS. // DEPRECATED
 
 #define NR_CLASS_MUTEXES 5
-
 
 #endif /* CUDA_SETTINGS_H_ */

@@ -51,7 +51,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}"
 # -------------------------- 
 
 # -- Compiler flags -------------------------------------------------
-set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${CUDARCH}" CACHE STRING "")
+set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${RELION_NVCC_FLAGS}" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_RELWITHDEBINFO  " ")
 
@@ -134,7 +134,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_REL
 
 # -- Compiler flags -------------------------------------------------
 set(RELION_FLAGS_PROFILING "" CACHE STRING "")
-set(RELION_NVCC_FLAGS_PROFILING "${RELION_NVCC_FLAGS} --disable-warnings -lineinfo" CACHE STRING "")
+set(RELION_NVCC_FLAGS_PROFILING "${RELION_NVCC_FLAGS} -lineinfo" CACHE STRING "")
 # -- Linker flags ---------------------------------------------------
 set(RELION_LINKER_FLAGS_PROFILING  "")
 

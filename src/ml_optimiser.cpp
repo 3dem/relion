@@ -286,7 +286,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GB) assigned to custom allocator (if enabled) for each thread", "-1"));
+	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "-1"));
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 
 	if (do_gpu)
@@ -455,7 +455,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_thread", "Device memory (in GB) assigned to custom allocator (if enabled) for each thread", "-1"));
+	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "-1"));
 
 	if (do_skip_align)
 		do_gpu = false;
@@ -4375,7 +4375,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 		exp_Mcoarse_significant.clear();
 
 	exp_min_diff2.clear();
-	exp_min_diff2.resize(exp_nr_particles, 99.e99);
+	exp_min_diff2.resize(exp_nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	precalculateShiftedImagesCtfsAndInvSigma2s(false, my_ori_particle, exp_current_image_size, exp_current_oversampling, metadata_offset,

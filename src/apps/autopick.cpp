@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include <src/autopicker.h>
-
+#include <src/gpu_utils/cuda_autopicker.h>
 
 int main(int argc, char *argv[])
 {
@@ -30,7 +30,10 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 
-		prm.run();
+		if (prm.do_gpu)
+			((AutoPickerCuda*)prm.cudaPicker)->run();
+		else
+			prm.run();
     }
 
     catch (RelionError XE)

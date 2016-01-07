@@ -7,6 +7,8 @@
 #include <fstream>
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
+#include "src/gpu_utils/cuda_projector.cuh"
+#include "src/gpu_utils/cuda_projector.h"
 
 __global__ void cuda_kernel_exponentiate_weights_coarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,
@@ -60,4 +62,34 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT radius,
 												XFLOAT radius_p,
 												XFLOAT cosine_width	);
+
+__global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
+										 XFLOAT *img_out,
+										 long int image_size,
+										 long int xdim,
+										 long int ydim,
+										 long int xshift,
+										 long int yshift);
+
+__global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
+										XFLOAT *d_Mpsi,
+										XFLOAT *d_Maux,
+										XFLOAT *d_Mmean,
+										XFLOAT *d_Mstddev,
+										long int image_size,
+										XFLOAT normfft,
+										XFLOAT sum_ref_under_circ_mask,
+										XFLOAT sum_ref2_under_circ_mask,
+										XFLOAT expected_Pratio,
+										XFLOAT psi);
+
+//__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux_real,
+//						  	  	  	  	  XFLOAT *d_ctf,
+//						  	  	  	  	  XFLOAT psi,
+//						  	  			  CudaProjectorKernel projector);
+
+__global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
+									 CUDACOMPLEX *d_B,
+									 int image_size);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

@@ -978,11 +978,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
         // Note that convoluteRealSpace acts on the complex array inside the transformer
         convoluteBlobRealSpace(transformer);
 
-        RFLOAT w, corr_min = 99.e99, corr_max = -99.e99, corr_avg=0., corr_nn=0.;
-        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-        {
-        	if (kp * kp + ip * ip + jp * jp < max_r2)
-        	{
+                RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
+                FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+                {
+                    if (kp * kp + ip * ip + jp * jp < max_r2)
+                    {
 
         		// Make sure no division by zero can occur....
         		w = XMIPP_MAX(1e-6, abs(DIRECT_A3D_ELEM(Fconv, k, i, j)));
