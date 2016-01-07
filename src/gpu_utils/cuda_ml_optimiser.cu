@@ -2373,6 +2373,7 @@ void MlDeviceBundle::resetData()
 
 #ifdef DEBUG_CUDA
 
+	allocator->syncReadyEvents();
 	allocator->freeReadyAllocs();
 	if (allocator->getNumberOfAllocs() != 0)
 	{

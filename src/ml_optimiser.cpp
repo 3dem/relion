@@ -1890,6 +1890,8 @@ void MlOptimiser::expectation()
 	{
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 		{
+			( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+
 			for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
 			{
 				unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
@@ -1897,7 +1899,6 @@ void MlOptimiser::expectation()
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
 				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 				int my_mutex = iclass % NR_CLASS_MUTEXES;
