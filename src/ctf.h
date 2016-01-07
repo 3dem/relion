@@ -135,6 +135,9 @@ public:
     /** Read from a single MetaDataTable */
     void read(MetaDataTable &MD);
 
+    /** Write to MetaDataTable. */
+    void write(MetaDataTable &MD);
+
     /** Write to output. */
     void write(std::ostream &out);
 

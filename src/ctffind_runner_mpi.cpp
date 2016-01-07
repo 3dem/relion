@@ -50,18 +50,34 @@ void CtffindRunnerMpi::run()
 		int barstep;
 		if (verb > 0)
 		{
-			std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
+			if (do_use_gctf)
+				std::cout << " Estimating CTF parameters using Kai Zhang's Gctf ..." << std::endl;
+			else
+				std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
 			init_progress_bar(my_nr_micrographs);
 			barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 		}
 
+		std::string allmicnames = "";
 		for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 		{
-			if (verb > 0 && imic % barstep == 0)
-				progress_bar(imic);
 
-			executeCtffind(fn_micrographs[imic]);
+			if (do_use_gctf)
+			{
+				addToGctfJobList(imic, allmicnames);
+			}
+			else
+			{
+				if (verb > 0 && imic % barstep == 0)
+					progress_bar(imic);
+
+				executeCtffind(imic);
+			}
 		}
+
+		if (do_use_gctf)
+			executeGctf(allmicnames);
+
 		if (verb > 0)
 			progress_bar(my_nr_micrographs);
 	}

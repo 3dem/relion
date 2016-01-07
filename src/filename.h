@@ -456,6 +456,18 @@ public:
     }
 };
 
+
+// Get a unique string based on the current time
+std::string getUniqDateString();
+
+// The following 2 functions are for the pipelining of RELION-2.0
+// Finds the 6-digit UNIQDATE substring from a larger string, as used in relion-2.0 pipeline
+// This function returns the position of the slash right before the UNIQDATE entry, and the entry itself is in
+size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate);
+
+// Replaces the UNIQDATE substring and its preceding Directory-structure from fn_input, and adds fn_new_outputdir in front of it
+FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir);
+
 /** True if the file exists in the current directory
  *
  * @code

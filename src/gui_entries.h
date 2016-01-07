@@ -30,14 +30,18 @@
 #include <FL/Fl_Tabs.H>
 #include <FL/Fl_Slider.H>
 #include <FL/Fl_Group.H>
+#include <FL/fl_ask.H>
 #include <FL/Fl_Tabs.H>
 #include <FL/Fl_Hold_Browser.H>
+#include <FL/Fl_Select_Browser.H>
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Toggle_Button.H>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Wizard.H>
+#include <FL/Fl_Text_Display.H>
+#include <FL/Fl_JPEG_Image.H>
 #include "src/macros.h"
 #include "src/strings.h"
 #include <string>
@@ -59,7 +63,8 @@
 //#define XCOL4 475
 //#define XCOL5 535
 #define GUIWIDTH 800
-#define GUIHEIGHT 400
+#define GUIHEIGHT_OLD 400
+#define GUIHEIGHT_EXT 700
 #define XCOL0 200
 #define WCOL0 200
 #define XCOL1 ( (XCOL0) + 10  )
@@ -80,8 +85,8 @@
 //version-1.4 #define GUI_BUTTON_COLOR (fl_rgb_color(60, 180, 155))
 //version-1.4 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(45, 135, 120))
 //devel-version
-#define GUI_BUTTON_COLOR (fl_rgb_color(60, 185, 0))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(30, 90, 0))
+#define GUI_BUTTON_COLOR (fl_rgb_color(0, 235, 235))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(0, 180, 180))
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //version-1.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(255,155,0))
 //version-1.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(255,50,50))
@@ -257,6 +262,7 @@ public:
     Fl_Button* browse;
 
     const char* pattern;
+    const char* directory;
 
     // Constructor (with 4 column widths)
 	FileNameEntry() {};
@@ -269,14 +275,16 @@ public:
     		const char* title,
     		const char* defaultvalue,
     		const char* _pattern = "",
+    		const char* _directory = NULL,
     		const char* help = NULL);
 
 	// places on one the window
 	void place(int &y,
 				const char * title,
-				const char* defaultvalue = NULL,
-				const char* pattern = "",
-				const char* helptext = NULL,
+				const char* defaultvalue,
+				const char* pattern,
+	    		const char* _directory,
+				const char* helptext,
 				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
 
     // Clear this entry
@@ -292,6 +300,55 @@ private:
     void cb_browse_i();
 
 };
+
+class InputNodeEntry: public FileNameEntry
+{
+
+public:
+    // Type of this node
+    int type;
+
+    //Output from which process?
+    std::string output_from;
+
+    // Constructor (with 4 column widths)
+	InputNodeEntry() {};
+
+    // Destructor
+	~InputNodeEntry(){};
+
+	void initialise(int x, int y, int height,
+    		int wcol2, int wcol3, int wcol4,
+    		const char* title,
+    		int _type,
+    		const char* defaultvalue,
+    		const char* _pattern = "",
+    		const char* help = NULL);
+
+	// places on one the window
+	void place(int &y,
+				const char * title,
+				int _type,
+				const char* defaultvalue = NULL,
+				const char* pattern = "",
+				const char* helptext = NULL,
+				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
+
+    // Clear this entry
+	void clear();
+
+	// Deactivate this entry if the input boolean is true
+    void deactivate(bool do_deactivate = true);
+
+
+private:
+    // Call-back functions for the browse button
+    static void cb_browse_node(Fl_Widget*, void*);
+    void cb_browse_node_i();
+
+};
+
+
 
 // Get an entry from a list of possible values from the user.
 class RadioEntry: public AnyEntry

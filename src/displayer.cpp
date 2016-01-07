@@ -164,7 +164,8 @@ bool DisplayBox::unSelect()
 
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool _do_class,
-		MetaDataTable *_MDdata, int _nr_regroup, bool _is_data, MetaDataTable *_MDgroups)
+		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
+		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts)
 {
     // Scroll bars
     Fl_Scroll scroll(0, 0, w(), h());
@@ -187,8 +188,12 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		canvas.ori_scale = _ori_scale;
 		canvas.display_label = display_label;
 		canvas.sigma_contrast = _sigma_contrast;
-		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol);
+		canvas.do_allow_save = do_allow_save;
+		canvas.fn_selected_imgs= fn_selected_imgs;
+		canvas.fn_selected_parts = fn_selected_parts;
+		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter);
 		canvas.nr_regroups = _nr_regroup;
+		canvas.do_recenter = _do_recenter;
 		if (canvas.nr_regroups > 0)
 			canvas.MDgroups = _MDgroups;
 		if (_do_class)
@@ -269,7 +274,7 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 
 }
 int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol)
+		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter)
 {
 
 	ncol = _ncol;
@@ -357,6 +362,10 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
                                         MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
                                         MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
                                         selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+				}
+				if (_do_recenter)
+				{
+					selfTranslateCenterOfMassToCenter(img());
 				}
 
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
@@ -513,6 +522,7 @@ int multiViewerCanvas::handle(int ev)
 				Fl_Menu_Item rclick_menu;
 				if (do_class)
 				{
+
 					Fl_Menu_Item rclick_menu[] = {
 						{ "Save backup selection" },
 						{ "Load backup selection" },
@@ -523,13 +533,17 @@ int multiViewerCanvas::handle(int ev)
 						{ "Print metadata this class" },
 						{ "Show original image" },
 						{ "Show particles from selected classes" },
-						{ "Save STAR with particles from selected classes" },
-						{ "Save STAR with selected classes" },
+						{ "Save selected classes" },
 						{ "Quit" },
 						{ 0 }
 					};
 
-					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
+					if (!do_allow_save)
+				    {
+						rclick_menu[9].deactivate();
+				    }
+
+				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 					if ( !m )
 						return 0;
 					else if ( strcmp(m->label(), "Save backup selection") == 0 )
@@ -550,10 +564,11 @@ int multiViewerCanvas::handle(int ev)
 						showOriginalImage(ipos);
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(SELECTED);
-					else if ( strcmp(m->label(), "Save STAR with particles from selected classes") == 0 )
-						saveSelectedParticles(SELECTED);
-					else if ( strcmp(m->label(), "Save STAR with selected classes") == 0 )
+					else if ( strcmp(m->label(), "Save selected classes") == 0 )
+					{
 						saveSelected(SELECTED);
+						saveSelectedParticles(SELECTED);
+					}
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 				}
@@ -574,6 +589,10 @@ int multiViewerCanvas::handle(int ev)
 						{ "Quit" },
 						{ 0 }
 					};
+					if (!do_allow_save)
+				    {
+						rclick_menu[10].deactivate();
+				    }
 
 					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 					if ( !m )
@@ -786,6 +805,12 @@ void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTab
 
 void multiViewerCanvas::saveSelectedParticles(bool save_selected)
 {
+	if (fn_selected_parts == "")
+	{
+		std::cout << " Not saving selected particles, as no filename was provided..." << std::endl;
+		return;
+	}
+
 	MetaDataTable MDpart;
 	makeStarFileSelectedParticles(save_selected, MDpart);
 	if (nr_regroups > 0)
@@ -793,16 +818,11 @@ void multiViewerCanvas::saveSelectedParticles(bool save_selected)
 	int nparts = MDpart.numberOfObjects();
 	if (nparts > 0)
 	{
-		char *newfile;
-		newfile = fl_file_chooser("Save File As?", "*.star", "");
-		if (newfile==NULL)
-			return;
-		FileName fn_out(newfile);
-		MDpart.write(fn_out);
-		std::cout << "Saved "<<fn_out << " with " << nparts << " selected particles." << std::endl;
+		MDpart.write(fn_selected_parts);
+		std::cout << "Saved "<< fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
 	}
 	else
-		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
+		std::cout <<" No classes selected. Please select one or more classes..." << std::endl;
 }
 
 void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, int nr_regroups)
@@ -865,7 +885,7 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 	if (MDout.containsLabel(EMDL_SORTED_IDX))
 		MDout.sort(EMDL_SORTED_IDX);
 
-	std::cout <<" Regrouped particles into " << new_group_id - 1 << " groups" << std::endl;
+	std::cout <<" Regrouped particles into " << new_group_id << " groups" << std::endl;
 	MDdata = MDout;
 
 }
@@ -887,7 +907,10 @@ void multiViewerCanvas::showSelectedParticles(bool save_selected)
 
 void multiViewerCanvas::saveSelected(bool save_selected)
 {
-	// Now save the MetaData
+	if (fn_selected_imgs == "")
+		return;
+
+	// Now save the selected images in a MetaData file.
 	MetaDataTable MDout;
 	int nsel = 0;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
@@ -900,21 +923,38 @@ void multiViewerCanvas::saveSelected(bool save_selected)
 	}
 	if (nsel > 0)
 	{
-		if (is_data && nr_regroups > 0)
-			regroupSelectedParticles(MDout, *MDgroups, nr_regroups);
-
-		char *newfile;
-		newfile = fl_file_chooser("Save File As?", "*.star", "");
-		if (newfile==NULL)
-			return;
-		FileName fn_out(newfile);
-
 		// Maintain the original image ordering
 		if (MDout.containsLabel(EMDL_SORTED_IDX))
 			MDout.sort(EMDL_SORTED_IDX);
 
-		MDout.write(fn_out);
-		std::cout << "Saved "<<fn_out << " with " << nsel << " selected images." << std::endl;
+		// If the images were re-centered to the center-of-mass, then output the recentered images, and change the names of the images in the MDout.
+		if (do_recenter)
+		{
+			FileName fn_stack = fn_selected_imgs.withoutExtension()+".mrcs";
+			FileName fn_img, fn_out;
+			Image<RFLOAT> img;
+			long int i = 0;
+			long int nr_images = MDout.numberOfObjects();
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+			{
+				i++;
+				MDout.getValue(EMDL_MLMODEL_REF_IMAGE, fn_img);
+				img.read(fn_img);
+				selfTranslateCenterOfMassToCenter(img());
+				fn_out.compose(i, fn_stack);
+				MDout.setValue(EMDL_MLMODEL_REF_IMAGE, fn_out);
+
+                if (i == 1)
+                	img.write(fn_stack, -1, (nr_images > 1), WRITE_OVERWRITE);
+                else
+                	img.write(fn_stack, -1, false, WRITE_APPEND);
+
+			}
+		}
+
+
+		MDout.write(fn_selected_imgs);
+		std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected images." << std::endl;
 	}
 	else
 		std::cout <<" No images to save...." << std::endl;
@@ -1153,7 +1193,7 @@ int pickerViewerCanvas::handle(int ev)
 			redraw();
 			Fl_Menu_Item rclick_menu[] = {
 				{ "Save STAR with coordinates" },
-				{ "Save_as STAR with coordinates" },
+//				{ "Save_as STAR with coordinates" },
 				{ "Load coordinates" },
 				{ "Reload coordinates" },
 				{ "Clear coordinates" },
@@ -1166,8 +1206,8 @@ int pickerViewerCanvas::handle(int ev)
 				return 0;
 			else if ( strcmp(m->label(), "Save STAR with coordinates") == 0 )
 				saveCoordinates(false);
-			else if ( strcmp(m->label(), "Save_as STAR with coordinates") == 0 )
-				saveCoordinates(true);
+//			else if ( strcmp(m->label(), "Save_as STAR with coordinates") == 0 )
+//				saveCoordinates(true);
 			else if ( strcmp(m->label(), "Load coordinates") == 0 )
 				loadCoordinates(true);
 			else if ( strcmp(m->label(), "Reload coordinates") == 0 )
@@ -1216,6 +1256,12 @@ void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 		fn_out = (fn_coords=="") ? "picked.star" : fn_coords;
 	}
 
+	FileName fn_dirs = fn_coords.beforeLastOf("/");
+	if (!(exists(fn_dirs)))
+	{
+		std::string command = "mkdir -p " + fn_dirs;
+		system(command.c_str());
+	}
 	// Never write out columns that come from the fn_color file....
 	if (fn_color != "" && color_label != EMDL_UNDEFINED)
 	{
@@ -1368,7 +1414,7 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	Fl_Text_Buffer *textbuff = new Fl_Text_Buffer();
 	textbuff->text(fn_short.c_str());
 	mydisp->buffer(textbuff);
-	int x=170, y=15, ystep = 27, height = 25,  inputwidth = 50;
+	int x=170, y=15, ystep = 27, height = 25,  inputwidth = 50, inputwidth2=30;
 	int x2 = width - inputwidth - 50;
 	y += ROUND(1.5*ystep);
 
@@ -1434,10 +1480,7 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	{
 		// Multiview box
 		Fl_Box *box3;
-		if (is_class || is_data)
-			box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(2.5*ystep), "");
-		else
-			box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(1.5*ystep), "");
+		box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(1.5*ystep), "");
 
 		box3->color(GUI_BACKGROUND_COLOR);
 		box3->box(FL_DOWN_BOX);
@@ -1449,46 +1492,25 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		ori_scale_input = new Fl_Input(x2, y, inputwidth, height, "Scale original images:");
 		ori_scale_input->value("1");
 		ori_scale_input->color(GUI_INPUT_COLOR);
-		y += ROUND(ystep);
+		y += ROUND(1.75*ystep);
 
-		if (is_class || is_data)
-		{
-			regroup_button = new Fl_Check_Button(20, y, inputwidth, height, "Regroup selected particles");
-			regroup_button->color(GUI_INPUT_COLOR);
-			nr_groups_input = new Fl_Input(x2, y, inputwidth, height, "in number of groups:");
-			nr_groups_input->color(GUI_INPUT_COLOR);
-			nr_groups_input->value("-1");
-
-			y+=1.75*ystep;
-		}
-		else
-			y += ROUND(0.75*ystep);
 	}
 	else // is_single
 	{
 		// singleview box
-		Fl_Box *box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(3.5*ystep), "");
+		Fl_Box *box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(1.5*ystep), "");
 		box3->color(GUI_BACKGROUND_COLOR);
 		box3->box(FL_DOWN_BOX);
 
-		pick_button = new Fl_Check_Button(150, y, inputwidth, height, "Pick particles");
-		pick_button->color(GUI_INPUT_COLOR);
-
-		particle_radius_input = new Fl_Input(x2, y, inputwidth, height, "with radius (pix):");
-		particle_radius_input->color(GUI_INPUT_COLOR);
-		particle_radius_input->value("100");
-		y += ystep;
-
-		pick_rootname_input = new Fl_Input(x2-inputwidth, y, 2*inputwidth, height, "picking rootname:");
-		pick_rootname_input->color(GUI_INPUT_COLOR);
-		pick_rootname_input->value("autopick");
-		y += ystep;
-
-		lowpass_input = new Fl_Input(x, y, inputwidth, height, "Lowpass filter (A):");
+		lowpass_input = new Fl_Input(x, y, inputwidth2, height, "Lowpass filter (A):");
 		lowpass_input->color(GUI_INPUT_COLOR);
 		lowpass_input->value("0");
 
-		angpix_input = new Fl_Input(x2, y, inputwidth, height, "Pixel size (A):");
+		highpass_input = new Fl_Input(275, y, inputwidth2, height, "Highpass:");
+		highpass_input->color(GUI_INPUT_COLOR);
+		highpass_input->value("0");
+
+		angpix_input = new Fl_Input(x2+inputwidth-inputwidth2, y, inputwidth2, height, "Pixel size (A):");
 		angpix_input->color(GUI_INPUT_COLOR);
 		angpix_input->value("1");
 
@@ -1537,16 +1559,12 @@ void displayerGuiWindow::readLastSettings()
 			sigma_contrast_input->value(value.c_str());
 		else if (is_multi && label == col_input->label())
 			col_input->value(value.c_str());
-		else if (!is_multi && label == particle_radius_input->label())
-			particle_radius_input->value(value.c_str());
-		else if (!is_multi && label == pick_rootname_input->label())
-			pick_rootname_input->value(value.c_str());
 		else if (!is_multi && label == lowpass_input->label())
 			lowpass_input->value(value.c_str());
+		else if (!is_multi && label == highpass_input->label())
+			highpass_input->value(value.c_str());
 		else if (!is_multi && label == angpix_input->label())
 			angpix_input->value(value.c_str());
-		else if (is_class && label == nr_groups_input->label())
-			nr_groups_input->value(value.c_str());
 	}
 
 	in.close();
@@ -1574,14 +1592,10 @@ void displayerGuiWindow::writeLastSettings()
     }
     else
     {
-    	fh << particle_radius_input->label() << " = " << particle_radius_input->value() << std::endl;
-    	fh << pick_rootname_input->label() << " = " << pick_rootname_input->value() << std::endl;
     	fh << lowpass_input->label() << " = " << lowpass_input->value() << std::endl;
+    	fh << highpass_input->label() << " = " << highpass_input->value() << std::endl;
     	fh << angpix_input->label() << " = " << angpix_input->value() << std::endl;
-
     }
-    if (is_class || is_data)
-    	fh << nr_groups_input->label() << " = " << nr_groups_input->value() << std::endl;
 
     fh.close();
 
@@ -1638,27 +1652,35 @@ void displayerGuiWindow::cb_display_i()
 	}
 	else
 	{
-		//check for pick
-		if (pick_button->value())
-		{
-			cl += " --pick  --particle_radius " + (std::string)particle_radius_input->value();
-			// get the coordinate files
-			FileName fn_coord = fn_in.withoutExtension() + "_" + (std::string)pick_rootname_input->value() + ".star";
-			cl += " --coords " + fn_coord;
-			cl += " --lowpass " + (std::string)lowpass_input->value();
-			cl += " --angpix " + (std::string)angpix_input->value();
-		}
+		//check for individual images
+		cl += " --lowpass " + (std::string)lowpass_input->value();
+		cl += " --highpass " + (std::string)highpass_input->value();
+		cl += " --angpix " + (std::string)angpix_input->value();
+	}
 
-	}
-	if ( (is_class || is_data) && regroup_button->value())
-	{
-		cl += " --regroup " + (std::string)nr_groups_input->value();
-	}
 	if (is_class)
 	{
 		cl += " --class ";
 	}
 
+	if (do_allow_save)
+	{
+		cl += " --allow_save ";
+		if (fn_parts != "")
+			cl += " --fn_parts " + fn_parts;
+		if (fn_imgs != "")
+			cl += " --fn_imgs " + fn_imgs;
+	}
+
+	if (nr_regroups > 0)
+	{
+		cl += " --regroup " + integerToString(nr_regroups);
+	}
+
+	if (do_recenter)
+	{
+		cl += " --recenter";
+	}
 
 	// send job in the background
 	cl += " &";
@@ -1692,13 +1714,18 @@ void Displayer::read(int argc, char **argv)
 	reverse_sort = parser.checkOption("--reverse", "Use reverse order (from high to low) in the sorting");
 	do_class = parser.checkOption("--class", "Use this to analyse classes in input model.star file");
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
+	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
+	fn_selected_imgs = parser.getOption("--fn_imgs", "Name of the STAR file in which to save selected images.", "");
+	fn_selected_parts = parser.getOption("--fn_parts", "Name of the STAR file in which to save particles from selected classes.", "");
+	do_recenter = parser.checkOption("--recenter", "Recenter the selected images to the center-of-mass of all positive pixel values. ");
 
 	int pick_section  = parser.addSection("Picking options");
 	do_pick = parser.checkOption("--pick", "Pick coordinates in input image");
 	fn_coords = parser.getOption("--coords", "STAR file with picked particle coordinates", "");
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A) to calculate lowpass filter", "1"));
+	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A) to calculate lowpass filter", "-1"));
 	fn_color = parser.getOption("--color_star", "STAR file with a column for red-blue coloring (a subset of) the particles", "");
 	color_label = parser.getOption("--color_label", "MetaDataLabel to color particles on (e.g. rlnParticleSelectZScore)", "");
 	color_blue_value = textToFloat(parser.getOption("--blue", "Value of the blue color", "1."));
@@ -1740,7 +1767,7 @@ void Displayer::initialise()
     		fn_data = fn_in.without("_model.star") + "_data.star";
     	MDdata.read(fn_data);
 
-    	// If regouping, also read the model_groups table into memory
+    	// If regrouping, also read the model_groups table into memory
     	if (nr_regroups > 0)
     		MDgroups.read(fn_in, "model_groups");
     }
@@ -1769,53 +1796,94 @@ void Displayer::initialise()
     		std::cout <<" Warning: cannot find model.star file for " << fn_in << " needed for regrouping..." << std::endl;
 
     }
+
+    // Check if input STAR file contains pixel-size information
+
+    if ((lowpass > 0 || highpass > 0) && angpix < 0)
+    {
+
+		if (fn_in.isStarFile())
+		{
+			MetaDataTable MD;
+			MD.read(fn_in);
+			RFLOAT mag, dstep;
+			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				MD.goToObject(0);
+				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				angpix = 10000. * dstep / mag;
+				if (verb > 0)
+					std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+			}
+			else if (verb > 0 && (lowpass > 0 || highpass > 0))
+			{
+				REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
+			}
+		}
+		else
+		{
+			REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, so please also provide --angpix.");
+		}
+    }
+
 }
 
 int Displayer::runGui()
 {
 	Fl::scheme("gtk+");
-    // Shall I make a browser window in this GUI or in the general relion GUI?
-    // Perhaps here is better..., then there will be no fn_in yet....
-    // Update entire window each time the entry of the browser changes...
-    Fl_File_Chooser chooser(".",                        // directory
-                            "All recognised formats (*.{star,mrc,mrcs})\tSTAR Files (*.star)\tMRC stack (*.mrcs)\tMRC image (*.mrc)\tAll Files (*)*", // filter
-                            Fl_File_Chooser::SINGLE,     // chooser type
-                            "Choose file to display");        // title
-    chooser.show();
-    // Block until user picks something.
-    while(chooser.shown())
-        { Fl::wait(); }
 
-    // User hit cancel?
-    if ( chooser.value() == NULL )
-    	exit(0);
-    FileName _fn_in(chooser.value());
+	if (fn_in == "")
+	{
+		// Shall I make a browser window in this GUI or in the general relion GUI?
+		// Perhaps here is better..., then there will be no fn_in yet....
+		// Update entire window each time the entry of the browser changes...
+		Fl_File_Chooser chooser(".",                        // directory
+								"All recognised formats (*.{star,mrc,mrcs})\tSTAR Files (*.star)\tMRC stack (*.mrcs)\tMRC image (*.mrc)\tAll Files (*)*", // filter
+								Fl_File_Chooser::SINGLE,     // chooser type
+								"Choose file to display");        // title
+		chooser.show();
+		// Block until user picks something.
+		while(chooser.shown())
+			{ Fl::wait(); }
+
+		// User hit cancel?
+		if ( chooser.value() == NULL )
+			exit(0);
+		FileName _fn_in(chooser.value());
+		fn_in = _fn_in;
+	}
 
 	// make a bigger window for STAR files...
-	int windowheight = _fn_in.isStarFile() ? 350 : 300;
+	int windowheight = fn_in.isStarFile() ? 350 : 300;
 
 	displayerGuiWindow win(500, windowheight, "Relion display GUI");
 	win.is_class = false;
 	win.is_data = false;
 	win.is_star = false;
 	win.is_multi = false;
+	win.do_allow_save = do_allow_save;
+	win.nr_regroups = nr_regroups;
+	win.do_recenter = do_recenter;
+	win.fn_imgs = fn_selected_imgs;
+	win.fn_parts = fn_selected_parts;
 
 	// If this is a STAR file, decide what to do
-	if (_fn_in.isStarFile())
+	if (fn_in.isStarFile())
 	{
 		MetaDataTable MD;
 		win.is_star = true;
 		win.is_multi = true;
-		win.is_data = _fn_in.contains("_data.star");
-		if (_fn_in.contains("_model.star"))
+		win.is_data = fn_in.contains("_data.star");
+		if (fn_in.contains("_model.star"))
 		{
 			win.fn_data = fn_in.without("_model.star") + "_data.star";
 			win.is_class = true;
-			MD.read(_fn_in, "model_classes");
+			MD.read(fn_in, "model_classes");
 		}
 		else
 		{
-			MD.read(_fn_in);
+			MD.read(fn_in);
 		}
 
 		// Get which labels are stored in this metadatatable and generate choice menus for display and sorting
@@ -1830,6 +1898,8 @@ int Displayer::runGui()
 		// If EMDL_IMAGE_NAME is among the labels: make that the default choice!)
 		if (MD.containsLabel(EMDL_IMAGE_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_IMAGE_NAME));
+		if (MD.containsLabel(EMDL_IMAGE_ORI_NAME))
+			win.display_labels.push_back(EMDL::label2Str(EMDL_IMAGE_ORI_NAME));
 		if (MD.containsLabel(EMDL_MLMODEL_REF_IMAGE))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MLMODEL_REF_IMAGE));
 		if (MD.containsLabel(EMDL_CTF_IMAGE))
@@ -1843,11 +1913,11 @@ int Displayer::runGui()
 	{
 		// Try reading as an image/stack header
 		Image<RFLOAT> img;
-		img.read(_fn_in, false);
+		img.read(fn_in, false);
 		win.is_multi = (ZSIZE(img()) * NSIZE(img()) > 1);
 	}
 
-	win.fill(_fn_in);
+	win.fill(fn_in);
 }
 
 
@@ -1864,6 +1934,8 @@ int Displayer::run()
 
         if (lowpass > 0.)
         	lowPassFilterMap(img(), lowpass, angpix);
+        if (highpass > 0.)
+        	highPassFilterMap(img(), highpass, angpix);
         basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
         if (fn_coords=="")
             fn_coords = fn_in.withoutExtension()+"_coords.star";
@@ -1898,7 +1970,7 @@ int Displayer::run()
 
         basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
         win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-        		do_class, &MDdata, nr_regroups, fn_in.contains("_data.star"), &MDgroups);
+        		do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups, do_allow_save, fn_selected_imgs, fn_selected_parts);
 
     }
     else
@@ -1954,7 +2026,12 @@ int Displayer::run()
         {
         	img.read(fn_in); // now read image data as well (not only header)
 
-        	MDin.addObject();
+            if (lowpass > 0.)
+            	lowPassFilterMap(img(), lowpass, angpix);
+            if (highpass > 0.)
+            	highPassFilterMap(img(), highpass, angpix);
+
+            MDin.addObject();
             MDin.setValue(EMDL_IMAGE_NAME, fn_in);
             basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
             win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);

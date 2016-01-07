@@ -18,11 +18,12 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+#include <unistd.h>
+#include <string.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 #include "src/gui_mainwindow.h"
-#include <unistd.h>
-#include <string.h>
+#include <src/args.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -66,10 +67,24 @@ int main(int argc, char *argv[])
         strcat(titletext,": ");
 
 	strcat (titletext, short_dir);
-	RelionMainWindow window(GUIWIDTH, GUIHEIGHT, titletext);
 
-    window.show(argc, argv);
+	try
+	{
+		// Fill the window
+		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
+		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe);
 
-    return Fl::run();
+		// Show and run the window
+		window.show(argc, argv);
+		Fl::run();
+	}
 
+    catch (RelionError XE)
+    {
+        std::cout << XE;
+        exit(1);
+    }
+
+    //return Fl::run();
+    return 0;
 }

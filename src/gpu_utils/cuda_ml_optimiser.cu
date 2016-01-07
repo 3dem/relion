@@ -128,14 +128,23 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (baseMLO->do_parallel_disc_io)
 		{
 			CUDA_CPU_TIC("setXmippOrigin");
-			// Read from disc
-			FileName fn_img;
-			std::istringstream split(baseMLO->exp_fn_img);
-			for (int i = 0; i <= istop; i++)
-				getline(split, fn_img);
 
-			img.read(fn_img);
-			img().setXmippOrigin();
+			// If all slaves had preread images into RAM: get those now
+			if (baseMLO->do_preread_images)
+			{
+				img() = baseMLO->mydata.particles[part_id].img;
+			}
+			else
+			{
+				// Read from disc
+				FileName fn_img;
+				std::istringstream split(baseMLO->exp_fn_img);
+				for (int i = 0; i <= istop; i++)
+					getline(split, fn_img);
+
+				img.read(fn_img);
+				img().setXmippOrigin();
+			}
 			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 			{
 				FileName fn_recimg;
@@ -530,7 +539,7 @@ void getAllSquaredDifferencesCoarse(
 	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 
@@ -804,7 +813,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 	CUDA_CPU_TOC("precalculateShiftedImagesCtfsAndInvSigma2s");
@@ -1380,6 +1389,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << std::endl;
 				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]  << std::endl;
+				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 
 				unsorted_ipart.dump_device_to_file("error_dump_filtered");
@@ -1473,7 +1484,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	CUDA_CPU_TIC("store_init");
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling,
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, op.Fimgs_nomask, op.Fctfs, op.local_Fimgs_shifted, op.local_Fimgs_shifted_nomask,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 

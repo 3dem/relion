@@ -15,6 +15,130 @@
 #include "src/fftw.h"
 #include "src/time.h"
 #include "src/mask.h"
+#include "src/macros.h"
+#include "src/helix.h"
+
+//#define OUTPUT_MEAN_MAP_ONLY 1
+//#define OUTPUT_STDDEV_MAP_ONLY 2
+//#define OUTPUT_BOTH_MEAN_AND_STDDEV_MAPS 3
+
+class ccfPixel
+{
+public:
+	RFLOAT x;
+	RFLOAT y;
+	RFLOAT fom;
+	//RFLOAT psi;
+	ccfPixel()
+	{
+		x = y = fom = (-1.);
+		//psi = -1.;
+	};
+	//ccfPixel(int _x, int _y, RFLOAT _fom, RFLOAT _psi)
+	//{
+	//	x = _x; y = _y; fom = _fom; psi = _psi;
+	//};
+	ccfPixel(RFLOAT _x, RFLOAT _y, RFLOAT _fom)
+	{
+		x = _x; y = _y; fom = _fom;
+	};
+	bool operator<(const ccfPixel& b) const
+	{
+		return (fom < b.fom);
+	};
+};
+
+class ccfPeak
+{
+public:
+	int id;
+	RFLOAT x;
+	RFLOAT y;
+	RFLOAT r;
+	RFLOAT area_percentage;
+	RFLOAT fom_max;
+	int ref;
+	RFLOAT psi;
+	RFLOAT dist;
+	RFLOAT fom_thres;
+	int nr_peak_pixel;
+	std::vector<ccfPixel> ccf_pixel_list;
+
+	bool isValid() const
+	{
+		// Invalid parameters
+		if ( (r < 0.) || (area_percentage < 0.) || (ccf_pixel_list.size() < 1) )
+			return false;
+		// TODO: check ccf values in ccf_pixel_list?
+		for (int id = 0; id < ccf_pixel_list.size(); id++)
+		{
+			if (ccf_pixel_list[id].fom > fom_thres)
+				return true;
+		}
+		return false;
+	};
+	void clear()
+	{
+		id = ref = nr_peak_pixel = -1;
+		x = y = r = area_percentage = fom_max = psi = dist = fom_thres = (-1.);
+		ccf_pixel_list.clear();
+	};
+	ccfPeak()
+	{
+		clear();
+	};
+	~ccfPeak()
+	{
+		clear();
+	};
+	bool operator<(const ccfPeak& b) const
+	{
+		if (fabs(r - b.r) < 0.01)
+		{
+			return (fom_max < b.fom_max);
+		}
+		return (r < b.r);
+	};
+	bool refresh()
+	{
+		RFLOAT x_avg, y_avg;
+		int nr_valid_pixel;
+
+		area_percentage = (-1.);
+
+		if (ccf_pixel_list.size() < 1)
+			return false;
+
+		fom_max = (-99.e99);
+		nr_valid_pixel = 0;
+		x_avg = y_avg = 0.;
+		for (int id = 0; id < ccf_pixel_list.size(); id++)
+		{
+			if (ccf_pixel_list[id].fom > fom_thres)
+			{
+				nr_valid_pixel++;
+
+				if (ccf_pixel_list[id].fom > fom_max)
+					fom_max = ccf_pixel_list[id].fom;
+
+				x_avg += ccf_pixel_list[id].x;
+				y_avg += ccf_pixel_list[id].y;
+			}
+		}
+		nr_peak_pixel = nr_valid_pixel;
+
+		if (nr_valid_pixel < 1)
+			return false;
+
+		x = x_avg / (RFLOAT)(nr_valid_pixel);
+		y = y_avg / (RFLOAT)(nr_valid_pixel);
+		area_percentage = (RFLOAT)(nr_valid_pixel) / ccf_pixel_list.size();
+
+		return true;
+	};
+};
+
+
 
 struct Peak
 {
@@ -43,7 +167,7 @@ public:
 	int verb;
 
 	// Input & Output rootname
-	FileName fn_in, fn_ref, fns_autopick, fn_out;
+	FileName fn_in, fn_ref, fns_autopick, fn_odir, fn_out;
 
 	// Pixel size (for low-pass filter and particle diameter)
 	RFLOAT angpix;
@@ -55,8 +179,11 @@ public:
 	RFLOAT particle_diameter;
 	int particle_radius2, decrease_radius;
 
-	// Low pass filetr cutoff (in Angstroms)
+	// Low pass filter cutoff (in Angstroms)
 	RFLOAT lowpass;
+
+	// High pass filter cutoff (in Angstroms)
+	RFLOAT highpass;
 
 	// Original size of the reference images
 	int particle_size;
@@ -82,7 +209,7 @@ public:
 	std::vector<FileName> fn_micrographs;
 
 	// Original size of the micrographs
-	int micrograph_size, micrograph_xsize, micrograph_ysize;
+	int micrograph_size, micrograph_xsize, micrograph_ysize, micrograph_minxy_size;
 
 	// decreased size micrograph
 	int workSize;
@@ -99,6 +226,17 @@ public:
 
 	// Keep the CTFs unchanged until the first peak?
 	bool intact_ctf_first_peak;
+
+	// Are the templates 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.
+	bool autopick_helical_segments;
+
+	RFLOAT helical_tube_curvature_factor_max;
+
+	RFLOAT helical_tube_diameter;
+
+	RFLOAT helical_tube_length_min;
+
+	bool do_mark_helical_tube_id;
 
 	// Apart from keeping particle_size/2 away from the sides, should we exclude more? E.g. to get rid of Polara bar code?
 	int autopick_skip_side;
@@ -146,13 +284,58 @@ public:
 	// General function to decide what to do
 	void run();
 
+	void pickCCFPeaks(
+			const MultidimArray<RFLOAT>& Mccf,
+			const MultidimArray<int>& Mclass,
+			RFLOAT threshold_value,
+			int peak_r_min,
+			RFLOAT particle_diameter_pix,
+			std::vector<ccfPeak>& ccf_peak_list,
+			MultidimArray<RFLOAT>& Mccfplot,
+			int micrograph_maxxy_size,
+			int micrograph_minxy_size,
+			int skip_side);
+
+	void extractHelicalTubes(
+			std::vector<ccfPeak>& ccf_peak_list,
+			std::vector<std::vector<ccfPeak> >& tube_coord_list,
+			std::vector<RFLOAT>& tube_len_list,
+			std::vector<std::vector<ccfPeak> >& tube_track_list,
+			RFLOAT particle_diameter_pix,
+			RFLOAT curvature_factor_max,
+			RFLOAT interbox_distance_pix,
+			RFLOAT tube_diameter_pix);
+
+	void exportHelicalTubes(
+			const MultidimArray<RFLOAT>& Mccf,
+			MultidimArray<RFLOAT>& Mccfplot,
+			const MultidimArray<int>& Mclass,
+			std::vector<std::vector<ccfPeak> >& tube_coord_list,
+			std::vector<std::vector<ccfPeak> >& tube_track_list,
+			std::vector<RFLOAT>& tube_len_list,
+			FileName& fn_mic_in,
+			FileName& fn_star_out,
+			RFLOAT particle_diameter_pix,
+			RFLOAT tube_length_min_pix,
+			int micrograph_maxxy_size,
+			int micrograph_xsize,
+			int micrograph_ysize,
+			int skip_side);
+
 	void autoPickOneMicrograph(FileName &fn_mic);
 
+	// Get the output coordinate filename given the micrograph filename
+	FileName getOutputRootName(FileName fn_mic);
 	// Uses Roseman2003 formulae to calculate stddev under the mask through FFTs
 	// The FFTs of the micrograph (Fmic), micrograph-squared (Fmic2) and the mask (Fmsk) need to be provided at downsize_mic
 	// The putput (Mstddev) will be at (binned) micrograph_size
-	void calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &Fmic, const MultidimArray<Complex > &Fmic2,
-			MultidimArray<Complex > &Fmsk, int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &Mstddev, MultidimArray<RFLOAT> &Mmean);
+	void calculateStddevAndMeanUnderMask(
+			const MultidimArray<Complex > &Fmic,
+			const MultidimArray<Complex > &Fmic2,
+			MultidimArray<Complex > &Fmsk,
+			int nr_nonzero_pixels_mask,
+			MultidimArray<RFLOAT> &Mstddev,
+			MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
 	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks);
@@ -161,7 +344,6 @@ public:
 	// From each cluster, take the single peaks with the highest ccf
 	// If then, there is another peaks at a distance of at least min_particle_distance: take that one as well, and so forth...
 	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance);
-
 
 	// Only keep those peaks that are at the given distance apart from each other
 	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance);

@@ -119,92 +119,28 @@ void Euler_angles2direction(RFLOAT alpha, RFLOAT beta,
 void Euler_direction2angles(Matrix1D<RFLOAT> &v0,
                             RFLOAT &alpha, RFLOAT &beta)
 {
-    RFLOAT abs_ca, sb, cb;
-    RFLOAT aux_alpha;
-    RFLOAT aux_beta;
-    RFLOAT error, newerror;
-    Matrix1D<RFLOAT> v_aux;
+	// Aug25,2015 - Shaoda
+	// This function can recover tilt (b) as small as 0.0001 degrees
+	// It replaces a more complicated version in the code before Aug2015
     Matrix1D<RFLOAT> v;
 
-    //if not normalized do it so
+    // Make sure the vector is normalised
     v.resize(3);
     v = v0;
     v.selfNormalize();
 
-    v_aux.resize(3);
-    cb = v(2);
+    // Tilt (b) should be [0, +180] degrees. Rot (a) should be [-180, +180] degrees
+    alpha = RAD2DEG(atan2(v(1), v(0))); // 'atan2' returns an angle within [-pi, +pi] radians for rot
+    beta = RAD2DEG(acos(v(2))); // 'acos' returns an angle within [0, +pi] radians for tilt
 
-    if (fabs((cb)) > 0.999847695)/*one degree */
-    {
-        std::cerr << "\nWARNING: Routine Euler_direction2angles is not reliable\n"
-        "for small tilt angles. Up to 0.001 deg it should be OK\n"
-        "for most applications but you never know";
-    }
+    // The following is done to keep in line with the results from old codes
+    // If tilt (b) = 0 or 180 degrees, sin(b) = 0, rot (a) cannot be calculated from the direction
+    if ( (fabs(beta) < 0.001) || (fabs(beta - 180.) < 0.001) )
+    	alpha = 0.;
 
-    if (fabs((cb - 1.)) < FLT_EPSILON)
-    {
-        alpha = 0.;
-        beta = 0.;
-    }
-    else
-    {/*1*/
+    return;
 
-        aux_beta = acos(cb); /* beta between 0 and PI */
-
-
-        sb = sin(aux_beta);
-
-        abs_ca = fabs(v(0)) / sb;
-        if (fabs((abs_ca - 1.)) < FLT_EPSILON)
-            aux_alpha = 0.;
-        else
-            aux_alpha = acos(abs_ca);
-
-        v_aux(0) = sin(aux_beta) * cos(aux_alpha);
-        v_aux(1) = sin(aux_beta) * sin(aux_alpha);
-        v_aux(2) = cos(aux_beta);
-
-        error = fabs(dotProduct(v, v_aux) - 1.);
-        alpha = aux_alpha;
-        beta = aux_beta;
-
-        v_aux(0) = sin(aux_beta) * cos(-1. * aux_alpha);
-        v_aux(1) = sin(aux_beta) * sin(-1. * aux_alpha);
-        v_aux(2) = cos(aux_beta);
-        newerror = fabs(dotProduct(v, v_aux) - 1.);
-        if (error > newerror)
-        {
-            alpha = -1. * aux_alpha;
-            beta  = aux_beta;
-            error = newerror;
-        }
-
-        v_aux(0) = sin(-aux_beta) * cos(-1. * aux_alpha);
-        v_aux(1) = sin(-aux_beta) * sin(-1. * aux_alpha);
-        v_aux(2) = cos(-aux_beta);
-        newerror = fabs(dotProduct(v, v_aux) - 1.);
-        if (error > newerror)
-        {
-            alpha = -1. * aux_alpha;
-            beta  = -1. * aux_beta;
-            error = newerror;
-        }
-
-        v_aux(0) = sin(-aux_beta) * cos(aux_alpha);
-        v_aux(1) = sin(-aux_beta) * sin(aux_alpha);
-        v_aux(2) = cos(-aux_beta);
-        newerror = fabs(dotProduct(v, v_aux) - 1.);
-
-        if (error > newerror)
-        {
-            alpha = aux_alpha;
-            beta  = -1. * aux_beta;
-            error = newerror;
-        }
-    }/*else 1 end*/
-    beta  = RAD2DEG(beta);
-    alpha = RAD2DEG(alpha);
-}/*Eulerdirection2angles end*/
+}
 
 /* Matrix --> Euler angles ------------------------------------------------- */
 #define CHECK

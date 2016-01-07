@@ -24,6 +24,7 @@
 #include "src/image.h"
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
+#include "src/healpix_sampling.h"
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/mask.h>
@@ -81,6 +82,9 @@ public:
 	// Flag to indicate whether we'll do masking
 	bool do_mask;
 
+	// Flag to indicate whether we're also doing amplitude correlations and DPR, in that case re-normalize amplitudes for n=uneven orientational distributions
+	bool do_ampl_corr;
+
 	// Minimum and maximum resolution to use in the fit
 	RFLOAT fit_minres, fit_maxres;
 
@@ -99,7 +103,7 @@ public:
 	int filter_edge_width;
 
 	// Arrays to store FSC, Guinier curves etc
-	MultidimArray<RFLOAT> fsc_unmasked;
+	MultidimArray<RFLOAT> fsc_unmasked, acorr_unmasked, acorr_masked, dpr_unmasked, dpr_masked;
 	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true;
 	RFLOAT global_intercept, global_slope, global_corr_coeff, global_bfactor, global_resol;
 	// The Guinier plots
@@ -127,6 +131,14 @@ public:
 
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
 	void sharpenMap();
+
+	// Map nay 3D FFTW pixel onto the surface of a sphere with radius myradius_count
+	bool findSurfacePixel(int idx, int kp, int ip, int jp,
+			int &best_kpp, int &best_ipp, int &best_jpp,
+			int myradius_count, int search=2);
+
+	// Correct amplitudes inhomogeneity due to non-uniform orientational distributions
+	void correctRadialAmplitudeDistribution(MultidimArray<RFLOAT > &I);
 
 	// This divides the input FT by the mtf (if fn_mtf !="")
 	void divideByMtf(MultidimArray<Complex > &FT);

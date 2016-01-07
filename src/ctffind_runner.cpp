@@ -26,22 +26,24 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	int gen_section = parser.addSection("General options");
 	int ctf_section = parser.addSection("CTF estimation");
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a unix wildcard to all micrograph files, e.g. \"mics/*.mrc\"");
-	fn_out = parser.getOption("--o", "Name for the STAR file with CTF params for each micrograph", "micrographs_ctf.star");
-	do_only_join_results = parser.checkOption("--only_make_star", "Don't run CTFFIND, only join the logfile results in a STAR file");
-	continue_old = parser.checkOption("--only_do_unfinished", "Only run CTFFIND for those micrographs for which there is not yet a logfile with Final values.");
-
+	fn_out = parser.getOption("--o", "Directory, where all output files will be stored", "CtfEstimate/");
+	do_only_join_results = parser.checkOption("--only_make_star", "Don't estimate any CTFs, only join all logfile results in a STAR file");
+	continue_old = parser.checkOption("--only_do_unfinished", "Only estimate CTFs for those micrographs for which there is not yet a logfile with Final values.");
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	ctf_win =  textToInteger(parser.getOption("--ctfWin", "Size (in pixels) of a centered, squared window to use for CTF-estimation", "-1"));
 
-	fn_ctffind_exe = parser.getOption("--ctffind_exe","Location of ctffind executable (or through RELION_CTFFIND_EXECUTABLE environment variable)","");
-
+	int mic_section = parser.addSection("Microscopy parameters");
 	// First parameter line in CTFFIND
 	Cs = textToFloat(parser.getOption("--CS", "Spherical Aberration (mm) ","2.0"));
 	Voltage = textToFloat(parser.getOption("--HT", "Voltage (kV)","300"));
 	AmplitudeConstrast = textToFloat(parser.getOption("--AmpCnst", "Amplitude constrast", "0.1"));
 	Magnification = textToFloat(parser.getOption("--XMAG", "Magnification", "60000"));
 	PixelSize = textToFloat(parser.getOption("--DStep", "Detector pixel size (um)", "14"));
+
+	int ctffind_section = parser.addSection("CTFFIND parameters");
+
 	// Second parameter line in CTFFIND
+	fn_ctffind_exe = parser.getOption("--ctffind_exe","Location of ctffind executable (or through RELION_CTFFIND_EXECUTABLE environment variable)","");
 	box_size = textToFloat(parser.getOption("--Box", "Size of the boxes to calculate FFTs", "512"));
 	resol_min = textToFloat(parser.getOption("--ResMin", "Minimum resolution (in A) to include in calculations", "100"));
 	resol_max = textToFloat(parser.getOption("--ResMax", "Maximum resolution (in A) to include in calculations", "7"));
@@ -49,6 +51,14 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	max_defocus = textToFloat(parser.getOption("--dFMax", "Maximum defocus value (in A) to search", "50000"));
 	step_defocus = textToFloat(parser.getOption("--FStep", "defocus step size (in A) for search", "250"));
 	amount_astigmatism  = textToFloat(parser.getOption("--dAst", "amount of astigmatism (in A)", "0"));
+
+	int gctf_section = parser.addSection("Gctf parameters");
+	do_use_gctf = parser.checkOption("--use_gctf", "Use Gctf instead of CTFFIND to estimate the CTF parameters");
+	fn_gctf_exe = parser.getOption("--gctf_exe","Location of Gctf executable (or through RELION_GCTF_EXECUTABLE environment variable)","");
+	angpix = textToFloat(parser.getOption("--angpix", "Magnified pixel size in Angstroms", "1."));
+	do_ignore_ctffind_params = parser.checkOption("--ignore_ctffind_params", "Use Gctf default parameters instead of CTFFIND parameters");
+	do_EPA = parser.checkOption("--EPA", "Use equi-phase averaging to calculate Thon rinds in Gctf");
+	do_validation = parser.checkOption("--do_validation", "Use validation inside Gctf to analyse quality of the fit?");
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -75,6 +85,21 @@ void CtffindRunner::initialise()
 		if (penv!=NULL)
 			fn_ctffind_exe = (std::string)penv;
 	}
+	// Get the GCTF executable
+	if (do_use_gctf && fn_gctf_exe == "")
+	{
+		char * penv;
+		penv = getenv ("RELION_GCTF_EXECUTABLE");
+		if (penv!=NULL)
+			fn_gctf_exe = (std::string)penv;
+	}
+
+	if (do_use_gctf && ctf_win>0)
+		REPORT_ERROR("CtffindRunner::initialise ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
+
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length()-1] != '/')
+		fn_out += "/";
 
 	// Set up which micrographs to estimate CTFs from
 	if (fn_in.isStarFile())
@@ -101,9 +126,9 @@ void CtffindRunner::initialise()
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			FileName fn_microot = fn_micrographs[imic].without(".mrc");
-			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
-					HT, CS, AmpCnst, XMAG, DStep, false)) // false: dont die if not found Final values
+					HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore, false)) // false: dont die if not found Final values
 				fns_todo.push_back(fn_micrographs[imic]);
 		}
 
@@ -111,10 +136,43 @@ void CtffindRunner::initialise()
 
 	}
 
+	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
+    char temp [180];
+    getcwd(temp, 180);
+    currdir = std::string(temp);
+    // Make sure fn_out ends with a slash
+	if (currdir[currdir.length()-1] != '/')
+		currdir += "/";
+	FileName prevdir="";
+	for (size_t i = 0; i < fn_micrographs.size(); i++)
+	{
+		// Remove the UNIQDATE part of the filename if present
+		FileName output = getOutputFileWithNewUniqueDate(fn_micrographs[i], fn_out);
+		// Create output directory if neccesary
+		FileName newdir = output.beforeLastOf("/");
+		if (newdir != prevdir)
+		{
+			std::string command = " mkdir -p " + newdir;
+			int res = system(command.c_str());
+		}
+		symlink((currdir+fn_micrographs[i]).c_str(), output.c_str());
+	}
+
+	if (do_use_gctf && fn_micrographs.size()>0)
+	{
+		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
+		Image<double> Itmp;
+		Itmp.read(fn_micrographs[0], false); // false means only read header!
+		xdim = XSIZE(Itmp());
+		ydim = YSIZE(Itmp());
+	}
 
 	if (verb > 0)
 	{
-		std::cout << " Using CTFFINDs executable in: " << fn_ctffind_exe << std::endl;
+		if (do_use_gctf)
+			std::cout << " Using Gctf executable in: " << fn_gctf_exe << std::endl;
+		else
+			std::cout << " Using CTFFIND executable in: " << fn_ctffind_exe << std::endl;
 		std::cout << " to estimate CTF parameters for the following micrographs: " << std::endl;
 		if (continue_old)
 			std::cout << " (skipping all micrographs for which a logfile with Final values already exists " << std::endl;
@@ -131,18 +189,34 @@ void CtffindRunner::run()
 		int barstep;
 		if (verb > 0)
 		{
-			std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
+			if (do_use_gctf)
+				std::cout << " Estimating CTF parameters using Kai Zhang's Gctf ..." << std::endl;
+			else
+				std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
 			init_progress_bar(fn_micrographs.size());
 			barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 		}
 
+		std::string allmicnames = "";
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
-			if (verb > 0 && imic % barstep == 0)
-				progress_bar(imic);
 
-			executeCtffind(fn_micrographs[imic]);
+			if (do_use_gctf)
+			{
+				addToGctfJobList(imic, allmicnames);
+			}
+			else
+			{
+
+				if (verb > 0 && imic % barstep == 0)
+					progress_bar(imic);
+
+				executeCtffind(imic);
+			}
 		}
+
+		if (do_use_gctf)
+			executeGctf(allmicnames);
 
 		if (verb > 0)
 			progress_bar(fn_micrographs.size());
@@ -157,10 +231,11 @@ void CtffindRunner::joinCtffindResults()
 	MetaDataTable MDctf;
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
     {
-		FileName fn_microot = fn_micrographs[imic].without(".mrc");
-		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
+		FileName outputfile= getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
+		FileName fn_microot = outputfile.without(".mrc");
+		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
-				HT, CS, AmpCnst, XMAG, DStep);
+				HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore);
 
 		if (!has_this_ctf)
 			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for");
@@ -178,13 +253,84 @@ void CtffindRunner::joinCtffindResults()
 	    MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
 	    MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
 	    MDctf.setValue(EMDL_CTF_FOM, CC);
+	    if (maxres > 0.)
+	    	MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+	    if (bfac > 0.)
+	    	MDctf.setValue(EMDL_CTF_BFACTOR, bfac);
+	    if (valscore > 0.)
+	    	MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+
     }
-	MDctf.write(fn_out);
+	MDctf.write(fn_out+"micrographs_ctf.star");
 }
 
-void CtffindRunner::executeCtffind(FileName fn_mic)
+
+void CtffindRunner::addToGctfJobList(long int i, std::string  &allmicnames)
 {
 
+	Image<double> Itmp;
+	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs[i], fn_out);
+	Itmp.read(outputfile, false); // false means only read header!
+	if (XSIZE(Itmp()) != xdim || YSIZE(Itmp()) != ydim)
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs[i] + " is different from the first micrograph!");
+	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs[i]);
+
+	allmicnames +=  " " + outputfile;
+
+}
+
+void CtffindRunner::executeGctf(std::string &allmicnames)
+{
+
+	std::string command = fn_gctf_exe;
+	//command +=  " --ctfstar " + fn_out + "tt_micrographs_ctf.star";
+	command +=  " --apix " + floatToString(angpix);
+	command +=  " --cs " + floatToString(Cs);
+	command +=  " --kV " + floatToString(Voltage);
+	command +=  " --ac " + floatToString(AmplitudeConstrast);
+	if (!do_ignore_ctffind_params)
+	{
+		command += " --boxsize " + floatToString(box_size);
+		command += " --resL " + floatToString(resol_min);
+		command += " --resH " + floatToString(resol_max);
+		command += " --defL " + floatToString(min_defocus);
+		command += " --defH " + floatToString(max_defocus);
+		command += " --defS " + floatToString(step_defocus);
+		command += " --astm " + floatToString(amount_astigmatism);
+	}
+
+	if (do_EPA)
+		command += " --do_EPA ";
+
+	if (do_validation)
+		command += " --do_validation ";
+
+	command += allmicnames;
+
+	std::cerr << "command= " << command << std::endl;
+	int res = system(command.c_str());
+
+	// Cleanup all the symbolic links again
+	for (size_t i = 0; i < fn_micrographs.size(); i++)
+	{
+		FileName output = getOutputFileWithNewUniqueDate(fn_micrographs[i], fn_out);
+		remove(output.c_str());
+	}
+
+	FileName fn_gctf_junk = "micrographs_all_gctf";
+	if (exists(fn_gctf_junk))
+		remove(fn_gctf_junk.c_str());
+	fn_gctf_junk = "extra_micrographs_all_gctf";
+	if (exists(fn_gctf_junk))
+		remove(fn_gctf_junk.c_str());
+
+}
+
+void CtffindRunner::executeCtffind(long int imic)
+{
+
+	FileName fn_mic = getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
 	FileName fn_root = fn_mic.withoutExtension();
 	FileName fn_script = fn_root + "_ctffind3.com";
 	FileName fn_log = fn_root + "_ctffind3.log";
@@ -245,11 +391,15 @@ void CtffindRunner::executeCtffind(FileName fn_mic)
 
 }
 
-bool getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
-		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep, bool die_if_not_found)
+bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
+		RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found)
 {
 
 	FileName fn_log = fn_microot + "_ctffind3.log";
+	if (do_use_gctf && !exists(fn_log)) // also test _gctf.log file
+		fn_log = fn_microot + "_gctf.log";
+
 	std::ifstream in(fn_log.data(), std::ios_base::in);
     if (in.fail())
     	return false;
@@ -292,6 +442,33 @@ bool getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &
             defAng = textToFloat(words[2]);
             CC = textToFloat(words[3]);
         }
+
+    	if (do_use_gctf && line.find("Resolution limit estimated by EPA:") != std::string::npos)
+    	{
+            tokenize(line, words);
+             if (words.size() < 7)
+             	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
+             maxres = textToFloat(words[6]);
+    	}
+
+    	if (do_use_gctf && line.find("Estimated Bfactor:") != std::string::npos)
+    	{
+            tokenize(line, words);
+             if (words.size() < 4)
+             	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
+             bfac = textToFloat(words[3]);
+    	}
+
+    	if (do_use_gctf && line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
+    	{
+            tokenize(line, words);
+             if (words.size() < 2)
+             	REPORT_ERROR("ERROR: Unexpected number of words on OVERALL_VALIDATION_SCORE line in " + fn_log);
+             valscore = textToFloat(words[1]);
+    	}
+
+
+
     }
     if (!Cs_is_found && die_if_not_found)
     	REPORT_ERROR("ERROR: cannot find line with Cs[mm], HT[kV], etc values in " + fn_log);

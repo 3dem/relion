@@ -27,6 +27,7 @@
 #include  <stdlib.h>
 #include  <stdio.h>
 #include "src/image.h"
+#include "src/ctf.h"
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/ctffind_runner.h"
@@ -43,18 +44,33 @@ public:
 	// Verbosity
 	int verb;
 
-	// Output rootname
-	FileName fn_in, fn_out;
+	// Name for directory of output Particle stacks and Particle STAR file
+	FileName fn_part_dir, fn_part_star;
 
-	////////////////////////////////////// Extract particles from the micrographs
+	// Does the input micrograph STAR file have CTF information?
+	bool star_has_ctf;
+
+	/////////////////? Do phase flipping?
+	bool do_phase_flip;
+	bool do_premultiply_ctf;
+	bool do_ctf_intact_first_peak;
+	RFLOAT angpix;
+
+	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
 	bool do_extract;
+
+	// Only extract particles when the STAR file for that micrograph doesn't exist yet
+	bool only_extract_unfinished;
 
 	// Skip gathering CTF information from the ctffind logfiles (e.g. when the info is already there from Gctf)?
 	bool do_skip_ctf_logfiles;
 
 	// Extract particles from movies instead of single micrographs
 	bool do_movie_extract;
+
+	// Movie identifier for extraction from movies (e.g. movie for movies called _movie.mrcs or _movie.mrc)
+	FileName movie_name;
 
 	// First frame to extract from movies
 	int movie_first_frame;
@@ -68,14 +84,26 @@ public:
 	// Rootname to identify movies, e.g. mic001_movie.mrcs will be the movie of mic001.mrc if fn_movie="movie"
 	FileName fn_movie;
 
-	// Filenames (may include wildcards) for all coordinate files to be used for particle extraction
-	FileName fns_coords_in;
+	// STAR file with all (selected) micrographs, the suffix of the coordinates files, and the directory where the coordinate files are
+	FileName fn_star_in, fn_coord_suffix, fn_coord_dir ;
 
-	// Alternative niput: STAR file with all (selected) micrographs and their rootname for the picked coordinates files
-	FileName fn_star_in, fn_pick_suffix;
+	// STAR file with refined particle coordinates (to re-extract particles, for example with different binning)
+	FileName fn_data;
+
+	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
+	bool do_recenter;
+
+	// MetadataTable with all refined particle coordinates (given through fn_data)
+	//MetaDataTable MDdata;
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;
+
+	// Filenames of all the micrographs to use for particle extraction
+	std::vector<FileName> fn_mics;
+
+	// Metadata table with CTF information for all micrographs
+	MetaDataTable MDmics;
 
 	// Dimensionality of the micrographs (2 for normal micrographs, 3 for tomograms)
 	int dimensionality;
@@ -110,8 +138,14 @@ public:
 	// Standard deviations to remove black and white dust
 	RFLOAT white_dust_stddev, black_dust_stddev;
 
-	// Radius of a circle in the extracted images outside of which one calculates background mean and stddev
+	// Radius of a circle in the extracted images outside of which one calculates background mean and stddev (in pixels)
 	int bg_radius;
+
+	// Radius of a cylinder in the extracted helical segments outside of which one calculates background mean and stddev (in pixels)
+	RFLOAT bg_helical_radius;
+
+	// Perform operations on helical segments
+	bool do_helical_segments;
 
 	// Use input stack to perform the image modifications
 	FileName fn_operate_in;
@@ -119,8 +153,8 @@ public:
 	// Name of output stack (only when fn_operate in is given)
 	FileName fn_operate_out;
 
-	//////////////////////////////////// Output STAR file
-	bool do_join_starfile;
+	// Manually set pixel size (rlnMagnification and rlnDetectorPixelSize) in the output STAR file
+	RFLOAT set_angpix;
 
 public:
 	// Read command line arguments
@@ -146,27 +180,37 @@ public:
 	void readCoordinates(FileName fn_coord, MetaDataTable &MD);
 
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
-	void extractParticlesFromFieldOfView(FileName fn_coord);
+	void extractParticlesFromFieldOfView(FileName fn_mic, long int imic);
 
 	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
 	void extractParticlesFromOneFrame(MetaDataTable &MD,
-			FileName fn_mic, int iframe, int n_frames, FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
+			FileName fn_mic, int ipos, int iframe, int n_frames, FileName fn_output_img_root,
+			long int &my_current_nr_images, long int my_total_nr_images,
 			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
 	// Perform per-image operations (e.g. normalise, rescaling, rewindowing and inverting contrast) on an input stack (or STAR file)
-	void runOperateOnInputFile(FileName fn_perimage_in);
+	void runOperateOnInputFile();
 
 	// Here normalisation, windowing etc is performed on an individual image and it is written to disc
-	void performPerImageOperations(Image<RFLOAT> &Ipart, FileName fn_output_img_root, int nframes, long int image_nr, long int nr_of_images,
-			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
+	// Jun24,2015 - Shaoda, extract helical segments
+	void performPerImageOperations(
+			Image<RFLOAT> &Ipart,
+			FileName fn_output_img_root,
+			int nframes,
+			long int image_nr,
+			long int nr_of_images,
+			RFLOAT tilt_deg,
+			RFLOAT psi_deg,
+			RFLOAT &all_avg,
+			RFLOAT &all_stddev,
+			RFLOAT &all_minval,
+			RFLOAT &all_maxval);
 
-	// Get micrograph name from the rootname
-	// The rootname may have an additional string after the uniqye micrograph name
-	// That way, multiple "families" of distinct particle types may be extracted from the same micrographs
-	FileName getMicrographNameFromRootName(FileName fn_root);
 
-	// The inverse of the function above
-	FileName getRootNameFromMicrographName(FileName fn_mic);
+	// Get the coordinate filename and the output filename for the particle stack from the micrograph filename
+	FileName getCoordinateFileName(FileName fn_mic);
+	MetaDataTable getCoordinateMetaDataTable(FileName fn_mic);
+	FileName getOutputFileNameRoot(FileName fn_mic);
 
 };
 

@@ -84,6 +84,7 @@ void CTF::read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID)
 			Q0=0;
 
 	initialise();
+
 }
 void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale)
@@ -107,11 +108,9 @@ void CTF::read(MetaDataTable &MD)
 	read(MD, MDempty);
 }
 
-/* Write ------------------------------------------------------------------- */
-void CTF::write(std::ostream &out)
+/** Write to an existing object in a MetaDataTable. */
+void CTF::write(MetaDataTable &MD)
 {
-    MetaDataTable MD;
-    MD.addObject();
     MD.setValue(EMDL_CTF_VOLTAGE, kV);
     MD.setValue(EMDL_CTF_DEFOCUSU, DeltafU);
     MD.setValue(EMDL_CTF_DEFOCUSV, DeltafV);
@@ -120,6 +119,14 @@ void CTF::write(std::ostream &out)
     MD.setValue(EMDL_CTF_BFACTOR, Bfac);
     MD.setValue(EMDL_CTF_SCALEFACTOR, scale);
     MD.setValue(EMDL_CTF_Q0, Q0);
+}
+
+/* Write ------------------------------------------------------------------- */
+void CTF::write(std::ostream &out)
+{
+    MetaDataTable MD;
+	MD.addObject();
+    write(MD);
     MD.write(out);
 }
 
