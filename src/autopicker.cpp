@@ -1410,11 +1410,10 @@ void AutoPicker::exportHelicalTubes(
 
 void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 {
-	std::cerr << " AutoPicker being run!" << std::endl;
 
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
-	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf;
+	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
 	MultidimArray<int> Mclass_best_combined;
 	FourierTransformer transformer;
 	RFLOAT sum_ref_under_circ_mask, sum_ref2_under_circ_mask;

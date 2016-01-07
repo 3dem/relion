@@ -49,10 +49,10 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 
 	// Initial screen picture with some density and some explanation
 	//fl_register_images(); // initialize image lib
-	image_box = new Fl_Box(0,100,w,h); // widget that will contain image
+	//image_box = new Fl_Box(0,100,w,h); // widget that will contain image
 	// TODO: control file location and use better figure
-	jpeg_image = new Fl_JPEG_Image("/lmb/home/scheres/bg.jpg"); // load jpeg image into ram
-	image_box->image(jpeg_image); // attach jpg image to box
+	//jpeg_image = new Fl_JPEG_Image("/lmb/home/scheres/bg.jpg"); // load jpeg image into ram
+	//image_box->image(jpeg_image); // attach jpg image to box
 
 	// Read in the pipeline STAR file if it exists
 	pipeline.name = fn_pipe;
