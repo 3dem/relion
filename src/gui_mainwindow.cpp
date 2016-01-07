@@ -685,6 +685,8 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_import->write(fn_settings);
 		if (do_read)
 			job_import->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_import->toggle_new_continue(is_main_continue);
 		if (do_commandline)
 			job_import->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
@@ -1047,7 +1049,7 @@ void RelionMainWindow::cb_display_io_node_i()
 
 	if (pipeline.nodeList[mynode].type == NODE_MIC_COORDS)
 	{
-		FileName fn_job = ".gui_manualpick.job";
+		FileName fn_job = ".gui_manualpickrun.job";
 		bool iscont=false;
 		if (exists(fn_job))
 			global_manualpickjob.read(fn_job.c_str(), iscont);
@@ -1308,7 +1310,7 @@ void RelionMainWindow::cb_run_scheduled_i()
 			if (found) // only open relevant .job files
 			{
 				/// TODO!!! Also change the input entries in the run.job file of that job!!!
-			    FileName fn_job = ".ScheduledJobs/" + pipeline.processList[i].name + ".job";
+			    FileName fn_job = ".ScheduledJobs/" + pipeline.processList[i].name + "run.job";
 			    std::ifstream in(fn_job.data(), std::ios_base::in);
 			    FileName fn_tmp = fn_job+".tmp";
 			    std::ofstream out(fn_tmp.data(), std::ios_base::out);

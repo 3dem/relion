@@ -291,7 +291,7 @@ void RelionJobWindow::toggle_new_continue(bool is_continue)
 void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
 {
 
-	fh.open((fn+".job").c_str(), std::ios::out);
+	fh.open((fn+"run.job").c_str(), std::ios::out);
     if (!fh)
     {
     	std::cerr << "Cannot write to file: "<<fn<<std::endl;
@@ -306,12 +306,13 @@ void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
     	fh << "is_continue == true" << std::endl;
     else
     	fh << "is_continue == false" << std::endl;
+
 }
 
 bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 {
 
-	fh.open((fn+".job").c_str(), std::ios_base::in);
+	fh.open((fn+"run.job").c_str(), std::ios_base::in);
     if (fh.fail())
     	return false;
     else
@@ -323,7 +324,7 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 		idx++;
 		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
 		if (!(type >= 0 && type < NR_BROWSE_TABS))
-			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + ".job");
+			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + "run.job");
     	// Get is_continue from second line
 		getline(fh, line, '\n');
 		if (line.rfind("is_continue == true") == 0)
@@ -355,7 +356,7 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh, std::string fn)
 	other_args.writeValue(fh);
 
 	fh.close();
-	std::string command = "chmod 664 " + fn + ".job";
+	std::string command = "chmod 664 " + fn + "run.job";
 	system(command.c_str());
 
 }
@@ -484,7 +485,8 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 			else
 				one_command = commands[icom];
 			// Save stdout and stderr to a .out and .err files
-			one_command += " >> " + outputname + "run.out 2>> " + outputname + "run.err";
+			if (type != PROC_IMPORT)
+				one_command += " >> " + outputname + "run.out 2>> " + outputname + "run.err";
 			final_command += one_command;
 			if (icom == commands.size() - 1)
 				final_command += " & "; // end by putting composite job in the background
@@ -568,6 +570,7 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 
 	// read settings if hidden file exists
 	read(".gui_import", is_continue);
+
 }
 
 void ImportJobWindow::write(std::string fn)
@@ -599,6 +602,12 @@ void ImportJobWindow::read(std::string fn, bool &_is_continue)
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
+}
+
+void ImportJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+
 }
 
 void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -702,7 +711,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	bin_factor.place(current_y, "Binning factor:", 1, 1, 8, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
+	bin_factor.place(current_y, "Binning factor (1 or 2):", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
 	first_frame_ali.place(current_y, "First frame for alignment:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
 	last_frame_ali.place(current_y, "Last frame for alignment:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
 	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
@@ -3636,7 +3645,7 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
-	type = PROC_MASKCREATE;
+	type = PROC_JOINSTAR;
 
 	tab1->begin();
 	tab1->label("I/O");
