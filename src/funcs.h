@@ -60,8 +60,6 @@
 #include "src/macros.h"
 #include "src/error.h"
 
-#define FILENAMENUMBERLENGTH 6
-
 /** Structure of the points to do least-squares straight-line fitting
  */
 struct fit_point2D

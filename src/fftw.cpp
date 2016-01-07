@@ -490,10 +490,134 @@ void getFSC(MultidimArray< RFLOAT > &m1,
 	getFSC(FT1, FT2, fsc);
 }
 
+void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< Complex > &FT1,
+		    MultidimArray< Complex > &FT2,
+		    MultidimArray< RFLOAT > &acorr,
+		    MultidimArray< RFLOAT > &dpr)
+{
+
+	MultidimArray< int > radial_count(XSIZE(FT1));
+    MultidimArray<RFLOAT> num, mu1, mu2, sig1, sig2;
+    Matrix1D<RFLOAT> f(3);
+    mu1.initZeros(radial_count);
+    mu2.initZeros(radial_count);
+    sig1.initZeros(radial_count);
+    sig2.initZeros(radial_count);
+    acorr.initZeros(radial_count);
+    dpr.initZeros(radial_count);
+    num.initZeros(radial_count);
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
+    {
+    	// Amplitudes
+    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+        if (idx >= XSIZE(FT1))
+        	continue;
+        RFLOAT abs1 = abs(DIRECT_A3D_ELEM(FT1, k, i, j));
+        RFLOAT abs2 = abs(DIRECT_A3D_ELEM(FT2, k, i, j));
+        mu1(idx)+= abs1;
+        mu2(idx)+= abs2;
+        radial_count(idx)++;
+
+        //phases
+        RFLOAT phas1 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT1, k, i, j)).imag, (DIRECT_A3D_ELEM(FT1, k, i, j)).real));
+        RFLOAT phas2 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT2, k, i, j)).imag, (DIRECT_A3D_ELEM(FT2, k, i, j)).real));
+        RFLOAT delta_phas = phas1 - phas2;
+        if (delta_phas > 180.)
+        	delta_phas -= 360.;
+        else if (delta_phas < -180.)
+        	delta_phas += 360.;
+        dpr(idx) += delta_phas*delta_phas*(abs1+abs2);
+        num(idx) += (abs1+abs2);
+    }
+
+    // Get average amplitudes in each shell for both maps
+    FOR_ALL_ELEMENTS_IN_ARRAY1D(mu1)
+    {
+        if (radial_count(i) > 0)
+        {
+			mu1(i) /= radial_count(i);
+			mu2(i) /= radial_count(i);
+			dpr(i) = sqrt(dpr(i)/num(i));
+        }
+    }
+
+    // Now calculate Pearson's correlation coefficient
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
+    {
+    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+        if (idx >= XSIZE(FT1))
+        	continue;
+        RFLOAT z1=abs(DIRECT_A3D_ELEM(FT1, k, i, j)) - mu1(idx);
+        RFLOAT z2=abs(DIRECT_A3D_ELEM(FT2, k, i, j)) - mu2(idx);
+        acorr(idx)  += z1*z2;
+        sig1(idx) += z1*z1;
+        sig2(idx) += z2*z2;
+    }
+
+    FOR_ALL_ELEMENTS_IN_ARRAY1D(acorr)
+    {
+        RFLOAT aux = sqrt(sig1(i))*sqrt(sig2(i));
+        if (aux > 0.)
+        	acorr(i) /= sqrt(sig1(i))*sqrt(sig2(i));
+        else
+        	acorr(i) = 1.;
+    }
+
+}
+
+void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT > &m1,
+		    MultidimArray< RFLOAT > &m2,
+		    MultidimArray< RFLOAT > &acorr,
+		    MultidimArray< RFLOAT > &dpr)
+{
+	MultidimArray< Complex > FT1, FT2;
+	FourierTransformer transformer;
+	transformer.FourierTransform(m1, FT1);
+	transformer.FourierTransform(m2, FT2);
+	getAmplitudeCorrelationAndDifferentialPhaseResidual(FT1, FT2, acorr, dpr);
+}
+
+
+/*
+void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<RFLOAT>& Mpmem, int nThreads)
+{
+
+    //Mmem = *this
+    //memory for fourier transform output
+    MultidimArray<Complex > MmemFourier;
+    // Perform the Fourier transform
+    FourierTransformer transformerM;
+    transformerM.setThreadsNumber(nThreads);
+    transformerM.FourierTransform(Mpmem, MmemFourier, true);
+
+    // Create space for the downsampled image and its Fourier transform
+    Mpmem.resize(Ydim, Xdim);
+    MultidimArray<Complex > MpmemFourier;
+    FourierTransformer transformerMp;
+    transformerMp.setReal(Mpmem);
+    transformerMp.getFourierAlias(MpmemFourier);
+    long int ihalf = XMIPP_MIN((YSIZE(MpmemFourier)/2+1),(YSIZE(MmemFourier)/2+1));
+    long int xsize = XMIPP_MIN((XSIZE(MmemFourier)),(XSIZE(MpmemFourier)));
+    //Init with zero
+    MpmemFourier.initZeros();
+    for (long int i=0; i<ihalf; i++)
+        for (long int j=0; j<xsize; j++)
+            MpmemFourier(i,j)=MmemFourier(i,j);
+    for (long int i=YSIZE(MpmemFourier)-1, n=1; n < ihalf-1; i--, n++)
+    {
+    	long int ip = YSIZE(MmemFourier) - n;
+    	for (long int j=0; j<xsize; j++)
+            MpmemFourier(i,j)=MmemFourier(ip,j);
+    }
+
+    // Transform data
+    transformerMp.inverseFourierTransform();
+}
+*/
+
 
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
         MultidimArray<Complex > &out,
-		  TabSine &tab_sin, TabCosine &tab_cos,
 		  RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	out.resize(in);
@@ -506,8 +630,7 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 		{
 			x = j;
 			dotp = 2 * PI * (x * xshift);
-			a = tab_cos(dotp);
-			b = tab_sin(dotp);
+                        sincos(dotp, &b, &a);
 			DIRECT_A1D_ELEM(out, j) = Complex(a, b);
 		}
 		break;
@@ -520,8 +643,7 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				a = tab_cos(dotp);
-				b = tab_sin(dotp);
+				sincos(dotp, &b, &a);
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
 		for (long int i=YSIZE(in)-1; i>=XSIZE(in); i--)
@@ -531,8 +653,7 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 			{
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				a = tab_cos(dotp);
-				b = tab_sin(dotp);
+				sincos(dotp, &b, &a);
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
 		}
@@ -551,8 +672,7 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				{
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
-					a = tab_cos(dotp);
-					b = tab_sin(dotp);
+					sincos(dotp, &b, &a);
 					DIRECT_A3D_ELEM(out, k, i, j) = Complex(a, b);
 				}
 			}
@@ -561,118 +681,8 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 	default:
 		REPORT_ERROR("getAbMatricesForShiftImageInFourierTransform ERROR: dimension should be 1, 2 or 3!");
 	}
-
-
 }
 
-
-// Shift an image through phase-shifts in its Fourier Transform
-void shiftImageInFourierTransform(MultidimArray<Complex > &in,
-		                          MultidimArray<Complex > &out,
-								  TabSine &tab_sin, TabCosine &tab_cos,
-								  RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
-{
-	out.resize(in);
-	RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
-	switch (in.getDim())
-	{
-	case 1:
-		xshift /= -oridim;
-		if (ABS(xshift) < XMIPP_EQUAL_ACCURACY)
-		{
-			out = in;
-			return;
-		}
-		for (long int j = 0; j < XSIZE(in); j++)
-		{
-			x = j;
-			dotp = 2 * PI * (x * xshift);
-			a = tab_cos(dotp);
-			b = tab_sin(dotp);
-			c = DIRECT_A1D_ELEM(in, j).real;
-			d = DIRECT_A1D_ELEM(in, j).imag;
-			ac = a * c;
-			bd = b * d;
-			ab_cd = (a + b) * (c + d); // (ab_cd-ac-bd = ad+bc : but needs 4 multiplications)
-			DIRECT_A1D_ELEM(out, j) = Complex(ac - bd, ab_cd - ac - bd);
-		}
-		break;
-	case 2:
-		xshift /= -oridim;
-		yshift /= -oridim;
-		if (ABS(xshift) < XMIPP_EQUAL_ACCURACY && ABS(yshift) < XMIPP_EQUAL_ACCURACY)
-		{
-			out = in;
-			return;
-		}
-		for (long int i=0; i<XSIZE(in); i++)
-			for (long int j=0; j<XSIZE(in); j++)
-			{
-				x = j;
-				y = i;
-				dotp = 2 * PI * (x * xshift + y * yshift);
-				a = tab_cos(dotp);
-				b = tab_sin(dotp);
-				c = DIRECT_A2D_ELEM(in, i, j).real;
-				d = DIRECT_A2D_ELEM(in, i, j).imag;
-				ac = a * c;
-				bd = b * d;
-				ab_cd = (a + b) * (c + d);
-				DIRECT_A2D_ELEM(out, i, j) = Complex(ac - bd, ab_cd - ac - bd);
-			}
-		for (long int i=YSIZE(in)-1; i>=XSIZE(in); i--)
-		{
-			y = i - YSIZE(in);
-			for (long int j=0; j<XSIZE(in); j++)
-			{
-				x = j;
-				dotp = 2 * PI * (x * xshift + y * yshift);
-				a = tab_cos(dotp);
-				b = tab_sin(dotp);
-				c = DIRECT_A2D_ELEM(in, i, j).real;
-				d = DIRECT_A2D_ELEM(in, i, j).imag;
-				ac = a * c;
-				bd = b * d;
-				ab_cd = (a + b) * (c + d);
-				DIRECT_A2D_ELEM(out, i, j) = Complex(ac - bd, ab_cd - ac - bd);
-			}
-		}
-		break;
-	case 3:
-		xshift /= -oridim;
-		yshift /= -oridim;
-		zshift /= -oridim;
-		if (ABS(xshift) < XMIPP_EQUAL_ACCURACY && ABS(yshift) < XMIPP_EQUAL_ACCURACY && ABS(zshift) < XMIPP_EQUAL_ACCURACY)
-		{
-			out = in;
-			return;
-		}
-		for (long int k=0; k<ZSIZE(in); k++)
-		{
-			z = (k < XSIZE(in)) ? k : k - ZSIZE(in);
-			for (long int i=0; i<YSIZE(in); i++)
-			{
-				y = (i < XSIZE(in)) ? i : i - YSIZE(in);
-				for (long int j=0; j<XSIZE(in); j++)
-				{
-					x = j;
-					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
-					a = tab_cos(dotp);
-					b = tab_sin(dotp);
-					c = DIRECT_A3D_ELEM(in, k, i, j).real;
-					d = DIRECT_A3D_ELEM(in, k, i, j).imag;
-					ac = a * c;
-					bd = b * d;
-					ab_cd = (a + b) * (c + d);
-					DIRECT_A3D_ELEM(out, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
-				}
-			}
-		}
-		break;
-	default:
-		REPORT_ERROR("shiftImageInFourierTransform ERROR: dimension should be 1, 2 or 3!");
-	}
-}
 // Shift an image through phase-shifts in its Fourier Transform (without pretabulated sine and cosine)
 void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 		                          MultidimArray<Complex > &out,
@@ -693,9 +703,8 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 		{
 			x = j;
 			dotp = 2 * PI * (x * xshift);
-			a = cos(dotp);
-			b = sin(dotp);
-			c = DIRECT_A1D_ELEM(in, j).real;
+                        sincos(dotp, &b, &a);
+  			c = DIRECT_A1D_ELEM(in, j).real;
 			d = DIRECT_A1D_ELEM(in, j).imag;
 			ac = a * c;
 			bd = b * d;
@@ -717,8 +726,7 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				a = cos(dotp);
-				b = sin(dotp);
+                                sincos(dotp, &b, &a);
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
 				ac = a * c;
@@ -733,8 +741,7 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 			{
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				a = cos(dotp);
-				b = sin(dotp);
+				sincos(dotp, &b, &a);
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
 				ac = a * c;
@@ -763,8 +770,7 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				{
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
-					a = cos(dotp);
-					b = sin(dotp);
+                                        sincos(dotp, &b, &a);
 					c = DIRECT_A3D_ELEM(in, k, i, j).real;
 					d = DIRECT_A3D_ELEM(in, k, i, j).imag;
 					ac = a * c;

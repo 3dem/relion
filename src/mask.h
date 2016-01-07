@@ -24,10 +24,26 @@
 #include "src/multidim_array.h"
 #include "src/fftw.h"
 #include "src/time.h"
+#include "src/euler.h"
+#include "src/macros.h"
 
 // Mask out corners outside sphere (replace by average value)
 // Apply a soft mask (raised cosine with cosine_width pixels width)
-void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, RFLOAT radius = -1., RFLOAT cosine_width = 3, MultidimArray<RFLOAT> *Mnoise = NULL);
+void softMaskOutsideMap(
+		MultidimArray<RFLOAT> &vol,
+		RFLOAT radius = -1.,
+		RFLOAT cosine_width = 3,
+		MultidimArray<RFLOAT> *Mnoise = NULL);
+
+// May27,2015 - Shaoda, Helical refinement
+void softMaskOutsideMapForHelix(
+		MultidimArray<RFLOAT> &vol,
+		RFLOAT psi_deg,
+		RFLOAT tilt_deg,
+		RFLOAT mask_sphere_radius_pix,
+		RFLOAT mask_cyl_radius_pix,
+		RFLOAT cosine_width = 3,
+		MultidimArray<RFLOAT> *Mnoise = NULL);
 
 // Apply a soft mask and set density outside the mask at the average value of those pixels in the original map
 void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, MultidimArray<RFLOAT> &msk, bool invert_mask = false);

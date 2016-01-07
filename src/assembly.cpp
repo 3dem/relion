@@ -223,6 +223,8 @@ void Assembly::readPDB(std::string filename, bool use_segid_instead_of_chainid, 
 		std::string record(line,0,6);
 		if (record == "ATOM  ")
 		{
+			// ======================== OLD VERSION ========================
+			/*
 			  char snum[5]={'\0'};
 		      char atomname[5]={'\0'};
 		      char resname[4]={'\0'};
@@ -236,6 +238,62 @@ void Assembly::readPDB(std::string filename, bool use_segid_instead_of_chainid, 
 		      int nr= sscanf(line, "ATOM  %5s %4s %3s %1s%4d%1c   %8f%8f%8f%6f%6f      %4s%2s%2s",
 		                          snum, atomname, resname, chainID, &resnum, &insertion_residue_code,
 		                          &x, &y, &z, &occupancy, &bfactor, segID, element, charge);
+		    */
+			// ======================== OLD VERSION ========================
+
+			// ============= May 7, 2015 - Shaoda - Modified according to wwPDB Format v3.3, v3.2 and v2.3 ================
+			// sscanf: spaces are ignored! May not get variables at correct subscripts in the string!
+			// last 3 objects are incorrect in the old version? No segID in PDB documentation...
+			if(strlen(line) < 20)
+			{
+		    	std::string str(line);
+		    	REPORT_ERROR("Assembly::readPDB ERROR: too few entries on ATOM line:" + str);
+			}
+			char snum[6] = "", atomname[5] = "", altLoc[2] = "", resname[4] = "", chainID[2] = "";
+			int resnum = -1;
+			char insertion_residue_code[2] = "";
+			float x, y, z, occupancy, bfactor;
+			char segID[5] = "", element[3] = "", charge[3] = "";
+			/*
+			int nr= sscanf(line, "ATOM  %5s %4s%1s%3s %1s%4d%1s   %8f%8f%8f%6f%6f      %4s%2s%2s",
+					snum, atomname, altLoc, resname, chainID, &resnum, insertion_residue_code,
+					&x, &y, &z, &occupancy, &bfactor, segID, element, charge);
+			*/
+			int nr = 0;
+			nr += sscanf(line + 6, "%5[^\n]s", snum);
+			nr += sscanf(line + 12, "%4[^\n]s", atomname);
+			nr += sscanf(line + 16, "%1[^\n]s", altLoc);
+			nr += sscanf(line + 17, "%3[^\n]s", resname);
+			nr += sscanf(line + 21, "%1[^\n]s", chainID);
+			nr += sscanf(line + 22, "%4d", &resnum);
+			nr += sscanf(line + 26, "%1[^\n]s", insertion_residue_code);
+			nr += sscanf(line + 30, "%8f%8f%8f%6f%6f", &x, &y, &z, &occupancy, &bfactor);
+			nr += sscanf(line + 72, "%4[^\n]s", segID);
+			nr += sscanf(line + 76, "%2[^\n]s", element);
+			nr += sscanf(line + 78, "%2[^\n]s", charge);
+
+			snum[5] = '\0'; atomname[4] = '\0'; altLoc[1] = '\0'; resname[3] = '\0'; chainID[1] = '\0';
+			insertion_residue_code[1] = '\0';
+			segID[4] = '\0'; element[2] = '\0'; charge[2] = '\0';
+
+			/*
+	    	std::cout << "snum = " << snum << ", "
+	    			<< "atomname = " << atomname << ", "
+					<< "altLoc = " << altLoc << ", "
+					<< "resname = " << resname << ", "
+					<< "chainID = " << chainID << ", "
+					<< "resnum = " << resnum << ", "
+					<< "insertion_residue_code = " << insertion_residue_code << ", "
+					<< "x = " << x << ", "
+					<< "y = " << y << ", "
+					<< "z = " << z << ", "
+					<< "occupancy = " << occupancy << ", "
+					<< "bfactor = " << bfactor << ", "
+					<< "segID = " << segID << ", "
+					<< "element = " << element << ", "
+					<< "charge = " << charge << ", " << std::endl;
+			*/
+			// ============= May 7, 2015 - Shaoda - Modified according to wwPDB Format v3.3, v3.2 and v2.3 ================
 
 //#define DEBUG
 		      if (nr < 5)
@@ -352,7 +410,10 @@ void Assembly::writePDB(std::string filename)
 				if (atomnum > 99999)
 					atomnum -= 99999;
 				char chainID = molecules[imol].name[0];
-				fprintf(file, "ATOM  %5ld %-4s %3s %1c%4d    %8.3f%8.3f%8.3f%6.2f%6.2f      %4s\n",
+
+				// ======================== OLD VERSION ========================
+ 				/*
+				fprintf(file, "ATOM  %5d %-4s %3s %1c%4d    %8.3f%8.3f%8.3f%6.2f%6.2f      %4s\n",
 						                          atomnum, molecules[imol].residues[ires].atoms[iatom].name.c_str(), molecules[imol].residues[ires].name.c_str(),
 						                          chainID, molecules[imol].residues[ires].number,
 						                          XX(molecules[imol].residues[ires].atoms[iatom].coords),
@@ -361,6 +422,33 @@ void Assembly::writePDB(std::string filename)
 						                          molecules[imol].residues[ires].atoms[iatom].occupancy,
 						                          molecules[imol].residues[ires].atoms[iatom].bfactor,
 						                          molecules[imol].name.c_str());
+				*/
+				// ======================== OLD VERSION ========================
+
+				// ============= May 7, 2015 - Shaoda - Modified according to wwPDB Format v3.3, v3.2 and v2.3 ================
+				// last 3 objects are incorrect in the old version? No segID in PDB documentation...
+				char atomname[5] = "", element[2] = "";
+				strcpy(atomname, molecules[imol].residues[ires].atoms[iatom].name.c_str());
+				element[0] = ' '; element[1] = '\0';
+				for(int ii = 0; ii < 4; ii++)
+				{
+					if(atomname[ii] != ' ')
+					{
+						element[0] = atomname[ii];
+						break;
+					}
+				}
+				fprintf(file, "ATOM  %5d %-4s %3s %1c%4d    %8.3f%8.3f%8.3f%6.2f%6.2f          %2s  \n",
+						                          atomnum, molecules[imol].residues[ires].atoms[iatom].name.c_str(), molecules[imol].residues[ires].name.c_str(),
+						                          chainID, molecules[imol].residues[ires].number,
+						                          XX(molecules[imol].residues[ires].atoms[iatom].coords),
+						                          YY(molecules[imol].residues[ires].atoms[iatom].coords),
+						                          ZZ(molecules[imol].residues[ires].atoms[iatom].coords),
+						                          molecules[imol].residues[ires].atoms[iatom].occupancy,
+						                          molecules[imol].residues[ires].atoms[iatom].bfactor,
+												  element);
+				// ============= May 7, 2015 - Shaoda - Modified according to wwPDB Format v3.3, v3.2 and v2.3 ================
+
 			}
 		}
 		if (imol + 1 < molecules.size())

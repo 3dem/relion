@@ -22,8 +22,7 @@
 #define GUI_MAINWINDOW_H_
 #include "src/gui_jobwindow.h"
 #include "src/gui_entries.h"
-
-#define NR_BROWSE_TABS 13
+#include "src/pipeliner.h"
 
 #define DO_WRITE true
 #define DONT_WRITE false
@@ -33,12 +32,26 @@
 #define DONT_TOGGLE_CONT false
 #define DO_GET_CL true
 #define DONT_GET_CL false
+#define DO_MKDIR true
+#define DONT_MKDIR false
+
+// Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
+#define MAX_JOBS_BROWSER 50
 
 // This class organises the main winfow of the relion GUI
 static Fl_Hold_Browser *browser;
-static Fl_Group        *browse_grp[NR_BROWSE_TABS];
+static Fl_Group *browse_grp[NR_BROWSE_TABS];
+static Fl_Choice *display_io_node;
+static Fl_Text_Display *text_current_job;
+static Fl_Text_Buffer *textbuff_current_job;
+static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
+static Fl_Box *image_box;
+static Fl_JPEG_Image *jpeg_image;
+// For keeping track of which process to use in the process browser on the GUI
+static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
-static GeneralJobWindow *job_general;
+static ImportJobWindow *job_import;
+static MotioncorrJobWindow *job_motioncorr;
 static CtffindJobWindow *job_ctffind;
 static ManualpickJobWindow *job_manualpick;
 static AutopickJobWindow *job_autopick;
@@ -47,14 +60,29 @@ static SortJobWindow *job_sort;
 static Class2DJobWindow *job_class2d;
 static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
+static ClassSelectJobWindow *job_classselect;
+static MaskCreateJobWindow *job_maskcreate;
+static JoinStarJobWindow *job_joinstar;
+static SubtractJobWindow *job_subtract;
 static PostJobWindow *job_post;
 static PolishJobWindow *job_polish;
 static ResmapJobWindow *job_resmap;
 static PublishJobWindow *job_publish;
-//Toggle continue button
-static Fl_Toggle_Button *toggle_continue;
 // Run button
 static Fl_Button *run_button;
+static Fl_Button *schedule_button;
+static FileName fn_settings;
+// Initial screen
+static bool show_initial_screen;
+
+// A manualpicker jobwindow for display of micrographs....
+static ManualpickJobWindow global_manualpickjob;
+
+// Store all the history
+static PipeLine pipeline;
+// Which is the current job being displayed?
+static int current_job;
+FileName global_outputname;
 
 class RelionMainWindow : public Fl_Window
 {
@@ -62,28 +90,42 @@ class RelionMainWindow : public Fl_Window
 public:
 
 	// For Tabs
-	Fl_Menu_Bar *menubar;
+	Fl_Menu_Bar *menubar, *menubar2;
 	Fl_Tabs *tabs;
 	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
 
     // Run button
-    Fl_Button *print_CL_button, *cite_button, *display_button;
+    Fl_Button *print_CL_button, *cite_button;
 
     // For job submission
-    std::string outputname, final_command;
+    std::string final_command;
     std::vector<std::string> commands;
 
-    //FileName for settings file
-    std::string fn_settings;
-
-	// Constructor with w x h size of the window and a title
-	RelionMainWindow(int w, int h, const char* title);
+    // Constructor with w x h size of the window and a title
+	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe);
 
     // Destructor
     ~RelionMainWindow(){};
 
     // Communicate with the different jobtype objects
-    void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, int this_job = 0);
+    void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
+
+    // Add a process to the PipeLine
+    void addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);
+
+    // Update the content of the finished, running and scheduled job lists
+    void fillRunningJobLists();
+
+    // Update the content of the input and output job lists for the current job
+    void fillToAndFromJobLists();
+
+    // Update all job lists (running, scheduled, finished, as well as to/from)
+    void updateJobLists();
+
+    // When a job is selected from the job browsers at the bottom: set current_job there, load that one in the current window
+    // and update all job lists at the bottom
+    void loadJobFromPipeline();
+
 
 private:
 
@@ -103,26 +145,67 @@ private:
     static void cb_select_browsegroup(Fl_Widget*, void*);
     inline void cb_select_browsegroup_i();
 
-    static void cb_toggle_continue(Fl_Widget*, void*);
-    inline void cb_toggle_continue_i();
+    static void cb_select_finished_job(Fl_Widget*, void*);
+    inline void cb_select_finished_job_i();
+
+    static void cb_select_running_job(Fl_Widget*, void*);
+    inline void cb_select_running_job_i();
+
+    static void cb_select_scheduled_job(Fl_Widget*, void*);
+    inline void cb_select_scheduled_job_i();
+
+    static void cb_select_input_job(Fl_Widget*, void*);
+    inline void cb_select_input_job_i();
+
+    static void cb_select_output_job(Fl_Widget*, void*);
+    inline void cb_select_output_job_i();
+
+    static void cb_display_io_node(Fl_Widget*, void*);
+    inline void cb_display_io_node_i();
 
     static void cb_display(Fl_Widget*, void*);
     inline void cb_display_i();
 
+    inline void cb_toggle_continue_i();
+
     static void cb_run(Fl_Widget*, void*);
     inline void cb_run_i();
 
+    static void cb_schedule(Fl_Widget*, void*);
+    inline void cb_schedule_i();
+
+    static void cb_run_scheduled(Fl_Widget*, void*);
+    inline void cb_run_scheduled_i();
+
+    static void cb_delete(Fl_Widget*, void*);
+    inline void cb_delete_i(bool do_ask = true, bool do_recursive = true);
+
+    static void cb_cleanup(Fl_Widget*, void*);
+    inline void cb_cleanup_i();
+
+    static void cb_set_alias(Fl_Widget*, void*);
+    inline void cb_set_alias_i();
+
+    static void cb_mark_as_finished(Fl_Widget*, void*);
+    inline void cb_mark_as_finished_i();
+
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();
-
-    static void cb_menubar_load(Fl_Widget*, void*);
-    inline void cb_menubar_load_i();
 
     static void cb_menubar_save(Fl_Widget*, void*);
     inline void cb_menubar_save_i();
 
     static void cb_menubar_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_menubar_reactivate_runbutton_i();
+
+    static void cb_show_initial_screen(Fl_Widget*, void*);
+    inline void cb_show_initial_screen_i();
+
+    static void cb_menubar_run_scheduled_jobs(Fl_Widget*, void*);
+    inline void cb_menubar_run_scheduled_jobs_i();
+
+    static void cb_menubar_stop_run_scheduled_jobs(Fl_Widget*, void*);
+    inline void cb_menubar_stop_run_scheduled_jobs_i();
 
     static void cb_menubar_about(Fl_Widget*, void*);
     inline void cb_menubar_about_i();

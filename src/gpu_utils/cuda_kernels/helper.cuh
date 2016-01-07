@@ -64,32 +64,128 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT cosine_width	);
 
 __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
-										 XFLOAT *img_out,
-										 long int image_size,
-										 long int xdim,
-										 long int ydim,
-										 long int xshift,
-										 long int yshift);
+										 int image_size,
+										 int xdim,
+										 int ydim,
+										 int xshift,
+										 int yshift);
 
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,
 										XFLOAT *d_Mmean,
 										XFLOAT *d_Mstddev,
-										long int image_size,
+										int image_size,
 										XFLOAT normfft,
 										XFLOAT sum_ref_under_circ_mask,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
-										XFLOAT psi);
+										int Npsi);
 
-//__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux_real,
-//						  	  	  	  	  XFLOAT *d_ctf,
-//						  	  	  	  	  XFLOAT psi,
-//						  	  			  CudaProjectorKernel projector);
+__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+						  	  	  	  	  XFLOAT *d_ctf,
+						  	  	  	  	  XFLOAT psi,
+						  	  			  CudaProjectorKernel projector);
 
-__global__ void cuda_kernel_convol(	 CUDACOMPLEX *d_A,
-									 CUDACOMPLEX *d_B,
-									 int image_size);
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A
+ */
+__global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 int image_size);
+
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A, writes to C
+ */
+__global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 CUDACOMPLEX *d_C,
+									 	 int image_size);
+
+/*
+ * Multiplies many complex arrays A (in-place) by a single B, pixel-by-pixel, after conjugating A
+ */
+__global__ void cuda_kernel_batch_convol_A(	 CUDACOMPLEX *d_A,
+									 	 	 CUDACOMPLEX *d_B,
+									 	 	 int image_size);
+
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B
+ */
+__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 int image_size);
+
+/*
+ * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B, writes to C
+ */
+__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
+									 	 CUDACOMPLEX *d_B,
+									 	 CUDACOMPLEX *d_C,
+									 	 int image_size);
+/*
+ * Multiplies many complex arrays A (in-place) by a single one B, pixel-by-pixel, after conjugating B
+ */
+__global__ void cuda_kernel_batch_convol_B(	 CUDACOMPLEX *d_A,
+									 	 	 CUDACOMPLEX *d_B,
+									 	 	 int image_size);
+
+/*
+ * Multiplies scalar array A by a scalar S
+ *
+ *  OUT[i] = A[i]*S
+ */
+__global__ void cuda_kernel_multi( XFLOAT *A,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size);
+
+/*
+ * In place multiplies scalar array A by a scalar S
+ *
+ *  A[i] = A[i]*S
+ */
+__global__ void cuda_kernel_multi(
+		XFLOAT *A,
+		XFLOAT S,
+		int image_size);
+/*
+ * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
+ *
+ *  OUT[i] = A[i]*B[i]*S
+ */
+__global__ void cuda_kernel_multi( XFLOAT *A,
+								   XFLOAT *B,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size);
+
+__global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
+											 XFLOAT *aux,
+											 XFLOAT S,
+											 int image_size);
+
+/*
+ * In place squares array in place
+ *
+ *  A[i] = A[i]*A[i]
+ */
+__global__ void cuda_kernel_square(
+		XFLOAT *A,
+		int image_size);
+
+/*
+ * Casts on device so we can copy_to_host directly into a multidimarray.
+ */
+template <typename T1, typename T2 >
+__global__ void cuda_kernel_cast(
+		T1 *IN,
+		T2 *OUT,
+		int size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<size)
+		OUT[pixel] = IN[pixel];
+}
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

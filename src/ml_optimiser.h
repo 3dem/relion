@@ -29,14 +29,10 @@
 #include "src/time.h"
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
+#include "src/helix.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
-
-#define METADATA_LINE_LENGTH_NOCTF 11
-#define METADATA_LINE_LENGTH_NOPRIOR 18
-#define METADATA_LINE_LENGTH_NOTILT 26
-#define METADATA_LINE_LENGTH_ALL 35
 
 #define METADATA_ROT 0
 #define METADATA_TILT 1
@@ -67,6 +63,8 @@
 
 #define METADATA_BEAMTILT_X 24
 #define METADATA_BEAMTILT_Y 25
+#define METADATA_LINE_LENGTH_BEFORE_BODIES 26
+#define METADATA_NR_BODY_PARAMS 7
 
 #define DO_WRITE_DATA true
 #define DONT_WRITE_DATA false
@@ -121,6 +119,9 @@ public:
 	// Filename for input tau2-spectrum
 	FileName fn_tau;
 
+	// Filename for input masks for multi-body refinement
+	FileName fn_body_masks;
+
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;
 
@@ -159,6 +160,9 @@ public:
 
 	// Images have been CTF phase flipped al;ready
 	bool ctf_phase_flipped;
+
+	// Images have been premultiplied with the CTF
+	bool ctf_premultiplied;
 
 	// Flag whether current references are ctf corrected
 	bool refs_are_ctf_corrected;
@@ -216,6 +220,9 @@ public:
 
 	// Flag to indicate that angular sampling in auto-sampling has reached its limit
 	bool has_fine_enough_angular_sampling;
+
+	// Minimum angular sampling to achieve in auto-refinement (in degrees)
+	RFLOAT minimum_angular_sampling;
 
 	// Flag to keep sigma2_offset fixed
 	bool fix_sigma_offset;
@@ -315,6 +322,12 @@ public:
 	/* Flag to indicate maximization step will be skipped: only data.star file will be written out */
 	bool do_skip_maximization;
 
+	/* Flag to only sample tilt angles (from -180->180), ignore rot angles: temporary fix for DNA-origami frames */
+	bool do_only_sample_tilt;
+
+	/* Flag to use bimodal prior distributions on psi (2D classification of helical segments) */
+	bool do_bimodal_psi;
+
 	//////// Special stuff for the first iterations /////////////////
 
 	// Skip marginalisation in first iteration and use signal cross-product instead of Gaussian
@@ -353,6 +366,49 @@ public:
 	// How wide are the running averages of the frames to use for alignment?
 	// If set to 1, then running averages will be n-1, n, n+1, i.e. 3 frames wide
 	int movie_frame_running_avg_side;
+
+	///////////// Helical symmetry /////////////
+	// Flag whether to do helical refinement
+	bool do_helical_refine;
+
+	// Number of new asymmetric units (asu) within each new box. This many times will the helical rise and twist be applied
+	int nr_helical_asu;
+
+	// Helical twist in degrees
+	RFLOAT helical_twist;
+
+	// Helical rise in Angstroms
+	RFLOAT helical_rise;
+
+	// Helical twist in degrees (helical parameters refinement - half1)
+	RFLOAT helical_twist_half1;
+
+	// Helical rise in Angstroms (helical parameters refinement - half1)
+	RFLOAT helical_rise_half1;
+
+	// Helical twist in degrees (helical parameters refinement - half2)
+	RFLOAT helical_twist_half2;
+
+	// Helical rise in Angstroms (helical parameters refinement - half2)
+	RFLOAT helical_rise_half2;
+
+	// Only expand this amount of Z axis proportion to full when imposing real space helical symmetry
+	RFLOAT helical_central_proportion;
+
+	// Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)
+	RFLOAT helical_mask_tube_inner_diameter;
+
+	// Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)
+	RFLOAT helical_mask_tube_outer_diameter;
+
+	// Flag whether to do bimodal searches of orientations for helical segments in the first few iterations
+	bool do_helical_bimodal_orient_searches;
+
+	// Flag whether to do local refinement of helical parameters
+	bool do_helical_symmetry_local_refinement;
+
+	// Maximum deviation (0.01% - 33.33%) of helical parameters in local refinement
+	RFLOAT helical_symmetry_local_refinement_max_dev;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -397,10 +453,6 @@ public:
 
     // Array with pointers to the resolution of each point in a Fourier-space FFTW-like array
 	MultidimArray<int> Mresol_fine, Mresol_coarse, Npix_per_shell;
-
-	// Tabulated sin and cosine functions for shifts in Fourier space
-	TabSine tab_sin;
-	TabCosine tab_cos;
 
 	// Verbosity flag
 	int verb;
@@ -634,6 +686,16 @@ public:
 	/* Perform the expectation integration over all k, phi and series elements for a given particle */
 	void expectationOneParticle(long int my_ori_particle, int thread_id);
 
+	/* Function to call symmetrise of BackProjector helical objects for each class or body
+	 * Do rise and twist for all asymmetrical units in Fourier space
+	 * */
+	void symmetriseReconstructions();
+
+	/* Apply helical symmetry (twist and rise) to the central Z slices of real space references. (Do average for every particle)
+	 * Then elongate and fill the perfect helix along Z axis.
+	 * */
+	void makeGoodHelixForEachRef();
+
 	/* Maximization step
 	 * Updates the current model: reconstructs and updates all other model parameter
 	 */
@@ -674,7 +736,7 @@ public:
 
 	/* Read image and its metadata from disc (threaded over all pooled particles)
 	 */
-	void getFourierTransformsAndCtfs(long int my_ori_particle, int metadata_offset,
+	void getFourierTransformsAndCtfs(long int my_ori_particle, int ibody, int metadata_offset,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
@@ -691,7 +753,7 @@ public:
 	 * also store precalculated 2D matrices with 1/sigma2_noise
 	 */
 	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_ori_particle,
-			int exp_current_image_size, int exp_current_oversampling,
+			int exp_current_image_size, int exp_current_oversampling, int metadata_offset,
 			int exp_itrans_min, int exp_itrans_max,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
@@ -707,7 +769,7 @@ public:
 			int exp_itrans_min, int exp_itrans_max, MultidimArray<bool> &exp_Mcoarse_significant);
 
 	// Get squared differences for all iclass, idir, ipsi and itrans...
-	void getAllSquaredDifferences(long int my_ori_particle, int exp_current_image_size,
+	void getAllSquaredDifferences(long int my_ori_particle, int ibody, int exp_current_image_size,
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
@@ -738,7 +800,7 @@ public:
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
 	// Store all relevant weighted sums, also return optimal hidden variables, max_weight and dLL
-	void storeWeightedSums(long int my_ori_particle, int exp_current_image_size,
+	void storeWeightedSums(long int my_ori_particle, int ibody, int exp_current_image_size,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,

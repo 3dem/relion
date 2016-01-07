@@ -46,6 +46,15 @@ public:
 	// Symmetry object
     SymList SL;
 
+    // Helical twist
+    RFLOAT twist;
+
+    // Helical rise
+    RFLOAT rise;
+
+    // Helical range
+    int H;
+
 public:
 
     /** Empty constructor
@@ -254,17 +263,25 @@ public:
                      int nr_threads = 1,
                      int minres_map = -1);
 
+
+	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
+	 */
+	void symmetrise(int nr_helical_asu = 1, RFLOAT helical_twist = 0., RFLOAT helical_rise = 0.);
+
 	/* Enforce hermitian symmetry on data and on weight (all points in the x==0 plane)
 	* Because the interpolations are numerical, hermitian symmetry may be broken.
 	* Repairing it here gives like a 2-fold averaging correction for interpolation errors...
     */
-	void enforceHermitianSymmetry(MultidimArray<Complex > &mydata,
-								  MultidimArray<RFLOAT> &myweight);
+	void enforceHermitianSymmetry();
+
+	/* Applies helical symmetry. Note that helical_rise is in PIXELS here, as BackProjector doesn't know angpix
+	 */
+	void applyHelicalSymmetry(int nr_helical_asu = 1, RFLOAT helical_twist = 0., RFLOAT helical_rise = 0.);
 
 	/* Applies the symmetry from the SymList object to the weight and the data array
 	 */
-	void symmetrise(MultidimArray<Complex > &mydata,
-					MultidimArray<RFLOAT> &myweight, int my_rmax2);
+	void applyPointGroupSymmetry();
+
 
    /* Convolute in Fourier-space with the blob by multiplication in real-space
 	 * Note the convlution is done on the complex array inside the transformer object!!
@@ -292,7 +309,6 @@ public:
 			   DIRECT_A3D_ELEM(Mout, k, i, j) = A3D_ELEM(Min, kp, ip, jp);
 	   }
    }
-
 
 #ifdef RELION_SINGLE_PRECISION
    // Fnewweight needs decentering, but has to be in double-precision for correct calculations!

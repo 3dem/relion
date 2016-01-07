@@ -79,8 +79,8 @@ void rotation2DMatrix(RFLOAT ang, Matrix2D< RFLOAT > &result, bool homogeneous)
 void translation2DMatrix(const Matrix1D<RFLOAT> &v,
                          Matrix2D< RFLOAT > &result)
 {
-    if (VEC_XSIZE(v) != 2)
-        REPORT_ERROR("Translation2D_matrix: vector is not in R2");
+    // if (VEC_XSIZE(v) != 2)
+    //    REPORT_ERROR("Translation2D_matrix: vector is not in R2");
 
     result.initIdentity(3);
     MAT_ELEM(result,0, 2) = XX(v);

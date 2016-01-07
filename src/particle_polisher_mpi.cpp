@@ -95,7 +95,7 @@ void ParticlePolisherMpi::fitMovementsAllMicrographs()
     if (node->isMaster())
     {
 		// Write out the STAR file with all the fitted movements
-		FileName fn_tmp = fn_in.withoutExtension() + "_" + fn_out + ".star";
+		FileName fn_tmp = fn_out + "fitted_tracks.star";
 		exp_model.MDimg.write(fn_tmp);
 		std::cout << " + Written out all fitted movements in STAR file: " << fn_tmp << std::endl;
     }
@@ -106,7 +106,7 @@ void ParticlePolisherMpi::fitMovementsAllMicrographs()
 void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 {
 
-	FileName fn_star = fn_in.withoutExtension() + "_" + fn_out + "_bfactors.star";
+	FileName fn_star = fn_out + "bfactors.star";
 	if (!do_start_all_over && readStarFileBfactors(fn_star))
 	{
 		if (verb > 0)
@@ -199,7 +199,7 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 		writeStarFileBfactors(fn_star);
 
 	    // Also write a STAR file with the relative contributions of each frame to all frequencies
-	    fn_star = fn_in.withoutExtension() + "_" + fn_out + "_relweights.star";
+	    fn_star = fn_out + "relweights.star";
 	    writeStarFileRelativeWeights(fn_star);
 	}
 
@@ -209,10 +209,10 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 void ParticlePolisherMpi::polishParticlesAllMicrographs()
 {
 
-	if (!do_start_all_over && exists(fn_out + ".star"))
+	if (!do_start_all_over && exists(fn_out + "shiny.star"))
 	{
 		if (verb > 0)
-			std::cout << std::endl << " + " << fn_out << ".star already exists: skipping polishing of the particles." << std::endl;
+			std::cout << std::endl << " + " << fn_out << "shiny.star already exists: skipping polishing of the particles." << std::endl;
 		return;
 	}
 
@@ -256,7 +256,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 		std::cout << "+ Reconstructing two halves of shiny particles ..." << std::endl;
 
 	// Re-read the shiny particles' metadatatable (ignore original particle names here...)
-	exp_model.read(fn_out + ".star", true);
+	exp_model.read(fn_out + "shiny.star", true);
 
 	 // Do the reconstructions for both halves
 	if (node->rank == 0)
@@ -268,21 +268,21 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	// Only the master performs the FSC-weighting
-	FileName fn_post = (ipass == 1) ? "_post" : "_post2";
+	FileName fn_post = (ipass == 1) ? "shiny_post" : "shiny_post2";
 	if (node->rank == 0)
 	{
 
-		if (!do_start_all_over && exists(fn_in.withoutExtension() + "_" + fn_out + fn_post + "_masked.mrc")
-						       && exists(fn_in.withoutExtension() + "_" + fn_out + fn_post + ".star") )
+		if (!do_start_all_over && exists(fn_out + fn_post + "_masked.mrc")
+						       && exists(fn_out + fn_post + ".star") )
 		{
 			if (verb > 0)
-				std::cout << std::endl << " + " << fn_in.withoutExtension() << "_" << fn_out << fn_post << "_masked.mrc already exists: re-reading map into memory." << std::endl;
+				std::cout << std::endl << " + " << fn_out << fn_post << "_masked.mrc already exists: re-reading map into memory." << std::endl;
 
 			if (verb > 0)
-				std::cout << std::endl << " + " << fn_in.withoutExtension() << "_" << fn_out << fn_post << ".star already exists: re-reading resolution from it." << std::endl;
+				std::cout << std::endl << " + " << fn_out << fn_post << ".star already exists: re-reading resolution from it." << std::endl;
 
 			MetaDataTable MD;
-			MD.read(fn_in.withoutExtension() + "_" + fn_out + fn_post + ".star", "general");
+			MD.read(fn_out + fn_post + ".star", "general");
 			MD.getValue(EMDL_POSTPROCESS_FINAL_RESOLUTION, maxres_model);
 		}
 		else
@@ -291,8 +291,8 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 			Postprocessing prm;
 
 			prm.clear();
-			prm.fn_in = fn_in.withoutExtension() + "_" + fn_out;
-			prm.fn_out = prm.fn_in + fn_post;
+			prm.fn_in = fn_out + "shiny";
+			prm.fn_out = fn_out + fn_post;
 			prm.angpix = angpix;
 			prm.do_auto_mask = false;
 			prm.fn_mask = fn_mask;
@@ -310,7 +310,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 	MultidimArray<RFLOAT> dum;
 	Image<RFLOAT> refvol;
 	FileName fn_vol;
-	fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half1_class001_unfil.mrc";
+	fn_vol = fn_out + "shiny_half1_class001_unfil.mrc";
 	refvol.read(fn_vol);
 	PPrefvol_half1.ori_size = XSIZE(refvol());
 	PPrefvol_half1.padding_factor = 2;
@@ -318,7 +318,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 	PPrefvol_half1.r_min_nn = 10;
 	PPrefvol_half1.data_dim = 2;
 	PPrefvol_half1.computeFourierTransformMap(refvol(), dum);
-	fn_vol = fn_in.withoutExtension() + "_" + fn_out + "_half2_class001_unfil.mrc";
+	fn_vol = fn_out + "shiny_half2_class001_unfil.mrc";
 	refvol.read(fn_vol);
 	PPrefvol_half2.ori_size = XSIZE(refvol());
 	PPrefvol_half2.padding_factor = 2;
@@ -397,7 +397,7 @@ void ParticlePolisherMpi::optimiseBeamTilt()
 
 	// Write the new MDTable to disc
 	if (verb > 0)
-		exp_model.MDimg.write(fn_out + ".star");
+		exp_model.MDimg.write(fn_out + "shiny.star");
 
 }
 

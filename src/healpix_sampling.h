@@ -27,11 +27,11 @@
 #include "src/multidim_array.h"
 #include "src/symmetries.h"
 #include "src/euler.h"
+#include "src/transformations.h"
 
 // For the angular searches
 #define NOPRIOR 0
 #define PRIOR_ROTTILT_PSI 1
-
 
 class HealpixSampling
 {
@@ -61,7 +61,8 @@ public:
 
     /* Translational search range and sampling rate
      */
-    RFLOAT offset_range, offset_step;
+    // Jun19,2015 - Shaoda, Helical refinement
+    RFLOAT offset_range, offset_step, helical_offset_step;
 
     /** Flag whether this is a real 3D sampling */
     bool is_3D;
@@ -151,16 +152,28 @@ public:
      * etc...
      *
      * */
-    void initialise(int prior_mode, int ref_dim = -1, bool do_3d_trans = false, bool do_warnpsi = false);
+    //void initialise(int prior_mode, int ref_dim = -1, bool do_3d_trans = false);
+    // May 6, 2015 - Shaoda & Sjors - initialise for helical translations
+    void initialise(
+    		int prior_mode,
+			int ref_dim = -1,
+			bool do_3d_trans = false,
+                        bool do_warnpsi = false,
+			bool do_local_searches = false,
+			bool do_helical_refine = false,
+			RFLOAT rise_pix  = 0.,
+			RFLOAT twist_deg = 0.);
 
     // Reset the random perturbation
     void resetRandomlyPerturbedSampling();
 
     // Read in all information from the command line to build the sampling object
-    void read(IOParser &parser, int ori_size, int ref_dim);
+    // Jun19,2015 - Shaoda, is that available???
+    //void read(IOParser &parser, int ori_size, int ref_dim);
 
     // Read CL options after a -continue statement.
-    void readContinue(int argc, char **argv, bool &directions_have_changed);
+    // Jun19,2015 - Shaoda, is that available???
+    //void readContinue(int argc, char **argv, bool &directions_have_changed);
 
     // Read in all information from a STAR file (for restarting)
     void read(FileName fn_in);
@@ -168,8 +181,18 @@ public:
     // Write the sampling information to a STAR file
     void write(FileName fn_out);
 
-    /* Set the non-oversampled list of translations */
-    void setTranslations(RFLOAT offset_step = -1., RFLOAT offset_range = -1.);
+    /* Set the non-oversampled list of translations
+     * For single particles, offset ranges are equal along different directions
+     * For helices, x offsets (along helical axis) should be less within -+0.5 * rise
+     * */
+    void setTranslations(
+    		RFLOAT new_offset_step = -1.,
+    		RFLOAT new_offset_range = -1.,
+    		bool do_local_searches = false,
+    		bool do_helical_refine = false,
+			RFLOAT new_helical_offset_step = -1.,
+    		RFLOAT helical_rise_pix = 0.,
+    		RFLOAT helical_twist_deg = 0.);
 
     /* Add a single translation */
     void addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear = false);
@@ -180,22 +203,36 @@ public:
     /* Add a single orientation */
     void addOneOrientation(RFLOAT rot, RFLOAT tilt, RFLOAT psi, bool do_clear = false);
 
-
     /* Write all orientations as a sphere in a bild file
      * Mainly useful for debugging */
     void writeAllOrientationsToBild(FileName fn_bild, std::string rgb = "1 0 0", RFLOAT size = 0.025);
     void writeNonZeroPriorOrientationsToBild(FileName fn_bild, RFLOAT rot_prior, RFLOAT tilt_prior,
     		std::vector<int> &pointer_dir_nonzeroprior, std::string rgb = "0 0 1", RFLOAT size = 0.025);
 
+    /* Sjors, 9nov2015: new rot-priors for DNA-origami-bound refinements
+     */
+    RFLOAT calculateDeltaRot(Matrix1D<RFLOAT> my_direction, RFLOAT rot_prior);
+
     /* Select all orientations with zero prior probabilities
      * store all these in the vectors pointer_dir_nonzeroprior and pointer_psi_nonzeroprior
      * Also precalculate their prior probabilities and store in directions_prior and psi_prior
      */
+    // Jun 04 - Shaoda & Sjors, Bimodel psi searches for helices
     void selectOrientationsWithNonZeroPriorProbability(
     		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,
     		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
     		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
+			bool do_bimodal_search_psi = false,
+    		RFLOAT sigma_cutoff = 3.);
+
+    void selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(
+    		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,
+    		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
+    		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+    		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
+			bool do_helical_bimodal_search_psi = false,
+			bool do_helical_bimodal_search_tilt = false,
     		RFLOAT sigma_cutoff = 3.);
 
     /** Get the symmetry group of this sampling object
@@ -219,6 +256,9 @@ public:
 
     /* Get the translational sampling step in pixels */
     RFLOAT getTranslationalSampling(int adaptive_oversampling = 0);
+
+    /* Get the translational sampling step along helical axis in pixels */
+    RFLOAT getHelicalTranslationalSampling(int adaptive_oversampling = 0);
 
     /* Get approximate angular sampling in degrees for any adaptive oversampling
      */
@@ -280,7 +320,10 @@ public:
     void getTranslations(long int itrans, int oversampling_order,
     		std::vector<RFLOAT > &my_translations_x,
     		std::vector<RFLOAT > &my_translations_y,
-    		std::vector<RFLOAT > &my_translations_z);
+    		std::vector<RFLOAT > &my_translations_z,
+			bool do_helical_refine = false,
+			RFLOAT rise_pix = 0.,
+			RFLOAT twist_deg = 0.);
 
     /* Get the vectors of (rot, tilt, psi) angle triplets for a more finely (oversampled) sampling
      * The oversampling_order is the difference in order of the original (coarse) and the oversampled (fine) sampling

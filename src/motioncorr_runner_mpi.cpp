@@ -17,21 +17,18 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include "src/autopicker_mpi.h"
+#include "src/motioncorr_runner_mpi.h"
 
-void AutoPickerMpi::read(int argc, char **argv)
+void MotioncorrRunnerMpi::read(int argc, char **argv)
 {
     // Define a new MpiNode
     node = new MpiNode(argc, argv);
 
     // First read in non-parallelisation-dependent variables
-    AutoPicker::read(argc, argv);
+    MotioncorrRunner::read(argc, argv);
 
     // Don't put any output to screen for mpi slaves
     verb = (node->isMaster()) ? 1 : 0;
-
-    if (do_write_fom_maps)
-    	REPORT_ERROR("AutoPickerMpi::read ERROR: --write_fom_maps is very heavy on disc I/O and therefore disabled in parallel execution. Use the sequential program instead!");
 
     // Possibly also read parallelisation-dependent variables here
 
@@ -40,7 +37,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 
 
 }
-void AutoPickerMpi::run()
+void MotioncorrRunnerMpi::run()
 {
 
 	// Each node does part of the work
@@ -51,31 +48,28 @@ void AutoPickerMpi::run()
 	int barstep;
 	if (verb > 0)
 	{
-		std::cout << " Autopicking ..." << std::endl;
+		std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 	}
 
-	FileName fn_olddir="";
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
-    {
-    	if (verb > 0 && imic % barstep == 0)
+	{
+		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
-		// Check new-style outputdirectory exists and make it if not!
-		FileName fn_dir = getOutputRootName(fn_micrographs[imic]);
-		fn_dir = fn_dir.beforeLastOf("/");
-		if (fn_dir != fn_olddir)
-		{
-			// Make a Particles directory
-			int res = system(("mkdir -p " + fn_dir).c_str());
-			fn_olddir = fn_dir;
-		}
-
-    	autoPickOneMicrograph(fn_micrographs[imic]);
+		executeMotioncorr(fn_micrographs[imic]);
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
 
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	// Only the master writes the joined result file
+	if (node->isMaster())
+	{
+		MDout.write(fn_out + "/corrected_micrographs.star");
+	}
 
 }
+

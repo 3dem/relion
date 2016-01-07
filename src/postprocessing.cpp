@@ -49,6 +49,7 @@ void Postprocessing::read(int argc, char **argv)
 	low_pass_freq = textToFloat(parser.getOption("--low_pass", "Resolution (in Angstroms) at which to low-pass filter the final map (by default at final resolution)", "0."));
 
 	int expert_section = parser.addSection("Expert options");
+	do_ampl_corr = parser.checkOption("--ampl_corr", "Perform amplitude correlation and DPR, also re-normalize amplitudes for non-uniform angular distributions");
 	randomize_fsc_at = textToFloat(parser.getOption("--randomize_at_fsc", "Randomize phases from the resolution where FSC drops below this value", "0.8"));
 	filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low-pass filter edge (in resolution shells)", "2"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
@@ -83,7 +84,7 @@ void Postprocessing::clear()
 	randomize_fsc_at = 0.8;
 	filter_edge_width = 2.;
 	verb = 1;
-
+	do_ampl_corr = false;
 }
 
 void Postprocessing::initialise()
@@ -261,6 +262,136 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 
 	}
 
+
+}
+
+bool Postprocessing::findSurfacePixel(int idx, int kp, int ip, int jp,
+		int &best_kpp, int &best_ipp, int &best_jpp,
+		int myradius_count, int search)
+{
+
+	// bring kp, ip, jp onto the sphere
+	RFLOAT frac = (RFLOAT)(myradius_count)/(RFLOAT)idx;
+	int kpp = ROUND(frac*kp);
+	int ipp = ROUND(frac*ip);
+	int jpp = ROUND(frac*jp);
+
+	// Search +/- 2 pixels in all directions and choose voxel closest to the circle
+	int best_dist = 999;
+	best_kpp=kpp;
+	best_ipp=ipp;
+	best_jpp=jpp;
+	bool found = false;
+	for (int kppp = kpp-search; kppp <= kpp+search; kppp++)
+	{
+		for (int ippp = ipp-search; ippp <= ipp+search; ippp++)
+    	{
+	        for (int jppp = jpp-search; jppp <= jpp+search; jppp++)
+	        {
+	        	// Distance to surface on the sphere
+	        	int dist = ABS(ROUND(sqrt((RFLOAT)(kppp*kppp + ippp*ippp + jppp*jppp))) - myradius_count);
+	        	int reldist2 = (kppp-kpp)*(kppp-kpp) + (ippp-ipp)*(ippp-ipp) + (jppp-jpp)*(jppp-jpp);
+	        	if (dist < 0.5 && reldist2 < best_dist)
+	        	{
+	        		best_kpp=kppp;
+	        		best_ipp=ippp;
+	        		best_jpp=jppp;
+	        		best_dist=reldist2;
+	        		found=true;
+	        	}
+        	}
+    	}
+	}
+	return found;
+
+}
+
+
+void Postprocessing::correctRadialAmplitudeDistribution(MultidimArray<RFLOAT > &I)
+{
+
+	MultidimArray<Complex > FT;
+	FourierTransformer transformer;
+	transformer.FourierTransform(I, FT, false);
+
+	// First calculate radial average, to normalize the power spectrum
+    int myradius = XSIZE(FT);
+	MultidimArray< int > radial_count(myradius);
+    MultidimArray<RFLOAT> num, ravg;
+    num.initZeros(myradius);
+    ravg.initZeros(myradius);
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+    {
+    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+        if (idx >= myradius)
+        	continue;
+        ravg(idx)+= norm(DIRECT_A3D_ELEM(FT, k, i, j));
+        radial_count(idx)++;
+    }
+    FOR_ALL_ELEMENTS_IN_ARRAY1D(ravg)
+    {
+        if (radial_count(i) > 0)
+        {
+			ravg(i) /= radial_count(i);
+		}
+    }
+
+    // Apply correction only beyond low-res fitting of B-factors
+    int minr = FLOOR(XSIZE(FT) * angpix / fit_minres);
+    int myradius_count = minr;
+    MultidimArray<RFLOAT> sum3d;
+    MultidimArray<int> count3d;
+    sum3d.resize(2*myradius_count+4, 2*myradius_count+4, 2*myradius_count+4);
+    sum3d.setXmippOrigin();
+    count3d.resize(sum3d);
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+    {
+    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+    	// only correct from fit_minres to Nyquist
+    	if (idx < minr || idx >= myradius)
+         	continue;
+
+    	int best_kpp, best_ipp, best_jpp;
+    	if (!findSurfacePixel(idx, kp, ip, jp, best_kpp, best_ipp, best_jpp, myradius_count, 2))
+    	{
+    		std::cerr << "Postprocessing::correctRadialAmplitudeDistribution ERROR! kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
+    	}
+
+    	// Apply correction on the spectrum-corrected values!
+    	RFLOAT aux = norm(DIRECT_A3D_ELEM(FT, k, i, j)) / ravg(idx);
+    	A3D_ELEM(sum3d, best_kpp, best_ipp, best_jpp) += aux;
+    	A3D_ELEM(count3d, best_kpp, best_ipp, best_jpp) += 1;
+    }
+
+    // Average
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum3d)
+    {
+    	if (DIRECT_MULTIDIM_ELEM(count3d, n) > 0)
+    	{
+    		DIRECT_MULTIDIM_ELEM(sum3d, n) /= DIRECT_MULTIDIM_ELEM(count3d, n);
+    	}
+    }
+
+    // Now divide all elements by the normalized correction term
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+    {
+    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+    	// only correct from fit_minres to Nyquist
+    	if (idx < minr || idx >= myradius)
+         	continue;
+
+    	int best_kpp, best_ipp, best_jpp;
+    	if (!findSurfacePixel(idx, kp, ip, jp, best_kpp, best_ipp, best_jpp, myradius_count, 2))
+    	{
+    		std::cerr << "Postprocessing::correctRadialAmplitudeDistribution ERROR!  kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
+    	}
+
+    	// Apply correction on the spectrum-corrected values!
+    	RFLOAT aux = sqrt(A3D_ELEM(sum3d, best_kpp, best_ipp, best_jpp));
+    	DIRECT_A3D_ELEM(FT, k, i, j) /= aux;
+    }
+
+	transformer.inverseFourierTransform(FT, I);
 
 }
 
@@ -532,10 +663,22 @@ void Postprocessing::writeOutput()
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_UNMASKED, DIRECT_A1D_ELEM(fsc_unmasked, i) );
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_MASKED, DIRECT_A1D_ELEM(fsc_masked, i) );
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_RANDOM_MASKED, DIRECT_A1D_ELEM(fsc_random_masked, i) );
+			if (do_ampl_corr)
+			{
+				MDfsc.setValue(EMDL_POSTPROCESS_AMPLCORR_UNMASKED, DIRECT_A1D_ELEM(acorr_unmasked, i) );
+				MDfsc.setValue(EMDL_POSTPROCESS_AMPLCORR_MASKED, DIRECT_A1D_ELEM(acorr_masked, i) );
+				MDfsc.setValue(EMDL_POSTPROCESS_DPR_UNMASKED, DIRECT_A1D_ELEM(dpr_unmasked, i) );
+				MDfsc.setValue(EMDL_POSTPROCESS_DPR_MASKED, DIRECT_A1D_ELEM(dpr_masked, i) );
+			}
 		}
 		else
 		{
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_UNMASKED, DIRECT_A1D_ELEM(fsc_true, i) );
+			if (do_ampl_corr)
+			{
+				MDfsc.setValue(EMDL_POSTPROCESS_AMPLCORR_UNMASKED, DIRECT_A1D_ELEM(acorr_unmasked, i) );
+				MDfsc.setValue(EMDL_POSTPROCESS_DPR_UNMASKED, DIRECT_A1D_ELEM(dpr_unmasked, i) );
+			}
 		}
 	}
 	MDfsc.write(fh);
@@ -601,8 +744,18 @@ void Postprocessing::run()
 	// Read inout maps and perform some checks
 	initialise();
 
+
+	// For amplitude correlation curves: first do radial amplitude correction for non-uniform angular distributions
+	if (do_ampl_corr)
+	{
+		correctRadialAmplitudeDistribution(I1());
+		correctRadialAmplitudeDistribution(I2());
+	}
+
 	// Calculate FSC of the unmask maps
 	getFSC(I1(), I2(), fsc_unmasked);
+	if (do_ampl_corr)
+		getAmplitudeCorrelationAndDifferentialPhaseResidual(I1(), I2(), acorr_unmasked, dpr_unmasked);
 
 	// Check whether we'll do masking
 	do_mask = getMask();
@@ -616,6 +769,8 @@ void Postprocessing::run()
 		I1() *= Im();
 		I2() *= Im();
 		getFSC(I1(), I2(), fsc_masked);
+		if (do_ampl_corr)
+			getAmplitudeCorrelationAndDifferentialPhaseResidual(I1(), I2(), acorr_masked, dpr_masked);
 
 		// To save memory re-read the same input maps again and randomize phases before masking
 		I1.read(fn_I1);
@@ -645,7 +800,6 @@ void Postprocessing::run()
 			I1() *= Im();
 			I2() *= Im();
 			getFSC(I1(), I2(), fsc_random_masked);
-
 		}
 		else
 			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.  You may want to check your mask.");

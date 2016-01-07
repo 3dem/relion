@@ -45,6 +45,11 @@ void MlOptimiserMpi::read(int argc, char **argv)
     // Don't put any output to screen for mpi slaves
     verb = (node->isMaster()) ? 1 : 0;
 
+//#define DEBUG_BODIES
+#ifdef DEBUG_BODIES
+    verb = (node->rank==1) ? 1 : 0;
+#endif
+
     // TMP for debugging only
     //if (node->rank==1)
     //	verb = 1;
@@ -170,13 +175,6 @@ void MlOptimiserMpi::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		// Make device bundles - at present segfault if auto-refine tries to run on a single device
-		if(!do_auto_refine || (devCount>=2))
-			for (int i = 0; i < devCount; i++)
-				cudaMlDeviceBundles.push_back((void *) new MlDeviceBundle(this, i));
-		else
-			raise(SIGSEGV);
-
 		// Sequential initialisation of GPUs on all ranks
 		for (int rank = 0; rank < node->size; rank++)
 		{
@@ -203,13 +201,21 @@ void MlOptimiserMpi::initialise()
 
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
-					int bundle_id;
-					if(!do_auto_refine || (devCount>=2))
-						bundle_id = dev_id;
-					else
-						raise(SIGSEGV);
+					//Only make a new bundle of not existing on device
+					MlDeviceBundle * bundle(NULL);
 
-					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, (MlDeviceBundle *) cudaMlDeviceBundles[bundle_id]));
+					for (int j = 0; j < cudaMlDeviceBundles.size(); j++)
+						if (((MlDeviceBundle *) cudaMlDeviceBundles[j])->device_id == dev_id)
+							bundle = (MlDeviceBundle *) cudaMlDeviceBundles[j];
+
+					if (bundle == NULL)
+					{
+						bundle = new MlDeviceBundle(this, dev_id);
+						cudaMlDeviceBundles.push_back((void *) bundle);
+					}
+
+					//Make new cuda optimizer and attach to bundle
+					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, bundle));
 				}
 
 			}
@@ -470,7 +476,7 @@ void MlOptimiserMpi::expectation()
 		{
 			// Slave has to receive all metadata from the master!
 			node->relion_MPI_Recv(&my_nr_images, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
-			exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH);
+			exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 			node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
 			node->relion_MPI_Recv(&length_fn_ctf, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
 			if (length_fn_ctf > 1)
@@ -528,12 +534,14 @@ void MlOptimiserMpi::expectation()
     {
         try
         {
-    		std::cout << " Expectation iteration " << iter;
-    		if (!do_auto_refine)
-    			std::cout << " of " << nr_iter;
-    		std::cout << std::endl;
-        	init_progress_bar(mydata.numberOfOriginalParticles());
-
+    		if (verb > 0)
+    		{
+				std::cout << " Expectation iteration " << iter;
+				if (!do_auto_refine)
+					std::cout << " of " << nr_iter;
+				std::cout << std::endl;
+				init_progress_bar(mydata.numberOfOriginalParticles());
+    		}
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
 			int random_subset = 0;
@@ -560,7 +568,7 @@ void MlOptimiserMpi::expectation()
 				// Otherwise, the master needs to receive and handle the updated metadata from the slaves
 				if (JOB_NIMG > 0)
 				{
-					exp_metadata.resize(JOB_NIMG, METADATA_LINE_LENGTH);
+					exp_metadata.resize(JOB_NIMG, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 					node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
 
 					// The master monitors the changes in the optimal orientations and classes
@@ -568,7 +576,7 @@ void MlOptimiserMpi::expectation()
 
 					// The master then updates the mydata.MDimg table
 					MlOptimiser::setMetaDataSubset(JOB_FIRST, JOB_LAST);
-					if (nr_ori_particles_done - prev_step_done > progress_bar_step_size)
+					if (verb > 0 && nr_ori_particles_done - prev_step_done > progress_bar_step_size)
 					{
 						prev_step_done = nr_ori_particles_done;
 						progress_bar(nr_ori_particles_done + JOB_NPAR);
@@ -724,7 +732,7 @@ void MlOptimiserMpi::expectation()
 					timer.tic(TIMING_MPISLAVEWAIT2);
 #endif
 					// Also receive the imagedata and the metadata for these images from the master
-					exp_metadata.resize(JOB_NIMG, METADATA_LINE_LENGTH);
+					exp_metadata.resize(JOB_NIMG, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 					node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
 
 					// Receive the image filenames or the exp_imagedata
@@ -816,6 +824,8 @@ void MlOptimiserMpi::expectation()
 			{
 				for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 				{
+					( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+
 					for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
 					{
 						unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
@@ -823,7 +833,6 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
 						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
@@ -855,7 +864,8 @@ void MlOptimiserMpi::expectation()
 	exp_imagedata.clear();
 	exp_metadata.clear();
 
-    progress_bar(mydata.numberOfOriginalParticles());
+	if (verb > 0)
+		progress_bar(mydata.numberOfOriginalParticles());
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest
@@ -1229,7 +1239,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 		}
 		else if (node->rank == 1)
 		{
-			std::cout << " Combining two random halves ..."<< std::endl;
+			if (verb > 0) std::cout << " Combining two random halves ..."<< std::endl;
 			wsum_model.pack(Mpack, piece, nr_pieces);
 			Msum.initZeros(Mpack);
 			node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, 2, MPITAG_PACK, MPI_COMM_WORLD, status);
@@ -1296,68 +1306,172 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
+	// Aug05,2015 - Shaoda, helical refinement
+	helical_twist_half1 = helical_twist_half2 = helical_twist;
+	helical_rise_half1 = helical_rise_half2 = helical_rise;
 
 	// First reconstruct all classes in parallel
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-    {
-		if (mymodel.pdf_class[iclass] > 0.)
+	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
-			// Parallelise: each MPI-node has a different reference
+			// either ibody or iclass can be larger than 0, never 2 at the same time!
+			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
 
-			// The code below will NOT work if nr_classes > 1 AND do_split_random_halves, but that is disabled anyway...
-			// Master does not participate in reconstruction tasks
-			int reconstruct_rank1 = (iclass % (node->size - 1) ) + 1;
-			//std::cerr << " size00 " <<  MULTIDIM_SIZE(mymodel.Iref[0]) << " rank= "<<node->rank << " iclass= "<<iclass << std::endl;
-			if (node->rank == reconstruct_rank1)
+			if (mymodel.pdf_class[iclass] > 0.)
 			{
-				wsum_model.BPref[iclass].reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-						mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-						mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class[iclass], wsum_model.pdf_class[iclass],
-						do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+				// Parallelise: each MPI-node has a different reference
+				int reconstruct_rank1;
+				if (do_split_random_halves)
+					reconstruct_rank1 = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + 1;
+				else
+					reconstruct_rank1 = ith_recons % (node->size - 1) + 1;
 
-				// Also perform the unregularized reconstruction
-				if (do_auto_refine && has_converged)
-					readTemporaryDataAndWeightArraysAndReconstruct(iclass, 1);
-
-			}
-			//std::cerr << " size01 " <<  MULTIDIM_SIZE(mymodel.Iref[0]) << " rank= "<<node->rank << " iclass= "<<iclass << std::endl;
-			// In some cases there is not enough memory to reconstruct two random halves in parallel
-			// Therefore the following option exists to perform them sequentially
-			if (do_sequential_halves_recons)
-				MPI_Barrier(MPI_COMM_WORLD);
-
-			// When splitting the data into two random halves, perform two reconstructions in parallel: one for each subset
-			if (do_split_random_halves)
-			{
-				int reconstruct_rank2 =(iclass % (node->size - 1) ) + 2;
-
-				if (node->rank == reconstruct_rank2)
+				if (node->rank == reconstruct_rank1)
 				{
-					// Rank 2 does not need to do the joined reconstruction
-					if (!do_join_random_halves)
-						wsum_model.BPref[iclass].reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-								mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-								mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class[iclass], wsum_model.pdf_class[iclass],
-								do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
+					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 
-					// But rank 2 always does the unfiltered reconstruction
+					// Also perform the unregularized reconstruction
 					if (do_auto_refine && has_converged)
-						readTemporaryDataAndWeightArraysAndReconstruct(iclass, 2);
+						readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 1);
 
+					// Apply the body mask
+					if (mymodel.nr_bodies > 1)
+					{
+						// 19may2015 translate the reconstruction back to its C.O.M.
+						selfTranslate(mymodel.Iref[ith_recons], mymodel.com_bodies[ibody], DONT_WRAP);
+
+						// Also write out unmasked body recontruction
+						FileName fn_tmp;
+						fn_tmp.compose(fn_out + "_unmasked_half1_body", ibody+1,"mrc");
+						Image<RFLOAT> Itmp;
+						Itmp()=mymodel.Iref[ith_recons];
+						Itmp.write(fn_tmp);
+						mymodel.Iref[ith_recons].setXmippOrigin();
+						mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
+					}
+
+					// Shaoda Jul26,2015 - Helical symmetry local refinement
+					if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+					{
+						localSearchHelicalSymmetry(
+								mymodel.Iref[ith_recons],
+								mymodel.pixel_size,
+								(particle_diameter / 2.),
+								(helical_mask_tube_inner_diameter / 2.),
+								(helical_mask_tube_outer_diameter / 2.),
+								helical_central_proportion,
+								helical_rise,
+								helical_twist,
+								helical_symmetry_local_refinement_max_dev,
+								helical_symmetry_local_refinement_max_dev,
+								helical_rise_half1,
+								helical_twist_half1);
+					}
+					// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
+					if( (do_helical_refine) && (!has_converged) )
+					{
+						makeHelicalReferenceInRealSpace(
+								mymodel.Iref[ith_recons],
+								mymodel.pixel_size,
+								helical_twist_half1,
+								helical_rise_half1,
+								helical_central_proportion,
+								(particle_diameter / 2.),
+								(helical_mask_tube_inner_diameter / 2.),
+								(helical_mask_tube_outer_diameter / 2.),
+								width_mask_edge);
+					}
 				}
-			}
 
-		} // endif pdf_class[iclass] > 0.
-		else
-		{
-			mymodel.Iref[iclass].initZeros();
-		}
+				// In some cases there is not enough memory to reconstruct two random halves in parallel
+				// Therefore the following option exists to perform them sequentially
+				if (do_sequential_halves_recons)
+					MPI_Barrier(MPI_COMM_WORLD);
+
+				// When splitting the data into two random halves, perform two reconstructions in parallel: one for each subset
+				if (do_split_random_halves)
+				{
+					int reconstruct_rank2 = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + 2;
+
+					if (node->rank == reconstruct_rank2)
+					{
+						// Rank 2 does not need to do the joined reconstruction
+						if (!do_join_random_halves)
+							wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
+
+						// But rank 2 always does the unfiltered reconstruction
+						if (do_auto_refine && has_converged)
+							readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 2);
+
+						// Apply the body mask
+						if (mymodel.nr_bodies > 1)
+						{
+							// 19may2015 translate the reconstruction back to its C.O.M.
+							selfTranslate(mymodel.Iref[ith_recons], mymodel.com_bodies[ibody], DONT_WRAP);
+
+							FileName fn_tmp;
+							fn_tmp.compose(fn_out + "_unmasked_half2_body", ibody+1,"mrc");
+							Image<RFLOAT> Itmp;
+							Itmp()=mymodel.Iref[ith_recons];
+							Itmp.write(fn_tmp);
+							mymodel.Iref[ith_recons].setXmippOrigin();
+							mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
+						}
+
+						// Shaoda Jul26,2015 - Helical symmetry local refinement
+						if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+						{
+							localSearchHelicalSymmetry(
+									mymodel.Iref[ith_recons],
+									mymodel.pixel_size,
+									(particle_diameter / 2.),
+									(helical_mask_tube_inner_diameter / 2.),
+									(helical_mask_tube_outer_diameter / 2.),
+									helical_central_proportion,
+									helical_rise,
+									helical_twist,
+									helical_symmetry_local_refinement_max_dev,
+									helical_symmetry_local_refinement_max_dev,
+									helical_rise_half2,
+									helical_twist_half2);
+						}
+						// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
+						if( (do_helical_refine) && (!has_converged) )
+						{
+							makeHelicalReferenceInRealSpace(
+									mymodel.Iref[ith_recons],
+									mymodel.pixel_size,
+									helical_twist_half2,
+									helical_rise_half2,
+									helical_central_proportion,
+									(particle_diameter / 2.),
+									(helical_mask_tube_inner_diameter / 2.),
+									(helical_mask_tube_outer_diameter / 2.),
+									width_mask_edge);
+						}
+
+					}
+				}
+
+			} // endif pdf_class[iclass] > 0.
+			else
+			{
+				mymodel.Iref[ith_recons].initZeros();
+			}
 
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
-		MPI_Barrier( MPI_COMM_WORLD);
+			MPI_Barrier( MPI_COMM_WORLD);
 #endif
-    }
+		} // end for iclass
+	} // end for ibody
 
 #ifdef DEBUG
 	std::cerr << "rank= "<<node->rank<<" has reached barrier of reconstruction" << std::endl;
@@ -1370,73 +1484,98 @@ void MlOptimiserMpi::maximization()
 
 	// Once reconstructed, broadcast new models to all other nodes
 	// This cannot be done in the reconstruction loop itself because then it will be executed sequentially
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-
-		if (do_split_random_halves && !do_join_random_halves)
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
-			MPI_Status status;
-			// Make sure I am sending from the rank where the reconstruction was done (see above) to all other slaves of this subset
-			// Loop twice through this, as each class was reconstructed by two different slaves!!
-			int nr_subsets = 2;
-			for (int isubset = 1; isubset <= nr_subsets; isubset++)
+			// either ibody or iclass can be larger than 0, never 2 at the same time!
+			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
+
+			if (do_split_random_halves && !do_join_random_halves)
 			{
-				if (node->myRandomSubset() == isubset)
+				MPI_Status status;
+				// Make sure I am sending from the rank where the reconstruction was done (see above) to all other slaves of this subset
+				// Loop twice through this, as each class was reconstructed by two different slaves!!
+				int nr_subsets = 2;
+				for (int isubset = 1; isubset <= nr_subsets; isubset++)
 				{
-					int reconstruct_rank = (iclass % (node->size - 1) ) + isubset; // first pass subset1, second pass subset2
-					int my_first_recv = node->myRandomSubset();
-
-					for (int recv_node = my_first_recv; recv_node < node->size; recv_node += nr_subsets)
+					if (node->myRandomSubset() == isubset)
 					{
-						if (node->rank == reconstruct_rank && recv_node != node->rank)
-						{
-#ifdef DEBUG
-							std::cerr << "isubset= "<<isubset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
-#endif
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[iclass]), MULTIDIM_SIZE(mymodel.Iref[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
-							node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
-						}
-						else if (node->rank != reconstruct_rank && node->rank == recv_node)
-						{
-							//std::cerr << "isubset= "<<isubset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[iclass]), MULTIDIM_SIZE(mymodel.Iref[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
-							node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
-#ifdef DEBUG
-							std::cerr << "isubset= "<<isubset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
-#endif
-						}
-					}
+						int reconstruct_rank = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + isubset; // first pass subset1, second pass subset2
+						int my_first_recv = node->myRandomSubset();
 
+						for (int recv_node = my_first_recv; recv_node < node->size; recv_node += nr_subsets)
+						{
+							if (node->rank == reconstruct_rank && recv_node != node->rank)
+							{
+#ifdef DEBUG
+								std::cerr << "isubset= "<<isubset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
+#endif
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
+							}
+							else if (node->rank != reconstruct_rank && node->rank == recv_node)
+							{
+								//std::cerr << "isubset= "<<isubset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
+#ifdef DEBUG
+								std::cerr << "isubset= "<<isubset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
+#endif
+							}
+						}
+
+					}
+				}
+				// No one should continue until we're all here
+				MPI_Barrier(MPI_COMM_WORLD);
+
+				// Now all slaves have all relevant reconstructions
+				// TODO: someone should also send reconstructions to the master (for comparison with other subset?)
+			}
+			else
+			{
+				int reconstruct_rank = (ith_recons % (node->size - 1) ) + 1;
+				// Broadcast the reconstructed references to all other MPI nodes
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]),
+						MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				// Broadcast the data_vs_prior spectra to all other MPI nodes
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]),
+						MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				// Broadcast the sigma2_class spectra to all other MPI nodes
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
+						MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+
+			}
+
+			// Re-set the origin (this may be lost in some cases??)
+			mymodel.Iref[ith_recons].setXmippOrigin();
+
+			// Aug05,2015 - Shaoda, helical symmetry refinement, broadcast refined helical parameters
+			if ( (mymodel.pdf_class[iclass] > 0.)
+					&& (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+			{
+				int reconstruct_rank1;
+				if (do_split_random_halves)
+					reconstruct_rank1 = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + 1;
+				else
+					reconstruct_rank1 = ith_recons % (node->size - 1) + 1;
+				node->relion_MPI_Bcast(&helical_twist_half1, 1, MY_MPI_DOUBLE, reconstruct_rank1, MPI_COMM_WORLD);
+				node->relion_MPI_Bcast(&helical_rise_half1, 1, MY_MPI_DOUBLE, reconstruct_rank1, MPI_COMM_WORLD);
+
+				// When splitting the data into two random halves, perform two reconstructions in parallel: one for each subset
+				if (do_split_random_halves)
+				{
+					int reconstruct_rank2 = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + 2;
+					node->relion_MPI_Bcast(&helical_twist_half2, 1, MY_MPI_DOUBLE, reconstruct_rank2, MPI_COMM_WORLD);
+					node->relion_MPI_Bcast(&helical_rise_half2, 1, MY_MPI_DOUBLE, reconstruct_rank2, MPI_COMM_WORLD);
 				}
 			}
-			// No one should continue until we're all here
-			MPI_Barrier(MPI_COMM_WORLD);
-
-			// Now all slaves have all relevant reconstructions
-			// TODO: someone should also send reconstructions to the master (for comparison with other subset?)
-
 		}
-		else
-		{
-			int reconstruct_rank = (iclass % (node->size - 1) ) + 1;
-			// Broadcast the reconstructed references to all other MPI nodes
-			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[iclass]),
-					MULTIDIM_SIZE(mymodel.Iref[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-			// Broadcast the data_vs_prior spectra to all other MPI nodes
-			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]),
-					MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-			// Broadcast the sigma2_class spectra to all other MPI nodes
-			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
-					MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-
-		}
-
-		// Re-set the origin (this may be lost in some cases??)
-		mymodel.Iref[iclass].setXmippOrigin();
 	}
 #ifdef TIMING
 		timer.toc(TIMING_RECONS);
@@ -1471,6 +1610,102 @@ void MlOptimiserMpi::maximization()
 
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
+
+	// Aug05,2015 - Shaoda, Output for helical refinement
+	if ( (verb > 0) && (do_helical_refine) )
+	{
+		std::cout << " Helical parameters (before refinement): twist = " << helical_twist
+				<< " degrees, rise = " << helical_rise << " Angstroms ("
+				<< (helical_rise / mymodel.pixel_size) << " pixels), asymmetrical units = "
+				<< nr_helical_asu << ", central Z proportion = "
+				<< helical_central_proportion << ", spherical diameter = "
+				<< particle_diameter << " Angstroms ("
+				<< (particle_diameter / mymodel.pixel_size) << " pixels), tube inner diameter = "
+				<< helical_mask_tube_inner_diameter << " Angstroms ("
+				<< (helical_mask_tube_inner_diameter / mymodel.pixel_size) << " pixels), tube outer diameter = "
+				<< helical_mask_tube_outer_diameter << " Angstroms ("
+				<< (helical_mask_tube_outer_diameter / mymodel.pixel_size) << " pixels), edge width (mask) = "
+				<< width_mask_edge << " pixels." << std::endl;
+	}
+	if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+	{
+		if (verb > 0)
+		{
+			RFLOAT nr_units_min = 2.;
+			RFLOAT twist_deg_min, twist_deg_max, rise_A_min, rise_A_max, rise_A_threshold;
+
+			twist_deg_min = helical_twist * (1. - helical_symmetry_local_refinement_max_dev);
+			twist_deg_max = helical_twist * (1. + helical_symmetry_local_refinement_max_dev);
+			if (fabs(twist_deg_min) < 0.01)
+				twist_deg_min = (twist_deg_min > 0.) ? (0.01) : (-0.01);
+			if (fabs(twist_deg_max) > 179.99)
+				twist_deg_max = (twist_deg_max > 0.) ? (179.99) : (-179.99);
+
+			rise_A_min = helical_rise * (1. - helical_symmetry_local_refinement_max_dev);
+			rise_A_max = helical_rise * (1. + helical_symmetry_local_refinement_max_dev);
+			rise_A_threshold = get_rise_A_max(mymodel.ori_size, mymodel.pixel_size, helical_central_proportion, nr_units_min);
+			if ( (rise_A_min / mymodel.pixel_size) < 0.001)
+				rise_A_min = 0.001 * mymodel.pixel_size;
+			if (rise_A_max > rise_A_threshold)
+			{
+				rise_A_max = rise_A_threshold;
+				std::cout << " WARNING: Increase of lenZ_percentage will enable larger range for helical rise searches." << std::endl;
+			}
+
+			std::cout << " Helical twist searched from "
+					<< twist_deg_min << " to " << twist_deg_max << " degrees, rise from "
+					<< rise_A_min << " to " << rise_A_max << " Angstroms ("
+					<< (rise_A_min / mymodel.pixel_size) << " to " << (rise_A_max / mymodel.pixel_size)
+					<< " pixels)." << std::endl;
+
+			if (do_split_random_halves)
+			{
+				std::cout << " Refined helical parameters (half1): twist = "
+						<< helical_twist_half1 << " degrees, rise = "
+						<< helical_rise_half1 << " Angstroms ("
+						<< (helical_rise_half1 / mymodel.pixel_size) << " pixels)" << std::endl;
+				std::cout << " Refined helical parameters (half2): twist = "
+						<< helical_twist_half2 << " degrees, rise = "
+						<< helical_rise_half2 << " Angstroms ("
+						<< (helical_rise_half2 / mymodel.pixel_size) << " pixels)" << std::endl;
+			}
+			else
+			{
+				std::cout << " Refined helical parameters: twist = "
+						<< helical_twist_half1 << " degrees, rise = "
+						<< helical_rise_half1 << " Angstroms ("
+						<< (helical_rise_half1 / mymodel.pixel_size) << " pixels)" << std::endl;
+			}
+		}
+
+		// No need to average/modify helical parameters if nr_asu==1 (when no helical symmetry is applied in Fourier space)
+		if (nr_helical_asu > 1)
+		{
+			if (do_split_random_halves)
+			{
+				if (verb > 0)
+				{
+					if ( (fabs((helical_twist_half1 / helical_twist_half2) - 1.) > 0.01)
+							|| (fabs((helical_rise_half1 / helical_rise_half2) - 1.) > 0.01) )
+						std::cout << " WARNING: Refined helical parameters from the two halves are different ( >1% apart)! Averaged parameters might be wrong! Please make sure that the data set is large enough and does not contain multiple symmetries! You probably need not worry if they converge during the next few iterations." << std::endl;
+				}
+				helical_twist = (helical_twist_half1 + helical_twist_half2) / 2.;
+				helical_rise = (helical_rise_half1 + helical_rise_half2) / 2.;
+				if (verb > 0)
+				{
+					std::cout << " Averaged helical parameters will be used for the next iteration: twist = "
+							<< helical_twist << " degrees, rise = "
+							<< helical_rise << " Angstroms ("
+							<< (helical_rise / mymodel.pixel_size) << " pixels)" << std::endl;
+				}
+			}
+			else
+			{
+				helical_twist = helical_twist_half1;
+				helical_rise = helical_rise_half1;
+			}
+		}
+	}
 
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::maximization: done" << std::endl;
@@ -1690,12 +1925,12 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 					DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
 			}
 		}
-		mymodel.fsc_halves_class[0] = fsc_true;
+		mymodel.fsc_halves_class = fsc_true;
 
 	}
 
 	// Now the master sends the fsc curve to everyone else
-	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[0]), MULTIDIM_SIZE(mymodel.fsc_halves_class[0]), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 
 }
@@ -1703,13 +1938,13 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 {
 
-	if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
+	if ( (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 	{
 		Image<RFLOAT> It;
 		FileName fn_root = fn_out + "_half" + integerToString(node->rank);;
 
 		// Write out temporary arrays for all classes
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		for (int iclass = 0; iclass < mymodel.nr_bodies * mymodel.nr_classes; iclass++)
 		{
 			FileName fn_tmp;
 			fn_tmp.compose(fn_root+"_class", iclass+1, "", 3);
@@ -1736,78 +1971,76 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 
 void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, int ihalf)
 {
-	if (mymodel.ref_dim == 3)
+	MultidimArray<RFLOAT> dummy;
+	Image<RFLOAT> Iunreg, Itmp;
+	FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
+	fn_root.compose(fn_root+"_class", iclass+1, "", 3);
+
+	// Read temporary arrays back in
+	Itmp.read(fn_root+"_data_real.mrc");
+	Itmp().setXmippOrigin();
+	Itmp().xinit=0;
+	if (!Itmp().sameShape(wsum_model.BPref[iclass].data))
 	{
-		MultidimArray<RFLOAT> dummy;
-		Image<RFLOAT> Iunreg, Itmp;
-		FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
-		fn_root.compose(fn_root+"_class", iclass+1, "", 3);
-
-		// Read temporary arrays back in
-		Itmp.read(fn_root+"_data_real.mrc");
-		Itmp().setXmippOrigin();
-		Itmp().xinit=0;
-		if (!Itmp().sameShape(wsum_model.BPref[iclass].data))
-		{
-			wsum_model.BPref[iclass].data.printShape(std::cerr);
-			Itmp().printShape(std::cerr);
-			REPORT_ERROR("Incompatible size of "+fn_root+"_data_real.mrc");
-		}
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(Itmp())
-		{
-			A3D_ELEM(wsum_model.BPref[iclass].data, k, i, j).real = A3D_ELEM(Itmp(), k, i, j);
-		}
-
-		Itmp.read(fn_root+"_data_imag.mrc");
-		Itmp().setXmippOrigin();
-		Itmp().xinit=0;
-		if (!Itmp().sameShape(wsum_model.BPref[iclass].data))
-		{
-			wsum_model.BPref[iclass].data.printShape(std::cerr);
-			Itmp().printShape(std::cerr);
-			REPORT_ERROR("Incompatible size of "+fn_root+"_data_imag.mrc");
-		}
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(Itmp())
-		{
-			A3D_ELEM(wsum_model.BPref[iclass].data, k, i, j).imag = A3D_ELEM(Itmp(), k, i, j);
-		}
-
-		Itmp.read(fn_root+"_weight.mrc");
-		Itmp().setXmippOrigin();
-		Itmp().xinit=0;
-		if (!Itmp().sameShape(wsum_model.BPref[iclass].weight))
-		{
-			wsum_model.BPref[iclass].weight.printShape(std::cerr);
-			Itmp().printShape(std::cerr);
-			REPORT_ERROR("Incompatible size of "+fn_root+"_weight.mrc");
-		}
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(Itmp())
-		{
-			A3D_ELEM(wsum_model.BPref[iclass].weight, k, i, j) = A3D_ELEM(Itmp(), k, i, j);
-		}
-
-		// Now perform the unregularized reconstruction
-		wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
-
-		// Update header information
-		RFLOAT avg, stddev, minval, maxval;
-	    Iunreg().computeStats(avg, stddev, minval, maxval);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
-		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
-		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
-		// And write the resulting model to disc
-		Iunreg.write(fn_root+"_unfil.mrc");
-
-
-		// remove temporary arrays from the disc
-		remove((fn_root+"_data_real.mrc").c_str());
-		remove((fn_root+"_data_imag.mrc").c_str());
-		remove((fn_root+"_weight.mrc").c_str());
+		wsum_model.BPref[iclass].data.printShape(std::cerr);
+		Itmp().printShape(std::cerr);
+		REPORT_ERROR("Incompatible size of "+fn_root+"_data_real.mrc");
 	}
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(Itmp())
+	{
+		A3D_ELEM(wsum_model.BPref[iclass].data, k, i, j).real = A3D_ELEM(Itmp(), k, i, j);
+	}
+
+	Itmp.read(fn_root+"_data_imag.mrc");
+	Itmp().setXmippOrigin();
+	Itmp().xinit=0;
+	if (!Itmp().sameShape(wsum_model.BPref[iclass].data))
+	{
+		wsum_model.BPref[iclass].data.printShape(std::cerr);
+		Itmp().printShape(std::cerr);
+		REPORT_ERROR("Incompatible size of "+fn_root+"_data_imag.mrc");
+	}
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(Itmp())
+	{
+		A3D_ELEM(wsum_model.BPref[iclass].data, k, i, j).imag = A3D_ELEM(Itmp(), k, i, j);
+	}
+
+	Itmp.read(fn_root+"_weight.mrc");
+	Itmp().setXmippOrigin();
+	Itmp().xinit=0;
+	if (!Itmp().sameShape(wsum_model.BPref[iclass].weight))
+	{
+		wsum_model.BPref[iclass].weight.printShape(std::cerr);
+		Itmp().printShape(std::cerr);
+		REPORT_ERROR("Incompatible size of "+fn_root+"_weight.mrc");
+	}
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(Itmp())
+	{
+		A3D_ELEM(wsum_model.BPref[iclass].weight, k, i, j) = A3D_ELEM(Itmp(), k, i, j);
+	}
+
+	// Now perform the unregularized reconstruction
+	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+
+	// Update header information
+	RFLOAT avg, stddev, minval, maxval;
+	Iunreg().computeStats(avg, stddev, minval, maxval);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
+	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+	// And write the resulting model to disc
+	Iunreg.write(fn_root+"_unfil.mrc");
+
+
+	// remove temporary arrays from the disc
+	remove((fn_root+"_data_real.mrc").c_str());
+	remove((fn_root+"_data_imag.mrc").c_str());
+	remove((fn_root+"_weight.mrc").c_str());
+
 }
 
 void MlOptimiserMpi::compareTwoHalves()
@@ -1817,56 +2050,94 @@ void MlOptimiserMpi::compareTwoHalves()
 #endif
 
 	if (!do_split_random_halves)
-		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves!");
+		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if !do_split_random_halves");
 
-	// Loop over all classes
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++ )
+	if (mymodel.nr_classes > 1)
+		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if mymodel.nr_classes > 1");
+
+	// Only do gold-standard FSC comparisons for single-class refinements
+	int iclass = 0;
+	// The first two slaves calculate the sum of the downsampled average of all bodies
+	if (node->rank == 1 || node->rank == 2)
 	{
-		if (node->rank == 1 || node->rank == 2)
+		// Sum over all bodies
+		MultidimArray<Complex > avg1;
+		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++ )
 		{
+			MultidimArray<Complex > tmp1;
+			wsum_model.BPref[ibody].getDownsampledAverage(tmp1);
 
-			// The first two slaves calculate the downsampled average
-			MultidimArray<Complex > avg1;
-			wsum_model.BPref[iclass].getDownsampledAverage(avg1);
-//#define DEBUG_FSC
-#ifdef DEBUG_FSC
-			MultidimArray<Complex > avg;
-			MultidimArray<RFLOAT> Mavg;
-			Mavg.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
-			FourierTransformer transformer_debug;
-			transformer_debug.setReal(Mavg);
-			transformer_debug.getFourierAlias(avg);
-			wsum_model.BPref[0].decenter(avg1,avg, wsum_model.BPref[0].r_max * wsum_model.BPref[0].r_max);
-			transformer_debug.inverseFourierTransform();
-			FileName fnt;
-			fnt.compose("downsampled_avg_half",node->rank,"spi");
-			Image<RFLOAT> It;
-			CenterFFT(Mavg, true);
-			It()=Mavg;
-			It.write(fnt);
-#endif
-			if (node->rank == 2)
+			if (mymodel.nr_bodies > 1)
 			{
-				// The second slave sends its average to the first slave
-				node->relion_MPI_Send(MULTIDIM_ARRAY(avg1), 2*MULTIDIM_SIZE(avg1), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
-			}
-			else if (node->rank == 1)
-			{
-
-				std::cout << " Calculating gold-standard FSC ..."<< std::endl;
-				// The first slave receives the average from the second slave and calculates the FSC between them
-				MPI_Status status;
-				MultidimArray<Complex > avg2;
-				avg2.resize(avg1);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-				wsum_model.BPref[iclass].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class[iclass]);
+				// 19may2015 Shift each downsampled avg in the FourierTransform to its original COM!!
+				// shiftImageInFourierTransform, but tmp1 is already centered (ie not in FFTW-arrangement)
+				RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
+				RFLOAT xshift = -XX(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
+				RFLOAT yshift = -YY(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
+				RFLOAT zshift = -ZZ(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
+				FOR_ALL_ELEMENTS_IN_ARRAY3D(tmp1)
+				{
+					dotp = 2 * PI * (j * xshift + i * yshift + k * zshift);
+					a = cos(dotp);
+					b = sin(dotp);
+					c = A3D_ELEM(tmp1, k, i, j).real;
+					d = A3D_ELEM(tmp1, k, i, j).imag;
+					ac = a * c;
+					bd = b * d;
+					ab_cd = (a + b) * (c + d);
+					A3D_ELEM(tmp1, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
+				}
 			}
 
+			if (ibody == 0)
+				avg1 = tmp1;
+			else
+				avg1 += tmp1;
 		}
 
-		// Now slave 1 sends the fsc curve to everyone else
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[iclass]), MULTIDIM_SIZE(mymodel.fsc_halves_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+//#define DEBUG_FSC
+#ifdef DEBUG_FSC
+		MultidimArray<Complex > avg;
+		MultidimArray<RFLOAT> Mavg;
+		if (mymodel.ref_dim == 2)
+			Mavg.resize(mymodel.ori_size, mymodel.ori_size);
+		else
+			Mavg.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+
+		FourierTransformer transformer_debug;
+		transformer_debug.setReal(Mavg);
+		transformer_debug.getFourierAlias(avg);
+		wsum_model.BPref[0].decenter(avg1, avg, wsum_model.BPref[0].r_max * wsum_model.BPref[0].r_max);
+		transformer_debug.inverseFourierTransform();
+		FileName fnt;
+		fnt.compose("downsampled_avg_half",node->rank,"spi");
+		Image<RFLOAT> It;
+		CenterFFT(Mavg, true);
+		It()=Mavg;
+		It.write(fnt);
+#endif
+
+		if (node->rank == 2)
+		{
+			// The second slave sends its average to the first slave
+			node->relion_MPI_Send(MULTIDIM_ARRAY(avg1), 2*MULTIDIM_SIZE(avg1), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
+		}
+		else if (node->rank == 1)
+		{
+
+			std::cout << " Calculating gold-standard FSC ..."<< std::endl;
+			// The first slave receives the average from the second slave and calculates the FSC between them
+			MPI_Status status;
+			MultidimArray<Complex > avg2;
+			avg2.resize(avg1);
+			node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+			wsum_model.BPref[iclass].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class);
+		}
+
 	}
+
+	// Now slave 1 sends the fsc curve to everyone else
+	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::compareTwoHalves: done" << std::endl;
@@ -1931,6 +2202,29 @@ void MlOptimiserMpi::iterate()
 
 		MPI_Barrier(MPI_COMM_WORLD);
 
+		// Sjors & Shaoda Apr 2015
+		// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
+		// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
+		// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
+		// Finally it applies point group symmetry (such as Cn, ...).
+		// DEBUG
+		if ( (verb > 0) && (node->isMaster()) )
+		{
+			if (do_helical_refine)
+			{
+				if (nr_helical_asu > 1)
+					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
+				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
+				{
+					std::cout << " Refining helical symmetry in real space..." << std::endl;
+					std::cout << " Applying refined helical symmetry in real space..." << std::endl;
+				}
+				else
+					std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
+			}
+		}
+		symmetriseReconstructions();
+
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
 		if (do_auto_refine && has_converged)
 			writeTemporaryDataAndWeightArrays();
@@ -1957,16 +2251,16 @@ void MlOptimiserMpi::iterate()
 				// Check that incr_size is at least the number of shells as between FSC=0.5 and FSC=0.143
 				int fsc05   = -1;
 				int fsc0143 = -1;
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[0])
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class)
 				{
-					if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class[0], i) < 0.5 && fsc05 < 0)
+					if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.5 && fsc05 < 0)
 						fsc05 = i;
-					if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class[0], i) < 0.143 && fsc0143 < 0)
+					if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.143 && fsc0143 < 0)
 						fsc0143 = i;
 				}
 				// At least fsc05 - fsc0143 + 5 shells as incr_size
 				incr_size = XMIPP_MAX(incr_size, fsc0143 - fsc05 + 5);
-				has_high_fsc_at_limit = (DIRECT_A1D_ELEM(mymodel.fsc_halves_class[0], mymodel.current_size/2 - 1) > 0.2);
+				has_high_fsc_at_limit = (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, mymodel.current_size/2 - 1) > 0.2);
 			}
 
 			// Upon convergence join the two random halves
@@ -2050,13 +2344,13 @@ void MlOptimiserMpi::iterate()
 			checkConvergence();
 		node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, 1, MPI_COMM_WORLD);
 
-
-
 #ifdef TIMING
 		// Only first slave prints it timing information
 		if (node->rank == 1)
 			timer.printTimes(false);
 #endif
+                for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+                    ((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
 
 	for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
 		((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
@@ -2064,6 +2358,7 @@ void MlOptimiserMpi::iterate()
 
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
+	MPI_Barrier(MPI_COMM_WORLD);
 
 }
 

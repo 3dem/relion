@@ -21,6 +21,7 @@
 #include <src/image.h>
 #include <src/funcs.h>
 #include <src/ctf.h>
+#include <src/fftw.h>
 #include <src/args.h>
 #include <src/error.h>
 #include <src/mask.h>
@@ -30,7 +31,7 @@ class mask_create_parameters
 {
 	public:
    	FileName fn_apply_in, fn_mask, fn_apply_out, fn_thr, fn_omask, fn_and, fn_or, fn_andnot, fn_ornot;
-   	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge;
+   	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge, lowpass, angpix;
 	bool do_invert;
    	IOParser parser;
 
@@ -55,6 +56,8 @@ class mask_create_parameters
 	    extend_ini_mask = textToFloat(parser.getOption("--extend_inimask", "Extend initial binary mask this number of pixels","0"));
 	    width_soft_edge  = textToFloat(parser.getOption("--width_soft_edge", "Width (in pixels) of the additional soft edge on the binary mask", "0"));
 	    do_invert = parser.checkOption("--invert", "Invert the final mask");
+	    lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in Angstroms) for the input map, prior to binarization (default is none)", "-1"));
+	    angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms) for the lowpass filter", "1"));
 
 	    if (fn_thr=="" && fn_apply_in == "")
 	    	REPORT_ERROR("Either provide --i to apply a mask, OR --create_from to create a new mask");
@@ -71,6 +74,11 @@ class mask_create_parameters
 		Image<RFLOAT> Iin, Iout, Ip;
 		std:: cout << " Creating a mask ..." << std::endl;
 		Iin.read(fn_thr);
+
+		if (lowpass > 0)
+		{
+			lowPassFilterMap(Iin(), lowpass, angpix);
+		}
 
 		if (fn_and != "")
 		{

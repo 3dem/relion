@@ -186,7 +186,6 @@ public:
     {
         if (isEmpty())
         	return false;
-
         MetaDataContainer * aux = getObject(objectID);
 
 		// Inside getValue of the container there will be a check of the correct type
@@ -361,7 +360,7 @@ public:
 
     /* Read a STAR loop structure
       */
-    void readStarLoop(std::ifstream& in, std::vector<EMDLabel> *labelsVector = NULL);
+    void readStarLoop(std::ifstream& in, std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "");
 
     /* Read a STAR list
      * The function returns true if the list is followed by a loop, false otherwise
@@ -380,10 +379,10 @@ public:
      * If no data block is found the function will return 0 and the MetaDataTable remains empty
      *
      */
-    int readStar(std::ifstream& in, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL);
+    int readStar(std::ifstream& in, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "");
 
     // Read a MetaDataTable (get fileformat from extension)
-    int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL);
+    int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "");
 
     // Write a MetaDataTable in STAR format
     void write(std::ostream& out = std::cout);

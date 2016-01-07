@@ -28,35 +28,37 @@ void MlModel::initialise()
     aux.initZeros(ori_size / 2 + 1);
 
 	// Now resize all relevant vectors
-    Iref.resize(nr_classes);
+    Iref.resize(nr_classes * nr_bodies);
+    masks_bodies.resize(nr_bodies);
+    com_bodies.resize(nr_bodies);
     pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes);
     group_names.resize(nr_groups, "");
     sigma2_noise.resize(nr_groups, aux);
     nr_particles_group.resize(nr_groups);
-    tau2_class.resize(nr_classes, aux);
-    fsc_halves_class.resize(nr_classes, aux);
-    sigma2_class.resize(nr_classes, aux);
-    data_vs_prior_class.resize(nr_classes, aux);
+    tau2_class.resize(nr_classes * nr_bodies, aux);
+    fsc_halves_class.resize(aux);
+    sigma2_class.resize(nr_classes * nr_bodies, aux);
+    data_vs_prior_class.resize(nr_classes * nr_bodies, aux);
     // TODO handle these two correctly.
     bfactor_correction.resize(nr_groups, 0.);
     scale_correction.resize(nr_groups, 1.);
 
-	acc_rot.resize(nr_classes, 0);
-	acc_trans.resize(nr_classes, 0);
+	acc_rot.resize(nr_classes * nr_bodies, 0);
+	acc_trans.resize(nr_classes * nr_bodies, 0);
 
 	if (ref_dim==2)
 	{
 		Matrix1D<RFLOAT> empty(2);
-		prior_offset_class.resize(nr_classes, empty);
+		prior_offset_class.resize(nr_classes * nr_bodies, empty);
 	}
 	// These arrays will be resized when they are filled
-	orientability_contrib.resize(nr_classes);
+	orientability_contrib.resize(nr_classes * nr_bodies);
 
 	Projector ref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
     PPref.clear();
     // Now fill the entire vector with instances of "ref"
-    PPref.resize(nr_classes, ref);
+    PPref.resize(nr_classes * nr_bodies, ref);
 
 }
 
@@ -72,7 +74,7 @@ void MlModel::read(FileName fn_in)
     if (in.fail())
         REPORT_ERROR( (std::string) "MlModel::readStar: File " + fn_in + " cannot be read." );
 
-    MetaDataTable MDclass, MDgroup, MDlog, MDsigma;
+    MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
 
     // Read general stuff
     MDlog.readStar(in, "model_general");
@@ -98,9 +100,17 @@ void MlModel::read(FileName fn_in)
 		!MDlog.getValue(EMDL_MLMODEL_AVE_PMAX, ave_Pmax) )
 		REPORT_ERROR("MlModel::readStar: incorrect model_general table");
 
-    // Retain compability with model files written by Relion prior to 1.4
-    if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim))
-        data_dim=2;
+	// Retain compability with model files written by Relion prior to 1.4
+	if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim))
+		data_dim=2;
+	if (!MDlog.getValue(EMDL_MLMODEL_NR_BODIES, nr_bodies))
+		nr_bodies=1;
+
+    // Treat classes or bodies (for multi-body refinement) in the same way...
+    int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
+
+    if (nr_classes > 1 && nr_bodies > 1)
+    	REPORT_ERROR("MlModel::readStar: nr_classes and nr_bodies cannot be both larger than one.");
 
     // Take inverse again of current resolution:
     current_resolution = 1. / current_resolution;
@@ -114,24 +124,38 @@ void MlModel::read(FileName fn_in)
 	initialise();
 
 	// Read classes
-	FileName fn_tmp;
+	FileName fn_tmp, fn_tmp2;
 	Image<RFLOAT> img;
-	MDclass.readStar(in, "model_classes");
+	if (nr_bodies > 1)
+		MDclass.readStar(in, "model_bodies");
+	else
+		MDclass.readStar(in, "model_classes");
 	int iclass = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 	{
 		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
-			!MDclass.getValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass])||
 			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) ||
 			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]) 	)
-			REPORT_ERROR("MlModel::readStar: incorrect model_classes table");
+			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table");
 		if (ref_dim==2)
-		{
 			if (!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(prior_offset_class[iclass])) ||
 				!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(prior_offset_class[iclass])) )
-				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no offset priors for 2D classes");
+				REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no offset priors for 2D classes");
+		if (nr_bodies == 1)
+		{
+			if (!MDclass.getValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass]) )
+				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no pdf_class");
 		}
-
+		else
+		{
+			// Read in mask for this body
+			if (!MDclass.getValue(EMDL_MASK_NAME, fn_tmp2) )
+				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no body mask name");
+			Image<RFLOAT> It;
+			It.read(fn_tmp2);
+			It().setXmippOrigin();
+			masks_bodies[iclass] = It();
+		}
 		// Read in actual reference image
 		img.read(fn_tmp);
 		Iref[iclass] = img();
@@ -153,19 +177,22 @@ void MlModel::read(FileName fn_in)
 	}
 
 	// Read SSNR, noise reduction, tau2_class spectra for each class
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 	{
-		MDsigma.readStar(in, "model_class_" + integerToString(iclass + 1));
+		if (nr_bodies > 1)
+			MDsigma.readStar(in, "model_body_" + integerToString(iclass + 1));
+		else
+			MDsigma.readStar(in, "model_class_" + integerToString(iclass + 1));
 		int idx;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
 		{
 			if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
-				REPORT_ERROR("MlModel::readStar: incorrect table model_class_"+integerToString(iclass));
+				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
 			if (!MDsigma.getValue(EMDL_MLMODEL_DATA_VS_PRIOR_REF, data_vs_prior_class[iclass](idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_TAU2_REF, tau2_class[iclass](idx)) ||
-			    !MDsigma.getValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class[iclass](idx)) ||
+			    !MDsigma.getValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class(idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](idx)))
-				REPORT_ERROR("MlModel::readStar: incorrect table model_class_"+integerToString(iclass));
+				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
 		}
 	}
 
@@ -237,23 +264,28 @@ void MlModel::read(FileName fn_in)
 void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild)
 {
 
-	MetaDataTable MDclass, MDgroup, MDlog, MDsigma;
+	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
     FileName fn_tmp, fn_tmp2;
     RFLOAT aux;
     std::ofstream  fh;
 
+    // Treat classes or bodies (for multi-body refinement) in the same way...
+    int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
     // A. Write images
     if (ref_dim == 2)
     {
-    	Image<RFLOAT> img(XSIZE(Iref[0]), YSIZE(Iref[0]), 1, nr_classes);
-    	for (int iclass = 0; iclass < nr_classes; iclass++)
+    	Image<RFLOAT> img(XSIZE(Iref[0]), YSIZE(Iref[0]), 1, nr_classes_bodies);
+    	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     	{
     		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Iref[iclass])
 			{
     			DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Iref[iclass], i, j);
 			}
     	}
-    	img.write(fn_out + "_classes.mrcs");
+    	if (nr_bodies > 1)
+    		img.write(fn_out + "_bodies.mrcs");
+    	else
+    		img.write(fn_out + "_classes.mrcs");
     }
     else
     {
@@ -262,19 +294,22 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size);
 		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size);
 		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size);
-    	for (int iclass = 0; iclass < nr_classes; iclass++)
+    	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     	{
-    		fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+    		if (nr_bodies > 1)
+    			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
+    		else
+    			fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+
     		img() = Iref[iclass];
     		img.write(fn_tmp);
-
-
     	}
 
     	if (do_write_bild)
     	{
 			// Also write out bild files with the orientational distribution of each class
 			// Also write out angular distributions
+    		// Don't do this for bodies, only for classes!
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FileName fn_bild;
@@ -284,7 +319,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset, offset);
 			}
     	}
-
 	}
 
     // B. Write STAR file with metadata
@@ -307,6 +341,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_MINIMUM_RADIUS_NN_INTERPOLATION, r_min_nn);
 	MDlog.setValue(EMDL_MLMODEL_PIXEL_SIZE, pixel_size);
 	MDlog.setValue(EMDL_MLMODEL_NR_CLASSES, nr_classes);
+	MDlog.setValue(EMDL_MLMODEL_NR_BODIES, nr_bodies);
 	MDlog.setValue(EMDL_MLMODEL_NR_GROUPS, nr_groups);
 	MDlog.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor);
 	MDlog.setValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction);
@@ -319,22 +354,50 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_AVE_PMAX, ave_Pmax);
 	MDlog.write(fh);
 
-	// Write metadata and images for all classes
-	MDclass.setName("model_classes");
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+    // Write metadata and images for all classes
+	FileName fn_root;
+	fn_root = fn_out.beforeFirstOf("_it");
+	if (nr_bodies > 1)
+		MDclass.setName("model_bodies");
+	else
+		MDclass.setName("model_classes");
+	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 	{
 		MDclass.addObject();
+		Image<RFLOAT> Itmp;
 		if (ref_dim==2)
 		{
-			fn_tmp = fn_out + "_classes.mrcs";
+			if (nr_bodies > 1)
+			{
+				fn_tmp = fn_out + "_bodies.mrcs";
+				fn_tmp2.compose(fn_root+"_body",iclass+1,"", 3); // class number from 1 to K!
+				fn_tmp2 += "_mask.mrc";
+			}
+			else
+			{
+				fn_tmp = fn_out + "_classes.mrcs";
+			}
 			fn_tmp.compose(iclass+1, fn_tmp); // fn_tmp = integerToString(iclass) + "@" + fn_tmp;
 		}
 		else
 		{
-			fn_tmp.compose(fn_out+"_class",iclass+1,"mrc", 3); // class number from 1 to K!
+			if (nr_bodies > 1)
+			{
+				fn_tmp.compose(fn_out+"_body",iclass+1,"mrc", 3); // class number from 1 to K!
+				fn_tmp2.compose(fn_root+"_body",iclass+1,"", 3); // class number from 1 to K!
+				fn_tmp2 += "_mask.mrc";
+			}
+			else
+				fn_tmp.compose(fn_out+"_class",iclass+1,"mrc", 3); // class number from 1 to K!
 		}
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
-		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass]);
+		// Also set he maskname for multi-body refinement
+		if (nr_bodies > 1)
+			MDclass.setValue(EMDL_MASK_NAME, fn_tmp2);
+
+		// For multiple bodies: only star PDF_CLASS in the first one!
+		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
+		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]);
 
@@ -348,10 +411,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDclass.write(fh);
 
 	// Write radial_average of tau2_class and data_vs_prior_class for each reference
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 	{
 		MDsigma.clear();
-		MDsigma.setName("model_class_"+integerToString(iclass+1));
+		if (nr_bodies > 1)
+			MDsigma.setName("model_body_"+integerToString(iclass+1));
+		else
+			MDsigma.setName("model_class_"+integerToString(iclass+1));
 		for (int ii = 0; ii < XSIZE(tau2_class[iclass]); ii++)
 		{
 			MDsigma.addObject();
@@ -359,7 +425,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
 			MDsigma.setValue(EMDL_RESOLUTION_ANGSTROM, getResolutionAngstrom(ii));
 			MDsigma.setValue(EMDL_MLMODEL_DATA_VS_PRIOR_REF, data_vs_prior_class[iclass](ii));
-			MDsigma.setValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class[iclass](ii));
+			MDsigma.setValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class(ii));
 			MDsigma.setValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_TAU2_REF, tau2_class[iclass](ii));
 			// Only write orientabilities if they have been determined
@@ -493,6 +559,7 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 		else
 		{
 			img.read(fn_ref);
+			img().setXmippOrigin();
 			ref_dim = img().getDim();
 			if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
 			{
@@ -500,8 +567,23 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 				REPORT_ERROR("MlOptimiser::read: size of reference image is not the same as the experimental images!");
 			}
 			Iref.clear();
-			for (int iclass = 0; iclass < nr_classes; iclass++)
-				Iref.push_back(img());
+			if (nr_bodies > 1)
+			{
+				for (int ibody = 0; ibody < nr_bodies; ibody++)
+				{
+					Iref.push_back(img());
+					if (masks_bodies.size() <= ibody)
+						REPORT_ERROR("BUG: masks_bodies.size() < ibody. Did you initialise the body masks before reading the references?");
+					Iref[ibody] *= masks_bodies[ibody];
+				}
+			}
+			else
+			{
+				for (int iclass = 0; iclass < nr_classes; iclass++)
+				{
+					Iref.push_back(img());
+				}
+			}
 			if (nr_classes > 1)
 				do_generate_seeds = true;
 			else
@@ -628,19 +710,74 @@ void MlModel::initialisePdfDirection(int newsize)
 
 }
 
+void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
+{
+	MetaDataTable MD;
+	MD.read(fn_masks);
+	if (!MD.containsLabel(EMDL_MASK_NAME))
+		REPORT_ERROR("ERROR MlModel::initialiseBodyMasks: body-mask STAR file does not contain rlnBodyMaskName label.");
+
+	nr_bodies = 0;
+	masks_bodies.resize(MD.numberOfObjects());
+	com_bodies.resize(MD.numberOfObjects());
+	FileName fn_mask;
+	Image<RFLOAT> Imask;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		MD.getValue(EMDL_MASK_NAME, fn_mask);
+		Imask.read(fn_mask);
+		Imask().setXmippOrigin();
+		masks_bodies[nr_bodies] = Imask();
+		// find center-of-mass for rotations around it
+		int mydim = Imask().getDim();
+		Matrix1D<RFLOAT> com(mydim);
+		Imask().centerOfMass(com);
+		com_bodies[nr_bodies].resize(3);
+		XX(com_bodies[nr_bodies]) = ROUND(XX(com)); // ROUND so no interpolation artifacts in selfTranslate(Iref)
+		YY(com_bodies[nr_bodies]) = ROUND(YY(com));
+		if (mydim == 3)
+			ZZ(com_bodies[nr_bodies]) = ROUND(ZZ(com));
+		else
+			ZZ(com_bodies[nr_bodies]) = 0.;
+		// Also write the mask with the standard name to disk
+
+		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
+		fn_mask += "_mask.mrc";
+
+		Imask.write(fn_mask);
+		// update counter at the end!
+		nr_bodies++;
+	}
+
+}
+
+
+
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads)
 {
 
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	int nr_classes_bodies = nr_classes * nr_bodies; // also set multiple bodies!
+	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     {
+		MultidimArray<RFLOAT> Irefp;
+		//19may2015: if multi-body refinement: place each body with its center-of-mass in the center
+		if (nr_bodies > 1)
+		{
+			translate(Iref[iclass], Irefp, -com_bodies[iclass], DONT_WRAP);
+		}
+		else
+		{
+			Irefp = Iref[iclass];
+		}
+
         if (update_tau2_spectra)
         {
-			PPref[iclass].computeFourierTransformMap(Iref[iclass], tau2_class[iclass], current_size, nr_threads);
+			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads);
         }
         else
         {
         	MultidimArray<RFLOAT> dummy;
-        	PPref[iclass].computeFourierTransformMap(Iref[iclass], dummy, current_size, nr_threads);
+        	PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads);
         }
     }
 
@@ -693,7 +830,7 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 
 		// Calculate data_vs_prior_class as spectral_nr_observations_per_class/sigma2_noise vs 1/tau2_class
 		data_vs_prior_class[iclass].resize(sigma2_noise[0]);
-		fsc_halves_class[iclass].initZeros(sigma2_noise[0]);
+		fsc_halves_class.initZeros(sigma2_noise[0]);
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
 		{
 			RFLOAT evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);
@@ -714,6 +851,7 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
 {
 	nr_classes = _model.nr_classes;
+	nr_bodies = _model.nr_bodies;
     nr_groups = _model.nr_groups;
     nr_directions = _model.nr_directions;
     ref_dim = _model.ref_dim;
@@ -752,7 +890,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
     BackProjector BP(ori_size, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn,
     		         ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim);
     BPref.clear();
-    BPref.resize(nr_classes, BP);
+    BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
     sumw_group.resize(nr_groups);
 
 }
@@ -769,9 +907,14 @@ void MlWsumModel::initZeros()
     sigma2_psi = 0.;
 
     // Set all weighted sums to zero
-    for (int iclass = 0; iclass < nr_classes; iclass++)
+
+    for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
     {
     	BPref[iclass].initZeros(current_size);
+    }
+
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
         pdf_class[iclass] = 0.;
         // Assume pdf_direction is already of the right size...
         pdf_direction[iclass].initZeros();
@@ -812,8 +955,8 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
     packed_size += nr_groups;
     // for all class-related stuff
     // data is complex: multiply by two!
-    packed_size += nr_classes * 2 * BPref[0].getSize();
-    packed_size += nr_classes * BPref[0].getSize();
+    packed_size += nr_classes * nr_bodies * 2 * BPref[0].getSize();
+    packed_size += nr_classes * nr_bodies * BPref[0].getSize();
     packed_size += nr_classes * nr_directions;
     // for pdf_class
     packed_size += nr_classes;
@@ -859,7 +1002,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
         DIRECT_MULTIDIM_ELEM(packed, idx++) = sumw_group[igroup];
 
     }
-    for (int iclass = 0; iclass < nr_classes; iclass++)
+    for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
     {
 
     	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data)
@@ -874,7 +1017,9 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
             DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n);
         }
         BPref[iclass].weight.clear();
-
+    }
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
         {
             DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n);
@@ -935,7 +1080,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
         sumw_group[igroup] = DIRECT_MULTIDIM_ELEM(packed, idx++);
     }
 
-    for (int iclass = 0; iclass < nr_classes; iclass++)
+    for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
     {
     	BPref[iclass].initialiseDataAndWeight(current_size);
     	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data)
@@ -947,6 +1092,9 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
         {
     		DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
         }
+    }
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
     	pdf_direction[iclass].resize(nr_directions);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
         {
@@ -979,7 +1127,8 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 
     // Determine size of the packed array
     int nr_groups = sigma2_noise.size();
-    int nr_classes = BPref.size();
+    int nr_classes_bodies = BPref.size();
+    int nr_classes = pdf_class.size();
     int spectral_size = (ori_size / 2) + 1;
     long long int packed_size = 0;
     long long int idx_start, idx_stop;
@@ -994,8 +1143,8 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     packed_size += nr_groups;
     // for all class-related stuff
     // data is complex: multiply by two!
-    packed_size += nr_classes * 2 * BPref[0].getSize();
-    packed_size += nr_classes * BPref[0].getSize();
+    packed_size += nr_classes_bodies * 2 * BPref[0].getSize();
+    packed_size += nr_classes_bodies * BPref[0].getSize();
     packed_size += nr_classes * nr_directions;
     // for pdf_class
     packed_size += nr_classes;
@@ -1083,9 +1232,8 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
         ori_idx++;
 
     }
-    for (int iclass = 0; iclass < nr_classes; iclass++)
+    for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     {
-
     	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data)
         {
             if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = (DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n)).real;
@@ -1104,8 +1252,11 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
         }
         if (idx == ori_idx && do_clear)
             BPref[iclass].weight.clear();
+    }
 
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
+    	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
         {
             if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n);
             ori_idx++;
@@ -1145,7 +1296,8 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 
 
     int nr_groups = sigma2_noise.size();
-    int nr_classes = BPref.size();
+    int nr_classes_bodies = BPref.size();
+    int nr_classes = pdf_class.size();
     int spectral_size = (ori_size / 2) + 1;
     long long int idx_start;
     long long int idx_stop;
@@ -1217,11 +1369,10 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 
     }
 
-    for (int iclass = 0; iclass < nr_classes; iclass++)
+    for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     {
     	if (idx == ori_idx)
     		BPref[iclass].initialiseDataAndWeight(current_size);
-
     	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data)
         {
         	if (ori_idx >= idx_start && ori_idx < idx_stop)
@@ -1240,7 +1391,10 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 				DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
             ori_idx++;
         }
+    }
 
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
     	if (idx == ori_idx)
     		pdf_direction[iclass].resize(nr_directions);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])

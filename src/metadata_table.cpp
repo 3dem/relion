@@ -500,7 +500,7 @@ long int MetaDataTable::goToObject(long int objectID)
 	}
 }
 
-void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels)
+void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
 {
 	setIsList(false);
 
@@ -512,69 +512,72 @@ void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desir
     // First read all the column labels
     while (getline(in, line, '\n'))
     {
-    	line = simplify(line);
-    	// TODO: handle comments...
-    	if (line[0] == '#' || line[0] == '\0' || line[0] == ';')
-    		continue;
+		line = simplify(line);
+		// TODO: handle comments...
+		if (line[0] == '#' || line[0] == '\0' || line[0] == ';')
+			continue;
 
-    	if (line[0] == '_') // label definition line
-    	{
-    		//Only take string from "_" until "#"
-    		token = line.substr(line.find("_") + 1, line.find("#") - 2);
-    		label = EMDL::str2Label(token);
-    		//std::cerr << " label= XX" << label << "XX token= XX" << token<<"XX" << std::endl;
-    		if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
-    			label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
+		if (line[0] == '_') // label definition line
+		{
+			//Only take string from "_" until "#"
+			token = line.substr(line.find("_") + 1, line.find("#") - 2);
+			label = EMDL::str2Label(token);
+			//std::cerr << " label= XX" << label << "XX token= XX" << token<<"XX" << std::endl;
+			if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
+				label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
 
-    		if (label == EMDL_UNDEFINED)
-    		{
-    			//std::cerr << "Warning: ignoring the following (undefined) label:" <<token << std::endl;
-    			REPORT_ERROR("ERROR: Unrecognised metadata label: " + token);
-    			ignoreLabels.push_back(labelPosition);
-    		}
-    		else
-    			activeLabels.push_back(label);
+			if (label == EMDL_UNDEFINED)
+			{
+				//std::cerr << "Warning: ignoring the following (undefined) label:" <<token << std::endl;
+				REPORT_ERROR("ERROR: Unrecognised metadata label: " + token);
+				ignoreLabels.push_back(labelPosition);
+			}
+			else
+				activeLabels.push_back(label);
 
-    		labelPosition++;
-    	}
-    	else // found first data line
-    	{
-    		break;
-    	}
+			labelPosition++;
+		}
+		else // found first data line
+		{
+			break;
+		}
     }
 
     // Then fill the table (dont read another line until the one from above has been handled)
     bool is_first= true;
     while (is_first || getline(in, line, '\n'))
     {
-    	is_first=false;
-    	line = simplify(line);
-    	// Stop at empty line
-    	if (line[0] == '\0')
-    		break;
+		is_first=false;
 
-    	// Add a new line to the table
-    	addObject();
+    	if ( grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
+    	{
+    		line = simplify(line);
+			// Stop at empty line
+			if (line[0] == '\0')
+				break;
 
-    	// Parse data values
-    	std::stringstream os2(line);
-    	std::string value;
-		labelPosition = 0;
-		int counterIgnored = 0;
-		while (os2 >> value)
-		{
-			// TODO: handle comments here...
-			if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+			// Add a new line to the table
+			addObject();
+
+			// Parse data values
+			std::stringstream os2(line);
+			std::string value;
+			labelPosition = 0;
+			int counterIgnored = 0;
+			while (os2 >> value)
 			{
-				// Ignore this column
-				counterIgnored++;
+				// TODO: handle comments here...
+				if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+				{
+					// Ignore this column
+					counterIgnored++;
+					labelPosition++;
+					continue;
+				}
+				setValueFromString(activeLabels[labelPosition - counterIgnored], value);
 				labelPosition++;
-				continue;
 			}
-			setValueFromString(activeLabels[labelPosition - counterIgnored], value);
-			labelPosition++;
-		}
-
+    	} // end if grep_pattern
     }
 
 }
@@ -639,7 +642,7 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
      return also_has_loop;
 }
 
-int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels)
+int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
 {
     std::stringstream ss;
     std::string line, token, value;
@@ -670,7 +673,7 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     				trim(line);
     				if (line.find("loop_") != std::string::npos)
     				{
-    					readStarLoop(in, desiredLabels);
+    					readStarLoop(in, desiredLabels, grep_pattern);
     					return 1;
     				}
     				else if (line[0] == '_')
@@ -688,7 +691,7 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     return 0;
 }
 
-int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels)
+int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
 {
 
     // Clear current table
@@ -702,7 +705,7 @@ int MetaDataTable::read(const FileName &filename, const std::string &name, std::
     if (ext =="star")
     {
         //REPORT_ERROR("readSTAR not implemented yet...");
-        return readStar(in, name, desiredLabels);
+        return readStar(in, name, desiredLabels, grep_pattern);
     }
     else
     {

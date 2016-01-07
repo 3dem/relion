@@ -32,11 +32,14 @@
 #define HAS_RUN true
 #define HAS_NOT_RUN false
 
+#include <ctime>
 #include "src/gui_entries.h"
+#include "src/pipeliner.h"
 
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
+#define DEFAULTMOTIONCORRLOCATION "/public/EM/motioncorr/motioncorr"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -55,11 +58,30 @@ static Fl_Menu_Item sampling_options[] = {
 		      {0} // this should be the last entry
 };
 
+static Fl_Menu_Item node_type_options[] = {
+		      {"2D micrograph movies (*.mrcs)"},
+	          {"2D micrographs/tomograms (*.mrc)"},
+		      {"2D/3D particle coordinates (*.box, *_pick.star)"},
+		      {"3D reference (.mrc)"},
+		      {"3D mask (.mrc)"},
+		      {0} // this should be the last entry
+};
+
 static int minimum_nr_dedicated;
 static bool do_allow_change_minimum_dedicated;
 
+
+// Output filenames of relion_refine (use iter=-1 for auto-refine)
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies = 1, bool do_movies = false, bool do_also_rot = false);
+
 class RelionJobWindow : public Fl_Box
 {
+protected:
+
+	// Which process type is this?
+	int type;
+	bool is_continue;
+
 public:
 	// Position of current cursor to place new elements
 	int start_y, current_y;
@@ -97,13 +119,16 @@ public:
 	bool has_mpi;
 	bool has_thread;
 
-	bool is_continue;
+	// General pipeline I/O (the same for all jobtypes)
+	std::vector<Node> pipelineInputNodes;
+	std::vector<Node> pipelineOutputNodes;
+	std::string pipelineOutputName;
 
 
 public:
 	// Constructor with x, y, w, h and a title
 	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
-			int x = WCOL0, int y = MENUHEIGHT+10, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT-70, const char* title = "");
+			int x = WCOL0, int y = MENUHEIGHT+10, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
 
     // Destructor
     ~RelionJobWindow() {};
@@ -118,14 +143,17 @@ public:
 	// write/read settings to disc
 	void openWriteFile(std::string fn, std::ofstream &fh);
 	bool openReadFile(std::string fn, std::ifstream &fh);
-	void closeWriteFile(std::ofstream& fh);
+	void closeWriteFile(std::ofstream& fh, std::string fn);
 	void closeReadFile(std::ifstream& fh);
 
 	// Write the job submission script
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
 
+	// Initialise pipeiline stuff for each job, return outputname
+	void initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue = false);
+
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
-	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command);
+	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
 
 private:
 
@@ -162,20 +190,21 @@ public:
 };
 */
 
-class GeneralJobWindow : public RelionJobWindow
+class ImportJobWindow : public RelionJobWindow
 {
 public:
 
 	// I/O
-	SliderEntry angpix, particle_diameter;
+	FileNameEntry fn_in;
+	RadioEntry node_type;
 
 public:
 
 	// Constructor
-	GeneralJobWindow();
+	ImportJobWindow();
 
 	// Destructor
-	~GeneralJobWindow(){};
+	~ImportJobWindow(){};
 
 	// write/read settings to disc
 	void write(std::string fn);
@@ -185,7 +214,42 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+class MotioncorrJobWindow : public RelionJobWindow
+{
+public:
+
+	InputNodeEntry input_star_mics;
+	FileNameEntry fn_motioncorr_exe;
+	SliderEntry bin_factor;
+	SliderEntry first_frame_ali;
+	SliderEntry last_frame_ali;
+	SliderEntry first_frame_sum;
+	SliderEntry last_frame_sum;
+	AnyEntry other_motioncorr_args;
+	BooleanEntry do_save_movies;
+
+
+public:
+
+	// Constructor
+	MotioncorrJobWindow();
+
+	// Destructor
+	~MotioncorrJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -193,14 +257,13 @@ class CtffindJobWindow : public RelionJobWindow
 {
 public:
 
-	FileNameEntry mic_names;
-	AnyEntry output_star_ctf_mics;
-	FileNameEntry fn_ctffind_exe;
+	InputNodeEntry input_star_mics;
+	FileNameEntry fn_ctffind_exe, fn_gctf_exe;
 	SliderEntry ctf_win;
-	SliderEntry cs, kv, q0, angpix, dstep, dast;
+	SliderEntry cs, kv, q0, angpix, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
-	FileNameEntry fn_gctf_exe;
+	AnyEntry other_gctf_args;
 
 	Fl_Group *gctf_group;
 
@@ -220,7 +283,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -228,13 +291,14 @@ class AutopickJobWindow : public RelionJobWindow
 {
 public:
 
-	FileNameEntry fn_input_autopick;
-	FileNameEntry fn_refs_autopick;
-	AnyEntry autopick_rootname;
+	InputNodeEntry fn_input_autopick;
+	InputNodeEntry fn_refs_autopick;
 	BooleanEntry do_invert_refs;
 	BooleanEntry do_ctf_autopick;
 	BooleanEntry do_ignore_first_ctfpeak_autopick;
-	SliderEntry lowpass_autopick;
+	SliderEntry lowpass;
+	SliderEntry highpass;
+	SliderEntry angpix;
 	SliderEntry psi_sampling_autopick;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
@@ -259,7 +323,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -268,10 +332,11 @@ class ManualpickJobWindow : public RelionJobWindow
 {
 public:
 
-	FileNameEntry fn_in;
-	FileNameEntry fn_out;
-	AnyEntry manualpick_rootname;
+	InputNodeEntry fn_in;
 	SliderEntry lowpass;
+	SliderEntry highpass;
+	SliderEntry angpix;
+	SliderEntry diameter;
 	SliderEntry micscale;
 	SliderEntry ctfscale;
 	SliderEntry sigma_contrast;
@@ -301,7 +366,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -311,16 +376,20 @@ class ExtractJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry star_mics;
-	AnyEntry pick_suffix;
-	AnyEntry extract_rootname;
+	InputNodeEntry star_mics;
+	InputNodeEntry coords_suffix;
+	BooleanEntry do_reextract;
+	InputNodeEntry fndata_reextract;
+	BooleanEntry do_recenter;
 
 	// extract
-	BooleanEntry do_extract;
 	SliderEntry extract_size;
+	BooleanEntry do_set_angpix;
+	SliderEntry angpix;
 	BooleanEntry do_rescale;
 	SliderEntry rescale;
 	BooleanEntry do_norm;
+	SliderEntry bg_diameter;
 	SliderEntry white_dust;
 	SliderEntry black_dust;
 	BooleanEntry do_invert;
@@ -331,7 +400,7 @@ public:
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
 
-	Fl_Group *extract_group, *rescale_group, *norm_group, *movie_extract_group;
+	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group;
 
 public:
 
@@ -350,7 +419,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -359,8 +428,7 @@ class SortJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry input_star;
-	FileNameEntry fn_refs;
+	InputNodeEntry input_star;
 	BooleanEntry do_ctf;
 	BooleanEntry do_ignore_first_ctfpeak;
 
@@ -383,10 +451,9 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
+			std::string &final_command, bool do_makedir);
 
 };
-
 
 
 class Class2DJobWindow : public RelionJobWindow
@@ -394,9 +461,8 @@ class Class2DJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	AnyEntry fn_out;
 	FileNameEntry fn_cont;
-	FileNameEntry fn_img;
+	InputNodeEntry fn_img;
 	BooleanEntry do_parallel_discio;
 
 	// CTF
@@ -407,6 +473,7 @@ public:
 	// Optimisation
 	SliderEntry nr_iter;
 	SliderEntry tau_fudge;
+	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
 	SliderEntry highres_limit;
 
@@ -436,7 +503,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -446,14 +513,14 @@ class Class3DJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	AnyEntry fn_out;
 	FileNameEntry fn_cont;
-	FileNameEntry fn_img;
+	InputNodeEntry fn_img;
+	InputNodeEntry fn_ref;
+	InputNodeEntry fn_mask;
 	SliderEntry nr_classes;
 	BooleanEntry do_parallel_discio;
 
 	// Reference
-	FileNameEntry fn_ref;
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -467,8 +534,8 @@ public:
 	// Optimisation
 	SliderEntry nr_iter;
 	SliderEntry tau_fudge;
+	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
-	FileNameEntry fn_mask;
 	SliderEntry highres_limit;
 
 	// Sampling
@@ -498,7 +565,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -508,13 +575,13 @@ class Auto3DJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	AnyEntry fn_out;
 	FileNameEntry fn_cont;
-	FileNameEntry fn_img;
+	InputNodeEntry fn_img;
+	InputNodeEntry fn_ref;
+	InputNodeEntry fn_mask;
 	BooleanEntry do_parallel_discio;
 
 	// Reference
-	FileNameEntry fn_ref;
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -526,8 +593,8 @@ public:
 	BooleanEntry ctf_intact_first_peak;
 
 	// Optimisation
+	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
-	FileNameEntry fn_mask;
 
 	// Sampling
 	textOnlyEntry autosample_text;
@@ -538,7 +605,7 @@ public:
 
 	// Movies
 	BooleanEntry do_movies;
-	FileNameEntry fn_movie_star;
+	InputNodeEntry fn_movie_star;
 	SliderEntry movie_runavg_window;
 	SliderEntry movie_sigma_offset;
 	BooleanEntry do_alsorot_movies;
@@ -563,57 +630,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, RFLOAT angpix, RFLOAT particle_diameter);
-
-};
-
-class PostJobWindow : public RelionJobWindow
-{
-public:
-
-	// I/O
-	FileNameEntry fn_in;
-	AnyEntry fn_out;
-
-	// Masking
-	BooleanEntry do_automask;
-	SliderEntry inimask_threshold;
-	SliderEntry extend_inimask;
-	SliderEntry width_mask_edge;
-	BooleanEntry do_usermask;
-	FileNameEntry fn_mask;
-
-	// Sharpening
-	BooleanEntry do_auto_bfac;
-	SliderEntry autob_lowres;
-	BooleanEntry do_adhoc_bfac;
-	SliderEntry adhoc_bfac;
-	FileNameEntry fn_mtf;
-
-	// Filtering
-	BooleanEntry do_skip_fsc_weighting;
-	SliderEntry low_pass;
-
-	Fl_Group *automask_group, *usermask_group, *autobfac_group, *adhocbfac_group, *skipweight_group;
-
-public:
-
-	// Constructor
-	PostJobWindow();
-
-	// Destructor
-	~PostJobWindow(){};
-
-	// write/read settings to disc
-	void write(std::string fn);
-	void read(std::string fn, bool &_is_continue);
-
-	// what happens if you change continue old run radiobutton
-	void toggle_new_continue(bool is_continue);
-
-	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			RFLOAT angpix);
+			std::string &final_command, bool do_makedir);
 
 };
 
@@ -622,8 +639,8 @@ class PolishJobWindow : public RelionJobWindow
 
 public:
 	// I/O
-	FileNameEntry fn_in;
-	AnyEntry fn_out;
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_mask;
 
 	// Movements
 	SliderEntry movie_runavg_window;
@@ -634,8 +651,13 @@ public:
 	BooleanEntry do_bfactor_weighting;
 	SliderEntry perframe_highres;
 	SliderEntry perframe_bfac_lowres;
-	FileNameEntry fn_mask;
+	SliderEntry average_frame_bfactor;
 	AnyEntry sym_name;
+
+	// Normalisation
+	SliderEntry bg_diameter;
+	SliderEntry white_dust;
+	SliderEntry black_dust;
 
 	Fl_Group *fit_group, *weight_group;
 
@@ -655,8 +677,183 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			RFLOAT angpix, RFLOAT particle_diameter, RFLOAT black_dust, RFLOAT white_dust);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+class ClassSelectJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_model;
+	InputNodeEntry fn_data;
+
+	BooleanEntry do_recenter;
+	BooleanEntry do_regroup;
+	SliderEntry nr_groups;
+
+	Fl_Group *regroup_group;
+
+public:
+
+	// Constructor
+	ClassSelectJobWindow();
+
+	// Destructor
+	~ClassSelectJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+class MaskCreateJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_in;
+	SliderEntry lowpass_filter;
+	SliderEntry angpix;
+	SliderEntry inimask_threshold;
+	SliderEntry extend_inimask;
+	SliderEntry width_mask_edge;
+
+
+public:
+
+	// Constructor
+	MaskCreateJobWindow();
+
+	// Destructor
+	~MaskCreateJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+class JoinStarJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_in1;
+	InputNodeEntry fn_in2;
+
+public:
+
+	// Constructor
+	JoinStarJobWindow();
+
+	// Destructor
+	~JoinStarJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+class SubtractJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_data;
+	InputNodeEntry fn_mask;
+
+	// CTF
+	BooleanEntry do_ctf_correction;
+	BooleanEntry ctf_phase_flipped;
+	BooleanEntry ctf_intact_first_peak;
+
+	Fl_Group *ctf_group;
+
+public:
+
+	// Constructor
+	SubtractJobWindow();
+
+	// Destructor
+	~SubtractJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
+
+
+class PostJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_mask;
+	SliderEntry angpix;
+
+	// Sharpening
+	BooleanEntry do_auto_bfac;
+	SliderEntry autob_lowres;
+	BooleanEntry do_adhoc_bfac;
+	SliderEntry adhoc_bfac;
+	FileNameEntry fn_mtf;
+
+	// Filtering
+	BooleanEntry do_skip_fsc_weighting;
+	SliderEntry low_pass;
+
+	Fl_Group *autobfac_group, *adhocbfac_group, *skipweight_group;
+
+public:
+
+	// Constructor
+	PostJobWindow();
+
+	// Destructor
+	~PostJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
 };
 
 class ResmapJobWindow : public RelionJobWindow
@@ -664,17 +861,16 @@ class ResmapJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	FileNameEntry fn_resmap;
-
-	FileNameEntry fn_in;
+	InputNodeEntry fn_in;
+	InputNodeEntry fn_mask;
 
 	// Params
+	FileNameEntry fn_resmap;
 	SliderEntry pval;
 	SliderEntry minres;
 	SliderEntry maxres;
 	SliderEntry stepres;
 
-	FileNameEntry fn_mask;
 
 public:
 
@@ -692,8 +888,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			RFLOAT angpix);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
 
 };
 

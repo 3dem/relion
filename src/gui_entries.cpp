@@ -241,6 +241,7 @@ void FileNameEntry::initialise(int x, int y, int height,
 		                     const char* title,
 		                     const char* defaultvalue,
 		                     const char* _pattern,
+		                     const char* _directory,
 		                     const char* helptext)
 {
 
@@ -252,6 +253,7 @@ void FileNameEntry::initialise(int x, int y, int height,
 
 	// Store the pattern for the file chooser
 	pattern = _pattern;
+	directory = _directory;
 
     // The Browse button
     browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
@@ -264,6 +266,7 @@ void FileNameEntry::place(int &y,
 		const char * title,
 		const char* defaultvalue,
 		const char* pattern,
+		const char* directory,
 		const char* helptext,
 		int x, int h, int wcol2, int wcol3, int wcol4 )
 {
@@ -272,7 +275,7 @@ void FileNameEntry::place(int &y,
 	clear();
 
 	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, pattern, helptext);
+	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, pattern, directory, helptext);
 
 	// Update the Y-coordinate
     y += h + 2;
@@ -314,7 +317,7 @@ void FileNameEntry::cb_browse_i() {
     Fl::scheme("gtk+");
     Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
 
-    G_chooser->directory(NULL);
+    G_chooser->directory(directory);
     G_chooser->color(GUI_BACKGROUND_COLOR);
     G_chooser->show();
 
@@ -335,6 +338,124 @@ void FileNameEntry::cb_browse_i() {
     fl_filename_relative(relname,sizeof(relname),G_chooser->value());
     inp->value(relname);
 }
+
+
+// ==============================================================================
+// InputNodeEntry ================================================================
+// ==============================================================================
+
+void InputNodeEntry::initialise(int x, int y, int height,
+		                     int wcol2, int wcol3, int wcol4,
+		                     const char* title,
+		                     int _type,
+		                     const char* defaultvalue,
+		                     const char* _pattern,
+		                     const char* helptext)
+{
+
+	AnyEntry::initialise(x,y,height,
+			wcol2,wcol3,
+			title,
+			defaultvalue,
+			helptext);
+
+	// Store the pattern for the file chooser
+	pattern = _pattern;
+	type = _type;
+    // The Browse button
+    browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
+    browse->callback( cb_browse_node, this );
+    browse->color(GUI_BUTTON_COLOR);
+}
+
+
+void InputNodeEntry::place(int &y,
+		const char * title,
+		int _type,
+		const char* defaultvalue,
+		const char* pattern,
+		const char* helptext,
+		int x, int h, int wcol2, int wcol3, int wcol4 )
+{
+
+	// Clear if existing
+	clear();
+
+	// Add the entry to the window
+	initialise(x, y, h, wcol2, wcol3, wcol4, title, _type, defaultvalue, pattern, helptext);
+
+	// Update the Y-coordinate
+    y += h + 2;
+
+}
+
+void InputNodeEntry::clear()
+{
+	// TODO: add stuff to track history here
+	if (label != "")
+	{
+		AnyEntry::clear();
+		delete browse;
+	}
+}
+
+void InputNodeEntry::deactivate(bool do_deactivate)
+{
+	// TODO: add stuff to track history here
+	AnyEntry::deactivate(do_deactivate);
+	if (do_deactivate)
+	{
+		browse->deactivate();
+	}
+	else
+	{
+		browse->activate();
+	}
+
+}
+
+void InputNodeEntry::cb_browse_node(Fl_Widget* o, void* v) {
+
+    InputNodeEntry* T=(InputNodeEntry*)v;
+    T->cb_browse_node_i();
+}
+
+
+void InputNodeEntry::cb_browse_node_i() {
+
+    Fl::scheme("gtk+");
+    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
+
+    std::string fn_dir = ".Nodes/" + integerToString(type);
+    G_chooser->directory(fn_dir.c_str());
+    G_chooser->color(GUI_BACKGROUND_COLOR);
+    G_chooser->show();
+
+    // Block until user picks something.
+    //     (The other way to do this is to use a callback())
+    //
+    while(G_chooser->shown()) {
+        Fl::wait();
+    }
+
+    // Print the results
+    if ( G_chooser->value() == NULL ) {
+        //fprintf(stderr, "(User hit 'Cancel')\n");
+        return;
+    }
+
+    char relname[FL_PATH_MAX];
+    fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+
+    // Get rid of the .Nodes/type/ directory-name again
+    std::string replace = std::string(relname);
+    std::string replace2 = replace.substr(fn_dir.length()+1, replace.length());
+    char relname2[FL_PATH_MAX];
+    strcpy(relname2, replace2.c_str());
+
+    inp->value(relname2);
+}
+
 
 // ==============================================================================
 // RadioEntry ================================================================

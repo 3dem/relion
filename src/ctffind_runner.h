@@ -25,6 +25,7 @@
 #include  <vector>
 #include  <string>
 #include  <stdlib.h>
+#include  <unistd.h>
 #include  <stdio.h>
 #include "src/metadata_table.h"
 #include "src/image.h"
@@ -49,8 +50,20 @@ public:
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;
 
-	// CTFFIND executable
-	FileName fn_ctffind_exe;
+	// CTFFIND and Gctf executables
+	FileName fn_ctffind_exe, fn_gctf_exe;
+
+	// use Kai Zhang's Gctf instead of CTFFIND?
+	bool do_use_gctf;
+
+	// When using Gctf, ignore CTFFIND parameters and use Gctf defaults instead?
+	bool do_ignore_ctffind_params;
+
+	// When using Gctf, use equi-phase averaging?
+	bool do_EPA;
+
+	// When using Gctf, do validation test?
+	bool do_validation;
 
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
@@ -83,8 +96,17 @@ public:
 	// Detector pixel size (um)
 	RFLOAT PixelSize;
 
+	// For Gctf: directly provide angpix!
+	RFLOAT angpix;
+
 	// Flag to only join results into a star file
 	bool do_only_join_results;
+
+	// Micrograph size (for Gctf check that all are equal size)
+	int xdim, ydim;
+
+	// Current working directory to make absolute-path symlinks
+	std::string currdir;
 
 public:
 	// Read command line arguments
@@ -103,13 +125,20 @@ public:
 	void joinCtffindResults();
 
 	// Execute CTFFIND for a single micrograph
-	void executeCtffind(FileName fn_mic);
+	void executeCtffind(long int imic);
 
+	// Check micrograph size and add name to the list of micrographs to run Gctf on
+	void addToGctfJobList(long int imic, std::string &allmicnames);
+
+	// Execute Gctf for many micrographs
+	void executeGctf(std::string &allmicnames);
+
+	// Get micrograph metadata
+	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
+			RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found = true);
 };
 
-// Get micrograph metadata
-bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
-		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep, bool die_if_not_found = true);
 
 
 #endif /* CTFFIND_RUNNER_H_ */
