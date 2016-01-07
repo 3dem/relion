@@ -189,6 +189,12 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 			job_maskcreate = new MaskCreateJobWindow();
 			break;
 		}
+    	case PROC_JOINSTAR:
+    	{
+    		browser->add("Join star files");
+			job_joinstar = new JoinStarJobWindow();
+			break;
+		}
     	case PROC_SUBTRACT:
     	{
     		browser->add("Particle subtraction");
@@ -603,6 +609,13 @@ void RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_
 		oname = job_maskcreate->pipelineOutputName;
 		break;
 	}
+	case PROC_JOINSTAR:
+	{
+		inputnodes = job_joinstar->pipelineInputNodes;
+		outputnodes= job_joinstar->pipelineOutputNodes;
+		oname = job_joinstar->pipelineOutputName;
+		break;
+	}
 	case PROC_SUBTRACT:
 	{
 		inputnodes = job_subtract->pipelineInputNodes;
@@ -818,6 +831,18 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_maskcreate->toggle_new_continue(is_main_continue);
 		if (do_commandline)
 			job_maskcreate->getCommands(global_outputname, commands, final_command, do_makedir);
+		break;
+	}
+	case PROC_JOINSTAR:
+	{
+		if (do_write)
+			job_joinstar->write(fn_settings);
+		if (do_read)
+			job_joinstar->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_joinstar->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_joinstar->getCommands(global_outputname, commands, final_command, do_makedir);
 		break;
 	}
 	case PROC_SUBTRACT:

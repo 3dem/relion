@@ -101,10 +101,11 @@ class Node
 #define PROC_3DAUTO	        10 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
 #define PROC_POLISH			11// Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE     12// Process to create masks from input maps
-#define PROC_SUBTRACT       13// Process to subtract projections of parts of the reference from experimental images
-#define PROC_POST			14// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			15// Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define NR_BROWSE_TABS      16
+#define PROC_JOINSTAR       13// Process to create masks from input maps
+#define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define NR_BROWSE_TABS      17
 
 // Status a Process may have
 #define PROC_RUNNING   0

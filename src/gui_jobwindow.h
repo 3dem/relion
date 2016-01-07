@@ -748,6 +748,34 @@ public:
 
 };
 
+class JoinStarJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	InputNodeEntry fn_in1;
+	InputNodeEntry fn_in2;
+
+public:
+
+	// Constructor
+	JoinStarJobWindow();
+
+	// Destructor
+	~JoinStarJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+
+};
+
 class SubtractJobWindow : public RelionJobWindow
 {
 public:

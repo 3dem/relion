@@ -62,6 +62,7 @@ static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
 static ClassSelectJobWindow *job_classselect;
 static MaskCreateJobWindow *job_maskcreate;
+static JoinStarJobWindow *job_joinstar;
 static SubtractJobWindow *job_subtract;
 static PostJobWindow *job_post;
 static PolishJobWindow *job_polish;
@@ -82,26 +83,6 @@ static PipeLine pipeline;
 // Which is the current job being displayed?
 static int current_job;
 FileName global_outputname;
-
-static Fl_Menu_Item new_job_options[] = {
-		{"Import"},
-		{"Motion correction"},
-		{"CTF estimation"},
-		{"Manual picking"},
-		{"Auto-picking"},
-		{"Particle extraction"},
-		{"Particle sorting"},
-		{"2D classification"},
-		{"3D classification"},
-		{"3D auto-refine"},
-		{"Particle polishing"},
-		{"Class selection"},
-		{"Mask creation"},
-		{"Image subtraction"},
-		{"Post-processing"},
-		{"Local-resolution"},
-		{0} // this should be the last entry
-};
 
 class RelionMainWindow : public Fl_Window
 {

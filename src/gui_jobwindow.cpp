@@ -3633,6 +3633,83 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 }
 
+JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
+{
+
+	type = PROC_MASKCREATE;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+
+	fn_in1.place(current_y, "TODO!!:", NODE_PART_DATA, "", "particle STAR file (*.star)", "One of the particle STAR files to be combined.");
+	tab1->end();
+
+	// read settings if hidden file exists
+	read(".gui_joinstar", is_continue);
+}
+
+
+
+void JoinStarJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_joinstar";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	fn_in1.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+
+void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+	// Only read things if the file exists
+	if (openReadFile(fn, fh))
+	{
+		fn_in1.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+
+void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+}
+
+void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir)
+{
+
+	commands.clear();
+	initialisePipeline(outputname, "JoinStar");
+
+	std::string command;
+	command="`which relion_star_combine`";
+
+	// I/O  TODO!!!
+	command += " --i " + fn_in1.getValue();
+	Node node(fn_in1.getValue(), fn_in1.type);
+	pipelineInputNodes.push_back(node);
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
 
 
 SubtractJobWindow::SubtractJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
