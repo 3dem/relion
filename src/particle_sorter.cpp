@@ -61,6 +61,7 @@ void ParticleSorter::initialise()
 	if (MDin.containsLabel(EMDL_CTF_MAGNIFICATION) && MDin.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 	{
 		RFLOAT mag, dstep;
+		MDin.goToObject(0);
 		MDin.getValue(EMDL_CTF_MAGNIFICATION, mag);
 		MDin.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 		angpix = 10000. * dstep / mag;

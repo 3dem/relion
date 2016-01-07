@@ -1809,6 +1809,7 @@ void Displayer::initialise()
 			RFLOAT mag, dstep;
 			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 			{
+				MD.goToObject(0);
 				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
 				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 				angpix = 10000. * dstep / mag;

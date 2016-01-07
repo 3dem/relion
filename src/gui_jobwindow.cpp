@@ -3741,16 +3741,19 @@ void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command="`which relion_project`";
 
 	// I/O
-	command += " --i " + fn_in.getValue();
+	command += " --subtract_exp --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 	command += " --mask " + fn_mask.getValue();
 	Node node2(fn_mask.getValue(), fn_mask.type);
 	pipelineInputNodes.push_back(node2);
+	command += " --ang " + fn_data.getValue();
+	Node node3(fn_data.getValue(), fn_data.type);
+	pipelineInputNodes.push_back(node3);
 
 	command += " --o " + outputname + "subtracted";
-	Node node3(outputname + "subtracted.star", NODE_PART_DATA);
-	pipelineOutputNodes.push_back(node3);
+	Node node4(outputname + "subtracted.star", NODE_PART_DATA);
+	pipelineOutputNodes.push_back(node4);
 
 	if (do_ctf_correction.getValue())
 	{

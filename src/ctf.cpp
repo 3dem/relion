@@ -84,6 +84,7 @@ void CTF::read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID)
 			Q0=0;
 
 	initialise();
+
 }
 void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale)

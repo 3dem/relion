@@ -115,6 +115,7 @@ void ParticlePolisher::initialise()
 		if (exp_model.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && exp_model.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 		{
 			RFLOAT mag, dstep;
+			exp_model.MDimg.goToObject(0);
 			exp_model.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
 			exp_model.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;

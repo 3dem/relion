@@ -119,6 +119,7 @@ void Preprocessing::initialise()
 		else if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 		{
 
+			MDmics.goToObject(0);
 			RFLOAT mag, dstep;
 			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag);
 			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
@@ -964,14 +965,13 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 	MetaDataTable MDresult;
 	MDresult.read(fn_data, "", NULL, fn_mic_nouniqdate);
 
-	MDresult.write("test.star");
-
 	if (!MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) || !MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 	{
 		REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star should contain rlnMagnification and rlnDetectorPixelSize.");
 	}
 
 	RFLOAT mag2, dstep2, angpix2;
+	MDresult.goToObject(0);
 	MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
 	MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
 	angpix2 = 10000. * dstep2 / mag2;

@@ -98,7 +98,8 @@ void AutoPicker::initialise()
         RFLOAT mag, dstep;
         if (MDmic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
         {
-			MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MDmic.goToObject(0);
+        	MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
 			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;
 			if (verb > 0)

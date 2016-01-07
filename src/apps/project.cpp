@@ -107,9 +107,9 @@ public:
     	Image<RFLOAT> vol, img, expimg;
     	FourierTransformer transformer, transformer_expimg;
 
-		std::cerr << " Reading map: " << fn_map << std::endl;
+		std::cout << " Reading map: " << fn_map << std::endl;
     	vol.read(fn_map);
-    	std::cerr << " Done reading map!" << std::endl;
+    	std::cout << " Done reading map!" << std::endl;
 
     	if (fn_mask != "")
     	{
@@ -123,9 +123,9 @@ public:
 
     	if (!do_only_one)
     	{
-    		std::cerr << " Reading STAR file with all angles " << fn_ang << std::endl;
-                MDang.read(fn_ang);
-    		std::cerr << " Done reading STAR file!" << std::endl;
+    		std::cout << " Reading STAR file with all angles " << fn_ang << std::endl;
+    		MDang.read(fn_ang);
+    		std::cout << " Done reading STAR file!" << std::endl;
     	}
 
 
@@ -133,17 +133,18 @@ public:
     	{
     		if (do_only_one)
     			REPORT_ERROR("project ERROR: please provide pixel size in Angstroms through --angpix");
-            if (MDang.containsLabel(EMDL_CTF_MAGNIFICATION) && MDang.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+    		if (MDang.containsLabel(EMDL_CTF_MAGNIFICATION) && MDang.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
             {
-                    RFLOAT mag, dstep;
-                    MDang.getValue(EMDL_CTF_MAGNIFICATION, mag);
-                    MDang.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-                    angpix = 10000. * dstep / mag;
-                    std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+                MDang.goToObject(0);
+				RFLOAT mag, dstep;
+				MDang.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				MDang.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				angpix = 10000. * dstep / mag;
+				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
             }
             else
             {
-            		REPORT_ERROR("project ERROR: please provide pixel size in Angstroms through --angpix");
+            	REPORT_ERROR("project ERROR: please provide pixel size in Angstroms through --angpix");
             }
     	}
 
@@ -190,7 +191,7 @@ public:
         	// Shift the image back to the center...
         	CenterFFT(img(), false);
         	img.write(fn_out);
-        	std::cerr<<" Done writing "<<fn_out<<std::endl;
+        	std::cout<<" Done writing "<<fn_out<<std::endl;
     	}
     	else
     	{
@@ -214,7 +215,7 @@ public:
             FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDang)
             {
 
-                MDang.getValue(EMDL_ORIENT_ROT, rot);
+            	MDang.getValue(EMDL_ORIENT_ROT, rot);
                 MDang.getValue(EMDL_ORIENT_TILT, tilt);
                 MDang.getValue(EMDL_ORIENT_PSI, psi);
                 MDang.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
@@ -246,7 +247,7 @@ public:
                 CTF ctf;
                 if (do_ctf || do_ctf2)
                 {
-                    ctf.read(MDang, MDang);
+                	ctf.read(MDang, MDang);
                     Fctf.resize(F2D);
                     ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
                     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
@@ -340,7 +341,7 @@ public:
                 }
                 else
                 {
-                    // Write this particle to the stack on disc
+                	// Write this particle to the stack on disc
                     // First particle: write stack in overwrite mode, from then on just append to it
                     fn_img.compose(imgno+1,fn_out+".mrcs");
                     if (imgno == 0)

@@ -220,6 +220,12 @@ private:
     static void cb_show_initial_screen(Fl_Widget*, void*);
     inline void cb_show_initial_screen_i();
 
+    static void cb_menubar_run_scheduled_jobs(Fl_Widget*, void*);
+    inline void cb_menubar_run_scheduled_jobs_i();
+
+    static void cb_menubar_stop_run_scheduled_jobs(Fl_Widget*, void*);
+    inline void cb_menubar_stop_run_scheduled_jobs_i();
+
     static void cb_menubar_about(Fl_Widget*, void*);
     inline void cb_menubar_about_i();
 

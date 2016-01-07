@@ -78,6 +78,9 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar->add("File/Show initial screen",  FL_ALT+'a', cb_show_initial_screen, this);
     menubar->add("File/About",  FL_ALT+'a', cb_menubar_about, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
+    menubar->add("Autorun/Run scheduled jobs", 0, cb_menubar_run_scheduled_jobs, this);
+    menubar->add("Autorun/Stop running scheduled jobs", 0, cb_menubar_stop_run_scheduled_jobs, this);
+
     current_y = MENUHEIGHT + 10;
 
     // Add run buttons on the menubar as well
@@ -277,9 +280,9 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT-40, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+    menubar2->add("Job actions/Move to trash", 0, cb_delete, this);
     menubar2->add("Job actions/Rename", 0, cb_set_alias, this);
     menubar2->add("Job actions/Run scheduled", 0, cb_run_scheduled, this);
-    menubar2->add("Job actions/Delete", 0, cb_delete, this);
     menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
 
     // Text display with the name of the current job
@@ -1389,13 +1392,13 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	if (do_ask)
 	{
 		std::string ask;
-		ask = "Are you sure you want to delete the following processes? \n";
+		ask = "Are you sure you want to move the following processes to Trash? \n";
 		for (size_t i = 0; i < deleteProcesses.size(); i++)
 		{
 			if (deleteProcesses[i])
 				ask += " - " + pipeline.processList[i].name + "\n";
 		}
-		proceed =  fl_choice(ask.c_str(), "Don't delete", "Delete", NULL);
+		proceed =  fl_choice(ask.c_str(), "Don't move", "Move", NULL);
 	}
 	else
 	{
@@ -1547,6 +1550,13 @@ void RelionMainWindow::cb_menubar_save(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_menubar_save_i()
 {
+	// For scheduled jobs, also save the .job file in the .Scheduled directory
+	if (pipeline.processList[current_job].status = PROC_SCHEDULED)
+	{
+		fn_settings = ".ScheduledJobs/" + global_outputname;
+		jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
+	}
+
 	fn_settings = "";
 	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
 
@@ -1577,6 +1587,29 @@ void RelionMainWindow::cb_show_initial_screen_i()
 	cb_select_browsegroup_i();
 }
 
+void RelionMainWindow::cb_menubar_run_scheduled_jobs(Fl_Widget* o, void* v)
+{
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_menubar_run_scheduled_jobs_i();
+}
+
+void RelionMainWindow::cb_menubar_run_scheduled_jobs_i()
+{
+	// TODO
+}
+
+void RelionMainWindow::cb_menubar_stop_run_scheduled_jobs(Fl_Widget* o, void* v)
+{
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_menubar_stop_run_scheduled_jobs_i();
+}
+
+void RelionMainWindow::cb_menubar_stop_run_scheduled_jobs_i()
+{
+	// TODO
+}
 
 void RelionMainWindow::cb_menubar_about(Fl_Widget* o, void* v)
 {

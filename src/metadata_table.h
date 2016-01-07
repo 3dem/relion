@@ -186,7 +186,6 @@ public:
     {
         if (isEmpty())
         	return false;
-
         MetaDataContainer * aux = getObject(objectID);
 
 		// Inside getValue of the container there will be a check of the correct type
