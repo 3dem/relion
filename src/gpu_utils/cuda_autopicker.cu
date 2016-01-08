@@ -274,7 +274,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	std::cerr << " cudaAutoPicker being run!" << std::endl;
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
-	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf;
+	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
+	MultidimArray<int> Mclass_best_combined;
 	CudaGlobalPtr<XFLOAT > d_Maux;
 
 	CudaGlobalPtr<XFLOAT >  d_Mccf_best(basePckr->workSize*basePckr->workSize, allocator);
@@ -410,7 +411,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	if (basePckr->do_read_fom_maps)
 	{
 		CUDA_CPU_TIC("readFromFomMaps_0");
-		FileName fn_tmp=fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_stddevNoise.spi";
+		FileName fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_stddevNoise.spi";
 		Image<RFLOAT> It;
 		It.read(fn_tmp);
 		Mstddev = It();
@@ -443,6 +444,14 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			micTransformer.reals[i] = (XFLOAT) Imic().data[i];
 		micTransformer.reals.cp_to_device();
 		CUDA_CPU_TIC("Imic_insert");
+
+		//TODO ADD HIGH PASS FILTER
+//		if (highpass > 0.)
+//        {
+//			lowPassFilterMap(Fmic, XSIZE(Imic()), highpass, angpix, 2, true); // true means highpass instead of lowpass!
+//        	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
+//        }
+
 
 
 		CUDA_CPU_TIC("runCenterFFT_0");
@@ -582,7 +591,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		{
 			CUDA_CPU_TIC("writeToFomMaps");
 			// TMP output
-			FileName fn_tmp=fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_stddevNoise.spi";
+			FileName fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_stddevNoise.spi";
 			Image<RFLOAT> It;
 
 			Mstddev.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
@@ -602,6 +611,37 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	std::vector<Peak> peaks;
 	peaks.clear();
 	CUDA_CPU_TOC("initPeaks");
+
+
+	//TODO FIX HELICAL SEGMENTS SUPPORT
+//	if (autopick_helical_segments)
+//	{
+//		if (do_read_fom_maps)
+//		{
+//			FileName fn_tmp;
+//			Image<RFLOAT> It_float;
+//			Image<int> It_int;
+//
+//			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCCF.mrc";
+//			It_float.read(fn_tmp);
+//			Mccf_best_combined = It_float();
+//
+//			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCLASS.mrc";
+//			It_int.read(fn_tmp);
+//			Mclass_best_combined = It_int();
+//		}
+//		else
+//		{
+//			Mccf_best_combined.clear();
+//			Mccf_best_combined.resize(micrograph_size, micrograph_size);
+//			Mccf_best_combined.initConstant(-99.e99);
+//			Mclass_best_combined.clear();
+//			Mclass_best_combined.resize(micrograph_size, micrograph_size);
+//			Mclass_best_combined.initConstant(-1);
+//		}
+//	}
+
+
 
 	CUDA_CPU_TIC("setupProjectors");
 	setupProjectors();
@@ -890,12 +930,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				Image<RFLOAT> It;
 				It() = Mccf_best;
 				// Store expected_Pratio in the header of the image..
-				It.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);;
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.spi");
+				It.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);  // Store expected_Pratio in the header of the image
+				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.spi");
 				It.write(fn_tmp);
 
 				It() = Mpsi_best;
-				fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
+				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
 //				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
@@ -907,50 +947,125 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 		} // end if do_read_fom_maps
 
-		// Now that we have Mccf_best and Mpsi_best, get the peaks
-		std::vector<Peak> my_ref_peaks;
-		CUDA_CPU_TIC("setXmippOriginX3");
-		Mstddev.setXmippOrigin();
-		Mccf_best.setXmippOrigin();
-		Mpsi_best.setXmippOrigin();
-		CUDA_CPU_TOC("setXmippOriginX3");
 
-		CUDA_CPU_TIC("peakSearch");
-		basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
-		CUDA_CPU_TOC("peakSearch");
+		//TODO FIX HELICAL SEGMENTS SUPPORT
+//		if (autopick_helical_segments)
+//		{
+//			if (!do_read_fom_maps)
+//			{
+//				// Combine Mccf_best and Mpsi_best from all refs
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+//				{
+//					RFLOAT new_ccf = DIRECT_MULTIDIM_ELEM(Mccf_best, n);
+//					RFLOAT old_ccf = DIRECT_MULTIDIM_ELEM(Mccf_best_combined, n);
+//					if (new_ccf > old_ccf)
+//					{
+//						DIRECT_MULTIDIM_ELEM(Mccf_best_combined, n) = new_ccf;
+//						DIRECT_MULTIDIM_ELEM(Mclass_best_combined, n) = iref;
+//					}
+//				}
+//			}
+//		}
+//		else
+		{
+			// Now that we have Mccf_best and Mpsi_best, get the peaks
+			std::vector<Peak> my_ref_peaks;
+			CUDA_CPU_TIC("setXmippOriginX3");
+			Mstddev.setXmippOrigin();
+			Mccf_best.setXmippOrigin();
+			Mpsi_best.setXmippOrigin();
+			CUDA_CPU_TOC("setXmippOriginX3");
 
-		CUDA_CPU_TIC("peakPrune");
-		basePckr->prunePeakClusters(my_ref_peaks, min_distance_pix);
-		CUDA_CPU_TOC("peakPrune");
+			CUDA_CPU_TIC("peakSearch");
+			basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
+			CUDA_CPU_TOC("peakSearch");
 
-		CUDA_CPU_TIC("peakInsert");
-		// append the peaks of this reference to all the other peaks
-		peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());
-		CUDA_CPU_TOC("peakInsert");
-		CUDA_CPU_TOC("OneReference");
+			CUDA_CPU_TIC("peakPrune");
+			basePckr->prunePeakClusters(my_ref_peaks, min_distance_pix);
+			CUDA_CPU_TOC("peakPrune");
+
+			CUDA_CPU_TIC("peakInsert");
+			// append the peaks of this reference to all the other peaks
+			peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());
+			CUDA_CPU_TOC("peakInsert");
+			CUDA_CPU_TOC("OneReference");
+
+		}
 	} // end for iref
 
 
-	//Now that we have done all references, prune the list again...
-	CUDA_CPU_TIC("finalPeakPrune");
-	basePckr->prunePeakClusters(peaks, min_distance_pix);
-	CUDA_CPU_TOC("finalPeakPrune");
-
-	// And remove all too close neighbours
-	basePckr->removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix);
-
-	// Write out a STAR file with the coordinates
-	MetaDataTable MDout;
-	for (int ipeak =0; ipeak < peaks.size(); ipeak++)
+	//TODO FIX HELICAL SEGMENTS SUPPORT
+//	if (autopick_helical_segments)
+//	{
+//		RFLOAT thres = min_fraction_expected_Pratio;
+//		int peak_r_min = 2;
+//		std::vector<ccfPeak> ccf_peak_list;
+//		std::vector<std::vector<ccfPeak> > tube_coord_list, tube_track_list;
+//		std::vector<RFLOAT> tube_len_list;
+//		MultidimArray<RFLOAT> Mccfplot;
+//
+//		Mccf_best_combined.setXmippOrigin();
+//		Mclass_best_combined.setXmippOrigin();
+//		pickCCFPeaks(Mccf_best_combined, Mclass_best_combined, thres, peak_r_min, (particle_diameter / angpix), ccf_peak_list, Mccfplot, micrograph_size, micrograph_minxy_size, my_skip_side);
+//		extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list, (particle_diameter / angpix), helical_tube_curvature_factor_max, (min_particle_distance / angpix), (helical_tube_diameter / angpix));
+//		exportHelicalTubes(Mccf_best_combined, Mccfplot, Mclass_best_combined,
+//					tube_coord_list, tube_track_list, tube_len_list,
+//					fn_mic, fn_out,
+//					(particle_diameter / angpix),
+//					(helical_tube_length_min / angpix),
+//					micrograph_size,
+//					micrograph_xsize,
+//					micrograph_ysize,
+//					my_skip_side);
+//
+//		if (do_write_fom_maps)
+//		{
+//			FileName fn_tmp;
+//			Image<RFLOAT> It_float;
+//			Image<int> It_int;
+//
+//			It_float() = Mccf_best_combined;
+//			fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + "_combinedCCF.mrc";
+//			It_float.write(fn_tmp);
+//
+//			It_int() = Mclass_best_combined;
+//			fn_tmp = getOutputRootName(fn_mic) + + "_" + fn_out + "_combinedCLASS.mrc";
+//			It_int.write(fn_tmp);
+//		} // end if do_write_fom_maps
+//
+//		if (do_write_fom_maps || do_read_fom_maps)
+//		{
+//			FileName fn_tmp;
+//			Image<RFLOAT> It;
+//
+//			It() = Mccfplot;
+//			fn_tmp =  getOutputRootName(fn_mic) + "_" + fn_out + "_combinedPLOT.mrc";
+//			It.write(fn_tmp);
+//		}
+//	}
+//	else
 	{
-		MDout.addObject();
-		MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x));
-		MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y));
-		MDout.setValue(EMDL_ORIENT_PSI, peaks[ipeak].psi);
-		MDout.setValue(EMDL_PARTICLE_CLASS, peaks[ipeak].ref + 1); // start counting at 1
-		MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, peaks[ipeak].fom);
+		//Now that we have done all references, prune the list again...
+		CUDA_CPU_TIC("finalPeakPrune");
+		basePckr->prunePeakClusters(peaks, min_distance_pix);
+		CUDA_CPU_TOC("finalPeakPrune");
+
+		// And remove all too close neighbours
+		basePckr->removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix);
+
+		// Write out a STAR file with the coordinates
+		MetaDataTable MDout;
+		for (int ipeak =0; ipeak < peaks.size(); ipeak++)
+		{
+			MDout.addObject();
+			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x));
+			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y));
+			MDout.setValue(EMDL_PARTICLE_CLASS, peaks[ipeak].ref + 1); // start counting at 1
+			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, peaks[ipeak].fom);
+			MDout.setValue(EMDL_ORIENT_PSI, peaks[ipeak].psi);
+		}
+		FileName fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + ".star";
+		MDout.write(fn_tmp);
 	}
-	FileName fn_tmp = fn_mic.withoutExtension() + "_" + basePckr->fn_out + ".star";
-	MDout.write(fn_tmp);
 
 }
