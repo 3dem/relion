@@ -70,6 +70,7 @@ static ResmapJobWindow *job_resmap;
 static PublishJobWindow *job_publish;
 // Run button
 static Fl_Button *run_button;
+static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
 static FileName fn_settings;
 // Initial screen
@@ -93,9 +94,6 @@ public:
 	Fl_Menu_Bar *menubar, *menubar2;
 	Fl_Tabs *tabs;
 	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
-
-    // Run button
-    Fl_Button *print_CL_button, *cite_button;
 
     // For job submission
     std::string final_command;

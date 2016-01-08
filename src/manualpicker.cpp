@@ -200,7 +200,8 @@ int manualpickerGuiWindow::fill()
 
 
 	Fl_Menu_Bar *menubar = new Fl_Menu_Bar(0, 0, w(), 25);
-    menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
+    if (do_allow_save)
+    	menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
     menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
     int current_y = 25;
@@ -285,7 +286,8 @@ int manualpickerGuiWindow::fill()
 
 
 	// See if the output STAR file already exists, if so apply that selection
-	readOutputStarfile();
+	if (do_allow_save)
+		readOutputStarfile();
 
 	// Also count the number of particles that were already picked
 	cb_menubar_recount_i();
@@ -447,6 +449,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1."));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
+	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
 
 	int mic_section = parser.addSection("Displaying options");
 	global_micscale = textToFloat(parser.getOption("--scale", "Relative scale for the micrograph display", "1"));
@@ -513,6 +516,7 @@ void ManualPicker::run()
 	// Transfer all parameters to the gui
 	win.MDin = MDin;
 	win.fn_sel = fn_sel;
+	win.do_allow_save = do_allow_save;
 	win.fill();
 
 }

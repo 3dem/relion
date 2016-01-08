@@ -753,8 +753,19 @@ class JoinStarJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	InputNodeEntry fn_in1;
-	InputNodeEntry fn_in2;
+	BooleanEntry do_part;
+	InputNodeEntry fn_part1;
+	InputNodeEntry fn_part2;
+	InputNodeEntry fn_part3;
+	InputNodeEntry fn_part4;
+
+	BooleanEntry do_mic;
+	InputNodeEntry fn_mic1;
+	InputNodeEntry fn_mic2;
+	InputNodeEntry fn_mic3;
+	InputNodeEntry fn_mic4;
+
+	Fl_Group *part_group, *mic_group;
 
 public:
 

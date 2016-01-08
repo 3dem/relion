@@ -205,6 +205,9 @@ public:
 	// Write precalculated best_localCCF and SPI arrays to disc
 	bool do_write_fom_maps;
 
+	/// Only autopick those micrographs for which the coordinate file does not yet exist
+	bool do_only_unfinished;
+
 	// All micrographs to autopick from
 	std::vector<FileName> fn_micrographs;
 

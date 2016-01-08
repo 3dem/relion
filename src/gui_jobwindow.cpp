@@ -485,7 +485,8 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 			else
 				one_command = commands[icom];
 			// Save stdout and stderr to a .out and .err files
-			if (type != PROC_IMPORT)
+			// But only when a re-direct '>' is NOT already present on the command line!
+			if (std::string::npos == commands[icom].find(">"))
 				one_command += " >> " + outputname + "run.out 2>> " + outputname + "run.err";
 			final_command += one_command;
 			if (icom == commands.size() - 1)
@@ -641,14 +642,15 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else if (node_type.getValue() == "2D/3D particle coordinates (*.box, *_pick.star)")
 	{
-		// Copy all coordinate files into the Import directory
-		command = "cp -r " + fn_in.getValue() + " " + outputname;
+		// Make the same directory structure of the coordinates
+		// Copy all coordinate files into the same subdirectory in the Import directory
+		command = "cp --parents " + fn_in.getValue() + " " + outputname;
 		commands.push_back(command);
 		// Get the coordinate-file suffix separately
 		FileName fn_suffix = fn_in.getValue();
 		fn_suffix = fn_suffix.afterLastOf("*");
 		fn_suffix = "coords_suffix" + fn_suffix;
-		Node node(fn_suffix, NODE_MIC_COORDS);
+		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
 		// Make a suffix file, which contains the actual suffix as a suffix
 		command = " touch " + outputname + fn_suffix;
@@ -809,7 +811,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	command += " --o " + outputname;
 	pipelineOutputName = outputname;
-	Node node2(outputname + "/corrected_micrographs.star", NODE_MICS);
+	Node node2(outputname + "corrected_micrographs.star", NODE_MICS);
 	pipelineOutputNodes.push_back(node2);
 
 	// Motioncorr-specific stuff
@@ -842,19 +844,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 {
 	type = PROC_CTFFIND;
 
-	// Check for environment variable RELION_QSUB_TEMPLATE
-	char * default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
-	if (default_location == NULL)
-	{
-		char mydefault[]=DEFAULTCTFFINDLOCATION;
-		default_location=mydefault;
-	}
-	char * gctf_default_location = getenv ("RELION_GCTF_EXECUTABLE");
-	if (gctf_default_location == NULL)
-	{
-		char mygctfdefault[]=DEFAULTGCTFLOCATION;
-		gctf_default_location=mygctfdefault;
-	}
+	char *default_location;
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -884,6 +874,13 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	tab3->label("CTFFIND");
 	resetHeight();
 
+	// Check for environment variable RELION_CTFFIND_EXECUTABLE
+	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
+	if (default_location == NULL)
+	{
+		char mydefault[]=DEFAULTCTFFINDLOCATION;
+		default_location=mydefault;
+	}
 	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", NULL, "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	// Add a little spacer
@@ -921,12 +918,19 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	use_gctf.place(current_y, "Use Gctf instead of CTFFIND?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND.", gctf_group);
 
 	gctf_group->begin();
-	fn_gctf_exe.place(current_y, "Gctf executable:", gctf_default_location, "*", NULL, "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	// Check for environment variable RELION_CTFFIND_EXECUTABLE
+	default_location = getenv ("RELION_GCTF_EXECUTABLE");
+	if (default_location == NULL)
+	{
+		char mydefault[]=DEFAULTGCTFLOCATION;
+		default_location=mydefault;
+	}
+	fn_gctf_exe.place(current_y, "Gctf executable:", default_location, "*", NULL, "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	do_ignore_ctffind_params.place(current_y, "Ignore CTFFIND parameters?", true, "If set to Yes, all parameters on the CTFFIND tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
 \n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 
-	do_EPA.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
+	do_EPA.place(current_y, "Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
 //	other_gctf_args.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
@@ -943,7 +947,7 @@ void CtffindJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_motioncorr";
+		fn=".gui_ctffind";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1210,7 +1214,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	std::string command;
 	command="`which relion_manualpick`";
 
-	command += " --i " + fn_in.getValue();
+	command += " --allow_save --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
@@ -1452,6 +1456,9 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command += " --threshold " + floatToString(threshold_autopick.getValue());
 	command += " --min_distance " + floatToString(mindist_autopick.getValue());
 	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
+
+	if (is_continue)
+		command += " --only_do_unfinished ";
 
 	// Other arguments
 	command += " " + other_args.getValue();
@@ -3651,8 +3658,30 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	tab1->label("I/O");
 	resetHeight();
 
+	part_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	part_group->end();
+	do_part.place(current_y, "Combine particle STAR files?", true, "", part_group);
+	part_group->begin();
+	fn_part1.place(current_y, "Particle STAR file 1: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The first of the particle STAR files to be combined.");
+	fn_part2.place(current_y, "Particle STAR file 2: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The second of the particle STAR files to be combined.");
+	fn_part3.place(current_y, "Particle STAR file 3: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The third of the particle STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_part4.place(current_y, "Particle STAR file 4: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The fourth of the particle STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	part_group->end();
+	do_part.cb_menu_i(); // make default active
 
-	fn_in1.place(current_y, "TODO!!:", NODE_PART_DATA, "", "particle STAR file (*.star)", "One of the particle STAR files to be combined.");
+	// Add a little spacer
+    current_y += STEPY/2;
+
+	mic_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	mic_group->end();
+	do_mic.place(current_y, "Combine micrograph STAR files?", false, "", mic_group);
+	mic_group->begin();
+	fn_mic1.place(current_y, "Micrograph STAR file 1: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The first of the micrograph STAR files to be combined.");
+	fn_mic2.place(current_y, "Micrograph STAR file 2: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The second of the micrograph STAR files to be combined.");
+	fn_mic3.place(current_y, "Micrograph STAR file 3: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The third of the micrograph STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_mic4.place(current_y, "Micrograph STAR file 4: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The fourth of the micrograph STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	mic_group->end();
+	do_mic.cb_menu_i(); // make default active
 	tab1->end();
 
 	// read settings if hidden file exists
@@ -3670,7 +3699,17 @@ void JoinStarJobWindow::write(std::string fn)
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 
-	fn_in1.writeValue(fh);
+	do_part.writeValue(fh);
+	fn_part1.writeValue(fh);
+	fn_part2.writeValue(fh);
+	fn_part3.writeValue(fh);
+	fn_part4.writeValue(fh);
+
+	do_mic.writeValue(fh);
+	fn_mic1.writeValue(fh);
+	fn_mic2.writeValue(fh);
+	fn_mic3.writeValue(fh);
+	fn_mic4.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3682,7 +3721,17 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
-		fn_in1.readValue(fh);
+		do_part.readValue(fh);
+		fn_part1.readValue(fh);
+		fn_part2.readValue(fh);
+		fn_part3.readValue(fh);
+		fn_part4.readValue(fh);
+
+		do_mic.readValue(fh);
+		fn_mic1.readValue(fh);
+		fn_mic2.readValue(fh);
+		fn_mic3.readValue(fh);
+		fn_mic4.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3706,9 +3755,60 @@ void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command="`which relion_star_combine`";
 
 	// I/O  TODO!!!
-	command += " --i " + fn_in1.getValue();
-	Node node(fn_in1.getValue(), fn_in1.type);
-	pipelineInputNodes.push_back(node);
+	if (do_part.getValue())
+	{
+		command += " --i \" " + fn_part1.getValue();
+		Node node(fn_part1.getValue(), fn_part1.type);
+		pipelineInputNodes.push_back(node);
+		command += " " + fn_part2.getValue();
+		Node node2(fn_part2.getValue(), fn_part2.type);
+		pipelineInputNodes.push_back(node2);
+		if (fn_part3.getValue() != "")
+		{
+			command += " " + fn_part3.getValue();
+			Node node3(fn_part3.getValue(), fn_part3.type);
+			pipelineInputNodes.push_back(node3);
+		}
+		if (fn_part4.getValue() != "")
+		{
+			command += " " + fn_part4.getValue();
+			Node node4(fn_part4.getValue(), fn_part4.type);
+			pipelineInputNodes.push_back(node4);
+		}
+		command += " \" ";
+
+		command += " --o " + outputname + "join_particles.star";
+		Node node5(outputname + "join_particles.star", fn_part1.type);
+		pipelineOutputNodes.push_back(node5);
+
+	}
+	else if (do_mic.getValue())
+	{
+		command += " --i \" " + fn_mic1.getValue();
+		Node node(fn_mic1.getValue(), fn_mic1.type);
+		pipelineInputNodes.push_back(node);
+		command += " " + fn_mic2.getValue();
+		Node node2(fn_mic2.getValue(), fn_mic2.type);
+		pipelineInputNodes.push_back(node2);
+		if (fn_mic3.getValue() != "")
+		{
+			command += " " + fn_mic3.getValue();
+			Node node3(fn_mic3.getValue(), fn_mic3.type);
+			pipelineInputNodes.push_back(node3);
+		}
+		if (fn_mic4.getValue() != "")
+		{
+			command += " " + fn_mic4.getValue();
+			Node node4(fn_mic4.getValue(), fn_mic4.type);
+			pipelineInputNodes.push_back(node4);
+		}
+		command += " \" ";
+
+		command += " --o " + outputname + "join_mics.star";
+		Node node5(outputname + "join_mics.star", fn_mic1.type);
+		pipelineOutputNodes.push_back(node5);
+
+	}
 
 	// Other arguments
 	command += " " + other_args.getValue();

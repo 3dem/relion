@@ -308,7 +308,9 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 
 	command += allmicnames;
 
-	std::cerr << "command= " << command << std::endl;
+	// Redirect all gctf output
+	command += " >& " + fn_out + "gctf.out ";
+
 	int res = system(command.c_str());
 
 	// Cleanup all the symbolic links again
@@ -446,9 +448,7 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     	if (do_use_gctf && line.find("Resolution limit estimated by EPA:") != std::string::npos)
     	{
             tokenize(line, words);
-             if (words.size() < 7)
-             	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
-             maxres = textToFloat(words[6]);
+             maxres = textToFloat(words[words.size()-1]);
     	}
 
     	if (do_use_gctf && line.find("Estimated Bfactor:") != std::string::npos)
@@ -462,9 +462,7 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     	if (do_use_gctf && line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
     	{
             tokenize(line, words);
-             if (words.size() < 2)
-             	REPORT_ERROR("ERROR: Unexpected number of words on OVERALL_VALIDATION_SCORE line in " + fn_log);
-             valscore = textToFloat(words[1]);
+            valscore = textToFloat(words[words.size()-1]);
     	}
 
 

@@ -65,11 +65,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	// Make temporary directory with all NodeNames
 	pipeline.makeNodeDirectory();
 
-	// Initialisation
-	run_button = NULL;
-	print_CL_button = NULL;
-	cite_button = NULL;
-
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, w+6, MENUHEIGHT);
     menubar->add("File/Save job settings",  FL_ALT+'s', cb_menubar_save, this);
@@ -286,8 +281,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT-40, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
-    menubar2->add("Job actions/Move to trash", 0, cb_delete, this);
-    menubar2->add("Job actions/Rename", 0, cb_set_alias, this);
+    menubar2->add("Job actions/Delete", 0, cb_delete, this);
+    menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
     menubar2->add("Job actions/Run scheduled", 0, cb_run_scheduled, this);
     menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
 
@@ -389,9 +384,12 @@ void RelionMainWindow::fillToAndFromJobLists()
 			if (pipeline.nodeList[mynode].type != NODE_MOVIES) // no display for movie rootname
 			{
 				FileName fnt = pipeline.nodeList[mynode].name;
-				fnt = "in: " + fnt.afterLastOf("/");
-				display_io_node->add(fnt.c_str());
-				io_nodes.push_back(mynode);
+				if (exists(fnt))
+				{
+					fnt = "in: " + fnt.afterLastOf("/");
+					display_io_node->add(fnt.c_str());
+					io_nodes.push_back(mynode);
+				}
 			}
 
 			long int myproc = (pipeline.nodeList[mynode]).outputFromProcess;
@@ -424,9 +422,12 @@ void RelionMainWindow::fillToAndFromJobLists()
 			if (pipeline.nodeList[mynode].type != NODE_MOVIES) // no display for movie rootname
 			{
 				FileName fnt = pipeline.nodeList[mynode].name;
-				fnt = "out: " + fnt.afterLastOf("/");
-				display_io_node->add(fnt.c_str());
-				io_nodes.push_back(mynode);
+				if (exists(fnt))
+				{
+					fnt = "out: " + fnt.afterLastOf("/");
+					display_io_node->add(fnt.c_str());
+					io_nodes.push_back(mynode);
+				}
 			}
 
 			long int nr_outputs = (pipeline.nodeList[mynode]).inputForProcessList.size();
@@ -1097,6 +1098,7 @@ void RelionMainWindow::cb_display_io_node_i()
 
 		// Other arguments for extraction
 		command += " " + global_manualpickjob.other_args.getValue() + " &";
+		std::cerr << "command= " << command << std::endl;
 	}
 	else
 	{
@@ -1189,11 +1191,31 @@ void RelionMainWindow::cb_run_i()
 		return;
 	}
 
+	// If this is a continuation job, check whether output files exist and move away!
+	// This is to ensure that the continuation job goes OK
+	bool is_refine = (pipeline.processList[current_job].type == PROC_2DCLASS ||
+			pipeline.processList[current_job].type == PROC_3DCLASS ||
+			pipeline.processList[current_job].type == PROC_3DAUTO);
+	if (is_main_continue && !is_refine )
+	{
+		for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
+		{
+			int j = pipeline.processList[current_job].outputNodeList[i];
+			std::string fn_node = pipeline.nodeList[j].name;
+			if (exists(fn_node))
+			{
+				std::string mvcommand = "mv -f " + fn_node + " " + fn_node + ".old";
+				int res = system(mvcommand.c_str());
+			}
+		}
+	}
+
 	std::cout << "Executing: " << final_command << std::endl;
 	int res = system(final_command.c_str());
 
 	// Now save the job (as Running) to the PipeLine
 	addToPipeLine(PROC_RUNNING, is_main_continue); // is_main_continue means: only allow to overwrite an existing process when continuing an old run...
+
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -1509,10 +1531,22 @@ void RelionMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_set_alias_i()
 {
 	std::string alias;
+	FileName before_uniqdate, uniqdate;
+	before_uniqdate = pipeline.processList[current_job].name;
+	size_t slashpos = findUniqueDateSubstring(before_uniqdate, uniqdate);
+	before_uniqdate = before_uniqdate.beforeFirstOf(uniqdate);
+
 	bool is_done = false;
 	while (!is_done)
 	{
-		alias =  fl_input("Rename to (provide 'None' to use original name): ", pipeline.processList[current_job].name.c_str());
+		const char * palias;
+		palias =  fl_input("Rename to (provide 'None' to use original name): ", uniqdate.c_str());
+		// TODO: check for cancel
+		if (palias == NULL)
+			return;
+
+		std::string al2(palias);
+		alias = al2;
 		bool is_unique = true;
 		for (size_t i = 0; i < pipeline.processList.size(); i++)
 		{
@@ -1528,7 +1562,19 @@ void RelionMainWindow::cb_set_alias_i()
 			is_done = true;
 	}
 
-	pipeline.processList[current_job].alias = alias;
+	if (alias == "None")
+		pipeline.processList[current_job].alias = "None";
+	else
+	{
+		// Make sure fn_alias ends with a slash
+		if (alias[alias.length()-1] != '/')
+			alias += "/";
+		// Don't use same alias as process name!
+		if (before_uniqdate + alias == pipeline.processList[current_job].name)
+			pipeline.processList[current_job].alias = "None";
+		else
+			pipeline.processList[current_job].alias = before_uniqdate + alias;
+	}
 
 	// Write new pipeline to disc and read in again
 	std::vector<bool> dummy;

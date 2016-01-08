@@ -75,7 +75,7 @@ void CtffindRunnerMpi::run()
 			}
 		}
 
-		if (do_use_gctf)
+		if (do_use_gctf && allmicnames != "")
 			executeGctf(allmicnames);
 
 		if (verb > 0)

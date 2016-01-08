@@ -37,6 +37,7 @@ void AutoPicker::read(int argc, char **argv)
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
+	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 
 	int ref_section = parser.addSection("References options");
@@ -105,12 +106,12 @@ void AutoPicker::initialise()
 			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;
 			if (verb > 0)
-				std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
         }
         else if (verb > 0)
         {
-        	std::cout << " Warning: input STAR file does not contain information about pixel size!" << std::endl;
-        	std::cout << " Warning: use --angpix to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
+        	std::cout << " + Warning: input STAR file does not contain information about pixel size!" << std::endl;
+        	std::cout << " + Warning: use --angpix to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
         }
 	}
 	else
@@ -124,12 +125,28 @@ void AutoPicker::initialise()
 			REPORT_ERROR("Cannot find any micrograph called: "+fns_autopick);
 	}
 
+	// If we're continuing an old run, see which micrographs have not been finished yet...
+	if (do_only_unfinished)
+	{
+		if (verb > 0)
+			std::cerr << " + Skipping those micrographs for which coordinate file already exists" << std::endl;
+		std::vector<FileName> fns_todo;
+		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
+		{
+
+			FileName fn_tmp = getOutputRootName(fn_micrographs[imic]) + "_" + fn_out + ".star";
+			if (!exists(fn_tmp))
+				fns_todo.push_back(fn_micrographs[imic]);
+		}
+
+		fn_micrographs = fns_todo;
+	}
 
 	if (verb > 0)
 	{
-		std::cout << " Run autopicking on the following micrographs: " << std::endl;
+		std::cout << " + Run autopicking on the following micrographs: " << std::endl;
 		for(unsigned  int  i = 0; i < fn_micrographs.size(); ++i)
-			std::cout << "  * " << fn_micrographs[i] << std::endl;
+			std::cout << "    * " << fn_micrographs[i] << std::endl;
 	}
 
 	// Read in the references
@@ -180,18 +197,26 @@ void AutoPicker::initialise()
 		{
 			RFLOAT cornerval = DIRECT_MULTIDIM_ELEM(Mrefs[iref], 0);
 			// Look on the central X-axis, which first and last values are NOT equal to the corner value
-			int last_corner=99999, first_corner=99999;
+			bool has_set_first=false;
+			bool has_set_last=false;
+			int last_corner=FINISHINGX(Mrefs[iref]), first_corner=STARTINGX(Mrefs[iref]);
 			for (long int j=STARTINGX(Mrefs[iref]); j<=FINISHINGX(Mrefs[iref]); j++)
 			{
-				if (first_corner == 99999)
+				if (!has_set_first)
 				{
 					if (A3D_ELEM(Mrefs[iref], 0,0,j) != cornerval)
+					{
 						first_corner = j;
+						has_set_first = true;
+					}
 				}
-				else if (last_corner  == 99999)
+				else if (!has_set_last)
 				{
 					if (A3D_ELEM(Mrefs[iref], 0,0,j) == cornerval)
+					{
 						last_corner = j - 1;
+						has_set_last = true;
+					}
 				}
 			}
 			sumr += (last_corner - first_corner);
@@ -200,8 +225,12 @@ void AutoPicker::initialise()
 		particle_radius2 = particle_diameter*particle_diameter/4.;
 		// diameter was in Angstroms
 		particle_diameter *= angpix;
-		std::cout << " Automatically set the background diameter to " << particle_diameter << " Angstroms " << std::endl;
-		std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+		if (verb>0)
+		{
+			std::cout << " + Automatically set the background diameter to " << particle_diameter << " Angstroms " << std::endl;
+			std::cout << " + You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+
+		}
 	}
 	else
 	{

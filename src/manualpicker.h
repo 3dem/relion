@@ -64,6 +64,9 @@ public:
 	// Input, picking & output names
 	FileName fn_in, fn_sel;
 
+	// Allow saving selected micrographs?
+	bool do_allow_save;
+
 	// MetaDataTable of input micrographs
 	MetaDataTable MDin;
 
@@ -101,6 +104,9 @@ public:
 
 	// Input, picking & output names
 	FileName fn_in, fn_sel;
+
+	// Allow save selected micrographs?
+	bool do_allow_save;
 
 
 public:

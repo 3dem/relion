@@ -27,6 +27,20 @@ long int PipeLine::addNode(Node &_Node)
 
 	if (_Node.name=="")
 		REPORT_ERROR("PipeLine::addNode ERROR: Adding an empty nodename. Did you fill in all Node named correctly?");
+
+	// Check if _Node has an aliased name, and if so, revert back to the original name!
+	FileName fn_node = _Node.name;
+	for (size_t i = 0; i < processList.size(); i++)
+	{
+		if (fn_node.contains(processList[i].alias))
+		{
+			// Replace the alias by the name
+			fn_node = processList[i].name + fn_node.without(processList[i].alias);
+			_Node.name = fn_node;
+			break;
+		}
+	}
+
 	bool is_found = false;
 	long int i;
 	for (i=0; i < nodeList.size(); i++)
@@ -203,8 +217,27 @@ long int PipeLine::findProcessByName(std::string name)
 bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 {
 	FileName fn_dir = ".Nodes/";
-	FileName fnt = node.name;
-	if (exists(fnt) || touch_even_if_not_exist)
+	FileName fnt;
+
+	// Check whether there is an alias for the corresponding process
+	//std::cerr << " node.name= " << node.name << " node.outputFromProcess= "<< node.outputFromProcess<< std::endl;
+	FileName fn_alias  = processList[node.outputFromProcess].alias;
+
+	if (fn_alias != "None")
+	{
+		// Make sure fn_alias ends with a slash
+		if (fn_alias[fn_alias.length()-1] != '/')
+			fn_alias += "/";
+		FileName uniqdate;
+		size_t slashpos = findUniqueDateSubstring(node.name, uniqdate);
+		FileName fn_after_uniqdate = (slashpos!= std::string::npos) ? node.name.substr(slashpos+15) : node.name;
+		fnt = fn_alias + fn_after_uniqdate;
+	}
+	else
+	{
+		fnt = node.name;
+	}
+	if (exists(node.name) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
 		FileName fn_type = integerToString(node.type) + "/";
@@ -305,6 +338,18 @@ void PipeLine::read()
 
 		Process newProcess(name, type, status, alias);
 		processList.push_back(newProcess);
+
+		// Make a symbolic link to the alias if it isn't there...
+		if (alias != "None")
+		{
+			// Also make a symbolic link for the output directory!
+			// Make sure it doesn't end in a slash
+			FileName fn_alias = alias;
+			if (fn_alias[fn_alias.length()-1] == '/')
+				fn_alias = fn_alias.beforeLastOf("/");
+			std::string command = " ln -s -f ${PWD}/" + name + " " + fn_alias;
+			int res= system(command.c_str());
+		}
 	}
 
     // Read in all input (Node->Process) edges
