@@ -271,7 +271,6 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 
 void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 {
-	std::cerr << " cudaAutoPicker being run!" << std::endl;
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
 	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
@@ -570,6 +569,18 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		d_Mstddev.cp_to_host();
 		d_Mstddev.streamSync();
 
+		//TODO put this in a kernel
+		for(int i = 0; i < d_Mstddev.size ; i ++)
+		{
+			if (d_Mstddev[i] > (XFLOAT)1E-10)
+				d_Mstddev[i] = 1 / d_Mstddev[i];
+			else
+				d_Mstddev[i] = 1;
+		}
+
+		d_Mstddev.cp_to_device();
+		d_Mstddev.streamSync();
+
 
 
 		CUDA_CPU_TOC("calculateStddevAndMeanUnderMask");
@@ -767,18 +778,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			sum_ref2_under_circ_mask /= sumn;
 			expected_Pratio = exp(suma2 / (2. * sumn));
 
-			for(int i = 0; i < d_Mstddev.size ; i ++)
-			{
-				if (d_Mstddev[i] > (XFLOAT)1E-10)
-					d_Mstddev[i] = 1 / d_Mstddev[i];
-				else
-					d_Mstddev[i] = 1;
-			}
-			HANDLE_ERROR(cudaDeviceSynchronize());
-
-			d_Mstddev.cp_to_device();
-			d_Mstddev.streamSync();
-
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");
 
@@ -938,7 +937,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+
+//				for (long int n=0; n<((Mccf_best).nzyxdim); n+=10000)
 //				{
 //					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
 //				}

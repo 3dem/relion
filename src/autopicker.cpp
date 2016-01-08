@@ -1850,7 +1850,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				It() = Mpsi_best;
 				fn_tmp.compose(getOutputRootName(fn_mic)+"_"+fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mccf_best)
+
+//				for (long int n=0; n<((Mccf_best).nzyxdim); n+=10000)
 //				{
 //					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
 //				}
