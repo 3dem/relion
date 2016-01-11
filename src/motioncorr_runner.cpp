@@ -155,6 +155,9 @@ void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, Fil
 {
 	// If there are any dots in the filename, replace them by underscores
 	FileName fn_root = fn_mic.withoutExtension();
+	// If fn_root already contains "_movie", then remove that from fn_root
+	fn_root = fn_root.without("_"+fn_movie);
+
 	size_t pos = 0;
 	while (true)
 	{
