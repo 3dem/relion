@@ -294,6 +294,7 @@ public:
     // One large MetaDataTable for all images
     MetaDataTable MDimg;
 
+    // Number of bodies in multi-body refinement
     int nr_bodies;
 
     // Vector with MetaDataTables for orientations of different bodies in the multi-body refinement

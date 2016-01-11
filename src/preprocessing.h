@@ -184,7 +184,7 @@ public:
 
 	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
 	void extractParticlesFromOneFrame(MetaDataTable &MD,
-			FileName fn_mic, int ipos, int iframe, int n_frames, FileName fn_output_img_root,
+			FileName fn_mic, int ipos, int iframe, int n_frames, FileName fn_output_img_root, FileName fn_oristack,
 			long int &my_current_nr_images, long int my_total_nr_images,
 			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
@@ -211,6 +211,7 @@ public:
 	FileName getCoordinateFileName(FileName fn_mic);
 	MetaDataTable getCoordinateMetaDataTable(FileName fn_mic);
 	FileName getOutputFileNameRoot(FileName fn_mic);
+	FileName getOriginalStackNameWithoutUniqDate(FileName fn_mic);
 
 };
 

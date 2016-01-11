@@ -1673,6 +1673,10 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	white_dust.deactivate(is_continue);
 	black_dust.deactivate(is_continue);
 	do_invert.deactivate(is_continue);
+	do_movie_extract.deactivate(is_continue);
+	movie_rootname.deactivate(is_continue);
+	first_movie_frame.deactivate(is_continue);
+	last_movie_frame.deactivate(is_continue);
 
 }
 

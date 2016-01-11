@@ -409,6 +409,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	// Name of the output particle stack
 	// Add the same root as the output STAR file (that way one could extract two "families" of different particle stacks)
 	FileName fn_output_img_root = getOutputFileNameRoot(fn_mic);
+	FileName fn_oristack = getOriginalStackNameWithoutUniqDate(fn_mic);
     // Name of this micrographs STAR file
     FileName fn_star = fn_output_img_root + ".star";
 
@@ -496,8 +497,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 
 	for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
 	{
-		extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, my_current_nr_images, my_total_nr_images,
-				all_avg, all_stddev, all_minval, all_maxval);
+		extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, fn_oristack,
+				my_current_nr_images, my_total_nr_images, all_avg, all_stddev, all_minval, all_maxval);
 
         MDout.append(MDin);
 		// Keep track of total number of images extracted thus far
@@ -512,7 +513,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 // Actually extract particles. This can be from one (average) micrograph or from a single movie frame
 void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		FileName fn_mic, int imic, int iframe, int n_frames,
-		FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
+		FileName fn_output_img_root, FileName fn_oristack, long int &my_current_nr_images, long int my_total_nr_images,
 		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
 
@@ -716,11 +717,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
 			if (do_movie_extract)
 			{
-				FileName fn_part, fn_mic;
-				long int dum;
-				fn_frame.decompose(dum, fn_mic);
-				FileName fn_mic_ori = fn_output_img_root.without("_"+movie_name);
-				fn_part.compose(ipos + 1,  fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
+				FileName fn_part;
+				fn_part.compose(ipos + 1,  fn_oristack); // start image counting in stacks at 1!
 				// for automated re-alignment of particles in relion_refine: have rlnParticleName equal to rlnImageName in non-movie star file
 				MD.setValue(EMDL_PARTICLE_ORI_NAME, fn_part);
 			}
@@ -1033,6 +1031,18 @@ FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
 	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
 	FileName fn_part = fn_part_dir + fn_mic_nouniqdate;
+	if (do_movie_extract)
+		fn_part += "_" + movie_name;
 	return fn_part;
+}
+
+FileName Preprocessing::getOriginalStackNameWithoutUniqDate(FileName fn_mic)
+{
+
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
+	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
+	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension() + ".mrcs";
+	return fn_mic_nouniqdate;
 }
 

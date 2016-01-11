@@ -784,9 +784,9 @@ void ParticlePolisher::changeParticleStackName(FileName &fn_part)
 	FileName fn_stack;
 	fn_part.decompose(nr, fn_stack);
 	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_part, uniqdate);
-	FileName fn_part_nouniqdate = (slashpos!= std::string::npos) ? fn_part.substr(slashpos+15) : fn_part;
-	fn_part = fn_out + fn_part_nouniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_stack, uniqdate);
+	FileName fn_stack_nouniqdate = (slashpos!= std::string::npos) ? fn_stack.substr(slashpos+15) : fn_stack;
+	fn_part = fn_out + fn_stack_nouniqdate;
 
 }
 

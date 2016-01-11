@@ -365,7 +365,9 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 #ifdef DEBUG_EXPAND
 	timer.tic(tmakevec);
 #endif
+
 	// Make a temporary vector of all image names in the current Experiment to gain speed
+	// remove all uniqdate instances, only keep part of filename that is not made by pipeline
 	std::vector<FileName> fn_curr_imgs, fn_curr_groups;
 	std::vector<int> count_frames;
 	std::vector<long int> pointer_current_idx;
@@ -375,6 +377,13 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 		MDimg.getValue(EMDL_IMAGE_NAME, fn_curr_img);
 		long int group_id;
 		MDimg.getValue(EMDL_MLMODEL_GROUP_NO, group_id);
+		FileName uniqdate, fnt;
+		long int my_nr;
+		fn_curr_img.decompose(my_nr, fnt);
+		// Remove the uniqdate if present
+		size_t slashpos = findUniqueDateSubstring(fn_curr_img, uniqdate);
+		FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fn_curr_img.substr(slashpos+15) : fn_curr_img;
+		fn_curr_img.compose(my_nr, fn_nouniqdate); // fn_img = integerToString(n) + "@" + fn_exp;
 		fn_curr_imgs.push_back(fn_curr_img);
 		fn_curr_groups.push_back(groups[group_id-1].name);
 		count_frames.push_back(0);
@@ -382,6 +391,7 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 #ifdef DEBUG_EXPAND
 	timer.toc(tmakevec);
 #endif
+
 
 	if (verb > 0)
 		init_progress_bar(MDmovie.numberOfObjects());
@@ -579,12 +589,14 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 
 	// Now replace the current Experiment with Exp_movie
 	(*this) = Exp_movie;
+	nr_bodies = 1; // need to set this explicitly, as it wasn't set upon reading Exp_movie
 
 #ifdef DEBUG_EXPAND
 		timer.tic(torderori);
 #endif
 	// Order the particles in each ori_particle
 	orderParticlesInOriginalParticles();
+
 #ifdef DEBUG_EXPAND
 		timer.toc(torderori);
 #endif

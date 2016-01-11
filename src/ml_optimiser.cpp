@@ -1058,6 +1058,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		else
 		{
 			mymodel.nr_bodies = 1;
+			mydata.initialiseBodies(mymodel.nr_bodies);
 		}
 
 		// Also get original size of the images to pass to mymodel.read()
