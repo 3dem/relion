@@ -46,8 +46,11 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 
 	if (!do_movies || do_also_rot)
 	{
-		Node node2(fn_out + "_model.star", NODE_MODEL);
-		result.push_back(node2);
+		if (iter > 0)
+		{
+			Node node2(fn_out + "_model.star", NODE_MODEL);
+			result.push_back(node2);
+		}
 
 		// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
 		if (dim == 3)
@@ -1670,7 +1673,6 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	white_dust.deactivate(is_continue);
 	black_dust.deactivate(is_continue);
 	do_invert.deactivate(is_continue);
-
 
 }
 
