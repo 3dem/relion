@@ -43,7 +43,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	do_movie_extract = parser.checkOption("--extract_movies", "Extract particles from movie stacks?");
-	movie_name = parser.getOption("--movie_name", "Movie-identifier to extract particles from movie stacks (e.g. _movie.mrcs)", "movie");
+	movie_name = parser.getOption("--movie_name", "Movie-identifier to extract particles from movie stacks (e.g. for _movie.mrcs)", "movie");
 	avg_n_frames = textToInteger(parser.getOption("--avg_movie_frames", "Average over this number of individual movie frames", "1"));
 	movie_first_frame = textToInteger(parser.getOption("--first_movie_frame", "Extract from this movie frame onwards", "1"));
 	movie_first_frame--; // (start counting at 0, not 1)
@@ -140,27 +140,6 @@ void Preprocessing::initialise()
 				std::cout << " + Re-extracting particles based on coordinates from input _data.star file " << fn_data << std::endl;
 			if (do_recenter && verb > 0)
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
-
-			/*
-			MDdata.read(fn_data);
-
-			if (!MDdata.containsLabel(EMDL_CTF_MAGNIFICATION) || !MDdata.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-				REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star should contain rlnMagnification and rlnDetectorPixelSize.");
-
-			RFLOAT mag2, dstep2, angpix2;
-			MDdata.getValue(EMDL_CTF_MAGNIFICATION, mag2);
-			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
-			angpix2 = 10000. * dstep2 / mag2;
-			rescale_fndata = angpix2 / angpix;
-			if (ABS(rescale_fndata - 1.) > 1e-6 && verb > 0)
-				std::cout << " + Re-scaling origin offsets by a factor of " << rescale_fndata << std::endl;
-
-			if (do_recenter)
-			{
-				if (!MDdata.containsLabel(EMDL_ORIENT_ORIGIN_X) || !MDdata.containsLabel(EMDL_ORIENT_ORIGIN_Y))
-					REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star file does not contain rlnOriginX/Y for re-centering.");
-			}
-			*/
 
 		}
 
