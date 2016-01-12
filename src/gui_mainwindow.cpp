@@ -304,6 +304,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     textbuff_stderr = new Fl_Text_Buffer();
     disp_stdout = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 60, w-20, 110);
     disp_stderr = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 170, w-20, 60);
+    textbuff_stdout->text("stdout will go here");
+    textbuff_stderr->text("stderr will go here");
     disp_stdout->buffer(textbuff_stdout);
     disp_stderr->buffer(textbuff_stderr);
     disp_stderr->textcolor(FL_RED);
@@ -1180,7 +1182,7 @@ void RelionMainWindow::cb_fill_stdout_i()
 		in.close();
 	}
 	else
-		textbuff_stdout->text("");
+		textbuff_stdout->text("stdout will go here");
 
 	if (exists(fn_err))
 	{
@@ -1192,7 +1194,7 @@ void RelionMainWindow::cb_fill_stdout_i()
 		in.close();
 	}
 	else
-		textbuff_stderr->text("");
+		textbuff_stderr->text("stderr will go here");
 
 }
 

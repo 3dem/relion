@@ -618,7 +618,7 @@ void ImportJobWindow::read(std::string fn, bool &_is_continue)
 void ImportJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
-
+	do_queue.deactivate(true);
 }
 
 void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -1024,11 +1024,20 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+	box.deactivate(is_continue);
+	resmin.deactivate(is_continue);
+	resmax.deactivate(is_continue);
+	dfmin.deactivate(is_continue);
+	dfmax.deactivate(is_continue);
+	dfstep.deactivate(is_continue);
+	dast.deactivate(is_continue);
 	fn_ctffind_exe.deactivate(is_continue);
+	ctf_win.deactivate(is_continue);
+	use_gctf.deactivate(is_continue);
 	fn_gctf_exe.deactivate(is_continue);
+	do_ignore_ctffind_params.deactivate(is_continue);
+	do_EPA.deactivate(is_continue);
 
-	// TODO: check which log files do not have Final values and re-run on those
-	// for that: modify run_ctffind wrapper program
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -1212,6 +1221,8 @@ void ManualpickJobWindow::read(std::string fn, bool &_is_continue)
 void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_in.deactivate(is_continue);
 	do_queue.deactivate(true);
 }
 
@@ -1407,7 +1418,22 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
-	return;
+
+	fn_input_autopick.deactivate(is_continue);
+	fn_refs_autopick.deactivate(is_continue);
+	do_invert_refs.deactivate(is_continue);
+	do_ctf_autopick.deactivate(is_continue);
+	do_ignore_first_ctfpeak_autopick.deactivate(is_continue);
+	lowpass.deactivate(is_continue);
+	highpass.deactivate(is_continue);
+	angpix.deactivate(is_continue);
+	psi_sampling_autopick.deactivate(is_continue);
+	do_write_fom_maps.deactivate(is_continue);
+	do_read_fom_maps.deactivate(is_continue);
+	threshold_autopick.deactivate(is_continue);
+	mindist_autopick.deactivate(is_continue);
+	maxstddevnoise_autopick.deactivate(is_continue);
+
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -1854,7 +1880,13 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 
 void SortJobWindow::toggle_new_continue(bool _is_continue)
 {
+
 	is_continue = _is_continue;
+
+	input_star.deactivate(is_continue);
+	do_ctf.deactivate(is_continue);
+	do_ignore_first_ctfpeak.deactivate(is_continue);
+
 }
 
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -3627,6 +3659,10 @@ void PolishJobWindow::read(std::string fn, bool &_is_continue)
 void PolishJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_in.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
+
 }
 
 void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -3771,6 +3807,15 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_model.deactivate(is_continue);
+	fn_data.deactivate(is_continue);
+	do_recenter.deactivate(is_continue);
+	do_regroup.deactivate(is_continue);
+	nr_groups.deactivate(is_continue);
+
+	do_queue.deactivate(true);
+
 }
 
 void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -3912,6 +3957,8 @@ void MaskCreateJobWindow::read(std::string fn, bool &_is_continue)
 void MaskCreateJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_in.deactivate(is_continue);
 }
 
 void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -4045,6 +4092,18 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	do_part.deactivate(is_continue);
+	fn_part1.deactivate(is_continue);
+	fn_part2.deactivate(is_continue);
+	fn_part3.deactivate(is_continue);
+	fn_part4.deactivate(is_continue);
+
+	do_mic.deactivate(is_continue);
+	fn_mic1.deactivate(is_continue);
+	fn_mic2.deactivate(is_continue);
+	fn_mic3.deactivate(is_continue);
+	fn_mic4.deactivate(is_continue);
 }
 
 void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -4216,6 +4275,14 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 
 void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 {
+	fn_data.deactivate(is_continue);
+	fn_in.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
+
+	do_ctf_correction.deactivate(is_continue);
+	ctf_phase_flipped.deactivate(is_continue);
+	ctf_intact_first_peak.deactivate(is_continue);
+
 	is_continue = _is_continue;
 }
 
@@ -4380,6 +4447,9 @@ void PostJobWindow::read(std::string fn, bool &_is_continue)
 }
 void PostJobWindow::toggle_new_continue(bool _is_continue)
 {
+	fn_in.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
+
 	is_continue = _is_continue;
 }
 
@@ -4533,6 +4603,10 @@ void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_resmap.deactivate(is_continue);
+	fn_in.deactivate(is_continue);
+
 	// never submit this to queue, as ResMap needs user interaction
 	do_queue.deactivate(true);
 }
