@@ -81,6 +81,9 @@ private:
     static void cb_menubar_save(Fl_Widget*, void*);
     inline void cb_menubar_save_i();
 
+    static void cb_menubar_invert_selection(Fl_Widget*, void*);
+    inline void cb_menubar_invert_selection_i();
+
     static void cb_menubar_quit(Fl_Widget*, void*);
     inline void cb_menubar_quit_i();
 
