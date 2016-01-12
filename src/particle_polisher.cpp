@@ -963,7 +963,6 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		if (ipar == 0)
 		{
 			FileName fn_dir = fn_part.beforeLastOf("/");
-			std::cerr << "making directory " << fn_dir << std::endl;
 			if (fn_dir != fn_olddir)
 			{
 				// Make a Particles directory

@@ -21,8 +21,6 @@
 #ifndef GUI_JOBWINDOW_H_
 #define GUI_JOBWINDOW_H_
 
-#define MENUHEIGHT 30
-#define TABHEIGHT 25
 #define HAS_MPI true
 #define HAS_NOT_MPI false
 #define HAS_THREAD true
@@ -128,7 +126,7 @@ public:
 public:
 	// Constructor with x, y, w, h and a title
 	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
-			int x = WCOL0, int y = MENUHEIGHT+10, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
+			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
 
     // Destructor
     ~RelionJobWindow() {};

@@ -72,6 +72,12 @@ static PublishJobWindow *job_publish;
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
+// Stdout and stderr display
+static Fl_Text_Display *disp_stdout;
+static Fl_Text_Display *disp_stderr;
+static Fl_Text_Buffer *textbuff_stdout;
+static Fl_Text_Buffer *textbuff_stderr;
+
 static FileName fn_settings;
 // Initial screen
 static bool show_initial_screen;
@@ -186,6 +192,9 @@ private:
 
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();
+
+    static void cb_fill_stdout(Fl_Widget*, void*);
+    inline void cb_fill_stdout_i();
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();

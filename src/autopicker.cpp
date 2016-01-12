@@ -129,7 +129,7 @@ void AutoPicker::initialise()
 	if (do_only_unfinished)
 	{
 		if (verb > 0)
-			std::cerr << " + Skipping those micrographs for which coordinate file already exists" << std::endl;
+			std::cout << " + Skipping those micrographs for which coordinate file already exists" << std::endl;
 		std::vector<FileName> fns_todo;
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{

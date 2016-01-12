@@ -107,7 +107,6 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	}
 
 	command += " &";
-	std::cerr << command << std::endl;
 	int res = system(command.c_str());
 
 	last_pick_viewed = imic;
@@ -138,7 +137,6 @@ void cb_viewctf(Fl_Widget* w, void* data)
 	command += " --scale " + floatToString(global_ctfscale);
 	command += " --sigma_contrast " + floatToString(global_ctfsigma);
 	command += " &";
-	std::cerr << command << std::endl;
 	int res = system(command.c_str());
 
 	last_ctf_viewed = imic;
