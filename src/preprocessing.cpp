@@ -185,6 +185,45 @@ void Preprocessing::initialise()
 		// Check for bg_radius in case of normalisation
 		if (do_normalise && bg_radius < 0)
 			REPORT_ERROR("ERROR: please provide a radius for a circle that defines the background area when normalising...");
+
+		// Jun24,2015 - Shaoda, extract helical segments
+		if (do_helical_segments)
+		{
+			MetaDataTable MD;
+			if (do_extract)
+			{
+				for (int ii = 0; ii < fn_coords.size(); ii++)
+				{
+					if (fn_coords[ii].isStarFile() == false)
+						REPORT_ERROR("ERROR: Extraction of helical segments: only STAR files are supported!");
+
+					MD.clear();
+					MD.read(fn_coords[ii]);
+					if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
+							|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
+							|| (!MD.containsLabel(EMDL_ORIENT_TILT))
+							|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+					{
+						REPORT_ERROR("ERROR: Extraction of helical segments: x, y, tilt and psi are missing in STAR files!");
+					}
+				}
+			}
+			if (fn_operate_in != "")
+			{
+				if (fn_operate_in.isStarFile() == false)
+					REPORT_ERROR("ERROR: Operations on helical segments: only STAR files are supported!");
+				MD.clear();
+				MD.read(fn_operate_in);
+				if ( (!MD.containsLabel(EMDL_ORIENT_TILT))
+						|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+				{
+					REPORT_ERROR("ERROR: Operations on helical segments: tilt and psi are missing in STAR files!");
+				}
+			}
+			if ((do_normalise) && (bg_helical_radius < 0))
+				REPORT_ERROR("ERROR: please provide a radius for a tube that defines the background area when normalising helical segments...");
+		}
+
 	}
 }
 

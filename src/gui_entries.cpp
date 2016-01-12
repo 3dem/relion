@@ -153,6 +153,46 @@ void AnyEntry::place(int &y,
 
 }
 
+void AnyEntry::placeOnSameYPosition(int y,
+		const char * title,
+		const char * title_full,
+		const char* defaultvalue,
+		const char* helptext,
+		int x, int h, int wcol2, int wcol3 )
+{
+
+	// Clear if existing
+	clear();
+
+    // Set the label
+    label = title;
+    if ( (title_full) && (strlen(title_full) > 0) )
+    	label_full = title_full;
+
+    // The input field
+	if (defaultvalue != NULL)
+	{
+		inp = new Fl_Input(x, y, wcol2, h, title);
+
+		// Set the input value
+		inp->value(defaultvalue);
+		inp->color(GUI_INPUT_COLOR);
+	}
+
+	// Display help button if needed
+    if (helptext != NULL)
+    {
+    	// Set the help text
+		myhelptext = helptext;
+
+		// The Help button
+		help = new Fl_Button(x + wcol2 + COLUMN_SEPARATION, y, wcol3, h, "?");
+		help->callback( cb_help, this );
+		help->color(GUI_BUTTON_COLOR);
+
+    }
+}
+
 std::string AnyEntry::getValue()
 {
 	return (std::string)inp->value();
@@ -166,14 +206,22 @@ void AnyEntry::setValue(const char* val)
 void AnyEntry::writeValue(std::ostream& out)
 {
 	// Only write entries that have been initialised
-	if (label != "")
+	if (label_full != "")
+		out << label_full << " == " << getValue() << std::endl;
+	else if (label != "")
 		out << label << " == " << getValue() << std::endl;
 }
 
 
 void AnyEntry::readValue(std::ifstream& in)
 {
-    if (label != "")
+	std::string label_saved;
+	if (label_full != "")
+		label_saved = label_full;
+	else
+		label_saved = label;
+
+    if (label_saved != "")
     {
 		// Start reading the ifstream at the top
 		in.clear(); // reset eof if happened...
@@ -181,7 +229,7 @@ void AnyEntry::readValue(std::ifstream& in)
 		std::string line;
 		while (getline(in, line, '\n'))
 		{
-			if (line.rfind(label) == 0)
+			if (line.rfind(label_saved) == 0)
 			{
 				// found my label
 				int equalsigns = line.rfind("==");
@@ -198,8 +246,16 @@ void AnyEntry::clear()
 	if (label != "")
 	{
 		label="";
-		delete inp;
-		delete help;
+		if (inp)
+		{
+			delete inp;
+			inp = NULL;
+		}
+		if (help)
+		{
+			delete help;
+			help = NULL;
+		}
 	}
 }
 
@@ -207,13 +263,17 @@ void AnyEntry::deactivate(bool do_deactivate)
 {
 	if (do_deactivate)
 	{
-		inp->deactivate();
-		help->deactivate();
+		if (inp)
+			inp->deactivate();
+		if (help)
+			help->deactivate();
 	}
 	else
 	{
-		inp->activate();
-		help->activate();
+		if (inp)
+			inp->activate();
+		if (help)
+			help->activate();
 	}
 
 }

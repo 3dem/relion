@@ -93,7 +93,7 @@ public:
 
 	// Tabs
     Fl_Tabs *tabs;
-	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *runtab;
+	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *tab7, *runtab;
 
 	// Running
 	Fl_Group *queue_group;
@@ -544,7 +544,27 @@ public:
 	BooleanEntry do_local_ang_searches;
 	SliderEntry sigma_angles;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group;
+	// Helix
+	//textOnlyEntry helix_text;
+	BooleanEntry do_helix;
+	BooleanEntry do_bimodal;
+	AnyEntry helical_tube_inner_diameter;
+	AnyEntry helical_tube_outer_diameter;
+	SliderEntry helical_nr_asu;
+	AnyEntry helical_twist_initial;
+	AnyEntry helical_rise_initial;
+	BooleanEntry do_local_search_helical_symmetry;
+	AnyEntry helical_twist_min;
+	AnyEntry helical_twist_max;
+	AnyEntry helical_twist_inistep;
+	AnyEntry helical_rise_min;
+	AnyEntry helical_rise_max;
+	AnyEntry helical_rise_inistep;
+	SliderEntry helical_z_percentage;
+	AnyEntry range_tilt;
+	AnyEntry range_psi;
+
+	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group;
 
 public:
 
@@ -609,7 +629,27 @@ public:
 	BooleanEntry do_alsorot_movies;
 	SliderEntry movie_sigma_angles;
 
-	Fl_Group *ctf_group, *movie_group, *alsorot_movie_group;
+	// Helix
+	//textOnlyEntry helix_text;
+	BooleanEntry do_helix;
+	BooleanEntry do_bimodal;
+	AnyEntry helical_tube_inner_diameter;
+	AnyEntry helical_tube_outer_diameter;
+	SliderEntry helical_nr_asu;
+	AnyEntry helical_twist_initial;
+	AnyEntry helical_rise_initial;
+	BooleanEntry do_local_search_helical_symmetry;
+	AnyEntry helical_twist_min;
+	AnyEntry helical_twist_max;
+	AnyEntry helical_twist_inistep;
+	AnyEntry helical_rise_min;
+	AnyEntry helical_rise_max;
+	AnyEntry helical_rise_inistep;
+	SliderEntry helical_z_percentage;
+	AnyEntry range_tilt;
+	AnyEntry range_psi;
+
+	Fl_Group *ctf_group, *movie_group, *alsorot_movie_group, *helix_group, *helix_symmetry_search_group;
 
 public:
 

@@ -44,37 +44,25 @@ public:
 	{
 		twist_deg = rise_pix = -1.;
 		dev = (1e35);
-		return;
 	}
 	HelicalSymmetryItem(RFLOAT _twist_deg, RFLOAT _rise_pix, RFLOAT _dev = (1e35))
 	{
 		twist_deg = _twist_deg;
 		rise_pix = _rise_pix;
 		dev = _dev;
-		return;
 	}
 };
 
-bool IsEqualHelicalSymmetry(
-		const HelicalSymmetryItem& a,
-		const HelicalSymmetryItem& b);
-
-bool IsHelicalSymmetryWithinOpenInterval(
-		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		RFLOAT rise_ori_pix,
-		RFLOAT twist_ori_deg,
-		RFLOAT rise_half_range_pix,
-		RFLOAT twist_half_range_deg);
-
 void makeHelicalSymmetryList(
 		std::vector<HelicalSymmetryItem>& list,
-		RFLOAT rise_ori_pix,
-		RFLOAT twist_ori_deg,
-		RFLOAT rise_half_range_pix,
-		RFLOAT twist_half_range_deg,
+		RFLOAT rise_min_pix,
+		RFLOAT rise_max_pix,
 		RFLOAT rise_step_pix,
-		RFLOAT twist_step_deg);
+		bool search_rise,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
+		RFLOAT twist_step_deg,
+		bool search_twist);
 
 bool calcCCofHelicalSymmetry(
 		const MultidimArray<RFLOAT>& v,
@@ -86,75 +74,29 @@ bool calcCCofHelicalSymmetry(
 		RFLOAT& cc,
 		int& nr_asym_voxels);
 
+void checkRangesForLocalSearchHelicalSymmetry(
+		RFLOAT rise_A,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT twist_deg,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg);
+
 bool localSearchHelicalSymmetry(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT pixel_size_A,
 		RFLOAT sphere_radius_A,
-		RFLOAT r_min_A,
-		RFLOAT r_max_A,
+		RFLOAT cyl_inner_radius_A,
+		RFLOAT cyl_outer_radius_A,
 		RFLOAT z_percentage,
-		RFLOAT rise_ori_A,
-		RFLOAT twist_ori_deg,
-		RFLOAT rise_search_max_dev_percentage,
-		RFLOAT twist_search_max_dev_percentage,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT rise_inistep_A,
 		RFLOAT& rise_refined_A,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
+		RFLOAT twist_inistep_deg,
 		RFLOAT& twist_refined_deg);
-
-
-
-
-
-
-
-
-// Impose helical symmetry in Fourier space (It takes too much time and memory...)
-/*
-bool get2DZsliceIn3DVolume(
-		const MultidimArray<RFLOAT>& vol_in,
-		MultidimArray<RFLOAT>& img_out,
-		int idz);
-
-bool add2DZsliceInto3DVolumeSum(
-		const MultidimArray<RFLOAT>& img_in,
-		MultidimArray<RFLOAT>& vol_sum,
-		std::vector<RFLOAT>& weight_sum,
-		int idz);
-
-void shift3DVolumeAlongZAxisInFourierSpace(
-		MultidimArray<RFLOAT>& img,
-		RFLOAT shift_pix);
-
-void rotateAndSum2DZSliceInRealSpace(
-		MultidimArray<RFLOAT>& img_ori,
-		MultidimArray<RFLOAT>& img_sum,
-		std::vector<RFLOAT>& weight_sum,
-		int idz,
-		RFLOAT outer_radius_pix,
-		RFLOAT rot_angle_deg);
-
-void rotate2DZSliceInFourierSpace(
-		MultidimArray<RFLOAT>& img,
-		RFLOAT rot_angle_deg,
-		int padding_factor = 2);
-
-// In Z axis [s, e] chunk, there must be a symmetrical segment of helix with at least one particle!
-void expandZaxisInFourierSpace(
-		MultidimArray<RFLOAT>& vol,
-		RFLOAT outer_radius_pix,
-		RFLOAT twist_deg,  // both + or -
-		RFLOAT rise_pix,  // only +
-		int idz_s,
-		int idz_e,
-		int padding_factor = 2);
-
-void imposeHelicalSymmetryInFourierSpace(MultidimArray<RFLOAT>& vol,
-		RFLOAT outer_radius_pix,
-		RFLOAT twist_deg,  // both + or -
-		RFLOAT rise_pix,  // only +
-		int idz_s,
-		int idz_e,
-		int padding_factor = 2);
-*/
 
 RFLOAT getHelicalSigma2Rot(
 		RFLOAT helical_rise_pix,
@@ -162,18 +104,6 @@ RFLOAT getHelicalSigma2Rot(
 		RFLOAT helical_offset_step_pix,
 		RFLOAT rot_step_deg,
 		RFLOAT old_sigma2_rot);
-
-// Impose helical symmetry in real space
-void imposeHelicalSymmetryInRealSpace(
-		MultidimArray<RFLOAT>& vol,
-		RFLOAT sphere_radius_pix,
-		RFLOAT cyl_inner_radius_pix,
-		RFLOAT cyl_outer_radius_pix,
-		RFLOAT cosine_width,
-		RFLOAT twist_deg,  // both + or -
-		RFLOAT rise_pix,  // only +
-		int idz_s,
-		int idz_e);
 
 // Assume all parameters are within range
 RFLOAT get_lenZ_percentage_max(
@@ -189,40 +119,28 @@ RFLOAT get_rise_A_max(
 		RFLOAT lenZ_percentage,
 		RFLOAT nr_units_min);
 
-bool checkHelicalParametersFor3DHelicalReference(
+void checkHelicalParametersFor3DHelicalReference(
 		int box_len,
 		RFLOAT pixel_size_A,
 		RFLOAT twist_deg,
 		RFLOAT rise_A,
 		RFLOAT lenZ_percentage,
-		bool do_helical_symmetry_local_refinement,
-		RFLOAT rise_max_dev_percentage,
-		RFLOAT twist_max_dev_percentage,
 		RFLOAT sphere_radius_A,
 		RFLOAT cyl_inner_radius_A,
 		RFLOAT cyl_outer_radius_A);
 
-void makeHelicalReferenceInRealSpace(
-		MultidimArray<RFLOAT>& vol,
+void imposeHelicalSymmetryInRealSpace(
+		MultidimArray<RFLOAT>& v,
 		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT lenZ_percentage,
 		RFLOAT sphere_radius_A,
 		RFLOAT cyl_inner_radius_A,
 		RFLOAT cyl_outer_radius_A,
+		RFLOAT z_percentage,
+		RFLOAT rise_A,
+		RFLOAT twist_deg,
 		RFLOAT cosine_width_pix);
 
-// Search for helical symmetry (not done!)
 /*
-bool calcCCOfCnZSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		int cn,
-		RFLOAT& cc,
-		int& nr_asym_voxels);
-
 void searchCnZSymmetry(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT r_min_pix,
@@ -236,48 +154,13 @@ void searchCnZSymmetry(
 */
 
 /*
-bool localSearchHelicalTwist(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		RFLOAT z_percentage,
-		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		RFLOAT search_half_range_deg,
-		RFLOAT search_step_deg,
-		RFLOAT& twist_refined_deg);
-
-bool localSearchHelicalRise(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		RFLOAT z_percentage,
-		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		RFLOAT search_half_range_pix,
-		RFLOAT search_step_pix,
-		RFLOAT& rise_refined_pix);
-
-bool localSearchHelicalSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT r_min_A,
-		RFLOAT r_max_A,
-		RFLOAT z_percentage,
-		RFLOAT rise_ori_A,
-		RFLOAT twist_ori_deg,
-		RFLOAT local_search_max_dev_percentage,
-		RFLOAT& rise_refined_A,
-		RFLOAT& twist_refined_deg);
-*/
-
 RFLOAT calcCCofPsiFor2DHelicalSegment(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT psi_deg,
 		RFLOAT pixel_size_A,
 		RFLOAT sphere_radius_A,
 		RFLOAT cyl_outer_radius_A);
+
 
 RFLOAT localSearchPsiFor2DHelicalSegment(
 		const MultidimArray<RFLOAT>& v,
@@ -293,23 +176,6 @@ RFLOAT searchPsiFor2DHelicalSegment(
 		RFLOAT pixel_size_A,
 		RFLOAT sphere_radius_A,
 		RFLOAT cyl_outer_radius_A);
-
-/*
-void searchHelicalSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		RFLOAT rise_pix_start,
-		RFLOAT rise_pix_incr,
-		int rise_pix_steps,
-		RFLOAT twist_deg_start,
-		RFLOAT twist_deg_incr,
-		int twist_deg_steps,
-		std::vector<RFLOAT>& rise_pix_list,
-		std::vector<RFLOAT>& twist_deg_list,
-		std::vector<RFLOAT>& cc_list,
-		std::vector<int>& nr_asym_voxels_list,
-		std::ofstream* fout_ptr = NULL);
 */
 
 // Some functions only for specific testing
@@ -348,11 +214,13 @@ void transformCartesianAndHelicalCoords(
 		int dim,
 		bool direction);
 
+/*
 void makeBlot(
 		MultidimArray<RFLOAT>& v,
 		RFLOAT y,
 		RFLOAT x,
 		RFLOAT r);
+*/
 
 // C1 Helix
 // If radius_A < 0, detect the radius of original assembly and calculate r as sqrt(x^2 + y^2)
@@ -373,10 +241,6 @@ void normalise2DImageSlices(
 		RFLOAT white_dust_stddev = -1.,
 		RFLOAT black_dust_stddev = -1.);
 */
-
-void enlarge3DReference(
-		MultidimArray<RFLOAT>& v,
-		int factor);
 
 void applySoftSphericalMask(
 		MultidimArray<RFLOAT>& v,
@@ -434,7 +298,7 @@ void removeBadTiltHelicalSegmentsFromDataStar(
 		FileName& fn_out,
 		RFLOAT max_dev_deg = 15.);
 
-int transformXimdispHelicalCoordsToStarFile(
+int transformXimdispHelicalSegmentCoordsToStarFile(
 		FileName& fn_in,
 		FileName& fn_out,
 		RFLOAT Xdim,
@@ -443,18 +307,32 @@ int transformXimdispHelicalCoordsToStarFile(
 
 // Files of Ximdisp coordinates: 001.coords, files of output coordinates: 001_all.star
 // Then suffix_coords = .coords, suffix_out = _all.star
-void transformXimdispHelicalCoordsToStarFile_Multiple(
+void transformXimdispHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize);
 
-/*
-void divideHelicalSegmentsFromMultipleMicrographsIntoHalves(
+int transformXimdispHelicalTubeCoordsToStarFile(
 		FileName& fn_in,
-		FileName& fn_out);
-*/
+		FileName& fn_out,
+		int nr_asu,
+		RFLOAT rise_ang,
+		RFLOAT pixel_size_ang,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix);
+
+void transformXimdispHelicalTubeCoordsToStarFile_Multiple(
+		FileName& suffix_coords,
+		FileName& suffix_out,
+		int nr_asu,
+		RFLOAT rise_ang,
+		RFLOAT pixel_size_ang,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT boxsize);
 
 void divideHelicalSegmentsFromMultipleMicrographsIntoRandomHalves(
 		FileName& fn_in,
@@ -493,11 +371,9 @@ void divideStarFile(
 		FileName& fn_in,
 		int nr);
 
-void combineStarFiles(
-		FileName& fn_in);
+void mergeStarFiles(FileName& fn_in);
 
-void sortHelicalTubeID(
-		MetaDataTable& MD);
+void sortHelicalTubeID(MetaDataTable& MD);
 
 void simulateHelicalSegments(
 		FileName& fn_out,
@@ -507,5 +383,29 @@ void simulateHelicalSegments(
 		RFLOAT twist_deg,
 		RFLOAT sigma_psi = 1.,
 		RFLOAT sigma_tilt = 1.);
+
+void outputHelicalSymmetryStatus(
+		int iter,
+		RFLOAT rise_initial_A,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT twist_initial_deg,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
+		bool do_local_search_helical_symmetry,
+		std::vector<RFLOAT>& rise_A,
+		std::vector<RFLOAT>& twist_deg,
+		RFLOAT rise_A_half1,
+		RFLOAT rise_A_half2,
+		RFLOAT twist_deg_half1,
+		RFLOAT twist_deg_half2,
+		bool do_split_random_halves,
+		std::ostream& out);
+
+void excludeLowCTFCCMicrographs(
+		FileName& fn_in,
+		FileName& fn_out,
+		RFLOAT cc_min,
+		RFLOAT EPA_lowest_res);
 
 #endif /* HELIX_H_ */

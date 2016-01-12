@@ -371,44 +371,26 @@ public:
 	// Flag whether to do helical refinement
 	bool do_helical_refine;
 
-	// Number of new asymmetric units (asu) within each new box. This many times will the helical rise and twist be applied
-	int nr_helical_asu;
+	// Initial helical twist in degrees
+	RFLOAT helical_twist_initial;
 
-	// Helical twist in degrees
-	RFLOAT helical_twist;
-
-	// Helical rise in Angstroms
-	RFLOAT helical_rise;
-
-	// Helical twist in degrees (helical parameters refinement - half1)
-	RFLOAT helical_twist_half1;
-
-	// Helical rise in Angstroms (helical parameters refinement - half1)
-	RFLOAT helical_rise_half1;
-
-	// Helical twist in degrees (helical parameters refinement - half2)
-	RFLOAT helical_twist_half2;
-
-	// Helical rise in Angstroms (helical parameters refinement - half2)
-	RFLOAT helical_rise_half2;
+	// Initial helical rise in Angstroms
+	RFLOAT helical_rise_initial;
 
 	// Only expand this amount of Z axis proportion to full when imposing real space helical symmetry
-	RFLOAT helical_central_proportion;
+	RFLOAT helical_z_percentage;
 
 	// Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)
-	RFLOAT helical_mask_tube_inner_diameter;
+	RFLOAT helical_tube_inner_diameter;
 
 	// Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)
-	RFLOAT helical_mask_tube_outer_diameter;
+	RFLOAT helical_tube_outer_diameter;
 
 	// Flag whether to do bimodal searches of orientations for helical segments in the first few iterations
 	bool do_helical_bimodal_orient_searches;
 
 	// Flag whether to do local refinement of helical parameters
 	bool do_helical_symmetry_local_refinement;
-
-	// Maximum deviation (0.01% - 33.33%) of helical parameters in local refinement
-	RFLOAT helical_symmetry_local_refinement_max_dev;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -602,7 +584,15 @@ public:
 		autosampling_hporder_local_searches(0),
 		do_split_random_halves(0),
 		random_seed(0),
-		do_gpu(0)
+		do_gpu(0),
+		do_helical_refine(0),
+		helical_twist_initial(0),
+		helical_rise_initial(0),
+		helical_z_percentage(0),
+		helical_tube_inner_diameter(0),
+		helical_tube_outer_diameter(0),
+		do_helical_bimodal_orient_searches(0),
+		do_helical_symmetry_local_refinement(0)
 	{};
 
 	/** ========================== I/O operations  =========================== */

@@ -20,85 +20,89 @@
 
 #include "src/helix.h"
 
-bool IsEqualHelicalSymmetry(
-		const HelicalSymmetryItem& a,
-		const HelicalSymmetryItem& b)
-{
-	if ( (fabs(a.twist_deg - b.twist_deg) < (1e-5))
-			&& (fabs(a.rise_pix - b.rise_pix) < (1e-5)) )
-		return true;
-	return false;
-};
-
-bool IsHelicalSymmetryWithinOpenInterval(
-		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		RFLOAT rise_ori_pix,
-		RFLOAT twist_ori_deg,
-		RFLOAT rise_half_range_pix,
-		RFLOAT twist_half_range_deg)
-{
-	RFLOAT rise_min_pix, twist_min_deg, rise_max_pix, twist_max_deg;
-	RFLOAT rise_error_pix, twist_error_deg;
-
-	rise_pix = fabs(rise_pix);
-	twist_deg = fabs(twist_deg);
-	rise_half_range_pix = fabs(rise_half_range_pix);
-	twist_half_range_deg = fabs(twist_half_range_deg);
-
-	rise_error_pix = rise_pix * (1e-5);
-	twist_error_deg = twist_deg * (1e-5);
-
-	rise_min_pix = rise_pix - rise_half_range_pix + rise_error_pix;
-	rise_max_pix = rise_pix + rise_half_range_pix - rise_error_pix;
-	twist_min_deg = twist_deg - twist_half_range_deg + twist_error_deg;
-	twist_max_deg = twist_deg + twist_half_range_deg - twist_error_deg;
-
-	if ( (rise_pix < rise_min_pix)
-			|| (rise_pix > rise_max_pix)
-			|| (twist_deg < twist_min_deg)
-			|| (twist_deg > twist_max_deg) )
-	{
-		return false;
-	}
-	return true;
-};
+//#define DEBUG_SEARCH_HELICAL_SYMMETRY
 
 void makeHelicalSymmetryList(
 		std::vector<HelicalSymmetryItem>& list,
-		RFLOAT rise_ori_pix,
-		RFLOAT twist_ori_deg,
-		RFLOAT rise_half_range_pix,
-		RFLOAT twist_half_range_deg,
+		RFLOAT rise_min_pix,
+		RFLOAT rise_max_pix,
 		RFLOAT rise_step_pix,
-		RFLOAT twist_step_deg)
+		bool search_rise,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
+		RFLOAT twist_step_deg,
+		bool search_twist)
 {
 	// Assume all parameters are within range
 	RFLOAT rise_pix, twist_deg;
-	int rise_half_samplings, twist_half_samplings;
+	int rise_samplings, twist_samplings;
 	std::vector<HelicalSymmetryItem> tmp_list;
 
-	rise_half_samplings = ROUND(fabs(rise_half_range_pix) / fabs(rise_step_pix));
-	twist_half_samplings = ROUND(fabs(twist_half_range_deg) / fabs(twist_step_deg));
+	if (search_rise)
+		rise_samplings = ROUND(fabs(rise_max_pix - rise_min_pix) / fabs(rise_step_pix));
+	else
+	{
+		rise_min_pix = (rise_min_pix + rise_max_pix) / 2.;
+		rise_samplings = 0;
+	}
+	if (search_twist)
+		twist_samplings = ROUND(fabs(twist_max_deg - twist_min_deg) / fabs(twist_step_deg));
+	else
+	{
+		twist_min_deg = (twist_min_deg + twist_max_deg) / 2.;
+		twist_samplings = 0;
+	}
 
 	// Store a matrix of symmetries
 	tmp_list.clear();
-	for (int ii = -rise_half_samplings; ii <= rise_half_samplings; ii++)
+	for (int ii = 0; ii <= rise_samplings; ii++)
 	{
-		for (int jj = -twist_half_samplings; jj <= twist_half_samplings; jj++)
+		for (int jj = 0; jj <= twist_samplings; jj++)
 		{
-			rise_pix = rise_ori_pix + rise_step_pix * RFLOAT(ii);
-			twist_deg = twist_ori_deg + twist_step_deg * RFLOAT(jj);
+			rise_pix = rise_min_pix + rise_step_pix * RFLOAT(ii);
+			twist_deg = twist_min_deg + twist_step_deg * RFLOAT(jj);
 			tmp_list.push_back(HelicalSymmetryItem(twist_deg, rise_pix));
 		}
 	}
 
 	// Check duplications and return this matrix
+	RFLOAT twist_dev_deg, twist_avg_deg, rise_dev_pix, rise_avg_pix;
+	RFLOAT err_max = (1e-10);
+	bool same_twist, same_rise;
 	for (int ii = 0; ii < list.size(); ii++)
 	{
 		for (int jj = 0; jj < tmp_list.size(); jj++)
 		{
-			if (IsEqualHelicalSymmetry(list[ii], tmp_list[jj]))
+			same_twist = same_rise = false;
+
+			twist_dev_deg = fabs(list[ii].twist_deg - tmp_list[jj].twist_deg);
+			rise_dev_pix = fabs(list[ii].rise_pix - tmp_list[jj].rise_pix);
+			twist_avg_deg = (fabs(list[ii].twist_deg) + fabs(tmp_list[jj].twist_deg)) / 2.;
+			rise_avg_pix = (fabs(list[ii].rise_pix) + fabs(tmp_list[jj].rise_pix)) / 2.;
+
+			if (twist_avg_deg < err_max)
+			{
+				if (twist_dev_deg < err_max)
+					same_twist = true;
+			}
+			else
+			{
+				if ((twist_dev_deg / twist_avg_deg) < err_max)
+					same_twist = true;
+			}
+
+			if (rise_avg_pix < err_max)
+			{
+				if (rise_dev_pix < err_max)
+					same_rise = true;
+			}
+			else
+			{
+				if ( (rise_dev_pix / rise_avg_pix) < err_max)
+					same_rise = true;
+			}
+
+			if (same_twist && same_rise)
 				tmp_list[jj].dev = list[ii].dev;
 		}
 	}
@@ -118,90 +122,83 @@ bool calcCCofHelicalSymmetry(
 		int& nr_asym_voxels)
 {
 	// TODO: go through every line to find bugs!!!
-	int r_max_XY, startZ, finishZ;
-	RFLOAT twist_rad, twist_rad_total, dist_r_pix, RFLOAT_counter, sum_pw1, sum_pw2;
-	std::vector<RFLOAT> dev_voxel, dev_chunk;
-	int id, idx, idy, idz, x0, y0, z0, x1, y1, z1;
-	RFLOAT xp, yp, zp, fx, fy, fz, d000, d001, d010, d011, d100, d101, d110, d111, dx00, dx01, dx10, dx11, dxy0, dxy1, ddd;
+	int rec_len, r_max_XY, startZ, finishZ;
+	RFLOAT dist_r_pix, sum_pw1, sum_pw2;
+	std::vector<RFLOAT> sin_rec, cos_rec, dev_voxel, dev_chunk;
 
-	if ( (STARTINGZ(v) != FIRST_XMIPP_INDEX(ZSIZE(v)))
-			|| (STARTINGY(v) != FIRST_XMIPP_INDEX(YSIZE(v)))
-			|| (STARTINGX(v) != FIRST_XMIPP_INDEX(XSIZE(v))) )
-	{
+	if ( (STARTINGZ(v) != FIRST_XMIPP_INDEX(ZSIZE(v))) || (STARTINGY(v) != FIRST_XMIPP_INDEX(YSIZE(v))) || (STARTINGX(v) != FIRST_XMIPP_INDEX(XSIZE(v))) )
 		REPORT_ERROR("helix.cpp::calcCCofHelicalSymmetry(): The origin of input 3D MultidimArray is not at the center (use v.setXmippOrigin() before calling this function)!");
-		return false;
-	}
 
 	// Check r_max
 	r_max_XY = (XSIZE(v) < YSIZE(v)) ? XSIZE(v) : YSIZE(v);
 	r_max_XY = (r_max_XY + 1) / 2 - 1;
-	if( r_max_pix > (((RFLOAT)(r_max_XY)) - 0.01) )  // 0.01 - avoid segmentation fault
+	if ( r_max_pix > (((RFLOAT)(r_max_XY)) - 0.01) )  // 0.01 - avoid segmentation fault
 		r_max_pix = (((RFLOAT)(r_max_XY)) - 0.01);
 
 	// Set startZ and finishZ
-	startZ = int(floor((-1.) * ((RFLOAT)(ZSIZE(v)) * z_percentage * 0.5)));
-	finishZ = int(ceil(((RFLOAT)(ZSIZE(v)) * z_percentage * 0.5)));
+	startZ = FLOOR( (-1.) * ((RFLOAT)(ZSIZE(v)) * z_percentage * 0.5) );
+	finishZ = CEIL( ((RFLOAT)(ZSIZE(v))) * z_percentage * 0.5 );
 	startZ = (startZ <= (STARTINGZ(v))) ? (STARTINGZ(v) + 1) : (startZ);
 	finishZ = (finishZ >= (FINISHINGZ(v))) ? (FINISHINGZ(v) - 1) : (finishZ);
 
-	// Get twist angle in radians
-	twist_rad = twist_deg * PI / 180.;
+	// Calculate tabulated sine and cosine values
+	rec_len = 2 + (CEIL((RFLOAT(ZSIZE(v)) + 2.) / rise_pix));
+	sin_rec.clear();
+	cos_rec.clear();
+	sin_rec.resize(rec_len);
+	cos_rec.resize(rec_len);
+	for (int id = 0; id < rec_len; id++)
+		sincos(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+
+	rise_pix = fabs(rise_pix);
 
 	// Test a chunk of Z length = rise
 	dev_chunk.clear();
 	// Iterate through all coordinates on Z, Y and then X axes
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
 	{
-		// Record X, Y, Z coordinates
-		idz = k;
-		idy = i;
-		idx = j;
+		RFLOAT xp, yp, zp, fx, fy, fz;
 
 		// Test a chunk of Z length = rise
 		// for(idz = startZ; (idz <= (startZ + ((int)(floor(rise_pix))))) && (idz <= finishZ); idz++)
-		if ( (idz < startZ) || (idz > (startZ + ((int)(floor(rise_pix))))) || (idz > finishZ) )
+		if ( (k < startZ) || (k > (startZ + (FLOOR(rise_pix)))) || (k > finishZ) )
 			continue;
 
-		dist_r_pix = sqrt(idy * idy + idx * idx);
-		if( (dist_r_pix < r_min_pix) || (dist_r_pix > r_max_pix) )
+		dist_r_pix = sqrt(i * i + j * j);
+		if ( (dist_r_pix < r_min_pix) || (dist_r_pix > r_max_pix) )
 			continue;
 
 		// Pick a voxel in the chunk
 		dev_voxel.clear();
-		dev_voxel.push_back(A3D_ELEM(v, idz, idy, idx));
+		dev_voxel.push_back(A3D_ELEM(v, k, i, j));
 
 		// Pick other voxels according to this voxel and helical symmetry
-		zp = idz;
-		RFLOAT_counter = 0.;
-		while(1)
+		zp = k;
+		int rot_id = 0;
+		while (1)
 		{
 			// Rise
 			zp += rise_pix;
-			if(zp > finishZ) // avoid segmentation fault - finishZ is always strictly smaller than FINISHINGZ(v)!
+			if (zp > finishZ) // avoid segmentation fault - finishZ is always strictly smaller than FINISHINGZ(v)!
 				break;
 
 			// Twist
-			RFLOAT_counter += 1.;
-			twist_rad_total = twist_rad * RFLOAT_counter;
-			xp = ((RFLOAT)(idx)) * cos(twist_rad_total) - ((RFLOAT)(idy)) * sin(twist_rad_total);
-			yp = ((RFLOAT)(idx)) * sin(twist_rad_total) + ((RFLOAT)(idy)) * cos(twist_rad_total);
+			rot_id++;
+			xp = ((RFLOAT)(j)) * cos_rec[rot_id] - ((RFLOAT)(i)) * sin_rec[rot_id];
+			yp = ((RFLOAT)(j)) * sin_rec[rot_id] + ((RFLOAT)(i)) * cos_rec[rot_id];
 
 			// Trilinear interpolation (with physical coords)
 			// Subtract STARTINGX,Y,Z to accelerate access to data
 			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+			int x0, y0, z0, x1, y1, z1;
 			x0 = FLOOR(xp); fx = xp - x0; x0 -= STARTINGX(v); x1 = x0 + 1;
 			y0 = FLOOR(yp); fy = yp - y0; y0 -= STARTINGY(v); y1 = y0 + 1;
 			z0 = FLOOR(zp); fz = zp - z0; z0 -= STARTINGZ(v); z1 = z0 + 1;
 			// DEBUG
-			if( (x0 < 0) || (y0 < 0) || (z0 < 0)
-					|| (x1 >= XSIZE(v)) || (y1 >= YSIZE(v)) || (z1 >= ZSIZE(v)) )
-			{
-				std::cout << "idzidyidx = " << idz << ", " << idy << ", " << idx
-						<< ",       x0x1y0y1z0z1 = " << x0 << ", " << x1 << ", " << y0
-						<< ", " << y1 << ", " << z0 << ", " << z1 << std::endl;
-			}
+			if ( (x0 < 0) || (y0 < 0) || (z0 < 0) || (x1 >= XSIZE(v)) || (y1 >= YSIZE(v)) || (z1 >= ZSIZE(v)) )
+				std::cout << " idzidyidx= " << k << ", " << i << ", " << j << ", x0x1y0y1z0z1= " << x0 << ", " << x1 << ", " << y0 << ", " << y1 << ", " << z0 << ", " << z1 << std::endl;
 
-			// Get values
+			RFLOAT d000, d001, d010, d011, d100, d101, d110, d111;
 			d000 = DIRECT_A3D_ELEM(v, z0, y0, x0);
 			d001 = DIRECT_A3D_ELEM(v, z0, y0, x1);
 			d010 = DIRECT_A3D_ELEM(v, z0, y1, x0);
@@ -211,17 +208,16 @@ bool calcCCofHelicalSymmetry(
 			d110 = DIRECT_A3D_ELEM(v, z1, y1, x0);
 			d111 = DIRECT_A3D_ELEM(v, z1, y1, x1);
 
-			// Interpolation 3D -> 2D
+			RFLOAT dx00, dx01, dx10, dx11;
 			dx00 = LIN_INTERP(fx, d000, d001);
 			dx01 = LIN_INTERP(fx, d100, d101);
 			dx10 = LIN_INTERP(fx, d010, d011);
 			dx11 = LIN_INTERP(fx, d110, d111);
 
-			// Interpolation 2D -> 1D
+			RFLOAT dxy0, dxy1, ddd;
 			dxy0 = LIN_INTERP(fy, dx00, dx10);
 			dxy1 = LIN_INTERP(fy, dx01, dx11);
 
-			// Interpolation of 2 voxels
 			ddd = LIN_INTERP(fz, dxy0, dxy1);
 
 			// Record this voxel
@@ -229,10 +225,10 @@ bool calcCCofHelicalSymmetry(
 		}
 
 		// Calc dev of this voxel in the chunk
-		if(dev_voxel.size() > 1)
+		if (dev_voxel.size() > 1)
 		{
 			sum_pw1 = sum_pw2 = 0.;
-			for(id = 0; id < dev_voxel.size(); id++)
+			for (int id = 0; id < dev_voxel.size(); id++)
 			{
 				sum_pw1 += dev_voxel[id];
 				sum_pw2 += dev_voxel[id] * dev_voxel[id];
@@ -246,7 +242,7 @@ bool calcCCofHelicalSymmetry(
 	}
 
 	// Calc avg of all voxels' devs in this chunk (for a specific helical symmetry)
-	if(dev_chunk.size() < 1)
+	if (dev_chunk.size() < 1)
 	{
 		cc = (1e10);
 		nr_asym_voxels = 0;
@@ -255,7 +251,7 @@ bool calcCCofHelicalSymmetry(
 	else
 	{
 		sum_pw1 = 0.;
-		for(id = 0; id < dev_chunk.size(); id++)
+		for (int id = 0; id < dev_chunk.size(); id++)
 			sum_pw1 += dev_chunk[id];
 		cc = (sum_pw1 / dev_chunk.size());
 	}
@@ -265,84 +261,160 @@ bool calcCCofHelicalSymmetry(
 	return true;
 };
 
+void checkRangesForLocalSearchHelicalSymmetry(
+		RFLOAT rise_A,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT twist_deg,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg)
+{
+	RFLOAT rise_avg_A = (rise_min_A + rise_max_A) / 2.;
+	RFLOAT twist_avg_deg = (twist_min_deg + twist_max_deg) / 2.;
+
+	if ( (rise_min_A < 0.001) || (rise_max_A < 0.001) || (rise_avg_A < 0.001) )
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Invalid helical rise!");
+	if ( (rise_min_A > rise_max_A) || (twist_min_deg > twist_max_deg) )
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Minimum values of twist/rise should be smaller than their maximum values!");
+	if ( (fabs(twist_avg_deg - twist_min_deg) > 180.01) || ((fabs(rise_avg_A - rise_min_A) / fabs(rise_avg_A)) > 0.3334) )
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Search ranges of helical parameters are too large!");
+	if ( (rise_A < rise_min_A) || (rise_A > rise_max_A) || (twist_deg < twist_min_deg) || (twist_deg > twist_max_deg) )
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Helical twist and/or rise are out of their specified ranges!");
+};
+
 bool localSearchHelicalSymmetry(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT pixel_size_A,
 		RFLOAT sphere_radius_A,
-		RFLOAT r_min_A,
-		RFLOAT r_max_A,
+		RFLOAT cyl_inner_radius_A,
+		RFLOAT cyl_outer_radius_A,
 		RFLOAT z_percentage,
-		RFLOAT rise_ori_A,
-		RFLOAT twist_ori_deg,
-		RFLOAT rise_search_max_dev_percentage,
-		RFLOAT twist_search_max_dev_percentage,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT rise_inistep_A,
 		RFLOAT& rise_refined_A,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
+		RFLOAT twist_inistep_deg,
 		RFLOAT& twist_refined_deg)
 {
 	// TODO: whether iterations can exit & this function works for negative twist
-	int iter, box_len, nr_asym_voxels, nr_half_samplings, nr_min_half_samplings, best_id;
-	RFLOAT r_min_pix, r_max_pix, rise_ori_pix, best_dev;
-	RFLOAT rise_half_range_pix, rise_step_pix, twist_half_range_deg, twist_step_deg;
+	int iter, box_len, nr_asym_voxels, nr_rise_samplings, nr_twist_samplings, nr_min_samplings, nr_max_samplings, best_id, iter_not_converged;
+	RFLOAT r_min_pix, r_max_pix, best_dev, err_max;
+	RFLOAT rise_min_pix, rise_max_pix, rise_step_pix, rise_inistep_pix, twist_step_deg, rise_refined_pix;
+	RFLOAT rise_local_min_pix, rise_local_max_pix, twist_local_min_deg, twist_local_max_deg;
 	std::vector<HelicalSymmetryItem> helical_symmetry_list;
+	bool out_of_range, search_rise, search_twist;
 
+	// Check input 3D reference
 	if (v.getDim() != 3)
-	{
-		REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): Input helical reference is not 3D! (v.getDim() = "
-						+ integerToString(v.getDim()) + ")");
-		return false;
-	}
+		REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): Input helical reference is not 3D! (v.getDim() = " + integerToString(v.getDim()) + ")");
 	box_len = (XSIZE(v) < YSIZE(v)) ? XSIZE(v) : YSIZE(v);
 	box_len = (box_len < ZSIZE(v)) ? box_len : ZSIZE(v);
-	if (checkHelicalParametersFor3DHelicalReference(
+
+	// Check helical parameters
+	checkHelicalParametersFor3DHelicalReference(
 			box_len,
 			pixel_size_A,
-			twist_ori_deg,
-			rise_ori_A,
+			twist_min_deg,
+			rise_min_A,
 			z_percentage,
-			true,
-			rise_search_max_dev_percentage,
-			twist_search_max_dev_percentage,
 			sphere_radius_A,
-			r_min_A,
-			r_max_A) == false)
-	{
-		REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): Input Parameters error!");
-		return false;
-	}
+			cyl_inner_radius_A,
+			cyl_outer_radius_A);
+	checkHelicalParametersFor3DHelicalReference(
+			box_len,
+			pixel_size_A,
+			twist_max_deg,
+			rise_max_A,
+			z_percentage,
+			sphere_radius_A,
+			cyl_inner_radius_A,
+			cyl_outer_radius_A);
+	rise_refined_A = (rise_min_A + rise_max_A) / 2.;
+	rise_refined_pix = rise_refined_A / pixel_size_A;
+	twist_refined_deg = (twist_min_deg + twist_max_deg) / 2.;
+	checkRangesForLocalSearchHelicalSymmetry(
+			rise_refined_A,
+			rise_min_A,
+			rise_max_A,
+			twist_refined_deg,
+			twist_min_deg,
+			twist_max_deg);
 
-	r_min_pix = r_min_A / pixel_size_A;
-	r_max_pix = r_max_A / pixel_size_A;
-	rise_ori_pix = rise_ori_A / pixel_size_A;
+	r_min_pix = cyl_inner_radius_A / pixel_size_A;
+	r_max_pix = cyl_outer_radius_A / pixel_size_A;
+	rise_inistep_pix = rise_inistep_A / pixel_size_A;
+	rise_local_min_pix = rise_min_pix = rise_min_A / pixel_size_A;
+	rise_local_max_pix = rise_max_pix = rise_max_A / pixel_size_A;
+	twist_local_min_deg = twist_min_deg;
+	twist_local_max_deg = twist_max_deg;
 
 	// Initial searches - Iteration 1
-	// Sampling steps should be finer than 1% the twist and the rise
-	// And also make sure to search for at least 11*11 sampling points (5*2+1=11)
-	nr_min_half_samplings = 5;
+	// Sampling of twist should be smaller than 1 degree
+	// Sampling of rise should be smaller than 1%
+	// And also make sure to search for at least 5*5 sampling points
+	// Avoid too many searches (at most 1000*1000)
+	err_max = (1e-5);
+	search_rise = search_twist = true;
+	nr_min_samplings = 5;
+	nr_max_samplings = 1000;
 
-	rise_half_range_pix = fabs(rise_ori_pix) * rise_search_max_dev_percentage;
-	nr_half_samplings = CEIL(rise_search_max_dev_percentage / 0.01);
-	nr_half_samplings = (nr_half_samplings >= nr_min_half_samplings) ? (nr_half_samplings) : (nr_min_half_samplings);
-	rise_step_pix = rise_half_range_pix / RFLOAT(nr_half_samplings);
-
-	twist_half_range_deg = fabs(twist_ori_deg) * twist_search_max_dev_percentage;
-	nr_half_samplings = CEIL(twist_search_max_dev_percentage / 0.01);
-	nr_half_samplings = (nr_half_samplings >= nr_min_half_samplings) ? (nr_half_samplings) : (nr_min_half_samplings);
-	twist_step_deg = twist_half_range_deg / RFLOAT(nr_half_samplings);
-
-	helical_symmetry_list.clear();
-	for (iter = 1; iter <= 20; iter++)
+	twist_inistep_deg = (twist_inistep_deg < (1e-5)) ? (1.) : (twist_inistep_deg);
+	nr_twist_samplings = CEIL(fabs(twist_local_min_deg - twist_local_max_deg) / twist_inistep_deg);
+	nr_twist_samplings = (nr_twist_samplings > nr_min_samplings) ? (nr_twist_samplings) : (nr_min_samplings);
+	nr_twist_samplings = (nr_twist_samplings < nr_max_samplings) ? (nr_twist_samplings) : (nr_max_samplings);
+	twist_step_deg = fabs(twist_local_min_deg - twist_local_max_deg) / RFLOAT(nr_twist_samplings);
+	if ( fabs(twist_local_min_deg - twist_local_max_deg) < err_max)
 	{
+		twist_step_deg = 0.;
+		twist_min_deg = twist_max_deg = twist_local_min_deg = twist_local_max_deg = twist_refined_deg;
+		search_twist = false;
+	}
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+	std::cout << " ### twist_step_deg = " << twist_step_deg << ", nr_twist_samplings = " << nr_twist_samplings << ", search_twist = " << (int)(search_twist) << std::endl;
+#endif
+
+	rise_inistep_pix = (rise_inistep_pix < (1e-5)) ? (1e30) : (rise_inistep_pix);
+	rise_step_pix = 0.01 * ((fabs(rise_local_min_pix) + fabs(rise_local_max_pix)) / 2.);
+	rise_step_pix = (rise_step_pix < rise_inistep_pix) ? (rise_step_pix) : (rise_inistep_pix);
+	nr_rise_samplings = CEIL(fabs(rise_local_min_pix - rise_local_max_pix) / rise_step_pix);
+	nr_rise_samplings = (nr_rise_samplings > nr_min_samplings) ? (nr_rise_samplings) : (nr_min_samplings);
+	nr_rise_samplings = (nr_rise_samplings < nr_max_samplings) ? (nr_rise_samplings) : (nr_max_samplings);
+	rise_step_pix = fabs(rise_local_min_pix - rise_local_max_pix) / RFLOAT(nr_rise_samplings);
+	if ((fabs(rise_local_min_pix - rise_local_max_pix) / fabs(rise_refined_pix)) < err_max)
+	{
+		rise_step_pix = 0.;
+		rise_min_pix = rise_max_pix = rise_local_min_pix = rise_local_max_pix = rise_refined_pix;
+		search_rise = false;
+	}
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+	std::cout << " ### rise_step_A = " << rise_step_pix * pixel_size_A << ", nr_rise_samplings = " << nr_rise_samplings << ", search_rise = " << (int)(search_rise) << std::endl;
+#endif
+
+	if ( (!search_twist) && (!search_rise) )
+		return true;
+
+	// Local searches
+	helical_symmetry_list.clear();
+	iter_not_converged = 0;
+	for (iter = 1; iter <= 100; iter++)
+	{
+		// TODO: please check this!!!
+		// rise_step_pix and twist_step_deg should be strictly > 0 now!
 		makeHelicalSymmetryList(
 				helical_symmetry_list,
-				rise_ori_pix,
-				twist_ori_deg,
-				rise_half_range_pix,
-				twist_half_range_deg,
+				rise_local_min_pix,
+				rise_local_max_pix,
 				rise_step_pix,
-				twist_step_deg);
-
+				search_rise,
+				twist_local_min_deg,
+				twist_local_max_deg,
+				twist_step_deg,
+				search_twist);
 		if (helical_symmetry_list.size() < 1)
-			REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): No helical symmetries are found in the search list!");
+			REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): BUG No helical symmetries are found in the search list!");
+
 		best_dev = (1e30);
 		best_id = -1;
 		for (int ii = 0; ii < helical_symmetry_list.size(); ii++)
@@ -350,6 +422,7 @@ bool localSearchHelicalSymmetry(
 			// If this symmetry is not calculated before
 			if (helical_symmetry_list[ii].dev > (1e30))
 			{
+				// TODO: please check this!!!
 				calcCCofHelicalSymmetry(
 						v,
 						r_min_pix,
@@ -359,722 +432,145 @@ bool localSearchHelicalSymmetry(
 						helical_symmetry_list[ii].twist_deg,
 						helical_symmetry_list[ii].dev,
 						nr_asym_voxels);
-				// DEBUG
-				//std::cout << helical_symmetry_list[ii].rise_pix << "	" << helical_symmetry_list[ii].twist_deg << "	" << helical_symmetry_list[ii].dev << std::endl;
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+				std::cout << " NEW -->" << std::flush;
+#endif
 			}
+			else
+			{
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+				std::cout << " OLD -->" << std::flush;
+#endif
+			}
+
 			if (helical_symmetry_list[ii].dev < best_dev)
 			{
 				best_dev = helical_symmetry_list[ii].dev;
 				best_id = ii;
 			}
-
-			// DEBUG
-			//std::cout << "  Twist = " << helical_symmetry_list[ii].twist_deg
-			//		<< ", Rise = " << helical_symmetry_list[ii].rise_pix * pixel_size_A
-			//		<< ", Dev = " << helical_symmetry_list[ii].dev << std::endl;
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+			std::cout << " Twist = " << helical_symmetry_list[ii].twist_deg << ", Rise = " << helical_symmetry_list[ii].rise_pix * pixel_size_A << ", Dev = " << helical_symmetry_list[ii].dev << std::endl;
+#endif
 		}
-
 
 		// Update refined symmetry
-		rise_ori_pix = helical_symmetry_list[best_id].rise_pix;
-		rise_refined_A = rise_ori_pix * pixel_size_A;
-		twist_refined_deg = twist_ori_deg = helical_symmetry_list[best_id].twist_deg;
-
-		// DEBUG
-		//std::cout << " ######################################################## " << std::endl;
-		//std::cout << "  ##### Refined Twist = " << twist_refined_deg << ", Rise = " << rise_refined_A
-		//		<< ", Dev = " << helical_symmetry_list[best_id].dev << std::endl;
-		//std::cout << " ######################################################## " << std::endl;
-
-		if (IsHelicalSymmetryWithinOpenInterval(
-				helical_symmetry_list[best_id].rise_pix,
-				helical_symmetry_list[best_id].twist_deg,
-				rise_ori_pix,
-				twist_ori_deg,
-				rise_half_range_pix,
-				twist_half_range_deg) == false)
+		rise_refined_pix = helical_symmetry_list[best_id].rise_pix;
+		rise_refined_A = rise_refined_pix * pixel_size_A;
+		twist_refined_deg = helical_symmetry_list[best_id].twist_deg;
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+		std::cout << " ################################################################################" << std::endl;
+		std::cout << " ##### Refined Twist = " << twist_refined_deg << ", Rise = " << rise_refined_A << ", Dev = " << helical_symmetry_list[best_id].dev << std::endl;
+		std::cout << " ################################################################################" << std::endl;
+#endif
+		out_of_range = false;
+		if ( (search_rise) && (rise_refined_pix < rise_min_pix) )
 		{
-			if (iter == 1)
-			{
-				std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
-				return false;
-			}
-			else
-			{
-				// Finer searches, optimal symmetry is out of the current search range
-				// Expand the search range and try again
-				rise_half_range_pix *= (2.);
-				twist_half_range_deg *= (2.);
+			out_of_range = true;
+			rise_refined_pix = rise_min_pix;
+			rise_refined_A = rise_refined_pix * pixel_size_A;
+		}
+		if ( (search_rise) && (rise_refined_pix > rise_max_pix) )
+		{
+			out_of_range = true;
+			rise_refined_pix = rise_max_pix;
+			rise_refined_A = rise_refined_pix * pixel_size_A;
+		}
+		if ( (search_twist) && (twist_refined_deg < twist_min_deg) )
+		{
+			out_of_range = true;
+			twist_refined_deg = twist_min_deg;
+		}
+		if ( (search_twist) && (twist_refined_deg > twist_max_deg) )
+		{
+			out_of_range = true;
+			twist_refined_deg = twist_max_deg;
+		}
 
-				// Prevent extra large search range
-				if ( (rise_half_range_pix / rise_step_pix) > 15)
+		if (out_of_range)
+		{
+			std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial guess of helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
+			return false;
+		}
+		else
+		{
+			if (iter > 1)
+			{
+				// If the symmetry does not fall into the local search range
+				// Try 7*, 9*, 11* ... samplings
+				bool this_iter_not_converged = false;
+				if (search_rise)
 				{
-					std::cout << " WARNING: Local searches failed to converge in finding helical symmetry." << std::endl;
-					return false;
+					if ( (rise_refined_pix < (rise_local_min_pix + rise_step_pix * 0.5))
+							|| (rise_refined_pix > (rise_local_max_pix - rise_step_pix * 0.5)) )
+					{
+						this_iter_not_converged = true;
+						rise_local_min_pix = rise_refined_pix - ((RFLOAT)(iter_not_converged) + 3.) * rise_step_pix;
+						rise_local_max_pix = rise_refined_pix + ((RFLOAT)(iter_not_converged) + 3.) * rise_step_pix;
+					}
+				}
+				if (search_twist)
+				{
+					if ( (twist_refined_deg < (twist_local_min_deg + twist_step_deg * 0.5))
+							|| (twist_refined_deg > (twist_local_max_deg - twist_step_deg * 0.5)) )
+					{
+						this_iter_not_converged = true;
+						twist_local_min_deg = twist_refined_deg - ((RFLOAT)(iter_not_converged) + 3.) * twist_step_deg;
+						twist_local_max_deg = twist_refined_deg + ((RFLOAT)(iter_not_converged) + 3.) * twist_step_deg;
+					}
+				}
+				if (this_iter_not_converged)
+				{
+					iter_not_converged++;
+#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
+					std::cout << " !!! NR_ITERATION_NOT_CONVERGED = " << iter_not_converged << " !!!" << std::endl;
+#endif
+					if (iter_not_converged > 10) // Up to 25*25 samplings are allowed (original 5*5 samplings)
+					{
+						std::cout << " WARNING: Local searches of helical symmetry cannot converge. Consider a finer initial sampling of helical parameters." << std::endl;
+						return false;
+					}
+					continue;
 				}
 			}
-		}
-		else
-		{
-			// Set 5*5 finer samplings for the next iteration
-			rise_half_range_pix = rise_step_pix;
-			twist_half_range_deg = twist_step_deg;
+			iter_not_converged = 0;
 
-			rise_step_pix /= (2.);
-			twist_step_deg /= (2.);
+			// Set 5*5 finer samplings for the next iteration
+			if (search_rise)
+			{
+				rise_local_min_pix = rise_refined_pix - rise_step_pix;
+				rise_local_max_pix = rise_refined_pix + rise_step_pix;
+			}
+			if (search_twist)
+			{
+				twist_local_min_deg = twist_refined_deg - twist_step_deg;
+				twist_local_max_deg = twist_refined_deg + twist_step_deg;
+			}
+
+			// When there is no need to search for either twist or rise
+			if ((rise_step_pix / fabs(rise_refined_pix)) < err_max)
+			{
+				rise_local_min_pix = rise_local_max_pix = rise_refined_pix;
+				search_rise = false;
+			}
+			if ((twist_step_deg / fabs(twist_refined_deg)) < err_max)
+			{
+				twist_local_min_deg = twist_local_max_deg = twist_refined_deg;
+				search_twist = false;
+			}
 
 			// Stop searches if step sizes are too small
-			if ( (rise_step_pix < fabs(rise_ori_pix) * (1e-5)) || (twist_step_deg < fabs(twist_ori_deg) * (1e-5)) )
-				break;
+			if ( (!search_twist) && (!search_rise) )
+				return true;
+
+			// Decrease step size
+			if (search_rise)
+				rise_step_pix /= 2.;
+			if (search_twist)
+				twist_step_deg /= 2.;
 		}
 	}
-
 	return true;
 };
-
-
-
-
-
-/*
-bool get2DZsliceIn3DVolume(
-		const MultidimArray<RFLOAT>& vol_in,
-		MultidimArray<RFLOAT>& img_out,
-		int idz)
-{
-	int Xdim, Ydim, Zdim, Ndim;
-
-	img_out.clear();
-	Xdim = XSIZE(vol_in); Ydim = YSIZE(vol_in); Zdim = ZSIZE(vol_in); Ndim = NSIZE(vol_in);
-
-	if( (Ndim != 1) || (Xdim < 5) || (Ydim < 5) || (Zdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::get2DZsliceIn3DVolume(): Input 3D MultidimArray has Wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return false;
-	}
-
-	if( (idz < STARTINGZ(vol_in)) || (idz > FINISHINGZ(vol_in)) )
-	{
-		REPORT_ERROR("helix.cpp::get2DZsliceIn3DVolume(): Invalid Z slice! (z = [" + integerToString(STARTINGZ(vol_in)) + ", " + integerToString(FINISHINGZ(vol_in)) + "] while requesting to access idz = " + integerToString(idz) + ")");
-		return false;
-	}
-
-	img_out.initZeros(Ydim, Xdim);
-	FOR_ALL_ELEMENTS_IN_ARRAY2D(img_out)
-	{
-		A2D_ELEM(img_out, i, j)
-				= A3D_ELEM(vol_in, idz, i - STARTINGY(img_out) + STARTINGY(vol_in), j - STARTINGX(img_out) + STARTINGX(vol_in));
-	}
-	img_out.setXmippOrigin();
-	return true;
-};
-
-bool add2DZsliceInto3DVolumeSum(
-		const MultidimArray<RFLOAT>& img_in,
-		MultidimArray<RFLOAT>& vol_sum,
-		std::vector<RFLOAT>& weight_sum,
-		int idz)
-{
-	int Xdim_vol, Ydim_vol, Zdim_vol, Ndim_vol, Xdim_img, Ydim_img, Zdim_img, Ndim_img;
-
-	Xdim_img = XSIZE(img_in); Ydim_img = YSIZE(img_in); Zdim_img = ZSIZE(img_in); Ndim_img = NSIZE(img_in);
-	Xdim_vol = XSIZE(vol_sum); Ydim_vol = YSIZE(vol_sum); Zdim_vol = ZSIZE(vol_sum); Ndim_vol = NSIZE(vol_sum);
-
-	if( (Ndim_img != 1) || (Zdim_img != 1) || (Ydim_img < 5) || (Xdim_img < 5)
-			|| (Ndim_vol != 1) || (Zdim_vol < 5) || (Ydim_vol < 5) || (Xdim_vol < 5)
-			|| (Ydim_img != Ydim_vol) || (Xdim_img != Xdim_vol)
-			|| (weight_sum.size() != Zdim_vol) )
-	{
-		REPORT_ERROR("Wrong dimensions!");
-		return false;
-	}
-
-	if( (idz < STARTINGZ(vol_sum)) || (idz > FINISHINGZ(vol_sum)) )
-	{
-		REPORT_ERROR("helix.cpp::add2DZsliceInto3DVolumeSum(): Invalid Z slice! (z = [" + integerToString(STARTINGZ(vol_sum)) + ", " + integerToString(FINISHINGZ(vol_sum)) + "] while requesting to access idz = " + integerToString(idz) + ")");
-		return false;
-	}
-
-	for (long int i = STARTINGY(vol_sum); i <= FINISHINGY(vol_sum); i++)
-	{
-		for (long int j = STARTINGX(vol_sum); j <= FINISHINGX(vol_sum); j++)
-		{
-			A3D_ELEM(vol_sum, idz, i, j)
-					+= A2D_ELEM(img_in, i - STARTINGY(vol_sum) + STARTINGY(img_in), j - STARTINGX(vol_sum) + STARTINGX(img_in));
-		}
-	}
-	weight_sum[idz - STARTINGZ(vol_sum)] += 1.0;
-	return true;
-};
-
-void shift3DVolumeAlongZAxisInFourierSpace(
-		MultidimArray<RFLOAT>& img,
-		RFLOAT shift_pix)
-{
-	const RFLOAT pi = 3.141592653589793238462643383279502884197;
-	int Xdim, Ydim, Zdim, Ndim;
-	RFLOAT tmp_RFLOAT, a, b, c, d, ac, bd, ab_cd;
-	MultidimArray<Complex> Faux;
-	FourierTransformer transformer;
-	Xdim = XSIZE(img); Ydim = YSIZE(img); Zdim = ZSIZE(img); Ndim = NSIZE(img);
-
-	if( (Ndim != 1) || (Xdim < 5) || (Ydim < 5) || (Zdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::shift3DVolumeAlongZAxisInFT(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-
-	Faux.clear();
-	transformer.clear();
-
-	// No need to shift
-	if(fabs(shift_pix) < (1e-6))
-	{
-		return;
-	}
-
-	// Do FT
-	CenterFFT(img, true);
-	transformer.FourierTransform(img, Faux);
-
-	// Shift
-	shift_pix /= (RFLOAT)(-Zdim);
-	for (long int k = 0, kp = 0; k < ZSIZE(Faux); k++, kp = (k < XSIZE(Faux)) ? k : k - ZSIZE(Faux))
-	{
-		tmp_RFLOAT = 2 * pi * (kp * shift_pix);
-		a = cos(tmp_RFLOAT);
-		b = sin(tmp_RFLOAT);
-		for (long int i = 0, ip = 0 ; i < YSIZE(Faux); i++, ip = (i < XSIZE(Faux)) ? i : i - YSIZE(Faux))
-		{
-			for (long int j = 0, jp = 0; j < XSIZE(Faux); j++, jp = j)
-			{
-				c = DIRECT_A3D_ELEM(Faux, k, i, j).real;
-				d = DIRECT_A3D_ELEM(Faux, k, i, j).imag;
-				ac = a * c;
-				bd = b * d;
-				ab_cd = (a + b) * (c + d);
-				DIRECT_A3D_ELEM(Faux, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
-			}
-		}
-	}
-
-	// Do IFT
-	transformer.inverseFourierTransform(Faux, img);
-	CenterFFT(img, false);
-	img.setXmippOrigin();
-	Faux.clear();
-	transformer.clear();
-
-	return;
-};
-
-void rotateAndSum2DZSliceInRealSpace(
-		MultidimArray<RFLOAT>& img_ori,
-		MultidimArray<RFLOAT>& img_sum,
-		std::vector<RFLOAT>& weight_sum,
-		int idz,
-		RFLOAT outer_radius_pix,
-		RFLOAT rot_angle_deg)
-{
-	const RFLOAT pi = 3.141592653589793238462643383279502884197;
-	int Xdim, Ydim, Zdim, Ndim, x_int, y_int;
-	RFLOAT cos_val, sin_val, r, r_max, u, v, x0, y0, x1, y1;
-	//RFLOAT dd00, dd01, dd10, dd11, dylo, dyhi;
-
-	Xdim = XSIZE(img_ori); Ydim = YSIZE(img_ori); Zdim = ZSIZE(img_ori); Ndim = NSIZE(img_ori);
-
-	if( (Ndim != 1) || (Zdim < 5) || (Xdim != Ydim) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::rotateAndSum2DZSliceInRealSpace(): Input MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-	if( (img_ori.sameShape(img_sum) == false) || (weight_sum.size() != Zdim) )
-	{
-		REPORT_ERROR("helix.cpp::rotateAndSum2DZSliceInRealSpace(): Input and sum MultidimArrays have different dimensions!");
-		return;
-	}
-	if( (idz < STARTINGZ(img_sum)) || (idz > FINISHINGZ(img_sum)) )
-	{
-		REPORT_ERROR("helix.cpp::add2DZsliceInto3DVolumeSum(): Invalid Z slice! (z = [" + integerToString(STARTINGZ(img_sum)) + ", " + integerToString(FINISHINGZ(img_sum)) + "] while requesting to access idz = " + integerToString(idz) + ")");
-		return;
-	}
-
-	// Rotation angle should be in (+0 deg, +360 deg)
-	u = rot_angle_deg / 360.;
-	if( (u > 1.) || (u < 0.) )
-	{
-		rot_angle_deg = (u - floor(u)) * 360.;
-	}
-	// Rotation angle = 0, 360 deg, or outer_radius_pix < 0., no need to rotate
-	if( (fabs(rot_angle_deg) < (1e-6)) || (fabs(rot_angle_deg - 360.) < (1e-6)) || (outer_radius_pix < 0.) )
-	{
-		return;
-	}
-
-	// Rotate (Trilinear interpolation)
-	cos_val = cos(rot_angle_deg * pi / 180.);
-	sin_val = sin(rot_angle_deg * pi / 180.);
-	r_max = ((RFLOAT)((Xdim + 1) / 2 - 2)) - 0.01;
-	if(r_max > outer_radius_pix)
-	{
-		r_max = outer_radius_pix;
-	}
-
-	img_ori.setXmippOrigin();
-	img_sum.setXmippOrigin();
-
-    for (long int i = STARTINGY(img_sum); i <= FINISHINGY(img_sum); i++)
-    {
-        for (long int j = STARTINGX(img_sum); j <= FINISHINGX(img_sum); j++)
-        {
-    		x0 = (RFLOAT)(j);
-    		y0 = (RFLOAT)(i);
-    		r = sqrt(x0 * x0 + y0 * y0);
-    		if(r > r_max)
-    		{
-    			// Needed ?
-    			//A3D_ELEM(img_sum, idz, i, j) = 0.;
-    			continue;
-    		}
-
-    		x1 = x0 * cos_val - y0 * sin_val;
-    		y1 = x0 * sin_val + y0 * cos_val;
-    		x_int = (int)(floor(x1));
-    		y_int = (int)(floor(y1));
-    		u = x1 - ((RFLOAT)(x_int));
-    		v = y1 - ((RFLOAT)(y_int));
-    		A3D_ELEM(img_sum, idz, i, j) +=
-    				A3D_ELEM(img_ori, idz, y_int, x_int) * (1. - u) * (1. - v) + A3D_ELEM(img_ori, idz, y_int + 1, x_int + 1) * u * v
-    				+ A3D_ELEM(img_ori, idz, y_int, x_int + 1) * u * (1. - v) + A3D_ELEM(img_ori, idz, y_int + 1, x_int) * (1. - u) * v;
-
-    		// This version creates artifacts on the surfaces of particles.
-    		//dd00 = A3D_ELEM(img_ori, idz, y_int, x_int);
-    		//dd01 = A3D_ELEM(img_ori, idz, y_int + 1, x_int);
-    		//dd10 = A3D_ELEM(img_ori, idz, y_int, x_int + 1);
-    		//dd11 = A3D_ELEM(img_ori, idz, y_int + 1, x_int + 1);
-    		//dylo = LIN_INTERP(u, dd00, dd10);
-    		//dyhi = LIN_INTERP(u, dd10, dd11);
-    		//A3D_ELEM(img_sum, idz, i, j) += LIN_INTERP(v, dylo, dyhi);
-        }
-    }
-    weight_sum[idz - STARTINGZ(img_sum)] += 1.0;
-
-	return;
-};
-
-
-void rotate2DZSliceInFourierSpace(
-		MultidimArray<RFLOAT>& img,
-		RFLOAT rot_angle_deg,
-		int padding_factor)
-{
-	const RFLOAT pi = 3.141592653589793238462643383279502884197;
-	int Xdim, Ydim, Zdim, Ndim, x_int, y_int;
-	RFLOAT sinc_val, sin_val, cos_val, x0, y0, x1, y1, r, r_max, u, v;
-	bool is_neg_x;
-	MultidimArray<RFLOAT> img_pad;
-	MultidimArray<Complex> Faux, Faux_trans;
-	FourierTransformer transformer;
-
-	Xdim = XSIZE(img); Ydim = YSIZE(img); Zdim = ZSIZE(img); Ndim = NSIZE(img);
-
-	if( (Zdim != 1) || (Ndim != 1) || (Xdim != Ydim) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::rotate2DZSliceInFT(): Input 2D square MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-
-	if( (padding_factor <= 0) || (padding_factor > 4) )
-	{
-		REPORT_ERROR("helix.cpp::rotate2DZSliceInFT(): Padding factor should be 1, 2, 3 or 4!");
-		return;
-	}
-
-	// Rotation angle should be in (+0 deg, +360 deg)
-	u = rot_angle_deg / 360.;
-	if( (u > 1.) || (u < 0.) )
-	{
-		rot_angle_deg = (u - floor(u)) * 360.;
-	}
-	// Rotation angle = 0 or 360 deg, no need to rotate
-	if( (fabs(rot_angle_deg) < (1e-6)) || (fabs(rot_angle_deg - 360.) < (1e-6)) )
-	{
-		return;
-	}
-
-	img_pad.clear();
-	Faux.clear();
-	Faux_trans.clear();
-	transformer.clear();
-
-	// Pad image & gridding
-	img.setXmippOrigin();
-	img_pad.initZeros(1, 1, Ydim * padding_factor, Xdim * padding_factor);
-	img_pad.setXmippOrigin();
-	FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
-	{
-		A2D_ELEM(img_pad, i, j) = A2D_ELEM(img, i, j);
-
-		// Gridding
-		r = sqrt((RFLOAT)(i * i + j * j)) / ((RFLOAT)(Xdim * padding_factor));
-		if(fabs(r) > (1e-6))
-		{
-			sinc_val = sin(pi * r) / (pi * r);
-			A2D_ELEM(img_pad, i, j) /= (sinc_val * sinc_val);
-		}
-	}
-
-	// Do FT
-	CenterFFT(img_pad, true);
-	transformer.FourierTransform(img_pad, Faux);
-	Faux_trans.resize(Faux);
-
-	// Rotate (Trilinear interpolation)
-	cos_val = cos(rot_angle_deg * pi / 180.);
-	sin_val = sin(rot_angle_deg * pi / 180.);
-	//r_max = ((RFLOAT)(Xdim * padding_factor / 2 - 1));  // -1 ?
-	r_max = ((RFLOAT)((Xdim * padding_factor + 1) / 2 - 1));
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux_trans)
-	{
-		x0 = RFLOAT(jp);
-		y0 = RFLOAT(ip);
-		r = sqrt(x0 * x0 + y0 * y0);
-		if(r > r_max)
-		{
-			FFTW2D_ELEM(Faux_trans, ip, jp).real = FFTW2D_ELEM(Faux_trans, ip, jp).imag = 0.;
-			continue;
-		}
-
-		x1 = x0 * cos_val - y0 * sin_val;
-		y1 = x0 * sin_val + y0 * cos_val;
-		is_neg_x = false;
-		if(x1 < 0.)
-		{
-			x1 *= -1.;
-			y1 *= -1.;
-			is_neg_x = true;
-		}
-		x_int = (int)(floor(x1));
-		y_int = (int)(floor(y1));
-		u = x1 - ((RFLOAT)(x_int));
-		v = y1 - ((RFLOAT)(y_int));
-		FFTW2D_ELEM(Faux_trans, ip, jp) =
-				FFTW2D_ELEM(Faux, y_int, x_int) * (1. - u) * (1. - v) + FFTW2D_ELEM(Faux, y_int + 1, x_int + 1) * u * v
-				+ FFTW2D_ELEM(Faux, y_int, x_int + 1) * u * (1. - v) + FFTW2D_ELEM(Faux, y_int + 1, x_int) * (1. - u) * v;
-		if(is_neg_x == true)
-		{
-			FFTW2D_ELEM(Faux_trans, ip, jp).imag *= -1.;
-		}
-	}
-	Faux.clear();
-
-	// Do IFT
-	transformer.inverseFourierTransform(Faux_trans, img_pad);
-	CenterFFT(img_pad, false);
-	Faux_trans.clear();
-	transformer.clear();
-
-	// Rewindow
-	r_max = ((RFLOAT)((Xdim + 1) / 2 - 1));
-	img.setXmippOrigin();
-	FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
-	{
-		r = sqrt(i * i + j * j);
-		if(r > r_max)
-		{
-			A2D_ELEM(img, i, j) = 0.;
-		}
-		else
-		{
-			A2D_ELEM(img, i, j) = A2D_ELEM(img_pad, i, j);
-		}
-	}
-	img_pad.clear();
-
-	return;
-};
-
-
-// In Z axis [s, e] chunk, there must be a symmetrical segment of helix with at least one particle!
-void expandZaxisInFourierSpace(
-		MultidimArray<RFLOAT>& vol,
-		RFLOAT outer_radius_pix,
-		RFLOAT twist_deg,  // both + or -
-		RFLOAT rise_pix,  // only +
-		int idz_s,
-		int idz_e,
-		int padding_factor)
-{
-	int ii, jj, Xdim, Ydim, Zdim, Ndim, nr_particles, idz_s_new, idz_e_new;
-	RFLOAT rise_mult_pix, twist_mult_deg;
-	MultidimArray<RFLOAT> vol_ori, vol_trans, vol_sum, Zslice2D;
-	std::vector<RFLOAT> weight_sum;
-
-	vol_ori.clear();
-	vol_trans.clear();
-	vol_sum.clear();
-	Zslice2D.clear();
-	weight_sum.clear();
-	Xdim = XSIZE(vol); Ydim = YSIZE(vol); Zdim = ZSIZE(vol); Ndim = NSIZE(vol);
-
-	if( (Ndim != 1) || (Zdim < 5) || (Xdim != Ydim) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::expandZaxis(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-
-	vol.setXmippOrigin();
-
-	if( (rise_pix < 0.01) || (rise_pix > ((RFLOAT)(Zdim / 2)))
-			|| (idz_s >= idz_e) || (idz_s < STARTINGZ(vol)) || (idz_e > FINISHINGZ(vol))
-			|| ((idz_e - idz_s) < rise_pix) || (outer_radius_pix < 0.) )
-	{
-		REPORT_ERROR("helix.cpp::expandZaxis(): Wrong parameters!");
-		return;
-	}
-
-	// No need to expand
-	if( (idz_s <= STARTINGZ(vol)) && (idz_e >= FINISHINGZ(vol)) )
-	{
-		return;
-	}
-
-	// How many x = n*rise pixels are there in [idz_e, idz_e] ? (n is an integer)
-	nr_particles = (int)(floor(((RFLOAT)(idz_e - idz_s)) / rise_pix));
-	rise_mult_pix = nr_particles * rise_pix;
-	twist_mult_deg = nr_particles * twist_deg;
-	// DEBUG
-
-	std::cout << "nr_particles = " << nr_particles
-			<< ", rise_mult_pix = " << rise_mult_pix
-			<< ", twist_mult_deg = " << twist_mult_deg << std::endl;
-	std::cout << "Center z[" << idz_s << ", " << idz_e << "]" << std::endl;
-
-	// Retain Z center part of volume
-	weight_sum.resize(Zdim);
-	for(ii = 0; ii < weight_sum.size(); ii++)
-	{
-		if( ((ii + STARTINGZ(vol)) < idz_s) || ((ii + STARTINGZ(vol)) > idz_e) )
-		{
-			weight_sum[ii] = 0.;
-			continue;
-		}
-		weight_sum[ii] = 1.;
-	}
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
-	{
-		if( (k < idz_s) || (k > idz_e) )
-		{
-			A3D_ELEM(vol, k, i, j) = 0.;
-		}
-	}
-
-	// Init result
-	vol_ori = vol;
-	vol_sum = vol;
-	idz_s_new = idz_s;
-	idz_e_new = idz_e;
-
-	// Shift upward (Z+)
-	for(ii = 1; idz_e_new <= FINISHINGZ(vol_sum) ; ii++)
-	{
-		idz_s_new = (int)(ceil(idz_s + rise_mult_pix * ((RFLOAT)(ii))));
-		idz_e_new = (int)(floor(idz_e + rise_mult_pix * ((RFLOAT)(ii))));
-		// DEBUG
-		std::cout << "Fill in z[" << idz_s_new << ", " << idz_e_new << "]" << std::endl;
-		vol_trans = vol_ori;
-		shift3DVolumeAlongZAxisInFourierSpace(vol_trans, rise_mult_pix * ((RFLOAT)(ii)) );
-		for(jj = idz_s_new; (jj <= idz_e_new) && (jj >= STARTINGZ(vol_sum)) && (jj <= FINISHINGZ(vol_sum)); jj++)
-		{
-			if(weight_sum[jj - STARTINGZ(vol_sum)] > 0.9)
-			{
-				continue;
-			}
-
-			if( (padding_factor >= 2) && (padding_factor <= 4) )
-			{
-				get2DZsliceIn3DVolume(vol_trans, Zslice2D, jj);
-				rotate2DZSliceInFourierSpace(Zslice2D, twist_mult_deg * ((RFLOAT)(ii)), padding_factor);
-				add2DZsliceInto3DVolumeSum(Zslice2D, vol_sum, weight_sum, jj);
-			}
-			else
-			{
-				rotateAndSum2DZSliceInRealSpace(vol_trans, vol_sum, weight_sum, jj, outer_radius_pix, twist_mult_deg * ((RFLOAT)(ii)));
-			}
-		}
-	}
-
-	// Shift downward (Z-)
-	for(ii = -1; idz_s_new >= STARTINGZ(vol_sum); ii--)
-	{
-		idz_s_new = (int)(ceil(idz_s + rise_mult_pix * ((RFLOAT)(ii))));
-		idz_e_new = (int)(floor(idz_e + rise_mult_pix * ((RFLOAT)(ii))));
-		// DEBUG
-		std::cout << "Fill in z[" << idz_s_new << ", " << idz_e_new << "]" << std::endl;
-		vol_trans = vol_ori;
-		shift3DVolumeAlongZAxisInFourierSpace(vol_trans, rise_mult_pix * ((RFLOAT)(ii)) );
-		for(jj = idz_e_new; (jj >= idz_s_new) && (jj >= STARTINGZ(vol_sum)) && (jj <= FINISHINGZ(vol_sum)); jj--)
-		{
-			if(weight_sum[jj - STARTINGZ(vol_sum)] > 0.9)
-			{
-				continue;
-			}
-			if( (padding_factor >= 2) && (padding_factor <= 4) )
-			{
-				get2DZsliceIn3DVolume(vol_trans, Zslice2D, jj);
-				rotate2DZSliceInFourierSpace(Zslice2D, twist_mult_deg * ((RFLOAT)(ii)), padding_factor);
-				add2DZsliceInto3DVolumeSum(Zslice2D, vol_sum, weight_sum, jj);
-			}
-			else
-			{
-				rotateAndSum2DZSliceInRealSpace(vol_trans, vol_sum, weight_sum, jj, outer_radius_pix, twist_mult_deg * ((RFLOAT)(ii)));
-			}
-		}
-	}
-
-	vol = vol_sum;
-
-	// Destructions
-	vol_ori.clear();
-	vol_trans.clear();
-	vol_sum.clear();
-	Zslice2D.clear();
-	weight_sum.clear();
-
-	return;
-};
-
-void imposeHelicalSymmetryInFourierSpace(MultidimArray<RFLOAT>& vol,
-		RFLOAT outer_radius_pix,
-		RFLOAT twist_deg,  // both + or -
-		RFLOAT rise_pix,  // only +
-		int idz_s,
-		int idz_e,
-		int padding_factor)
-{
-	int ii, jj, Xdim, Ydim, Zdim, Ndim, idz_s_new, idz_e_new;
-	RFLOAT twist_total_deg, rise_total_pix;
-	MultidimArray<RFLOAT> vol_ori, vol_trans, vol_sum, Zslice2D;
-	std::vector<RFLOAT> weight_sum;
-
-	vol_ori.clear();
-	vol_trans.clear();
-	vol_sum.clear();
-	Zslice2D.clear();
-	weight_sum.clear();
-	Xdim = XSIZE(vol); Ydim = YSIZE(vol); Zdim = ZSIZE(vol); Ndim = NSIZE(vol);
-
-	if( (Ndim != 1) || (Zdim < 5) || (Xdim != Ydim) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::imposeHelicalSymmetry(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-
-	vol.setXmippOrigin();
-
-	if( (idz_s < STARTINGZ(vol)) || (idz_e > FINISHINGZ(vol))
-			|| (idz_s >= idz_e) || (rise_pix < 0.01) || ((idz_e - idz_s) < rise_pix)
-			|| (outer_radius_pix < 0.) )
-	{
-		REPORT_ERROR("helix.cpp::imposeHelicalSymmetry(): Wrong parameters!");
-		return;
-	}
-
-	// Copy original volume and reset sums of weight
-	vol_ori = vol;
-	vol_sum = vol;
-	weight_sum.resize(Zdim);
-	for(ii = 0; ii < weight_sum.size(); ii++)
-	{
-		weight_sum[ii] = 1.0;
-	}
-
-	// Shift upward (Z+)
-	for(ii = 1; ; ii++)
-	{
-		rise_total_pix = ((RFLOAT)(ii)) * rise_pix;
-		twist_total_deg = ((RFLOAT)(ii)) * twist_deg;
-		idz_s_new = ((int)(ceil((idz_s + rise_total_pix))));
-		if(idz_s_new > idz_e)
-		{
-			break;
-		}
-
-		// DEBUG
-		std::cout << "Shift upward " << ii << "..." << std::endl;
-
-		vol_trans = vol_ori;
-		shift3DVolumeAlongZAxisInFourierSpace(vol_trans, rise_total_pix);
-
-		for(jj = idz_s_new; jj <= idz_e; jj++)
-		{
-			if( (padding_factor >= 2) && (padding_factor <= 4) )
-			{
-				get2DZsliceIn3DVolume(vol_trans, Zslice2D, jj);
-				rotate2DZSliceInFourierSpace(Zslice2D, twist_total_deg, padding_factor);
-				add2DZsliceInto3DVolumeSum(Zslice2D, vol_sum, weight_sum, jj);
-			}
-			else
-			{
-				rotateAndSum2DZSliceInRealSpace(vol_trans, vol_sum, weight_sum, jj, outer_radius_pix, twist_total_deg);
-			}
-		}
-	}
-
-	// Shift downward (Z-)
-	for(ii = -1; ; ii--)
-	{
-		rise_total_pix = ((RFLOAT)(ii)) * rise_pix;
-		twist_total_deg = ((RFLOAT)(ii)) * twist_deg;
-		idz_e_new = ((int)(floor((idz_e + rise_total_pix))));
-		if(idz_e_new < idz_s)
-		{
-			break;
-		}
-
-		// DEBUG
-		std::cout << "Shift downward " << ii << "..." << std::endl;
-
-		vol_trans = vol_ori;
-		shift3DVolumeAlongZAxisInFourierSpace(vol_trans, rise_total_pix);
-
-		for(jj = idz_e_new; jj >= idz_s; jj--)
-		{
-			if( (padding_factor >= 2) && (padding_factor <= 4) )
-			{
-				get2DZsliceIn3DVolume(vol_trans, Zslice2D, jj);
-				rotate2DZSliceInFourierSpace(Zslice2D, twist_total_deg, padding_factor);
-				add2DZsliceInto3DVolumeSum(Zslice2D, vol_sum, weight_sum, jj);
-			}
-			else
-			{
-				rotateAndSum2DZSliceInRealSpace(vol_trans, vol_sum, weight_sum, jj, outer_radius_pix, twist_total_deg);
-			}
-		}
-	}
-
-	// Sum / Weight - Only retain central part of Z - [idz_s, idz_e]
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_sum)
-	{
-		if( (k < idz_s) || (k > idz_e) )
-		{
-			A3D_ELEM(vol_sum, k, i, j) = 0.;
-			continue;
-		}
-		A3D_ELEM(vol_sum, k, i, j) /= weight_sum[k - STARTINGZ(vol_sum)];
-	}
-	vol = vol_sum;
-
-	// Destructions
-	vol_ori.clear();
-	vol_trans.clear();
-	vol_sum.clear();
-	Zslice2D.clear();
-	weight_sum.clear();
-
-	return;
-};
-*/
 
 RFLOAT getHelicalSigma2Rot(
 		RFLOAT helical_rise_pix,
@@ -1089,7 +585,7 @@ RFLOAT getHelicalSigma2Rot(
 	RFLOAT nr_samplings_along_helical_axis = (fabs(helical_rise_pix)) / helical_offset_step_pix;
 	RFLOAT rot_search_range = (fabs(helical_twist_deg)) / nr_samplings_along_helical_axis;
 	RFLOAT new_rot_step = rot_search_range / 6.;
-	RFLOAT factor = CEIL(new_rot_step / rot_step_deg);
+	RFLOAT factor = ceil(new_rot_step / rot_step_deg);
 	RFLOAT new_sigma2_rot = old_sigma2_rot;
 	//RFLOAT factor_max = 10.;
 	if (factor > 1.)
@@ -1100,284 +596,6 @@ RFLOAT getHelicalSigma2Rot(
 		new_sigma2_rot *= factor * factor;
 	}
 	return new_sigma2_rot;
-};
-
-// Impose helical symmetry in real space
-void imposeHelicalSymmetryInRealSpace(
-		MultidimArray<RFLOAT>& vol,
-		RFLOAT sphere_radius_pix,
-		RFLOAT cyl_inner_radius_pix,
-		RFLOAT cyl_outer_radius_pix,
-		RFLOAT cosine_width,
-		RFLOAT twist_deg,  // both + or -
-		RFLOAT rise_pix,  // only +
-		int idz_s,
-		int idz_e)
-{
-	const RFLOAT pi = 3.141592653589793238462643383279502884197;
-	int ii, Zdim, x0, y0, z0, x1, y1, z1, tab_len, nn;
-	RFLOAT pix_sum, pix_weight;
-	RFLOAT x_ori, y_ori, z_ori, xp, yp, zp, fx, fy, fz, r, d, r_min, r_max, d_min, d_max, D_min, D_max, rot_angle_deg, cos_val, sin_val;
-	RFLOAT d000, d001, d010, d011, d100, d101, d110, d111, dx00, dx01, dx10, dx11, dxy0, dxy1;
-	std::vector<RFLOAT> tab_sin, tab_cos;
-	//MultidimArray<RFLOAT> vol_in, vol_out;
-	MultidimArray<RFLOAT> vol_out;
-
-	tab_sin.clear();
-	tab_cos.clear();
-	//vol_in.clear();
-	vol_out.clear();
-	Zdim = ZSIZE(vol);
-	//Xdim = XSIZE(vol); Ydim = YSIZE(vol); Zdim = ZSIZE(vol); Ndim = NSIZE(vol);
-
-	/*
-	if( (Ndim != 1) || (Zdim < 5) || (Xdim != Ydim) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::imposeHelicalSymmetry(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-	*/
-
-	vol.setXmippOrigin();
-
-	/*
-	if( (idz_s < STARTINGZ(vol)) || (idz_e > FINISHINGZ(vol))
-			|| (idz_s >= idz_e) || (rise_pix < 0.01) || ((idz_e - idz_s) < (2. * rise_pix))
-			|| (cyl_outer_radius_pix < 0.) )
-	{
-		REPORT_ERROR("helix.cpp::imposeHelicalSymmetry(): Wrong parameters!");
-		return;
-	}
-	*/
-
-	// Set max radius
-	/*
-	r_max = ((RFLOAT)((Xdim + 1) / 2 - 2)) - 0.01;
-	if(r_max > cyl_outer_radius_pix)
-	{
-		r_max = cyl_outer_radius_pix;
-	}
-	*/
-
-	// Set tab cos, sin values
-	rise_pix = fabs(rise_pix); // Rise should be a positive value!
-	tab_len = 10 + ROUND((Zdim + 2) / rise_pix);
-	tab_sin.resize(tab_len);
-	tab_cos.resize(tab_len);
-	for(ii = 0; ii < tab_len; ii++)
-	{
-		rot_angle_deg = ((RFLOAT)(ii)) * twist_deg;
-		tab_cos[ii] = cos(rot_angle_deg * pi / 180.);
-		tab_sin[ii] = sin(rot_angle_deg * pi / 180.);
-	}
-
-	// Jun14,2015 - Shaoda, apply helical mask
-	r_min = sphere_radius_pix;
-	r_max = sphere_radius_pix + cosine_width;
-	d_min = cyl_inner_radius_pix - cosine_width;
-	d_max = cyl_inner_radius_pix;
-	D_min = cyl_outer_radius_pix;
-	D_max = cyl_outer_radius_pix + cosine_width;
-	// DEBUG
-	//std::cout << "r_min, r_max, d_min, d_max, D_min, D_max = "
-	//		<< r_min << ", " << r_max << ", " << d_min << ", " << d_max << ", " << D_min << ", " << D_max << std::endl;
-
-	// Copy original volume
-	//vol.setXmippOrigin();
-	//vol_in = vol;
-	vol_out.resize(vol);
-	vol_out.setXmippOrigin();
-
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_out)
-	{
-
-		/*
-		if( (i == STARTINGY(vol_out)) && (j == STARTINGX(vol_out)) )
-		{
-			std::cout << "z = " << k << std::endl;
-		}
-		*/
-
-
-		d = ((RFLOAT)(i * i + j * j));
-		r = d + ((RFLOAT)(k * k));
-		d = sqrt(d);
-		r = sqrt(r);
-		if ( (d < d_min) || (d > D_max) || (r > r_max) )
-		{
-			A3D_ELEM(vol_out, k, i, j) = 0.;
-			continue;
-		}
-
-		x_ori = ((RFLOAT)(j));
-		y_ori = ((RFLOAT)(i));
-		z_ori = ((RFLOAT)(k));
-		pix_sum = pix_weight = 0.;
-
-		if (z_ori > idz_s)
-		{
-			nn = FLOOR((z_ori - idz_s) / rise_pix);
-			nn *= -1;
-		}
-		else
-		{
-			nn = CEIL((idz_s - z_ori) / rise_pix);
-		}
-		for(ii = nn; ; ii++)
-		{
-			zp = z_ori + ((RFLOAT)(ii)) * rise_pix;
-			if(zp < idz_s)
-			{
-				continue;
-			}
-			if(zp > idz_e)
-			{
-				break;
-			}
-
-			if(ii >= 0)
-			{
-				cos_val = tab_cos[ii];
-				sin_val = tab_sin[ii];
-			}
-			else
-			{
-				cos_val = tab_cos[-ii];
-				sin_val = (-1.) * tab_sin[-ii];
-			}
-
-    		xp = x_ori * cos_val - y_ori * sin_val;
-    		yp = x_ori * sin_val + y_ori * cos_val;
-
-			// Trilinear interpolation (with physical coords)
-			// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
-			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-			x0 = FLOOR(xp);
-			fx = xp - x0;
-			x0 -= STARTINGX(vol_out);
-			x1 = x0 + 1;
-
-			y0 = FLOOR(yp);
-			fy = yp - y0;
-			y0 -= STARTINGY(vol_out);
-			y1 = y0 + 1;
-
-			z0 = FLOOR(zp);
-			fz = zp - z0;
-			z0 -= STARTINGZ(vol_out);
-			z1 = z0 + 1;
-
-			if( (z0 < 0) || (z1 >= ZSIZE(vol_out)) )
-			{
-				continue;
-			}
-
-			/*
-			d000 = DIRECT_A3D_ELEM(vol_in, z0, y0, x0);
-			d001 = DIRECT_A3D_ELEM(vol_in, z0, y0, x1);
-			d010 = DIRECT_A3D_ELEM(vol_in, z0, y1, x0);
-			d011 = DIRECT_A3D_ELEM(vol_in, z0, y1, x1);
-			d100 = DIRECT_A3D_ELEM(vol_in, z1, y0, x0);
-			d101 = DIRECT_A3D_ELEM(vol_in, z1, y0, x1);
-			d110 = DIRECT_A3D_ELEM(vol_in, z1, y1, x0);
-			d111 = DIRECT_A3D_ELEM(vol_in, z1, y1, x1);
-			*/
-
-			d000 = DIRECT_A3D_ELEM(vol, z0, y0, x0);
-			d001 = DIRECT_A3D_ELEM(vol, z0, y0, x1);
-			d010 = DIRECT_A3D_ELEM(vol, z0, y1, x0);
-			d011 = DIRECT_A3D_ELEM(vol, z0, y1, x1);
-			d100 = DIRECT_A3D_ELEM(vol, z1, y0, x0);
-			d101 = DIRECT_A3D_ELEM(vol, z1, y0, x1);
-			d110 = DIRECT_A3D_ELEM(vol, z1, y1, x0);
-			d111 = DIRECT_A3D_ELEM(vol, z1, y1, x1);
-
-			dx00 = LIN_INTERP(fx, d000, d001);
-			dx01 = LIN_INTERP(fx, d100, d101);
-			dx10 = LIN_INTERP(fx, d010, d011);
-			dx11 = LIN_INTERP(fx, d110, d111);
-
-			dxy0 = LIN_INTERP(fy, dx00, dx10);
-			dxy1 = LIN_INTERP(fy, dx01, dx11);
-
-			pix_sum += LIN_INTERP(fz, dxy0, dxy1);
-			pix_weight += 1.;
-		}
-		if(pix_weight > 0.9)
-		{
-			A3D_ELEM(vol_out, k, i, j) = pix_sum / pix_weight;
-
-			// Jun14,2015 - Shaoda, apply soft helical mask
-			if ( (d > d_max) && (d < D_min) && (r < r_min) )
-			{}
-			else // The pixel is within cosine edge(s)
-			{
-				pix_weight = 1.;
-				if (d < d_max)  // d_min < d < d_max : w=(0~1)
-					pix_weight = 0.5 + (0.5 * cos(PI * ((d_max - d) / cosine_width)));
-				else if (d > D_min) // D_min < d < D_max : w=(1~0)
-					pix_weight = 0.5 + (0.5 * cos(PI * ((d - D_min) / cosine_width)));
-				if (r > r_min) // r_min < r < r_max
-				{
-					pix_sum = 0.5 + (0.5 * cos(PI * ((r - r_min) / cosine_width)));
-					pix_weight = (pix_sum < pix_weight) ? (pix_sum) : (pix_weight);
-				}
-				A3D_ELEM(vol_out, k, i, j) *= pix_weight;
-				pix_weight = 0.;
-			}
-		}
-		else
-		{
-			A3D_ELEM(vol_out, k, i, j) = 0.;
-		}
-	}
-
-	/*
-	// Jun14,2015 - Shaoda, apply soft helical mask
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_out)
-	{
-		d = ((RFLOAT)(i * i + j * j));
-		r = d + ((RFLOAT)(k * k));
-		d = sqrt(d);
-		r = sqrt(r);
-
-		if ( (d < d_min) || (d > D_max) || (r > r_max) )
-		{
-			A3D_ELEM(vol_out, k, i, j) = 0.;
-			continue;
-		}
-		else if ( (d > d_max) && (d < D_min) && (r < r_min) )
-		{
-
-		}
-
-		if ( (d > d_max) && (d < D_min) && (r < r_min) )
-		{}
-		else // The pixel is within cosine edge(s)
-		{
-			pix_weight = 1.;
-			if (d < d_max)  // d_min < d < d_max : w=(0~1)
-				pix_weight = 0.5 + (0.5 * cos(PI * ((d_max - d) / cosine_width)));
-			else if (d > D_min) // D_min < d < D_max : w=(1~0)
-				pix_weight = 0.5 + (0.5 * cos(PI * ((d - D_min) / cosine_width)));
-			if (r > r_min) // r_min < r < r_max
-			{
-				pix_sum = 0.5 + (0.5 * cos(PI * ((r - r_min) / cosine_width)));
-				pix_weight = (pix_sum < pix_weight) ? (pix_sum) : (pix_weight);
-			}
-			A3D_ELEM(vol_out, k, i, j) *= pix_weight;
-			pix_weight = 0.;
-		}
-	}
-	*/
-
-	vol = vol_out;
-	tab_sin.clear();
-	tab_cos.clear();
-	//vol_in.clear();
-	vol_out.clear();
-
-	return;
 };
 
 // Assume all parameters are within range
@@ -1400,15 +618,12 @@ RFLOAT get_rise_A_max(
 	return (pixel_size_A * box_len * lenZ_percentage / nr_units_min);
 };
 
-bool checkHelicalParametersFor3DHelicalReference(
+void checkHelicalParametersFor3DHelicalReference(
 		int box_len,
 		RFLOAT pixel_size_A,
 		RFLOAT twist_deg,
 		RFLOAT rise_A,
 		RFLOAT lenZ_percentage,
-		bool do_helical_symmetry_local_refinement,
-		RFLOAT rise_search_max_dev_percentage,
-		RFLOAT twist_search_max_dev_percentage,
 		RFLOAT sphere_radius_A,
 		RFLOAT cyl_inner_radius_A,
 		RFLOAT cyl_outer_radius_A)
@@ -1418,29 +633,19 @@ bool checkHelicalParametersFor3DHelicalReference(
 	RFLOAT lenZ_percentage_max, rise_A_max, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix;
 
 	if (pixel_size_A < 0.001)
-	{
 		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Pixel size (in Angstroms) should be larger than 0.001!");
-		return false;
-	}
 
 	sphere_radius_pix = sphere_radius_A / pixel_size_A;
 	cyl_inner_radius_pix = cyl_inner_radius_A / pixel_size_A;
 	cyl_outer_radius_pix = cyl_outer_radius_A / pixel_size_A;
 
 	if (box_len < 10)
-	{
 		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Input box size should be larger than 5!");
-		return false;
-	}
 	half_box_len = box_len / 2 - ((box_len + 1) % 2);
 
-	if ( (fabs(twist_deg) < 0.01) || (fabs(twist_deg) > 179.99)
-			|| ((rise_A / pixel_size_A) < 0.001)
-			|| (lenZ_percentage < 0.001) || (lenZ_percentage > 0.999) )
-	{
+	if ( (fabs(twist_deg) > 360.) || ((rise_A / pixel_size_A) < 0.001) || (lenZ_percentage < 0.001) || (lenZ_percentage > 0.999) )
 		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Wrong helical twist, rise or lenZ!");
-		return false;
-	}
+
 	if ( (sphere_radius_pix < 2.) || (sphere_radius_pix > half_box_len)
 			|| ( (cyl_inner_radius_pix + 2.) > cyl_outer_radius_pix)
 			|| (cyl_outer_radius_pix < 2.) || (cyl_outer_radius_pix > half_box_len)
@@ -1449,262 +654,207 @@ bool checkHelicalParametersFor3DHelicalReference(
 		std::cout << "sphere_radius_pix= " << sphere_radius_pix << ", half_box_len= " << half_box_len
 				<< ", cyl_inner_radius_pix= " << cyl_inner_radius_pix << ", cyl_outer_radius_pix= " << cyl_outer_radius_pix << std::endl;
 		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Radii of spherical and/or cylindrical masks are invalid!");
-		return false;
 	}
 
 	lenZ_percentage_max = get_lenZ_percentage_max(box_len, sphere_radius_A, cyl_outer_radius_A, pixel_size_A);
 	if (lenZ_percentage > lenZ_percentage_max)
-	{
 		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z part is too long. (lenZ_percentage = "
 				+ floatToString(lenZ_percentage) + "; lenZ_percentage < " + floatToString(lenZ_percentage_max) + ")");
-		return false;
-	}
+
 	rise_A_max = get_rise_A_max(box_len, pixel_size_A, lenZ_percentage, nr_units_min);
 	if (fabs(rise_A) > rise_A_max)
-	{
 		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z part is too short (< nr_particles_min * helical_rise_A). (rise_A = "
 				+ floatToString(rise_A) + ", lenZ_percentage = " + floatToString(lenZ_percentage)
 				+ ", nr_particles_min = " + floatToString(nr_units_min) + "; lenZ_percentage > "
 				+ floatToString((nr_units_min * rise_A_max) / (pixel_size_A * box_len)) + ")");
-		return false;
-	}
-
-	if (do_helical_symmetry_local_refinement)
-	{
-		if ( (rise_search_max_dev_percentage < 0.0099) || (rise_search_max_dev_percentage > 0.3301)
-				|| (twist_search_max_dev_percentage < 0.0099) || (twist_search_max_dev_percentage > 0.3301) )
-		{
-			REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Maximum deviation of local searches should between 1% and 33%!");
-			return false;
-		}
-	}
-
-	return true;
 };
 
-void makeHelicalReferenceInRealSpace(
-		MultidimArray<RFLOAT>& vol,
+void imposeHelicalSymmetryInRealSpace(
+		MultidimArray<RFLOAT>& v,
 		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT lenZ_percentage,
 		RFLOAT sphere_radius_A,
 		RFLOAT cyl_inner_radius_A,
 		RFLOAT cyl_outer_radius_A,
+		RFLOAT z_percentage,
+		RFLOAT rise_A,
+		RFLOAT twist_deg,
 		RFLOAT cosine_width_pix)
 {
 	long int Xdim, Ydim, Zdim, Ndim, box_len;
-	int idz_s, idz_e;
-	RFLOAT rise_pix, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix;
-	RFLOAT rr, dd, RR, DD;
+	RFLOAT rise_pix, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix, r_min, r_max, d_min, d_max, D_min, D_max, z_min, z_max;
 
-	if (vol.getDim() != 3)
-	{
-		REPORT_ERROR("helix.cpp::makeHelicalReferenceInRealSpace(): Input helical reference is not 3D! (vol.getDim() = "
-						+ integerToString(vol.getDim()) + ")");
-		return;
-	}
-	vol.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	int rec_len;
+	std::vector<RFLOAT> sin_rec, cos_rec;
+	MultidimArray<RFLOAT> vout;
+
+	if (v.getDim() != 3)
+		REPORT_ERROR("helix.cpp::imposeHelicalSymmetryInRealSpace(): Input helical reference is not 3D! (vol.getDim() = " + integerToString(v.getDim()) + ")");
+	v.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	box_len = (Xdim < Ydim) ? Xdim : Ydim;
 	box_len = (box_len < Zdim) ? box_len : Zdim;
+
+	// Check helical parameters
 	checkHelicalParametersFor3DHelicalReference(
 			box_len,
 			pixel_size_A,
 			twist_deg,
 			rise_A,
-			lenZ_percentage,
-			false,
-			0.,
-			0.,
+			z_percentage,
 			sphere_radius_A,
 			cyl_inner_radius_A,
 			cyl_outer_radius_A);
 
-	vol.setXmippOrigin();
-	idz_s = (int)(Zdim * lenZ_percentage / (-2.));
-	idz_e = (int)(Zdim * lenZ_percentage / 2.);
-	idz_s = (idz_s < STARTINGZ(vol)) ? (STARTINGZ(vol)) : (idz_s);
-	idz_e = (idz_e > FINISHINGZ(vol)) ? (FINISHINGZ(vol)) : (idz_e);
-
-	// DEBUG
-	//std::cout << "vol, twist_deg = " << twist_deg << ", rise_pix = " << rise_pix
-	//		<< ", idz_s = " << idz_s << ", idz_e = " << idz_e << std::endl;
-
-	// Real space version
-	//std::cout << "imposeHelicalSymmetry ..." << std::endl;
-	rise_pix = rise_A / pixel_size_A;
+	// Parameters of mask
+	if (cosine_width_pix < 1.)
+		cosine_width_pix = 1.;  // Avoid 'divided by 0' error
+	rise_pix = fabs(rise_A / pixel_size_A);  // Keep helical rise as a positive number
 	sphere_radius_pix = sphere_radius_A / pixel_size_A;
 	cyl_inner_radius_pix = cyl_inner_radius_A / pixel_size_A;
 	cyl_outer_radius_pix = cyl_outer_radius_A / pixel_size_A;
-	imposeHelicalSymmetryInRealSpace(
-			vol,
-			sphere_radius_pix,
-			cyl_inner_radius_pix,
-			cyl_outer_radius_pix,
-			cosine_width_pix,
-			twist_deg,
-			rise_pix,
-			idz_s,
-			idz_e);
+	r_min = sphere_radius_pix;
+	r_max = sphere_radius_pix + cosine_width_pix;
+	d_min = cyl_inner_radius_pix - cosine_width_pix;
+	d_max = cyl_inner_radius_pix;
+	D_min = cyl_outer_radius_pix;
+	D_max = cyl_outer_radius_pix + cosine_width_pix;
 
-	// Fourier space version
-	//std::cout << "imposeHelicalSymmetry ..." << std::endl;
-	//imposeHelicalSymmetryInFourierSpace(vol, helical_outer_radius_pix, helical_twist_deg, helical_rise_pix, idz_s, idz_e, padding_factor);
-	//std::cout << "expandZaxis ..." << std::endl;
-	//expandZaxisInFourierSpace(vol, helical_outer_radius_pix, helical_twist_deg, helical_rise_pix, idz_s, idz_e, padding_factor);
+	// Crop the central slices
+	v.setXmippOrigin();
+	z_max = ((RFLOAT)(Zdim)) * z_percentage / 2.;
+	if (z_max > (((RFLOAT)(FINISHINGZ(v))) - 1.))
+		z_max = (((RFLOAT)(FINISHINGZ(v))) - 1.);
+	z_min = -z_max;
+	if (z_min < (((RFLOAT)(STARTINGZ(v))) + 1.))
+		z_min = (((RFLOAT)(STARTINGZ(v))) + 1.);
 
-	// Spherical and cylindrical mask
-	// Info around the soft edges remains intact. It will be soft-masked afterwards.
-	/*
-	RR = (sphere_radius_pix + cosine_width + 0.1) * (sphere_radius_pix + cosine_width + 0.1);
-	DD = (cyl_outer_radius_pix + cosine_width + 0.1) * (cyl_outer_radius_pix + cosine_width + 0.1);
-	vol.setXmippOrigin();
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
+	// Init volumes
+	v.setXmippOrigin();
+	vout.clear();
+	vout.resize(v);
+	vout.setXmippOrigin();
+
+	// Calculate tabulated sine and cosine values
+	rec_len = 2 + (CEIL((RFLOAT(Zdim) + 2.) / rise_pix));
+	sin_rec.clear();
+	cos_rec.clear();
+	sin_rec.resize(rec_len);
+	cos_rec.resize(rec_len);
+	for (int id = 0; id < rec_len; id++)
+		sincos(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
 	{
-		dd = ((RFLOAT)(i * i + j * j));
-		rr = dd + ((RFLOAT)(k * k));
-		if ( (rr > RR) || (dd > DD) )
-			A3D_ELEM(vol, k, i, j) = 0.;
-	}
-	*/
+		// Out of the mask
+		RFLOAT dd = (RFLOAT)(i * i + j * j);
+		RFLOAT rr = dd + (RFLOAT)(k * k);
+		RFLOAT d = sqrt(dd);
+		RFLOAT r = sqrt(rr);
+		if ( (r > r_max) || (d < d_min) || (d > D_max) )
+		{
+			A3D_ELEM(v, k, i, j) = 0.;
+			continue;
+		}
+
+		// How many voxels should be used to calculate the average?
+		RFLOAT zi = (RFLOAT)(k);
+		RFLOAT yi = (RFLOAT)(i);
+		RFLOAT xi = (RFLOAT)(j);
+		int rot_max = -(CEIL((zi - z_max) / rise_pix));
+		int rot_min = -(FLOOR((zi - z_min) / rise_pix));
+		if (rot_max < rot_min)
+			REPORT_ERROR("helix.cpp::makeHelicalReferenceInRealSpace(): ERROR in imposing symmetry!");
+
+		// Do the average
+		RFLOAT pix_sum, pix_weight;
+		pix_sum = pix_weight = 0.;
+		for (int id = rot_min; id <= rot_max; id++)
+		{
+			// Get the sine and cosine value
+			RFLOAT sin_val, cos_val;
+			if (id >= 0)
+			{
+				sin_val = sin_rec[id];
+				cos_val = cos_rec[id];
+			}
+			else
+			{
+				sin_val = (-1.) * sin_rec[-id];
+				cos_val = cos_rec[-id];
+			}
+
+			// Get the voxel coordinates
+			RFLOAT zp = zi + ((RFLOAT)(id)) * rise_pix;
+			RFLOAT yp = xi * sin_val + yi * cos_val;
+			RFLOAT xp = xi * cos_val - yi * sin_val;
+
+			// Trilinear interpolation (with physical coords)
+			// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
+			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+			int x0, y0, z0, x1, y1, z1;
+			RFLOAT fx, fy, fz;
+			x0 = FLOOR(xp); fx = xp - x0; x0 -= STARTINGX(v); x1 = x0 + 1;
+			y0 = FLOOR(yp); fy = yp - y0; y0 -= STARTINGY(v); y1 = y0 + 1;
+			z0 = FLOOR(zp); fz = zp - z0; z0 -= STARTINGZ(v); z1 = z0 + 1;
+
+			RFLOAT d000, d001, d010, d011, d100, d101, d110, d111;
+			d000 = DIRECT_A3D_ELEM(v, z0, y0, x0);
+			d001 = DIRECT_A3D_ELEM(v, z0, y0, x1);
+			d010 = DIRECT_A3D_ELEM(v, z0, y1, x0);
+			d011 = DIRECT_A3D_ELEM(v, z0, y1, x1);
+			d100 = DIRECT_A3D_ELEM(v, z1, y0, x0);
+			d101 = DIRECT_A3D_ELEM(v, z1, y0, x1);
+			d110 = DIRECT_A3D_ELEM(v, z1, y1, x0);
+			d111 = DIRECT_A3D_ELEM(v, z1, y1, x1);
+
+			RFLOAT dx00, dx01, dx10, dx11;
+			dx00 = LIN_INTERP(fx, d000, d001);
+			dx01 = LIN_INTERP(fx, d100, d101);
+			dx10 = LIN_INTERP(fx, d010, d011);
+			dx11 = LIN_INTERP(fx, d110, d111);
+
+			RFLOAT dxy0, dxy1;
+			dxy0 = LIN_INTERP(fy, dx00, dx10);
+			dxy1 = LIN_INTERP(fy, dx01, dx11);
+
+			pix_sum += LIN_INTERP(fz, dxy0, dxy1);
+			pix_weight += 1.;
+		}
+
+		if (pix_weight > 0.9)
+		{
+			A3D_ELEM(vout, k, i, j) = pix_sum / pix_weight;
+
+			if ( (d > d_max) && (d < D_min) && (r < r_min) )
+			{}
+			else // The pixel is within cosine edge(s)
+			{
+				pix_weight = 1.;
+				if (d < d_max)  // d_min < d < d_max : w=(0~1)
+					pix_weight = 0.5 + (0.5 * cos(PI * ((d_max - d) / cosine_width_pix)));
+				else if (d > D_min) // D_min < d < D_max : w=(1~0)
+					pix_weight = 0.5 + (0.5 * cos(PI * ((d - D_min) / cosine_width_pix)));
+				if (r > r_min) // r_min < r < r_max
+				{
+					pix_sum = 0.5 + (0.5 * cos(PI * ((r - r_min) / cosine_width_pix)));
+					pix_weight = (pix_sum < pix_weight) ? (pix_sum) : (pix_weight);
+				}
+				A3D_ELEM(vout, k, i, j) *= pix_weight;
+			}
+		}
+		else
+			A3D_ELEM(vout, k, i, j) = 0.;
+    }
+
+	// Copy and exit
+	v = vout;
+	sin_rec.clear();
+	cos_rec.clear();
+	vout.clear();
 
 	return;
 };
 
 /*
-bool calcCCOfCnZSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		int cn,
-		RFLOAT& cc,
-		int& nr_asym_voxels)
-{
-	const RFLOAT pi = 3.141592653589793238462643383279502884197;
-	int id, Xdim, Ydim, Zdim, Ndim, r_max_XY;
-	int x0, y0, x1, y1, z;
-	RFLOAT cn_rot_rad, dist_r_pix, atan2_rad, rot_rad_total, sum_pw1, sum_pw2;
-	RFLOAT xp, yp, fx, fy, d00, d01, d10, d11, dx0, dx1, dd;
-	bool ok_flag;
-	MultidimArray<RFLOAT> vol;
-	std::vector<RFLOAT> dev_voxel, dev_chunk;
-
-	Xdim = XSIZE(v); Ydim = YSIZE(v); Zdim = ZSIZE(v); Ndim = NSIZE(v);
-
-	if( (Ndim != 1) || (Zdim < 5) || (Ydim < 5) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::calcCCOfCnZSymmetry(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return false;
-	}
-
-	if( (r_max_pix < 2.) || (r_min_pix < 0.) || ((r_max_pix - r_min_pix) < 2.) || (cn <= 1) || (cn > 36) )
-	{
-		REPORT_ERROR("helix.cpp::calcCCOfCnZSymmetry(): Wrong parameters!");
-		return false;
-	}
-
-	// Check r_max
-	r_max_XY = (Xdim < Ydim) ? Xdim : Ydim;
-	r_max_XY = (r_max_XY + 1) / 2 - 1;
-	if( r_max_pix > (((RFLOAT)(r_max_XY)) - 0.01) )  // 0.01 - avoid segmentation fault
-	{
-		r_max_pix = (((RFLOAT)(r_max_XY)) - 0.01);
-	}
-
-	vol.clear();
-	vol = v;
-	vol.setXmippOrigin();
-
-	dev_chunk.clear();
-	cn_rot_rad = (360. / ((RFLOAT)(cn))) * pi / 180.;
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
-	{
-		dist_r_pix = sqrt(i * i + j * j);
-		if( (dist_r_pix < r_min_pix) || (dist_r_pix > r_max_pix) )
-		{
-			continue;
-		}
-		atan2_rad = pi + atan2(j, i); // deg [0, 360] = rad [0, 2 * pi]
-		if(atan2_rad > cn_rot_rad)
-		{
-			continue;
-		}
-
-		// Pick a voxel in the chunk
-		dev_voxel.clear();
-		dev_voxel.push_back(A3D_ELEM(vol, k, i, j));
-
-		// Pick other voxels according to this voxel and Cn rotational symmetry
-		for(id = 1; id < cn; id++)
-		{
-			rot_rad_total = cn_rot_rad * ((RFLOAT)(id));
-			xp = ((RFLOAT)(j)) * cos(rot_rad_total) - ((RFLOAT)(i)) * sin(rot_rad_total);
-			yp = ((RFLOAT)(j)) * sin(rot_rad_total) + ((RFLOAT)(i)) * cos(rot_rad_total);
-
-			// Bilinear interpolation (with physical coords)
-			// Subtract STARTINGX, STARTINGY and STARTINGZ to accelerate access to data
-			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-			x0 = FLOOR(xp); fx = xp - x0; x0 -= STARTINGX(vol); x1 = x0 + 1;
-			y0 = FLOOR(yp); fy = yp - y0; y0 -= STARTINGY(vol); y1 = y0 + 1;
-			z = k; z -= STARTINGZ(vol);
-
-			// Get values
-			d00 = DIRECT_A3D_ELEM(vol, z, y0, x0);
-			d01 = DIRECT_A3D_ELEM(vol, z, y0, x1);
-			d10 = DIRECT_A3D_ELEM(vol, z, y1, x0);
-			d11 = DIRECT_A3D_ELEM(vol, z, y1, x1);
-
-			// Interpolation 2D -> 1D
-			dx0 = LIN_INTERP(fx, d00, d01);
-			dx1 = LIN_INTERP(fx, d10, d11);
-
-			// Interpolation of 2 voxels
-			dd = LIN_INTERP(fy, dx0, dx1);
-
-			// Record this voxel
-			dev_voxel.push_back(dd);
-		}
-
-		// Calc dev of this voxel in the chunk
-		if(dev_voxel.size() > 1)
-		{
-			sum_pw1 = sum_pw2 = 0.;
-			for(id = 0; id < dev_voxel.size(); id++)
-			{
-				sum_pw1 += dev_voxel[id];
-				sum_pw2 += dev_voxel[id] * dev_voxel[id];
-			}
-			sum_pw1 /= dev_voxel.size();
-			sum_pw2 /= dev_voxel.size();
-			dev_chunk.push_back(sum_pw2 - sum_pw1 * sum_pw1);
-		}
-		dev_voxel.clear();
-	}
-
-	// Calc avg of all voxels' devs in this chunk (for a specific helical symmetry)
-	ok_flag = true;
-	if(dev_chunk.size() < 1)
-	{
-		cc = (-1.);
-		ok_flag = false;
-	}
-	else
-	{
-		sum_pw1 = 0.;
-		for(id = 0; id < dev_chunk.size(); id++)
-		{
-			sum_pw1 += dev_chunk[id];
-		}
-		cc = (sum_pw1 / dev_chunk.size());
-	}
-	nr_asym_voxels = dev_chunk.size();
-
-	dev_chunk.clear();
-	vol.clear();
-
-	return ok_flag;
-};
-
 void searchCnZSymmetry(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT r_min_pix,
@@ -1723,17 +873,11 @@ void searchCnZSymmetry(
 	Xdim = XSIZE(v); Ydim = YSIZE(v); Zdim = ZSIZE(v); Ndim = NSIZE(v);
 
 	if( (Ndim != 1) || (Zdim < 5) || (Ydim < 5) || (Xdim < 5) )
-	{
 		REPORT_ERROR("helix.cpp::searchCnZSymmetry(): Input 3D MultidimArray has Wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
 
 	if( (r_max_pix < 2.) || (r_min_pix < 0.) || ((r_max_pix - r_min_pix) < 2.)
 			|| (cn_start <= 1) || (cn_end <= 1) || (cn_start > cn_end) || (cn_end > 36) )
-	{
 		REPORT_ERROR("helix.cpp::searchCnZSymmetry(): Wrong parameters!");
-		return;
-	}
 
 	cn_list.clear();
 	cc_list.clear();
@@ -1742,284 +886,21 @@ void searchCnZSymmetry(
 	for(cn = cn_start; cn <= cn_end; cn++)
 	{
 		ok_flag = calcCCOfCnZSymmetry(v, r_min_pix, r_max_pix, cn, cc, nr_asym_voxels);
-		if(ok_flag == false)
-		{
+		if(!ok_flag)
 			continue;
-		}
 
 		cn_list.push_back(cn);
 		cc_list.push_back(cc);
 		nr_asym_voxels_list.push_back(nr_asym_voxels);
 
 		if(fout_ptr != NULL)
-		{
-			(*fout_ptr) << "Test Cn = " << cn << ", cc = " << cc
-					<< ",                               asym voxels = " << nr_asym_voxels << std::endl;
-		}
+			(*fout_ptr) << "Test Cn = " << cn << ", cc = " << cc << ",                               asym voxels = " << nr_asym_voxels << std::endl;
 	}
-
 	return;
 }
 */
 
 /*
-bool localSearchHelicalTwist(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		RFLOAT z_percentage,
-		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		RFLOAT search_half_range_deg,
-		RFLOAT search_step_deg,
-		RFLOAT& twist_refined_deg)
-{
-	int ii, nr_tests, nr_asym_voxels, id_best;
-	RFLOAT nr_units_min = 2.; // Minimum nr_particles required along lenZ_max
-	RFLOAT twist_test_deg, cc, min_cc, twist_best_deg, rise_max_pix;
-	bool isValid;
-
-	rise_max_pix = get_rise_A_max(ZSIZE(v), 1., z_percentage, nr_units_min);
-
-	if ( (rise_pix < 0.001) || (rise_pix > rise_max_pix)
-			|| (fabs(twist_deg) < 0.01) || (fabs(twist_deg) > 179.99)
-			|| (search_half_range_deg < (1e-12)) || (search_step_deg < (1e-12)) )
-	{
-		REPORT_ERROR("helix.cpp::localSearchHelicalTwist(): Errors found in the helical twist and/or search parameters!");
-		return false;
-	}
-
-	nr_tests = search_half_range_deg / search_step_deg;
-	if (nr_tests > 5000)
-		std::cout << " WARNING: More than 10000 tests are running for helical twist refinement. It is extremely time consuming..." << std::endl;
-
-	min_cc = cc = (1e+10);
-	twist_best_deg = twist_deg;
-	id_best = 0;
-	isValid = false;
-	for(ii = -nr_tests; ii <= nr_tests; ii++)
-	{
-		twist_test_deg = twist_deg + ii * search_step_deg;
-		if ( (fabs(twist_test_deg) < 0.01) || (fabs(twist_test_deg) > 179.99)
-				|| ((twist_test_deg * twist_deg) < 0.) )
-			continue;
-
-		isValid = calcCCofHelicalSymmetry(v, r_min_pix, r_max_pix, z_percentage, rise_pix, twist_test_deg, cc, nr_asym_voxels);
-		if (isValid)
-		{
-			if (cc < min_cc)
-			{
-				min_cc = cc;
-				twist_best_deg = twist_test_deg;
-				id_best = ii;
-			}
-		}
-		// DEBUG
-		std::cout << "Twist = " << twist_test_deg << ", Rise = " << rise_pix << ", cc = " << cc << std::endl;
-	}
-	twist_refined_deg = twist_best_deg;
-	// DEBUG
-	std::cout << "-------------------------------------------------------" << std::endl;
-
-	if ( (min_cc > (0.99e+10)) || (ABS(id_best) == nr_tests) )
-		return false;
-	return true;
-}
-
-bool localSearchHelicalRise(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		RFLOAT z_percentage,
-		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		RFLOAT search_half_range_pix,
-		RFLOAT search_step_pix,
-		RFLOAT& rise_refined_pix)
-{
-	int ii, nr_tests, nr_asym_voxels, id_best;
-	RFLOAT nr_units_min = 2.; // Minimum nr_particles required along lenZ_max
-	RFLOAT rise_test_pix, cc, min_cc, rise_best_pix, rise_max_pix;
-	bool isValid;
-
-	rise_max_pix = get_rise_A_max(ZSIZE(v), 1., z_percentage, nr_units_min);
-
-	if ( (rise_pix < 0.001) || (rise_pix > rise_max_pix)
-			|| (fabs(twist_deg) < 0.01) || (fabs(twist_deg) > 179.99)
-			|| (search_half_range_pix < (1e-12)) || (search_step_pix < (1e-12)) )
-	{
-		REPORT_ERROR("helix.cpp::localSearchHelicalRise(): Errors found in the helical rise and/or search parameters!");
-		return false;
-	}
-
-	nr_tests = search_half_range_pix / search_step_pix;
-	if (nr_tests > 5000)
-		std::cout << " WARNING: More than 10000 tests are running for helical rise refinement. It is extremely time consuming..." << std::endl;
-
-	min_cc = cc = (1e+10);
-	rise_best_pix = rise_pix;
-	id_best = 0;
-	isValid = false;
-	for(ii = -nr_tests; ii <= nr_tests; ii++)
-	{
-		rise_test_pix = rise_pix + ii * search_step_pix;
-		if ( (rise_test_pix < 0.001) || (rise_test_pix > rise_max_pix) )
-			continue;
-
-		isValid = calcCCofHelicalSymmetry(v, r_min_pix, r_max_pix, z_percentage, rise_test_pix, twist_deg, cc, nr_asym_voxels);
-		if (isValid)
-		{
-			if (cc < min_cc)
-			{
-				min_cc = cc;
-				rise_best_pix = rise_test_pix;
-				id_best = ii;
-			}
-		}
-		// DEBUG
-		std::cout << "Twist = " << twist_deg << ", Rise = " << rise_test_pix << ", cc = " << cc << std::endl;
-	}
-	rise_refined_pix = rise_best_pix;
-	// DEBUG
-	std::cout << "-------------------------------------------------------" << std::endl;
-
-	if ( (min_cc > (0.99e+10)) || (ABS(id_best) == nr_tests) )
-		return false;
-	return true;
-}
-
-bool localSearchHelicalSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT r_min_A,
-		RFLOAT r_max_A,
-		RFLOAT z_percentage,
-		RFLOAT rise_ori_A,
-		RFLOAT twist_ori_deg,
-		RFLOAT local_search_max_dev_percentage,
-		RFLOAT& rise_refined_A,
-		RFLOAT& twist_refined_deg)
-{
-	int nr_iter, nr_round, box_len;
-	bool isParametersValid, isTwistValid, isRiseValid;
-	RFLOAT r_min_pix, r_max_pix, rise_ori_pix;
-	RFLOAT twist_half_range_deg, rise_half_range_pix, twist_step_deg, rise_step_pix, twist_new_deg, rise_new_pix;
-
-	if (v.getDim() != 3)
-	{
-		REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): Input helical reference is not 3D! (v.getDim() = "
-						+ integerToString(v.getDim()) + ")");
-		return false;
-	}
-	box_len = (XSIZE(v) < YSIZE(v)) ? XSIZE(v) : YSIZE(v);
-	box_len = (box_len < ZSIZE(v)) ? box_len : ZSIZE(v);
-	isParametersValid = checkHelicalParametersFor3DHelicalReference(
-			box_len,
-			pixel_size_A,
-			twist_ori_deg,
-			rise_ori_A,
-			z_percentage,
-			true,
-			local_search_max_dev_percentage,
-			local_search_max_dev_percentage,
-			sphere_radius_A,
-			r_min_A,
-			r_max_A);
-	if (isParametersValid == false)
-	{
-		REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): Input Parameters error!");
-		return false;
-	}
-
-	r_min_pix = r_min_A / pixel_size_A;
-	r_max_pix = r_max_A / pixel_size_A;
-	rise_ori_pix = rise_ori_A / pixel_size_A;
-
-	// Initialization - for iteration #1
-	// Step sizes of local searches should be less than 0.1% of the original parameters
-	// And also at least 10 sampling points should always be guaranteed
-	twist_half_range_deg = fabs(twist_ori_deg * local_search_max_dev_percentage);
-	rise_half_range_pix = fabs(rise_ori_pix * local_search_max_dev_percentage);
-	twist_step_deg = fabs(twist_ori_deg * 0.001);
-	rise_step_pix = fabs(rise_ori_pix * 0.001);
-	if (twist_half_range_deg / twist_step_deg < 5.)
-		twist_step_deg = twist_half_range_deg / 5.;
-	if (rise_half_range_pix / rise_step_pix < 5.)
-		rise_step_pix = rise_half_range_pix / 5.;
-
-	isTwistValid = isRiseValid = false;
-	for(nr_iter = 1; nr_iter <= 20; nr_iter++)
-	{
-		nr_round = 0;
-		while(1)
-		{
-			// Check convergence for a specific symmetry sampling
-			nr_round++;
-			if (nr_round > 20)
-			{
-				std::cout << " WARNING: Refined helical symmetry cannot converge." << std::endl;
-				return false;
-			}
-
-			// DEBUG
-			std::cout << "      ### iter = " << nr_iter
-					<< "; twist half range, step (in degrees) = "
-					<< twist_half_range_deg << ", " << twist_step_deg
-					<< "; twist half range, step (in pixels) = "
-					<< rise_half_range_pix << ", " << rise_step_pix << std::endl;
-
-			// Perform local searches - first on twist and then rise
-			isTwistValid = localSearchHelicalTwist(v, r_min_pix, r_max_pix, z_percentage,
-					rise_ori_pix, twist_ori_deg, twist_half_range_deg, twist_step_deg, twist_new_deg);
-			isRiseValid = localSearchHelicalRise(v, r_min_pix, r_max_pix, z_percentage,
-					rise_ori_pix, twist_new_deg, rise_half_range_pix, rise_step_pix, rise_new_pix);
-
-			// Update result
-			twist_refined_deg = twist_new_deg;
-			rise_refined_A = rise_new_pix * pixel_size_A;
-
-			// DEBUG
-			std::cout << "      ### iter = " << nr_iter << " ### Twist = " << twist_new_deg
-					<< ", Rise = " << rise_new_pix << " ###" << std::endl;
-
-			// Check whether the refined symmetry could be out of range
-			// TODO: Only break if it is the iteration #1 ???
-			if ( ((isTwistValid == false) || (isRiseValid == false)) )
-			{
-				std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
-				return false;
-			}
-
-			// Refined helical symmetry converges. Search for the symmetry at a finer sampling
-			if ( (fabs(twist_new_deg - twist_ori_deg) < 1.5 * twist_step_deg)
-					&& (fabs(rise_new_pix - rise_ori_pix) < 1.5 * rise_step_pix) )
-			{
-				// Update search ranges for the next iteration
-				twist_half_range_deg = 2. * twist_step_deg;
-				rise_half_range_pix = 2. * rise_step_pix;
-
-				// Update search steps for the next iteration (only try 10 sampling points)
-				twist_step_deg = twist_half_range_deg / 5.;
-				rise_step_pix = rise_half_range_pix / 5.;
-				break;
-			}
-
-			// Update initial symmetry
-			twist_ori_deg = twist_new_deg;
-			rise_ori_pix = rise_new_pix;
-		}
-
-		// Stop iterations if the step size is finer than 0.0001% of the true values
-		if ( (fabs(twist_step_deg / twist_new_deg) < 0.000001)
-				&& (fabs(rise_step_pix / rise_new_pix) < 0.000001) )
-			break;
-	}
-
-	return true;
-}
-*/
-
 RFLOAT calcCCofPsiFor2DHelicalSegment(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT psi_deg,
@@ -2158,80 +1039,6 @@ RFLOAT searchPsiFor2DHelicalSegment(
 	}
 	return best_psi_deg;
 }
-
-/*
-void searchHelicalSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		RFLOAT rise_pix_start,
-		RFLOAT rise_pix_incr,
-		int rise_pix_steps,
-		RFLOAT twist_deg_start,
-		RFLOAT twist_deg_incr,
-		int twist_deg_steps,
-		std::vector<RFLOAT>& rise_pix_list,
-		std::vector<RFLOAT>& twist_deg_list,
-		std::vector<RFLOAT>& cc_list,
-		std::vector<int>& nr_asym_voxels_list,
-		std::ofstream* fout_ptr)
-{
-	int rise_pix_counter, twist_deg_counter, Xdim, Ydim, Zdim, Ndim, nr_asym_voxels;
-	RFLOAT rise_pix, twist_deg, cc;
-	bool ok_flag;
-
-	Xdim = XSIZE(v); Ydim = YSIZE(v); Zdim = ZSIZE(v); Ndim = NSIZE(v);
-
-	if( (Ndim != 1) || (Zdim < 5) || (Ydim < 5) || (Xdim < 5) )
-	{
-		REPORT_ERROR("helix.cpp::searchHelicalSymmetry(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
-
-	if( (r_max_pix < 2.) || (r_min_pix < 0.) || ((r_max_pix - r_min_pix) < 2.)
-			|| (rise_pix_start < 0.0001) || (rise_pix_incr < 0.0001) || (rise_pix_steps < 1)
-			|| ( rise_pix_start > ((RFLOAT)(Zdim / 2)) )
-			|| ( (rise_pix_start + ((RFLOAT)(rise_pix_steps)) * rise_pix_incr) > ((RFLOAT)(Zdim / 2)) )
-			|| (twist_deg_incr < 0.0001) || (twist_deg_steps < 1) )
-	{
-		REPORT_ERROR("helix.cpp::searchHelicalSymmetry(): Wrong parameters!");
-		return;
-	}
-
-	rise_pix_list.clear();
-	twist_deg_list.clear();
-	cc_list.clear();
-	nr_asym_voxels_list.clear();
-
-	for(rise_pix_counter = 0; rise_pix_counter < rise_pix_steps; rise_pix_counter++)
-	{
-		for(twist_deg_counter = 0; twist_deg_counter < twist_deg_steps; twist_deg_counter++)
-		{
-			rise_pix = rise_pix_start + ((RFLOAT)(rise_pix_counter)) * rise_pix_incr;
-			twist_deg = twist_deg_start + ((RFLOAT)(twist_deg_counter)) * twist_deg_incr;
-
-			ok_flag = calcCCofHelicalSymmetry(v, r_min_pix, r_max_pix, rise_pix, twist_deg, cc, nr_asym_voxels);
-
-			if(ok_flag == false)
-			{
-				continue;
-			}
-
-			rise_pix_list.push_back(rise_pix);
-			twist_deg_list.push_back(twist_deg);
-			cc_list.push_back(cc);
-			nr_asym_voxels_list.push_back(nr_asym_voxels);
-
-			if(fout_ptr != NULL)
-			{
-				(*fout_ptr) << "Test rise = " << rise_pix << ", twist = " << twist_deg << ", cc = " << cc
-						<< ",                                asym voxels = " << nr_asym_voxels << std::endl;
-			}
-		}
-	}
-
-	return;
-};
 */
 
 void calcRadialAverage(
@@ -2250,10 +1057,7 @@ void calcRadialAverage(
 	Xdim = XSIZE(v); Ydim = YSIZE(v); Zdim = ZSIZE(v); Ndim = NSIZE(v);
 
 	if( (Ndim != 1) || (Zdim < 5) || (Ydim < 5) || (Xdim < 5) )
-	{
 		REPORT_ERROR("helix.cpp::calcRadialAverage(): Input 3D MultidimArray has wrong dimensions! (Ndim = " + integerToString(Ndim) + ", Zdim = " + integerToString(Zdim) + ", Ydim = " + integerToString(Ydim) + ", Xdim = " + integerToString(Xdim) + ")");
-		return;
-	}
 
 	// Resize and init vectors
 	list_size = ROUND(sqrt(Xdim * Xdim + Ydim * Ydim)) + 2;
@@ -2271,9 +1075,7 @@ void calcRadialAverage(
 	{
 		dist = ROUND(sqrt(i * i + j * j));
 		if( (dist < 0) || (dist > (list_size - 1)) )
-		{
 			continue;
-		}
 		radial_pix_counter_list[dist] += 1.;
 		radial_avg_val_list[dist] += A3D_ELEM(vol, k, i, j);
 	}
@@ -2281,13 +1083,9 @@ void calcRadialAverage(
 	for(ii = 0; ii < list_size; ii++)
 	{
 		if(radial_pix_counter_list[ii] > 0.9)
-		{
 			radial_avg_val_list[ii] /= radial_pix_counter_list[ii];
-		}
 		else
-		{
 			radial_avg_val_list[ii] = 0.;
-		}
 	}
 
 	radial_pix_counter_list.clear();
@@ -2317,10 +1115,8 @@ void cutZCentralPartOfSoftMask(
 	idz_s = idz_e * (-1.);
 	idz_s_w = idz_s - cosine_width;
 	idz_e_w = idz_e + cosine_width;
-	std::cout << "z_len, z_percentage, cosine_width = "
-			<< Zdim << ", " << z_percentage << ", " << cosine_width << std::endl;
-	std::cout << "idz_s_w, idz_s, idz_e, idz_e_w = "
-			<< idz_s_w << ", " << idz_s << ", " << idz_e << ", " << idz_e_w << std::endl;
+	std::cout << "z_len, z_percentage, cosine_width = " << Zdim << ", " << z_percentage << ", " << cosine_width << std::endl;
+	std::cout << "idz_s_w, idz_s, idz_e, idz_e_w = " << idz_s_w << ", " << idz_s << ", " << idz_e << ", " << idz_e_w << std::endl;
 	mask.setXmippOrigin();
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(mask)
 	{
@@ -2388,7 +1184,6 @@ void createCylindricalReference(
 	}
 	return;
 }
-
 
 void transformCartesianAndHelicalCoords(
 		Matrix1D<RFLOAT>& in,
@@ -2473,24 +1268,22 @@ void transformCartesianAndHelicalCoords(
 	return;
 }
 
-void makeBlot(MultidimArray<RFLOAT>& v, RFLOAT y, RFLOAT x, RFLOAT r)
+/*
+void makeBlot(
+		MultidimArray<RFLOAT>& v,
+		RFLOAT y,
+		RFLOAT x,
+		RFLOAT r)
 {
 	int Xdim, Ydim, Zdim, Ndim;
 	RFLOAT dist, min;
-	Xdim = XSIZE(v);
-	Ydim = YSIZE(v);
-	Zdim = ZSIZE(v);
-	Ndim = NSIZE(v);
+	v.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	if( (Ndim != 1) || (Zdim != 1) || (YXSIZE(v) <= 2) )
-	{
 		return;
-	}
 
 	min = DIRECT_A2D_ELEM(v, 0, 0);
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(v)
-	{
 		min = (DIRECT_A2D_ELEM(v, i, j) < min) ? DIRECT_A2D_ELEM(v, i, j) : min;
-	}
 
 	v.setXmippOrigin();
 	FOR_ALL_ELEMENTS_IN_ARRAY2D(v)
@@ -2498,12 +1291,11 @@ void makeBlot(MultidimArray<RFLOAT>& v, RFLOAT y, RFLOAT x, RFLOAT r)
 		dist = (i - y) * (i - y) + (j - x) * (j - x);
 		dist = sqrt(dist);
 		if(dist < r)
-		{
 			A2D_ELEM(v, i, j) = min;
-		}
 	}
 	return;
 }
+*/
 
 void makeSimpleHelixFromPDBParticle(
 		const Assembly& ori,
@@ -2633,53 +1425,6 @@ void normalise2DImageSlices(
 	return;
 }
 */
-
-
-
-
-void enlarge3DReference(
-		MultidimArray<RFLOAT>& v,
-		int factor)
-{
-	MultidimArray<RFLOAT> aux;
-	int i_ori, j_ori, k_ori;
-	int dim = v.getDim();
-	if (dim != 3)
-		REPORT_ERROR("helix.cpp::enlarge3DReference(): Input image should have a dimension of 3!");
-	if (factor <= 1)
-		REPORT_ERROR("helix.cpp::enlarge3DReference(): Factor should be at least 2!");
-	if (factor > 4)
-	{
-		std::cout << " WARNING: You request for " << factor
-			<< " times the size of the original volume, it might use up your memory..." << std::endl;
-		std::cout << " WARNING: The enlarged volume has X, Y, Z dimensions of "
-				<< XSIZE(aux) << ", " << YSIZE(aux) << ", " << ZSIZE(aux) << std::endl;
-	}
-
-	aux.clear();
-	v.setXmippOrigin();
-	aux.resize(factor * ZSIZE(v), factor * YSIZE(v), factor * XSIZE(v));
-	aux.setXmippOrigin();
-
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(aux)
-	{
-		i_ori = i / factor;
-		j_ori = j / factor;
-		k_ori = k / factor;
-
-		if ( (k_ori < STARTINGZ(v)) || (k_ori > FINISHINGZ(v))
-				|| (i_ori < STARTINGY(v)) || (i_ori > FINISHINGY(v))
-				|| (j_ori < STARTINGX(v)) || (j_ori > FINISHINGX(v)) )
-			A3D_ELEM(aux, k, i, j) = 0.;
-		else
-			A3D_ELEM(aux, k, i, j) = A3D_ELEM(v, k_ori, i_ori, j_ori);
-	}
-
-	v.clear();
-	v = aux;
-	aux.clear();
-	return;
-}
 
 void applySoftSphericalMask(
 		MultidimArray<RFLOAT>& v,
@@ -3053,13 +1798,9 @@ void combineParticlePriorsWithKaiLocalCTF(
 	RFLOAT _x, _y, _rot, _tilt, _psi, _xoff, _yoff;
 	int ii;
 
-	if ( (fn_priors.getFileFormat() != "star")
-			|| (fn_local_ctf.getFileFormat() != "star")
-			|| (fn_combined.getFileFormat() != "star") )
+	if ( (fn_priors.getFileFormat() != "star") || (fn_local_ctf.getFileFormat() != "star") || (fn_combined.getFileFormat() != "star") )
 		REPORT_ERROR( (std::string) "helix.cpp::combineParticlePriorsWithKaiLocalCTF(): MetaDataTable should have .star extension.");
-	if ( (fn_priors == fn_local_ctf)
-			|| (fn_local_ctf == fn_combined)
-			|| (fn_combined == fn_priors) )
+	if ( (fn_priors == fn_local_ctf) || (fn_local_ctf == fn_combined) || (fn_combined == fn_priors) )
 		REPORT_ERROR( (std::string) "helix.cpp::combineParticlePriorsWithKaiLocalCTF(): File names must be different.");
 
 	MD_priors.clear();
@@ -3268,9 +2009,7 @@ void combineParticlePriorsWithKaiLocalCTF_Multiple(
 	FileName fns_priors;
 	std::vector<FileName> fn_priors_list;
 
-	if ( (suffix_priors == suffix_local_ctf)
-			|| (suffix_priors == suffix_combined)
-			|| (suffix_combined == suffix_priors) )
+	if ( (suffix_priors == suffix_local_ctf) || (suffix_priors == suffix_combined) || (suffix_combined == suffix_priors) )
 		REPORT_ERROR( (std::string) "helix.cpp::combineParticlePriorsWithKaiLocalCTF_Multiple(): File names error!");
 
 	fns_priors = "*" + suffix_priors;
@@ -3346,8 +2085,7 @@ void removeBadTiltHelicalSegmentsFromDataStar(
 	RFLOAT tilt_deg;
 	if ( (max_dev_deg < 0.) || (max_dev_deg > 89.) )
 		REPORT_ERROR( (std::string) "helix.cpp::removeBadTiltParticlesFromDataStar(): Max deviations of tilt angles from 90 degree should be in the range of 0~89 degrees.");
-	if ( (fn_in.getFileFormat() != "star")
-			|| (fn_out.getFileFormat() != "star") )
+	if ( (fn_in.getFileFormat() != "star") || (fn_out.getFileFormat() != "star") )
 		REPORT_ERROR( (std::string) "helix.cpp::removeBadTiltParticlesFromDataStar(): MetaDataTable should have .star extension.");
 	if (fn_in == fn_out)
 		REPORT_ERROR( (std::string) "helix.cpp::removeBadTiltParticlesFromDataStar(): File names must be different.");
@@ -3374,7 +2112,7 @@ void removeBadTiltHelicalSegmentsFromDataStar(
 	return;
 }
 
-int transformXimdispHelicalCoordsToStarFile(
+int transformXimdispHelicalSegmentCoordsToStarFile(
 		FileName& fn_in,
 		FileName& fn_out,
 		RFLOAT Xdim,
@@ -3382,12 +2120,12 @@ int transformXimdispHelicalCoordsToStarFile(
 		RFLOAT box_size_pix)
 {
 	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix))
-		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalCoordsToStarFile(): Wrong dimensions or box size!");
-	if (fn_out.isStarFile() == false)
-		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalCoordsToStarFile(): Output should be a star file!");
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalSegmentCoordsToStarFile(): Wrong dimensions or box size!");
+	if (!fn_out.isStarFile())
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalSegmentCoordsToStarFile(): Output should be a star file!");
 
 	char tmpstr[1000];
-	int nr_particles_on_edges, nr_particles;
+	int nr_segments_on_edges, nr_segments;
 	RFLOAT x, y, psi_deg, half_box_size_pix;
 	MetaDataTable MD;
 	std::ifstream fin;
@@ -3397,7 +2135,7 @@ int transformXimdispHelicalCoordsToStarFile(
 	half_box_size_pix = box_size_pix / 2.;
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalCoordsToStarFile(): Cannot open input file!");
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalSegmentCoordsToStarFile(): Cannot open input file!");
 	MD.clear();
 	MD.addLabel(EMDL_IMAGE_COORD_X);
 	MD.addLabel(EMDL_IMAGE_COORD_Y);
@@ -3406,29 +2144,26 @@ int transformXimdispHelicalCoordsToStarFile(
 	MD.addLabel(EMDL_ORIENT_PSI);
 	MD.addLabel(EMDL_ORIENT_ORIGIN_X);
 	MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
-	nr_particles_on_edges = nr_particles = 0;
+	nr_segments_on_edges = nr_segments = 0;
 	getline(fin, line, '\n');
 	while (getline(fin, line, '\n'))
 	{
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 3)
-			REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalCoordsToStarFile(): Every line in input Ximdisp file should only contain x, y and psi angle!");
+			REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalSegmentCoordsToStarFile(): Every line in input Ximdisp file should only contain x, y and psi angle!");
 		x = textToFloat(words[0]);
 		y = textToFloat(words[1]);
 		psi_deg = textToFloat(words[2]);
 
 		// Avoid segments lying on the edges of the micrographs
-		if ( (x < half_box_size_pix)
-				|| (x > (Xdim - half_box_size_pix))
-				|| (y < half_box_size_pix)
-				|| (y > (Ydim - half_box_size_pix)) )
+		if ( (x < half_box_size_pix) || (x > (Xdim - half_box_size_pix)) || (y < half_box_size_pix) || (y > (Ydim - half_box_size_pix)) )
 		{
-			nr_particles_on_edges++;
+			nr_segments_on_edges++;
 			continue;
 		}
 
-		nr_particles++;
+		nr_segments++;
 		MD.addObject();
 		MD.setValue(EMDL_IMAGE_COORD_X, x);
 		MD.setValue(EMDL_IMAGE_COORD_Y, y);
@@ -3439,23 +2174,20 @@ int transformXimdispHelicalCoordsToStarFile(
 		MD.setValue(EMDL_ORIENT_ORIGIN_Y, 0.);
 	}
 	MD.write(fn_out);
-	std::cout << "Input Ximdisp .coords = " << fn_in.c_str()
-			<< ", output STAR file = " << fn_out.c_str()
-			<< ", size of micrograph = " << Xdim << " * " << Ydim
-			<< ", box size = " << box_size_pix << ", "
-			<< nr_particles_on_edges << " particles excluded, "
-			<< nr_particles << " particles left." << std::endl;
-	return nr_particles;
+	std::cout << "Input Ximdisp .coords = " << fn_in.c_str() << ", output STAR file = " << fn_out.c_str()
+			<< ", size of micrograph = " << Xdim << " * " << Ydim << ", box size = " << box_size_pix << ", "
+			<< nr_segments_on_edges << " segments excluded, " << nr_segments << " segments left." << std::endl;
+	return nr_segments;
 }
 
-void transformXimdispHelicalCoordsToStarFile_Multiple(
+void transformXimdispHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize)
 {
-	int nr_particles;
+	int nr_segments;
 	FileName fns_coords;
 	std::vector<FileName> fn_coords_list;
 
@@ -3465,103 +2197,148 @@ void transformXimdispHelicalCoordsToStarFile_Multiple(
 	if (fn_coords_list.size() < 1)
 		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalCoordsToStarFile_Multiple(): No input files are found!");
 
-	nr_particles = 0;
+	nr_segments = 0;
 	for (int ii = 0; ii < fn_coords_list.size(); ii++)
 	{
 		FileName fn_out;
 		fn_out = fn_coords_list[ii].beforeFirstOf(suffix_coords) + suffix_out;
-		nr_particles += transformXimdispHelicalCoordsToStarFile(fn_coords_list[ii], fn_out, Xdim, Ydim, boxsize);
+		nr_segments += transformXimdispHelicalSegmentCoordsToStarFile(fn_coords_list[ii], fn_out, Xdim, Ydim, boxsize);
 	}
-	std::cout << "Number of particles = " << nr_particles << std::endl;
+	std::cout << "Total number of segments = " << nr_segments << std::endl;
 	return;
 }
 
-/*
-void divideHelicalSegmentsFromMultipleMicrographsIntoHalves(
+int transformXimdispHelicalTubeCoordsToStarFile(
 		FileName& fn_in,
-		FileName& fn_out)
+		FileName& fn_out,
+		int nr_asu,
+		RFLOAT rise_ang,
+		RFLOAT pixel_size_ang,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix)
 {
-	int id_mic, nr_segments_subset1, nr_segments_subset2;
-	RFLOAT ratio;
-	std::string mic_name;
-	MetaDataTable MD;
-	std::vector<std::string> mic_names;
-	std::vector<int> mic_nr_segments;
-	std::vector<int> mic_subset;
+	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix))
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile(): Wrong dimensions or box size!");
+	if (!fn_out.isStarFile())
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile(): Output should be a star file!");
+	if (pixel_size_ang < 0.001)
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile(): Invalid pixel size!");
+	RFLOAT step_pix = ((RFLOAT)(nr_asu)) * rise_ang / pixel_size_ang;
+	if ( (nr_asu < 1) || (rise_ang < 0.001) || (step_pix < 0.001) )
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile(): Invalid helical rise or number of asymmetrical units!");
 
-	if (fn_in == fn_out)
-		REPORT_ERROR("helix.cpp::divideHelicalSegmentsFromMultipleMicrographsIntoHalves(): File names error!");
+	std::cout << "NOTICE: Each .coords file should contain coordinates of only ONE rectangular box!" << std::endl;
+
+	char tmpstr[1000];
+	int nr_segments;
+	RFLOAT xp, yp, dx, dy, x0, y0, x1, y1, dist, psi_deg, psi_rad, half_box_size_pix;
+	MetaDataTable MD;
+	std::ifstream fin;
+	std::string line;
+	std::vector<std::string> words;
+	std::vector<RFLOAT> x, y;
+
+	x.resize(4);
+	y.resize(4);
+	half_box_size_pix = box_size_pix / 2.;
+	fin.open(fn_in.c_str(), std::ios_base::in);
+	if (fin.fail())
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile(): Cannot open input file!");
+	getline(fin, line, '\n');
+	for (int iline = 0; iline < 4; iline++)
+	{
+		getline(fin, line, '\n');
+		words.clear();
+		tokenize(line, words);
+		if (words.size() != 2)
+			REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile(): Every line in input Ximdisp file should only contain x, y and psi angle!");
+		x[iline] = textToFloat(words[0]);
+		y[iline] = textToFloat(words[1]);
+	}
+	fin.close();
+
+	x0 = (x[0] + x[1]) / 2.;
+	y0 = (y[0] + y[1]) / 2.;
+	x1 = (x[2] + x[3]) / 2.;
+	y1 = (y[2] + y[3]) / 2.;
+	psi_rad = atan2(y1 - y0, x1 - x0);
+	psi_deg = RAD2DEG(psi_rad);
+	dx = step_pix * cos(psi_rad);
+	dy = step_pix * sin(psi_rad);
+	dist = sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+	nr_segments = FLOOR(dist / step_pix);
+	//if (nr_segments < 1)
+	//	return 0;
 
 	MD.clear();
-	MD.read(fn_in);
-
-	if (!MD.containsLabel(EMDL_MICROGRAPH_NAME))
-		REPORT_ERROR("helix.cpp::divideHelicalSegmentsFromMultipleMicrographsIntoHalves(): Input MetadataTable should contain rlnMicrographName!");
-	if (!MD.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
-		MD.addLabel(EMDL_PARTICLE_RANDOM_SUBSET);
-
-	mic_names.clear();
-	mic_nr_segments.clear();
-	mic_subset.clear();
-	id_mic = nr_segments_subset1 = nr_segments_subset2 = 0;
-
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	MD.addLabel(EMDL_IMAGE_COORD_X);
+	MD.addLabel(EMDL_IMAGE_COORD_Y);
+	MD.addLabel(EMDL_ORIENT_ROT);
+	MD.addLabel(EMDL_ORIENT_TILT);
+	MD.addLabel(EMDL_ORIENT_PSI);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_X);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
+	int id_segment = -1;
+	while (1)
 	{
-		MD.getValue(EMDL_MICROGRAPH_NAME, mic_name);
-		for (id_mic = (mic_names.size() - 1); id_mic >= 0; id_mic--)
-		{
-			if (mic_names[id_mic] == mic_name)
-			{
-				mic_nr_segments[id_mic]++;
-				MD.setValue(EMDL_PARTICLE_RANDOM_SUBSET, id_mic);
-				break;
-			}
-		}
-		if (id_mic < 0)
-		{
-			mic_names.push_back(mic_name);
-			mic_nr_segments.push_back(1);
-			mic_subset.push_back(1);
-			id_mic = (mic_names.size() - 1);
-			MD.setValue(EMDL_PARTICLE_RANDOM_SUBSET, id_mic);
-		}
+		id_segment++;
+		if ((id_segment + 1) > nr_segments)
+			break;
+		xp = x0 + ((RFLOAT)(id_segment)) * dx;
+		yp = y0 + ((RFLOAT)(id_segment)) * dy;
+
+		// Avoid segments lying on the edges of the micrographs
+		if ( (xp < half_box_size_pix) || (xp > (Xdim - half_box_size_pix)) || (yp < half_box_size_pix) || (yp > (Ydim - half_box_size_pix)) )
+			continue;
+
+		MD.addObject();
+		MD.setValue(EMDL_IMAGE_COORD_X, xp);
+		MD.setValue(EMDL_IMAGE_COORD_Y, yp);
+		MD.setValue(EMDL_ORIENT_ROT, 0.);
+		MD.setValue(EMDL_ORIENT_TILT, 90.);
+		MD.setValue(EMDL_ORIENT_PSI, -psi_deg);
+		MD.setValue(EMDL_ORIENT_ORIGIN_X, 0.);
+		MD.setValue(EMDL_ORIENT_ORIGIN_Y, 0.);
 	}
-
-	// Randomise
-
-	for (id_mic = 0; id_mic < mic_names.size(); id_mic++)
-	{
-		if (nr_segments_subset1 < nr_segments_subset2)
-		{
-			mic_subset[id_mic] = 1;
-			nr_segments_subset1 += mic_nr_segments[id_mic];
-		}
-		else
-		{
-			mic_subset[id_mic] = 2;
-			nr_segments_subset2 += mic_nr_segments[id_mic];
-		}
-	}
-
-	if ( (nr_segments_subset1 < 1) || (nr_segments_subset2 < 1) )
-		REPORT_ERROR("helix.cpp::divideHelicalSegmentsFromMultipleMicrographsIntoHalves(): Number of helical segments from one of the two half sets is 0!");
-	ratio = (RFLOAT(nr_segments_subset1) / RFLOAT(nr_segments_subset2));
-	if ( (ratio > 1.5) || ( (1. / ratio) > 1.5) )
-		REPORT_ERROR("helix.cpp::divideHelicalSegmentsFromMultipleMicrographsIntoHalves(): Numbers of helical segments from two half sets are extremely unbalanced!");
-
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-	{
-		MD.getValue(EMDL_PARTICLE_RANDOM_SUBSET, id_mic);
-		MD.setValue(EMDL_PARTICLE_RANDOM_SUBSET, mic_subset[id_mic]);
-	}
-
-	std::cout << " Helical segments in two half sets = " << nr_segments_subset1 << ", " << nr_segments_subset2 << std::endl;
-
 	MD.write(fn_out);
 
+	std::cout << "Input Ximdisp .coords = " << fn_in.c_str() << ", output STAR file = " << fn_out.c_str()
+			<< ", size of micrograph = " << Xdim << " * " << Ydim << ", box size = " << box_size_pix
+			<< ", number of segments = " << MD.numberOfObjects() << "." << std::endl;
+	return MD.numberOfObjects();
+}
+
+void transformXimdispHelicalTubeCoordsToStarFile_Multiple(
+		FileName& suffix_coords,
+		FileName& suffix_out,
+		int nr_asu,
+		RFLOAT rise_ang,
+		RFLOAT pixel_size_ang,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT boxsize)
+{
+	int nr_segments;
+	FileName fns_coords;
+	std::vector<FileName> fn_coords_list;
+
+	fns_coords = "*" + suffix_coords;
+	fns_coords.globFiles(fn_coords_list);
+	std::cout << "Number of input files = " << fn_coords_list.size() << std::endl;
+	if (fn_coords_list.size() < 1)
+		REPORT_ERROR( (std::string) "helix.cpp::transformXimdispHelicalTubeCoordsToStarFile_Multiple(): No input files are found!");
+
+	nr_segments = 0;
+	for (int ii = 0; ii < fn_coords_list.size(); ii++)
+	{
+		FileName fn_out;
+		fn_out = fn_coords_list[ii].beforeFirstOf(suffix_coords) + suffix_out;
+		nr_segments += transformXimdispHelicalTubeCoordsToStarFile(fn_coords_list[ii], fn_out, nr_asu, rise_ang, pixel_size_ang, Xdim, Ydim, boxsize);
+	}
+	std::cout << "Total number of segments = " << nr_segments << std::endl;
 	return;
 }
-*/
 
 void divideHelicalSegmentsFromMultipleMicrographsIntoRandomHalves(
 		FileName& fn_in,
@@ -3766,7 +2543,7 @@ void makeHelicalReference3D(
 	tube_diameter_pix = tube_diameter_A / pixel_size_A;
 	particle_diameter_pix = particle_diameter_A / pixel_size_A;
 	particle_radius_pix = particle_diameter_pix / 2.;
-	particle_radius_max_pix = (int)(CEIL(particle_diameter_pix / 2.)) + 1;
+	particle_radius_max_pix = (CEIL(particle_diameter_pix / 2.)) + 1;
 
 	if (particle_diameter_pix < 2.)
 		REPORT_ERROR("helix.cpp::makeHelicalReference3D(): Particle diameter should be larger than 2 pixels!");
@@ -3957,8 +2734,7 @@ void divideStarFile(
 	return;
 }
 
-void combineStarFiles(
-		FileName& fn_in)
+void mergeStarFiles(FileName& fn_in)
 {
 	int file_id;
 	std::vector<FileName> fns_list;
@@ -4002,8 +2778,7 @@ void combineStarFiles(
 	return;
 }
 
-void sortHelicalTubeID(
-		MetaDataTable& MD)
+void sortHelicalTubeID(MetaDataTable& MD)
 {
 	std::string str_particle_fullname, str_particle_name, str_comment, str_particle_id, str_tube_id;
 	int int_tube_id;
@@ -4100,3 +2875,113 @@ void simulateHelicalSegments(
 	MD.write(fn_out);
 	return;
 };
+
+void outputHelicalSymmetryStatus(
+		int iter,
+		RFLOAT rise_initial_A,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT twist_initial_deg,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
+		bool do_local_search_helical_symmetry,
+		std::vector<RFLOAT>& rise_A,
+		std::vector<RFLOAT>& twist_deg,
+		RFLOAT rise_A_half1,
+		RFLOAT rise_A_half2,
+		RFLOAT twist_deg_half1,
+		RFLOAT twist_deg_half2,
+		bool do_split_random_halves,
+		std::ostream& out)
+{
+	if (iter < 1)
+		REPORT_ERROR("helix.cpp::outputHelicalSymmetryStatus(): BUG iteration id cannot be less than 1!");
+	if ( (do_local_search_helical_symmetry) && (iter > 1) )
+	{
+		out << " Local searches of helical twist from " << twist_min_deg << " to " << twist_max_deg << " degrees, rise from " << rise_min_A << " to " << rise_max_A << " Angstroms." << std::endl;
+	}
+	else
+	{
+		out << " For all classes, helical twist = " << twist_initial_deg << " degrees, rise = " << rise_initial_A << " Angstroms." << std::endl;
+		return;
+	}
+
+	if (do_split_random_halves)
+	{
+		RFLOAT twist_avg_deg = (twist_deg_half1 + twist_deg_half2) / 2.;
+		RFLOAT rise_avg_A = (rise_A_half1 + rise_A_half2) / 2.;
+
+		// TODO: raise a warning if two sets of helical parameters are >1% apart?
+		out << " (Half 1) Refined helical twist = " << twist_deg_half1 << " degrees, rise = " << rise_A_half1 << " Angstroms." << std::endl;
+		out << " (Half 2) Refined helical twist = " << twist_deg_half2 << " degrees, rise = " << rise_A_half2 << " Angstroms." << std::endl;
+		out << " Averaged helical twist = " << twist_avg_deg << " degrees, rise = " << rise_avg_A << " Angstroms." << std::endl;
+		return;
+	}
+	else
+	{
+		if ( (rise_A.size() != twist_deg.size()) || (rise_A.size() < 1) )
+			REPORT_ERROR("helix.cpp::outputHelicalSymmetryStatus(): BUG vectors rise_A and twist_deg are not of the same size!");
+		for (int iclass = 0; iclass < rise_A.size(); iclass++)
+		{
+			out << " (Class " << (iclass + 1) << ") Refined helical twist = " << twist_deg[iclass] << " degrees, rise = " << rise_A[iclass] << " Angstroms." << std::endl;
+		}
+	}
+}
+
+void excludeLowCTFCCMicrographs(
+		FileName& fn_in,
+		FileName& fn_out,
+		RFLOAT cc_min,
+		RFLOAT EPA_lowest_res)
+{
+	EMDLabel EMDL_ctf_EPA_final_resolution = EMDL_POSTPROCESS_FINAL_RESOLUTION;
+	bool contain_EPA_res;
+	MetaDataTable MD_in, MD_out;
+	int nr_mics_old, nr_mics_new;
+	RFLOAT cc, EPA_res;
+	if ( (fn_in.getFileFormat() != "star") || (fn_out.getFileFormat() != "star") )
+		REPORT_ERROR( (std::string) "helix.cpp::excludeLowCTFCCMicrographs(): MetaDataTable should have .star extension.");
+	if (fn_in == fn_out)
+		REPORT_ERROR( (std::string) "helix.cpp::excludeLowCTFCCMicrographs(): File names must be different.");
+
+	MD_in.clear();
+	MD_in.read(fn_in);
+	if ( (!MD_in.containsLabel(EMDL_CTF_DEFOCUSU))
+			|| (!MD_in.containsLabel(EMDL_CTF_DEFOCUSV))
+			|| (!MD_in.containsLabel(EMDL_CTF_DEFOCUS_ANGLE))
+			|| (!MD_in.containsLabel(EMDL_CTF_VOLTAGE))
+			|| (!MD_in.containsLabel(EMDL_CTF_CS))
+			|| (!MD_in.containsLabel(EMDL_CTF_Q0))
+			|| (!MD_in.containsLabel(EMDL_CTF_MAGNIFICATION))
+			|| (!MD_in.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			|| (!MD_in.containsLabel(EMDL_CTF_FOM)) )
+		REPORT_ERROR( (std::string) "helix.cpp::removeBadTiltParticlesFromDataStar(): Input STAR file should contain CTF information.");
+
+	contain_EPA_res = MD_in.containsLabel(EMDL_ctf_EPA_final_resolution);
+
+	nr_mics_old = nr_mics_new = 0;
+	MD_out.clear();
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
+	{
+		nr_mics_old++;
+		MD_in.getValue(EMDL_CTF_FOM, cc);
+		MD_in.getValue(EMDL_ctf_EPA_final_resolution, EPA_res);
+		if (cc > cc_min)
+		{
+			if ( (contain_EPA_res) && (EPA_res > EPA_lowest_res) )
+			{}
+			else
+			{
+				nr_mics_new++;
+				MD_out.addObject(MD_in.getObject());
+			}
+		}
+	}
+
+	std::cout << " Number of micrographs (input / output) = " << nr_mics_old << " / " << nr_mics_new << std::endl;
+	if (MD_out.numberOfObjects() < 1)
+		std::cout << " No micrographs in output file!" << std::endl;
+	else
+		MD_out.write(fn_out);
+	return;
+}

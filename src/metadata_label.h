@@ -154,6 +154,16 @@ enum EMDLabel
     EMDL_MLMODEL_GROUP_NO,
     EMDL_MLMODEL_GROUP_NR_PARTICLES,
     EMDL_MLMODEL_GROUP_SCALE_CORRECTION,
+    EMDL_MLMODEL_HELICAL_NR_ASU,
+    EMDL_MLMODEL_HELICAL_TWIST,
+    EMDL_MLMODEL_HELICAL_TWIST_MIN,
+    EMDL_MLMODEL_HELICAL_TWIST_MAX,
+    EMDL_MLMODEL_HELICAL_TWIST_INITIAL_STEP,
+    EMDL_MLMODEL_HELICAL_RISE,
+    EMDL_MLMODEL_HELICAL_RISE_MIN,
+    EMDL_MLMODEL_HELICAL_RISE_MAX,
+    EMDL_MLMODEL_HELICAL_RISE_INITIAL_STEP,
+    EMDL_MLMODEL_IS_HELIX,
     EMDL_MLMODEL_INTERPOLATOR,
     EMDL_MLMODEL_LL,
     EMDL_MLMODEL_MINIMUM_RADIUS_NN_INTERPOLATION,
@@ -216,15 +226,13 @@ enum EMDLabel
     EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT,
     EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO,
     EMDL_OPTIMISER_DO_HELICAL_REFINE,
-    EMDL_OPTIMISER_HELICAL_NR_ASU,
-    EMDL_OPTIMISER_HELICAL_TWIST,
-    EMDL_OPTIMISER_HELICAL_RISE,
-    EMDL_OPTIMISER_HELICAL_CENTRAL_PROPORTION,
-	EMDL_OPTIMISER_HELICAL_MASK_TUBE_INNER_DIAMETER,
-	EMDL_OPTIMISER_HELICAL_MASK_TUBE_OUTER_DIAMETER,
+    EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
+    EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
+    EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
+	EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
+	EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS,
 	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
-	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT_MAX_DEV,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
@@ -271,7 +279,7 @@ enum EMDLabel
     EMDL_ORIENT_PSI_PRIOR,
 
     EMDL_PARTICLE_AUTOPICK_FOM,
-    EMDL_PARTICLE_HELICAL_TUBE_ID,
+	EMDL_PARTICLE_HELICAL_TUBE_ID,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
     EMDL_PARTICLE_ID,
@@ -512,6 +520,16 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NO, EMDL_LONG, "rlnGroupNumber", "The number of a group of images");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NR_PARTICLES, EMDL_LONG, "rlnGroupNrParticles", "Number particles in a group of images");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_SCALE_CORRECTION, EMDL_DOUBLE, "rlnGroupScaleCorrection", "Intensity-scale correction for a group of images");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_NR_ASU, EMDL_INT, "rlnNrHelicalAsymUnits", "How many new helical asymmetric units are there in each box");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_TWIST, EMDL_DOUBLE, "rlnHelicalTwist", "The helical twist (rotation per subunit) in degrees");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_TWIST_MIN, EMDL_DOUBLE, "rlnHelicalTwistMin", "Minimum helical twist (in degrees, + for right-handedness)");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_TWIST_MAX, EMDL_DOUBLE, "rlnHelicalTwistMax", "Maximum helical twist (in degrees, + for right-handedness)");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_TWIST_INITIAL_STEP, EMDL_DOUBLE, "rlnHelicalTwistInitialStep", "Initial step of helical twist search (in degrees)");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_RISE, EMDL_DOUBLE, "rlnHelicalRise", "The helical rise (translation per subunit) in Angstroms");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_RISE_MIN, EMDL_DOUBLE, "rlnHelicalRiseMin", "Minimum helical rise (in Angstroms)");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_RISE_MAX, EMDL_DOUBLE, "rlnHelicalRiseMax", "Maximum helical rise (in Angstroms)");
+        EMDL::addLabel(EMDL_MLMODEL_HELICAL_RISE_INITIAL_STEP, EMDL_DOUBLE, "rlnHelicalRiseInitialStep", "Initial step of helical rise search (in Angstroms)");
+        EMDL::addLabel(EMDL_MLMODEL_IS_HELIX, EMDL_BOOL, "rlnIsHelix", "Flag to indicate that helical refinement should be performed");
         EMDL::addLabel(EMDL_MLMODEL_INTERPOLATOR, EMDL_INT, "rlnFourierSpaceInterpolator", "The kernel used for Fourier-space interpolation (NN=0, linear=1)");
         EMDL::addLabel(EMDL_MLMODEL_LL, EMDL_DOUBLE, "rlnLogLikelihood", "Value of the log-likelihood target function");
         EMDL::addLabel(EMDL_MLMODEL_MINIMUM_RADIUS_NN_INTERPOLATION,  EMDL_INT, "rlnMinRadiusNnInterpolation","Minimum radius for NN-interpolation (in Fourier pixels), for smaller radii linear int. is used");
@@ -574,15 +592,13 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, EMDL_BOOL, "rlnHasHighFscAtResolLimit", "Flag to indicate that the FSC at the resolution limit is significant");
         EMDL::addLabel(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, EMDL_INT, "rlnHasLargeSizeIncreaseIterationsAgo", "How many iterations have passed since the last large increase in image size");
         EMDL::addLabel(EMDL_OPTIMISER_DO_HELICAL_REFINE, EMDL_BOOL, "rlnDoHelicalRefine", "Flag to indicate that helical refinement should be performed");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_NR_ASU, EMDL_INT, "rlnNrHelicalAsymUnits", "How many new helical asymmetric units are there in each box");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST, EMDL_DOUBLE, "rlnHelicalTwist", "The helical twist (rotation per subunit) in degrees");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE, EMDL_DOUBLE, "rlnHelicalRise", "The helical rise (translation per subunit) in Angstroms");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_CENTRAL_PROPORTION, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_MASK_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_MASK_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, EMDL_BOOL, "rlnHelicalBimodalOrientations", "Flag to indicate that bimodal orientations are searched for helical segments in the first few iterations");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT_MAX_DEV, EMDL_DOUBLE, "rlnHelicalSymmetryLocalRefinementMaxDev", "Maximum deviation (0.01% - 33.33%) of helical parameters in local refinement");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");

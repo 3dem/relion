@@ -200,6 +200,8 @@ public:
 	// Label
 	std::string label;
 
+	std::string label_full;
+
     // Button to show additional help text
 	Fl_Button* help;
 
@@ -212,11 +214,30 @@ public:
 	 *  defaultvalue is what will appear by default in the input value
 	 *  help is the additional help text. If it is set to NULL, no help button will be displayed
 	 */
-	AnyEntry(){};
+	AnyEntry()
+    {
+		inp = NULL;
+		help = NULL;
+		myhelptext = NULL;
+		label = "";
+		label_full = "";
+    };
 
     /** Empty destructor
      */
-	~AnyEntry(){};
+	~AnyEntry()
+	{
+		if (inp)
+		{
+			delete inp;
+			inp = NULL;
+		}
+		if (help)
+		{
+			delete help;
+			help = NULL;
+		}
+	};
 
 	/** Here really start the entry
 	 */
@@ -226,6 +247,13 @@ public:
 	 */
 	void place(int &y,
 				const char * title,
+				const char* defaultvalue = NULL,
+				const char* helptext = NULL,
+				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
+
+	void placeOnSameYPosition(int y,
+				const char * title,
+				const char * title_full,
 				const char* defaultvalue = NULL,
 				const char* helptext = NULL,
 				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
