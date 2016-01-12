@@ -21,7 +21,7 @@ endif()
 if(NOT FLTK_FOUND)
 
     set(FLTK_LIBRARIES     "${FLTK_EXTERNAL_PATH}/lib/libfltk.so" ) 
-    set(FLTK_INCLUDE_DIR   "${FLTK_EXTERNAL_PATH}/includes" )
+    set(FLTK_INCLUDE_DIR   "${FLTK_EXTERNAL_PATH}/include" )
     #set(FLTK_PATH          "${FLTK_EXTERNAL_PATH}/includes/FL/Fl.H" )  
     #set(FLTK_INCLUDES      "${FLTK_EXTERNAL_PATH}/includes/FL/Fl.H" ) 
 
