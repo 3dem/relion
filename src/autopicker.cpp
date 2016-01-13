@@ -277,6 +277,8 @@ void AutoPicker::initialise()
 			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
 	}
 
+	printf("workSize = %d, corresponding to a resolution of %g for these settings.", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
+
 	if (min_particle_distance < 0)
 	{
 		min_particle_distance = particle_size * angpix / 2.;
@@ -1452,6 +1454,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	CTF ctf;
 
 	int min_distance_pix = ROUND(min_particle_distance / angpix);
+	float scale = (float)workSize / (float)micrograph_size;
 
 #ifdef DEBUG
 	Image<RFLOAT> tt;
@@ -1828,12 +1831,12 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			} // end for psi
 
 //			CenterFFT(Mccf_best, true);
-			transformer.FourierTransform(Mccf_best, Faux2);
-//			CenterFFT(Faux2, false);
-			Faux.resize(1,micrograph_size,micrograph_size/2+1);
-			windowFourierTransform(Faux2, Faux, micrograph_size);
-			Mccf_best.resize(1,micrograph_size,micrograph_size);
-			transformer.inverseFourierTransform(Faux, Mccf_best);
+//			transformer.FourierTransform(Mccf_best, Faux2);
+////			CenterFFT(Faux2, false);
+//			Faux.resize(1,micrograph_size,micrograph_size/2+1);
+//			windowFourierTransform(Faux2, Faux, micrograph_size);
+//			Mccf_best.resize(1,micrograph_size,micrograph_size);
+//			transformer.inverseFourierTransform(Faux, Mccf_best);
 //			CenterFFT(Mccf_best, false);
 
 
@@ -1886,8 +1889,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Mccf_best.setXmippOrigin();
 			Mpsi_best.setXmippOrigin();
 
-			peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
-			prunePeakClusters(my_ref_peaks, min_distance_pix);
+			peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks, scale);
+			prunePeakClusters(my_ref_peaks, min_distance_pix, scale);
 			peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());  // append the peaks of this reference to all the other peaks
 
 		}
@@ -1946,16 +1949,16 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	else
 	{
 		//Now that we have done all references, prune the list again...
-		prunePeakClusters(peaks, min_distance_pix);
+		prunePeakClusters(peaks, min_distance_pix, scale);
 		// And remove all too close neighbours
-		removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix);
+		removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix, scale);
 		// Write out a STAR file with the coordinates
 		MetaDataTable MDout;
 		for (int ipeak =0; ipeak < peaks.size(); ipeak++)
 		{
 			MDout.addObject();
-			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x));
-			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y));
+			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x)/scale);
+			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y)/scale);
 			MDout.setValue(EMDL_PARTICLE_CLASS, peaks[ipeak].ref + 1); // start counting at 1
 			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, peaks[ipeak].fom);
 			MDout.setValue(EMDL_ORIENT_PSI, peaks[ipeak].psi);
@@ -2043,19 +2046,21 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 }
 
 void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref,
-		int skip_side, std::vector<Peak> &peaks)
+		int skip_side, std::vector<Peak> &peaks, float scale)
 {
 
 	peaks.clear();
 	Peak peak;
 	peak.ref = iref;
 
+	skip_side = (int)((float)skip_side*scale);
+
 	// Skip the pixels along the side of the micrograph!
 	// At least 1, so dont have to check for the borders!
 	skip_side = XMIPP_MAX(1, skip_side);
-	for (int i = FIRST_XMIPP_INDEX(micrograph_ysize) + skip_side; i <= LAST_XMIPP_INDEX(micrograph_ysize) - skip_side; i++)
+	for (int i = FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side; i <= LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side; i++)
 	{
-		for (int j = FIRST_XMIPP_INDEX(micrograph_xsize) + skip_side; j <= LAST_XMIPP_INDEX(micrograph_xsize) - skip_side; j++)
+		for (int j = FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side; j <= LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side; j++)
 		{
 
 			RFLOAT myval = A2D_ELEM(Mfom, i, j);
@@ -2076,8 +2081,8 @@ void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArr
 					continue;
 				if (A2D_ELEM(Mfom, i, j+1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j+1) > myval )
 					continue;
-				peak.x = j - FIRST_XMIPP_INDEX(micrograph_xsize);
-				peak.y = i - FIRST_XMIPP_INDEX(micrograph_ysize);
+				peak.x = j - FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale));
+				peak.y = i - FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale));
 				peak.psi = A2D_ELEM(Mpsi, i, j);
 				peak.fom = A2D_ELEM(Mfom, i, j);
 				peak.relative_fom = myval;
@@ -2088,9 +2093,9 @@ void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArr
 
 }
 
-void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance)
+void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance, float scale)
 {
-	int mind2 = min_distance*min_distance;
+	int mind2 = (float)(min_distance*min_distance)*scale*scale;
 	int nclus = 0;
 
 	std::vector<Peak> pruned_peaks;
@@ -2108,7 +2113,7 @@ void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance)
 			{
 				int dx = my_x - peaks[ipeakp].x;
 				int dy = my_y - peaks[ipeakp].y;
-				if (dx*dx + dy*dy < particle_radius2)
+				if (dx*dx + dy*dy < ( (float)(particle_radius2)*scale*scale ))
 				{
 					// Put ipeakp in the cluster, and remove from the peaks list
 					cluster.push_back(peaks[ipeakp]);
@@ -2143,7 +2148,7 @@ void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance)
 			{
 				int dx = cluster[iclus].x - bestpeak.x;
 				int dy = cluster[iclus].y - bestpeak.y;
-				if (dx*dx + dy*dy < mind2)
+				if (dx*dx + dy*dy < ((float)(mind2)*scale*scale) )
 				{
 					cluster.erase(cluster.begin()+iclus);
 					iclus--;
@@ -2158,11 +2163,11 @@ void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance)
 
 }
 
-void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance)
+void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance, float scale)
 {
 	// Now only keep those peaks that are at least min_particle_distance number of pixels from any other peak
 	std::vector<Peak> pruned_peaks;
-	int mind2 = min_distance*min_distance;
+	int mind2 = (float)(min_distance*min_distance)*scale*scale;
 	for (int ipeak = 0; ipeak < peaks.size(); ipeak++)
 	{
 		int my_x = peaks[ipeak].x;
@@ -2175,7 +2180,7 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 				int dx = peaks[ipeakp].x - my_x;
 				int dy = peaks[ipeakp].y - my_y;
 				int d2 = dx*dx + dy*dy;
-				if ( d2 < my_mind2 )
+				if ( d2 < (((float)my_mind2)*scale*scale) )
 					my_mind2 = d2;
 			}
 		}
