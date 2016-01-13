@@ -1248,19 +1248,22 @@ void RelionMainWindow::cb_run_i()
 
 	// If this is a continuation job, check whether output files exist and move away!
 	// This is to ensure that the continuation job goes OK
-	bool is_refine = (pipeline.processList[current_job].type == PROC_2DCLASS ||
-			pipeline.processList[current_job].type == PROC_3DCLASS ||
-			pipeline.processList[current_job].type == PROC_3DAUTO);
-	if (is_main_continue && !is_refine )
+	if (is_main_continue)
 	{
-		for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
+		bool is_refine = (pipeline.processList[current_job].type == PROC_2DCLASS ||
+				pipeline.processList[current_job].type == PROC_3DCLASS ||
+				pipeline.processList[current_job].type == PROC_3DAUTO);
+		if (!is_refine )
 		{
-			int j = pipeline.processList[current_job].outputNodeList[i];
-			std::string fn_node = pipeline.nodeList[j].name;
-			if (exists(fn_node))
+			for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
 			{
-				std::string mvcommand = "mv -f " + fn_node + " " + fn_node + ".old";
-				int res = system(mvcommand.c_str());
+				int j = pipeline.processList[current_job].outputNodeList[i];
+				std::string fn_node = pipeline.nodeList[j].name;
+				if (exists(fn_node))
+				{
+					std::string mvcommand = "mv -f " + fn_node + " " + fn_node + ".old";
+					int res = system(mvcommand.c_str());
+				}
 			}
 		}
 	}
