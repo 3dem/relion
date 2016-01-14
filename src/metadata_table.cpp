@@ -693,6 +693,9 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     	}
     }
 
+    // Clear the eofbit so we can perform more actions on the stream.
+    in.clear();
+
     return 0;
 }
 

@@ -433,15 +433,12 @@ void RelionMainWindow::fillToAndFromJobLists()
 		for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
 		{
 			long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
-			if (pipeline.nodeList[mynode].type != NODE_MOVIES) // no display for movie rootname
+			FileName fnt = pipeline.nodeList[mynode].name;
+			if (exists(fnt))
 			{
-				FileName fnt = pipeline.nodeList[mynode].name;
-				if (exists(fnt))
-				{
-					fnt = "out: " + fnt.afterLastOf("/");
-					display_io_node->add(fnt.c_str());
-					io_nodes.push_back(mynode);
-				}
+				fnt = "out: " + fnt.afterLastOf("/");
+				display_io_node->add(fnt.c_str());
+				io_nodes.push_back(mynode);
 			}
 
 			long int nr_outputs = (pipeline.nodeList[mynode]).inputForProcessList.size();
