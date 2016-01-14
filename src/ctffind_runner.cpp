@@ -106,35 +106,34 @@ void CtffindRunner::initialise()
 	{
 		MetaDataTable MDin;
 		MDin.read(fn_in);
-		fn_micrographs.clear();
+		fn_micrographs_all.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
 			FileName fn_mic;
 			MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-			fn_micrographs.push_back(fn_mic);
+			fn_micrographs_all.push_back(fn_mic);
 		}
 	}
 	else
 	{
-		fn_in.globFiles(fn_micrographs);
+		fn_in.globFiles(fn_micrographs_all);
 	}
 
 	// If we're continuing an old run, see which micrographs have not been finished yet...
 	if (continue_old)
 	{
-		std::vector<FileName> fns_todo;
+		fn_micrographs.clear();
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			FileName fn_microot = fn_micrographs[imic].without(".mrc");
 			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
 					HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore, false)) // false: dont die if not found Final values
-				fns_todo.push_back(fn_micrographs[imic]);
+				fn_micrographs.push_back(fn_micrographs[imic]);
 		}
-
-		fn_micrographs = fns_todo;
-
 	}
+	else
+		fn_micrographs = fn_micrographs_all;
 
 	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
     char temp [180];
@@ -228,21 +227,21 @@ void CtffindRunner::run()
 
 void CtffindRunner::joinCtffindResults()
 {
+
 	MetaDataTable MDctf;
-	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
+	for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
     {
-		FileName outputfile= getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
-		FileName fn_microot = outputfile.without(".mrc");
+		FileName fn_microot = fn_micrographs_all[imic].without(".mrc");
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
 				HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore);
 
 		if (!has_this_ctf)
-			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for");
+			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for " + fn_micrographs_all[imic] );
 
 		FileName fn_ctf = fn_microot + ".ctf:mrc";
 		MDctf.addObject();
-		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs[imic]);
+		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
 	    MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
 		MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
 	    MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
@@ -399,9 +398,9 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 		RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found)
 {
 
-	FileName fn_log = fn_microot + "_ctffind3.log";
+	FileName fn_log = fn_out + fn_microot + "_ctffind3.log";
 	if (do_use_gctf && !exists(fn_log)) // also test _gctf.log file
-		fn_log = fn_microot + "_gctf.log";
+		fn_log = fn_out + fn_microot + "_gctf.log";
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
     if (in.fail())
@@ -449,7 +448,7 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     	if (do_use_gctf && line.find("Resolution limit estimated by EPA:") != std::string::npos)
     	{
             tokenize(line, words);
-             maxres = textToFloat(words[words.size()-1]);
+            maxres = textToFloat(words[words.size()-1]);
     	}
 
     	if (do_use_gctf && line.find("Estimated Bfactor:") != std::string::npos)
@@ -465,10 +464,8 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
             tokenize(line, words);
             valscore = textToFloat(words[words.size()-1]);
     	}
-
-
-
     }
+
     if (!Cs_is_found && die_if_not_found)
     	REPORT_ERROR("ERROR: cannot find line with Cs[mm], HT[kV], etc values in " + fn_log);
     if (!Final_is_found && die_if_not_found)

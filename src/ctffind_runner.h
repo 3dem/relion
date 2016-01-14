@@ -45,7 +45,7 @@ public:
 	FileName fn_in, fn_out;
 
 	// Filenames of all the micrographs to estimate the CTF from
-	std::vector<FileName> fn_micrographs;
+	std::vector<FileName> fn_micrographs, fn_micrographs_all;
 
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;
