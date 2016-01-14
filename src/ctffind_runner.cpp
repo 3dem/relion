@@ -239,7 +239,7 @@ void CtffindRunner::joinCtffindResults()
 		if (!has_this_ctf)
 			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for " + fn_micrographs_all[imic] );
 
-		FileName fn_ctf = fn_microot + ".ctf:mrc";
+		FileName fn_ctf = fn_out + fn_microot + ".ctf:mrc";
 		MDctf.addObject();
 		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
 	    MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
@@ -261,6 +261,7 @@ void CtffindRunner::joinCtffindResults()
 
     }
 	MDctf.write(fn_out+"micrographs_ctf.star");
+	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
 }
 
 
