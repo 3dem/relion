@@ -123,13 +123,13 @@ void CtffindRunner::initialise()
 	if (continue_old)
 	{
 		fn_micrographs.clear();
-		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
+		for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
 		{
-			FileName fn_microot = fn_micrographs[imic].without(".mrc");
+			FileName fn_microot = fn_micrographs_all[imic].without(".mrc");
 			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
 					HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore, false)) // false: dont die if not found Final values
-				fn_micrographs.push_back(fn_micrographs[imic]);
+				fn_micrographs.push_back(fn_micrographs_all[imic]);
 		}
 	}
 	else
