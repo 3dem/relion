@@ -58,7 +58,7 @@ void CtffindRunnerMpi::run()
 			barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 		}
 
-		std::string allmicnames = "";
+		std::vector<std::string> allmicnames;
 		for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 		{
 
@@ -75,7 +75,7 @@ void CtffindRunnerMpi::run()
 			}
 		}
 
-		if (do_use_gctf && allmicnames != "")
+		if (do_use_gctf && allmicnames.size() > 0)
 			executeGctf(allmicnames);
 
 		if (verb > 0)

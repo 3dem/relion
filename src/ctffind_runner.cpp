@@ -197,7 +197,7 @@ void CtffindRunner::run()
 			barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 		}
 
-		std::string allmicnames = "";
+		std::vector<std::string> allmicnames;
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 
@@ -265,7 +265,7 @@ void CtffindRunner::joinCtffindResults()
 }
 
 
-void CtffindRunner::addToGctfJobList(long int i, std::string  &allmicnames)
+void CtffindRunner::addToGctfJobList(long int i, std::vector<std::string>  &allmicnames)
 {
 
 	Image<double> Itmp;
@@ -276,11 +276,11 @@ void CtffindRunner::addToGctfJobList(long int i, std::string  &allmicnames)
 	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
 		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs[i]);
 
-	allmicnames +=  " " + outputfile;
+	allmicnames.push_back(outputfile);
 
 }
 
-void CtffindRunner::executeGctf(std::string &allmicnames)
+void CtffindRunner::executeGctf(std::vector<std::string> &allmicnames)
 {
 
 	std::string command = fn_gctf_exe;
@@ -306,7 +306,8 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 	if (do_validation)
 		command += " --do_validation ";
 
-	command += allmicnames;
+	for (size_t i = 0; i<allmicnames.size(); i++)
+		command += allmicnames[i];
 
 	// Redirect all gctf output
 	command += " >& " + fn_out + "gctf.out ";

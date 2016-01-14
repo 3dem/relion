@@ -128,10 +128,10 @@ public:
 	void executeCtffind(long int imic);
 
 	// Check micrograph size and add name to the list of micrographs to run Gctf on
-	void addToGctfJobList(long int imic, std::string &allmicnames);
+	void addToGctfJobList(long int imic, std::vector<std::string> &allmicnames);
 
 	// Execute Gctf for many micrographs
-	void executeGctf(std::string &allmicnames);
+	void executeGctf( std::vector<std::string> &allmicnames);
 
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
