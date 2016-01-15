@@ -1260,7 +1260,7 @@ void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 	if (!(exists(fn_dirs)))
 	{
 		std::string command = "mkdir -p " + fn_dirs;
-		system(command.c_str());
+		int res = system(command.c_str());
 	}
 	// Never write out columns that come from the fn_color file....
 	if (fn_color != "" && color_label != EMDL_UNDEFINED)

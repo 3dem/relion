@@ -138,7 +138,7 @@ void CtffindRunner::initialise()
 
 	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
     char temp [180];
-    getcwd(temp, 180);
+    char *cwd = getcwd(temp, 180);
     currdir = std::string(temp);
     // Make sure fn_out ends with a slash
 	if (currdir[currdir.length()-1] != '/')
@@ -155,7 +155,7 @@ void CtffindRunner::initialise()
 			std::string command = " mkdir -p " + newdir;
 			int res = system(command.c_str());
 		}
-		symlink((currdir+fn_micrographs[i]).c_str(), output.c_str());
+		 int slk = symlink((currdir+fn_micrographs[i]).c_str(), output.c_str());
 	}
 
 	if (do_use_gctf && fn_micrographs.size()>0)

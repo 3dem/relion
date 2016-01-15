@@ -1114,7 +1114,7 @@ void RelionMainWindow::cb_display(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_display_i()
 {
         std::string command = " relion_display --gui &" ;
-        system(command.c_str());
+        int res = system(command.c_str());
 }
 
 void RelionMainWindow::cb_toggle_continue_i()
@@ -1329,7 +1329,7 @@ void RelionMainWindow::cb_run_scheduled_i()
 			    out.close();
 			    std::rename(fn_tmp.data(), fn_job.data());
 			    std::string command = "chmod 664 " + fn_job;
-			    system(command.c_str());
+			    int res = system(command.c_str());
 			}
 		}
 	}
