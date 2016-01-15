@@ -202,20 +202,20 @@ void CtffindRunner::run()
 
 			if (do_use_gctf)
 			{
-				addToGctfJobList(imic, allmicnames);
+				//addToGctfJobList(imic, allmicnames);
+				executeGctf(imic, allmicnames, imic+1==fn_micrographs.size());
 			}
 			else
 			{
-
-				if (verb > 0 && imic % barstep == 0)
-					progress_bar(imic);
-
 				executeCtffind(imic);
 			}
+
+			if (verb > 0 && imic % barstep == 0)
+				progress_bar(imic);
 		}
 
-		if (do_use_gctf)
-			executeGctf(allmicnames);
+		//if (do_use_gctf)
+		//	executeGctf(allmicnames);
 
 		if (verb > 0)
 			progress_bar(fn_micrographs.size());
@@ -262,9 +262,21 @@ void CtffindRunner::joinCtffindResults()
     }
 	MDctf.write(fn_out+"micrographs_ctf.star");
 	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
+
+	if (do_use_gctf)
+	{
+		FileName fn_gctf_junk = "micrographs_all_gctf";
+		if (exists(fn_gctf_junk))
+			remove(fn_gctf_junk.c_str());
+		fn_gctf_junk = "extra_micrographs_all_gctf";
+		if (exists(fn_gctf_junk))
+			remove(fn_gctf_junk.c_str());
+	}
+
+
 }
 
-
+/*
 void CtffindRunner::addToGctfJobList(long int i, std::vector<std::string>  &allmicnames)
 {
 
@@ -279,6 +291,7 @@ void CtffindRunner::addToGctfJobList(long int i, std::vector<std::string>  &allm
 	allmicnames.push_back(outputfile);
 
 }
+
 
 void CtffindRunner::executeGctf(std::vector<std::string> &allmicnames)
 {
@@ -321,12 +334,68 @@ void CtffindRunner::executeGctf(std::vector<std::string> &allmicnames)
 		remove(output.c_str());
 	}
 
-	FileName fn_gctf_junk = "micrographs_all_gctf";
-	if (exists(fn_gctf_junk))
-		remove(fn_gctf_junk.c_str());
-	fn_gctf_junk = "extra_micrographs_all_gctf";
-	if (exists(fn_gctf_junk))
-		remove(fn_gctf_junk.c_str());
+
+}
+*/
+
+void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicnames, bool is_last, int rank)
+{
+
+	// Always add the new micrograph to the TODO list
+	Image<double> Itmp;
+	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
+	Itmp.read(outputfile, false); // false means only read header!
+	if (XSIZE(Itmp()) != xdim || YSIZE(Itmp()) != ydim)
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs[imic] + " is different from the first micrograph!");
+	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs[imic]);
+
+	allmicnames.push_back(outputfile);
+
+	// Execute Gctf every 20 images, and always for the last one
+	if (imic+1%20 || is_last)
+	{
+		std::string command = fn_gctf_exe;
+		//command +=  " --ctfstar " + fn_out + "tt_micrographs_ctf.star";
+		command +=  " --apix " + floatToString(angpix);
+		command +=  " --cs " + floatToString(Cs);
+		command +=  " --kV " + floatToString(Voltage);
+		command +=  " --ac " + floatToString(AmplitudeConstrast);
+		if (!do_ignore_ctffind_params)
+		{
+			command += " --boxsize " + floatToString(box_size);
+			command += " --resL " + floatToString(resol_min);
+			command += " --resH " + floatToString(resol_max);
+			command += " --defL " + floatToString(min_defocus);
+			command += " --defH " + floatToString(max_defocus);
+			command += " --defS " + floatToString(step_defocus);
+			command += " --astm " + floatToString(amount_astigmatism);
+		}
+
+		if (do_EPA)
+			command += " --do_EPA ";
+
+		if (do_validation)
+			command += " --do_validation ";
+
+		for (size_t i = 0; i<allmicnames.size(); i++)
+			command += allmicnames[i];
+
+		// TODO: better control over which GPU to use. For now, gid = rank!
+		command += " --gid " + integerToString(rank);
+
+		// Redirect all gctf output
+		command += " >> " + fn_out + "gctf" + integerToString(rank)+".out  2>> " + fn_out + "gctf" + integerToString(rank)+".err";
+		int res = system(command.c_str());
+
+		// Cleanup all the symbolic links again
+		for (size_t i = 0; i < allmicnames.size(); i++)
+			remove(allmicnames[i].c_str());
+
+		// Re-set the allmicnames vector
+		allmicnames.clear();
+	}
+
 
 }
 

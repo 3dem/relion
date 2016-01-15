@@ -64,19 +64,21 @@ void CtffindRunnerMpi::run()
 
 			if (do_use_gctf)
 			{
-				addToGctfJobList(imic, allmicnames);
+				//addToGctfJobList(imic, allmicnames);
+				executeGctf(imic, allmicnames, imic == my_last_micrograph, node->rank);
 			}
 			else
 			{
-				if (verb > 0 && imic % barstep == 0)
-					progress_bar(imic);
-
 				executeCtffind(imic);
 			}
+
+			if (verb > 0 && imic % barstep == 0)
+				progress_bar(imic);
+
 		}
 
-		if (do_use_gctf && allmicnames.size() > 0)
-			executeGctf(allmicnames);
+		//if (do_use_gctf && allmicnames.size() > 0)
+		//	executeGctf(allmicnames);
 
 		if (verb > 0)
 			progress_bar(my_nr_micrographs);
