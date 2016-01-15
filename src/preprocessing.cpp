@@ -269,7 +269,7 @@ void Preprocessing::joinAllStarFiles()
 			MDonestack.read(fn_star);
 
 			for (long int current_object2 = MDonestack.firstObject();
-						  current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
+						  current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object2 != MetaDataTable::NO_OBJECTS_STORED;
 						  current_object2 = MDonestack.nextObject())
 			{
 				MDout.addObject( MDonestack.getObject());
