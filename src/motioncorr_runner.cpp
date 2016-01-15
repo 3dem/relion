@@ -207,13 +207,15 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
 
 
-	FileName fn_out = fn_avg.withoutExtension() + ".log";
+	FileName fn_out = fn_avg.withoutExtension() + ".out";
+	FileName fn_log = fn_avg.withoutExtension() + ".log";
 	FileName fn_err = fn_avg.withoutExtension() + ".err";
 	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
 	std::string command = fn_motioncorr_exe + " ";
 
 	command += fn_mic + " -fcs " + fn_avg;
+	command += " -flg " + fn_log;
 	command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
 	command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
 
