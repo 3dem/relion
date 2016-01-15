@@ -90,7 +90,7 @@ static ManualpickJobWindow global_manualpickjob;
 static PipeLine pipeline;
 // Which is the current job being displayed?
 static int current_job;
-FileName global_outputname;
+static FileName global_outputname;
 
 
 class NoteEditorWindow : public Fl_Window

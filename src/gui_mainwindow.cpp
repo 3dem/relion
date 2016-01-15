@@ -30,7 +30,7 @@ NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn
 	editor->buffer(textbuff_note);
 	fn_note = _fn_note;
 	if (exists(fn_note))
-		textbuff_note->loadfile(fn_note.c_str());
+		int errno = textbuff_note->loadfile(fn_note.c_str());
 	else
 		textbuff_note->text("Describe what this job is about here...");
 
@@ -64,7 +64,7 @@ void NoteEditorWindow::cb_save(Fl_Widget*, void* v)
 
 void NoteEditorWindow::cb_save_i()
 {
-	textbuff_note->savefile(fn_note.c_str());
+	int errno = textbuff_note->savefile(fn_note.c_str());
 }
 
 
@@ -350,7 +350,10 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     // Display stdout and stderr of jobs
     textbuff_stdout = new Fl_Text_Buffer();
     textbuff_stderr = new Fl_Text_Buffer();
-    disp_stdout = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 60, w-20, 110);
+    // Disable warning message about UTF-8 transcoding
+    textbuff_stdout->transcoding_warning_action=NULL;
+    textbuff_stderr->transcoding_warning_action=NULL;
+	disp_stdout = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 60, w-20, 110);
     disp_stderr = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 170, w-20, 60);
     textbuff_stdout->text("stdout will go here");
     textbuff_stderr->text("stderr will go here");
@@ -1229,7 +1232,7 @@ void RelionMainWindow::cb_fill_stdout_i()
 		std::ifstream in(".gui_tmpout", std::ios_base::in);
 		if (in.fail())
 			REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_out + " does not exists" );
-		textbuff_stdout->loadfile(".gui_tmpout");
+		int errno = textbuff_stdout->loadfile(".gui_tmpout");
 		disp_stdout->scroll(textbuff_stdout->length(), 0);
 		in.close();
 	}
@@ -1241,7 +1244,7 @@ void RelionMainWindow::cb_fill_stdout_i()
 		std::ifstream in(fn_err.data(), std::ios_base::in);
 		if (in.fail())
 			REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_err + " does not exists" );
-		textbuff_stderr->loadfile(fn_err.c_str());
+		int errno = textbuff_stderr->loadfile(fn_err.c_str());
 		disp_stderr->scroll(textbuff_stderr->length(), 0);
 		in.close();
 	}

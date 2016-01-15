@@ -475,7 +475,7 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	}
 
 	// Prepare full mpi commands or save jobsubmission script to disc
-	if (do_queue.getValue())
+	if (do_queue.getValue() && do_makedir)
 	{
 		// Make the submission script and write it to disc
 		std::string output_script = outputname + "run_submit.script";
@@ -488,7 +488,7 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 		// Also add mpirun in front of all commands if no submission via the queue is done
 		std::string one_command;
 		final_command = "";
-		for (int icom = 0; icom < commands.size(); icom++)
+		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
 			if (has_mpi && nr_mpi.getValue() > 1)
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
@@ -1519,12 +1519,14 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
 	resetHeight();
 
     star_mics.place(current_y,"micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
+	// Add a little spacer
+	current_y += STEPY/2;
 	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 
 	reextract_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	reextract_group->end();
 
-	do_reextract.place(current_y, "Re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.", reextract_group);
+	do_reextract.place(current_y, "OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.", reextract_group);
 
 	reextract_group->begin();
 
