@@ -21,6 +21,54 @@
 
 #define DEBUG
 
+
+NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn_note):Fl_Window(w,h,title)
+{
+	editor = new Fl_Text_Editor(0, 0, w, h-50);
+    editor->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,10);
+	textbuff_note = new Fl_Text_Buffer;
+	editor->buffer(textbuff_note);
+	fn_note = _fn_note;
+	if (exists(fn_note))
+		textbuff_note->loadfile(fn_note.c_str());
+	else
+		textbuff_note->text("Describe what this job is about here...");
+
+	// Button to exit
+	Fl_Button *cancel_button = new Fl_Button(w-200, h-40, 80, 30, "Cancel");
+	cancel_button->color(GUI_RUNBUTTON_COLOR);
+	cancel_button->labelsize(12);
+	cancel_button->callback( cb_cancel, this);
+
+	// Button to save and exit
+	Fl_Button *save_button = new Fl_Button(w-100, h-40, 80, 30, "Save");
+	save_button->color(GUI_RUNBUTTON_COLOR);
+	save_button->labelsize(12);
+	save_button->callback( cb_save, this);
+
+
+}
+
+void NoteEditorWindow::cb_cancel(Fl_Widget*, void* v)
+{
+    NoteEditorWindow* T=(NoteEditorWindow*)v;
+    T->hide();
+}
+
+void NoteEditorWindow::cb_save(Fl_Widget*, void* v)
+{
+    NoteEditorWindow* T=(NoteEditorWindow*)v;
+    T->cb_save_i();
+    T->hide();
+}
+
+void NoteEditorWindow::cb_save_i()
+{
+	textbuff_note->savefile(fn_note.c_str());
+}
+
+
+
 RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
 {
 
@@ -70,6 +118,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar->add("File/Save job settings",  FL_ALT+'s', cb_menubar_save, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
     menubar->add("File/Reactivate Run",  FL_ALT+'r', cb_menubar_reactivate_runbutton, this);
+    menubar->add("File/Print all notes",  FL_ALT+'p', cb_menubar_print_notes, this);
     menubar->add("File/Show initial screen",  FL_ALT+'a', cb_show_initial_screen, this);
     menubar->add("File/About",  FL_ALT+'a', cb_menubar_about, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
@@ -150,7 +199,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     	}
     	case PROC_CLASSSELECT:
     	{
-    		browser->add("Particle selection");
+    		browser->add("Subset selection");
 			job_classselect = new ClassSelectJobWindow();
 			break;
 		}
@@ -228,6 +277,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT_START, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+    menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
     menubar2->add("Job actions/Delete", 0, cb_delete, this);
     menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
     menubar2->add("Job actions/Run scheduled", 0, cb_run_scheduled, this);
@@ -1073,44 +1123,56 @@ void RelionMainWindow::cb_display_io_node_i()
 
 		// Get the name of the micrograph STAR file from reading the suffix file
 	    FileName fn_suffix = pipeline.nodeList[mynode].name;
-	    std::ifstream in(fn_suffix.data(), std::ios_base::in);
-	    FileName fn_star;
-	    in >> fn_star ;
-	    in.close();
-	    FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
-	    fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
-	    fn_suffix = fn_suffix.withoutExtension();
-		// Launch the manualpicker...
-	    command="`which relion_manualpick` --i " + fn_star;
-		command += " --odir " + fn_dirs;
-		command += " --pickname " + fn_suffix;
-		command += " --scale " + floatToString(global_manualpickjob.micscale.getValue());
-		command += " --sigma_contrast " + floatToString(global_manualpickjob.sigma_contrast.getValue());
-		command += " --black " + floatToString(global_manualpickjob.black_val.getValue());
-		command += " --white " + floatToString(global_manualpickjob.white_val.getValue());
+	    if (fn_suffix.getExtension() == "star")
+	    {
+			std::ifstream in(fn_suffix.data(), std::ios_base::in);
+			FileName fn_star;
+			in >> fn_star ;
+			in.close();
+			if (fn_star != "")
+			{
+				FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
+				fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
+				fn_suffix = fn_suffix.withoutExtension();
+				// Launch the manualpicker...
+				command="`which relion_manualpick` --i " + fn_star;
+				command += " --odir " + fn_dirs;
+				command += " --pickname " + fn_suffix;
+				command += " --scale " + floatToString(global_manualpickjob.micscale.getValue());
+				command += " --sigma_contrast " + floatToString(global_manualpickjob.sigma_contrast.getValue());
+				command += " --black " + floatToString(global_manualpickjob.black_val.getValue());
+				command += " --white " + floatToString(global_manualpickjob.white_val.getValue());
 
-		if (global_manualpickjob.lowpass.getValue() > 0.)
-			command += " --lowpass " + floatToString(global_manualpickjob.lowpass.getValue());
-		if (global_manualpickjob.highpass.getValue() > 0.)
-			command += " --highpass " + floatToString(global_manualpickjob.highpass.getValue());
-		if (global_manualpickjob.angpix.getValue() > 0.)
-			command += " --angpix " + floatToString(global_manualpickjob.angpix.getValue());
+				if (global_manualpickjob.lowpass.getValue() > 0.)
+					command += " --lowpass " + floatToString(global_manualpickjob.lowpass.getValue());
+				if (global_manualpickjob.highpass.getValue() > 0.)
+					command += " --highpass " + floatToString(global_manualpickjob.highpass.getValue());
+				if (global_manualpickjob.angpix.getValue() > 0.)
+					command += " --angpix " + floatToString(global_manualpickjob.angpix.getValue());
 
-		command += " --ctf_scale " + floatToString(global_manualpickjob.ctfscale.getValue());
+				command += " --ctf_scale " + floatToString(global_manualpickjob.ctfscale.getValue());
 
-		command += " --particle_diameter " + floatToString(global_manualpickjob.diameter.getValue());
+				command += " --particle_diameter " + floatToString(global_manualpickjob.diameter.getValue());
 
-		if (global_manualpickjob.do_color.getValue())
-		{
-			command += " --color_label " + global_manualpickjob.color_label.getValue();
-			command += " --blue " + floatToString(global_manualpickjob.blue_value.getValue());
-			command += " --red " + floatToString(global_manualpickjob.red_value.getValue());
-			if (global_manualpickjob.fn_color.getValue().length() > 0)
-				command += " --color_star " + global_manualpickjob.fn_color.getValue();
-		}
+				if (global_manualpickjob.do_color.getValue())
+				{
+					command += " --color_label " + global_manualpickjob.color_label.getValue();
+					command += " --blue " + floatToString(global_manualpickjob.blue_value.getValue());
+					command += " --red " + floatToString(global_manualpickjob.red_value.getValue());
+					if (global_manualpickjob.fn_color.getValue().length() > 0)
+						command += " --color_star " + global_manualpickjob.fn_color.getValue();
+				}
 
-		// Other arguments for extraction
-		command += " " + global_manualpickjob.other_args.getValue() + " &";
+				// Other arguments for extraction
+				command += " " + global_manualpickjob.other_args.getValue() + " &";
+			}
+			else
+			{
+				std::cout << " Only coordinates generated in the pipeline are allowed" << std::endl;
+			}
+	    }
+	    else
+	    	std::cout << " Only coordinates in .star format (generated in the pipeline) are allowed" << std::endl;
 	}
 	else
 	{
@@ -1667,6 +1729,25 @@ void RelionMainWindow::cb_mark_as_finished_i()
 
 }
 
+void RelionMainWindow::cb_edit_note(Fl_Widget*, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_edit_note_i();
+
+}
+
+void RelionMainWindow::cb_edit_note_i()
+{
+	if (current_job < 0)
+	{
+		std::cout << " You can only edit the note for existing jobs ... " << std::endl;
+		return;
+	}
+	FileName fn_note = pipeline.processList[current_job].name + "note.txt";
+	NoteEditorWindow* w = new NoteEditorWindow(660, 400, "Note", fn_note);
+	w->show();
+}
+
 
 // Save button call-back function
 void RelionMainWindow::cb_menubar_save(Fl_Widget* o, void* v)
@@ -1678,7 +1759,7 @@ void RelionMainWindow::cb_menubar_save(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_menubar_save_i()
 {
 	// For scheduled jobs, also save the .job file in the .Scheduled directory
-	if (pipeline.processList[current_job].status = PROC_SCHEDULED)
+	if (pipeline.processList[current_job].status == PROC_SCHEDULED)
 	{
 		fn_settings = ".ScheduledJobs/" + global_outputname;
 		jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
@@ -1688,6 +1769,41 @@ void RelionMainWindow::cb_menubar_save_i()
 	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
 
 }
+void RelionMainWindow::cb_menubar_print_notes(Fl_Widget*, void* v)
+{
+  	 RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_menubar_print_notes_i();
+}
+
+void RelionMainWindow::cb_menubar_print_notes_i()
+{
+	std::cout << " ################################################################ " << std::endl;
+	std::cout << " # Printing all note files for pipeline: " << pipeline.name << std::endl;
+	for (size_t i = 0; i < pipeline.processList.size(); i++)
+	{
+		FileName fn_note = pipeline.processList[i].name+"note.txt";
+		std::cout << " ################################################################ " << std::endl;
+		std::cout << " # Job= " << pipeline.processList[i].name;
+		if (pipeline.processList[i].alias != "None")
+			std::cout <<" alias: " << pipeline.processList[i].alias;
+		std::cout	<< std::endl;
+		if (exists(fn_note))
+		{
+			std::ifstream in(fn_note.data(), std::ios_base::in);
+			std::string line;
+			if (in.fail())
+        		REPORT_ERROR( (std::string) "ERROR: cannot read file " + fn_note);
+    	    in.seekg(0);
+    	    while (getline(in, line, '\n'))
+    	    {
+    	    	std::cout << line << std::endl;
+    	    }
+			in.close();
+		}
+	}
+
+}
+
 
 void RelionMainWindow::cb_menubar_reactivate_runbutton(Fl_Widget* o, void* v)
 {
@@ -1736,6 +1852,7 @@ void RelionMainWindow::cb_menubar_stop_run_scheduled_jobs(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_menubar_stop_run_scheduled_jobs_i()
 {
 	// TODO
+	std::cout <<" todo.." << std::endl;
 }
 
 void RelionMainWindow::cb_menubar_about(Fl_Widget* o, void* v)

@@ -77,6 +77,7 @@ static Fl_Text_Display *disp_stdout;
 static Fl_Text_Display *disp_stderr;
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
+static Fl_Text_Buffer *textbuff_note;
 
 static FileName fn_settings;
 // Initial screen
@@ -90,6 +91,31 @@ static PipeLine pipeline;
 // Which is the current job being displayed?
 static int current_job;
 FileName global_outputname;
+
+
+class NoteEditorWindow : public Fl_Window
+{
+
+public:
+
+	FileName fn_note;
+	Fl_Text_Editor *editor;
+	NoteEditorWindow(int w, int h, const char* t, FileName _fn_note);
+
+	~NoteEditorWindow() {};
+
+private:
+
+    static void cb_save(Fl_Widget*, void*);
+    inline void cb_save_i();
+
+    static void cb_cancel(Fl_Widget*, void*);
+    inline void cb_cancel_i();
+
+};
+
+
+
 
 class RelionMainWindow : public Fl_Window
 {
@@ -193,6 +219,9 @@ private:
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();
 
+    static void cb_edit_note(Fl_Widget*, void*);
+    inline void cb_edit_note_i();
+
     static void cb_fill_stdout(Fl_Widget*, void*);
     inline void cb_fill_stdout_i();
 
@@ -201,6 +230,9 @@ private:
 
     static void cb_menubar_save(Fl_Widget*, void*);
     inline void cb_menubar_save_i();
+
+    static void cb_menubar_print_notes(Fl_Widget*, void*);
+    inline void cb_menubar_print_notes_i();
 
     static void cb_menubar_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_menubar_reactivate_runbutton_i();
