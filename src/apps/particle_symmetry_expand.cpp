@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
     catch (RelionError XE)
     {
         prm.usage();
-        std::cout << XE;
+        std::cerr << XE;
         exit(1);
     }
 

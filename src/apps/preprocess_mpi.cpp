@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     catch (RelionError XE)
     {
         prm.usage();
-        std::cout << XE;
+        std::cerr << XE;
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
