@@ -454,7 +454,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 
     if (exists(fn_star) && only_extract_unfinished)
     {
-    	std::cout << fn_star << " already exists, so skipping extraction!" << std::endl;
+    	//std::cout << fn_star << " already exists, so skipping extraction!" << std::endl;
     	return;
     }
 
