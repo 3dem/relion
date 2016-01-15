@@ -726,6 +726,7 @@ public:
 	// I/O
 	InputNodeEntry fn_model;
 	InputNodeEntry fn_data;
+	InputNodeEntry fn_mic;
 
 	BooleanEntry do_recenter;
 	BooleanEntry do_regroup;

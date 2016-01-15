@@ -3741,13 +3741,14 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_data.place(current_y, "Select individual particles:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
-	fn_model.place(current_y, "OR select from classes:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
+	fn_model.place(current_y, "Select 2D/3D classes:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
+	fn_mic.place(current_y, "OR select micrographs:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
+	fn_data.place(current_y, "OR select individual particles:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
 
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Options");
+	tab2->label("Class options");
 	resetHeight();
 
 	do_recenter.place(current_y, "Re-center the class averages?", true, "This option is only used when selecting particles from 2D classes. The selected class averages will all re-centered on their center-of-mass. This is useful when you plane to use these class averages as templates for auto-picking.");
@@ -3778,6 +3779,7 @@ void ClassSelectJobWindow::write(std::string fn)
 
 	fn_model.writeValue(fh);
 	fn_data.writeValue(fh);
+	fn_mic.writeValue(fh);
 	do_recenter.writeValue(fh);
 	do_regroup.writeValue(fh);
 	nr_groups.writeValue(fh);
@@ -3794,6 +3796,7 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 	{
 		fn_model.readValue(fh);
 		fn_data.readValue(fh);
+		fn_mic.readValue(fh);
 		do_recenter.readValue(fh);
 		do_regroup.readValue(fh);
 		nr_groups.readValue(fh);
@@ -3810,6 +3813,7 @@ void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 
 	fn_model.deactivate(is_continue);
 	fn_data.deactivate(is_continue);
+	fn_mic.deactivate(is_continue);
 	do_recenter.deactivate(is_continue);
 	do_regroup.deactivate(is_continue);
 	nr_groups.deactivate(is_continue);
@@ -3823,7 +3827,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "ParticleSelect");
+	initialisePipeline(outputname, "Select");
 
 	std::string command;
 	command="`which relion_display`";
@@ -3834,6 +3838,11 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command += " --gui --i " + fn_model.getValue();
 		Node node(fn_model.getValue(), fn_model.type);
 		pipelineInputNodes.push_back(node);
+
+		FileName fn_parts = outputname+"particles.star";
+		command += " --allow_save --fn_parts " + fn_parts;
+		Node node2(fn_parts, NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node2);
 
 		// Only save the 2D class averages for 2D jobs
 		FileName fnt = fn_model.getValue();
@@ -3850,11 +3859,27 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 			}
 		}
 	}
-	else
+	else if (fn_mic.getValue() != "")
+	{
+		command += " --gui --i " + fn_mic.getValue();
+		Node node(fn_mic.getValue(), fn_mic.type);
+		pipelineInputNodes.push_back(node);
+
+		FileName fn_mics = outputname+"micrographs.star";
+		command += " --allow_save --fn_imgs " + fn_mics;
+		Node node2(fn_mics, NODE_MICS);
+		pipelineOutputNodes.push_back(node2);
+	}
+	else if (fn_data.getValue() != "")
 	{
 		command += " --gui --i " + fn_data.getValue();
 		Node node(fn_data.getValue(), fn_data.type);
 		pipelineInputNodes.push_back(node);
+
+		FileName fn_parts = outputname+"particles.star";
+		command += " --allow_save --fn_imgs " + fn_parts;
+		Node node2(fn_parts, NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node2);
 	}
 
 	// Re-grouping
@@ -3863,11 +3888,6 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command += " --regroup " + floatToString(nr_groups.getValue());
 	}
 
-
-	FileName fn_parts = outputname+"particles.star";
-	command += " --allow_save --fn_parts " + fn_parts;
-	Node node2(fn_parts, NODE_PART_DATA);
-	pipelineOutputNodes.push_back(node2);
 
 
 	// Other arguments
