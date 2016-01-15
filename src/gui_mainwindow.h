@@ -222,7 +222,6 @@ private:
     static void cb_edit_note(Fl_Widget*, void*);
     inline void cb_edit_note_i();
 
-    static void cb_fill_stdout(Fl_Widget*, void*);
     inline void cb_fill_stdout_i();
 
     static void cb_print_cl(Fl_Widget*, void*);

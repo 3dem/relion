@@ -276,13 +276,11 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT_START, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
-    menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
     menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
-    menubar2->add("Job actions/Delete", 0, cb_delete, this);
     menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
-    menubar2->add("Job actions/Run scheduled", 0, cb_run_scheduled, this);
-    menubar2->add("Job actions/Update stdout", 0, cb_fill_stdout, this);
+    menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
     menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
+    menubar2->add("Job actions/Delete", 0, cb_delete, this);
 
     // Text display with the name of the current job
     text_current_job = new Fl_Text_Display(XJOBCOL2-50 , GUIHEIGHT_EXT_START+3, 250, MENUHEIGHT-6);
@@ -1215,11 +1213,6 @@ void RelionMainWindow::cb_toggle_continue_i()
 
 	jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
 
-}
-void RelionMainWindow::cb_fill_stdout(Fl_Widget*, void* v)
-{
-	   RelionMainWindow* T=(RelionMainWindow*)v;
-	   T->cb_fill_stdout_i(); // stdout
 }
 
 void RelionMainWindow::cb_fill_stdout_i()
