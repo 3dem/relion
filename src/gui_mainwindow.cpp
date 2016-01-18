@@ -69,7 +69,7 @@ void NoteEditorWindow::cb_save_i()
 
 
 
-RelionMainWindow::RelionMainWindow(int x, int y, int w, int h, const char* title, FileName fn_pipe):Fl_Widget(x, y, w,h,title)
+RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
 {
 
 	show_initial_screen = true;
@@ -728,10 +728,6 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 	int itype = (this_job > 0) ? this_job : (browser->value() - 1); // browser starts counting at 1 ....
 	show_initial_screen = false;
 
-	// always write the general settings with the (hidden) empty name
-	if (do_write)
-		job_import->write("");
-
 	if (is_main_continue && do_commandline)
 	{
 		// For the continuation jobs: set the outputname to the one from the current job
@@ -990,7 +986,7 @@ void RelionMainWindow::cb_select_browsegroup_i()
     }
 
     // Toggle the new tab according to the continue toggle button
-    jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
+    jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -1338,6 +1334,10 @@ void RelionMainWindow::cb_run_i()
 	// Update all job lists in the main GUI
 	updateJobLists();
 
+	current_job = pipeline.processList.size() - 1;
+	// Open the edit note window
+	cb_edit_note_i();
+
 
 }
 
@@ -1581,12 +1581,15 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			{
 				FileName alldirs = pipeline.processList[i].name;
 				alldirs = alldirs.beforeLastOf("/");
+				FileName fn_alias = (pipeline.processList[i]).alias;
+				fn_alias = fn_alias.beforeLastOf("/");
 				if (pipeline.processList[i].status == PROC_SCHEDULED)
 				{
 					// Just remove the .ScheduledJobs entry
 					alldirs = ".ScheduledJobs/" + alldirs;
 					std::string command = "rm -rf " + alldirs;
 					int res = system(command.c_str());
+					fn_alias = ".ScheduledJobs/" + fn_alias;
 				}
 				else
 				{
@@ -1597,7 +1600,11 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 					command= "mv -f " + alldirs + " Trash/" + firstdirs+"/.";
 					res = system(command.c_str());
 				}
-
+				// Also remove the symlink if it exists
+				if (fn_alias != "None")
+				{
+					int res = std::remove(fn_alias.c_str());
+				}
 			}
 		}
 
@@ -1653,11 +1660,19 @@ void RelionMainWindow::cb_set_alias_i()
 	size_t slashpos = findUniqueDateSubstring(before_uniqdate, uniqdate);
 	before_uniqdate = before_uniqdate.beforeFirstOf(uniqdate);
 
+	// If alias already exists: remove that symlink
+	FileName fn_alias = pipeline.processList[current_job].alias;
+	if (fn_alias != "None")
+	{
+		std::remove((fn_alias.beforeLastOf("/")).c_str());
+	}
+
+
 	bool is_done = false;
 	while (!is_done)
 	{
 		const char * palias;
-		palias =  fl_input("Rename to (provide 'None' to use original name): ", uniqdate.c_str());
+		palias =  fl_input("Rename to: ", uniqdate.c_str());
 		// TODO: check for cancel
 		if (palias == NULL)
 			return;
@@ -1720,6 +1735,43 @@ void RelionMainWindow::cb_mark_as_finished_i()
 
 	pipeline.processList[current_job].status = PROC_FINISHED;
 
+	// For relion_refine jobs, add last iteration optimiser.star, data.star, model.star and class???.mrc to the pipeline
+	if (pipeline.processList[current_job].type == PROC_2DCLASS ||
+		pipeline.processList[current_job].type == PROC_3DCLASS ||
+		pipeline.processList[current_job].type == PROC_3DAUTO)
+	{
+		// Get the last iteration optimiser file
+		FileName fn_opt = pipeline.processList[current_job].name + "run*optimiser.star";
+		std::vector<FileName> fn_opts;
+		fn_opt.globFiles(fn_opts);
+		fn_opt = fn_opts[fn_opts.size()-1]; // the last one
+		Node node1(fn_opt, NODE_OPTIMISER);
+		pipeline.addNewOutputEdge(current_job, node1);
+
+		// Also get data.star
+		FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
+		Node node2(fn_data, NODE_PART_DATA);
+		pipeline.addNewOutputEdge(current_job, node2);
+
+		FileName fn_root = fn_opt.without("_optimiser.star");
+		if (pipeline.processList[current_job].type == PROC_3DAUTO)
+			fn_root += "_half1";
+
+		FileName fn_model = fn_root + "_model.star";
+		Node node3(fn_model, NODE_MODEL);
+		pipeline.addNewOutputEdge(current_job, node3);
+
+
+		FileName fn_map = fn_root + "_class???.mrc";
+		std::vector<FileName> fn_maps;
+		fn_map.globFiles(fn_maps);
+		for (int i = 0; i < fn_maps.size(); i++)
+		{
+			Node node4(fn_maps[i], NODE_3DREF);
+			pipeline.addNewOutputEdge(current_job, node4);
+		}
+	}
+
 	// Write new pipeline to disc and read in again
 	std::vector<bool> dummy;
 	pipeline.write(dummy, dummy);
@@ -1745,7 +1797,8 @@ void RelionMainWindow::cb_edit_note_i()
 		return;
 	}
 	FileName fn_note = pipeline.processList[current_job].name + "note.txt";
-	NoteEditorWindow* w = new NoteEditorWindow(660, 400, "Note", fn_note);
+	std::string title = (pipeline.processList[current_job].alias == "None") ? pipeline.processList[current_job].name : pipeline.processList[current_job].alias;
+	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note);
 	w->show();
 }
 
@@ -1760,7 +1813,7 @@ void RelionMainWindow::cb_menubar_save(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_menubar_save_i()
 {
 	// For scheduled jobs, also save the .job file in the .Scheduled directory
-	if (pipeline.processList[current_job].status == PROC_SCHEDULED)
+	if (current_job > 0 && pipeline.processList[current_job].status == PROC_SCHEDULED)
 	{
 		fn_settings = ".ScheduledJobs/" + global_outputname;
 		jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);

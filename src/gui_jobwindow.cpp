@@ -580,7 +580,7 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_import", is_continue);
+	read(".gui_importrun.job", is_continue);
 
 }
 
@@ -588,7 +588,7 @@ void ImportJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_import";
+		fn=".gui_importrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -734,7 +734,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_motioncorr", is_continue);
+	read(".gui_motioncorrrun.job", is_continue);
 }
 
 
@@ -743,7 +743,7 @@ void MotioncorrJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_motioncorr";
+		fn=".gui_motioncorrrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -950,14 +950,14 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_ctffind.settings", is_continue);
+	read(".gui_ctffindrun.job", is_continue);
 }
 
 void CtffindJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_ctffind";
+		fn=".gui_ctffindrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1161,14 +1161,14 @@ Particles that are not in this STAR file, but present in the picked coordinates 
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_manualpick", is_continue);
+	read(".gui_manualpickrun.job", is_continue);
 }
 
 void ManualpickJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_manualpick";
+		fn=".gui_manualpickrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1358,14 +1358,14 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_autopick", is_continue);
+	read(".gui_autopickrun.job", is_continue);
 }
 
 void AutopickJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_autopick";
+		fn=".gui_autopickrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1612,7 +1612,7 @@ The name of the MCR stacks should be the rootname of the micrographs + '_moviero
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_extract", is_continue);
+	read(".gui_extractrun.job", is_continue);
 }
 
 
@@ -1620,7 +1620,7 @@ void ExtractJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_extract";
+		fn=".gui_extractrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1846,14 +1846,14 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_sort", is_continue);
+	read(".gui_sortrun.job", is_continue);
 }
 
 void SortJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_sort";
+		fn=".gui_sortrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2093,7 +2093,7 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_class2d", is_continue);
+	read(".gui_class2drun.job", is_continue);
 
 }
 
@@ -2101,7 +2101,7 @@ void Class2DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_class2d";
+		fn=".gui_class2drun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2544,7 +2544,7 @@ tilt and psi angles in the first few iterations (global searches for orientation
 	tab6->end();
 
 	// read settings if hidden file exists
-	read(".gui_class3d", is_continue);
+	read(".gui_class3drun.job", is_continue);
 
 }
 
@@ -2552,7 +2552,7 @@ void Class3DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_class3d";
+		fn=".gui_class3drun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3137,7 +3137,7 @@ tilt and psi angles in the first few iterations (global searches for orientation
 	tab7->end();
 
 	// read settings if hidden file exists
-	read(".gui_auto3d", is_continue);
+	read(".gui_auto3drun.job", is_continue);
 
 }
 
@@ -3145,7 +3145,7 @@ void Auto3DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_auto3d";
+		fn=".gui_auto3drun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3607,14 +3607,14 @@ Pixels values higher than this many times the image stddev will be replaced with
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_polish", is_continue);
+	read(".gui_polishrun.job", is_continue);
 }
 
 void PolishJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_polish";
+		fn=".gui_polishrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3765,7 +3765,7 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_particleselect", is_continue);
+	read(".gui_particleselectrun.job", is_continue);
 }
 
 
@@ -3774,7 +3774,7 @@ void ClassSelectJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_particleselect";
+		fn=".gui_particleselectrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3932,7 +3932,7 @@ If you don't know what value to use, display one of the unfiltered half-maps in 
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_maskcreate", is_continue);
+	read(".gui_maskcreaterun.job", is_continue);
 }
 
 
@@ -3941,7 +3941,7 @@ void MaskCreateJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_maskcreate";
+		fn=".gui_maskcreaterun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4057,7 +4057,7 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_joinstar", is_continue);
+	read(".gui_joinstarrun.job", is_continue);
 }
 
 
@@ -4066,7 +4066,7 @@ void JoinStarJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_joinstar";
+		fn=".gui_joinstarrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4248,7 +4248,7 @@ However, if the phases have been flipped, you should tell the program about it b
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_subtract", is_continue);
+	read(".gui_subtractrun.job", is_continue);
 }
 
 
@@ -4257,7 +4257,7 @@ void SubtractJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_subtract";
+		fn=".gui_subtractrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4423,14 +4423,14 @@ In such cases, set this option to Yes and provide an ad-hoc filter as described 
 
 
 	// read settings if hidden file exists
-	read(".gui_post", is_continue);
+	read(".gui_postrun.job", is_continue);
 }
 
 void PostJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_post";
+		fn=".gui_postrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4583,14 +4583,14 @@ Note that values larger than zero will be changed to 1 by ResMap, therefore the 
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_resmap", is_continue);
+	read(".gui_resmaprun.job", is_continue);
 }
 
 void ResmapJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmap";
+		fn=".gui_resmaprun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);

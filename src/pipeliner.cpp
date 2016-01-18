@@ -347,7 +347,7 @@ void PipeLine::read()
 			FileName fn_alias = alias;
 			if (fn_alias[fn_alias.length()-1] == '/')
 				fn_alias = fn_alias.beforeLastOf("/");
-			std::string command = " ln -s -f ${PWD}/" + name + " " + fn_alias;
+			std::string command = " ln -s -f ../" + name + " " + fn_alias;
 			int res= system(command.c_str());
 		}
 	}
