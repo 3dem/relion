@@ -69,7 +69,7 @@ void NoteEditorWindow::cb_save_i()
 
 
 
-RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
+RelionMainWindow::RelionMainWindow(int x, int y, int w, int h, const char* title, FileName fn_pipe):Fl_Widget(x, y, w,h,title)
 {
 
 	show_initial_screen = true;
@@ -368,8 +368,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     // Set and activate current selection from side-browser
     cb_select_browsegroup_i(); // make default active
     is_main_continue = false; // default is a new run
-
-    resizable();
 
 }
 
@@ -953,6 +951,13 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 	{
 		// Make the choice active
 		cb_toggle_continue_i();
+	}
+
+	// Copy pipeline star file as backup to the output directory
+	if (do_commandline && do_makedir)
+	{
+		std::string command = "cp " + pipeline.name + "_pipeline.star " + global_outputname;
+		int res = system(command.c_str());
 	}
 
 }
