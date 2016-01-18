@@ -468,9 +468,10 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 		RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found)
 {
 
-	FileName fn_log = fn_out + fn_microot + "_ctffind3.log";
+	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
+	FileName fn_log = fn_root + "_ctffind3.log";
 	if (do_use_gctf && !exists(fn_log)) // also test _gctf.log file
-		fn_log = fn_out + fn_microot + "_gctf.log";
+		fn_log = fn_root + "_gctf.log";
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
     if (in.fail())
