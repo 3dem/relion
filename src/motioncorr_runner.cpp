@@ -200,7 +200,7 @@ void MotioncorrRunner::run()
 }
 
 
-void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
+void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 {
 
 	FileName fn_avg, fn_mov;
@@ -228,6 +228,8 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
 	if (fn_other_args.length() > 0)
 		command += " " + fn_other_args;
 
+	// TODO: think about GPU and MPI interplay!
+	command += " -gpu " + integerToString(rank);
 
 	command += " >> " + fn_out + " 2>> " + fn_err;
 

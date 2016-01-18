@@ -84,7 +84,7 @@ public:
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
 	// Execute MOTIONCORR for a single micrograph
-	void executeMotioncorr(FileName fn_mic);
+	void executeMotioncorr(FileName fn_mic, int rank = 0);
 
 	// Write out final STAR file
 	void writeSTAR();
