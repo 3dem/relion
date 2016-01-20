@@ -405,14 +405,43 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		CUDA_CPU_TOC("zeroMask");
 
-		CUDA_CPU_TIC("CenterFFT2");
-		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
-		CenterFFT(img(), true);
-		CUDA_CPU_TOC("CenterFFT2");
-		CUDA_CPU_TIC("FourierTransform2");
-		// Store the Fourier Transform of the image Fimg
-		cudaMLO->transformer.FourierTransform(img(), Faux);
-		CUDA_CPU_TOC("FourierTransform2");
+
+		CUDA_CPU_TIC("transform");
+		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
+
+		for (int i = 0; i < img().nzyxdim; i ++)
+			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
+
+		cudaMLO->transformer2.reals.cp_to_device();
+
+		runCenterFFT(
+				cudaMLO->transformer2.reals,
+				(int)cudaMLO->transformer2.xSize,
+				(int)cudaMLO->transformer2.ySize,
+				false
+				);
+
+		cudaMLO->transformer2.forward();
+		int FMultiBsize2 = ( (int) ceilf(( float)cudaMLO->transformer2.fouriers.getSize()*2/(float)BLOCK_SIZE));
+		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE>>>(
+						(XFLOAT*)~cudaMLO->transformer2.fouriers,
+						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer2.reals.getSize())),
+						cudaMLO->transformer2.fouriers.getSize()*2);
+
+		CUDA_CPU_TOC("transform");
+
+		CUDA_CPU_TIC("cpResults");
+		cudaMLO->transformer2.fouriers.cp_to_host();
+		cudaMLO->transformer2.fouriers.streamSync();
+
+		Faux.initZeros(img().ydim, img().xdim/2+1);
+		for (int i = 0; i < Faux.nzyxdim; i ++)
+		{
+			Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
+			Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
+		}
+		CUDA_CPU_TOC("cpResults");
+
 
 		CUDA_CPU_TIC("powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
