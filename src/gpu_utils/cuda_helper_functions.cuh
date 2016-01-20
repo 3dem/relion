@@ -521,7 +521,7 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 				  int xSize,
 				  int ySize,
 				  bool forward,
-				  int num = 1)
+				  int batchSize = 1)
 {
 //	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
 //	img_aux.device_alloc();
@@ -535,13 +535,14 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 		yshift = -yshift;
 	}
 
-	dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),num);
-	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
-												      xSize*ySize,
-													  xSize,
-													  ySize,
-													  xshift,
-													  yshift);
+	dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
+	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE>>>(
+			~img_in,
+			xSize*ySize,
+			xSize,
+			ySize,
+			xshift,
+			yshift);
 
 //	HANDLE_ERROR(cudaStreamSynchronize(0));
 //	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.

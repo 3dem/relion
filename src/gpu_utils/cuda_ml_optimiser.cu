@@ -228,55 +228,58 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		op.prior[ipart] = my_prior;
 		CUDA_CPU_TOC("selfTranslate");
 
-		CUDA_CPU_TIC("CenterFFT1");
 		// Always store FT of image without mask (to be used for the reconstruction)
 		MultidimArray<RFLOAT> img_aux;
 		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
-		CenterFFT(img_aux, true);
-		CUDA_CPU_TOC("CenterFFT1");
 
-		CUDA_CPU_TIC("FourierTransform1");
-		/* Everything in this CPU_TIC/TOC- block could be replaced by
-		*  cudaMLO->transformer.FourierTransform(img_aux, Faux);
-		*  but for now we keep like this to be able to time it more easily
-		*/
+		CUDA_CPU_TIC("calcFimg");
+		unsigned current_size_x = baseMLO->mymodel.current_size / 2 + 1;
+		unsigned current_size_y = baseMLO->mymodel.current_size;
 
-//#ifdef TIMING
-//	// Only time one thread
-////	if (thread_id == 0)
-//		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
-//#endif
-		CUDA_CPU_TIC("setReal");
-		cudaMLO->transformer.setReal(img_aux);
-		CUDA_CPU_TOC("setReal");
-//#ifdef TIMING
-//	// Only time one thread
-////	if (thread_id == 0)
-//		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
-//#endif
-//#ifdef TIMING
-//	// Only time one thread
-////	if (thread_id == 0)
-//		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_B);
-//#endif
-		CUDA_CPU_TIC("Transform");
-		cudaMLO->transformer.Transform(FFTW_FORWARD);
-		CUDA_CPU_TIC("CopyOrAlias");
-		if (true)cudaMLO->transformer.getFourierCopy(Faux);
-		else  cudaMLO->transformer.getFourierAlias(Faux);
-		CUDA_CPU_TOC("CopyOrAlias");
-		CUDA_CPU_TOC("Transform");
-//#ifdef TIMING
-//	// Only time one thread
-////	if (thread_id == 0)
-//		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
-//#endif
-		CUDA_CPU_TOC("FourierTransform1");
+		cudaMLO->transformer1.setSize(img_aux.xdim,img_aux.ydim);
 
+		for (int i = 0; i < img_aux.nzyxdim; i ++)
+			cudaMLO->transformer1.reals[i] = (XFLOAT) img_aux.data[i];
 
-		CUDA_CPU_TIC("windowFourierTransform1");
-		windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
-		CUDA_CPU_TOC("windowFourierTransform1");
+		cudaMLO->transformer1.reals.cp_to_device();
+
+		runCenterFFT(
+				cudaMLO->transformer1.reals,
+				(int)cudaMLO->transformer1.xSize,
+				(int)cudaMLO->transformer1.ySize,
+				false
+				);
+
+		cudaMLO->transformer1.forward();
+		int FMultiBsize = ( (int) ceilf(( float)cudaMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
+		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+						(XFLOAT*)~cudaMLO->transformer1.fouriers,
+						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
+						cudaMLO->transformer1.fouriers.getSize()*2);
+
+		CudaGlobalPtr<cufftComplex> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
+		d_Fimg.device_alloc();
+
+		windowFourierTransform2(
+				cudaMLO->transformer1.fouriers,
+				d_Fimg,
+				img_aux.xdim/2+1,img_aux.ydim, 1, //Input dimensions
+				current_size_x, current_size_y, 1 //Output dimensions
+				);
+
+		CUDA_CPU_TOC("calcFimg");
+
+		CUDA_CPU_TIC("cpFimg2Host");
+		d_Fimg.cp_to_host();
+		d_Fimg.streamSync();
+
+		Fimg.initZeros(current_size_y, current_size_x);
+		for (int i = 0; i < Fimg.nzyxdim; i ++)
+		{
+			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
+			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
+		}
+		CUDA_CPU_TOC("cpFimg2Host");
 
 		CUDA_CPU_TIC("selfApplyBeamTilt");
 		// Here apply the beamtilt correction if necessary
@@ -2454,8 +2457,8 @@ void MlDeviceBundle::resetData()
 	}
 };
 
-MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* Bundle) :
-		baseMLO(baseMLOptimiser)
+MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* bundle) :
+		baseMLO(baseMLOptimiser), transformer1(0, bundle->allocator), transformer2(0, bundle->allocator)
 {
 	unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
 
@@ -2476,7 +2479,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDev
 	else
 		HANDLE_ERROR(cudaSetDevice(dev_id));
 
-	devBundle = Bundle;
+	devBundle = bundle;
 
 	HANDLE_ERROR(cudaStreamCreate(&stream1));
 	HANDLE_ERROR(cudaStreamCreate(&stream2));
@@ -2517,6 +2520,9 @@ void MlOptimiserCuda::resetData()
 		else
 			translator_current2.clear();
 	}
+
+	transformer1.clear();
+	transformer2.clear();
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)

@@ -1826,10 +1826,10 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
 	}
 
 	// Now perform real expectation over all particles

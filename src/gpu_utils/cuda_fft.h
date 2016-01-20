@@ -49,7 +49,7 @@ public:
 
 	void setSize(size_t x, size_t y, int batch = 1)
 	{
-		if (x == xSize && y == ySize && batch == batchSize)
+		if (x == xSize && y == ySize && batch == batchSize && planSet)
 			return;
 
 		clear();
@@ -61,25 +61,25 @@ public:
 		xFSize = x/2 + 1;
 		yFSize = y;
 
-		reals.setSize(x*y*batchSize);
+		reals.setSize(x*y*batch);
 		reals.device_alloc();
 		reals.host_alloc();
 
-		fouriers.setSize(y*(x/2+1)*batchSize);
+		fouriers.setSize(y*(x/2+1)*batch);
 		fouriers.device_alloc();
 		fouriers.host_alloc();
 
-	    int idist = ySize*xSize;
-	    int odist = ySize*(xSize/2+1);
+	    int idist = y*x;
+	    int odist = y*(x/2+1);
 
-	    int inembed[] = {ySize, xSize};
-	    int onembed[] = {ySize, xSize/2+1};
+	    int inembed[] = {y, x};
+	    int onembed[] = {y, x/2+1};
 
 	    int istride = 1;
 	    int ostride = 1;
 
-	    int nR[2] = {ySize, xSize};
-//	    int nC[2] = {ySize, xSize/2 +1};
+	    int nR[2] = {y, x};
+//	    int nC[2] = {y, x/2 +1};
 #ifdef CUDA_DOUBLE_PRECISION
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batchSize));
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batchSize));
