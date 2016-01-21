@@ -245,6 +245,7 @@ __global__ void cuda_kernel_window_fourier_transform(
 		)
 {
 	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
+	long int image_offset = oX*oY*oZ*blockIdx.y;
 	if (n >= max_idx) return;
 
 	int k, i, kp, ip, jp;
@@ -271,8 +272,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 		jp = n % oX;
 	}
 
-	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp];
-	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp];
+	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
+	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 }
 
 void windowFourierTransform2(
@@ -296,6 +297,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 		)
 {
 	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
+	long int oOFF = oX*oY*oZ*blockIdx.y;
+	long int iOFF = iX*iY*iZ*blockIdx.y;
 	if (n >= max_idx) return;
 
 	int k, i, kp, ip, jp;
@@ -322,15 +325,16 @@ __global__ void cuda_kernel_window_fourier_transform(
 		jp = n % oX;
 	}
 
-	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp].x = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp].x;
-	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp].y = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp].y;
+	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + oOFF].x = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + iOFF].x;
+	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + oOFF].y = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + iOFF].y;
 }
 
 void windowFourierTransform2(
-		CUDACOMPLEX *d_in,
-		CUDACOMPLEX *d_out,
+		CudaGlobalPtr<CUDACOMPLEX > &d_in,
+		CudaGlobalPtr<CUDACOMPLEX > &d_out,
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
+		long int Npsi = 1,
 		cudaStream_t stream = 0);
 
 
@@ -341,15 +345,13 @@ template <typename T>
 void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allocator)
 {
 	CudaGlobalPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
-	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
+//	CudaGlobalPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
 
-	for (unsigned i = 0; i < img_in.getSize(); i ++)
+	for (unsigned i = 0; i < v.nzyxdim; i ++)
 		img_in[i] = (XFLOAT) v.data[i];
 
-	img_in.device_alloc();
-	img_in.cp_to_device();
-	img_aux.device_alloc();
-	HANDLE_ERROR(cudaStreamSynchronize(0));
+	img_in.put_on_device();
+//	img_aux.device_alloc();
 
 	if ( v.getDim() == 1 )
 	{
@@ -397,21 +399,20 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		}
 
 
-		dim3 dim((int)(v.nzyxdim/(long int)CFTT_BLOCK_SIZE));
+		dim3 dim(ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE))));
 		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
-										  img_aux.d_ptr,
 										  v.nzyxdim,
 										  XSIZE(v),
 										  YSIZE(v),
 										  xshift,
 										  yshift);
 
-		img_aux.cp_to_host();
+		img_in.cp_to_host();
 
-		HANDLE_ERROR(cudaStreamSynchronize(0));
+//		HANDLE_ERROR(cudaStreamSynchronize(0));
 
-		for (unsigned i = 0; i < img_aux.getSize(); i ++)
-			v.data[i] = (T) img_aux[i];
+		for (unsigned i = 0; i < v.nzyxdim; i ++)
+			v.data[i] = (T) img_in[i];
 
 	}
 	else if ( v.getDim() == 3 )
@@ -514,66 +515,38 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	}
 }
 
+
 template <typename T>
-void runProbRatio(MultidimArray< T >& Mccf_best,
-				  MultidimArray< T >& Mpsi_best,
-				  MultidimArray< T >& Maux,
-				  MultidimArray< T >& Mmean,
-				  MultidimArray< T >& Mstddev,
-				  T normfft,
-				  T sum_ref_under_circ_mask,
-				  T sum_ref2_under_circ_mask,
-				  T expected_Pratio,
-				  T psi,
-				  CudaCustomAllocator *allocator)
+void runCenterFFT( CudaGlobalPtr< T > &img_in,
+				  int xSize,
+				  int ySize,
+				  bool forward,
+				  int num = 1)
 {
+//	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	img_aux.device_alloc();
 
-	CudaGlobalPtr<XFLOAT >  d_Maux(Maux.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mmean(Mmean.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mstddev(Mstddev.nzyxdim, allocator);
+	int xshift = (xSize / 2);
+	int yshift = (ySize / 2);
 
-	CudaGlobalPtr<XFLOAT >  d_Mccf(Mccf_best.nzyxdim, allocator);
-	CudaGlobalPtr<XFLOAT >  d_Mpsi(Mpsi_best.nzyxdim, allocator);
+	if (!forward)
+	{
+		xshift = -xshift;
+		yshift = -yshift;
+	}
 
-	for (unsigned i = 0; i < Maux.getSize(); i ++)
-		d_Maux[i] = (XFLOAT) Maux.data[i];
-	for (unsigned i = 0; i < Mmean.getSize(); i ++)
-		d_Mmean[i] = (XFLOAT) Mmean.data[i];
-	for (unsigned i = 0; i < Mstddev.getSize(); i ++)
-		d_Mstddev[i] = (XFLOAT) Mstddev.data[i];
+	dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),num);
+	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
+												      xSize*ySize,
+													  xSize,
+													  ySize,
+													  xshift,
+													  yshift);
 
-	d_Mccf.put_on_device();
-	d_Mpsi.put_on_device();
-	d_Maux.put_on_device();
-	d_Mmean.put_on_device();
-	d_Mstddev.put_on_device();
+//	HANDLE_ERROR(cudaStreamSynchronize(0));
+//	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
 
-	HANDLE_ERROR(cudaStreamSynchronize(0));
 
-	dim3 dim((int)(Maux.nzyxdim/(long int)PROBRATIO_BLOCK_SIZE));
-	cuda_kernel_probRatio<<<dim,PROBRATIO_BLOCK_SIZE>>>(
-			d_Mccf.d_ptr,
-			d_Mpsi.d_ptr,
-			d_Maux.d_ptr,
-			d_Mmean.d_ptr,
-			d_Mstddev.d_ptr,
-			d_Maux.size,
-			-2*normfft,
-			2*sum_ref_under_circ_mask,
-			sum_ref2_under_circ_mask,
-			expected_Pratio,
-			psi
-			);
-
-	d_Mccf.cp_to_host();
-	d_Mpsi.cp_to_host();
-
-	HANDLE_ERROR(cudaStreamSynchronize(0));
-
-	for (unsigned i = 0; i < d_Mccf.getSize(); i ++)
-		Mccf_best.data[i] = (T) d_Mccf[i];
-	for (unsigned i = 0; i < d_Mpsi.getSize(); i ++)
-		Mpsi_best.data[i] = (T) d_Mpsi[i];
 }
 
 #endif //CUDA_HELPER_FUNCTIONS_CUH_

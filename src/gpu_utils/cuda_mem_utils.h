@@ -879,11 +879,37 @@ public:
 	void cp_to_device(T * hostPtr)
 	{
 #ifdef DEBUG_CUDA
-		if (h_ptr != 0)
-			printf("DEBUG_WARNING: Host pointer already set in call to cp_to_device(hostPtr).\n");
+		if (hostPtr == NULL)
+			printf("DEBUG_WARNING: Null-pointer given in cp_to_device(hostPtr).\n");
 #endif
 		h_ptr = hostPtr;
 		cp_to_device();
+	}
+
+	/**
+	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
+	 */
+	inline
+	void cp_on_device(T * dstDevPtr)
+	{
+#ifdef DEBUG_CUDA
+		if (dstDevPtr == NULL)
+			printf("DEBUG_WARNING: Null-pointer given in cp_on_device(dstDevPtr).\n");
+#endif
+		cudaCpyDeviceToDevice(d_ptr, dstDevPtr, size, stream);
+	}
+
+	/**
+	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
+	 */
+	inline
+	void cp_on_device(CudaGlobalPtr<T> devPtr)
+	{
+#ifdef DEBUG_CUDA
+		if (devPtr.size == 0)
+			printf("DEBUG_WARNING: Zero size on provided pointer in cp_on_device.\n");
+#endif
+		cp_on_device(devPtr.d_ptr);
 	}
 
 	/**
@@ -915,14 +941,43 @@ public:
 	void cp_to_host()
 	{
 #ifdef DEBUG_CUDA
-		if (d_ptr == 0)
+		if (d_ptr == NULL)
 			printf("DEBUG_WARNING: cp_to_host() called before device allocation.\n");
-		if (h_ptr == 0)
+		if (h_ptr == NULL)
 			printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
 #endif
 		cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size, stream);
 	}
 
+	/**
+	 * Copy a number (thisSize) of bytes from device to the host pointer
+	 */
+	inline
+	void cp_to_host(int thisSize)
+	{
+#ifdef DEBUG_CUDA
+		if (d_ptr == NULL)
+			printf("DEBUG_WARNING: cp_to_host(thisSize) called before device allocation.\n");
+		if (h_ptr == NULL)
+			printf("DEBUG_WARNING: NULL host pointer in cp_to_host(thisSize).\n");
+#endif
+		cudaCpyDeviceToHost<T>(d_ptr, h_ptr, thisSize, stream);
+	}
+
+	/**
+	 * Copy a number (thisSize) of bytes from device to a specific host pointer
+	 */
+	inline
+	void cp_to_host(T* hstPtr, int thisSize)
+	{
+#ifdef DEBUG_CUDA
+		if (d_ptr == NULL)
+			printf("DEBUG_WARNING: cp_to_host(hstPtr, thisSize) called before device allocation.\n");
+		if (hstPtr == NULL)
+			printf("DEBUG_WARNING: NULL host pointer in cp_to_host(hstPtr, thisSize).\n");
+#endif
+		cudaCpyDeviceToHost<T>(d_ptr, hstPtr, thisSize, stream);
+	}
 
 	/**
 	 * Copy a number (size) of bytes from device to the host pointer
@@ -931,10 +986,10 @@ public:
 	void cp_to_host_on_stream(cudaStream_t s)
 	{
 #ifdef DEBUG_CUDA
-		if (d_ptr == 0)
-			printf("DEBUG_WARNING: cp_to_host() called before device allocation.\n");
-		if (h_ptr == 0)
-			printf("DEBUG_WARNING: NULL host pointer in cp_to_host().\n");
+		if (d_ptr == NULL)
+			printf("DEBUG_WARNING: cp_to_host_on_stream(s) called before device allocation.\n");
+		if (h_ptr == NULL)
+			printf("DEBUG_WARNING: NULL host pointer in cp_to_host_on_stream(s).\n");
 #endif
 		cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size, s);
 	}

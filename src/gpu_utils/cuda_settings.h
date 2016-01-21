@@ -4,17 +4,17 @@
 #define COMPLEXTEXTURE false
 
 #ifdef CUDA_DOUBLE_PRECISION
-#define XFLOAT double
+	#define XFLOAT double
+	#define CUDACOMPLEX double2
 #else
-#define XFLOAT float
+	#define XFLOAT float
+	#define CUDACOMPLEX float2
 #endif
 
 #ifdef RELION_SINGLE_PRECISION
 	#define RFLOAT float
-	#define CUDACOMPLEX float2
 #else
-#define RFLOAT double
-	#define CUDACOMPLEX double2
+	#define RFLOAT double
 #endif
 
 #define MAX_RESOL_SHARED_MEM 32

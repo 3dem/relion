@@ -896,13 +896,6 @@ void MlOptimiser::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		// Make device bundles - at present segfault if auto-refine tries to run on a single device
-		if(!do_auto_refine || (devCount>=2))
-			for (int i = 0; i < devCount; i++)
-				cudaMlDeviceBundles.push_back((void *) new MlDeviceBundle(this, i));
-		else
-			raise(SIGSEGV);
-
 		if (!std::isdigit(*gpu_ids.begin()))
 			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 		else if(gpu_ids.length()<nr_threads)
@@ -918,13 +911,20 @@ void MlOptimiser::initialise()
 
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
-			int bundle_id;
-			if(!do_auto_refine || (devCount>=2))
-				bundle_id = dev_id;
-			else
-				raise(SIGSEGV);
+			//Only make a new bundle of not existing on device
+			MlDeviceBundle * bundle(NULL);
 
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, (MlDeviceBundle *) cudaMlDeviceBundles[bundle_id]));
+			for (int j = 0; j < cudaMlDeviceBundles.size(); j++)
+				if (((MlDeviceBundle *) cudaMlDeviceBundles[j])->device_id == dev_id)
+					bundle = (MlDeviceBundle *) cudaMlDeviceBundles[j];
+
+			if (bundle == NULL)
+			{
+				bundle = new MlDeviceBundle(this, dev_id);
+				cudaMlDeviceBundles.push_back((void *) bundle);
+			}
+
+			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, bundle));
 		}
 	}
 
@@ -1894,6 +1894,8 @@ void MlOptimiser::expectation()
 	{
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 		{
+			( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+
 			for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
 			{
 				unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
@@ -1901,7 +1903,6 @@ void MlOptimiser::expectation()
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
 				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 				int my_mutex = iclass % NR_CLASS_MUTEXES;

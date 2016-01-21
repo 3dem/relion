@@ -214,6 +214,10 @@ public:
 	// Original size of the micrographs
 	int micrograph_size, micrograph_xsize, micrograph_ysize, micrograph_minxy_size;
 
+	// decreased size micrograph
+	int workSize;
+	float workFrac;
+
 	// Is density in micrograph inverted wrt templates?
 	bool do_invert;
 
@@ -335,15 +339,15 @@ public:
 			MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
-	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks);
+	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks, float scale);
 
 	// Now prune the coordinates: within min_particle_distance: all peaks are the same cluster
 	// From each cluster, take the single peaks with the highest ccf
 	// If then, there is another peaks at a distance of at least min_particle_distance: take that one as well, and so forth...
-	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance);
+	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance, float scale);
 
 	// Only keep those peaks that are at the given distance apart from each other
-	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance);
+	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance, float scale);
 
 };
 

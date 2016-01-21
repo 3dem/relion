@@ -55,6 +55,7 @@
 #include "src/matrix1d.h"
 #include "src/matrix2d.h"
 #include "src/complex.h"
+#include <limits>
 
 
 extern int bestPrecision(float F, int _width);
@@ -2452,62 +2453,24 @@ public:
      * The average, standard deviation, minimum and maximum value are
      * returned.
      */
-    void computeStats(RFLOAT& avg, RFLOAT& stddev, T& minval, T& maxval) const
+    void computeStats(RFLOAT &_avg, RFLOAT &_stddev, T &_minval, T &_maxval) const
     {
         if (NZYXSIZE(*this) <= 0)
             return;
 
-        avg = 0;
-        stddev = 0;
+        double avg = 0;
+        double stddev = 0;
 
-        minval = maxval = data[0];
+        double minval = std::numeric_limits<double>::max();
+        double maxval = std::numeric_limits<double>::min();
 
-        T* ptr=NULL;
+        T* ptr = NULL;
         long int n;
 
-#ifdef RELION_SINGLE_PRECISION
-        // Two-passes throught the data, as single-precision is not enough for a single-pass
-        // Also: averages of large arrays will give trouble: computer median first....
-        RFLOAT median = 0.;
-        if (NZYXSIZE(*this) > 1e6)
-         	median = (*this).computeMedian();
-
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this, n, ptr)
         {
-            T Tval=*ptr;
-            RFLOAT val=static_cast< RFLOAT >(Tval);
-            avg += val - median;
-            if (Tval > maxval)
-                 maxval = Tval;
-             else if (Tval < minval)
-                 minval = Tval;
-        }
-
-        avg /= NZYXSIZE(*this);
-        avg += median;
-
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        {
-            T Tval=*ptr;
-            RFLOAT val=static_cast< RFLOAT >(Tval);
-            stddev += (val - avg)*(val - avg);
-        }
-
-        if (NZYXSIZE(*this) > 1)
-        {
-            stddev = stddev / (NZYXSIZE(*this) - 1);
-            // Foreseeing numerical instabilities
-            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
-        }
-        else
-            stddev = 0;
-
-#else
-
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
-        {
-            T Tval=*ptr;
-            RFLOAT val=static_cast< RFLOAT >(Tval);
+            T Tval = *ptr;
+            double val = static_cast< double >(Tval);
             avg += val;
             stddev += val * val;
 
@@ -2529,7 +2492,11 @@ public:
         }
         else
             stddev = 0;
-#endif
+
+        _avg = avg;
+        _stddev = stddev;
+        _minval = minval;
+        _maxval = maxval;
     }
 
     /** Median

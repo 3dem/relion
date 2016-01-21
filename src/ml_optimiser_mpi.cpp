@@ -175,13 +175,6 @@ void MlOptimiserMpi::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		// Make device bundles - at present segfault if auto-refine tries to run on a single device
-		if(!do_auto_refine || (devCount>=2))
-			for (int i = 0; i < devCount; i++)
-				cudaMlDeviceBundles.push_back((void *) new MlDeviceBundle(this, i));
-		else
-			raise(SIGSEGV);
-
 		// Sequential initialisation of GPUs on all ranks
 		for (int rank = 0; rank < node->size; rank++)
 		{
@@ -208,13 +201,21 @@ void MlOptimiserMpi::initialise()
 
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
-					int bundle_id;
-					if(!do_auto_refine || (devCount>=2))
-						bundle_id = dev_id;
-					else
-						raise(SIGSEGV);
+					//Only make a new bundle of not existing on device
+					MlDeviceBundle * bundle(NULL);
 
-					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, (MlDeviceBundle *) cudaMlDeviceBundles[bundle_id]));
+					for (int j = 0; j < cudaMlDeviceBundles.size(); j++)
+						if (((MlDeviceBundle *) cudaMlDeviceBundles[j])->device_id == dev_id)
+							bundle = (MlDeviceBundle *) cudaMlDeviceBundles[j];
+
+					if (bundle == NULL)
+					{
+						bundle = new MlDeviceBundle(this, dev_id);
+						cudaMlDeviceBundles.push_back((void *) bundle);
+					}
+
+					//Make new cuda optimizer and attach to bundle
+					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, bundle));
 				}
 
 			}
@@ -822,6 +823,8 @@ void MlOptimiserMpi::expectation()
 			{
 				for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 				{
+					( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+
 					for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
 					{
 						unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
@@ -829,7 +832,6 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
 						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)

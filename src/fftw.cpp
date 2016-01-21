@@ -630,7 +630,11 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 		{
 			x = j;
 			dotp = 2 * PI * (x * xshift);
+#ifdef RELION_SINGLE_PRECISION
+                        sincosf(dotp, &b, &a);
+#else
                         sincos(dotp, &b, &a);
+#endif
 			DIRECT_A1D_ELEM(out, j) = Complex(a, b);
 		}
 		break;
@@ -643,7 +647,11 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+                sincosf(dotp, &b, &a);
+#else
+                sincos(dotp, &b, &a);
+#endif
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
 		for (long int i=YSIZE(in)-1; i>=XSIZE(in); i--)
@@ -653,7 +661,11 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 			{
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+                sincosf(dotp, &b, &a);
+#else
+                sincos(dotp, &b, &a);
+#endif
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
 		}
@@ -672,7 +684,11 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				{
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
-					sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+                    sincosf(dotp, &b, &a);
+#else
+                    sincos(dotp, &b, &a);
+#endif
 					DIRECT_A3D_ELEM(out, k, i, j) = Complex(a, b);
 				}
 			}
@@ -703,7 +719,11 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 		{
 			x = j;
 			dotp = 2 * PI * (x * xshift);
-                        sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+            sincosf(dotp, &b, &a);
+#else
+            sincos(dotp, &b, &a);
+#endif
   			c = DIRECT_A1D_ELEM(in, j).real;
 			d = DIRECT_A1D_ELEM(in, j).imag;
 			ac = a * c;
@@ -726,7 +746,11 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-                                sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+                sincosf(dotp, &b, &a);
+#else
+                sincos(dotp, &b, &a);
+#endif
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
 				ac = a * c;
@@ -741,7 +765,11 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 			{
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
-				sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+                sincosf(dotp, &b, &a);
+#else
+                sincos(dotp, &b, &a);
+#endif
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
 				ac = a * c;
@@ -770,7 +798,11 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				{
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
-                                        sincos(dotp, &b, &a);
+#ifdef RELION_SINGLE_PRECISION
+                    sincosf(dotp, &b, &a);
+#else
+                    sincos(dotp, &b, &a);
+#endif
 					c = DIRECT_A3D_ELEM(in, k, i, j).real;
 					d = DIRECT_A3D_ELEM(in, k, i, j).imag;
 					ac = a * c;
