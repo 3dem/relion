@@ -46,8 +46,11 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 
 	if (!do_movies || do_also_rot)
 	{
-		Node node2(fn_out + "_model.star", NODE_MODEL);
-		result.push_back(node2);
+		if (iter > 0)
+		{
+			Node node2(fn_out + "_model.star", NODE_MODEL);
+			result.push_back(node2);
+		}
 
 		// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
 		if (dim == 3)
@@ -145,7 +148,14 @@ RelionJobWindow::RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, b
 		}
 		if (nr_tabs >= 7)
 		{
-			std::cerr << "ERROR: only 6 job-specific tabs implemented..." << std::endl;
+			tab7 = new Fl_Group(x, current_y, w, h - MENUHEIGHT, "");
+			tab7->end();
+			tab7->color(GUI_BACKGROUND_COLOR);
+			tab7->selection_color(GUI_BACKGROUND_COLOR2);
+		}
+		if (nr_tabs >= 8)
+		{
+			std::cerr << "ERROR: only 7 job-specific tabs implemented..." << std::endl;
 			exit(1);
 		}
 		current_y += 15;
@@ -291,7 +301,7 @@ void RelionJobWindow::toggle_new_continue(bool is_continue)
 void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
 {
 
-	fh.open((fn+".job").c_str(), std::ios::out);
+	fh.open((fn+"run.job").c_str(), std::ios::out);
     if (!fh)
     {
     	std::cerr << "Cannot write to file: "<<fn<<std::endl;
@@ -306,12 +316,13 @@ void RelionJobWindow::openWriteFile(std::string fn, std::ofstream &fh)
     	fh << "is_continue == true" << std::endl;
     else
     	fh << "is_continue == false" << std::endl;
+
 }
 
 bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 {
 
-	fh.open((fn+".job").c_str(), std::ios_base::in);
+	fh.open((fn+"run.job").c_str(), std::ios_base::in);
     if (fh.fail())
     	return false;
     else
@@ -323,7 +334,7 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 		idx++;
 		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
 		if (!(type >= 0 && type < NR_BROWSE_TABS))
-			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + ".job");
+			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + "run.job");
     	// Get is_continue from second line
 		getline(fh, line, '\n');
 		if (line.rfind("is_continue == true") == 0)
@@ -434,16 +445,15 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 
 }
 
-void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue)
+void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname)
 {
 
 	pipelineOutputNodes.clear();
 	pipelineInputNodes.clear();
 
-	if (!is_continue || newname_for_continue) // for continue jobs, use the same outputname
-	{
+	if (outputname == "") // for continue jobs, use the same outputname
 		outputname = defaultname + "/" + getUniqDateString() + "/";
-	}
+
 	pipelineOutputName = outputname;
 
 }
@@ -464,7 +474,7 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	}
 
 	// Prepare full mpi commands or save jobsubmission script to disc
-	if (do_queue.getValue())
+	if (do_queue.getValue() && do_makedir)
 	{
 		// Make the submission script and write it to disc
 		std::string output_script = outputname + "run_submit.script";
@@ -477,14 +487,16 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 		// Also add mpirun in front of all commands if no submission via the queue is done
 		std::string one_command;
 		final_command = "";
-		for (int icom = 0; icom < commands.size(); icom++)
+		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
 			if (has_mpi && nr_mpi.getValue() > 1)
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
 			else
 				one_command = commands[icom];
 			// Save stdout and stderr to a .out and .err files
-			one_command += " >> " + outputname + "run.out 2>> " + outputname + "run.err";
+			// But only when a re-direct '>' is NOT already present on the command line!
+			if (std::string::npos == commands[icom].find(">"))
+				one_command += " >> " + outputname + "run.out 2>> " + outputname + "run.err";
 			final_command += one_command;
 			if (icom == commands.size() - 1)
 				final_command += " & "; // end by putting composite job in the background
@@ -567,14 +579,15 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_import", is_continue);
+	read(".gui_importrun.job", is_continue);
+
 }
 
 void ImportJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_import";
+		fn=".gui_importrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -599,6 +612,12 @@ void ImportJobWindow::read(std::string fn, bool &_is_continue)
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
+}
+
+void ImportJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+	do_queue.deactivate(true);
 }
 
 void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -632,14 +651,15 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else if (node_type.getValue() == "2D/3D particle coordinates (*.box, *_pick.star)")
 	{
-		// Copy all coordinate files into the Import directory
-		command = "cp -r " + fn_in.getValue() + " " + outputname;
+		// Make the same directory structure of the coordinates
+		// Copy all coordinate files into the same subdirectory in the Import directory
+		command = "cp --parents " + fn_in.getValue() + " " + outputname;
 		commands.push_back(command);
 		// Get the coordinate-file suffix separately
 		FileName fn_suffix = fn_in.getValue();
 		fn_suffix = fn_suffix.afterLastOf("*");
 		fn_suffix = "coords_suffix" + fn_suffix;
-		Node node(fn_suffix, NODE_MIC_COORDS);
+		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
 		// Make a suffix file, which contains the actual suffix as a suffix
 		command = " touch " + outputname + fn_suffix;
@@ -702,7 +722,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	bin_factor.place(current_y, "Binning factor:", 1, 1, 8, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
+	bin_factor.place(current_y, "Binning factor (1 or 2):", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
 	first_frame_ali.place(current_y, "First frame for alignment:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
 	last_frame_ali.place(current_y, "Last frame for alignment:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
 	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
@@ -713,7 +733,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_motioncorr", is_continue);
+	read(".gui_motioncorrrun.job", is_continue);
 }
 
 
@@ -722,7 +742,7 @@ void MotioncorrJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_motioncorr";
+		fn=".gui_motioncorrrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -800,7 +820,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	command += " --o " + outputname;
 	pipelineOutputName = outputname;
-	Node node2(outputname + "/corrected_micrographs.star", NODE_MICS);
+	Node node2(outputname + "corrected_micrographs.star", NODE_MICS);
 	pipelineOutputNodes.push_back(node2);
 
 	// Motioncorr-specific stuff
@@ -833,19 +853,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 {
 	type = PROC_CTFFIND;
 
-	// Check for environment variable RELION_QSUB_TEMPLATE
-	char * default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
-	if (default_location == NULL)
-	{
-		char mydefault[]=DEFAULTCTFFINDLOCATION;
-		default_location=mydefault;
-	}
-	char * gctf_default_location = getenv ("RELION_GCTF_EXECUTABLE");
-	if (gctf_default_location == NULL)
-	{
-		char mygctfdefault[]=DEFAULTGCTFLOCATION;
-		gctf_default_location=mygctfdefault;
-	}
+	char *default_location;
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -875,6 +883,13 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	tab3->label("CTFFIND");
 	resetHeight();
 
+	// Check for environment variable RELION_CTFFIND_EXECUTABLE
+	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
+	if (default_location == NULL)
+	{
+		char mydefault[]=DEFAULTCTFFINDLOCATION;
+		default_location=mydefault;
+	}
 	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", NULL, "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	// Add a little spacer
@@ -912,12 +927,19 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	use_gctf.place(current_y, "Use Gctf instead of CTFFIND?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND.", gctf_group);
 
 	gctf_group->begin();
-	fn_gctf_exe.place(current_y, "Gctf executable:", gctf_default_location, "*", NULL, "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	// Check for environment variable RELION_CTFFIND_EXECUTABLE
+	default_location = getenv ("RELION_GCTF_EXECUTABLE");
+	if (default_location == NULL)
+	{
+		char mydefault[]=DEFAULTGCTFLOCATION;
+		default_location=mydefault;
+	}
+	fn_gctf_exe.place(current_y, "Gctf executable:", default_location, "*", NULL, "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
 	do_ignore_ctffind_params.place(current_y, "Ignore CTFFIND parameters?", true, "If set to Yes, all parameters on the CTFFIND tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
 \n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 
-	do_EPA.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
+	do_EPA.place(current_y, "Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
 //	other_gctf_args.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
@@ -927,14 +949,14 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_ctffind.settings", is_continue);
+	read(".gui_ctffindrun.job", is_continue);
 }
 
 void CtffindJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_motioncorr";
+		fn=".gui_ctffindrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1001,11 +1023,20 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+	box.deactivate(is_continue);
+	resmin.deactivate(is_continue);
+	resmax.deactivate(is_continue);
+	dfmin.deactivate(is_continue);
+	dfmax.deactivate(is_continue);
+	dfstep.deactivate(is_continue);
+	dast.deactivate(is_continue);
 	fn_ctffind_exe.deactivate(is_continue);
+	ctf_win.deactivate(is_continue);
+	use_gctf.deactivate(is_continue);
 	fn_gctf_exe.deactivate(is_continue);
+	do_ignore_ctffind_params.deactivate(is_continue);
+	do_EPA.deactivate(is_continue);
 
-	// TODO: check which log files do not have Final values and re-run on those
-	// for that: modify run_ctffind wrapper program
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -1129,14 +1160,14 @@ Particles that are not in this STAR file, but present in the picked coordinates 
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_manualpick", is_continue);
+	read(".gui_manualpickrun.job", is_continue);
 }
 
 void ManualpickJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_manualpick";
+		fn=".gui_manualpickrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1189,6 +1220,8 @@ void ManualpickJobWindow::read(std::string fn, bool &_is_continue)
 void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_in.deactivate(is_continue);
 	do_queue.deactivate(true);
 }
 
@@ -1201,7 +1234,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	std::string command;
 	command="`which relion_manualpick`";
 
-	command += " --i " + fn_in.getValue();
+	command += " --allow_save --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
@@ -1256,7 +1289,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 }
 
 
-AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_AUTOPICK;
@@ -1322,16 +1355,42 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 	do_read_fom_maps.place(current_y, "Read FOM maps?", false, "If written out previously, read the FOM maps back in and re-run the picking to quickly find the optimal threshold and inter-particle distance parameters");
 
 	tab3->end();
+	tab4->begin();
+	tab4->label("Helix");
+	resetHeight();
+
+	autopick_helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	autopick_helix_group->end();
+
+	do_pick_helical_segments.place(current_y, "Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.", autopick_helix_group);
+
+	autopick_helix_group->begin();
+
+	helical_tube_kappa_max.place(current_y, "Maximum curvature (kappa): ", 0.1, 0.05, 0.5, 0.01, "Maximum curvature allowed for picking helical tubes. \
+Kappa = 0.3 means that the curvature of the picked helical tubes should not be larger than 30% the curvature of a circle (diameter = particle mask diameter). \
+Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
+
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of the tubes.");
+
+	helical_tube_length_min.place(current_y, "Minimum length (A): ", 200, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
+Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
+
+	autopick_helix_group->end();
+
+	do_pick_helical_segments.cb_menu_i();
+
+	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_autopick", is_continue);
+	read(".gui_autopickrun.job", is_continue);
 }
 
 void AutopickJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_autopick";
+		fn=".gui_autopickrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1350,6 +1409,10 @@ void AutopickJobWindow::write(std::string fn)
 	threshold_autopick.writeValue(fh);
 	mindist_autopick.writeValue(fh);
 	maxstddevnoise_autopick.writeValue(fh);
+	do_pick_helical_segments.writeValue(fh);
+	helical_tube_kappa_max.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
+	helical_tube_length_min.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -1375,6 +1438,10 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		threshold_autopick.readValue(fh);
 		mindist_autopick.readValue(fh);
 		maxstddevnoise_autopick.readValue(fh);
+		do_pick_helical_segments.readValue(fh);
+		helical_tube_kappa_max.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
+		helical_tube_length_min.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -1384,7 +1451,17 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
-	return;
+
+	fn_input_autopick.deactivate(is_continue);
+	fn_refs_autopick.deactivate(is_continue);
+	do_invert_refs.deactivate(is_continue);
+	do_ctf_autopick.deactivate(is_continue);
+	do_ignore_first_ctfpeak_autopick.deactivate(is_continue);
+	lowpass.deactivate(is_continue);
+	highpass.deactivate(is_continue);
+	angpix.deactivate(is_continue);
+	psi_sampling_autopick.deactivate(is_continue);
+
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -1444,6 +1521,18 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command += " --min_distance " + floatToString(mindist_autopick.getValue());
 	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
 
+	// Helix
+	if (do_pick_helical_segments.getValue())
+	{
+		command += " --helix";
+		command += " --helical_tube_kappa_max " + floatToString(helical_tube_kappa_max.getValue());
+		command += " --helical_tube_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		command += " --helical_tube_length_min " + floatToString(helical_tube_length_min.getValue());
+	}
+
+	if (is_continue && !(do_read_fom_maps.getValue() || do_write_fom_maps.getValue()))
+		command += " --only_do_unfinished ";
+
 	// Other arguments
 	command += " " + other_args.getValue();
 
@@ -1458,7 +1547,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 }
 
 
-ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
 	type = PROC_EXTRACT;
 
@@ -1467,12 +1556,14 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
 	resetHeight();
 
     star_mics.place(current_y,"micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
+	// Add a little spacer
+	current_y += STEPY/2;
 	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 
 	reextract_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	reextract_group->end();
 
-	do_reextract.place(current_y, "Re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.", reextract_group);
+	do_reextract.place(current_y, "OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.", reextract_group);
 
 	reextract_group->begin();
 
@@ -1556,9 +1647,45 @@ The name of the MCR stacks should be the rootname of the micrographs + '_moviero
 	do_movie_extract.cb_menu_i();
 
 	tab3->end();
+	tab4->begin();
+	tab4->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_extract_helix.place(current_y, "Extract helical segments?", false, "Set to Yes if you want to extract helical segments. RELION (.star), EMAN2 (.box) and XIMDISP (.coords) formats of tube or segment coordinates are supported.", helix_group);
+
+	helix_group->begin();
+
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of helical tubes.");
+
+	helical_tubes_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helical_tubes_group->end();
+
+	do_extract_helical_tubes.place(current_y, "Coordinates are start-end only?", true, "Set to Yes if you want to extract helical segments from manually picked tube coordinates (starting and end points of helical tubes in RELION, EMAN or XIMDISP format). \
+Set to No if segment coordinates (RELION auto-picked results or EMAN / XIMDISP segments) are provided.", helical_tubes_group);
+
+	helical_tubes_group->begin();
+
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
+The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
+
+	helical_rise.place(current_y, "Helical rise (A):", 0, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+
+	helical_tubes_group->end();
+
+	do_extract_helical_tubes.cb_menu_i();
+
+	helix_group->end();
+
+	do_extract_helix.cb_menu_i();
+
+	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_extract", is_continue);
+	read(".gui_extractrun.job", is_continue);
 }
 
 
@@ -1566,7 +1693,7 @@ void ExtractJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_extract";
+		fn=".gui_extractrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1595,6 +1722,13 @@ void ExtractJobWindow::write(std::string fn)
 	movie_rootname.writeValue(fh);
 	first_movie_frame.writeValue(fh);
 	last_movie_frame.writeValue(fh);
+
+	// Helix
+	do_extract_helix.writeValue(fh);
+	do_extract_helical_tubes.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_rise.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -1630,6 +1764,13 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		first_movie_frame.readValue(fh);
 		last_movie_frame.readValue(fh);
 
+		// Helix
+		do_extract_helix.readValue(fh);
+		do_extract_helical_tubes.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_rise.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -1654,7 +1795,15 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	white_dust.deactivate(is_continue);
 	black_dust.deactivate(is_continue);
 	do_invert.deactivate(is_continue);
-
+	do_movie_extract.deactivate(is_continue);
+	movie_rootname.deactivate(is_continue);
+	first_movie_frame.deactivate(is_continue);
+	last_movie_frame.deactivate(is_continue);
+	do_extract_helix.deactivate(is_continue);
+	do_extract_helical_tubes.deactivate(is_continue);
+	helical_nr_asu.deactivate(is_continue);
+	helical_rise.deactivate(is_continue);
+	helical_tube_outer_diameter.deactivate(is_continue);
 
 }
 
@@ -1748,6 +1897,19 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --set_angpix " + floatToString(angpix.getValue());
 	}
 
+	// Helix
+	if (do_extract_helix.getValue())
+	{
+		command += " --helix";
+		command += " --helical_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		if (do_extract_helical_tubes.getValue())
+		{
+			command += " --helical_tubes";
+			command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+			command += " --helical_rise " + floatToString(helical_rise.getValue());
+		}
+	}
+
 	if (is_continue)
 		command += " --only_extract_unfinished ";
 
@@ -1789,14 +1951,14 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_sort", is_continue);
+	read(".gui_sortrun.job", is_continue);
 }
 
 void SortJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_sort";
+		fn=".gui_sortrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1825,7 +1987,13 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 
 void SortJobWindow::toggle_new_continue(bool _is_continue)
 {
+
 	is_continue = _is_continue;
+
+	input_star.deactivate(is_continue);
+	do_ctf.deactivate(is_continue);
+	do_ignore_first_ctfpeak.deactivate(is_continue);
+
 }
 
 void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -1890,7 +2058,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 
 
-Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
+Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_2DCLASS;
@@ -2028,9 +2196,29 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 	dont_skip_align.cb_menu_i(); // to make default effective
 
 	tab4->end();
+	tab5->begin();
+	tab5->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_bimodal_psi.place(current_y, "Do bimodal angular searches?", false, "Do bimodal search for psi angles? \
+Set to Yes if you want to classify 2D helical segments with priors of psi angles. The priors should be bimodal due to unknown polarities of the segments.", helix_group);
+
+	helix_group->begin();
+
+	range_psi.place(current_y, "Angular search range - psi (deg):", 6, 3, 30, 1, "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the psi priors estimated through helical segment picking. \
+A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of angular searches should be much larger than the sampling.");
+
+	helix_group->end();
+	do_bimodal_psi.cb_menu_i(); // to make default effective
+
+	tab5->end();
 
 	// read settings if hidden file exists
-	read(".gui_class2d", is_continue);
+	read(".gui_class2drun.job", is_continue);
 
 }
 
@@ -2038,7 +2226,7 @@ void Class2DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_class2d";
+		fn=".gui_class2drun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2066,6 +2254,10 @@ void Class2DJobWindow::write(std::string fn)
 	psi_sampling.writeValue(fh);
 	offset_range.writeValue(fh);
 	offset_step.writeValue(fh);
+
+	// Helix
+	do_bimodal_psi.writeValue(fh);
+	range_psi.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -2101,6 +2293,10 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		offset_range.readValue(fh);
 		offset_step.readValue(fh);
 
+		// Helix
+		do_bimodal_psi.readValue(fh);
+		range_psi.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -2124,7 +2320,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Class2D", true); // true means: also make a new process for continuation runs (as users may actually change things there)
+	initialisePipeline(outputname, "Class2D");
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -2198,6 +2394,13 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --offset_step " + floatToString(offset_step.getValue() * pow(2., iover));
 	}
 
+	// Helix
+	if (do_bimodal_psi.getValue())
+	{
+		command += " --bimodal_psi";
+		command += " --sigma_psi " + floatToString(range_psi.getValue() / 3.);
+	}
+
 	// Always do norm and scale correction
 	if (!is_continue)
 		command += " --norm --scale ";
@@ -2216,7 +2419,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
+Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_3DCLASS;
@@ -2422,8 +2625,69 @@ in the previous iteration will get higher weights than those further away.");
 
 	tab5->end();
 
+	tab6->begin();
+	tab6->label("Helix");
+	resetHeight();
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	//helix_text.place(current_y, "Nov 21, 2015");
+	do_helix.place(current_y, "Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.", helix_group);
+	helix_group->begin();
+	helical_tube_inner_diameter.placeOnSameYPosition(current_y, "Tube diameter - inner, outer (A):", "Tube diameter - inner (A):", "-1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "0", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
+Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
+particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
+is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
+signal to noise ratio in helical reconstruction.");
+	helical_twist_initial.placeOnSameYPosition(current_y, "Initial twist (deg), rise (A):", "Initial helical twist (deg):", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	helical_rise_initial.placeOnSameYPosition(current_y, "", "Initial helical rise (A):", "0", "Initial helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
+Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	helix_symmetry_search_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_symmetry_search_group->end();
+	do_local_search_helical_symmetry.place(current_y, "Do local searches of symmetry?", true, "If set to Yes, then perform local searches of helical twist and rise within given ranges.", helix_symmetry_search_group);
+	helix_symmetry_search_group->begin();
+	helical_twist_min.placeOnSameYPosition(current_y, "Twist search - Min, Max, Step (deg):", "Helical twist search (deg) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_twist_max.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_twist_inistep.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Step:", "0", "Minimum, maximum and initial step for helical twist search. Set helical twist (in degrees) \
+to positive value if it is a right-handed helix. Generally it is not necessary for the user to provide an initial step (less than 1 degree, 5~1000 samplings as default). But it needs to be set manually if the default value \
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	current_y += STEPY + 2;
+	helical_rise_min.placeOnSameYPosition(current_y, "Rise search - Min, Max, Step (A):", "Helical rise search (A) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_rise_max.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_rise_inistep.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Step:", "0", "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
+Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	current_y += STEPY + 2;
+	helix_symmetry_search_group->end();
+	do_local_search_helical_symmetry.cb_menu_i(); // to make default effective
+	helical_z_percentage.place(current_y, "Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
+number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+	/*
+	do_bimodal.place(current_y, "Do bimodal searches?", true, "If set to Yes, then perform bimodal searches of psi and tilt angles around their priors. \
+Angular priors can be estimated through autopicking of helical segments or previous runs of 3D classification or refinement. It must be set to Yes if \
+helical segments are picked using autopicking or '--extract' option in relion_helix_toolbox.");
+	*/
+	range_tilt.placeOnSameYPosition(current_y, "Angular search range - tilt, psi (deg):", "Angular search range - tilt (deg):", "15", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	range_psi.placeOnSameYPosition(current_y, "", "Angular search range - psi (deg):", "15", "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
+A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees. No priors will be applied if these values are set to negative.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	helix_group->end();
+	do_helix.cb_menu_i(); // to make default effective
+	tab6->end();
+
 	// read settings if hidden file exists
-	read(".gui_class3d", is_continue);
+	read(".gui_class3drun.job", is_continue);
 
 }
 
@@ -2431,7 +2695,7 @@ void Class3DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_class3d";
+		fn=".gui_class3drun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2469,6 +2733,25 @@ void Class3DJobWindow::write(std::string fn)
 	offset_step.writeValue(fh);
 	do_local_ang_searches.writeValue(fh);
 	sigma_angles.writeValue(fh);
+
+	// Helix
+	do_helix.writeValue(fh);
+	//do_bimodal.writeValue(fh);
+	helical_tube_inner_diameter.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_twist_initial.writeValue(fh);
+	helical_rise_initial.writeValue(fh);
+	do_local_search_helical_symmetry.writeValue(fh);
+	helical_twist_min.writeValue(fh);
+	helical_twist_max.writeValue(fh);
+	helical_twist_inistep.writeValue(fh);
+	helical_rise_min.writeValue(fh);
+	helical_rise_max.writeValue(fh);
+	helical_rise_inistep.writeValue(fh);
+	helical_z_percentage.writeValue(fh);
+	range_tilt.writeValue(fh);
+	range_psi.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -2514,6 +2797,25 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		do_local_ang_searches.readValue(fh);
 		sigma_angles.readValue(fh);
 
+		// Helix
+		do_helix.readValue(fh);
+		//do_bimodal.readValue(fh);
+		helical_tube_inner_diameter.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_twist_initial.readValue(fh);
+		helical_rise_initial.readValue(fh);
+		do_local_search_helical_symmetry.readValue(fh);
+		helical_twist_min.readValue(fh);
+		helical_twist_max.readValue(fh);
+		helical_twist_inistep.readValue(fh);
+		helical_rise_min.readValue(fh);
+		helical_rise_max.readValue(fh);
+		helical_rise_inistep.readValue(fh);
+		helical_z_percentage.readValue(fh);
+		range_tilt.readValue(fh);
+		range_psi.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -2542,6 +2844,25 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	//Optimisation
 	do_zero_mask.deactivate(is_continue);
 
+	// Helix
+	do_helix.deactivate(is_continue);
+	//do_bimodal.deactivate(is_continue);
+	helical_tube_inner_diameter.deactivate(is_continue);
+	helical_tube_outer_diameter.deactivate(is_continue);
+	helical_nr_asu.deactivate(is_continue);
+	helical_twist_initial.deactivate(is_continue);
+	helical_rise_initial.deactivate(is_continue);
+	do_local_search_helical_symmetry.deactivate(is_continue);
+	helical_twist_min.deactivate(is_continue);
+	helical_twist_max.deactivate(is_continue);
+	helical_twist_inistep.deactivate(is_continue);
+	helical_rise_min.deactivate(is_continue);
+	helical_rise_max.deactivate(is_continue);
+	helical_rise_inistep.deactivate(is_continue);
+	helical_z_percentage.deactivate(is_continue);
+	range_tilt.deactivate(is_continue);
+	range_psi.deactivate(is_continue);
+
 	// Sampling
 
 
@@ -2552,7 +2873,8 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.clear();
 	std::string command;
-	initialisePipeline(outputname, "Class3D", true);
+
+	initialisePipeline(outputname, "Class3D");
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -2662,6 +2984,40 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --norm --scale ";
 	}
 
+	if ( (!is_continue) && (do_helix.getValue()) )
+	{
+		command += " --helix";
+		if (textToFloat(helical_tube_inner_diameter.getValue()) > 0.)
+			command += " --helical_inner_diameter " + floatToString(textToFloat(helical_tube_inner_diameter.getValue()));
+		command += " --helical_outer_diameter " + floatToString(textToFloat(helical_tube_outer_diameter.getValue()));
+		command += " --helical_z_percentage " + floatToString(helical_z_percentage.getValue() / 100.);
+		command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+		command += " --helical_twist_initial " + floatToString(textToFloat(helical_twist_initial.getValue()));
+		command += " --helical_rise_initial " + floatToString(textToFloat(helical_rise_initial.getValue()));
+		if (do_local_search_helical_symmetry.getValue())
+		{
+			command += " --helical_symmetry_search";
+			command += " --helical_twist_min " + floatToString(textToFloat(helical_twist_min.getValue()));
+			command += " --helical_twist_max " + floatToString(textToFloat(helical_twist_max.getValue()));
+			if (textToFloat(helical_twist_inistep.getValue()) > 0.)
+				command += " --helical_twist_inistep " + floatToString(textToFloat(helical_twist_inistep.getValue()));
+			command += " --helical_rise_min " + floatToString(textToFloat(helical_rise_min.getValue()));
+			command += " --helical_rise_max " + floatToString(textToFloat(helical_rise_max.getValue()));
+			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
+				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
+		}
+		command += " --helical_bimodal_search";
+		RFLOAT val;
+		val = textToFloat(range_tilt.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_tilt " + floatToString(val / 3.);
+		val = textToFloat(range_psi.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_psi " + floatToString(val / 3.);
+	}
+
 	// Running stuff
 	command += " --j " + floatToString(nr_threads.getValue());
 	if (!is_continue)
@@ -2676,7 +3032,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
+Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(7, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_3DAUTO;
@@ -2869,8 +3225,70 @@ will be centered at the rotations determined for the corresponding particle wher
 	do_movies.cb_menu_i(); // to make default effective
 
 	tab6->end();
+	tab7->begin();
+	tab7->label("Helix");
+	resetHeight();
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	//helix_text.place(current_y, "Nov 21, 2015");
+	do_helix.place(current_y, "Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.", helix_group);
+	helix_group->begin();
+	helical_tube_inner_diameter.placeOnSameYPosition(current_y, "Tube diameter - inner, outer (A):", "Tube diameter - inner (A):", "-1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "0", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
+Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
+particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
+is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
+signal to noise ratio in helical reconstruction.");
+	helical_twist_initial.placeOnSameYPosition(current_y, "Initial twist (deg), rise (A):", "Initial helical twist (deg):", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	helical_rise_initial.placeOnSameYPosition(current_y, "", "Initial helical rise (A):", "0", "Initial helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
+Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	helix_symmetry_search_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_symmetry_search_group->end();
+	do_local_search_helical_symmetry.place(current_y, "Do local searches of symmetry?", true, "If set to Yes, then perform local searches of helical twist and rise within given ranges.", helix_symmetry_search_group);
+	helix_symmetry_search_group->begin();
+	helical_twist_min.placeOnSameYPosition(current_y, "Twist search - Min, Max, Step (deg):", "Helical twist search (deg) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_twist_max.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_twist_inistep.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Step:", "0", "Minimum, maximum and initial step for helical twist search. Set helical twist (in degrees) \
+to positive value if it is a right-handed helix. Generally it is not necessary for the user to provide an initial step (less than 1 degree, 5~1000 samplings as default). But it needs to be set manually if the default value \
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	current_y += STEPY + 2;
+	helical_rise_min.placeOnSameYPosition(current_y, "Rise search - Min, Max, Step (A):", "Helical rise search (A) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_rise_max.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	helical_rise_inistep.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Step:", "0", "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
+Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	current_y += STEPY + 2;
+	helix_symmetry_search_group->end();
+	do_local_search_helical_symmetry.cb_menu_i(); // to make default effective
+	helical_z_percentage.place(current_y, "Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
+number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+	/*
+	do_bimodal.place(current_y, "Do bimodal searches?", true, "If set to Yes, then perform bimodal searches of psi and tilt angles around their priors. \
+Angular priors can be estimated through autopicking of helical segments or previous runs of 3D classification or refinement. It must be set to Yes if \
+helical segments are picked using autopicking or '--extract' option in relion_helix_toolbox.");
+	*/
+	range_tilt.placeOnSameYPosition(current_y, "Angular search range - tilt, psi (deg):", "Angular search range - tilt (deg):", "15", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	range_psi.placeOnSameYPosition(current_y, "", "Angular search range - psi (deg):", "15", "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
+A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees. No priors will be applied if these values are set to negative.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	helix_group->end();
+	do_helix.cb_menu_i(); // to make default effective
+
+	tab7->end();
+
 	// read settings if hidden file exists
-	read(".gui_auto3d", is_continue);
+	read(".gui_auto3drun.job", is_continue);
 
 }
 
@@ -2878,7 +3296,7 @@ void Auto3DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_auto3d";
+		fn=".gui_auto3drun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2918,6 +3336,25 @@ void Auto3DJobWindow::write(std::string fn)
 	movie_sigma_offset.writeValue(fh);
 	do_alsorot_movies.writeValue(fh);
 	movie_sigma_angles.writeValue(fh);
+
+	// Helix
+	do_helix.writeValue(fh);
+	//do_bimodal.writeValue(fh);
+	helical_tube_inner_diameter.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_twist_initial.writeValue(fh);
+	helical_rise_initial.writeValue(fh);
+	do_local_search_helical_symmetry.writeValue(fh);
+	helical_twist_min.writeValue(fh);
+	helical_twist_max.writeValue(fh);
+	helical_twist_inistep.writeValue(fh);
+	helical_rise_min.writeValue(fh);
+	helical_rise_max.writeValue(fh);
+	helical_rise_inistep.writeValue(fh);
+	helical_z_percentage.writeValue(fh);
+	range_tilt.writeValue(fh);
+	range_psi.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -2965,6 +3402,25 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		do_alsorot_movies.readValue(fh);
 		movie_sigma_angles.readValue(fh);
 
+		// Helix
+		do_helix.readValue(fh);
+		//do_bimodal.readValue(fh);
+		helical_tube_inner_diameter.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_twist_initial.readValue(fh);
+		helical_rise_initial.readValue(fh);
+		do_local_search_helical_symmetry.readValue(fh);
+		helical_twist_min.readValue(fh);
+		helical_twist_max.readValue(fh);
+		helical_twist_inistep.readValue(fh);
+		helical_rise_min.readValue(fh);
+		helical_rise_max.readValue(fh);
+		helical_rise_inistep.readValue(fh);
+		helical_z_percentage.readValue(fh);
+		range_tilt.readValue(fh);
+		range_psi.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -3006,7 +3462,24 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	do_alsorot_movies.deactivate(!is_continue);
 	movie_sigma_angles.deactivate(!is_continue);
 
-
+	// Helix
+	do_helix.deactivate(is_continue);
+	//do_bimodal.deactivate(is_continue);
+	helical_tube_inner_diameter.deactivate(is_continue);
+	helical_tube_outer_diameter.deactivate(is_continue);
+	helical_nr_asu.deactivate(is_continue);
+	helical_twist_initial.deactivate(is_continue);
+	helical_rise_initial.deactivate(is_continue);
+	do_local_search_helical_symmetry.deactivate(is_continue);
+	helical_twist_min.deactivate(is_continue);
+	helical_twist_max.deactivate(is_continue);
+	helical_twist_inistep.deactivate(is_continue);
+	helical_rise_min.deactivate(is_continue);
+	helical_rise_max.deactivate(is_continue);
+	helical_rise_inistep.deactivate(is_continue);
+	helical_z_percentage.deactivate(is_continue);
+	range_tilt.deactivate(is_continue);
+	range_psi.deactivate(is_continue);
 }
 
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -3014,7 +3487,8 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.clear();
 	std::string command;
-	initialisePipeline(outputname, "Refine3D", true);
+
+	initialisePipeline(outputname, "Refine3D");
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -3144,6 +3618,41 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		}
 	}
 
+	// Helix
+	if ( (!is_continue) && (do_helix.getValue()) )
+	{
+		command += " --helix";
+		if (textToFloat(helical_tube_inner_diameter.getValue()) > 0.)
+			command += " --helical_inner_diameter " + floatToString(textToFloat(helical_tube_inner_diameter.getValue()));
+		command += " --helical_outer_diameter " + floatToString(textToFloat(helical_tube_outer_diameter.getValue()));
+		command += " --helical_z_percentage " + floatToString(helical_z_percentage.getValue() / 100.);
+		command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+		command += " --helical_twist_initial " + floatToString(textToFloat(helical_twist_initial.getValue()));
+		command += " --helical_rise_initial " + floatToString(textToFloat(helical_rise_initial.getValue()));
+		if (do_local_search_helical_symmetry.getValue())
+		{
+			command += " --helical_symmetry_search";
+			command += " --helical_twist_min " + floatToString(textToFloat(helical_twist_min.getValue()));
+			command += " --helical_twist_max " + floatToString(textToFloat(helical_twist_max.getValue()));
+			if (textToFloat(helical_twist_inistep.getValue()) > 0.)
+				command += " --helical_twist_inistep " + floatToString(textToFloat(helical_twist_inistep.getValue()));
+			command += " --helical_rise_min " + floatToString(textToFloat(helical_rise_min.getValue()));
+			command += " --helical_rise_max " + floatToString(textToFloat(helical_rise_max.getValue()));
+			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
+				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
+		}
+		command += " --helical_bimodal_search";
+		RFLOAT val;
+		val = textToFloat(range_tilt.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_tilt " + floatToString(val / 3.);
+		val = textToFloat(range_psi.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_psi " + floatToString(val / 3.);
+	}
+
 	// Running stuff
 	command += " --j " + floatToString(nr_threads.getValue());
 	if (!is_continue)
@@ -3158,7 +3667,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 }
 
-PolishJobWindow::PolishJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
+PolishJobWindow::PolishJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_POLISH;
@@ -3253,15 +3762,39 @@ Pixels values higher than this many times the image stddev will be replaced with
 
 	tab4->end();
 
+	tab5->begin();
+	tab5->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_helix.place(current_y, "Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.", helix_group);
+
+	helix_group->begin();
+
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the interbox distance (set in segment picking step) \
+is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
+signal to noise ratio in helical reconstruction.\n\nPlease copy this value from previous 3D refinement.");
+
+	helical_twist.placeOnSameYPosition(current_y, "Helical twist (deg), rise (A):", "Helical twist (deg):", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	helical_rise.placeOnSameYPosition(current_y, "", "Helical rise (A):", "0", "Helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
+Helical rise is a positive value in Angstroms.\n\nPlease copy the refined helical symmetry from previous 3D refinement.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+
+	helix_group->end();
+	do_helix.cb_menu_i(); // to make default effective
+
+	tab5->end();
+
 	// read settings if hidden file exists
-	read(".gui_polish", is_continue);
+	read(".gui_polishrun.job", is_continue);
 }
 
 void PolishJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_polish";
+		fn=".gui_polishrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3278,6 +3811,10 @@ void PolishJobWindow::write(std::string fn)
 	bg_diameter.writeValue(fh);
 	white_dust.writeValue(fh);
 	black_dust.writeValue(fh);
+	do_helix.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_twist.writeValue(fh);
+	helical_rise.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3300,6 +3837,10 @@ void PolishJobWindow::read(std::string fn, bool &_is_continue)
 		bg_diameter.readValue(fh);
 		white_dust.readValue(fh);
 		black_dust.readValue(fh);
+		do_helix.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_twist.readValue(fh);
+		helical_rise.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3308,6 +3849,10 @@ void PolishJobWindow::read(std::string fn, bool &_is_continue)
 void PolishJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_in.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
+
 }
 
 void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
@@ -3367,6 +3912,14 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --white_dust " + floatToString(white_dust.getValue());
 	command += " --black_dust " + floatToString(black_dust.getValue());
 
+	// Helix
+	if (do_helix.getValue())
+	{
+		command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+		command += " --helical_twist " + floatToString(textToFloat(helical_twist.getValue()));
+		command += " --helical_rise " + floatToString(textToFloat(helical_rise.getValue()));
+	}
+
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
 
@@ -3386,13 +3939,14 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_data.place(current_y, "Select individual particles:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
-	fn_model.place(current_y, "OR select from classes:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
+	fn_model.place(current_y, "Select 2D/3D classes:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
+	fn_mic.place(current_y, "OR select micrographs:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
+	fn_data.place(current_y, "OR select individual particles:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
 
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Options");
+	tab2->label("Class options");
 	resetHeight();
 
 	do_recenter.place(current_y, "Re-center the class averages?", true, "This option is only used when selecting particles from 2D classes. The selected class averages will all re-centered on their center-of-mass. This is useful when you plane to use these class averages as templates for auto-picking.");
@@ -3407,7 +3961,7 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_particleselect", is_continue);
+	read(".gui_particleselectrun.job", is_continue);
 }
 
 
@@ -3416,13 +3970,14 @@ void ClassSelectJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_particleselect";
+		fn=".gui_particleselectrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 
 	fn_model.writeValue(fh);
 	fn_data.writeValue(fh);
+	fn_mic.writeValue(fh);
 	do_recenter.writeValue(fh);
 	do_regroup.writeValue(fh);
 	nr_groups.writeValue(fh);
@@ -3439,6 +3994,7 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 	{
 		fn_model.readValue(fh);
 		fn_data.readValue(fh);
+		fn_mic.readValue(fh);
 		do_recenter.readValue(fh);
 		do_regroup.readValue(fh);
 		nr_groups.readValue(fh);
@@ -3452,6 +4008,16 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_model.deactivate(is_continue);
+	fn_data.deactivate(is_continue);
+	fn_mic.deactivate(is_continue);
+	do_recenter.deactivate(is_continue);
+	do_regroup.deactivate(is_continue);
+	nr_groups.deactivate(is_continue);
+
+	do_queue.deactivate(true);
+
 }
 
 void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -3459,7 +4025,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "ParticleSelect");
+	initialisePipeline(outputname, "Select");
 
 	std::string command;
 	command="`which relion_display`";
@@ -3470,6 +4036,11 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command += " --gui --i " + fn_model.getValue();
 		Node node(fn_model.getValue(), fn_model.type);
 		pipelineInputNodes.push_back(node);
+
+		FileName fn_parts = outputname+"particles.star";
+		command += " --allow_save --fn_parts " + fn_parts;
+		Node node2(fn_parts, NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node2);
 
 		// Only save the 2D class averages for 2D jobs
 		FileName fnt = fn_model.getValue();
@@ -3486,11 +4057,27 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 			}
 		}
 	}
-	else
+	else if (fn_mic.getValue() != "")
+	{
+		command += " --gui --i " + fn_mic.getValue();
+		Node node(fn_mic.getValue(), fn_mic.type);
+		pipelineInputNodes.push_back(node);
+
+		FileName fn_mics = outputname+"micrographs.star";
+		command += " --allow_save --fn_imgs " + fn_mics;
+		Node node2(fn_mics, NODE_MICS);
+		pipelineOutputNodes.push_back(node2);
+	}
+	else if (fn_data.getValue() != "")
 	{
 		command += " --gui --i " + fn_data.getValue();
 		Node node(fn_data.getValue(), fn_data.type);
 		pipelineInputNodes.push_back(node);
+
+		FileName fn_parts = outputname+"particles.star";
+		command += " --allow_save --fn_imgs " + fn_parts;
+		Node node2(fn_parts, NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node2);
 	}
 
 	// Re-grouping
@@ -3499,11 +4086,6 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command += " --regroup " + floatToString(nr_groups.getValue());
 	}
 
-
-	FileName fn_parts = outputname+"particles.star";
-	command += " --allow_save --fn_parts " + fn_parts;
-	Node node2(fn_parts, NODE_PART_DATA);
-	pipelineOutputNodes.push_back(node2);
 
 
 	// Other arguments
@@ -3516,7 +4098,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 }
 
 
-MaskCreateJobWindow::MaskCreateJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
+MaskCreateJobWindow::MaskCreateJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_MASKCREATE;
@@ -3545,8 +4127,26 @@ If you don't know what value to use, display one of the unfiltered half-maps in 
 
 	tab2->end();
 
+	tab3->begin();
+	tab3->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_helix.place(current_y, "Mask a 3D helix?", false, "Generate a mask for 3D helix which spans across Z axis of the box.", helix_group);
+
+	helix_group->begin();
+
+	helical_z_percentage.place(current_y, "Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used but you may want to try different lengths.");
+	helix_group->end();
+	do_helix.cb_menu_i(); // to make default effective
+
+	tab3->end();
+
 	// read settings if hidden file exists
-	read(".gui_maskcreate", is_continue);
+	read(".gui_maskcreaterun.job", is_continue);
 }
 
 
@@ -3555,7 +4155,7 @@ void MaskCreateJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_maskcreate";
+		fn=".gui_maskcreaterun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3566,6 +4166,8 @@ void MaskCreateJobWindow::write(std::string fn)
 	inimask_threshold.writeValue(fh);
 	extend_inimask.writeValue(fh);
 	width_mask_edge.writeValue(fh);
+	do_helix.writeValue(fh);
+	helical_z_percentage.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3583,6 +4185,8 @@ void MaskCreateJobWindow::read(std::string fn, bool &_is_continue)
 		inimask_threshold.readValue(fh);
 		extend_inimask.readValue(fh);
 		width_mask_edge.readValue(fh);
+		do_helix.readValue(fh);
+		helical_z_percentage.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3593,6 +4197,8 @@ void MaskCreateJobWindow::read(std::string fn, bool &_is_continue)
 void MaskCreateJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_in.deactivate(is_continue);
 }
 
 void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -3624,6 +4230,11 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command += " --extend_inimask " + floatToString(extend_inimask.getValue());
 	command += " --width_soft_edge " + floatToString(width_mask_edge.getValue());
 
+	if (do_helix.getValue())
+	{
+		command += " --helix --z_percentage " + floatToString(helical_z_percentage.getValue() / 100.);
+	}
+
 	// Other arguments
 	command += " " + other_args.getValue();
 
@@ -3636,18 +4247,40 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
-	type = PROC_MASKCREATE;
+	type = PROC_JOINSTAR;
 
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
+	part_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	part_group->end();
+	do_part.place(current_y, "Combine particle STAR files?", true, "", part_group);
+	part_group->begin();
+	fn_part1.place(current_y, "Particle STAR file 1: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The first of the particle STAR files to be combined.");
+	fn_part2.place(current_y, "Particle STAR file 2: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The second of the particle STAR files to be combined.");
+	fn_part3.place(current_y, "Particle STAR file 3: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The third of the particle STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_part4.place(current_y, "Particle STAR file 4: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The fourth of the particle STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	part_group->end();
+	do_part.cb_menu_i(); // make default active
 
-	fn_in1.place(current_y, "TODO!!:", NODE_PART_DATA, "", "particle STAR file (*.star)", "One of the particle STAR files to be combined.");
+	// Add a little spacer
+    current_y += STEPY/2;
+
+	mic_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	mic_group->end();
+	do_mic.place(current_y, "Combine micrograph STAR files?", false, "", mic_group);
+	mic_group->begin();
+	fn_mic1.place(current_y, "Micrograph STAR file 1: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The first of the micrograph STAR files to be combined.");
+	fn_mic2.place(current_y, "Micrograph STAR file 2: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The second of the micrograph STAR files to be combined.");
+	fn_mic3.place(current_y, "Micrograph STAR file 3: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The third of the micrograph STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_mic4.place(current_y, "Micrograph STAR file 4: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The fourth of the micrograph STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	mic_group->end();
+	do_mic.cb_menu_i(); // make default active
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_joinstar", is_continue);
+	read(".gui_joinstarrun.job", is_continue);
 }
 
 
@@ -3656,12 +4289,22 @@ void JoinStarJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_joinstar";
+		fn=".gui_joinstarrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
 
-	fn_in1.writeValue(fh);
+	do_part.writeValue(fh);
+	fn_part1.writeValue(fh);
+	fn_part2.writeValue(fh);
+	fn_part3.writeValue(fh);
+	fn_part4.writeValue(fh);
+
+	do_mic.writeValue(fh);
+	fn_mic1.writeValue(fh);
+	fn_mic2.writeValue(fh);
+	fn_mic3.writeValue(fh);
+	fn_mic4.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3673,7 +4316,17 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
-		fn_in1.readValue(fh);
+		do_part.readValue(fh);
+		fn_part1.readValue(fh);
+		fn_part2.readValue(fh);
+		fn_part3.readValue(fh);
+		fn_part4.readValue(fh);
+
+		do_mic.readValue(fh);
+		fn_mic1.readValue(fh);
+		fn_mic2.readValue(fh);
+		fn_mic3.readValue(fh);
+		fn_mic4.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3684,6 +4337,18 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	do_part.deactivate(is_continue);
+	fn_part1.deactivate(is_continue);
+	fn_part2.deactivate(is_continue);
+	fn_part3.deactivate(is_continue);
+	fn_part4.deactivate(is_continue);
+
+	do_mic.deactivate(is_continue);
+	fn_mic1.deactivate(is_continue);
+	fn_mic2.deactivate(is_continue);
+	fn_mic3.deactivate(is_continue);
+	fn_mic4.deactivate(is_continue);
 }
 
 void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -3697,9 +4362,60 @@ void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command="`which relion_star_combine`";
 
 	// I/O  TODO!!!
-	command += " --i " + fn_in1.getValue();
-	Node node(fn_in1.getValue(), fn_in1.type);
-	pipelineInputNodes.push_back(node);
+	if (do_part.getValue())
+	{
+		command += " --i \" " + fn_part1.getValue();
+		Node node(fn_part1.getValue(), fn_part1.type);
+		pipelineInputNodes.push_back(node);
+		command += " " + fn_part2.getValue();
+		Node node2(fn_part2.getValue(), fn_part2.type);
+		pipelineInputNodes.push_back(node2);
+		if (fn_part3.getValue() != "")
+		{
+			command += " " + fn_part3.getValue();
+			Node node3(fn_part3.getValue(), fn_part3.type);
+			pipelineInputNodes.push_back(node3);
+		}
+		if (fn_part4.getValue() != "")
+		{
+			command += " " + fn_part4.getValue();
+			Node node4(fn_part4.getValue(), fn_part4.type);
+			pipelineInputNodes.push_back(node4);
+		}
+		command += " \" ";
+
+		command += " --o " + outputname + "join_particles.star";
+		Node node5(outputname + "join_particles.star", fn_part1.type);
+		pipelineOutputNodes.push_back(node5);
+
+	}
+	else if (do_mic.getValue())
+	{
+		command += " --i \" " + fn_mic1.getValue();
+		Node node(fn_mic1.getValue(), fn_mic1.type);
+		pipelineInputNodes.push_back(node);
+		command += " " + fn_mic2.getValue();
+		Node node2(fn_mic2.getValue(), fn_mic2.type);
+		pipelineInputNodes.push_back(node2);
+		if (fn_mic3.getValue() != "")
+		{
+			command += " " + fn_mic3.getValue();
+			Node node3(fn_mic3.getValue(), fn_mic3.type);
+			pipelineInputNodes.push_back(node3);
+		}
+		if (fn_mic4.getValue() != "")
+		{
+			command += " " + fn_mic4.getValue();
+			Node node4(fn_mic4.getValue(), fn_mic4.type);
+			pipelineInputNodes.push_back(node4);
+		}
+		command += " \" ";
+
+		command += " --o " + outputname + "join_mics.star";
+		Node node5(outputname + "join_mics.star", fn_mic1.type);
+		pipelineOutputNodes.push_back(node5);
+
+	}
 
 	// Other arguments
 	command += " " + other_args.getValue();
@@ -3755,7 +4471,7 @@ However, if the phases have been flipped, you should tell the program about it b
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_subtract", is_continue);
+	read(".gui_subtractrun.job", is_continue);
 }
 
 
@@ -3764,7 +4480,7 @@ void SubtractJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_subtract";
+		fn=".gui_subtractrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3804,6 +4520,14 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 
 void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 {
+	fn_data.deactivate(is_continue);
+	fn_in.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
+
+	do_ctf_correction.deactivate(is_continue);
+	ctf_phase_flipped.deactivate(is_continue);
+	ctf_intact_first_peak.deactivate(is_continue);
+
 	is_continue = _is_continue;
 }
 
@@ -3922,14 +4646,14 @@ In such cases, set this option to Yes and provide an ad-hoc filter as described 
 
 
 	// read settings if hidden file exists
-	read(".gui_post", is_continue);
+	read(".gui_postrun.job", is_continue);
 }
 
 void PostJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_post";
+		fn=".gui_postrun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3968,6 +4692,9 @@ void PostJobWindow::read(std::string fn, bool &_is_continue)
 }
 void PostJobWindow::toggle_new_continue(bool _is_continue)
 {
+	fn_in.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
+
 	is_continue = _is_continue;
 }
 
@@ -4079,14 +4806,14 @@ Note that values larger than zero will be changed to 1 by ResMap, therefore the 
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_resmap", is_continue);
+	read(".gui_resmaprun.job", is_continue);
 }
 
 void ResmapJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmap";
+		fn=".gui_resmaprun.job";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4121,6 +4848,10 @@ void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	fn_resmap.deactivate(is_continue);
+	fn_in.deactivate(is_continue);
+
 	// never submit this to queue, as ResMap needs user interaction
 	do_queue.deactivate(true);
 }

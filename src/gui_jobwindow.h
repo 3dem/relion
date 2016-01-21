@@ -21,8 +21,6 @@
 #ifndef GUI_JOBWINDOW_H_
 #define GUI_JOBWINDOW_H_
 
-#define MENUHEIGHT 30
-#define TABHEIGHT 25
 #define HAS_MPI true
 #define HAS_NOT_MPI false
 #define HAS_THREAD true
@@ -95,7 +93,7 @@ public:
 
 	// Tabs
     Fl_Tabs *tabs;
-	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *runtab;
+	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *tab7, *runtab;
 
 	// Running
 	Fl_Group *queue_group;
@@ -128,7 +126,7 @@ public:
 public:
 	// Constructor with x, y, w, h and a title
 	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
-			int x = WCOL0, int y = MENUHEIGHT+10, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
+			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
 
     // Destructor
     ~RelionJobWindow() {};
@@ -150,7 +148,7 @@ public:
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
 
 	// Initialise pipeiline stuff for each job, return outputname
-	void initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue = false);
+	void initialisePipeline(std::string &outputname, std::string defaultname);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
@@ -304,8 +302,12 @@ public:
 	SliderEntry threshold_autopick;
 	SliderEntry mindist_autopick;
 	SliderEntry maxstddevnoise_autopick;
+	BooleanEntry do_pick_helical_segments;
+	SliderEntry helical_tube_kappa_max;
+	SliderEntry helical_tube_outer_diameter;
+	SliderEntry helical_tube_length_min;
 
-	Fl_Group *autopick_ctf_group;
+	Fl_Group *autopick_ctf_group, *autopick_helix_group;
 
 public:
 
@@ -400,7 +402,14 @@ public:
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
 
-	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group;
+	// Helix
+	BooleanEntry do_extract_helix;
+	BooleanEntry do_extract_helical_tubes;
+	SliderEntry helical_nr_asu;
+	SliderEntry helical_rise;
+	SliderEntry helical_tube_outer_diameter;
+
+	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group, *helix_group, *helical_tubes_group;
 
 public:
 
@@ -484,7 +493,11 @@ public:
 	SliderEntry offset_range;
 	SliderEntry offset_step;
 
-	Fl_Group *ctf_group, *dont_skip_align_group;
+	// Helix
+	BooleanEntry do_bimodal_psi;
+	SliderEntry range_psi;
+
+	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
 
 public:
 
@@ -546,7 +559,27 @@ public:
 	BooleanEntry do_local_ang_searches;
 	SliderEntry sigma_angles;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group;
+	// Helix
+	//textOnlyEntry helix_text;
+	BooleanEntry do_helix;
+	//BooleanEntry do_bimodal;
+	AnyEntry helical_tube_inner_diameter;
+	AnyEntry helical_tube_outer_diameter;
+	SliderEntry helical_nr_asu;
+	AnyEntry helical_twist_initial;
+	AnyEntry helical_rise_initial;
+	BooleanEntry do_local_search_helical_symmetry;
+	AnyEntry helical_twist_min;
+	AnyEntry helical_twist_max;
+	AnyEntry helical_twist_inistep;
+	AnyEntry helical_rise_min;
+	AnyEntry helical_rise_max;
+	AnyEntry helical_rise_inistep;
+	SliderEntry helical_z_percentage;
+	AnyEntry range_tilt;
+	AnyEntry range_psi;
+
+	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group;
 
 public:
 
@@ -611,7 +644,27 @@ public:
 	BooleanEntry do_alsorot_movies;
 	SliderEntry movie_sigma_angles;
 
-	Fl_Group *ctf_group, *movie_group, *alsorot_movie_group;
+	// Helix
+	//textOnlyEntry helix_text;
+	BooleanEntry do_helix;
+	//BooleanEntry do_bimodal;
+	AnyEntry helical_tube_inner_diameter;
+	AnyEntry helical_tube_outer_diameter;
+	SliderEntry helical_nr_asu;
+	AnyEntry helical_twist_initial;
+	AnyEntry helical_rise_initial;
+	BooleanEntry do_local_search_helical_symmetry;
+	AnyEntry helical_twist_min;
+	AnyEntry helical_twist_max;
+	AnyEntry helical_twist_inistep;
+	AnyEntry helical_rise_min;
+	AnyEntry helical_rise_max;
+	AnyEntry helical_rise_inistep;
+	SliderEntry helical_z_percentage;
+	AnyEntry range_tilt;
+	AnyEntry range_psi;
+
+	Fl_Group *ctf_group, *movie_group, *alsorot_movie_group, *helix_group, *helix_symmetry_search_group;
 
 public:
 
@@ -659,8 +712,13 @@ public:
 	SliderEntry white_dust;
 	SliderEntry black_dust;
 
-	Fl_Group *fit_group, *weight_group;
+	// Helix
+	BooleanEntry do_helix;
+	SliderEntry helical_nr_asu;
+	AnyEntry helical_twist;
+	AnyEntry helical_rise;
 
+	Fl_Group *fit_group, *weight_group, *helix_group;
 
 public:
 	// Constructor
@@ -688,6 +746,7 @@ public:
 	// I/O
 	InputNodeEntry fn_model;
 	InputNodeEntry fn_data;
+	InputNodeEntry fn_mic;
 
 	BooleanEntry do_recenter;
 	BooleanEntry do_regroup;
@@ -726,7 +785,10 @@ public:
 	SliderEntry inimask_threshold;
 	SliderEntry extend_inimask;
 	SliderEntry width_mask_edge;
+	BooleanEntry do_helix;
+	SliderEntry helical_z_percentage;
 
+	Fl_Group *helix_group;
 
 public:
 
@@ -753,8 +815,19 @@ class JoinStarJobWindow : public RelionJobWindow
 public:
 
 	// I/O
-	InputNodeEntry fn_in1;
-	InputNodeEntry fn_in2;
+	BooleanEntry do_part;
+	InputNodeEntry fn_part1;
+	InputNodeEntry fn_part2;
+	InputNodeEntry fn_part3;
+	InputNodeEntry fn_part4;
+
+	BooleanEntry do_mic;
+	InputNodeEntry fn_mic1;
+	InputNodeEntry fn_mic2;
+	InputNodeEntry fn_mic3;
+	InputNodeEntry fn_mic4;
+
+	Fl_Group *part_group, *mic_group;
 
 public:
 

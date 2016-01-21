@@ -50,9 +50,9 @@ void ParticlePolisher::read(int argc, char **argv)
 	fit_minres = textToFloat(parser.getOption("--autob_lowres", "Lowest resolution (in A) to include in fitting of the B-factor", "20."));
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 	// Sep24,2015 - Shaoda, Helical reconstruction
-	nr_helical_asu = textToInteger(parser.getOption("--h_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
-	helical_twist = textToFloat(parser.getOption("--h_twist", "Helical twist (in degrees, positive values for right-handedness)", "0."));
-	helical_rise = textToFloat(parser.getOption("--h_rise", "Helical rise (in Angstroms)", "0."));
+	helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
+	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, positive values for right-handedness)", "0."));
+	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
 
 	fn_mask = parser.getOption("--mask", "Postprocessing mask for B-factor determination of per-frame reconstructions (1=protein, 0=solvent, all values in range [0,1])", "");
 
@@ -149,7 +149,7 @@ void ParticlePolisher::initialise()
 	}
 
 	// Sep24,2015 - Shaoda, Helical reconstruction
-	if (nr_helical_asu > 1)
+	if (helical_nr_asu > 1)
 	{
 		if ( (fabs(helical_twist) < 0.01) || (fabs(helical_twist) > 179.99) || (angpix < 0.001) || ((helical_rise / angpix) < 0.001))
 			REPORT_ERROR("ERROR: Invalid helical twist or rise!");
@@ -640,7 +640,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 
 	}
 
-	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise / angpix);
+	backprojector.symmetrise(helical_nr_asu, helical_twist, helical_rise / angpix);
 
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;
@@ -784,9 +784,9 @@ void ParticlePolisher::changeParticleStackName(FileName &fn_part)
 	FileName fn_stack;
 	fn_part.decompose(nr, fn_stack);
 	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_part, uniqdate);
-	FileName fn_part_nouniqdate = (slashpos!= std::string::npos) ? fn_part.substr(slashpos+15) : fn_part;
-	fn_part = fn_out + fn_part_nouniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_stack, uniqdate);
+	FileName fn_stack_nouniqdate = (slashpos!= std::string::npos) ? fn_stack.substr(slashpos+15) : fn_stack;
+	fn_part = fn_out + fn_stack_nouniqdate;
 
 }
 
@@ -963,7 +963,6 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		if (ipar == 0)
 		{
 			FileName fn_dir = fn_part.beforeLastOf("/");
-			std::cerr << "making directory " << fn_dir << std::endl;
 			if (fn_dir != fn_olddir)
 			{
 				// Make a Particles directory
@@ -1141,7 +1140,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 	}
 
 
-	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise / angpix);
+	backprojector.symmetrise(helical_nr_asu, helical_twist, helical_rise / angpix);
 
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;

@@ -223,7 +223,6 @@ void MlOptimiserMpi::initialise()
 		}
 	}
 
-
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
 #endif
@@ -255,7 +254,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     // First split the data into two random halves and then randomise the particle order
 	if (do_split_random_halves)
-		mydata.divideOriginalParticlesInRandomHalves(random_seed);
+		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
 
 	// Randomise the order of the particles
     mydata.randomiseOriginalParticlesOrder(random_seed, do_split_random_halves);
@@ -1306,9 +1305,9 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	// Aug05,2015 - Shaoda, helical refinement
-	helical_twist_half1 = helical_twist_half2 = helical_twist;
-	helical_rise_half1 = helical_rise_half2 = helical_rise;
+	RFLOAT helical_twist_half1, helical_rise_half1, helical_twist_half2, helical_rise_half2;
+	helical_twist_half1 = helical_twist_half2 = helical_twist_initial;
+	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
 
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -1355,36 +1354,40 @@ void MlOptimiserMpi::maximization()
 					}
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
-					if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+					if ( (iter > 1) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
 					{
 						localSearchHelicalSymmetry(
 								mymodel.Iref[ith_recons],
 								mymodel.pixel_size,
 								(particle_diameter / 2.),
-								(helical_mask_tube_inner_diameter / 2.),
-								(helical_mask_tube_outer_diameter / 2.),
-								helical_central_proportion,
-								helical_rise,
-								helical_twist,
-								helical_symmetry_local_refinement_max_dev,
-								helical_symmetry_local_refinement_max_dev,
-								helical_rise_half1,
-								helical_twist_half1);
+								(helical_tube_inner_diameter / 2.),
+								(helical_tube_outer_diameter / 2.),
+								helical_z_percentage,
+								mymodel.helical_rise_min,
+								mymodel.helical_rise_max,
+								mymodel.helical_rise_inistep,
+								mymodel.helical_rise[ith_recons],
+								mymodel.helical_twist_min,
+								mymodel.helical_twist_max,
+								mymodel.helical_twist_inistep,
+								mymodel.helical_twist[ith_recons]);
 					}
 					// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
-					if( (do_helical_refine) && (!has_converged) )
+					if ( (do_helical_refine) && (!has_converged) )
 					{
-						makeHelicalReferenceInRealSpace(
+						imposeHelicalSymmetryInRealSpace(
 								mymodel.Iref[ith_recons],
 								mymodel.pixel_size,
-								helical_twist_half1,
-								helical_rise_half1,
-								helical_central_proportion,
 								(particle_diameter / 2.),
-								(helical_mask_tube_inner_diameter / 2.),
-								(helical_mask_tube_outer_diameter / 2.),
+								(helical_tube_inner_diameter / 2.),
+								(helical_tube_outer_diameter / 2.),
+								helical_z_percentage,
+								mymodel.helical_rise[ith_recons],
+								mymodel.helical_twist[ith_recons],
 								width_mask_edge);
 					}
+					helical_rise_half1 = mymodel.helical_rise[ith_recons];
+					helical_twist_half1 = mymodel.helical_twist[ith_recons];
 				}
 
 				// In some cases there is not enough memory to reconstruct two random halves in parallel
@@ -1426,34 +1429,36 @@ void MlOptimiserMpi::maximization()
 						}
 
 						// Shaoda Jul26,2015 - Helical symmetry local refinement
-						if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+						if ( (iter > 1) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
 						{
 							localSearchHelicalSymmetry(
 									mymodel.Iref[ith_recons],
 									mymodel.pixel_size,
 									(particle_diameter / 2.),
-									(helical_mask_tube_inner_diameter / 2.),
-									(helical_mask_tube_outer_diameter / 2.),
-									helical_central_proportion,
-									helical_rise,
-									helical_twist,
-									helical_symmetry_local_refinement_max_dev,
-									helical_symmetry_local_refinement_max_dev,
+									(helical_tube_inner_diameter / 2.),
+									(helical_tube_outer_diameter / 2.),
+									helical_z_percentage,
+									mymodel.helical_rise_min,
+									mymodel.helical_rise_max,
+									mymodel.helical_rise_inistep,
 									helical_rise_half2,
+									mymodel.helical_twist_min,
+									mymodel.helical_twist_max,
+									mymodel.helical_twist_inistep,
 									helical_twist_half2);
 						}
 						// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
 						if( (do_helical_refine) && (!has_converged) )
 						{
-							makeHelicalReferenceInRealSpace(
+							imposeHelicalSymmetryInRealSpace(
 									mymodel.Iref[ith_recons],
 									mymodel.pixel_size,
-									helical_twist_half2,
-									helical_rise_half2,
-									helical_central_proportion,
 									(particle_diameter / 2.),
-									(helical_mask_tube_inner_diameter / 2.),
-									(helical_mask_tube_outer_diameter / 2.),
+									(helical_tube_inner_diameter / 2.),
+									(helical_tube_outer_diameter / 2.),
+									helical_z_percentage,
+									helical_rise_half2,
+									helical_twist_half2,
 									width_mask_edge);
 						}
 
@@ -1549,15 +1554,19 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the sigma2_class spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
 						MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-
+				// Broadcast helical rise and twist of this 3D class
+				if (do_helical_refine)
+				{
+					node->relion_MPI_Bcast(&mymodel.helical_rise[iclass], 1, MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+					node->relion_MPI_Bcast(&mymodel.helical_twist[iclass], 1, MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				}
 			}
 
 			// Re-set the origin (this may be lost in some cases??)
 			mymodel.Iref[ith_recons].setXmippOrigin();
 
 			// Aug05,2015 - Shaoda, helical symmetry refinement, broadcast refined helical parameters
-			if ( (mymodel.pdf_class[iclass] > 0.)
-					&& (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+			if ( (iter > 1) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
 			{
 				int reconstruct_rank1;
 				if (do_split_random_halves)
@@ -1611,100 +1620,30 @@ void MlOptimiserMpi::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
-	// Aug05,2015 - Shaoda, Output for helical refinement
 	if ( (verb > 0) && (do_helical_refine) )
 	{
-		std::cout << " Helical parameters (before refinement): twist = " << helical_twist
-				<< " degrees, rise = " << helical_rise << " Angstroms ("
-				<< (helical_rise / mymodel.pixel_size) << " pixels), asymmetrical units = "
-				<< nr_helical_asu << ", central Z proportion = "
-				<< helical_central_proportion << ", spherical diameter = "
-				<< particle_diameter << " Angstroms ("
-				<< (particle_diameter / mymodel.pixel_size) << " pixels), tube inner diameter = "
-				<< helical_mask_tube_inner_diameter << " Angstroms ("
-				<< (helical_mask_tube_inner_diameter / mymodel.pixel_size) << " pixels), tube outer diameter = "
-				<< helical_mask_tube_outer_diameter << " Angstroms ("
-				<< (helical_mask_tube_outer_diameter / mymodel.pixel_size) << " pixels), edge width (mask) = "
-				<< width_mask_edge << " pixels." << std::endl;
+		outputHelicalSymmetryStatus(
+				iter,
+				helical_rise_initial,
+				mymodel.helical_rise_min,
+				mymodel.helical_rise_max,
+				helical_twist_initial,
+				mymodel.helical_twist_min,
+				mymodel.helical_twist_max,
+				do_helical_symmetry_local_refinement,
+				mymodel.helical_rise,
+				mymodel.helical_twist,
+				helical_rise_half1,
+				helical_rise_half2,
+				helical_twist_half1,
+				helical_twist_half2,
+				do_split_random_halves, // TODO: && !join_random_halves ???
+				std::cout);
 	}
-	if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+	if (do_helical_refine && do_split_random_halves)
 	{
-		if (verb > 0)
-		{
-			RFLOAT nr_units_min = 2.;
-			RFLOAT twist_deg_min, twist_deg_max, rise_A_min, rise_A_max, rise_A_threshold;
-
-			twist_deg_min = helical_twist * (1. - helical_symmetry_local_refinement_max_dev);
-			twist_deg_max = helical_twist * (1. + helical_symmetry_local_refinement_max_dev);
-			if (fabs(twist_deg_min) < 0.01)
-				twist_deg_min = (twist_deg_min > 0.) ? (0.01) : (-0.01);
-			if (fabs(twist_deg_max) > 179.99)
-				twist_deg_max = (twist_deg_max > 0.) ? (179.99) : (-179.99);
-
-			rise_A_min = helical_rise * (1. - helical_symmetry_local_refinement_max_dev);
-			rise_A_max = helical_rise * (1. + helical_symmetry_local_refinement_max_dev);
-			rise_A_threshold = get_rise_A_max(mymodel.ori_size, mymodel.pixel_size, helical_central_proportion, nr_units_min);
-			if ( (rise_A_min / mymodel.pixel_size) < 0.001)
-				rise_A_min = 0.001 * mymodel.pixel_size;
-			if (rise_A_max > rise_A_threshold)
-			{
-				rise_A_max = rise_A_threshold;
-				std::cout << " WARNING: Increase of lenZ_percentage will enable larger range for helical rise searches." << std::endl;
-			}
-
-			std::cout << " Helical twist searched from "
-					<< twist_deg_min << " to " << twist_deg_max << " degrees, rise from "
-					<< rise_A_min << " to " << rise_A_max << " Angstroms ("
-					<< (rise_A_min / mymodel.pixel_size) << " to " << (rise_A_max / mymodel.pixel_size)
-					<< " pixels)." << std::endl;
-
-			if (do_split_random_halves)
-			{
-				std::cout << " Refined helical parameters (half1): twist = "
-						<< helical_twist_half1 << " degrees, rise = "
-						<< helical_rise_half1 << " Angstroms ("
-						<< (helical_rise_half1 / mymodel.pixel_size) << " pixels)" << std::endl;
-				std::cout << " Refined helical parameters (half2): twist = "
-						<< helical_twist_half2 << " degrees, rise = "
-						<< helical_rise_half2 << " Angstroms ("
-						<< (helical_rise_half2 / mymodel.pixel_size) << " pixels)" << std::endl;
-			}
-			else
-			{
-				std::cout << " Refined helical parameters: twist = "
-						<< helical_twist_half1 << " degrees, rise = "
-						<< helical_rise_half1 << " Angstroms ("
-						<< (helical_rise_half1 / mymodel.pixel_size) << " pixels)" << std::endl;
-			}
-		}
-
-		// No need to average/modify helical parameters if nr_asu==1 (when no helical symmetry is applied in Fourier space)
-		if (nr_helical_asu > 1)
-		{
-			if (do_split_random_halves)
-			{
-				if (verb > 0)
-				{
-					if ( (fabs((helical_twist_half1 / helical_twist_half2) - 1.) > 0.01)
-							|| (fabs((helical_rise_half1 / helical_rise_half2) - 1.) > 0.01) )
-						std::cout << " WARNING: Refined helical parameters from the two halves are different ( >1% apart)! Averaged parameters might be wrong! Please make sure that the data set is large enough and does not contain multiple symmetries! You probably need not worry if they converge during the next few iterations." << std::endl;
-				}
-				helical_twist = (helical_twist_half1 + helical_twist_half2) / 2.;
-				helical_rise = (helical_rise_half1 + helical_rise_half2) / 2.;
-				if (verb > 0)
-				{
-					std::cout << " Averaged helical parameters will be used for the next iteration: twist = "
-							<< helical_twist << " degrees, rise = "
-							<< helical_rise << " Angstroms ("
-							<< (helical_rise / mymodel.pixel_size) << " pixels)" << std::endl;
-				}
-			}
-			else
-			{
-				helical_twist = helical_twist_half1;
-				helical_rise = helical_rise_half1;
-			}
-		}
+		mymodel.helical_rise[0] = (helical_rise_half1 + helical_rise_half2) / 2.;
+		mymodel.helical_twist[0] = (helical_twist_half1 + helical_twist_half2) / 2.;
 	}
 
 #ifdef DEBUG
@@ -2212,7 +2151,7 @@ void MlOptimiserMpi::iterate()
 		{
 			if (do_helical_refine)
 			{
-				if (nr_helical_asu > 1)
+				if (mymodel.helical_nr_asu > 1)
 					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
 				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
 				{
@@ -2290,6 +2229,15 @@ void MlOptimiserMpi::iterate()
 		timer.toc(TIMING_MAX);
 #endif
 
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (node->isMaster())
+		{
+			if (do_helical_refine)
+			{
+				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+			}
+		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
 		// Mask the reconstructions to get rid of noisy solvent areas

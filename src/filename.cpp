@@ -422,7 +422,7 @@ std::string getUniqDateString()
 	std::string uniqstr = integerToString(ltm->tm_year%100, 2);
 	uniqstr+= integerToString(1 + ltm->tm_mon, 2);
 	uniqstr+= integerToString(ltm->tm_mday, 2);
-	uniqstr+= "-";
+	uniqstr+= ".";
 	uniqstr+= integerToString(ltm->tm_hour, 2);
 	uniqstr+= integerToString(ltm->tm_min, 2);
 	uniqstr+= integerToString(ltm->tm_sec, 2);
@@ -442,7 +442,8 @@ size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
 		slashpos = fnt.find("/", slashpos+1);
 		if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
 		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
-		    fnt[slashpos+7] == '-' &&
+		    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
+		    (fnt[slashpos+7] == '.' || fnt[slashpos+7] == '-') &&
 		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
 		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
 			{

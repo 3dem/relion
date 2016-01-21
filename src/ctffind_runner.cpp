@@ -106,35 +106,34 @@ void CtffindRunner::initialise()
 	{
 		MetaDataTable MDin;
 		MDin.read(fn_in);
-		fn_micrographs.clear();
+		fn_micrographs_all.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
 			FileName fn_mic;
 			MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-			fn_micrographs.push_back(fn_mic);
+			fn_micrographs_all.push_back(fn_mic);
 		}
 	}
 	else
 	{
-		fn_in.globFiles(fn_micrographs);
+		fn_in.globFiles(fn_micrographs_all);
 	}
 
 	// If we're continuing an old run, see which micrographs have not been finished yet...
 	if (continue_old)
 	{
-		std::vector<FileName> fns_todo;
-		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
+		fn_micrographs.clear();
+		for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
 		{
-			FileName fn_microot = fn_micrographs[imic].without(".mrc");
+			FileName fn_microot = fn_micrographs_all[imic].without(".mrc");
 			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
 					HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore, false)) // false: dont die if not found Final values
-				fns_todo.push_back(fn_micrographs[imic]);
+				fn_micrographs.push_back(fn_micrographs_all[imic]);
 		}
-
-		fn_micrographs = fns_todo;
-
 	}
+	else
+		fn_micrographs = fn_micrographs_all;
 
 	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
     char temp [180];
@@ -197,26 +196,26 @@ void CtffindRunner::run()
 			barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 		}
 
-		std::string allmicnames = "";
+		std::vector<std::string> allmicnames;
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 
 			if (do_use_gctf)
 			{
-				addToGctfJobList(imic, allmicnames);
+				//addToGctfJobList(imic, allmicnames);
+				executeGctf(imic, allmicnames, imic+1==fn_micrographs.size());
 			}
 			else
 			{
-
-				if (verb > 0 && imic % barstep == 0)
-					progress_bar(imic);
-
 				executeCtffind(imic);
 			}
+
+			if (verb > 0 && imic % barstep == 0)
+				progress_bar(imic);
 		}
 
-		if (do_use_gctf)
-			executeGctf(allmicnames);
+		//if (do_use_gctf)
+		//	executeGctf(allmicnames);
 
 		if (verb > 0)
 			progress_bar(fn_micrographs.size());
@@ -228,21 +227,22 @@ void CtffindRunner::run()
 
 void CtffindRunner::joinCtffindResults()
 {
+
 	MetaDataTable MDctf;
-	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
+	for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
     {
-		FileName outputfile= getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
-		FileName fn_microot = outputfile.without(".mrc");
+		FileName fn_microot = fn_micrographs_all[imic].without(".mrc");
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., bfac = -1., valscore = -1.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
 				HT, CS, AmpCnst, XMAG, DStep, maxres, bfac, valscore);
 
 		if (!has_this_ctf)
-			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for");
+			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for " + fn_micrographs_all[imic] );
 
-		FileName fn_ctf = fn_microot + ".ctf:mrc";
+		FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
+		FileName fn_ctf = fn_root + ".ctf:mrc";
 		MDctf.addObject();
-		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs[imic]);
+		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
 	    MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
 		MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
 	    MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
@@ -262,10 +262,23 @@ void CtffindRunner::joinCtffindResults()
 
     }
 	MDctf.write(fn_out+"micrographs_ctf.star");
+	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
+
+	if (do_use_gctf)
+	{
+		FileName fn_gctf_junk = "micrographs_all_gctf";
+		if (exists(fn_gctf_junk))
+			remove(fn_gctf_junk.c_str());
+		fn_gctf_junk = "extra_micrographs_all_gctf";
+		if (exists(fn_gctf_junk))
+			remove(fn_gctf_junk.c_str());
+	}
+
+
 }
 
-
-void CtffindRunner::addToGctfJobList(long int i, std::string  &allmicnames)
+/*
+void CtffindRunner::addToGctfJobList(long int i, std::vector<std::string>  &allmicnames)
 {
 
 	Image<double> Itmp;
@@ -276,11 +289,12 @@ void CtffindRunner::addToGctfJobList(long int i, std::string  &allmicnames)
 	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
 		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs[i]);
 
-	allmicnames +=  " " + outputfile;
+	allmicnames.push_back(outputfile);
 
 }
 
-void CtffindRunner::executeGctf(std::string &allmicnames)
+
+void CtffindRunner::executeGctf(std::vector<std::string> &allmicnames)
 {
 
 	std::string command = fn_gctf_exe;
@@ -306,9 +320,12 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 	if (do_validation)
 		command += " --do_validation ";
 
-	command += allmicnames;
+	for (size_t i = 0; i<allmicnames.size(); i++)
+		command += allmicnames[i];
 
-	std::cerr << "command= " << command << std::endl;
+	// Redirect all gctf output
+	command += " >& " + fn_out + "gctf.out ";
+
 	int res = system(command.c_str());
 
 	// Cleanup all the symbolic links again
@@ -318,12 +335,68 @@ void CtffindRunner::executeGctf(std::string &allmicnames)
 		remove(output.c_str());
 	}
 
-	FileName fn_gctf_junk = "micrographs_all_gctf";
-	if (exists(fn_gctf_junk))
-		remove(fn_gctf_junk.c_str());
-	fn_gctf_junk = "extra_micrographs_all_gctf";
-	if (exists(fn_gctf_junk))
-		remove(fn_gctf_junk.c_str());
+
+}
+*/
+
+void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicnames, bool is_last, int rank)
+{
+
+	// Always add the new micrograph to the TODO list
+	Image<double> Itmp;
+	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
+	Itmp.read(outputfile, false); // false means only read header!
+	if (XSIZE(Itmp()) != xdim || YSIZE(Itmp()) != ydim)
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs[imic] + " is different from the first micrograph!");
+	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs[imic]);
+
+	allmicnames.push_back(outputfile);
+
+	// Execute Gctf every 20 images, and always for the last one
+	if (imic+1%20 || is_last)
+	{
+		std::string command = fn_gctf_exe;
+		//command +=  " --ctfstar " + fn_out + "tt_micrographs_ctf.star";
+		command +=  " --apix " + floatToString(angpix);
+		command +=  " --cs " + floatToString(Cs);
+		command +=  " --kV " + floatToString(Voltage);
+		command +=  " --ac " + floatToString(AmplitudeConstrast);
+		if (!do_ignore_ctffind_params)
+		{
+			command += " --boxsize " + floatToString(box_size);
+			command += " --resL " + floatToString(resol_min);
+			command += " --resH " + floatToString(resol_max);
+			command += " --defL " + floatToString(min_defocus);
+			command += " --defH " + floatToString(max_defocus);
+			command += " --defS " + floatToString(step_defocus);
+			command += " --astm " + floatToString(amount_astigmatism);
+		}
+
+		if (do_EPA)
+			command += " --do_EPA ";
+
+		if (do_validation)
+			command += " --do_validation ";
+
+		for (size_t i = 0; i<allmicnames.size(); i++)
+			command += allmicnames[i];
+
+		// TODO: better control over which GPU to use. For now, gid = rank!
+		command += " --gid " + integerToString(rank);
+
+		// Redirect all gctf output
+		command += " >> " + fn_out + "gctf" + integerToString(rank)+".out  2>> " + fn_out + "gctf" + integerToString(rank)+".err";
+		int res = system(command.c_str());
+
+		// Cleanup all the symbolic links again
+		for (size_t i = 0; i < allmicnames.size(); i++)
+			remove(allmicnames[i].c_str());
+
+		// Re-set the allmicnames vector
+		allmicnames.clear();
+	}
+
 
 }
 
@@ -396,9 +469,10 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 		RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found)
 {
 
-	FileName fn_log = fn_microot + "_ctffind3.log";
+	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
+	FileName fn_log = fn_root + "_ctffind3.log";
 	if (do_use_gctf && !exists(fn_log)) // also test _gctf.log file
-		fn_log = fn_microot + "_gctf.log";
+		fn_log = fn_root + "_gctf.log";
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
     if (in.fail())
@@ -446,9 +520,7 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     	if (do_use_gctf && line.find("Resolution limit estimated by EPA:") != std::string::npos)
     	{
             tokenize(line, words);
-             if (words.size() < 7)
-             	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
-             maxres = textToFloat(words[6]);
+            maxres = textToFloat(words[words.size()-1]);
     	}
 
     	if (do_use_gctf && line.find("Estimated Bfactor:") != std::string::npos)
@@ -462,14 +534,10 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     	if (do_use_gctf && line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
     	{
             tokenize(line, words);
-             if (words.size() < 2)
-             	REPORT_ERROR("ERROR: Unexpected number of words on OVERALL_VALIDATION_SCORE line in " + fn_log);
-             valscore = textToFloat(words[1]);
+            valscore = textToFloat(words[words.size()-1]);
     	}
-
-
-
     }
+
     if (!Cs_is_found && die_if_not_found)
     	REPORT_ERROR("ERROR: cannot find line with Cs[mm], HT[kV], etc values in " + fn_log);
     if (!Final_is_found && die_if_not_found)

@@ -189,32 +189,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		fnt = parser.getOption("--offset_step", "Sampling rate for origin offsets (in pixels)", "OLD");
 		if (fnt != "OLD")
 			sampling.offset_step = textToFloat(fnt);
-
-		// Jun19,2015 - Shaoda, Helical refinement
-		fnt = parser.getOption("--h_offset_step", "Sampling rate for offsets along helical axis (in pixels)", "OLD");
-		if (fnt != "OLD")
-			sampling.helical_offset_step = textToFloat(fnt);
 	}
 
 	fnt = parser.getOption("--auto_local_healpix_order", "Minimum healpix order (before oversampling) from which auto-refine procedure will use local searches", "OLD");
 	if (fnt != "OLD")
 		autosampling_hporder_local_searches = textToInteger(fnt);
-
-	// Check whether helical parameters have changed
-	fnt = parser.getOption("--h_twist", "Helical twist (in degrees, positive values for right-handedness)", "OLD");
-	if (fnt != "OLD")
-		helical_twist = textToFloat(fnt);
-
-	fnt = parser.getOption("--h_rise", "Helical rise (in Angstroms)", "OLD");
-	if (fnt != "OLD")
-		helical_rise = textToFloat(fnt);
-
-	if (parser.checkOption("--h_sym_search", "Perform local refinement of helical symmetry?", "OLD"))
-		do_helical_symmetry_local_refinement = true;
-
-	fnt = parser.getOption("--h_sym_search_range", "Maximum deviation (1% ~ 33%) of helical symmetry in local refinement", "OLD");
-	if (fnt != "OLD")
-		helical_symmetry_local_refinement_max_dev = textToFloat(fnt);
 
 	// Check whether the prior mode changes
 	RFLOAT _sigma_rot, _sigma_tilt, _sigma_psi, _sigma_off;
@@ -384,7 +363,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	sampling.offset_range = textToFloat(parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "6"));
 	sampling.offset_step = textToFloat(parser.getOption("--offset_step", "Sampling rate (before oversampling) for origin offsets (in pixels)", "2"));
 	// Jun19,2015 - Shaoda, Helical refinement
-	sampling.helical_offset_step = textToFloat(parser.getOption("--h_offset_step", "Sampling rate (before oversampling) for offsets along helical axis (in pixels)", "-1"));
+	sampling.helical_offset_step = textToFloat(parser.getOption("--helical_offset_step", "Sampling rate (before oversampling) for offsets along helical axis (in pixels)", "-1"));
 	sampling.perturbation_factor = textToFloat(parser.getOption("--perturb", "Perturbation factor for the angular sampling (0=no perturb; 0.5=perturb)", "0.5"));
 	do_auto_refine = parser.checkOption("--auto_refine", "Perform 3D auto-refine procedure?");
 	autosampling_hporder_local_searches = textToInteger(parser.getOption("--auto_local_healpix_order", "Minimum healpix order (before oversampling) from which autosampling procedure will use local searches", "4"));
@@ -421,15 +400,22 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// Set the helical symmetry
     int helical_section = parser.addSection("Helical symmetry (in development...)");
     do_helical_refine = parser.checkOption("--helix", "Perform 3D classification or refinement for helices?");
-    nr_helical_asu = textToInteger(parser.getOption("--h_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
-    helical_twist = textToFloat(parser.getOption("--h_twist", "Helical twist (in degrees, positive values for right-handedness)", "0."));
-    helical_rise = textToFloat(parser.getOption("--h_rise", "Helical rise (in Angstroms)", "0."));
-    helical_central_proportion = textToFloat(parser.getOption("--h_length", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.4"));
-    helical_mask_tube_inner_diameter = textToFloat(parser.getOption("--h_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
-    helical_mask_tube_outer_diameter = textToFloat(parser.getOption("--h_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
-    do_helical_bimodal_orient_searches = parser.checkOption("--h_bimodal", "Perform bimodal searches of orientations (psi and tilt angles) for helical segments in the first few iterations?");
-    do_helical_symmetry_local_refinement = parser.checkOption("--h_sym_search", "Perform local refinement of helical symmetry?");
-    helical_symmetry_local_refinement_max_dev = textToFloat(parser.getOption("--h_sym_search_range", "Maximum deviation (1% ~ 33%) of helical symmetry in local refinement", "0.1"));
+    mymodel.helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
+    helical_twist_initial = textToFloat(parser.getOption("--helical_twist_initial", "Helical twist (in degrees, positive values for right-handedness)", "0."));
+    mymodel.helical_twist_min = textToFloat(parser.getOption("--helical_twist_min", "Minimum helical twist (in degrees, positive values for right-handedness)", "0."));
+    mymodel.helical_twist_max = textToFloat(parser.getOption("--helical_twist_max", "Maximum helical twist (in degrees, positive values for right-handedness)", "0."));
+    mymodel.helical_twist_inistep = textToFloat(parser.getOption("--helical_twist_inistep", "Initial step of helical twist search (in degrees)", "0."));
+    helical_rise_initial = textToFloat(parser.getOption("--helical_rise_initial", "Helical rise (in Angstroms)", "0."));
+    mymodel.helical_rise_min = textToFloat(parser.getOption("--helical_rise_min", "Minimum helical rise (in Angstroms)", "0."));
+    mymodel.helical_rise_max = textToFloat(parser.getOption("--helical_rise_max", "Maximum helical rise (in Angstroms)", "0."));
+    mymodel.helical_rise_inistep = textToFloat(parser.getOption("--helical_rise_inistep", "Initial step of helical rise search (in Angstroms)", "0."));
+    helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
+    helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
+    helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
+    do_helical_bimodal_orient_searches = parser.checkOption("--helical_bimodal_search", "Perform bimodal searches of orientations (psi and tilt angles) for helical segments in the first few iterations?");
+    do_helical_symmetry_local_refinement = parser.checkOption("--helical_symmetry_search", "Perform local refinement of helical symmetry?");
+    mymodel.initialiseHelicalParametersLists(helical_twist_initial, helical_rise_initial);
+    mymodel.is_helix = do_helical_refine;
 
     // CTF, norm, scale, bfactor correction etc.
 	int corrections_section = parser.addSection("Corrections");
@@ -617,24 +603,20 @@ void MlOptimiser::read(FileName fn_in, int rank)
     // Backward compatibility with RELION-1.4
     if (!MD.getValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine))
     	do_helical_refine = false;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_NR_ASU, nr_helical_asu))
-    	nr_helical_asu = 1;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TWIST, helical_twist))
-		helical_twist = 0.;
-	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_RISE, helical_rise))
-		helical_rise = 0.;
-	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_CENTRAL_PROPORTION, helical_central_proportion))
-		helical_central_proportion = 0.4;
-	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_MASK_TUBE_INNER_DIAMETER, helical_mask_tube_inner_diameter))
-		helical_mask_tube_inner_diameter = -1.;
-	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_MASK_TUBE_OUTER_DIAMETER, helical_mask_tube_outer_diameter))
-		helical_mask_tube_outer_diameter = -1.;
+    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial))
+    	helical_twist_initial = 0.;
+    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial))
+    	helical_rise_initial = 0.;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage))
+		helical_z_percentage = 0.3;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter))
+		helical_tube_inner_diameter = -1.;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter))
+		helical_tube_outer_diameter = -1.;
     if (!MD.getValue(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, do_helical_bimodal_orient_searches))
     	do_helical_bimodal_orient_searches = false;
     if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement))
     	do_helical_symmetry_local_refinement = false;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT_MAX_DEV, helical_symmetry_local_refinement_max_dev))
-    	helical_symmetry_local_refinement_max_dev = 0.1;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
 
@@ -766,15 +748,13 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_OFFSETS, smallest_changes_optimal_offsets);
 	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_CLASSES, smallest_changes_optimal_classes);
 	    MD.setValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_NR_ASU, nr_helical_asu);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST, helical_twist);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_RISE, helical_rise);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_CENTRAL_PROPORTION, helical_central_proportion);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_MASK_TUBE_INNER_DIAMETER, helical_mask_tube_inner_diameter);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_MASK_TUBE_OUTER_DIAMETER, helical_mask_tube_outer_diameter);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, do_helical_bimodal_orient_searches);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT_MAX_DEV, helical_symmetry_local_refinement_max_dev);
 	    MD.setValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged);
 	    MD.setValue(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, has_high_fsc_at_limit);
 	    MD.setValue(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, has_large_incr_size_iter_ago);
@@ -1058,6 +1038,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		else
 		{
 			mymodel.nr_bodies = 1;
+			mydata.initialiseBodies(mymodel.nr_bodies);
 		}
 
 		// Also get original size of the images to pass to mymodel.read()
@@ -1162,24 +1143,39 @@ void MlOptimiser::initialiseGeneral(int rank)
 			particle_diameter *= (0.90 * mymodel.pixel_size);
 		}
 
-		if ( (!do_auto_refine) && (do_helical_symmetry_local_refinement) )
-			REPORT_ERROR("ERROR: Local refinement of helical symmetry can only be done in 3D refinement, not 2D/3D classification!");
-
-		bool correct_helical_params = false;
-		correct_helical_params = checkHelicalParametersFor3DHelicalReference(
+		if (do_helical_symmetry_local_refinement)
+		{
+			checkRangesForLocalSearchHelicalSymmetry(
+					helical_rise_initial,
+					mymodel.helical_rise_min,
+					mymodel.helical_rise_max,
+					helical_twist_initial,
+					mymodel.helical_twist_min,
+					mymodel.helical_twist_max);
+		}
+		else
+		{
+			mymodel.helical_twist_min = mymodel.helical_twist_max = helical_twist_initial;
+			mymodel.helical_rise_min = mymodel.helical_rise_max = helical_rise_initial;
+		}
+		checkHelicalParametersFor3DHelicalReference(
 				mymodel.ori_size,
 				mymodel.pixel_size,
-				helical_twist,
-				helical_rise,
-				helical_central_proportion,
-				( (do_auto_refine) && (do_helical_symmetry_local_refinement) ),
-				helical_symmetry_local_refinement_max_dev,
-				helical_symmetry_local_refinement_max_dev,
+				mymodel.helical_twist_min,
+				mymodel.helical_rise_min,
+				helical_z_percentage,
 				(particle_diameter / 2.),
-				(helical_mask_tube_inner_diameter / 2.),
-				(helical_mask_tube_outer_diameter / 2.));
-		if (!correct_helical_params)
-			REPORT_ERROR("ERROR: Helical parameters are wrong!");
+				(helical_tube_inner_diameter / 2.),
+				(helical_tube_outer_diameter / 2.));
+		checkHelicalParametersFor3DHelicalReference(
+				mymodel.ori_size,
+				mymodel.pixel_size,
+				mymodel.helical_twist_max,
+				mymodel.helical_rise_max,
+				helical_z_percentage,
+				(particle_diameter / 2.),
+				(helical_tube_inner_diameter / 2.),
+				(helical_tube_outer_diameter / 2.));
 
 		if ( (do_helical_bimodal_orient_searches) && (mymodel.sigma2_rot > 0.) )
 		{
@@ -1220,18 +1216,15 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 			// Aug20,2015 - Shaoda, Helical refinement
 			if (do_helical_refine)
-				mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise / mymodel.pixel_size), helical_twist, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
+				mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
 		}
 	}
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
-	//sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, mymodel.data_dim == 3);
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
-	bool do_local_searches = false;
-	if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
-		do_local_searches = true;
+	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
 	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu,
-			do_local_searches, do_helical_refine, helical_rise / mymodel.pixel_size, helical_twist);
+			do_local_searches, do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 	// Default max_coarse_size is original size
 	if (max_coarse_size < 0)
@@ -1292,7 +1285,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.addOneTranslation(dummy, dummy, dummy, true);
 		do_shifts_onthefly = false; // on-the-fly shifts are incompatible with do_skip_align!
 	}
-    if (do_bimodal_psi && (mymodel.sigma2_psi > 0.))
+    if ( (do_bimodal_psi) && (mymodel.sigma2_psi > 0.) && (verb > 0) )
     	std::cout << " Using bimodal priors on the psi angle..." << std::endl;
 
 	// Resize the pdf_direction arrays to the correct size and fill with an even distribution
@@ -1407,8 +1400,16 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (do_helical_refine)
 			{
-				if ( (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg)) || (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg)) )
-					REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Cannot do it for helical 3D classification / refinement without psi and tilt angles (priors)!");
+				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg))
+				{
+					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg))
+						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Helical reconstruction - Psi priors are missing!");
+				}
+				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg))
+				{
+					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg))
+						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Helical reconstruction - Tilt priors are missing!");
+				}
 			}
 
 			// Read image from disc
@@ -1428,7 +1429,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			{
 				// NEW METHOD
 				RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
-				cyl_radius_pix = helical_mask_tube_outer_diameter / (2. * mymodel.pixel_size);
+				cyl_radius_pix = helical_tube_outer_diameter / (2. * mymodel.pixel_size);
 				sphere_radius_pix = particle_diameter / (2. * mymodel.pixel_size);
 				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), do_helical_refine, cyl_radius_pix, tilt_deg, psi_deg);
 
@@ -1458,7 +1459,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				if (do_helical_refine)
 				{
 					softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
-							(helical_mask_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
+							(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
 				}
 				else
 					softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), width_mask_edge);
@@ -1680,7 +1681,7 @@ void MlOptimiser::iterate()
 		{
 			if (do_helical_refine)
 			{
-				if (nr_helical_asu > 1)
+				if (mymodel.helical_nr_asu > 1)
 					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
 				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
 				{
@@ -1714,7 +1715,10 @@ void MlOptimiser::iterate()
 		// Shaoda Jul26,2015
 		// Helical symmetry refinement and imposition of real space helical symmetry.
 		if (do_helical_refine)
+		{
 			makeGoodHelixForEachRef();
+			updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+		}
 
 		// Apply masks to the reference images
 		// At the last iteration, do not mask the map for validation purposes
@@ -2108,7 +2112,7 @@ void MlOptimiser::precalculateABMatrices()
 		// First get the non-oversampled translations as defined by the sampling object
 		// Jun01,2015 - Shaoda & Sjors, Helical refinement
 		sampling.getTranslations(itrans, 0, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-				do_helical_refine, helical_rise / mymodel.pixel_size, helical_twist); // need getTranslations to add random_perturbation
+				do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial); // need getTranslations to add random_perturbation
 
 		// Precalculate AB-matrices
 		RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[0];
@@ -2126,7 +2130,7 @@ void MlOptimiser::precalculateABMatrices()
 			// Then loop over all its oversampled relatives
 			// Jun01,2015 - Shaoda & Sjors, Helical refinement
 			sampling.getTranslations(itrans, 1, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-					do_helical_refine, helical_rise / mymodel.pixel_size, helical_twist);
+					do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
 				// Shift through phase-shifts in the Fourier transform
@@ -2652,8 +2656,8 @@ void MlOptimiser::symmetriseReconstructions()
 			if (mymodel.pdf_class[iclass] > 0.)
 			{
 				// Immediately after expectation process. Do rise and twist for all asymmetrical units in Fourier space
-				// Also convert helical_rise to pixels for BPref object
-				wsum_model.BPref[ith_recons].symmetrise(nr_helical_asu, helical_twist, helical_rise / mymodel.pixel_size);
+				// Also convert helical rise to pixels for BPref object
+				wsum_model.BPref[ith_recons].symmetrise(mymodel.helical_nr_asu, mymodel.helical_twist[ith_recons], mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
 			}
 		}
 	}
@@ -2662,12 +2666,8 @@ void MlOptimiser::symmetriseReconstructions()
 
 void MlOptimiser::makeGoodHelixForEachRef()
 {
-	// If it is not doing helical refinement or it is the last iteration
-	if ( (do_helical_refine == false) || (mymodel.ref_dim != 3) )
+	if (!do_helical_refine)
 		return;
-
-	helical_twist_half1 = helical_twist_half2 = helical_twist;
-	helical_rise_half1 = helical_rise_half2 = helical_rise;
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
@@ -2677,99 +2677,53 @@ void MlOptimiser::makeGoodHelixForEachRef()
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
 			if (mymodel.pdf_class[iclass] > 0.)
 			{
-				// Shaoda Jul26,2015 - Helical symmetry local refinement
-				if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
 				{
 					localSearchHelicalSymmetry(
 							mymodel.Iref[ith_recons],
 							mymodel.pixel_size,
 							(particle_diameter / 2.),
-							(helical_mask_tube_inner_diameter / 2.),
-							(helical_mask_tube_outer_diameter / 2.),
-							helical_central_proportion,
-							helical_rise,
-							helical_twist,
-							helical_symmetry_local_refinement_max_dev,
-							helical_symmetry_local_refinement_max_dev,
-							helical_rise_half1,
-							helical_twist_half1);
+							(helical_tube_inner_diameter / 2.),
+							(helical_tube_outer_diameter / 2.),
+							helical_z_percentage,
+							mymodel.helical_rise_min,
+							mymodel.helical_rise_max,
+							mymodel.helical_rise_inistep,
+							mymodel.helical_rise[iclass],
+							mymodel.helical_twist_min,
+							mymodel.helical_twist_max,
+							mymodel.helical_twist_inistep,
+							mymodel.helical_twist[iclass]);
 				}
-				// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
-				if( (do_helical_refine) && (!has_converged) )
-				{
-					makeHelicalReferenceInRealSpace(
-							mymodel.Iref[ith_recons],
-							mymodel.pixel_size,
-							helical_twist_half1,
-							helical_rise_half1,
-							helical_central_proportion,
-							(particle_diameter / 2.),
-							(helical_mask_tube_inner_diameter / 2.),
-							(helical_mask_tube_outer_diameter / 2.),
-							width_mask_edge);
-				}
+				imposeHelicalSymmetryInRealSpace(
+						mymodel.Iref[ith_recons],
+						mymodel.pixel_size,
+						(particle_diameter / 2.),
+						(helical_tube_inner_diameter / 2.),
+						(helical_tube_outer_diameter / 2.),
+						helical_z_percentage,
+						mymodel.helical_rise[iclass],
+						mymodel.helical_twist[iclass],
+						width_mask_edge);
 			}
 		}
 	}
 
-	// Aug05,2015 - Shaoda, Output for helical refinement
-	if ( (verb > 0) && (do_helical_refine) )
+	if (verb > 0)
 	{
-		std::cout << " Helical parameters (before refinement): twist = " << helical_twist
-				<< " degrees, rise = " << helical_rise << " Angstroms ("
-				<< (helical_rise / mymodel.pixel_size) << " pixels), asymmetrical units = "
-				<< nr_helical_asu << ", central Z proportion = "
-				<< helical_central_proportion << ", spherical diameter = "
-				<< particle_diameter << " Angstroms ("
-				<< (particle_diameter / mymodel.pixel_size) << " pixels), tube inner diameter = "
-				<< helical_mask_tube_inner_diameter << " Angstroms ("
-				<< (helical_mask_tube_inner_diameter / mymodel.pixel_size) << " pixels), tube outer diameter = "
-				<< helical_mask_tube_outer_diameter << " Angstroms ("
-				<< (helical_mask_tube_outer_diameter / mymodel.pixel_size) << " pixels), edge width (mask) = "
-				<< width_mask_edge << " pixels." << std::endl;
-	}
-	if ( (iter > 1) && (do_auto_refine) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
-	{
-		if (verb > 0)
-		{
-			RFLOAT nr_units_min = 2.;
-			RFLOAT twist_deg_min, twist_deg_max, rise_A_min, rise_A_max, rise_A_threshold;
-
-			twist_deg_min = helical_twist * (1. - helical_symmetry_local_refinement_max_dev);
-			twist_deg_max = helical_twist * (1. + helical_symmetry_local_refinement_max_dev);
-			if (fabs(twist_deg_min) < 0.01)
-				twist_deg_min = (twist_deg_min > 0.) ? (0.01) : (-0.01);
-			if (fabs(twist_deg_max) > 179.99)
-				twist_deg_max = (twist_deg_max > 0.) ? (179.99) : (-179.99);
-
-			rise_A_min = helical_rise * (1. - helical_symmetry_local_refinement_max_dev);
-			rise_A_max = helical_rise * (1. + helical_symmetry_local_refinement_max_dev);
-			rise_A_threshold = get_rise_A_max(mymodel.ori_size, mymodel.pixel_size, helical_central_proportion, nr_units_min);
-			if ( (rise_A_min / mymodel.pixel_size) < 0.001)
-				rise_A_min = 0.001 * mymodel.pixel_size;
-			if (rise_A_max > rise_A_threshold)
-			{
-				rise_A_max = rise_A_threshold;
-				std::cout << " WARNING: Increase of lenZ_percentage will enable larger range for helical rise searches." << std::endl;
-			}
-
-			std::cout << " Helical twist searched from "
-					<< twist_deg_min << " to " << twist_deg_max << " degrees, rise from "
-					<< rise_A_min << " to " << rise_A_max << " Angstroms ("
-					<< (rise_A_min / mymodel.pixel_size) << " to " << (rise_A_max / mymodel.pixel_size)
-					<< " pixels)." << std::endl;
-
-			std::cout << " Refined helical twist = " << helical_twist_half1
-					<< " degrees, rise = " << helical_rise_half1 << " Angstroms ("
-					<< (helical_rise_half1 / mymodel.pixel_size) << " pixels)" << std::endl;
-		}
-
-		// No need to average/modify helical parameters if nr_asu==1 (when no helical symmetry is applied in Fourier space)
-		if (nr_helical_asu > 1)
-		{
-			helical_twist = helical_twist_half1;
-			helical_rise = helical_rise_half1;
-		}
+		outputHelicalSymmetryStatus(
+				iter,
+				helical_rise_initial,
+				mymodel.helical_rise_min,
+				mymodel.helical_rise_max,
+				helical_twist_initial,
+				mymodel.helical_twist_min,
+				mymodel.helical_twist_max,
+				do_helical_symmetry_local_refinement,
+				mymodel.helical_rise,
+				mymodel.helical_twist,
+				0., 0., 0., 0., false,
+				std::cout);
 	}
 	return;
 }
@@ -3595,8 +3549,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 #endif
 			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
 			// However, when doing helical local searches, we accumulate offsets
-			// ?????? Should we enable this for Class3D ??????
-			if ( !((mymodel.ref_dim == 3) && (sampling.healpix_order >= autosampling_hporder_local_searches)) ) // Local searches
+			// Do NOT accumulate offsets in 3D classification of helices
+			if ( !((mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches)) ) // Local searches
 			{
 				XX(my_old_offset_helix_coords) = 0.;
 			}
@@ -3767,7 +3721,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			if (do_helical_refine)
 			{
 				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
-						(helical_mask_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge, &Mnoise);
+						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge, &Mnoise);
 			}
 			else
 				softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge, &Mnoise);
@@ -3778,7 +3732,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			if (do_helical_refine)
 			{
 				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
-						(helical_mask_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
+						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
 			}
 			else
 				softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
@@ -4204,7 +4158,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				std::vector<RFLOAT > oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 				// Jun01,2014 - Shaoda & Sjors, Helical refinement
 				sampling.getTranslations(itrans, exp_current_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-						do_helical_refine, helical_rise / mymodel.pixel_size, helical_twist);
+						do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 				// Then loop over all its oversampled relatives
 				for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++, my_trans_image++)
 				{
@@ -4576,7 +4530,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 									{
 										// Jun01,2015 - Shaoda & Sjors, Helical refinement
 										sampling.getTranslations(itrans, exp_current_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-												do_helical_refine, helical_rise / mymodel.pixel_size, helical_twist);
+												do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 										for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
 										{
 #ifdef TIMING
@@ -5623,7 +5577,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 							{
 								// Jun01,2015 - Shaoda & Sjors, Helical refinement
 								sampling.getTranslations(itrans, exp_current_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-										do_helical_refine, helical_rise / mymodel.pixel_size, helical_twist);
+										do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 								for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++, iitrans++)
 								{
 #ifdef DEBUG_CHECKSIZES
@@ -6708,7 +6662,7 @@ void MlOptimiser::updateAngularSampling(bool verb)
 			if (new_step < new_helical_offset_step)
 				new_helical_offset_step = new_step;
 		}
-		sampling.setTranslations(new_step, new_range, do_local_searches, do_helical_refine, new_helical_offset_step, helical_rise / mymodel.pixel_size, helical_twist);
+		sampling.setTranslations(new_step, new_range, do_local_searches, do_helical_refine, new_helical_offset_step, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 		if (!do_skip_rotate || do_only_sample_tilt)
 		{
@@ -6833,9 +6787,7 @@ void MlOptimiser::updateAngularSampling(bool verb)
 					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches = false;
-				if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
-					do_local_searches = true;
+				bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
 
 				// Don't go to coarse angular samplings. Then just keep doing as it was
 				if (new_step > sampling.offset_step)
@@ -6844,7 +6796,7 @@ void MlOptimiser::updateAngularSampling(bool verb)
 					new_range = sampling.offset_range;
 				}
 
-				sampling.setTranslations(new_step, new_range, do_local_searches, do_helical_refine, new_helical_offset_step, helical_rise / mymodel.pixel_size, helical_twist);
+				sampling.setTranslations(new_step, new_range, do_local_searches, do_helical_refine, new_helical_offset_step, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 				// Reset iteration counters
 				nr_iter_wo_resol_gain = 0;
@@ -6865,7 +6817,7 @@ void MlOptimiser::updateAngularSampling(bool verb)
 
 					// Aug20,2015 - Shaoda, Helical refinement
 					if (do_helical_refine)
-						mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise / mymodel.pixel_size), helical_twist, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
+						mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
 				}
 
 			}
@@ -6884,7 +6836,7 @@ void MlOptimiser::updateAngularSampling(bool verb)
 		if (do_helical_refine)
 		{
 			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
-			if ( (mymodel.ref_dim == 3) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+			if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
 				std:: cout << "true" << std::endl;
 			else
 				std:: cout << "false" << std::endl;

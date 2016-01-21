@@ -66,7 +66,8 @@ void PreprocessingMpi::runExtractParticles()
 			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 			// Check new-style outputdirectory exists and make it if not!
-			FileName fn_dir = fn_part_dir + fn_mic.beforeLastOf("/");
+			FileName fn_dir = getOutputFileNameRoot(fn_mic);
+			fn_dir = fn_dir.beforeLastOf("/");
 			if (fn_dir != fn_olddir)
 			{
 				// Make a Particles directory

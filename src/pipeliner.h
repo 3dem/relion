@@ -109,9 +109,9 @@ class Node
 
 // Status a Process may have
 #define PROC_RUNNING   0
-#define PROC_SCHEDULED 1
+#define PROC_SCHEDULED_NEW 1
 #define PROC_FINISHED  2
-#define PROC_CANCELLED 3
+#define PROC_SCHEDULED_CONT 3
 
 
 class Process

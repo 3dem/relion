@@ -47,6 +47,9 @@ void MlModel::initialise()
 	acc_rot.resize(nr_classes * nr_bodies, 0);
 	acc_trans.resize(nr_classes * nr_bodies, 0);
 
+	helical_twist.resize(nr_classes, 0);
+	helical_rise.resize(nr_classes, 0);
+
 	if (ref_dim==2)
 	{
 		Matrix1D<RFLOAT> empty(2);
@@ -102,9 +105,32 @@ void MlModel::read(FileName fn_in)
 
 	// Retain compability with model files written by Relion prior to 1.4
 	if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim))
-		data_dim=2;
+		data_dim = 2;
 	if (!MDlog.getValue(EMDL_MLMODEL_NR_BODIES, nr_bodies))
-		nr_bodies=1;
+		nr_bodies = 1;
+	if (!MDlog.getValue(EMDL_MLMODEL_IS_HELIX, is_helix))
+		is_helix = false;
+	if (is_helix)
+	{
+		if (nr_bodies != 1)
+			REPORT_ERROR("MlModel::readStar: incorrect nr_bodies for helix");
+		if (ref_dim == 2)
+			REPORT_ERROR("MlModel::readStar: incorrect ref_dim for helix");
+	}
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_NR_ASU, helical_nr_asu))
+		helical_nr_asu = 1;
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_TWIST_MIN, helical_twist_min))
+		helical_twist_min = 0.;
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_TWIST_MAX, helical_twist_max))
+		helical_twist_max = 0.;
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_TWIST_INITIAL_STEP, helical_twist_inistep))
+		helical_twist_inistep = 0.;
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_RISE_MIN, helical_rise_min))
+		helical_rise_min = 0.;
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_RISE_MAX, helical_rise_max))
+		helical_rise_max = 0.;
+	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_RISE_INITIAL_STEP, helical_rise_inistep))
+		helical_rise_inistep = 0.;
 
     // Treat classes or bodies (for multi-body refinement) in the same way...
     int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
@@ -156,6 +182,13 @@ void MlModel::read(FileName fn_in)
 			It().setXmippOrigin();
 			masks_bodies[iclass] = It();
 		}
+		if (is_helix)
+		{
+			if (!MDclass.getValue(EMDL_MLMODEL_HELICAL_RISE, helical_rise[iclass]) ||
+			    !MDclass.getValue(EMDL_MLMODEL_HELICAL_TWIST, helical_twist[iclass]) )
+				REPORT_ERROR("MlModel::readStar: incorrect helical parameters");
+		}
+
 		// Read in actual reference image
 		img.read(fn_tmp);
 		Iref[iclass] = img();
@@ -337,6 +370,17 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_CURRENT_RESOLUTION, 1./current_resolution);
 	MDlog.setValue(EMDL_MLMODEL_CURRENT_SIZE, current_size);
 	MDlog.setValue(EMDL_MLMODEL_PADDING_FACTOR, padding_factor);
+	MDlog.setValue(EMDL_MLMODEL_IS_HELIX, is_helix);
+	if (is_helix)
+	{
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_NR_ASU, helical_nr_asu);
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_TWIST_MIN, helical_twist_min);
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_TWIST_MAX, helical_twist_max);
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_TWIST_INITIAL_STEP, helical_twist_inistep);
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_RISE_MIN, helical_rise_min);
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_RISE_MAX, helical_rise_max);
+		MDlog.setValue(EMDL_MLMODEL_HELICAL_RISE_INITIAL_STEP, helical_rise_inistep);
+	}
 	MDlog.setValue(EMDL_MLMODEL_INTERPOLATOR, interpolator);
 	MDlog.setValue(EMDL_MLMODEL_MINIMUM_RADIUS_NN_INTERPOLATION, r_min_nn);
 	MDlog.setValue(EMDL_MLMODEL_PIXEL_SIZE, pixel_size);
@@ -407,6 +451,11 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(prior_offset_class[iclass]));
 		}
 
+		if (is_helix)
+		{
+			MDclass.setValue(EMDL_MLMODEL_HELICAL_RISE, helical_rise[iclass]);
+			MDclass.setValue(EMDL_MLMODEL_HELICAL_TWIST, helical_twist[iclass]);
+		}
 	}
 	MDclass.write(fh);
 
@@ -847,6 +896,19 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 
 }
 
+void MlModel::initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise)
+{
+    if (nr_classes < 1)
+    	REPORT_ERROR("MlModel.cpp::initialiseHelicalParametersLists  nr_classes is smaller than 1");
+    helical_twist.resize(nr_classes);
+    helical_rise.resize(nr_classes);
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
+    	helical_twist[iclass] = _helical_twist;
+    	helical_rise[iclass] = _helical_rise;
+    }
+}
+
 /////////// MlWsumModel
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
 {
@@ -869,6 +931,14 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
     padding_factor = _model.padding_factor;
     interpolator = _model.interpolator;
     r_min_nn = _model.r_min_nn;
+	is_helix = _model.is_helix;
+	helical_nr_asu = _model.helical_nr_asu;
+	helical_twist_min = _model.helical_twist_min;
+	helical_twist_max = _model.helical_twist_max;
+	helical_twist_inistep = _model.helical_twist_inistep;
+	helical_rise_min = _model.helical_rise_min;
+	helical_rise_max = _model.helical_rise_max;
+	helical_rise_inistep = _model.helical_rise_inistep;
 
     // Don't need forward projectors in MlWsumModel!
     PPref.clear();
@@ -881,6 +951,13 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
 	acc_trans.clear();
     orientability_contrib.clear();
 
+	helical_twist.resize(nr_classes);
+	helical_rise.resize(nr_classes);
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
+		helical_twist[iclass] = _model.helical_twist[iclass];
+		helical_rise[iclass] = _model.helical_rise[iclass];
+	}
 
     MultidimArray<RFLOAT> aux(ori_size / 2 + 1);
     wsum_signal_product_spectra.resize(nr_groups, aux);

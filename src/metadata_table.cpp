@@ -235,6 +235,11 @@ bool MetaDataTable::containsLabel(const EMDLabel label) const
     return vectorContainsLabel(activeLabels, label);
 }
 
+std::vector<EMDLabel> MetaDataTable::getActiveLabels() const
+{
+    return activeLabels;
+}
+
 void MetaDataTable::deactivateLabel(EMDLabel label)
 {
     if (containsLabel(label))
@@ -688,6 +693,9 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     	}
     }
 
+    // Clear the eofbit so we can perform more actions on the stream.
+    in.clear();
+
     return 0;
 }
 
@@ -978,5 +986,66 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 
 }
 
+MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
+{
+
+	MetaDataTable MDc;
+
+	if (MDin.size() == 1 )
+		MDc = MDin[0];
+	else
+	{
+
+		bool some_labels_missing = false;
+		// Find which labels occur in all input tables
+		std::vector<EMDLabel> labelsc;
+		std::vector<EMDLabel> labels1 = MDin[0].getActiveLabels();
+
+		// Loop over all labels
+		for (size_t i = 0; i < labels1.size(); i++)
+		{
+			// Check their presence in each of the input files
+			bool is_present = true;
+			for (size_t j = 0; j < MDin.size(); j++)
+			{
+				is_present = vectorContainsLabel(MDin[j].getActiveLabels(), labels1[i]);
+				if (!is_present)
+				{
+					some_labels_missing = true;
+					break;
+				}
+			}
+			if (is_present)
+			{
+				labelsc.push_back(labels1[i]);
+			}
+		}
+
+		if (!some_labels_missing)
+		{
+			// Just append entire tables
+			for (size_t j = 0; j < MDin.size(); j++)
+			{
+				MDc.append(MDin[j]);
+			}
+		}
+		else
+		{
+			// Select only the labels in common, do this per line!
+			for (size_t j = 0; j < MDin.size(); j++)
+			{
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin[j])
+				{
+					MetaDataContainer *aux =  MDin[j].getObject();
+					aux->keepOnlyLabels(labelsc);
+					MDc.addObject(aux);
+				}
+			}
+		}
+
+
+	}
+	return MDc;
+}
 
 

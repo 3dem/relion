@@ -117,13 +117,11 @@ void softMaskOutsideMapForHelix(
 
 	// Diameter of the cylindrical mask around the helix should not exceed the box size, otherwise noise cannot be estimated
 	if ( (cosine_width < 0.)
-			|| (mask_sphere_radius_pix < 1.) || ( (mask_sphere_radius_pix + cosine_width) > boxsize)
-			|| (mask_cyl_radius_pix < 1.) || ( (mask_cyl_radius_pix + cosine_width) > boxsize)
+			|| (mask_sphere_radius_pix < 1.) || (mask_sphere_radius_pix > boxsize)
+			|| (mask_cyl_radius_pix < 1.) || (mask_cyl_radius_pix > boxsize)
 			|| (mask_sphere_radius_pix < mask_cyl_radius_pix) )
-	{
 		REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): Invalid radii of spherical and cylindrical masks or soft cosine widths!");
-		return;
-	}
+
 	// Spherical mask: 0 < R1 < R2
 	R1 = mask_sphere_radius_pix;
 	R2 = R1 + cosine_width;
@@ -178,10 +176,7 @@ void softMaskOutsideMapForHelix(
 		}
 		// Test (this should not happen)
 		if (sum < 0.00001)
-		{
 			REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): No background (noise) areas found in this particle!");
-			return;
-		}
 		sum_bg /= sum;
 	}
 

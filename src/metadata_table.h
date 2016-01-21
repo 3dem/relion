@@ -309,6 +309,9 @@ public:
      */
     bool containsLabel(const EMDLabel label) const;
 
+    /** Get all active labels */
+    std::vector<EMDLabel> getActiveLabels() const;
+
     /** Deactivate a column from a table, so that it is no longer written out
       */
     void deactivateLabel(EMDLabel label);
@@ -401,6 +404,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
 		EMDLabel label1, RFLOAT eps = 0., EMDLabel label2 = EMDL_UNDEFINED, EMDLabel label3 = EMDL_UNDEFINED);
 
-
+// Join 2 metadata tables. Only include labels that are present in both of them.
+MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin);
 
 #endif

@@ -71,6 +71,8 @@ class MetaDataContainer
     std::map<EMDLabel, std::string *> strings;
 
     void copy(const MetaDataContainer &MDc);
+    // Copy only the provided labels
+    void copy_select(const MetaDataContainer &MDc, std::vector<EMDLabel> only_labels);
 
 public:
 
@@ -189,6 +191,9 @@ public:
                 return true;
         return false;
     }
+
+    // Return a container with only the selected containers
+    void keepOnlyLabels(std::vector<EMDLabel> only_labels);
 
     // Get all labels in this container
     std::vector<EMDLabel> getLabels();
