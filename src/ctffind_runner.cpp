@@ -239,7 +239,8 @@ void CtffindRunner::joinCtffindResults()
 		if (!has_this_ctf)
 			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for " + fn_micrographs_all[imic] );
 
-		FileName fn_ctf = fn_out + fn_microot + ".ctf:mrc";
+		FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
+		FileName fn_ctf = fn_root + ".ctf:mrc";
 		MDctf.addObject();
 		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
 	    MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
