@@ -1309,7 +1309,7 @@ void RelionMainWindow::cb_display(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_display_i()
 {
         std::string command = " relion_display --gui &" ;
-        system(command.c_str());
+        int res = system(command.c_str());
 }
 
 void RelionMainWindow::cb_toggle_continue_i()
