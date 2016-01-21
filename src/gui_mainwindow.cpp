@@ -730,7 +730,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 	if (do_commandline)
 	{
 		// relion_refine jobs get a new directory for continuation jobs, but NOT for execution of scheduled jobs
-		int mytype = pipeline.processList[current_job].type;
+		int mytype = (current_job >= 0) ? pipeline.processList[current_job].type : -1;
 		if (mytype == PROC_2DCLASS || mytype == PROC_3DCLASS || mytype == PROC_3DAUTO)
 		{
 			if (is_scheduled)
@@ -743,6 +743,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 				global_outputname = fn_settings.beforeLastOf("/") + "/";
 		}
 	}
+
 	switch (itype)
 	{
 	case PROC_IMPORT:
