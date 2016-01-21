@@ -23,6 +23,9 @@
 #include "src/gui_jobwindow.h"
 #include "src/gui_entries.h"
 #include "src/pipeliner.h"
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
 #define DO_WRITE true
 #define DONT_WRITE false
@@ -92,7 +95,6 @@ static PipeLine pipeline;
 static int current_job;
 static FileName global_outputname;
 
-
 class NoteEditorWindow : public Fl_Window
 {
 
@@ -140,8 +142,8 @@ public:
     // Communicate with the different jobtype objects
     void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
 
-    // Add a process to the PipeLine
-    void addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);
+    // Add a process to the PipeLine, return the number of the process
+    long int addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);
 
     // Update the content of the finished, running and scheduled job lists
     void fillRunningJobLists();
@@ -156,6 +158,8 @@ public:
     // and update all job lists at the bottom
     void loadJobFromPipeline();
 
+    // Run scheduled jobs from the pipeliner
+    void runScheduledJobs(int nr_repeat, long int minutes_wait);
 
 private:
 
@@ -199,13 +203,8 @@ private:
     inline void cb_toggle_continue_i();
 
     static void cb_run(Fl_Widget*, void*);
-    inline void cb_run_i();
-
     static void cb_schedule(Fl_Widget*, void*);
-    inline void cb_schedule_i();
-
-    static void cb_run_scheduled(Fl_Widget*, void*);
-    inline void cb_run_scheduled_i();
+    inline void cb_run_i(bool only_schedule = false, bool do_open_edit = true);
 
     static void cb_delete(Fl_Widget*, void*);
     inline void cb_delete_i(bool do_ask = true, bool do_recursive = true);
@@ -227,29 +226,31 @@ private:
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();
 
-    static void cb_menubar_save(Fl_Widget*, void*);
-    inline void cb_menubar_save_i();
+    static void cb_save(Fl_Widget*, void*);
+    inline void cb_save_i();
 
-    static void cb_menubar_print_notes(Fl_Widget*, void*);
-    inline void cb_menubar_print_notes_i();
+    static void cb_print_notes(Fl_Widget*, void*);
+    inline void cb_print_notes_i();
 
-    static void cb_menubar_reactivate_runbutton(Fl_Widget*, void*);
-    inline void cb_menubar_reactivate_runbutton_i();
+    static void cb_reactivate_runbutton(Fl_Widget*, void*);
+    inline void cb_reactivate_runbutton_i();
 
     static void cb_show_initial_screen(Fl_Widget*, void*);
     inline void cb_show_initial_screen_i();
 
-    static void cb_menubar_run_scheduled_jobs(Fl_Widget*, void*);
-    inline void cb_menubar_run_scheduled_jobs_i();
+    static void cb_start_pipeliner(Fl_Widget*, void*);
+    inline void cb_start_pipeliner_i();
 
-    static void cb_menubar_stop_run_scheduled_jobs(Fl_Widget*, void*);
-    inline void cb_menubar_stop_run_scheduled_jobs_i();
+    static void cb_stop_pipeliner(Fl_Widget*, void*);
+    inline void cb_stop_pipeliner_i();
 
-    static void cb_menubar_about(Fl_Widget*, void*);
-    inline void cb_menubar_about_i();
+    static void cb_about(Fl_Widget*, void*);
+    inline void cb_about_i();
 
-    static void cb_menubar_quit(Fl_Widget*, void*);
-    inline void cb_menubar_quit_i();
+public:
+    static void cb_quit(Fl_Widget*, void*);
+private:
+    inline void cb_quit_i();
 };
 
 #endif /* GUI_MAINWINDOW_H_ */

@@ -120,6 +120,10 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 	if (myNode == old_size)
 		processList[myProcess].outputNodeList.push_back(myNode);
 
+	// Touch .Nodes file, even if it doesn't exist yet for scheduled jobs
+	bool touch_if_not_exist = (processList[myProcess].status == PROC_SCHEDULED_CONT || processList[myProcess].status == PROC_SCHEDULED_NEW);
+	touchTemporaryNodeFile(nodeList[myNode], touch_if_not_exist);
+
 }
 
 long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
@@ -132,6 +136,7 @@ long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
 		if (processList[i].name == _Process.name)
 		{
 			is_found = true;
+			processList[i].status = _Process.status;
 			break;
 		}
 	}
@@ -220,7 +225,8 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	FileName fnt;
 
 	// Check whether there is an alias for the corresponding process
-	//std::cerr << " node.name= " << node.name << " node.outputFromProcess= "<< node.outputFromProcess<< std::endl;
+	if (node.outputFromProcess < 0)
+		REPORT_ERROR("Pipeline ERROR: node " + node.name + " does not seem to come from any process in the pipeline..." );
 	FileName fn_alias  = processList[node.outputFromProcess].alias;
 
 	if (fn_alias != "None")
@@ -260,10 +266,16 @@ void PipeLine::makeNodeDirectory()
 
 	for (long int i = 0; i < nodeList.size(); i++)
 	{
-		touchTemporaryNodeFile(nodeList[i]);
+		int myproc = nodeList[i].outputFromProcess;
+		if (myproc < 0)
+			REPORT_ERROR("PipeLine::makeNodeDirectory ERROR: cannot get from which process node " + nodeList[i].name + " is coming.");
+		bool touch_if_not_exist = (processList[myproc].status == PROC_SCHEDULED_CONT ||
+								   processList[myproc].status == PROC_SCHEDULED_NEW);
+		touchTemporaryNodeFile(nodeList[i], touch_if_not_exist);
 	}
 
 }
+
 
 void PipeLine::checkProcessCompletion()
 {
@@ -276,6 +288,8 @@ void PipeLine::checkProcessCompletion()
 			for (long int j = 0; j < processList[i].outputNodeList.size(); j++)
 			{
 				int myNode = (processList[i]).outputNodeList[j];
+				if (myNode < 0 || myNode >= nodeList.size())
+					REPORT_ERROR("pipeline checkProcessCompletion ERROR: " + integerToString(j) + "th output node of " + processList[i].name + " is invalid: " + integerToString(myNode));
 				if (!touchTemporaryNodeFile(nodeList[myNode]))
 				{
 					all_exist = false;
@@ -285,15 +299,6 @@ void PipeLine::checkProcessCompletion()
 			if (all_exist)
 			{
 				processList[i].status = PROC_FINISHED;
-			}
-		}
-		else if (processList[i].status == PROC_SCHEDULED)
-		{
-			// Also touch the output nodes of the scheduled jobs (even though they don't exist yet. That way can link future jobs together!)
-			for (long int j = 0; j < processList[i].outputNodeList.size(); j++)
-			{
-				int myNode = (processList[i]).outputNodeList[j];
-				touchTemporaryNodeFile(nodeList[myNode], true); // true means touch even if output node does not exist yet
 			}
 		}
 	}
@@ -347,8 +352,12 @@ void PipeLine::read()
 			FileName fn_alias = alias;
 			if (fn_alias[fn_alias.length()-1] == '/')
 				fn_alias = fn_alias.beforeLastOf("/");
-			std::string command = " ln -s -f ../" + name + " " + fn_alias;
-			int res= system(command.c_str());
+			// Only make the alias if it doesn't exist yet, otherwise you end up with recursive ones.
+			if (!exists(fn_alias))
+			{
+				std::string command = " ln -s ../" + name + " " + fn_alias;
+				int res= system(command.c_str());
+			}
 		}
 	}
 
@@ -363,10 +372,10 @@ void PipeLine::read()
 
 		// Now fill in all To and FromEdgeLists of all Nodes
 		long int myProcess = findProcessByName(procname);
-		if (myProcess < 0)
+		if (myProcess < 0 || myProcess >= processList.size())
 			REPORT_ERROR("PipeLine::read ERROR: cannot find to-process with name: " + procname);
 		long int fromNode = findNodeByName(fromnodename);
-		if (fromNode < 0)
+		if (fromNode < 0 || fromNode >= nodeList.size())
 			REPORT_ERROR("PipeLine::read ERROR: cannot find from-node with name: " + fromnodename);
 		processList[myProcess].inputNodeList.push_back(fromNode);
 		nodeList[fromNode].inputForProcessList.push_back(myProcess);
@@ -383,10 +392,10 @@ void PipeLine::read()
 
 		// Now fill in all To and FromEdgeLists of all Nodes
 		long int myProcess = findProcessByName(procname);
-		if (myProcess < 0)
+		if (myProcess < 0 || myProcess >= processList.size())
 			REPORT_ERROR("PipeLine::read ERROR: cannot find from-process with name: " + procname);
 		long int toNode = findNodeByName(tonodename);
-		if (toNode < 0)
+		if (toNode < 0 || toNode  >= nodeList.size())
 			REPORT_ERROR("PipeLine::read ERROR: cannot find to-node with name: " + tonodename);
 
 		processList[myProcess].outputNodeList.push_back(toNode);
