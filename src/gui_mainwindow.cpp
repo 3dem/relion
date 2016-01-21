@@ -1866,9 +1866,34 @@ void RelionMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_start_pipeliner_i()
 {
-	// TODO: I/O for these 2
-	int nr_repeat = 3;
-	int min_wait = 1;
+
+	int nr_repeat, min_wait;
+
+	// Ask how many times to repeat
+	const char * answer;
+	std::string default_answer="1";
+	answer =  fl_input("Repeat how often? ", default_answer.c_str());
+	if (answer == NULL)
+		nr_repeat = 1;
+	else
+	{
+		std::string str_answer(answer);
+		nr_repeat = textToInteger(str_answer);
+	}
+
+	if (nr_repeat > 1)
+	{
+		// Ask how long to wait at least in between repeats
+		default_answer="15";
+		answer =  fl_input("Wait at least how many minutes between repeats? ", default_answer.c_str());
+		if (answer == NULL)
+			min_wait = 15;
+		else
+		{
+			std::string str_answer(answer);
+			min_wait = textToInteger(str_answer);
+		}
+	}
 
 	std::string command = "touch RUNNING_PIPELINER_" + pipeline.name;
 	int res = system(command.c_str());
