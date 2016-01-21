@@ -1285,7 +1285,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.addOneTranslation(dummy, dummy, dummy, true);
 		do_shifts_onthefly = false; // on-the-fly shifts are incompatible with do_skip_align!
 	}
-    if (do_bimodal_psi && (mymodel.sigma2_psi > 0.))
+    if ( (do_bimodal_psi) && (mymodel.sigma2_psi > 0.) && (verb > 0) )
     	std::cout << " Using bimodal priors on the psi angle..." << std::endl;
 
 	// Resize the pdf_direction arrays to the correct size and fill with an even distribution
@@ -1400,8 +1400,16 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (do_helical_refine)
 			{
-				if ( (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg)) || (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg)) )
-					REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Cannot do it for helical 3D classification / refinement without psi and tilt angles (priors)!");
+				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg))
+				{
+					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg))
+						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Helical reconstruction - Psi priors are missing!");
+				}
+				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg))
+				{
+					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg))
+						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Helical reconstruction - Tilt priors are missing!");
+				}
 			}
 
 			// Read image from disc
@@ -1707,7 +1715,10 @@ void MlOptimiser::iterate()
 		// Shaoda Jul26,2015
 		// Helical symmetry refinement and imposition of real space helical symmetry.
 		if (do_helical_refine)
+		{
 			makeGoodHelixForEachRef();
+			updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+		}
 
 		// Apply masks to the reference images
 		// At the last iteration, do not mask the map for validation purposes

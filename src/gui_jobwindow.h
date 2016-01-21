@@ -302,8 +302,12 @@ public:
 	SliderEntry threshold_autopick;
 	SliderEntry mindist_autopick;
 	SliderEntry maxstddevnoise_autopick;
+	BooleanEntry do_pick_helical_segments;
+	SliderEntry helical_tube_kappa_max;
+	SliderEntry helical_tube_outer_diameter;
+	SliderEntry helical_tube_length_min;
 
-	Fl_Group *autopick_ctf_group;
+	Fl_Group *autopick_ctf_group, *autopick_helix_group;
 
 public:
 
@@ -398,7 +402,14 @@ public:
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
 
-	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group;
+	// Helix
+	BooleanEntry do_extract_helix;
+	BooleanEntry do_extract_helical_tubes;
+	SliderEntry helical_nr_asu;
+	SliderEntry helical_rise;
+	SliderEntry helical_tube_outer_diameter;
+
+	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group, *helix_group, *helical_tubes_group;
 
 public:
 
@@ -482,7 +493,11 @@ public:
 	SliderEntry offset_range;
 	SliderEntry offset_step;
 
-	Fl_Group *ctf_group, *dont_skip_align_group;
+	// Helix
+	BooleanEntry do_bimodal_psi;
+	SliderEntry range_psi;
+
+	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
 
 public:
 
@@ -547,7 +562,7 @@ public:
 	// Helix
 	//textOnlyEntry helix_text;
 	BooleanEntry do_helix;
-	BooleanEntry do_bimodal;
+	//BooleanEntry do_bimodal;
 	AnyEntry helical_tube_inner_diameter;
 	AnyEntry helical_tube_outer_diameter;
 	SliderEntry helical_nr_asu;
@@ -632,7 +647,7 @@ public:
 	// Helix
 	//textOnlyEntry helix_text;
 	BooleanEntry do_helix;
-	BooleanEntry do_bimodal;
+	//BooleanEntry do_bimodal;
 	AnyEntry helical_tube_inner_diameter;
 	AnyEntry helical_tube_outer_diameter;
 	SliderEntry helical_nr_asu;
@@ -697,8 +712,13 @@ public:
 	SliderEntry white_dust;
 	SliderEntry black_dust;
 
-	Fl_Group *fit_group, *weight_group;
+	// Helix
+	BooleanEntry do_helix;
+	SliderEntry helical_nr_asu;
+	AnyEntry helical_twist;
+	AnyEntry helical_rise;
 
+	Fl_Group *fit_group, *weight_group, *helix_group;
 
 public:
 	// Constructor
@@ -765,7 +785,10 @@ public:
 	SliderEntry inimask_threshold;
 	SliderEntry extend_inimask;
 	SliderEntry width_mask_edge;
+	BooleanEntry do_helix;
+	SliderEntry helical_z_percentage;
 
+	Fl_Group *helix_group;
 
 public:
 

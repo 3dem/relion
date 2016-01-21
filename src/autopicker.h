@@ -235,8 +235,6 @@ public:
 
 	RFLOAT helical_tube_length_min;
 
-	bool do_mark_helical_tube_id;
-
 	// Apart from keeping particle_size/2 away from the sides, should we exclude more? E.g. to get rid of Polara bar code?
 	int autopick_skip_side;
 

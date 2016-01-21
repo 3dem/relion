@@ -31,6 +31,7 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/ctffind_runner.h"
+#include "src/helix.h"
 #include <src/fftw.h>
 #include <src/time.h>
 
@@ -141,11 +142,20 @@ public:
 	// Radius of a circle in the extracted images outside of which one calculates background mean and stddev (in pixels)
 	int bg_radius;
 
-	// Radius of a cylinder in the extracted helical segments outside of which one calculates background mean and stddev (in pixels)
-	RFLOAT bg_helical_radius;
+	// Extract helical segments
+	bool do_extract_helix;
 
-	// Perform operations on helical segments
-	bool do_helical_segments;
+	// Outer diameter of helical tubes in Angstroms (for masks of helical segments)
+	RFLOAT helical_tube_outer_diameter;
+
+	// Extract helical segments from tube coordinates
+	bool do_extract_helical_tubes;
+
+	// Number of helical asymmetrical units
+	int helical_nr_asu;
+
+	// Helical rise in Angstroms
+	RFLOAT helical_rise;
 
 	// Use input stack to perform the image modifications
 	FileName fn_operate_in;
@@ -178,6 +188,9 @@ public:
 
 	// Read coordinates from text files
 	void readCoordinates(FileName fn_coord, MetaDataTable &MD);
+
+	// Read helical coordinates from text files
+	void readHelicalCoordinates(FileName fn_mic, FileName fn_coord, MetaDataTable &MD);
 
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
 	void extractParticlesFromFieldOfView(FileName fn_mic, long int imic);

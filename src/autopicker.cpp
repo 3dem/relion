@@ -49,12 +49,11 @@ void AutoPicker::read(int argc, char **argv)
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 
-	// Aug12,2015 - Shaoda, Auto-picking for helical segments
+	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
-	helical_tube_curvature_factor_max = textToFloat(parser.getOption("--kappa", "Factor of maximum curvature relative to that of a circle", "0.25"));
-	helical_tube_diameter = textToFloat(parser.getOption("--tube_diameter", "Tube diameter in Angstroms", "-1"));
-	helical_tube_length_min = textToFloat(parser.getOption("--tube_length_min", "Minimum tube length in Angstroms", "-1"));
-	do_mark_helical_tube_id = parser.checkOption("--mark_tube_id", "Mark helical tube ID?");
+	helical_tube_curvature_factor_max = textToFloat(parser.getOption("--helical_tube_kappa_max", "Factor of maximum curvature relative to that of a circle", "0.25"));
+	helical_tube_diameter = textToFloat(parser.getOption("--helical_tube_outer_diameter", "Tube diameter in Angstroms", "-1"));
+	helical_tube_length_min = textToFloat(parser.getOption("--helical_tube_length_min", "Minimum tube length in Angstroms", "-1"));
 
 	int peak_section = parser.addSection("Peak-search options");
 	min_fraction_expected_Pratio = textToFloat(parser.getOption("--threshold", "Fraction of expected probability ratio in order to consider peaks?", "0.25"));
@@ -1376,6 +1375,7 @@ void AutoPicker::exportHelicalTubes(
 	FileName fn_tmp;
 	MetaDataTable MDout;
 	int helical_tube_id;
+	RFLOAT helical_tube_len;
 
 	// Only output STAR header if there are no tubes...
 	MDout.clear();
@@ -1383,10 +1383,11 @@ void AutoPicker::exportHelicalTubes(
 	MDout.addLabel(EMDL_IMAGE_COORD_Y);
 	MDout.addLabel(EMDL_PARTICLE_CLASS);
 	MDout.addLabel(EMDL_PARTICLE_AUTOPICK_FOM);
-	MDout.addLabel(EMDL_ORIENT_TILT);
-	MDout.addLabel(EMDL_ORIENT_PSI);
-	if (do_mark_helical_tube_id)
-		MDout.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+	MDout.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+	MDout.addLabel(EMDL_ORIENT_TILT_PRIOR);
+	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR);
+	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
 	helical_tube_id = 0;
 	for (int itube = 0; itube < tube_coord_list.size(); itube++)
@@ -1397,10 +1398,18 @@ void AutoPicker::exportHelicalTubes(
 				continue;
 		}
 		helical_tube_id++;
+		helical_tube_len = 0.;
 		for (int icoord = 0; icoord < tube_coord_list[itube].size(); icoord++)
 		{
 			int x_int, y_int, iref;
 			RFLOAT fom;
+
+			if (icoord > 0)
+			{
+				RFLOAT dx = ((RFLOAT)(tube_coord_list[itube][icoord].x)) - ((RFLOAT)(tube_coord_list[itube][icoord - 1].x));
+				RFLOAT dy = ((RFLOAT)(tube_coord_list[itube][icoord].y)) - ((RFLOAT)(tube_coord_list[itube][icoord - 1].y));
+				helical_tube_len += sqrt(dx * dx + dy * dy);
+			}
 
 			// Invalid psi (crossover)
 			if (fabs(tube_coord_list[itube][icoord].psi) > 360.)
@@ -1424,10 +1433,11 @@ void AutoPicker::exportHelicalTubes(
 			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(tube_coord_list[itube][icoord].y - FIRST_XMIPP_INDEX(micrograph_ysize)));
 			MDout.setValue(EMDL_PARTICLE_CLASS, iref + 1); // start counting at 1
 			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
-			MDout.setValue(EMDL_ORIENT_TILT, 90.);
-			MDout.setValue(EMDL_ORIENT_PSI, (-1.) * (tube_coord_list[itube][icoord].psi)); // Beware! Multiplied by -1!
-			if (do_mark_helical_tube_id)
-				MDout.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+			MDout.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+			MDout.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
+			MDout.setValue(EMDL_ORIENT_PSI_PRIOR, (-1.) * (tube_coord_list[itube][icoord].psi)); // Beware! Multiplied by -1!
+			MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, helical_tube_len);
+			MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, 0.5);
 		}
 	}
 

@@ -32,6 +32,9 @@
 
 #define CART_TO_HELICAL_COORDS true
 #define HELICAL_TO_CART_COORDS false
+#define RELION_STAR_FORMAT 0
+#define XIMDISP_COORDS_FORMAT 1
+#define EMAN2_FORMAT 2
 
 class HelicalSymmetryItem
 {
@@ -247,38 +250,40 @@ void applySoftSphericalMask(
 		RFLOAT sphere_diameter = -1.,
 		RFLOAT cosine_width = 5.);
 
-int extractCoordsForAllHelicalSegments(
-		FileName& fn_in,
-		FileName& fn_out,
-		int nr_asu,
-		RFLOAT rise_ang,
-		RFLOAT pixel_size_ang,
-		RFLOAT Xdim,
-		RFLOAT Ydim,
-		RFLOAT box_size_pix);
-
-// Files of input coordinates of tops and bottoms of helices: mic1_manualpick.star
-// Files of output coordinates of segments: mic1_all.star
-// Then suffix_in = _manualpick.star, suffix_out = _all.star
-void extractCoordsForAllHelicalSegments_Multiple(
+void extractHelicalSegmentsFromTubes_Multiple(
 		FileName& suffix_in,
 		FileName& suffix_out,
 		int nr_asu,
-		RFLOAT rise_ang,
-		RFLOAT pixel_size_ang,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
-		RFLOAT box_size_pix);
+		RFLOAT box_size_pix,
+		int format_tag);
+
+void extractCoordsForAllHelicalSegments(
+		FileName& fn_in,
+		MetaDataTable& MD_out,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix,
+		int& total_segments,
+		int& total_tubes);
 
 void combineParticlePriorsWithKaiLocalCTF(
 		FileName& fn_priors,
 		FileName& fn_local_ctf,
 		FileName& fn_combined);
 
+/*
 void addPriorsToParticleDataFile(
 		FileName& fn_priors,
 		FileName& fn_data,
 		FileName& fn_out);
+*/
 
 // Files of priors: mic1_priors.star, files of local CTF: mic1_local.star
 // Then suffix_priors = _priors.star, suffix_local_ctf = _local.star
@@ -287,57 +292,84 @@ void combineParticlePriorsWithKaiLocalCTF_Multiple(
 		std::string& suffix_local_ctf,
 		std::string& suffix_combined);
 
-void setNullAlignmentPriorsInDataStar(
+void setNullTiltPriorsInDataStar(
 		FileName& fn_in,
-		FileName& fn_out,
-		bool rewrite_tilt = false,
-		bool rewrite_psi = false);
+		FileName& fn_out);
 
 void removeBadTiltHelicalSegmentsFromDataStar(
 		FileName& fn_in,
 		FileName& fn_out,
 		RFLOAT max_dev_deg = 15.);
 
-int transformXimdispHelicalSegmentCoordsToStarFile(
+void removeBadPsiHelicalSegmentsFromDataStar(
 		FileName& fn_in,
 		FileName& fn_out,
-		RFLOAT Xdim,
-		RFLOAT Ydim,
-		RFLOAT box_size_pix);
+		RFLOAT max_dev_deg = 15.);
 
-// Files of Ximdisp coordinates: 001.coords, files of output coordinates: 001_all.star
-// Then suffix_coords = .coords, suffix_out = _all.star
-void transformXimdispHelicalSegmentCoordsToStarFile_Multiple(
+void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
-		RFLOAT boxsize);
+		RFLOAT boxsize,
+		int format_tag);
 
-int transformXimdispHelicalTubeCoordsToStarFile(
+void convertHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
-		FileName& fn_out,
-		int nr_asu,
-		RFLOAT rise_ang,
-		RFLOAT pixel_size_ang,
+		MetaDataTable& MD_out,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
-		RFLOAT box_size_pix);
+		RFLOAT box_size_pix,
+		int& total_segments);
 
-void transformXimdispHelicalTubeCoordsToStarFile_Multiple(
-		FileName& suffix_coords,
-		FileName& suffix_out,
-		int nr_asu,
-		RFLOAT rise_ang,
-		RFLOAT pixel_size_ang,
+void convertXimdispHelicalSegmentCoordsToMetaDataTable(
+		FileName& fn_in,
+		MetaDataTable& MD_out,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
-		RFLOAT boxsize);
+		RFLOAT box_size_pix,
+		int& total_segments,
+		int& total_tubes);
 
+void convertXimdispHelicalTubeCoordsToMetaDataTable(
+		FileName& fn_in,
+		MetaDataTable& MD_out,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix,
+		int& total_segments,
+		int& total_tubes);
+
+void convertEmanHelicalSegmentCoordsToMetaDataTable(
+		FileName& fn_in,
+		MetaDataTable& MD_out,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix,
+		int& total_segments,
+		int& total_tubes);
+
+void convertEmanHelicalTubeCoordsToMetaDataTable(
+		FileName& fn_in,
+		MetaDataTable& MD_out,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix,
+		int& total_segments,
+		int& total_tubes);
+
+/*
 void divideHelicalSegmentsFromMultipleMicrographsIntoRandomHalves(
 		FileName& fn_in,
 		FileName& fn_out,
 		int random_seed = -1);
+*/
 
 void makeHelicalReference2D(
 		MultidimArray<RFLOAT>& out,
@@ -357,6 +389,7 @@ void makeHelicalReference3D(
 		RFLOAT particle_diameter_A,
 		int sym_Cn);
 
+/*
 void makeHelicalReconstructionStarFileFromSingle2DClassAverage(
 		FileName& fn_in_class2D,
 		FileName& fn_out_star,
@@ -366,6 +399,7 @@ void makeHelicalReconstructionStarFileFromSingle2DClassAverage(
 		RFLOAT tilt_deg,
 		RFLOAT psi_deg,
 		int nr_projections);
+*/
 
 void divideStarFile(
 		FileName& fn_in,
@@ -380,9 +414,11 @@ void simulateHelicalSegments(
 		int nr_subunits,
 		int nr_asu,
 		int nr_tubes,
+		bool do_bimodal_searches,
+		RFLOAT rise_pix,
 		RFLOAT twist_deg,
-		RFLOAT sigma_psi = 1.,
-		RFLOAT sigma_tilt = 1.);
+		RFLOAT sigma_psi,
+		RFLOAT sigma_tilt);
 
 void outputHelicalSymmetryStatus(
 		int iter,
@@ -407,5 +443,25 @@ void excludeLowCTFCCMicrographs(
 		FileName& fn_out,
 		RFLOAT cc_min,
 		RFLOAT EPA_lowest_res);
+
+void flipPsiTiltForHelicalSegment(
+		RFLOAT old_psi,
+		RFLOAT old_tilt,
+		RFLOAT& new_psi,
+		RFLOAT& new_tilt);
+
+/*
+void updateAngularPriorsForHelicalReconstruction(
+		MetaDataTable& MD,
+		RFLOAT sigma_segment_dist,
+		int& total_same_psi,
+		int& total_opposite_psi,
+		bool do_local_average_tilt = true,
+		RFLOAT sigma_cutoff = 3.);
+*/
+
+void updateAngularPriorsForHelicalReconstruction(MetaDataTable& MD);
+
+void testDataFileTransformXY(MetaDataTable& MD);
 
 #endif /* HELIX_H_ */

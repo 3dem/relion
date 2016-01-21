@@ -222,7 +222,6 @@ void MlOptimiserMpi::initialise()
 		}
 	}
 
-
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
 #endif
@@ -254,7 +253,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     // First split the data into two random halves and then randomise the particle order
 	if (do_split_random_halves)
-		mydata.divideOriginalParticlesInRandomHalves(random_seed);
+		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
 
 	// Randomise the order of the particles
     mydata.randomiseOriginalParticlesOrder(random_seed, do_split_random_halves);
@@ -2228,6 +2227,15 @@ void MlOptimiserMpi::iterate()
 		timer.toc(TIMING_MAX);
 #endif
 
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (node->isMaster())
+		{
+			if (do_helical_refine)
+			{
+				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+			}
+		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
 		// Mask the reconstructions to get rid of noisy solvent areas

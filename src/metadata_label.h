@@ -229,10 +229,11 @@ enum EMDLabel
     EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
     EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
     EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
-	EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
-	EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
-	EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS,
-	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
+    EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
+    EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
+    EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS,
+    EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
+    EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
@@ -277,9 +278,11 @@ enum EMDLabel
     EMDL_ORIENT_TILT_PRIOR,
     EMDL_ORIENT_PSI,
     EMDL_ORIENT_PSI_PRIOR,
+    EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO,
 
     EMDL_PARTICLE_AUTOPICK_FOM,
-	EMDL_PARTICLE_HELICAL_TUBE_ID,
+    EMDL_PARTICLE_HELICAL_TUBE_ID,
+    EMDL_PARTICLE_HELICAL_TRACK_LENGTH,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
     EMDL_PARTICLE_ID,
@@ -599,6 +602,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, EMDL_BOOL, "rlnHelicalBimodalOrientations", "Flag to indicate that bimodal orientations are searched for helical segments in the first few iterations");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaSegmentDistance", "Sigma of helical segment distance (in Angstroms)");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");
@@ -643,9 +647,11 @@ private:
         EMDL::addLabel(EMDL_ORIENT_TILT_PRIOR, EMDL_DOUBLE, "rlnAngleTiltPrior", "Center of the prior (in degrees) on the second Euler angle (tilt)");
         EMDL::addLabel(EMDL_ORIENT_PSI, EMDL_DOUBLE, "rlnAnglePsi", "Third Euler, or in-plane angle (psi, in degrees)");
         EMDL::addLabel(EMDL_ORIENT_PSI_PRIOR, EMDL_DOUBLE, "rlnAnglePsiPrior", "Center of the prior (in degrees) on the third Euler angle (psi)");
+        EMDL::addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, EMDL_DOUBLE, "rlnAnglePsiFlipRatio", "Flip ratio of bimodal psi prior (0~0.5, 0 means an ordinary prior, 0.5 means a perfect bimodal prior)");
 
         EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
-        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Autopicking helical tube ID for a helical segment");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Helical tube ID for a helical segment");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance from the position of this helical segment to the starting point of the tube");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
         EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_LONG, "rlnParticleId", "ID (i.e. a unique number) for a particle");

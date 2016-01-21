@@ -1289,7 +1289,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 }
 
 
-AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_AUTOPICK;
@@ -1355,6 +1355,32 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THR
 	do_read_fom_maps.place(current_y, "Read FOM maps?", false, "If written out previously, read the FOM maps back in and re-run the picking to quickly find the optimal threshold and inter-particle distance parameters");
 
 	tab3->end();
+	tab4->begin();
+	tab4->label("Helix");
+	resetHeight();
+
+	autopick_helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	autopick_helix_group->end();
+
+	do_pick_helical_segments.place(current_y, "Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.", autopick_helix_group);
+
+	autopick_helix_group->begin();
+
+	helical_tube_kappa_max.place(current_y, "Maximum curvature (kappa): ", 0.1, 0.05, 0.5, 0.01, "Maximum curvature allowed for picking helical tubes. \
+Kappa = 0.3 means that the curvature of the picked helical tubes should not be larger than 30% the curvature of a circle (diameter = particle mask diameter). \
+Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
+
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of the tubes.");
+
+	helical_tube_length_min.place(current_y, "Minimum length (A): ", 200, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
+Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
+
+	autopick_helix_group->end();
+
+	do_pick_helical_segments.cb_menu_i();
+
+	tab4->end();
 
 	// read settings if hidden file exists
 	read(".gui_autopickrun.job", is_continue);
@@ -1383,6 +1409,10 @@ void AutopickJobWindow::write(std::string fn)
 	threshold_autopick.writeValue(fh);
 	mindist_autopick.writeValue(fh);
 	maxstddevnoise_autopick.writeValue(fh);
+	do_pick_helical_segments.writeValue(fh);
+	helical_tube_kappa_max.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
+	helical_tube_length_min.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -1408,6 +1438,10 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		threshold_autopick.readValue(fh);
 		mindist_autopick.readValue(fh);
 		maxstddevnoise_autopick.readValue(fh);
+		do_pick_helical_segments.readValue(fh);
+		helical_tube_kappa_max.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
+		helical_tube_length_min.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -1487,6 +1521,15 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command += " --min_distance " + floatToString(mindist_autopick.getValue());
 	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
 
+	// Helix
+	if (do_pick_helical_segments.getValue())
+	{
+		command += " --helix";
+		command += " --helical_tube_kappa_max " + floatToString(helical_tube_kappa_max.getValue());
+		command += " --helical_tube_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		command += " --helical_tube_length_min " + floatToString(helical_tube_length_min.getValue());
+	}
+
 	if (is_continue && !(do_read_fom_maps.getValue() || do_write_fom_maps.getValue()))
 		command += " --only_do_unfinished ";
 
@@ -1504,7 +1547,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 }
 
 
-ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
 	type = PROC_EXTRACT;
 
@@ -1604,6 +1647,42 @@ The name of the MCR stacks should be the rootname of the micrographs + '_moviero
 	do_movie_extract.cb_menu_i();
 
 	tab3->end();
+	tab4->begin();
+	tab4->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_extract_helix.place(current_y, "Extract helical segments?", false, "Set to Yes if you want to extract helical segments. RELION (.star), EMAN2 (.box) and XIMDISP (.coords) formats of tube or segment coordinates are supported.", helix_group);
+
+	helix_group->begin();
+
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of helical tubes.");
+
+	helical_tubes_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helical_tubes_group->end();
+
+	do_extract_helical_tubes.place(current_y, "Coordinates are start-end only?", true, "Set to Yes if you want to extract helical segments from manually picked tube coordinates (starting and end points of helical tubes in RELION, EMAN or XIMDISP format). \
+Set to No if segment coordinates (RELION auto-picked results or EMAN / XIMDISP segments) are provided.", helical_tubes_group);
+
+	helical_tubes_group->begin();
+
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
+The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
+
+	helical_rise.place(current_y, "Helical rise (A):", 0, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+
+	helical_tubes_group->end();
+
+	do_extract_helical_tubes.cb_menu_i();
+
+	helix_group->end();
+
+	do_extract_helix.cb_menu_i();
+
+	tab4->end();
 
 	// read settings if hidden file exists
 	read(".gui_extractrun.job", is_continue);
@@ -1644,6 +1723,13 @@ void ExtractJobWindow::write(std::string fn)
 	first_movie_frame.writeValue(fh);
 	last_movie_frame.writeValue(fh);
 
+	// Helix
+	do_extract_helix.writeValue(fh);
+	do_extract_helical_tubes.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_rise.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
+
 	closeWriteFile(fh, fn);
 }
 void ExtractJobWindow::read(std::string fn, bool &_is_continue)
@@ -1678,6 +1764,13 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		first_movie_frame.readValue(fh);
 		last_movie_frame.readValue(fh);
 
+		// Helix
+		do_extract_helix.readValue(fh);
+		do_extract_helical_tubes.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_rise.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -1706,6 +1799,11 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	movie_rootname.deactivate(is_continue);
 	first_movie_frame.deactivate(is_continue);
 	last_movie_frame.deactivate(is_continue);
+	do_extract_helix.deactivate(is_continue);
+	do_extract_helical_tubes.deactivate(is_continue);
+	helical_nr_asu.deactivate(is_continue);
+	helical_rise.deactivate(is_continue);
+	helical_tube_outer_diameter.deactivate(is_continue);
 
 }
 
@@ -1797,6 +1895,19 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (do_set_angpix.getValue())
 	{
 		command += " --set_angpix " + floatToString(angpix.getValue());
+	}
+
+	// Helix
+	if (do_extract_helix.getValue())
+	{
+		command += " --helix";
+		command += " --helical_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		if (do_extract_helical_tubes.getValue())
+		{
+			command += " --helical_tubes";
+			command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+			command += " --helical_rise " + floatToString(helical_rise.getValue());
+		}
 	}
 
 	if (is_continue)
@@ -1947,7 +2058,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 
 
-Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
+Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_2DCLASS;
@@ -2085,6 +2196,26 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 	dont_skip_align.cb_menu_i(); // to make default effective
 
 	tab4->end();
+	tab5->begin();
+	tab5->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_bimodal_psi.place(current_y, "Do bimodal angular searches?", false, "Do bimodal search for psi angles? \
+Set to Yes if you want to classify 2D helical segments with priors of psi angles. The priors should be bimodal due to unknown polarities of the segments.", helix_group);
+
+	helix_group->begin();
+
+	range_psi.place(current_y, "Angular search range - psi (deg):", 6, 3, 30, 1, "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the psi priors estimated through helical segment picking. \
+A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of angular searches should be much larger than the sampling.");
+
+	helix_group->end();
+	do_bimodal_psi.cb_menu_i(); // to make default effective
+
+	tab5->end();
 
 	// read settings if hidden file exists
 	read(".gui_class2drun.job", is_continue);
@@ -2124,6 +2255,10 @@ void Class2DJobWindow::write(std::string fn)
 	offset_range.writeValue(fh);
 	offset_step.writeValue(fh);
 
+	// Helix
+	do_bimodal_psi.writeValue(fh);
+	range_psi.writeValue(fh);
+
 	closeWriteFile(fh, fn);
 }
 
@@ -2157,6 +2292,10 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		psi_sampling.readValue(fh);
 		offset_range.readValue(fh);
 		offset_step.readValue(fh);
+
+		// Helix
+		do_bimodal_psi.readValue(fh);
+		range_psi.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -2253,6 +2392,13 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --offset_range " + floatToString(offset_range.getValue());
 		// The sampling given in the GUI will be the oversampled one!
 		command += " --offset_step " + floatToString(offset_step.getValue() * pow(2., iover));
+	}
+
+	// Helix
+	if (do_bimodal_psi.getValue())
+	{
+		command += " --bimodal_psi";
+		command += " --sigma_psi " + floatToString(range_psi.getValue() / 3.);
 	}
 
 	// Always do norm and scale correction
@@ -2490,15 +2636,15 @@ in the previous iteration will get higher weights than those further away.");
 	helix_group->begin();
 	helical_tube_inner_diameter.placeOnSameYPosition(current_y, "Tube diameter - inner, outer (A):", "Tube diameter - inner (A):", "-1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "0", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
-Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the width of helical tubes because it also decides the shape of 2D \
-particle mask for each segment. If the extracted segments do not have priors of psi angles, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
+particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
-	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the interbox distance (set in segment picking step) \
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
 is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
 signal to noise ratio in helical reconstruction.");
 	helical_twist_initial.placeOnSameYPosition(current_y, "Initial twist (deg), rise (A):", "Initial helical twist (deg):", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	helical_rise_initial.placeOnSameYPosition(current_y, "", "Initial helical rise (A):", "0", "Initial helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
-Helical rise is a positive value in Angstroms. If local searches of helical symmetry are to be done, initial values of helical twist and rise should be within their respective ranges.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	helix_symmetry_search_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helix_symmetry_search_group->end();
@@ -2508,30 +2654,33 @@ Helical rise is a positive value in Angstroms. If local searches of helical symm
 	helical_twist_max.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	helical_twist_inistep.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Step:", "0", "Minimum, maximum and initial step for helical twist search. Set helical twist (in degrees) \
 to positive value if it is a right-handed helix. Generally it is not necessary for the user to provide an initial step (less than 1 degree, 5~1000 samplings as default). But it needs to be set manually if the default value \
-does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y += STEPY + 2;
 	helical_rise_min.placeOnSameYPosition(current_y, "Rise search - Min, Max, Step (A):", "Helical rise search (A) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	helical_rise_max.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	helical_rise_inistep.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Step:", "0", "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
 Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
-does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y += STEPY + 2;
 	helix_symmetry_search_group->end();
 	do_local_search_helical_symmetry.cb_menu_i(); // to make default effective
 	helical_z_percentage.place(current_y, "Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
-The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are present if the \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
 number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
-helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size.");
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+	/*
 	do_bimodal.place(current_y, "Do bimodal searches?", true, "If set to Yes, then perform bimodal searches of psi and tilt angles around their priors. \
 Angular priors can be estimated through autopicking of helical segments or previous runs of 3D classification or refinement. It must be set to Yes if \
 helical segments are picked using autopicking or '--extract' option in relion_helix_toolbox.");
+	*/
 	range_tilt.placeOnSameYPosition(current_y, "Angular search range - tilt, psi (deg):", "Angular search range - tilt (deg):", "15", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	range_psi.placeOnSameYPosition(current_y, "", "Angular search range - psi (deg):", "15", "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in helical reconstruction. If the angular priors \
-(tilt or psi) of input segments are not available, set the respective values to negative. A range of 15 degrees is the same as sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees. No priors will be applied if these values are set to negative.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
@@ -2587,7 +2736,7 @@ void Class3DJobWindow::write(std::string fn)
 
 	// Helix
 	do_helix.writeValue(fh);
-	do_bimodal.writeValue(fh);
+	//do_bimodal.writeValue(fh);
 	helical_tube_inner_diameter.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 	helical_nr_asu.writeValue(fh);
@@ -2650,7 +2799,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 
 		// Helix
 		do_helix.readValue(fh);
-		do_bimodal.readValue(fh);
+		//do_bimodal.readValue(fh);
 		helical_tube_inner_diameter.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
 		helical_nr_asu.readValue(fh);
@@ -2697,7 +2846,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	// Helix
 	do_helix.deactivate(is_continue);
-	do_bimodal.deactivate(is_continue);
+	//do_bimodal.deactivate(is_continue);
 	helical_tube_inner_diameter.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
@@ -2857,12 +3006,16 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
 				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
 		}
-		if (do_bimodal.getValue())
-			command += " --helical_bimodal_search";
-		if (textToFloat(range_tilt.getValue()) > 0.)
-			command += " --sigma_tilt " + floatToString(textToFloat(range_tilt.getValue()) / 3.);
-		if (textToFloat(range_psi.getValue()) > 0.)
-			command += " --sigma_psi " + floatToString(textToFloat(range_psi.getValue()) / 3.);
+		command += " --helical_bimodal_search";
+		RFLOAT val;
+		val = textToFloat(range_tilt.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_tilt " + floatToString(val / 3.);
+		val = textToFloat(range_psi.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_psi " + floatToString(val / 3.);
 	}
 
 	// Running stuff
@@ -3083,15 +3236,15 @@ will be centered at the rotations determined for the corresponding particle wher
 	helix_group->begin();
 	helical_tube_inner_diameter.placeOnSameYPosition(current_y, "Tube diameter - inner, outer (A):", "Tube diameter - inner (A):", "-1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "0", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
-Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the width of helical tubes because it also decides the shape of 2D \
-particle mask for each segment. If the extracted segments do not have priors of psi angles, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
+particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
-	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the interbox distance (set in segment picking step) \
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
 is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
 signal to noise ratio in helical reconstruction.");
 	helical_twist_initial.placeOnSameYPosition(current_y, "Initial twist (deg), rise (A):", "Initial helical twist (deg):", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	helical_rise_initial.placeOnSameYPosition(current_y, "", "Initial helical rise (A):", "0", "Initial helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
-Helical rise is a positive value in Angstroms. If local searches of helical symmetry are to be done, initial values of helical twist and rise should be within their respective ranges.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	helix_symmetry_search_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helix_symmetry_search_group->end();
@@ -3101,30 +3254,33 @@ Helical rise is a positive value in Angstroms. If local searches of helical symm
 	helical_twist_max.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	helical_twist_inistep.placeOnSameYPosition(current_y, "", "Helical twist search (deg) - Step:", "0", "Minimum, maximum and initial step for helical twist search. Set helical twist (in degrees) \
 to positive value if it is a right-handed helix. Generally it is not necessary for the user to provide an initial step (less than 1 degree, 5~1000 samplings as default). But it needs to be set manually if the default value \
-does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y += STEPY + 2;
 	helical_rise_min.placeOnSameYPosition(current_y, "Rise search - Min, Max, Step (A):", "Helical rise search (A) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	helical_rise_max.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Max:", "0", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	helical_rise_inistep.placeOnSameYPosition(current_y, "", "Helical rise search (A) - Step:", "0", "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
 Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
-does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y += STEPY + 2;
 	helix_symmetry_search_group->end();
 	do_local_search_helical_symmetry.cb_menu_i(); // to make default effective
 	helical_z_percentage.place(current_y, "Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
-The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are present if the \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
 number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
-helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size.");
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+	/*
 	do_bimodal.place(current_y, "Do bimodal searches?", true, "If set to Yes, then perform bimodal searches of psi and tilt angles around their priors. \
 Angular priors can be estimated through autopicking of helical segments or previous runs of 3D classification or refinement. It must be set to Yes if \
 helical segments are picked using autopicking or '--extract' option in relion_helix_toolbox.");
+	*/
 	range_tilt.placeOnSameYPosition(current_y, "Angular search range - tilt, psi (deg):", "Angular search range - tilt (deg):", "15", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	range_psi.placeOnSameYPosition(current_y, "", "Angular search range - psi (deg):", "15", "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in helical reconstruction. If the angular priors \
-(tilt or psi) of input segments are not available, set the respective values to negative. A range of 15 degrees is the same as sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees. No priors will be applied if these values are set to negative.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
@@ -3183,7 +3339,7 @@ void Auto3DJobWindow::write(std::string fn)
 
 	// Helix
 	do_helix.writeValue(fh);
-	do_bimodal.writeValue(fh);
+	//do_bimodal.writeValue(fh);
 	helical_tube_inner_diameter.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 	helical_nr_asu.writeValue(fh);
@@ -3248,7 +3404,7 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 
 		// Helix
 		do_helix.readValue(fh);
-		do_bimodal.readValue(fh);
+		//do_bimodal.readValue(fh);
 		helical_tube_inner_diameter.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
 		helical_nr_asu.readValue(fh);
@@ -3308,7 +3464,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	// Helix
 	do_helix.deactivate(is_continue);
-	do_bimodal.deactivate(is_continue);
+	//do_bimodal.deactivate(is_continue);
 	helical_tube_inner_diameter.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
@@ -3485,12 +3641,16 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
 				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
 		}
-		if (do_bimodal.getValue())
-			command += " --helical_bimodal_search";
-		if (textToFloat(range_tilt.getValue()) > 0.)
-			command += " --sigma_tilt " + floatToString(textToFloat(range_tilt.getValue()) / 3.);
-		if (textToFloat(range_psi.getValue()) > 0.)
-			command += " --sigma_psi " + floatToString(textToFloat(range_psi.getValue()) / 3.);
+		command += " --helical_bimodal_search";
+		RFLOAT val;
+		val = textToFloat(range_tilt.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_tilt " + floatToString(val / 3.);
+		val = textToFloat(range_psi.getValue());
+		val = (val < 0.) ? (0.) : (val);
+		val = (val > 90.) ? (90.) : (val);
+		command += " --sigma_psi " + floatToString(val / 3.);
 	}
 
 	// Running stuff
@@ -3507,7 +3667,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 }
 
-PolishJobWindow::PolishJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
+PolishJobWindow::PolishJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_POLISH;
@@ -3602,6 +3762,30 @@ Pixels values higher than this many times the image stddev will be replaced with
 
 	tab4->end();
 
+	tab5->begin();
+	tab5->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_helix.place(current_y, "Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.", helix_group);
+
+	helix_group->begin();
+
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the interbox distance (set in segment picking step) \
+is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
+signal to noise ratio in helical reconstruction.\n\nPlease copy this value from previous 3D refinement.");
+
+	helical_twist.placeOnSameYPosition(current_y, "Helical twist (deg), rise (A):", "Helical twist (deg):", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	helical_rise.placeOnSameYPosition(current_y, "", "Helical rise (A):", "0", "Helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
+Helical rise is a positive value in Angstroms.\n\nPlease copy the refined helical symmetry from previous 3D refinement.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+
+	helix_group->end();
+	do_helix.cb_menu_i(); // to make default effective
+
+	tab5->end();
+
 	// read settings if hidden file exists
 	read(".gui_polishrun.job", is_continue);
 }
@@ -3627,6 +3811,10 @@ void PolishJobWindow::write(std::string fn)
 	bg_diameter.writeValue(fh);
 	white_dust.writeValue(fh);
 	black_dust.writeValue(fh);
+	do_helix.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_twist.writeValue(fh);
+	helical_rise.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3649,6 +3837,10 @@ void PolishJobWindow::read(std::string fn, bool &_is_continue)
 		bg_diameter.readValue(fh);
 		white_dust.readValue(fh);
 		black_dust.readValue(fh);
+		do_helix.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_twist.readValue(fh);
+		helical_rise.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3719,6 +3911,14 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --bg_radius " + floatToString(FLOOR(bg_diameter.getValue()/2.));
 	command += " --white_dust " + floatToString(white_dust.getValue());
 	command += " --black_dust " + floatToString(black_dust.getValue());
+
+	// Helix
+	if (do_helix.getValue())
+	{
+		command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+		command += " --helical_twist " + floatToString(textToFloat(helical_twist.getValue()));
+		command += " --helical_rise " + floatToString(textToFloat(helical_rise.getValue()));
+	}
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
@@ -3898,7 +4098,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 }
 
 
-MaskCreateJobWindow::MaskCreateJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
+MaskCreateJobWindow::MaskCreateJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_MASKCREATE;
@@ -3927,6 +4127,24 @@ If you don't know what value to use, display one of the unfiltered half-maps in 
 
 	tab2->end();
 
+	tab3->begin();
+	tab3->label("Helix");
+	resetHeight();
+
+	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	helix_group->end();
+
+	do_helix.place(current_y, "Mask a 3D helix?", false, "Generate a mask for 3D helix which spans across Z axis of the box.", helix_group);
+
+	helix_group->begin();
+
+	helical_z_percentage.place(current_y, "Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used but you may want to try different lengths.");
+	helix_group->end();
+	do_helix.cb_menu_i(); // to make default effective
+
+	tab3->end();
+
 	// read settings if hidden file exists
 	read(".gui_maskcreaterun.job", is_continue);
 }
@@ -3948,6 +4166,8 @@ void MaskCreateJobWindow::write(std::string fn)
 	inimask_threshold.writeValue(fh);
 	extend_inimask.writeValue(fh);
 	width_mask_edge.writeValue(fh);
+	do_helix.writeValue(fh);
+	helical_z_percentage.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3965,6 +4185,8 @@ void MaskCreateJobWindow::read(std::string fn, bool &_is_continue)
 		inimask_threshold.readValue(fh);
 		extend_inimask.readValue(fh);
 		width_mask_edge.readValue(fh);
+		do_helix.readValue(fh);
+		helical_z_percentage.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -4007,6 +4229,11 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command += " --ini_threshold " + floatToString(inimask_threshold.getValue());
 	command += " --extend_inimask " + floatToString(extend_inimask.getValue());
 	command += " --width_soft_edge " + floatToString(width_mask_edge.getValue());
+
+	if (do_helix.getValue())
+	{
+		command += " --helix --z_percentage " + floatToString(helical_z_percentage.getValue() / 100.);
+	}
 
 	// Other arguments
 	command += " " + other_args.getValue();
