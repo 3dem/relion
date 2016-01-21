@@ -959,17 +959,6 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		cb_toggle_continue_i();
 	}
 
-	// Copy pipeline star file as backup to the output directory
-	if (do_commandline && do_makedir)
-	{
-		FileName fn_pipe = pipeline.name + "_pipeline.star ";
-		if (exists(fn_pipe))
-		{
-			std::string command = "cp " + fn_pipe + " " + global_outputname;
-			int res = system(command.c_str());
-		}
-	}
-
 }
 
 void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
@@ -1423,7 +1412,7 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	}
 
 	// If this is a continuation job, check whether output files exist and move away!
-	// This is to ensure that the continuation job goes OK
+	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
 	if (!only_schedule && is_main_continue)
 	{
 		bool is_refine = (pipeline.processList[current_job].type == PROC_2DCLASS ||
@@ -1467,6 +1456,14 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		// Open the edit note window
 		if (do_open_edit)
 			cb_edit_note_i();
+	}
+
+	// Copy pipeline star file as backup to the output directory
+	FileName fn_pipe = pipeline.name + "_pipeline.star";
+	if (exists(fn_pipe))
+	{
+		std::string command = "cp " + fn_pipe + " " + pipeline.processList[current_job].name;
+		int res = system(command.c_str());
 	}
 
 }
@@ -1717,31 +1714,40 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		FileName fn_opt = pipeline.processList[current_job].name + "run*optimiser.star";
 		std::vector<FileName> fn_opts;
 		fn_opt.globFiles(fn_opts);
-		fn_opt = fn_opts[fn_opts.size()-1]; // the last one
-		Node node1(fn_opt, NODE_OPTIMISER);
-		pipeline.addNewOutputEdge(current_job, node1);
-
-		// Also get data.star
-		FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
-		Node node2(fn_data, NODE_PART_DATA);
-		pipeline.addNewOutputEdge(current_job, node2);
-
-		FileName fn_root = fn_opt.without("_optimiser.star");
-		if (pipeline.processList[current_job].type == PROC_3DAUTO)
-			fn_root += "_half1";
-
-		FileName fn_model = fn_root + "_model.star";
-		Node node3(fn_model, NODE_MODEL);
-		pipeline.addNewOutputEdge(current_job, node3);
-
-
-		FileName fn_map = fn_root + "_class???.mrc";
-		std::vector<FileName> fn_maps;
-		fn_map.globFiles(fn_maps);
-		for (int i = 0; i < fn_maps.size(); i++)
+		if (fn_opts.size() > 0)
 		{
-			Node node4(fn_maps[i], NODE_3DREF);
-			pipeline.addNewOutputEdge(current_job, node4);
+			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
+			Node node1(fn_opt, NODE_OPTIMISER);
+			pipeline.addNewOutputEdge(current_job, node1);
+
+			// Also get data.star
+			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
+			Node node2(fn_data, NODE_PART_DATA);
+			pipeline.addNewOutputEdge(current_job, node2);
+
+			FileName fn_root = fn_opt.without("_optimiser.star");
+			if (pipeline.processList[current_job].type == PROC_3DAUTO)
+				fn_root += "_half1";
+
+			FileName fn_model = fn_root + "_model.star";
+			Node node3(fn_model, NODE_MODEL);
+			pipeline.addNewOutputEdge(current_job, node3);
+
+
+			FileName fn_map = fn_root + "_class???.mrc";
+			std::vector<FileName> fn_maps;
+			fn_map.globFiles(fn_maps);
+			for (int i = 0; i < fn_maps.size(); i++)
+			{
+				Node node4(fn_maps[i], NODE_3DREF);
+				pipeline.addNewOutputEdge(current_job, node4);
+			}
+		}
+		else
+		{
+			std::cout << " You are trying to mark a relion_refine job as finished that hasn't even started. This will be ignored. " << std::endl;
+			std::cout << " Perhaps you wanted to delete it instead?" << std::endl;
+			pipeline.processList[current_job].status = PROC_RUNNING;
 		}
 	}
 
