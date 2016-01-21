@@ -64,6 +64,9 @@ public:
 	// Input, picking & output names
 	FileName fn_in, fn_sel;
 
+	// Allow saving selected micrographs?
+	bool do_allow_save;
+
 	// MetaDataTable of input micrographs
 	MetaDataTable MDin;
 
@@ -77,6 +80,9 @@ private:
 
     static void cb_menubar_save(Fl_Widget*, void*);
     inline void cb_menubar_save_i();
+
+    static void cb_menubar_invert_selection(Fl_Widget*, void*);
+    inline void cb_menubar_invert_selection_i();
 
     static void cb_menubar_quit(Fl_Widget*, void*);
     inline void cb_menubar_quit_i();
@@ -101,6 +107,9 @@ public:
 
 	// Input, picking & output names
 	FileName fn_in, fn_sel;
+
+	// Allow save selected micrographs?
+	bool do_allow_save;
 
 
 public:

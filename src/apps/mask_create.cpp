@@ -26,13 +26,14 @@
 #include <src/error.h>
 #include <src/mask.h>
 #include <src/time.h>
+#include <src/helix.h>
 
 class mask_create_parameters
 {
 	public:
    	FileName fn_apply_in, fn_mask, fn_apply_out, fn_thr, fn_omask, fn_and, fn_or, fn_andnot, fn_ornot;
-   	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge, lowpass, angpix;
-	bool do_invert;
+   	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge, lowpass, angpix, helical_z_percentage;
+	bool do_invert, do_helix;
    	IOParser parser;
 
 	void usage()
@@ -56,8 +57,10 @@ class mask_create_parameters
 	    extend_ini_mask = textToFloat(parser.getOption("--extend_inimask", "Extend initial binary mask this number of pixels","0"));
 	    width_soft_edge  = textToFloat(parser.getOption("--width_soft_edge", "Width (in pixels) of the additional soft edge on the binary mask", "0"));
 	    do_invert = parser.checkOption("--invert", "Invert the final mask");
+	    do_helix = parser.checkOption("--helix", "Generate a mask for 3D helix");
 	    lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in Angstroms) for the input map, prior to binarization (default is none)", "-1"));
 	    angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms) for the lowpass filter", "1"));
+	    helical_z_percentage = textToFloat(parser.getOption("--z_percentage", "This box length along the center of Z axis contains good information of the helix", "0.3"));
 
 	    if (fn_thr=="" && fn_apply_in == "")
 	    	REPORT_ERROR("Either provide --i to apply a mask, OR --create_from to create a new mask");
@@ -135,6 +138,11 @@ class mask_create_parameters
 
 		autoMask(Iin(), Iout(), ini_threshold, extend_ini_mask, width_soft_edge, true); // true sets verbosity
 
+		if (do_helix)
+		{
+			cutZCentralPartOfSoftMask(Iout(), helical_z_percentage, width_soft_edge);
+		}
+
 		if (do_invert)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iout())
@@ -168,7 +176,7 @@ int main(int argc, char *argv[])
     }
     catch (RelionError XE)
     {
-        std::cout << XE;
+        std::cerr << XE;
         prm.usage();
         exit(1);
     }

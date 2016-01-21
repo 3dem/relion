@@ -35,7 +35,6 @@ void Preprocessing::read(int argc, char **argv, int rank)
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
-	do_helical_segments = parser.checkOption("--helical_segments", "Perform operations on helical segments");
 	do_premultiply_ctf = parser.checkOption("--premultiply_ctf", "Premultiply the micrograph/frame with its CTF prior to particle extraction");
 	do_ctf_intact_first_peak = parser.checkOption("--ctf_intact_first_peak", "When premultiplying with the CTF, leave frequencies intact until the first peak");
 	do_phase_flip = parser.checkOption("--phase_flip", "Flip CTF-phases in the micrograph/frame prior to particle extraction");
@@ -43,7 +42,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	do_movie_extract = parser.checkOption("--extract_movies", "Extract particles from movie stacks?");
-	movie_name = parser.getOption("--movie_name", "Movie-identifier to extract particles from movie stacks (e.g. _movie.mrcs)", "movie");
+	movie_name = parser.getOption("--movie_name", "Movie-identifier to extract particles from movie stacks (e.g. for _movie.mrcs)", "movie");
 	avg_n_frames = textToInteger(parser.getOption("--avg_movie_frames", "Average over this number of individual movie frames", "1"));
 	movie_first_frame = textToInteger(parser.getOption("--first_movie_frame", "Extract from this movie frame onwards", "1"));
 	movie_first_frame--; // (start counting at 0, not 1)
@@ -59,12 +58,18 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	do_normalise = parser.checkOption("--norm", "Normalise the background to average zero and stddev one");
 	do_ramp = !parser.checkOption("--no_ramp", "Just subtract the background mean in the normalisation, instead of subtracting a fitted ramping background. ");
 	bg_radius = textToInteger(parser.getOption("--bg_radius", "Radius of the circular mask that will be used to define the background area (in pixels)", "-1"));
-	bg_helical_radius = textToFloat(parser.getOption("--bg_helical_radius", "Radius of the cylindrical mask that will be used to define the background area (in pixels)", "-1."));
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 	do_invert_contrast = parser.checkOption("--invert_contrast", "Invert the contrast in the input images");
 	fn_operate_in = parser.getOption("--operate_on", "Use this option to operate on an input stack/STAR file", "");
 	fn_operate_out = parser.getOption("--operate_out", "Output rootname when operating on an input stack/STAR file", "preprocessed");
+
+	int helix_section = parser.addSection("Helix extraction");
+	do_extract_helix = parser.checkOption("--helix", "Extract helical segments");
+	helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical segments)", "-1."));
+	do_extract_helical_tubes = parser.checkOption("--helical_tubes", "Extract helical segments from tube coordinates");
+	helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of helical asymmetrical units", "1"));
+	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -141,27 +146,6 @@ void Preprocessing::initialise()
 			if (do_recenter && verb > 0)
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
 
-			/*
-			MDdata.read(fn_data);
-
-			if (!MDdata.containsLabel(EMDL_CTF_MAGNIFICATION) || !MDdata.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-				REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star should contain rlnMagnification and rlnDetectorPixelSize.");
-
-			RFLOAT mag2, dstep2, angpix2;
-			MDdata.getValue(EMDL_CTF_MAGNIFICATION, mag2);
-			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
-			angpix2 = 10000. * dstep2 / mag2;
-			rescale_fndata = angpix2 / angpix;
-			if (ABS(rescale_fndata - 1.) > 1e-6 && verb > 0)
-				std::cout << " + Re-scaling origin offsets by a factor of " << rescale_fndata << std::endl;
-
-			if (do_recenter)
-			{
-				if (!MDdata.containsLabel(EMDL_ORIENT_ORIGIN_X) || !MDdata.containsLabel(EMDL_ORIENT_ORIGIN_Y))
-					REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star file does not contain rlnOriginX/Y for re-centering.");
-			}
-			*/
-
 		}
 
 		// Make sure the directory names end with a '/'
@@ -206,6 +190,16 @@ void Preprocessing::initialise()
 		// Check for bg_radius in case of normalisation
 		if (do_normalise && bg_radius < 0)
 			REPORT_ERROR("ERROR: please provide a radius for a circle that defines the background area when normalising...");
+
+		// Extract helical segments
+		if (do_extract_helix)
+		{
+			if ( (!do_extract) || (fn_operate_in != "") )
+				REPORT_ERROR("ERROR: cannot perform operations on helical segments other than extraction");
+			if ((do_normalise) && (helical_tube_outer_diameter < 0))
+				REPORT_ERROR("ERROR: please provide a tube radius that defines the background area when normalising helical segments...");
+		}
+
 	}
 }
 
@@ -251,7 +245,7 @@ void Preprocessing::joinAllStarFiles()
 			MDonestack.read(fn_star);
 
 			for (long int current_object2 = MDonestack.firstObject();
-						  current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
+						  current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object2 != MetaDataTable::NO_OBJECTS_STORED;
 						  current_object2 = MDonestack.nextObject())
 			{
 				MDout.addObject( MDonestack.getObject());
@@ -327,24 +321,10 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 
     if (is_star)
 	{
-		MD.read(fn_coord);
-		if (do_helical_segments)
-		{
-			if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
-					|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
-					|| (!MD.containsLabel(EMDL_ORIENT_TILT))
-					|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
-			{
-				REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments: x, y, tilt or psi are missing in STAR file: " + fn_coord);
-			}
-		}
+    	MD.read(fn_coord);
 	}
 	else
 	{
-
-		if (do_helical_segments)
-			REPORT_ERROR("Preprocessing::readCoordinates ERROR: only STAR files are allowed for helical segments.");
-
 		std::ifstream in(fn_coord.data(), std::ios_base::in);
 		if (in.fail())
 			REPORT_ERROR( (std::string) "Preprocessing::readCoordinates ERROR: File " + fn_coord + " does not exists" );
@@ -379,7 +359,6 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 				// But could also be a data line (as in plain text format)
 				if (n==0)
 				{
-
 					int num1, num2, num3;
 					bool is_data = false;
 
@@ -394,8 +373,6 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 						if (words.size() > 2 && sscanf(words[2].c_str(), "%d", &num3))
 							MD.setValue(EMDL_IMAGE_COORD_Z, (RFLOAT)num3);
 					}
-
-
 				}
 				else
 				{
@@ -414,14 +391,66 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 					// It could also be a X,Y,Z coordinate...
 					if (words.size() > 2 && sscanf(words[2].c_str(), "%d", &num3))
 						MD.setValue(EMDL_IMAGE_COORD_Z, (RFLOAT)num3);
-
 				}
 			}
 			n++;
-
 		}
 		in.close();
 	}
+}
+
+void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, MetaDataTable &MD)
+{
+    MD.clear();
+
+    bool is_star = (fn_coord.getExtension() == "star");
+    bool is_box = (fn_coord.getExtension() == "box");
+    bool is_coords = (fn_coord.getExtension() == "coords");
+    if ( (!is_star) && (!is_box) && (!is_coords) )
+		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (*.star, *.box and *.coords are supported).");
+
+	// Get movie or normal micrograph name and check it exists
+	// This implicitly assumes that the movie is next to the micrograph....
+	// TODO: That may not necessarily be true?
+	FileName fn_img = (do_movie_extract) ? fn_mic.withoutExtension() + "_" + movie_name + ".mrcs" : fn_mic;
+	if (!exists(fn_img))
+	{
+		std::cout << "WARNING: cannot find micrograph file " << fn_img << std::endl;
+		return;
+	}
+
+	// Read the header of the micrograph to see X and Y dimensions
+	Image<RFLOAT> Imic;
+	Imic.read(fn_img, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
+
+	int xdim, ydim, zdim;
+	long int ndim;
+	Imic.getDimensions(xdim, ydim, zdim, ndim);
+
+	int total_segments, total_tubes;
+    if (is_star)
+    {
+		if (do_extract_helical_tubes)
+			extractCoordsForAllHelicalSegments(fn_coord, MD, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, total_segments, total_tubes);
+		else
+			convertHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, xdim, ydim, extract_size, total_segments);
+    }
+    else if (is_box)
+    {
+		if (do_extract_helical_tubes)
+			convertEmanHelicalTubeCoordsToMetaDataTable(fn_coord, MD, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, total_segments, total_tubes);
+		else
+			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, xdim, ydim, extract_size, total_segments, total_tubes);
+    }
+    else if (is_coords)
+    {
+		if (do_extract_helical_tubes)
+			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_coord, MD, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, total_segments, total_tubes);
+		else
+			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, xdim, ydim, extract_size, total_segments, total_tubes);
+    }
+	else
+		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (*.star, *.box and *.coords are supported).");
 }
 
 void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int imic)
@@ -430,12 +459,13 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	// Name of the output particle stack
 	// Add the same root as the output STAR file (that way one could extract two "families" of different particle stacks)
 	FileName fn_output_img_root = getOutputFileNameRoot(fn_mic);
+	FileName fn_oristack = getOriginalStackNameWithoutUniqDate(fn_mic);
     // Name of this micrographs STAR file
     FileName fn_star = fn_output_img_root + ".star";
 
     if (exists(fn_star) && only_extract_unfinished)
     {
-    	std::cout << fn_star << " already exists, so skipping extraction!" << std::endl;
+    	//std::cout << fn_star << " already exists, so skipping extraction!" << std::endl;
     	return;
     }
 
@@ -451,7 +481,10 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		FileName fn_coord = getCoordinateFileName(fn_mic);
 		if (!exists(fn_coord))
 			return;
-		readCoordinates(fn_coord, MDin);
+		if (do_extract_helix)
+			readHelicalCoordinates(fn_mic, fn_coord, MDin);
+		else
+			readCoordinates(fn_coord, MDin);
 	}
 
 	// Correct for bias in the picked coordinates
@@ -517,8 +550,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 
 	for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
 	{
-		extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, my_current_nr_images, my_total_nr_images,
-				all_avg, all_stddev, all_minval, all_maxval);
+		extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, fn_oristack,
+				my_current_nr_images, my_total_nr_images, all_avg, all_stddev, all_minval, all_maxval);
 
         MDout.append(MDin);
 		// Keep track of total number of images extracted thus far
@@ -533,7 +566,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 // Actually extract particles. This can be from one (average) micrograph or from a single movie frame
 void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		FileName fn_mic, int imic, int iframe, int n_frames,
-		FileName fn_output_img_root, long int &my_current_nr_images, long int my_total_nr_images,
+		FileName fn_output_img_root, FileName fn_oristack, long int &my_current_nr_images, long int my_total_nr_images,
 		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
 
@@ -606,18 +639,6 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		if (ori_xsize != ori_ysize)
 			Imic().window(FIRST_XMIPP_INDEX(ori_ysize), FIRST_XMIPP_INDEX(ori_xsize),
 					LAST_XMIPP_INDEX(ori_ysize),  LAST_XMIPP_INDEX(ori_xsize));
-	}
-
-	// Jun24,2015 - Shaoda, helical segments
-	if (do_helical_segments)
-	{
-		if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
-				|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
-				|| (!MD.containsLabel(EMDL_ORIENT_TILT))
-				|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
-		{
-			REPORT_ERROR("ERROR: Extraction of helical segments: x, y, tilt and psi are missing in STAR files!");
-		}
 	}
 
 	// Now window all particles from the micrograph
@@ -720,10 +741,10 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			// Jun24,2015 - Shaoda, extract helical segments
 			RFLOAT tilt_deg, psi_deg;
 			tilt_deg = psi_deg = 0.;
-			if (do_helical_segments)
+			if (do_extract_helix) // If priors do not exist, errors will occur in 'readHelicalCoordinates()'.
 			{
-				MD.getValue(EMDL_ORIENT_TILT, tilt_deg);
-				MD.getValue(EMDL_ORIENT_PSI, psi_deg);
+				MD.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
+				MD.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
 			}
 			performPerImageOperations(Ipart, fn_output_img_root, n_frames, my_current_nr_images + ipos, my_total_nr_images,
 					tilt_deg, psi_deg,
@@ -737,11 +758,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
 			if (do_movie_extract)
 			{
-				FileName fn_part, fn_mic;
-				long int dum;
-				fn_frame.decompose(dum, fn_mic);
-				FileName fn_mic_ori = fn_output_img_root.without("_"+movie_name);
-				fn_part.compose(ipos + 1,  fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
+				FileName fn_part;
+				fn_part.compose(ipos + 1,  fn_oristack); // start image counting in stacks at 1!
 				// for automated re-alignment of particles in relion_refine: have rlnParticleName equal to rlnImageName in non-movie star file
 				MD.setValue(EMDL_PARTICLE_ORI_NAME, fn_part);
 			}
@@ -794,23 +812,9 @@ void Preprocessing::runOperateOnInputFile()
 			Nimg++;
 		}
 		MD.firstObject(); // reset pointer to the first object in the table
-
-		// Jun25,2015 - Shaoda, helical segments
-		if (do_helical_segments)
-		{
-			if ( (!MD.containsLabel(EMDL_ORIENT_TILT))
-					|| (!MD.containsLabel(EMDL_ORIENT_PSI)) )
-			{
-				REPORT_ERROR("ERROR: Operations on helical segments: only STAR files with tilt and psi angles are supported!");
-			}
-		}
 	}
 	else
 	{
-		// Jun25,2015 - Shaoda, helical segments
-		if (do_helical_segments)
-			REPORT_ERROR("ERROR: Operations on helical segments: only STAR files are supported!");
-
 		// Read the header of the stack to see how many images there
 		Iout.read(fn_operate_in, false);
 		Nimg = NSIZE(Iout());
@@ -848,14 +852,8 @@ void Preprocessing::runOperateOnInputFile()
 			MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
 		}
 
-		// Jun24,2015 - Shaoda, extract helical segments
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
-		if (do_helical_segments)
-		{
-			MD.getValue(EMDL_ORIENT_TILT, tilt_deg);
-			MD.getValue(EMDL_ORIENT_PSI, psi_deg);
-		}
 		performPerImageOperations(Ipart, fn_stack, 1, i, Nimg,
 				tilt_deg, psi_deg,
 				all_avg, all_stddev, all_minval, all_maxval);
@@ -897,8 +895,11 @@ void Preprocessing::performPerImageOperations(
 	// Jun24,2015 - Shaoda, helical segments
 	if (do_normalise)
 	{
+		RFLOAT bg_helical_radius = (helical_tube_outer_diameter * 0.5) / angpix;
+		if (do_rescale)
+			bg_helical_radius *= scale / extract_size;
 		normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp,
-				do_helical_segments, bg_helical_radius, tilt_deg, psi_deg);
+				do_extract_helix, bg_helical_radius, tilt_deg, psi_deg);
 	}
 
 	if (do_invert_contrast) invert_contrast(Ipart);
@@ -1054,6 +1055,18 @@ FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
 	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
 	FileName fn_part = fn_part_dir + fn_mic_nouniqdate;
+	if (do_movie_extract)
+		fn_part += "_" + movie_name;
 	return fn_part;
+}
+
+FileName Preprocessing::getOriginalStackNameWithoutUniqDate(FileName fn_mic)
+{
+
+	FileName uniqdate;
+	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
+	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
+	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension() + ".mrcs";
+	return fn_mic_nouniqdate;
 }
 

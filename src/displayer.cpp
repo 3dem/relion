@@ -1684,7 +1684,7 @@ void displayerGuiWindow::cb_display_i()
 
 	// send job in the background
 	cl += " &";
-	std::cerr << "Executing: " << cl << std::endl;
+	std::cout << "Executing: " << cl << std::endl;
 	int res = system(cl.c_str());
 
 }
@@ -1906,6 +1906,8 @@ int Displayer::runGui()
 			win.display_labels.push_back(EMDL::label2Str(EMDL_CTF_IMAGE));
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_NAME));
+		if (MD.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_MOVIE_NAME));
 
 
 	}

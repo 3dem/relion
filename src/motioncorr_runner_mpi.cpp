@@ -58,7 +58,7 @@ void MotioncorrRunnerMpi::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
-		executeMotioncorr(fn_micrographs[imic]);
+		executeMotioncorr(fn_micrographs[imic], node->rank);
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);

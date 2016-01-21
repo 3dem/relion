@@ -17,31 +17,37 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <src/ctffind_runner.h>
+
+#include <FL/Fl.H>
+#include <FL/Fl_Window.H>
+#include "src/gui_mainwindow.h"
+#include <src/args.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 
 int main(int argc, char *argv[])
 {
-	CtffindRunner prm;
 
 	try
-    {
-		prm.read(argc, argv);
+	{
+		// Fill the window, but don't show it!
+		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
+		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, "", fn_pipe);
 
-		prm.initialise();
+		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "1"));
+		long int minutes_wait =  textToInteger(getParameter(argc, argv, "--min_wait", "10"));
+		window.runScheduledJobs(nr_repeat, minutes_wait);
 
-		prm.run();
-    }
+	}
 
     catch (RelionError XE)
     {
-        prm.usage();
         std::cerr << XE;
         exit(1);
     }
 
     return 0;
-
 }
-
-

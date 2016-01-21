@@ -58,25 +58,27 @@ void CtffindRunnerMpi::run()
 			barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 		}
 
-		std::string allmicnames = "";
+		std::vector<std::string> allmicnames;
 		for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 		{
 
 			if (do_use_gctf)
 			{
-				addToGctfJobList(imic, allmicnames);
+				//addToGctfJobList(imic, allmicnames);
+				executeGctf(imic, allmicnames, imic == my_last_micrograph, node->rank);
 			}
 			else
 			{
-				if (verb > 0 && imic % barstep == 0)
-					progress_bar(imic);
-
 				executeCtffind(imic);
 			}
+
+			if (verb > 0 && imic % barstep == 0)
+				progress_bar(imic);
+
 		}
 
-		if (do_use_gctf)
-			executeGctf(allmicnames);
+		//if (do_use_gctf && allmicnames.size() > 0)
+		//	executeGctf(allmicnames);
 
 		if (verb > 0)
 			progress_bar(my_nr_micrographs);

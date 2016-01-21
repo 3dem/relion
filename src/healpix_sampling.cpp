@@ -870,11 +870,11 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 	if (is_3D)
 	{
 		// If tilt prior is less than 20 or larger than 160 degrees, print a warning message
-		if (fabs(((prior_tilt / 180.) - ROUND(prior_tilt / 180.)) * 180.) < 20.)
-		{
-			std::cerr << " WARNING: A segment is found with tilt prior= " << prior_tilt
-					<< " degrees. It will probably impact searches of orientations in 3D helical reconstruction."<< std::endl;
-		}
+		//if (fabs(((prior_tilt / 180.) - ROUND(prior_tilt / 180.)) * 180.) < 20.)
+		//{
+		//	std::cerr << " WARNING: A helical segment is found with tilt prior= " << prior_tilt
+		//			<< " degrees. It will probably impact searches of orientations in 3D helical reconstruction."<< std::endl;
+		//}
 
 		// Loop over all directions
 		RFLOAT sumprior = 0.;

@@ -107,7 +107,6 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	}
 
 	command += " &";
-	std::cerr << command << std::endl;
 	int res = system(command.c_str());
 
 	last_pick_viewed = imic;
@@ -138,7 +137,6 @@ void cb_viewctf(Fl_Widget* w, void* data)
 	command += " --scale " + floatToString(global_ctfscale);
 	command += " --sigma_contrast " + floatToString(global_ctfsigma);
 	command += " &";
-	std::cerr << command << std::endl;
 	int res = system(command.c_str());
 
 	last_ctf_viewed = imic;
@@ -200,7 +198,11 @@ int manualpickerGuiWindow::fill()
 
 
 	Fl_Menu_Bar *menubar = new Fl_Menu_Bar(0, 0, w(), 25);
-    menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
+    if (do_allow_save)
+    {
+    	menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
+    	menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
+    }
     menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
     int current_y = 25;
@@ -285,7 +287,8 @@ int manualpickerGuiWindow::fill()
 
 
 	// See if the output STAR file already exists, if so apply that selection
-	readOutputStarfile();
+	if (do_allow_save)
+		readOutputStarfile();
 
 	// Also count the number of particles that were already picked
 	cb_menubar_recount_i();
@@ -375,6 +378,44 @@ void manualpickerGuiWindow::cb_menubar_save_i()
 	std::cout << " Saved " << fn_sel << std::endl;
 }
 
+void manualpickerGuiWindow::cb_menubar_invert_selection(Fl_Widget* w, void* v)
+{
+	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
+    T->cb_menubar_invert_selection_i();
+
+}
+
+void manualpickerGuiWindow::cb_menubar_invert_selection_i()
+{
+	for (int imic = 0; imic < selected.size(); imic++)
+	{
+		selected[imic] = !selected[imic];
+		if (selected[imic])
+		{
+			check_buttons[imic]->value(1);
+			text_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+			text_displays[imic]->activate();
+			viewmic_buttons[imic]->activate();
+			count_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+			count_displays[imic]->activate();
+			if (global_has_ctf)
+				viewctf_buttons[imic]->activate();
+		}
+		else
+		{
+			check_buttons[imic]->value(0);
+			text_displays[imic]->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
+			text_displays[imic]->deactivate();
+			viewmic_buttons[imic]->deactivate();
+			count_displays[imic]->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
+			count_displays[imic]->deactivate();
+			if (global_has_ctf)
+				viewctf_buttons[imic]->deactivate();
+		}
+	}
+
+}
+
 void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
@@ -447,6 +488,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1."));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
+	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
 
 	int mic_section = parser.addSection("Displaying options");
 	global_micscale = textToFloat(parser.getOption("--scale", "Relative scale for the micrograph display", "1"));
@@ -513,6 +555,7 @@ void ManualPicker::run()
 	// Transfer all parameters to the gui
 	win.MDin = MDin;
 	win.fn_sel = fn_sel;
+	win.do_allow_save = do_allow_save;
 	win.fill();
 
 }

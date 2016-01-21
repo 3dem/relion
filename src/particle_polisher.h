@@ -147,13 +147,13 @@ public:
 	RFLOAT defocus_shift_max, defocus_shift_step;
 
 	// Sep24,2015 - Shaoda, Helical reconstruction
-	int nr_helical_asu;
+	int helical_nr_asu;
+
 	RFLOAT helical_twist;
 	RFLOAT helical_rise;
 
 	// Make output directories only if it doesn't exist yet
 	FileName fn_olddir;
-
 
 public:
 	// Read command line arguments

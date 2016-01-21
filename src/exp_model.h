@@ -294,6 +294,7 @@ public:
     // One large MetaDataTable for all images
     MetaDataTable MDimg;
 
+    // Number of bodies in multi-body refinement
     int nr_bodies;
 
     // Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
@@ -372,7 +373,7 @@ public:
 	long int addAverageMicrograph(std::string avg_mic_name);
 
 	// for separate refinement of random halves of the data
-	void divideOriginalParticlesInRandomHalves(int seed);
+	void divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
 	// Randomise the order of the original_particles
 	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false);

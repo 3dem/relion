@@ -45,7 +45,7 @@ public:
 	FileName fn_in, fn_out;
 
 	// Filenames of all the micrographs to estimate the CTF from
-	std::vector<FileName> fn_micrographs;
+	std::vector<FileName> fn_micrographs, fn_micrographs_all;
 
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;
@@ -128,10 +128,11 @@ public:
 	void executeCtffind(long int imic);
 
 	// Check micrograph size and add name to the list of micrographs to run Gctf on
-	void addToGctfJobList(long int imic, std::string &allmicnames);
+	//void addToGctfJobList(long int imic, std::vector<std::string> &allmicnames);
 
 	// Execute Gctf for many micrographs
-	void executeGctf(std::string &allmicnames);
+	//void executeGctf( std::vector<std::string> &allmicnames);
+	void executeGctf(long int imic,  std::vector<std::string> &allmicnames, bool is_last, int rank = 0);
 
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,

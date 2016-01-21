@@ -41,6 +41,7 @@
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Wizard.H>
 #include <FL/Fl_Text_Display.H>
+#include <FL/Fl_Text_Editor.H>
 #include <FL/Fl_JPEG_Image.H>
 #include "src/macros.h"
 #include "src/strings.h"
@@ -62,9 +63,13 @@
 //#define XCOL3 460
 //#define XCOL4 475
 //#define XCOL5 535
+#define MENUHEIGHT 30
+#define TABHEIGHT 25
 #define GUIWIDTH 800
 #define GUIHEIGHT_OLD 400
-#define GUIHEIGHT_EXT 700
+#define GUIHEIGHT_EXT_START 350
+#define GUIHEIGHT_EXT_START2 (GUIHEIGHT_EXT_START+MENUHEIGHT+10)
+#define GUIHEIGHT_EXT 800
 #define XCOL0 200
 #define WCOL0 200
 #define XCOL1 ( (XCOL0) + 10  )
@@ -196,6 +201,8 @@ public:
 	// Label
 	std::string label;
 
+	std::string label_full;
+
     // Button to show additional help text
 	Fl_Button* help;
 
@@ -208,11 +215,30 @@ public:
 	 *  defaultvalue is what will appear by default in the input value
 	 *  help is the additional help text. If it is set to NULL, no help button will be displayed
 	 */
-	AnyEntry(){};
+	AnyEntry()
+    {
+		inp = NULL;
+		help = NULL;
+		myhelptext = NULL;
+		label = "";
+		label_full = "";
+    };
 
     /** Empty destructor
      */
-	~AnyEntry(){};
+	~AnyEntry()
+	{
+		if (inp)
+		{
+			delete inp;
+			inp = NULL;
+		}
+		if (help)
+		{
+			delete help;
+			help = NULL;
+		}
+	};
 
 	/** Here really start the entry
 	 */
@@ -222,6 +248,13 @@ public:
 	 */
 	void place(int &y,
 				const char * title,
+				const char* defaultvalue = NULL,
+				const char* helptext = NULL,
+				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
+
+	void placeOnSameYPosition(int y,
+				const char * title,
+				const char * title_full,
 				const char* defaultvalue = NULL,
 				const char* helptext = NULL,
 				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );

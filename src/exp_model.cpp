@@ -188,7 +188,7 @@ long int Experiment::addMicrograph(std::string mic_name)
 
 }
 
-void Experiment::divideOriginalParticlesInRandomHalves(int seed)
+void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine)
 {
 
 	// Only do this if the random_subset of all original_particles is zero
@@ -223,24 +223,142 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed)
 	{
 		// Only randomise them if the random_subset values were not read in from the STAR file
 		srand(seed);
-		for (long int i = 0; i < ori_particles.size(); i++)
+		if (do_helical_refine)
 		{
-			int random_subset = rand() % 2 + 1;
-			ori_particles[i].random_subset = random_subset; // randomly 1 or 2
-			if (random_subset == 1)
-				nr_ori_particles_subset1++;
-			else if (random_subset == 2)
-				nr_ori_particles_subset2++;
-			else
-				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
+			std::string mic_name, img_name;
+			int nr_swaps, nr_segments_subset1, nr_segments_subset2, helical_tube_id;
+			bool divide_according_to_helical_tube_id;
+			std::map<std::string, int> map_mics;
+			std::map<std::string, int>::const_iterator ii_map;
+			std::vector<std::pair<std::string, int> > vec_mics;
+
+			for (long int i = 0; i < ori_particles.size(); i++)
+			{
+				if ( ((ori_particles[i]).particles_id.size() != 1) || ((ori_particles[i]).particles_order.size() != 1) )
+					REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: cannot divide helical segments into random halves with tilt series or movie frames!");
+			}
+			if (!MDimg.containsLabel(EMDL_IMAGE_NAME))
+				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Input MetadataTable should contain rlnImageName!");
+
+			divide_according_to_helical_tube_id = false;
+			if (MDimg.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
+				divide_according_to_helical_tube_id = true;
+
+			// Count micrograph names
+			map_mics.clear();
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+			{
+				MDimg.getValue(EMDL_IMAGE_NAME, img_name);
+				mic_name = img_name.substr(img_name.find("@") + 1);
+				if (divide_according_to_helical_tube_id)
+				{
+					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+					if (helical_tube_id < 1)
+						REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Helical tube ID should be positive integer!");
+					mic_name += std::string("_TUBEID_");
+					mic_name += std::string(integerToString(helical_tube_id));
+				}
+				if ((map_mics.insert(std::make_pair(mic_name, 1))).second == false)
+					map_mics[mic_name]++;
+			}
+			vec_mics.clear();
+			for (ii_map = map_mics.begin(); ii_map != map_mics.end(); ii_map++)
+				vec_mics.push_back(*ii_map);
+
+			// Perform swaps
+			nr_swaps = ROUND(rnd_unif(vec_mics.size(), 2. * vec_mics.size()));
+			for (int ii = 0; ii < nr_swaps; ii++)
+			{
+				int ptr_a, ptr_b;
+				std::pair<std::string, int> tmp;
+				ptr_a = ROUND(rnd_unif(0, vec_mics.size()));
+				ptr_b = ROUND(rnd_unif(0, vec_mics.size()));
+				if ( (ptr_a == ptr_b) || (ptr_a < 0 ) || (ptr_b < 0) || (ptr_a >= vec_mics.size()) || (ptr_b >= vec_mics.size()) )
+					continue;
+				tmp = vec_mics[ptr_a];
+				vec_mics[ptr_a] = vec_mics[ptr_b];
+				vec_mics[ptr_b] = tmp;
+
+				// DEBUG
+				//std::cout << " Swap mic_id= " << ptr_a << " with mic_id= " << ptr_b << "." << std::endl;
+			}
+
+			// DEBUG
+			//if (divide_according_to_helical_tube_id)
+			//	std::cout << " Helical tubes= " << vec_mics.size() << ", nr_swaps= " << nr_swaps << std::endl;
+			//else
+			//	std::cout << " Micrographs= " << vec_mics.size() << ", nr_swaps= " << nr_swaps << std::endl;
+
+			// Divide micrographs into halves
+			map_mics.clear();
+			nr_segments_subset1 = nr_segments_subset2 = 0;
+			for (int ii = 0; ii < vec_mics.size(); ii++)
+			{
+				if (nr_segments_subset1 < nr_segments_subset2)
+				{
+					nr_segments_subset1 += vec_mics[ii].second;
+					vec_mics[ii].second = 1;
+				}
+				else
+				{
+					nr_segments_subset2 += vec_mics[ii].second;
+					vec_mics[ii].second = 2;
+				}
+				map_mics.insert(vec_mics[ii]);
+			}
+
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+			{
+				MDimg.getValue(EMDL_IMAGE_NAME, img_name);
+				mic_name = img_name.substr(img_name.find("@") + 1);
+				if (divide_according_to_helical_tube_id)
+				{
+					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+					if (helical_tube_id < 1)
+						REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Helical tube ID should be positive integer!");
+					mic_name += std::string("_TUBEID_");
+					mic_name += std::string(integerToString(helical_tube_id));
+				}
+				MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, map_mics[mic_name]);
+			}
+
+			nr_ori_particles_subset1 = nr_segments_subset1;
+			nr_ori_particles_subset2 = nr_segments_subset2;
+
+			// DEBUG
+			//std::cout << " Helical segments in two half sets = " << nr_ori_particles_subset1 << ", " << nr_ori_particles_subset2 << std::endl;
 
 			// Loop over all particles in each ori_particle and set their random_subset
-			for (long int j = 0; j < ori_particles[i].particles_id.size(); j++)
+			for (long int i = 0; i < ori_particles.size(); i++)
 			{
-				long int part_id = (ori_particles[i]).particles_id[j];
+				int random_subset;
+				long int part_id = (ori_particles[i]).particles_id[0];
+				MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, part_id);
+				ori_particles[i].random_subset = random_subset;
+				particles[part_id].random_subset = random_subset;
+			}
+		}
+		else
+		{
+			for (long int i = 0; i < ori_particles.size(); i++)
+			{
+				int random_subset = rand() % 2 + 1;
+				ori_particles[i].random_subset = random_subset; // randomly 1 or 2
+				if (random_subset == 1)
+					nr_ori_particles_subset1++;
+				else if (random_subset == 2)
+					nr_ori_particles_subset2++;
+				else
+					REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
+
+				// Loop over all particles in each ori_particle and set their random_subset
+				for (long int j = 0; j < ori_particles[i].particles_id.size(); j++)
 				{
-					particles[part_id].random_subset = random_subset;
-					MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, part_id);
+					long int part_id = (ori_particles[i]).particles_id[j];
+					{
+						particles[part_id].random_subset = random_subset;
+						MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, part_id);
+					}
 				}
 			}
 		}
@@ -365,7 +483,9 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 #ifdef DEBUG_EXPAND
 	timer.tic(tmakevec);
 #endif
+
 	// Make a temporary vector of all image names in the current Experiment to gain speed
+	// remove all uniqdate instances, only keep part of filename that is not made by pipeline
 	std::vector<FileName> fn_curr_imgs, fn_curr_groups;
 	std::vector<int> count_frames;
 	std::vector<long int> pointer_current_idx;
@@ -375,6 +495,13 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 		MDimg.getValue(EMDL_IMAGE_NAME, fn_curr_img);
 		long int group_id;
 		MDimg.getValue(EMDL_MLMODEL_GROUP_NO, group_id);
+		FileName uniqdate, fnt;
+		long int my_nr;
+		fn_curr_img.decompose(my_nr, fnt);
+		// Remove the uniqdate if present
+		size_t slashpos = findUniqueDateSubstring(fn_curr_img, uniqdate);
+		FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fn_curr_img.substr(slashpos+15) : fn_curr_img;
+		fn_curr_img.compose(my_nr, fn_nouniqdate); // fn_img = integerToString(n) + "@" + fn_exp;
 		fn_curr_imgs.push_back(fn_curr_img);
 		fn_curr_groups.push_back(groups[group_id-1].name);
 		count_frames.push_back(0);
@@ -382,6 +509,7 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 #ifdef DEBUG_EXPAND
 	timer.toc(tmakevec);
 #endif
+
 
 	if (verb > 0)
 		init_progress_bar(MDmovie.numberOfObjects());
@@ -579,12 +707,14 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 
 	// Now replace the current Experiment with Exp_movie
 	(*this) = Exp_movie;
+	nr_bodies = 1; // need to set this explicitly, as it wasn't set upon reading Exp_movie
 
 #ifdef DEBUG_EXPAND
 		timer.tic(torderori);
 #endif
 	// Order the particles in each ori_particle
 	orderParticlesInOriginalParticles();
+
 #ifdef DEBUG_EXPAND
 		timer.toc(torderori);
 #endif
@@ -1022,13 +1152,18 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y);
 	bool have_clas = MDimg.containsLabel(EMDL_PARTICLE_CLASS);
 	bool have_norm = MDimg.containsLabel(EMDL_IMAGE_NORM_CORRECTION);
-	// May23,2015 - Shaoda, Helical refinement
+
+	// Jan20,2016 - Helical reconstruction
+	bool have_tilt_prior = MDimg.containsLabel(EMDL_ORIENT_TILT_PRIOR);
+	bool have_psi_prior = MDimg.containsLabel(EMDL_ORIENT_PSI_PRIOR);
+	bool have_tiltpsi = (have_tilt) && (have_psi);
+	bool have_tiltpsi_prior = (have_tilt_prior) && (have_psi_prior);
 	if (need_tiltpsipriors_for_helical_refine)
 	{
-		if ( (!have_tilt) || (!have_psi) )
+		if (!have_tiltpsi_prior)
 		{
-			REPORT_ERROR("exp_model.cpp: void Experiment::read(): Priors of tilt and psi angles are needed for all particles in helical refinement!");
-			return;
+			if (!have_tiltpsi)
+				REPORT_ERROR("exp_model.cpp: void Experiment::read(): Tilt and psi priors of helical segments are needed for 3D reconstruction!");
 		}
 	}
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
@@ -1049,6 +1184,20 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			MDimg.setValue(EMDL_PARTICLE_CLASS, izero);
 		if (!have_norm)
 			MDimg.setValue(EMDL_IMAGE_NORM_CORRECTION, done);
+		if (need_tiltpsipriors_for_helical_refine && have_tiltpsi_prior) // If doing 3D helical reconstruction and PRIORs exist
+		{
+			RFLOAT tilt = 0., psi = 0.;
+			if (have_tiltpsi)
+				MDimg.getValue(EMDL_ORIENT_TILT, tilt);
+			// If ANGLEs do not exist or they are all set to 0 (from a Class2D job), copy values of PRIORs to ANGLEs
+			if ( (!have_tiltpsi) || ((have_tiltpsi) && (ABS(tilt) < 0.001)) )
+			{
+				MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt);
+				MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi);
+				MDimg.setValue(EMDL_ORIENT_TILT, tilt);
+				MDimg.setValue(EMDL_ORIENT_PSI, psi);
+			}
+		}
 	}
 
 #ifdef DEBUG_READ

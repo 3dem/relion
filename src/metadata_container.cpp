@@ -64,6 +64,42 @@ void MetaDataContainer::copy(const MetaDataContainer &MDc)
     }
 }
 
+void MetaDataContainer::copy_select(const MetaDataContainer &MDc, std::vector<EMDLabel> only_labels)
+{
+
+    clear();
+	if (this != &MDc)
+    {
+		labels = only_labels;
+
+        for (std::map<EMDLabel, RFLOAT *>::const_iterator It = MDc.RFLOATs.begin(); It != MDc.RFLOATs.end(); It++)
+        {
+        	if (vectorContainsLabel(only_labels, It->first))
+        		addValue(It->first, *It->second);
+        }
+        for (std::map<EMDLabel, int *>::const_iterator It = MDc.ints.begin(); It != MDc.ints.end(); It++)
+        {
+        	if (vectorContainsLabel(only_labels, It->first))
+        		addValue(It->first, *It->second);
+        }
+        for (std::map<EMDLabel, long *>::const_iterator It = MDc.longs.begin(); It != MDc.longs.end(); It++)
+        {
+        	if (vectorContainsLabel(only_labels, It->first))
+        		addValue(It->first, *It->second);
+        }
+        for (std::map<EMDLabel, bool *>::const_iterator It = MDc.bools.begin(); It != MDc.bools.end(); It++)
+        {
+        	if (vectorContainsLabel(only_labels, It->first))
+        		addValue(It->first, *It->second);
+        }
+        for (std::map<EMDLabel, std::string *>::const_iterator It = MDc.strings.begin(); It != MDc.strings.end(); It++)
+        {
+        	if (vectorContainsLabel(only_labels, It->first))
+        		addValue(It->first, *It->second);
+        }
+    }
+}
+
 MetaDataContainer& MetaDataContainer::operator =(const MetaDataContainer &MDc)
 {
     copy(MDc);
@@ -364,3 +400,8 @@ bool MetaDataContainer::writeValueToString(std::string &outString, EMDLabel inLa
     return result;
 }
 
+void MetaDataContainer::keepOnlyLabels(std::vector<EMDLabel> only_labels)
+{
+	MetaDataContainer MDc = *this;
+	copy_select(MDc, only_labels);
+}

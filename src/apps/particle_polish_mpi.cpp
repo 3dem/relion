@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     {
     	if (prm.verb > 0)
     		prm.usage();
-        std::cout << XE;
+        std::cerr << XE;
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 

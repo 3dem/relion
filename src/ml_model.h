@@ -157,6 +157,24 @@ public:
 	// Spectral contribution to orientability of individual particles, one for each class
 	std::vector<MultidimArray<RFLOAT > > orientability_contrib;
 
+	// Nov20,2015 - Shaoda, Helical refinement
+	bool is_helix;
+
+	// Number of helical asymmetrical units
+	int helical_nr_asu;
+
+	// Helical twist (in degrees)
+	std::vector<RFLOAT> helical_twist;
+
+	// Helical rise (in Angstroms)
+	std::vector<RFLOAT> helical_rise;
+
+	// Search range of helical twist (in degrees)
+	RFLOAT helical_twist_min,  helical_twist_max, helical_twist_inistep;
+
+	// Search range of helical rise (in Angstroms)
+	RFLOAT helical_rise_min,  helical_rise_max, helical_rise_inistep;
+
 
 public:
 
@@ -182,7 +200,15 @@ public:
 		orientational_prior_mode(0),
 		sigma2_rot(0),
 		sigma2_tilt(0),
-		sigma2_psi(0)
+		sigma2_psi(0),
+		is_helix(0),
+		helical_nr_asu(1),
+		helical_twist_min(0),
+		helical_twist_max(0),
+		helical_twist_inistep(0),
+		helical_rise_min(0),
+		helical_rise_max(0),
+		helical_rise_inistep(0)
 	{
 		clear();
 	}
@@ -217,6 +243,8 @@ public:
 		acc_rot.clear();
 		acc_trans.clear();
 		orientability_contrib.clear();
+		helical_twist.clear();
+		helical_rise.clear();
 	}
 
 	// Initialise vectors with the right size
@@ -264,6 +292,8 @@ public:
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
 	void initialiseDataVersusPrior(bool fix_tau);
+
+	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 
 };
 

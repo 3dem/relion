@@ -155,6 +155,9 @@ void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, Fil
 {
 	// If there are any dots in the filename, replace them by underscores
 	FileName fn_root = fn_mic.withoutExtension();
+	// If fn_root already contains "_movie", then remove that from fn_root
+	fn_root = fn_root.without("_"+fn_movie);
+
 	size_t pos = 0;
 	while (true)
 	{
@@ -197,12 +200,16 @@ void MotioncorrRunner::run()
 }
 
 
-void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
+void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 {
 
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+
+
+	FileName fn_out = fn_avg.withoutExtension() + ".out";
 	FileName fn_log = fn_avg.withoutExtension() + ".log";
+	FileName fn_err = fn_avg.withoutExtension() + ".err";
 	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
 	std::string command = fn_motioncorr_exe + " ";
@@ -220,6 +227,11 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic)
 
 	if (fn_other_args.length() > 0)
 		command += " " + fn_other_args;
+
+	// TODO: think about GPU and MPI interplay!
+	command += " -gpu " + integerToString(rank);
+
+	command += " >> " + fn_out + " 2>> " + fn_err;
 
 	// Save the command that was executed
 	std::ofstream fh;
