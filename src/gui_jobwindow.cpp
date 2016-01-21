@@ -366,7 +366,7 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh, std::string fn)
 	other_args.writeValue(fh);
 
 	fh.close();
-	std::string command = "chmod 664 " + fn + "run.job";
+	std::string command = "chmod 664 " + fn + ".job";
 	int res = system(command.c_str());
 
 }
