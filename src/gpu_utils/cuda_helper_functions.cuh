@@ -335,6 +335,7 @@ void windowFourierTransform2(
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
 		long int Npsi = 1,
+		long int pos = 0,
 		cudaStream_t stream = 0);
 
 
