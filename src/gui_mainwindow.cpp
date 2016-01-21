@@ -724,7 +724,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 
 	bool is_scheduled=false;
 	if (current_job >= 0)
-		is_scheduled= (pipeline.processList[current_job].status == PROC_SCHEDULED_CONT || PROC_SCHEDULED_NEW);
+		is_scheduled= (pipeline.processList[current_job].status == PROC_SCHEDULED_CONT || pipeline.processList[current_job].status == PROC_SCHEDULED_NEW);
 
 	global_outputname = ""; // default is that all new jobs get a new uniqdate directory
 	if (do_commandline)
@@ -743,7 +743,6 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 				global_outputname = fn_settings.beforeLastOf("/") + "/";
 		}
 	}
-
 	switch (itype)
 	{
 	case PROC_IMPORT:
