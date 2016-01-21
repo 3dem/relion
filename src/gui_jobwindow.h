@@ -148,7 +148,7 @@ public:
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
 
 	// Initialise pipeiline stuff for each job, return outputname
-	void initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue = false);
+	void initialisePipeline(std::string &outputname, std::string defaultname);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);

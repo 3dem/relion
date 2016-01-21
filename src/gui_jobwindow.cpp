@@ -445,16 +445,15 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 
 }
 
-void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname, bool newname_for_continue)
+void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname)
 {
 
 	pipelineOutputNodes.clear();
 	pipelineInputNodes.clear();
 
-	if (!is_continue || newname_for_continue) // for continue jobs, use the same outputname
-	{
+	if (outputname == "") // for continue jobs, use the same outputname
 		outputname = defaultname + "/" + getUniqDateString() + "/";
-	}
+
 	pipelineOutputName = outputname;
 
 }
@@ -1428,11 +1427,6 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 	highpass.deactivate(is_continue);
 	angpix.deactivate(is_continue);
 	psi_sampling_autopick.deactivate(is_continue);
-	do_write_fom_maps.deactivate(is_continue);
-	do_read_fom_maps.deactivate(is_continue);
-	threshold_autopick.deactivate(is_continue);
-	mindist_autopick.deactivate(is_continue);
-	maxstddevnoise_autopick.deactivate(is_continue);
 
 }
 
@@ -1493,7 +1487,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command += " --min_distance " + floatToString(mindist_autopick.getValue());
 	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
 
-	if (is_continue)
+	if (is_continue && !(do_read_fom_maps.getValue() || do_write_fom_maps.getValue()))
 		command += " --only_do_unfinished ";
 
 	// Other arguments
@@ -2187,7 +2181,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Class2D", true); // true means: also make a new process for continuation runs (as users may actually change things there)
+	initialisePipeline(outputname, "Class2D");
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -2730,7 +2724,8 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.clear();
 	std::string command;
-	initialisePipeline(outputname, "Class3D", true);
+
+	initialisePipeline(outputname, "Class3D");
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -3336,7 +3331,8 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.clear();
 	std::string command;
-	initialisePipeline(outputname, "Refine3D", true);
+
+	initialisePipeline(outputname, "Refine3D");
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
