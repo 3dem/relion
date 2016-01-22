@@ -8,9 +8,9 @@ set(ext_conf_flags_fltk --enable-shared --prefix=${FLTK_EXTERNAL_PATH})
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
 
 find_library(FLTK_LIBRARIES NAMES libfltk.so  PATHS  "${FLTK_EXTERNAL_PATH}/lib" NO_DEFAULT_PATH) 
-find_path(FLTK_INCLUDE_DIR  NAMES Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include/FL" NO_DEFAULT_PATH) 
-find_path(FLTK_PATH         NAMES Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include/FL" NO_DEFAULT_PATH) 
-find_path(FLTK_INCLUDES     NAMES Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include/FL" NO_DEFAULT_PATH)  
+find_path(FLTK_INCLUDE_DIR  NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH) 
+find_path(FLTK_PATH         NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH) 
+find_path(FLTK_INCLUDES     NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH)  
 
 if(FLTK_INCLUDE_DIR AND FLTK_LIBRARIES)
     set(FLTK_FOUND TRUE)
