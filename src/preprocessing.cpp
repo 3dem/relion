@@ -238,7 +238,7 @@ void Preprocessing::joinAllStarFiles()
 		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 		// Get the filename of the STAR file for just this micrograph
-		FileName fn_star = getOutputFileNameRoot(fn_mic) + ".star";
+		FileName fn_star = getOutputFileNameRoot(fn_mic) + "_extract.star";
 		if (exists(fn_star))
 		{
 
@@ -461,7 +461,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	FileName fn_output_img_root = getOutputFileNameRoot(fn_mic);
 	FileName fn_oristack = getOriginalStackNameWithoutUniqDate(fn_mic);
     // Name of this micrographs STAR file
-    FileName fn_star = fn_output_img_root + ".star";
+    FileName fn_star = fn_output_img_root + "_extract.star";
 
     if (exists(fn_star) && only_extract_unfinished)
     {
@@ -487,79 +487,85 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			readCoordinates(fn_coord, MDin);
 	}
 
-	// Correct for bias in the picked coordinates
-	if (ABS(extract_bias_x) > 0 || ABS(extract_bias_y) > 0)
+
+	if (MDin.numberOfObjects() > 0)
 	{
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+
+
+		// Correct for bias in the picked coordinates
+		if (ABS(extract_bias_x) > 0 || ABS(extract_bias_y) > 0)
 		{
-			RFLOAT xcoor, ycoor;
-			MDin.getValue(EMDL_IMAGE_COORD_X, xcoor);
-			MDin.getValue(EMDL_IMAGE_COORD_Y, ycoor);
-			xcoor += extract_bias_x;
-			ycoor += extract_bias_y;
-			MDin.setValue(EMDL_IMAGE_COORD_X, xcoor);
-			MDin.setValue(EMDL_IMAGE_COORD_Y, ycoor);
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+			{
+				RFLOAT xcoor, ycoor;
+				MDin.getValue(EMDL_IMAGE_COORD_X, xcoor);
+				MDin.getValue(EMDL_IMAGE_COORD_Y, ycoor);
+				xcoor += extract_bias_x;
+				ycoor += extract_bias_y;
+				MDin.setValue(EMDL_IMAGE_COORD_X, xcoor);
+				MDin.setValue(EMDL_IMAGE_COORD_Y, ycoor);
+			}
 		}
+
+		// Warn for small groups
+		int npos = MDin.numberOfObjects();
+		if (npos < 10)
+		{
+			std:: cout << "WARNING: there are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
+		}
+
+		// Get movie or normal micrograph name and check it exists
+		// This implicitly assumes that the movie is next to the micrograph....
+		// TODO: That may not necessarily be true?
+		FileName fn_img = (do_movie_extract) ? fn_mic.withoutExtension() + "_" + movie_name + ".mrcs" : fn_mic;
+		if (!exists(fn_img))
+		{
+			std::cout << "WARNING: cannot find micrograph file " << fn_img << " which has " << npos << " particles" << std::endl;
+			return;
+		}
+
+		// Read the header of the micrograph to see how many frames there are.
+		Image<RFLOAT> Imic;
+		Imic.read(fn_img, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
+
+		int xdim, ydim, zdim;
+		long int ndim;
+		Imic.getDimensions(xdim, ydim, zdim, ndim);
+		dimensionality = (zdim > 1) ? 3 : 2;
+		if (dimensionality == 3 || do_movie_extract)
+			do_ramp = false;
+
+		// Just to be sure...
+		if (do_movie_extract && ndim < 2)
+			std::cout << "WARNING: movie " << fn_mic << " does not have multiple frames..." << std::endl;
+
+		long int my_current_nr_images = 0;
+		RFLOAT all_avg = 0;
+		RFLOAT all_stddev = 0;
+		RFLOAT all_minval = LARGE_NUMBER;
+		RFLOAT all_maxval = -LARGE_NUMBER;
+
+		// To deal with default movie_last_frame value
+		if (movie_last_frame < 0)
+			movie_last_frame = ndim - 1;
+
+		int n_frames = movie_last_frame - movie_first_frame + 1;
+		// The total number of images to be extracted
+		long int my_total_nr_images = npos * n_frames;
+
+		for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
+		{
+			extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, fn_oristack,
+					my_current_nr_images, my_total_nr_images, all_avg, all_stddev, all_minval, all_maxval);
+
+			MDout.append(MDin);
+			// Keep track of total number of images extracted thus far
+			my_current_nr_images += npos;
+
+		}
+		MDout.setName("images");
+		MDout.write(fn_star);
 	}
-
-	// Warn for small groups
-	int npos = MDin.numberOfObjects();
-	if (npos < 10)
-	{
-		std:: cout << "WARNING: there are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
-	}
-
-	// Get movie or normal micrograph name and check it exists
-	// This implicitly assumes that the movie is next to the micrograph....
-	// TODO: That may not necessarily be true?
-	FileName fn_img = (do_movie_extract) ? fn_mic.withoutExtension() + "_" + movie_name + ".mrcs" : fn_mic;
-	if (!exists(fn_img))
-	{
-		std::cout << "WARNING: cannot find micrograph file " << fn_img << " which has " << npos << " particles" << std::endl;
-		return;
-	}
-
-	// Read the header of the micrograph to see how many frames there are.
-	Image<RFLOAT> Imic;
-	Imic.read(fn_img, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
-
-	int xdim, ydim, zdim;
-	long int ndim;
-	Imic.getDimensions(xdim, ydim, zdim, ndim);
-	dimensionality = (zdim > 1) ? 3 : 2;
-	if (dimensionality == 3 || do_movie_extract)
-		do_ramp = false;
-
-	// Just to be sure...
-	if (do_movie_extract && ndim < 2)
-		std::cout << "WARNING: movie " << fn_mic << " does not have multiple frames..." << std::endl;
-
-	long int my_current_nr_images = 0;
-	RFLOAT all_avg = 0;
-	RFLOAT all_stddev = 0;
-	RFLOAT all_minval = LARGE_NUMBER;
-	RFLOAT all_maxval = -LARGE_NUMBER;
-
-	// To deal with default movie_last_frame value
-	if (movie_last_frame < 0)
-		movie_last_frame = ndim - 1;
-
-	int n_frames = movie_last_frame - movie_first_frame + 1;
-	// The total number of images to be extracted
-	long int my_total_nr_images = npos * n_frames;
-
-	for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
-	{
-		extractParticlesFromOneFrame(MDin, fn_img, imic, iframe, n_frames, fn_output_img_root, fn_oristack,
-				my_current_nr_images, my_total_nr_images, all_avg, all_stddev, all_minval, all_maxval);
-
-        MDout.append(MDin);
-		// Keep track of total number of images extracted thus far
-		my_current_nr_images += npos;
-
-	}
-    MDout.setName("images");
-    MDout.write(fn_star);
 
 }
 
@@ -972,61 +978,64 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 	}
 
 	RFLOAT mag2, dstep2, angpix2;
-	MDresult.goToObject(0);
-	MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
-	MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
-	angpix2 = 10000. * dstep2 / mag2;
-	RFLOAT rescale_fndata = angpix2 / angpix;
-
-	bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y));
-	bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z));
-
-	if (do_recenter && !do_contains_xy)
+	if (MDresult.numberOfObjects() > 0)
 	{
-		REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star file does not contain rlnOriginX/Y for re-centering.");
-	}
+		MDresult.goToObject(0);
+		MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
+		MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
+		angpix2 = 10000. * dstep2 / mag2;
+		RFLOAT rescale_fndata = angpix2 / angpix;
 
-	// Rescale (and apply) rlnOriginoffsetX/Y/Z
-	RFLOAT xoff, yoff, zoff, xcoord, ycoord, zcoord, diffx, diffy, diffz;
-	if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
-	{
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDresult)
+		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y));
+		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z));
+
+		if (do_recenter && !do_contains_xy)
 		{
-			if (do_contains_xy)
+			REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star file does not contain rlnOriginX/Y for re-centering.");
+		}
+
+		// Rescale (and apply) rlnOriginoffsetX/Y/Z
+		RFLOAT xoff, yoff, zoff, xcoord, ycoord, zcoord, diffx, diffy, diffz;
+		if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
+		{
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDresult)
 			{
-				MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-				xoff *= rescale_fndata;
-				yoff *= rescale_fndata;
-				if (do_recenter)
+				if (do_contains_xy)
 				{
-					MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
-					MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
-					diffx = xoff - ROUND(xoff);
-					diffy = yoff - ROUND(yoff);
-					xcoord -= ROUND(xoff);
-					ycoord -= ROUND(yoff);
-					xoff = diffx;
-					yoff = diffy;
-					MDresult.setValue(EMDL_IMAGE_COORD_X, xcoord);
-					MDresult.setValue(EMDL_IMAGE_COORD_Y, ycoord);
+					MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
+					MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+					xoff *= rescale_fndata;
+					yoff *= rescale_fndata;
+					if (do_recenter)
+					{
+						MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
+						MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+						diffx = xoff - ROUND(xoff);
+						diffy = yoff - ROUND(yoff);
+						xcoord -= ROUND(xoff);
+						ycoord -= ROUND(yoff);
+						xoff = diffx;
+						yoff = diffy;
+						MDresult.setValue(EMDL_IMAGE_COORD_X, xcoord);
+						MDresult.setValue(EMDL_IMAGE_COORD_Y, ycoord);
+					}
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
 				}
-				MDresult.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-			}
-			if (do_contains_z)
-			{
-				MDresult.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
-				zoff *= rescale_fndata;
-				if (do_recenter)
+				if (do_contains_z)
 				{
-					MDresult.getValue(EMDL_IMAGE_COORD_Z, zcoord);
-					diffz = zoff - ROUND(zoff);
-					zcoord -= ROUND(zoff);
-					zoff = diffz;
-					MDresult.setValue(EMDL_IMAGE_COORD_Z, zcoord);
+					MDresult.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+					zoff *= rescale_fndata;
+					if (do_recenter)
+					{
+						MDresult.getValue(EMDL_IMAGE_COORD_Z, zcoord);
+						diffz = zoff - ROUND(zoff);
+						zcoord -= ROUND(zoff);
+						zoff = diffz;
+						MDresult.setValue(EMDL_IMAGE_COORD_Z, zcoord);
+					}
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zoff);
 				}
-				MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zoff);
 			}
 		}
 	}
