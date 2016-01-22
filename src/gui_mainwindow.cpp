@@ -1644,7 +1644,9 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 	bool is_done = false;
 	while (!is_done)
 	{
-		if (alias == "") // if an alias is provided, just check it is unique, otherwise ask
+		// If the alias already contains a uniquedate string it may be a continuation of a relion_refine job
+		// (where alias_current_job contains a different uniqdate than the outputname of the job)
+		if (alias == "" || findUniqueDateSubstring(alias, uniqdate)!= std::string::npos ) // if an alias is provided, just check it is unique, otherwise ask
 		{
 			const char * palias;
 			palias =  fl_input("Rename to: ", uniqdate.c_str());
@@ -1678,15 +1680,13 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 			is_done = true;
 	}
 
-	if (alias == "None")
+	// No alias if the alias contains a uniquedate string because of continuation of relion_refine jobs
+	// (where alias_current_job contains a different uniqdate than the outputname of the job)
+	if (alias == "None" )
 		pipeline.processList[current_job].alias = "None";
 	else
 	{
-		// Don't use same alias as process name!
-		if (before_uniqdate + alias == pipeline.processList[current_job].name)
-			pipeline.processList[current_job].alias = "None";
-		else
-			pipeline.processList[current_job].alias = before_uniqdate + alias;
+		pipeline.processList[current_job].alias = before_uniqdate + alias;
 	}
 
 	// Write new pipeline to disc and read in again
