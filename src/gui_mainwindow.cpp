@@ -117,7 +117,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
     menubar->add("File/Save job settings",  FL_ALT+'s', cb_save, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
-    menubar->add("File/Reactivate Run",  FL_ALT+'r', cb_reactivate_runbutton, this);
+    menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
     menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
     menubar->add("File/Show initial screen",  FL_ALT+'a', cb_show_initial_screen, this);
     menubar->add("File/About",  FL_ALT+'a', cb_about, this);
@@ -279,16 +279,11 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
     menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
-    menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
+    //menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
     menubar2->add("Job actions/Delete", 0, cb_delete, this);
 
-    // Text display with the name of the current job
-    text_current_job = new Fl_Text_Display(XJOBCOL2-50 , GUIHEIGHT_EXT_START+3, 250, MENUHEIGHT-6);
-    textbuff_current_job = new Fl_Text_Buffer();
-    text_current_job->label("Current job: ");
-    text_current_job->align(FL_ALIGN_LEFT);
-    text_current_job->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
-    text_current_job->buffer(textbuff_current_job);
+    // Fl_input with the alias of the new job (or the name of an existing one)
+    alias_current_job = new Fl_Input(XJOBCOL2-50 , GUIHEIGHT_EXT_START+3, JOBCOLWIDTH, MENUHEIGHT-6, "Current job:");
 
     // Left-hand side browsers for input/output nodes and processes
 	display_io_node  = new Fl_Choice(XJOBCOL3, GUIHEIGHT_EXT_START+3, 250, MENUHEIGHT-6);
@@ -553,8 +548,7 @@ void RelionMainWindow::loadJobFromPipeline()
     	is_main_continue = false;
     cb_toggle_continue_i();
 
-	textbuff_current_job->text(pipeline.processList[current_job].name.c_str());
-	text_current_job->buffer(textbuff_current_job);
+    alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
 	cb_fill_stdout_i();
 }
@@ -984,11 +978,9 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		timeval time_start, time_end;
 		gettimeofday(&time_start, NULL);
 
-		std::cerr << "repeat= "<<repeat << std::endl;
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		{
 			current_job = my_scheduled_processes[i];
-			std::cerr << " current_job = "<< current_job << " i= " << i << " size= "<<my_scheduled_processes.size()<< " new size= "<<scheduled_processes.size()<< " name=" << pipeline.processList[current_job].name << std::endl;
 			loadJobFromPipeline();
 			cb_run_i(false, false); //dont only schedule and dont open the editor window
 
@@ -1010,18 +1002,19 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 			if (!fn_check_exists)
 				break;
 
-			//updateJobLists();
-			// Set the current job back into the job list of the repeating cycle
-			// Do we want to run this as NEW or CONTINUED NEXT TIME?
-			int mytype = pipeline.processList[current_job].type;
-			// The following jobtypes have functionality to only do the unfinished part of the job
-			if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT)
-				pipeline.processList[current_job].status = PROC_SCHEDULED_CONT;
-			else
-				pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
-			// Write the pipeline to an updated STAR file, and read back in again to update the lists
-			pipeline.write(dummy, dummy);
-			//pipeline.read();
+			if (repeat + 1 != nr_repeat)
+			{
+				// Set the current job back into the job list of the repeating cycle
+				// Do we want to run this as NEW or CONTINUED NEXT TIME?
+				int mytype = pipeline.processList[current_job].type;
+				// The following jobtypes have functionality to only do the unfinished part of the job
+				if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT)
+					pipeline.processList[current_job].status = PROC_SCHEDULED_CONT;
+				else
+					pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
+				// Write the pipeline to an updated STAR file, and read back in again to update the lists
+				pipeline.write(dummy, dummy);
+			}
 		}
 
 		if (!fn_check_exists)
@@ -1031,7 +1024,6 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		gettimeofday(&time_end, NULL);
 		long int passed_minutes = (time_end.tv_sec - time_start.tv_sec)/60;
 		long int still_wait = minutes_wait - passed_minutes;
-		std::cerr << " passed_minutes= " << passed_minutes << " still_wait = " << still_wait << " minutes " << std::endl;
 		if (still_wait > 0 && repeat+1 != nr_repeat)
 			sleep(still_wait * 60);
 
@@ -1039,7 +1031,8 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 
 	if (repeat == nr_repeat)
 	{
-		std::cout << " Performed all requested repeats. Stopping now ..." << std::endl;
+		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
+		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
 
 		// After breaking out of repeat, set status of the jobs to finished
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
@@ -1054,11 +1047,12 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	}
 	else if (!fn_check_exists)
 	{
-		std::cout << " The " << fn_check << " file was removed. Stopping now ..." << std::endl;
+		std::cout << " PIPELINER: the " << fn_check << " file was removed. Stopping now ..." << std::endl;
+		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
 	}
 	else
 	{
-		REPORT_ERROR("relion_pipeliner BUG: This shouldn't happen, either fn_check should not exist or we should reach end of repeat cycles...");
+		REPORT_ERROR("PIPELINER BUG: This shouldn't happen, either fn_check should not exist or we should reach end of repeat cycles...");
 	}
 
 	cb_quit_i();
@@ -1101,8 +1095,7 @@ void RelionMainWindow::cb_select_browsegroup_i()
     is_main_continue = false;
     cb_toggle_continue_i(); // make default active
 
-    textbuff_current_job->text("New job");
-	text_current_job->buffer(textbuff_current_job);
+    alias_current_job->value("Give_alias_here");
 	//current_job = -1;
 
 }
@@ -1309,12 +1302,14 @@ void RelionMainWindow::cb_toggle_continue_i()
 		run_button->label("Continue now");
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
+		alias_current_job->deactivate();
 	}
 	else
 	{
 		run_button->label("Run now!");
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(16);
+		alias_current_job->activate();
 	}
 
 	jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
@@ -1388,7 +1383,7 @@ void RelionMainWindow::cb_run(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 
     RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_run_i(true, false); // true means only_schedule, do not run, false means dont open the note editor window
+    T->cb_run_i(true, true); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
 }
 
 void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
@@ -1453,9 +1448,18 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		std::cout << "Executing: " << final_command << std::endl;
 		int res = system(final_command.c_str());
 
-		// Open the edit note window
-		if (do_open_edit)
-			cb_edit_note_i();
+	}
+
+	// Open the edit note window
+	if (do_open_edit)
+	{
+		// Open the note editor window
+		cb_edit_note_i();
+
+		// Also set alias from the alias_current_job input
+		std::string alias= (std::string)alias_current_job->value();
+		if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
+			cb_set_alias_i(alias);
 	}
 
 	// Copy pipeline star file as backup to the output directory
@@ -1622,9 +1626,8 @@ void RelionMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
     T->cb_set_alias_i();
 }
 
-void RelionMainWindow::cb_set_alias_i()
+void RelionMainWindow::cb_set_alias_i(std::string alias)
 {
-	std::string alias;
 	FileName before_uniqdate, uniqdate;
 	before_uniqdate = pipeline.processList[current_job].name;
 	size_t slashpos = findUniqueDateSubstring(before_uniqdate, uniqdate);
@@ -1641,25 +1644,36 @@ void RelionMainWindow::cb_set_alias_i()
 	bool is_done = false;
 	while (!is_done)
 	{
-		const char * palias;
-		palias =  fl_input("Rename to: ", uniqdate.c_str());
-		// TODO: check for cancel
-		if (palias == NULL)
-			return;
+		if (alias == "") // if an alias is provided, just check it is unique, otherwise ask
+		{
+			const char * palias;
+			palias =  fl_input("Rename to: ", uniqdate.c_str());
+			// TODO: check for cancel
+			if (palias == NULL)
+				return;
+			std::string al2(palias);
+			alias = al2;
+		}
 
-		std::string al2(palias);
-		alias = al2;
+		// Make sure the alias ends with a slash
+		if (alias[alias.length()-1] != '/')
+			alias += "/";
+
+		// Check uniqueness of the alias
 		bool is_unique = true;
 		for (size_t i = 0; i < pipeline.processList.size(); i++)
 		{
-			if ( pipeline.processList[i].alias == alias && alias != "None")
+			if ( pipeline.processList[i].alias == before_uniqdate + alias && alias != "None")
 			{
 				is_unique = false;
 				break;
 			}
 		}
 		if (!is_unique)
+		{
 			 fl_message("Alias is not unique, please provide another one");
+			 alias="";
+		}
 		else
 			is_done = true;
 	}
@@ -1668,9 +1682,6 @@ void RelionMainWindow::cb_set_alias_i()
 		pipeline.processList[current_job].alias = "None";
 	else
 	{
-		// Make sure fn_alias ends with a slash
-		if (alias[alias.length()-1] != '/')
-			alias += "/";
 		// Don't use same alias as process name!
 		if (before_uniqdate + alias == pipeline.processList[current_job].name)
 			pipeline.processList[current_job].alias = "None";
@@ -1779,6 +1790,7 @@ void RelionMainWindow::cb_edit_note_i()
 	std::string title = (pipeline.processList[current_job].alias == "None") ? pipeline.processList[current_job].name : pipeline.processList[current_job].alias;
 	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note);
 	w->show();
+
 }
 
 
@@ -1837,6 +1849,16 @@ void RelionMainWindow::cb_print_notes_i()
 	}
 
 }
+void RelionMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
+{
+  	 RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_reread_pipeline_i();
+}
+
+void RelionMainWindow::cb_reread_pipeline_i()
+{
+	pipeline.read();
+}
 
 
 void RelionMainWindow::cb_reactivate_runbutton(Fl_Widget* o, void* v)
@@ -1874,7 +1896,7 @@ void RelionMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_start_pipeliner_i()
 {
 
-	int nr_repeat, min_wait;
+	int nr_repeat, min_wait=0;
 
 	// Ask how many times to repeat
 	const char * answer;

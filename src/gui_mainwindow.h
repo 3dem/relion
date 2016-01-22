@@ -45,8 +45,6 @@
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
 static Fl_Choice *display_io_node;
-static Fl_Text_Display *text_current_job;
-static Fl_Text_Buffer *textbuff_current_job;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
 static Fl_JPEG_Image *jpeg_image;
@@ -75,6 +73,7 @@ static PublishJobWindow *job_publish;
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
+static Fl_Input *alias_current_job;
 // Stdout and stderr display
 static Fl_Text_Display *disp_stdout;
 static Fl_Text_Display *disp_stderr;
@@ -213,7 +212,7 @@ private:
     inline void cb_cleanup_i();
 
     static void cb_set_alias(Fl_Widget*, void*);
-    inline void cb_set_alias_i();
+    inline void cb_set_alias_i(std::string newalias = "");
 
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();
@@ -231,6 +230,9 @@ private:
 
     static void cb_print_notes(Fl_Widget*, void*);
     inline void cb_print_notes_i();
+
+    static void cb_reread_pipeline(Fl_Widget*, void*);
+    inline void cb_reread_pipeline_i();
 
     static void cb_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_reactivate_runbutton_i();
