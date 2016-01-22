@@ -184,7 +184,7 @@ if(GUI)
         message(FATAL_ERROR "X11 is required for GUI.")
     endif(X11_FOUND)
     
-endif(GUI)    
+endif(GUI)
     
 # ------------------------------------------------------------------------------FFTW--
 option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)

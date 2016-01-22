@@ -689,10 +689,10 @@ void MlOptimiserMpi::expectation()
 
     		if (do_gpu)
     		{
-    			for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-    				((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
     			for (int i = 0; i < cudaMlOptimisers.size(); i ++)
     		    	((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+    			for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+    				((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
     		}
     		// Start off with an empty job request
 			JOB_FIRST = 0;

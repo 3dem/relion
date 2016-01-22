@@ -723,6 +723,7 @@ void windowFourierTransform2(
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
 		long int Npsi,
+		long int pos,
 		cudaStream_t stream)
 {
 	if (iX > 1 && iY/2 + 1 != iX)
@@ -736,7 +737,7 @@ void windowFourierTransform2(
 
 	if(oX==iX)
 	{
-		cudaCpyDeviceToDevice(~d_in, ~d_out, oX*oY*oZ*Npsi, d_in.getStream());
+		cudaCpyDeviceToDevice(&d_in.d_ptr[pos], ~d_out, oX*oY*oZ*Npsi, d_in.getStream());
 		return;
 	}
 
@@ -746,7 +747,7 @@ void windowFourierTransform2(
 
 		dim3 grid_dim(ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
-				d_in.d_ptr,
+				&d_in.d_ptr[pos],
 				d_out.d_ptr,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
@@ -757,7 +758,7 @@ void windowFourierTransform2(
 	{
 		dim3 grid_dim(ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream >>>(
-				d_in.d_ptr,
+				&d_in.d_ptr[pos],
 				d_out.d_ptr,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions

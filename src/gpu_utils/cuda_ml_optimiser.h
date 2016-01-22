@@ -7,6 +7,7 @@
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
 #include "src/gpu_utils/cuda_translator.h"
+#include "src/gpu_utils/cuda_fft.h"
 #include <stack>
 //#include <cufft.h>
 
@@ -441,6 +442,9 @@ public:
 	CudaTranslator translator_coarse2;
 	CudaTranslator translator_current1;
 	CudaTranslator translator_current2;
+
+	CudaFFT transformer1;
+	CudaFFT transformer2;
 
 	MlOptimiser *baseMLO;
 
