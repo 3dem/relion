@@ -238,7 +238,7 @@ void Preprocessing::joinAllStarFiles()
 		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 		// Get the filename of the STAR file for just this micrograph
-		FileName fn_star = getOutputFileNameRoot(fn_mic) + ".star";
+		FileName fn_star = getOutputFileNameRoot(fn_mic) + "_extract.star";
 		if (exists(fn_star))
 		{
 
@@ -461,7 +461,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	FileName fn_output_img_root = getOutputFileNameRoot(fn_mic);
 	FileName fn_oristack = getOriginalStackNameWithoutUniqDate(fn_mic);
     // Name of this micrographs STAR file
-    FileName fn_star = fn_output_img_root + ".star";
+    FileName fn_star = fn_output_img_root + "_extract.star";
 
     if (exists(fn_star) && only_extract_unfinished)
     {
