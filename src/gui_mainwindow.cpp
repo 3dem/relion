@@ -726,9 +726,9 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 	if (current_job >= 0)
 		is_scheduled= (pipeline.processList[current_job].status == PROC_SCHEDULED_CONT || pipeline.processList[current_job].status == PROC_SCHEDULED_NEW);
 
-	global_outputname = ""; // default is that all new jobs get a new uniqdate directory
 	if (do_commandline)
 	{
+		global_outputname = ""; // default is that all new jobs get a new uniqdate directory
 		// relion_refine jobs get a new directory for continuation jobs, but NOT for execution of scheduled jobs
 		int mytype = (current_job >= 0) ? pipeline.processList[current_job].type : -1;
 		if (mytype == PROC_2DCLASS || mytype == PROC_3DCLASS || mytype == PROC_3DAUTO)
@@ -1399,11 +1399,11 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	// Save temporary hidden file with this jobs settings as default for a new job
 	fn_settings = "";
-	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
+	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
 
 	// Also save a copy of the GUI settings with the current output name
 	fn_settings = global_outputname;
-	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
+	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
 
 	if (commands.size()==0)
 	{
