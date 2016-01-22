@@ -1918,7 +1918,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
-	if (do_reextract.getValue())
+	if (do_reextract.getValue() || (do_extract_helix.getValue() && do_extract_helical_tubes.getValue()) )
 	{
 		// Also touch the suffix file. Do this after the first command had completed
 		command = "echo " + star_mics.getValue() + " > " +  outputname + "coords_suffix_extract.star";
