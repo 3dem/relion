@@ -64,12 +64,12 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	if (basePckr->available_gpu_memory > 0)
 		allocationSize = basePckr->available_gpu_memory * (1000*1000*1000);
 	else
-		allocationSize = (float)free * .7;
+		allocationSize = (float)free * .5;
 
 	if (allocationSize > free)
 	{
 		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_thread\", not available on device. (Defaulting to less)\n");
-		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		allocationSize = (float)free * .5; //Lets leave some for other processes for now
 	}
 
 	int memAlignmentSize;
@@ -785,17 +785,19 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");
 
-//			for (RFLOAT psi = 0.; psi < 360.; psi+=basePckr->psi_sampling, Cpsi += FauxStride)
-//			{
+			// Now multiply template and micrograph to calculate the cross-correlation
+			CUDA_CPU_TIC("convol");
+			dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),Npsi);
+			cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   d_FauxNpsi.d_ptr,
+														  	  	  d_Fmic.d_ptr,
+														  	  	  FauxStride);
+			CUDA_CPU_TOC("convol");
+
+			for (int psiIter = 0; psiIter < cudaTransformer.psiIters; psiIter++) // psi-batches for possible memory-limits
+			{
+
 				CUDA_CPU_TIC("OneRotation");
 
-				// Now multiply template and micrograph to calculate the cross-correlation
-				CUDA_CPU_TIC("convol");
-				dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),Npsi);
-				cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   d_FauxNpsi.d_ptr,
-															  	  	  d_Fmic.d_ptr,
-															  	  	  FauxStride);
-				CUDA_CPU_TOC("convol");
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
 				CUDA_CPU_TIC("windowFourierTransform_1");
@@ -804,7 +806,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						cudaTransformer.fouriers,
 						downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
 						basePckr->workSize/2+1, basePckr->workSize, 1,  //Output dimensions
-						Npsi
+						cudaTransformer.batchSize[psiIter],
+						cudaTransformer.batchSize[0]*psiIter*FauxStride
 						);
 				CUDA_CPU_TOC("windowFourierTransform_1");
 				HANDLE_ERROR(cudaDeviceSynchronize());
@@ -820,7 +823,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 							 (int)cudaTransformer.xSize,
 							 (int)cudaTransformer.ySize,
 							 false,
-							 Npsi);
+							 cudaTransformer.batchSize[psiIter]);
 				CUDA_CPU_TOC("runCenterFFT_1");
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
@@ -833,24 +836,24 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
 				CUDA_CPU_TIC("probRatio");
 				HANDLE_ERROR(cudaDeviceSynchronize());
-				dim3 PR_blocks(ceilf((float)(cudaTransformer.reals.size/Npsi)/(float)PROBRATIO_BLOCK_SIZE));
+				dim3 PR_blocks(ceilf((float)(cudaTransformer.reals.size/cudaTransformer.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
 				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
 						d_Mccf_best.d_ptr,
 						d_Mpsi_best.d_ptr,
 						cudaTransformer.reals.d_ptr,
 						d_Mmean.d_ptr,
 						d_Mstddev.d_ptr,
-						cudaTransformer.reals.size/Npsi,
+						cudaTransformer.reals.size/cudaTransformer.batchSize[0],
 						(XFLOAT) -2*normfft,
 						(XFLOAT) 2*sum_ref_under_circ_mask,
 						(XFLOAT) sum_ref2_under_circ_mask,
 						(XFLOAT) expected_Pratio,
-						Npsi
+						cudaTransformer.batchSize[psiIter]
 						);
 
 				CUDA_CPU_TOC("probRatio");
 			    CUDA_CPU_TOC("OneRotation");
-//			} // end for psi
+			} // end for psi-batches
 
 
 //			if(basePckr->workSize!=basePckr->micrograph_size) // if we've been working with a smaller copy, resize it back (in fourier space)
@@ -942,7 +945,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
 
-//				for (long int n=0; n<((Mccf_best).nzyxdim); n+=10000)
+//				for (long int n=0; n<((Mccf_best).nzyxdim/10); n+=1)
 //				{
 //					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
 //				}
