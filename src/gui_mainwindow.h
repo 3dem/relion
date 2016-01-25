@@ -24,9 +24,9 @@
 #include "src/gui_entries.h"
 #include "src/pipeliner.h"
 #include <signal.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
-
 #define DO_WRITE true
 #define DONT_WRITE false
 #define DO_READ true

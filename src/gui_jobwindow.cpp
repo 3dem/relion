@@ -484,12 +484,12 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	else
 	{
 		// If there are multiple commands, then join them all on a single line (final_command)
-		// Also add mpirun in front of all commands if no submission via the queue is done
+		// Also add mpirun in front of the first command if no submission via the queue is done
 		std::string one_command;
 		final_command = "";
 		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
-			if (has_mpi && nr_mpi.getValue() > 1)
+			if (has_mpi && nr_mpi.getValue() > 1 && icom == 0)
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
 			else
 				one_command = commands[icom];
@@ -1918,7 +1918,19 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
+	if (do_reextract.getValue() || (do_extract_helix.getValue() && do_extract_helical_tubes.getValue()) )
+	{
+		// Also touch the suffix file. Do this after the first command had completed
+		command = "echo " + star_mics.getValue() + " > " +  outputname + "coords_suffix_extract.star";
+		commands.push_back(command.c_str());
+
+		Node node(outputname + "coords_suffix_extract.star", NODE_MIC_COORDS);
+		pipelineOutputNodes.push_back(node);
+
+	}
+
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
 }
 
 SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
