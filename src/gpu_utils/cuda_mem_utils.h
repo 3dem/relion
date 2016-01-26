@@ -9,6 +9,12 @@
 #include <vector>
 #include <pthread.h>
 
+#ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) (fprintf(stderr, "\n%s", name))
+#else
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) (name) //Do nothing
+#endif
+
 #ifdef DEBUG_CUDA
 #define DEBUG_HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 #else
@@ -117,9 +123,11 @@ void cudaMemInit( T *ptr, int value, size_t size, cudaStream_t &stream)
 
 class CudaCustomAllocator
 {
+
 	typedef unsigned char BYTE;
 
 public:
+
 	class Alloc
 	{
 		friend class CudaCustomAllocator;
@@ -431,6 +439,10 @@ public:
 	inline
 	Alloc* alloc(size_t size)
 	{
+
+#ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
+		fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
+#endif
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		Alloc *nAlloc = new Alloc();
 		nAlloc->size = size;
