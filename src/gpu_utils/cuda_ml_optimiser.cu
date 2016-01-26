@@ -2014,7 +2014,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			eulers[exp_iclass].setSize(orientation_num * 9);
-			eulers[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
+			eulers[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
 			eulers[exp_iclass].host_alloc();
 
 			CUDA_CPU_TIC("generateEulerMatricesProjector");
@@ -2031,15 +2031,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TOC("generateEulerMatricesProjector");
 
 			reals[exp_iclass].setSize(orientation_num * image_size);
-			reals[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
+			reals[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
 			reals[exp_iclass].device_alloc();
 
 			imags[exp_iclass].setSize(orientation_num * image_size);
-			imags[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
+			imags[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
 			imags[exp_iclass].device_alloc();
 
 			weights[exp_iclass].setSize(orientation_num * image_size);
-			weights[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
+			weights[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
 			weights[exp_iclass].device_alloc();
 
 
@@ -2060,6 +2060,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TOC("pre_wavg_map");
 		}
 		sorted_weights.put_on_device();
+
+		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		classPos = 0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2136,7 +2141,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 		} // end loop iclass
+
+		// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
+		// its absence in other parts of the code has caused issues. It is also very low-cost.
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		wdiff2s_AA.cp_to_host();
 		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
@@ -2340,14 +2351,6 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
-
-	//Loop over classes
-	bpStreams.resize(nr_classes, 0);
-	for (int iclass = 0; iclass < nr_classes; iclass++)
-	{
-		HANDLE_ERROR(cudaStreamCreateWithPriority(&bpStreams[iclass], cudaStreamNonBlocking, 1)); //Lower priority stream (1)
-		cudaBackprojectors[iclass].setStream(bpStreams[iclass]);
-	}
 
 	/*======================================================
 	                    CUSTOM ALLOCATOR
