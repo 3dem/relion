@@ -746,6 +746,7 @@ void getAllSquaredDifferencesCoarse(
 			Fimgs_real.put_on_device();
 			Fimgs_imag.put_on_device();
 		}
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		CUDA_CPU_TOC("translation_1");
 
@@ -1079,7 +1080,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
+
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
@@ -1288,7 +1293,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			pdf_offset.cp_to_device();
 			CUDA_CPU_TOC("get_offset_priors");
 
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 			{
 				CUDA_CPU_TIC("sumweight1");
 				long int block_num;
@@ -1350,12 +1355,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			if(exp_ipass!=0)
-			{
-				PassWeights[ipart].weights.cp_to_host();
-			}
+				PassWeights[ipart].weights.cp_to_host(); // note that the host-pointer is shared: we're copying to Mweight.
 		}
-
 	} // end loop ipart
+
 	if (exp_ipass==0)
 		op.Mcoarse_significant.resizeNoCp(1,1,sp.nr_particles, XSIZE(op.Mweight));
 
@@ -1384,6 +1387,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else if (exp_ipass!=0)
 		{
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 			size_t weightSize = PassWeights[ipart].weights.getSize();
 
 			CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
@@ -1404,6 +1408,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		else
 		{
 			CUDA_CPU_TIC("sort");
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 			//Wrap the current ipart data in a new pointer
 			CudaGlobalPtr<XFLOAT> unsorted_ipart(Mweight,
 					ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
@@ -1478,6 +1484,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			Mcoarse_significant.device_alloc();
 
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 			arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, (XFLOAT) my_significant_weight);
 			Mcoarse_significant.cp_to_host();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
