@@ -918,7 +918,7 @@ void MlOptimiser::initialise()
 			{
 				semiAutomaticMapping = false;
 				std::cout << " Using explicit indexing to assign devices ";
-						for (int j = 0; j < allThreadIDs[0].size(); j++)
+				for (int j = 0; j < allThreadIDs[0].size(); j++)
 					std::cout << " "  << allThreadIDs[0][j];
 				std::cout  << std::endl;
 			}
