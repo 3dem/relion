@@ -102,8 +102,8 @@
 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))
 #
-#define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
-#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(200,200,200))
+#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
+#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,180))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
 
 // Replace a single instance of text in a buffer. Return true if replaced, false otherwise
