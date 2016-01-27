@@ -1116,7 +1116,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	}
 #endif
 
-	CUSTOM_ALLOCATOR_REGION_NAME("CASDTW");
 
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
@@ -1127,6 +1126,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	RFLOAT pdf_orientation_mean(0);
 	unsigned pdf_orientation_count(0);
+
+	CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_PDF");
 
 	pdf_orientation.device_alloc();
 	pdf_offset.device_alloc();
@@ -1395,6 +1396,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
 			CudaGlobalPtr<XFLOAT> cumulative_sum(weightSize, cudaMLO->devBundle->allocator);
+
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
+
 			sorted.device_alloc();
 			cumulative_sum.device_alloc();
 
@@ -1417,6 +1421,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
 			CudaGlobalPtr<XFLOAT> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
+
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
+
 			filtered.device_alloc();
 
 			MoreThanCubOpt<XFLOAT> moreThanOpt(0.);
@@ -1483,6 +1490,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
 					cudaMLO->devBundle->allocator);
 
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
 			Mcoarse_significant.device_alloc();
 
 			arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, (XFLOAT) my_significant_weight);
@@ -1977,8 +1985,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUSTOM_ALLOCATOR_REGION_NAME("wdiff2s");
 
-		CudaGlobalPtr<XFLOAT> wdiff2s_AA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> wdiff2s_XA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> wdiff2s_AA(baseMLO->mymodel.nr_classes*image_size, 0, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> wdiff2s_XA(baseMLO->mymodel.nr_classes*image_size, 0, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->devBundle->allocator);
 
 		wdiff2s_AA.device_alloc();
@@ -2129,7 +2137,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				orientation_num,
 				cudaMLO->classStreams[exp_iclass]);
 
-			AAXA_pos += orientation_num*image_size;
+			AAXA_pos += image_size;
 			classPos += orientation_num*translation_num;
 
 			CUDA_CPU_TOC("backproject");
@@ -2169,7 +2177,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
 				}
 			}
-			AAXA_pos+=ProjectionData[ipart].orientation_num[exp_iclass]*image_size;
+			AAXA_pos += image_size;
 		} // end loop iclass
 		for (long int j = 0; j < image_size; j++)
 		{
