@@ -896,19 +896,51 @@ void MlOptimiser::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		if (!std::isdigit(*gpu_ids.begin()))
-			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-		else if(gpu_ids.length()<nr_threads)
-			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		std::vector < std::vector < std::string > > allThreadIDs;
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
+
+		// Sequential initialisation of GPUs on all ranks
+		bool fullAutomaticMapping(true);
+		bool semiAutomaticMapping(true);
+		if (allThreadIDs[0].size()==0)
+			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		else
+		{
+			fullAutomaticMapping=false;
+			if(allThreadIDs[0].size()!=nr_threads)
+			{
+				std::cout << " Will distribute threads over devices ";
+				for (int j = 0; j < allThreadIDs[0].size(); j++)
+					std::cout << " "  << allThreadIDs[0][j];
+				std::cout  << std::endl;
+			}
+			else
+			{
+				semiAutomaticMapping = false;
+				std::cout << " Using explicit indexing to assign devices ";
+						for (int j = 0; j < allThreadIDs[0].size(); j++)
+					std::cout << " "  << allThreadIDs[0][j];
+				std::cout  << std::endl;
+			}
+		}
 
 		for (int i = 0; i < nr_threads; i ++)
 		{
 			int dev_id;
-			if (!std::isdigit(*gpu_ids.begin()))
-				dev_id = i%devCount;
-			else
-				dev_id = (int)(gpu_ids[i]-'0');
+			if (semiAutomaticMapping)
+			{
+				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+				if (fullAutomaticMapping)
+					dev_id = i%devCount;
+				else
+					dev_id = i%allThreadIDs[0].size();
 
+				dev_id =  StringToNumber<int >(allThreadIDs[0][dev_id]);
+			}
+			else // not semiAutomatic => explicit
+			{
+				dev_id = StringToNumber<int >(allThreadIDs[0][i]);
+			}                                       
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
 			//Only make a new bundle of not existing on device
@@ -7263,6 +7295,38 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			}
 		}
     }
-
 }
 
+void MlOptimiser::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
+{
+	// Handle GPU (device) assignments for each rank, if speficied
+	size_t pos = 0;
+	std::string delim = ":";
+	std::vector < std::string > allRankIDs;
+	std::string thisRankIDs, thisThreadID;
+	while ((pos = tangled.find(delim)) != std::string::npos)
+	{
+		thisRankIDs = tangled.substr(0, pos);
+//		    std::cout << "in loop " << thisRankIDs << std::endl;
+		tangled.erase(0, pos + delim.length());
+		allRankIDs.push_back(thisRankIDs);
+	}
+	allRankIDs.push_back(tangled);
+
+	untangled.resize(allRankIDs.size());
+	//Now handle the thread assignements in each rank
+	for (int i = 0; i < allRankIDs.size(); i++)
+	{
+		pos=0;
+		delim = ",";
+//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
+		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
+		{
+			thisThreadID = allRankIDs[i].substr(0, pos);
+//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
+			allRankIDs[i].erase(0, pos + delim.length());
+			untangled[i].push_back(thisThreadID);
+		}
+		untangled[i].push_back(allRankIDs[i]);
+	}
+}

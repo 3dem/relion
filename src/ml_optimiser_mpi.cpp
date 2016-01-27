@@ -23,13 +23,6 @@
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
-template <typename T>
-  T StringToNumber ( const std::string &Text )
-  {
-     std::istringstream ss(Text);
-     T result;
-     return ss >> result ? result : 0;
-  }
 
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
@@ -184,7 +177,7 @@ void MlOptimiserMpi::initialise()
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 		std::vector < std::vector < std::string > > allThreadIDs;
-		untangleDeviceIDs(gpu_ids, allThreadIDs);
+		MlOptimiser::untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 		// Sequential initialisation of GPUs on all ranks
 		bool fullAutomaticMapping(true);
@@ -2354,38 +2347,4 @@ void MlOptimiserMpi::iterate()
 	MlOptimiser::iterateWrapUp();
 	MPI_Barrier(MPI_COMM_WORLD);
 
-}
-
-void MlOptimiserMpi::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
-{
-	// Handle GPU (device) assignments for each rank, if speficied
-	size_t pos = 0;
-	std::string delim = ":";
-	std::vector < std::string > allRankIDs;
-	std::string thisRankIDs, thisThreadID;
-	while ((pos = tangled.find(delim)) != std::string::npos)
-	{
-		thisRankIDs = tangled.substr(0, pos);
-//		    std::cout << "in loop " << thisRankIDs << std::endl;
-		tangled.erase(0, pos + delim.length());
-		allRankIDs.push_back(thisRankIDs);
-	}
-	allRankIDs.push_back(tangled);
-
-	untangled.resize(allRankIDs.size());
-	//Now handle the thread assignements in each rank
-	for (int i = 0; i < allRankIDs.size(); i++)
-	{
-		pos=0;
-		delim = ",";
-//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
-		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
-		{
-			thisThreadID = allRankIDs[i].substr(0, pos);
-//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
-			allRankIDs[i].erase(0, pos + delim.length());
-			untangled[i].push_back(thisThreadID);
-		}
-		untangled[i].push_back(allRankIDs[i]);
-	}
 }
