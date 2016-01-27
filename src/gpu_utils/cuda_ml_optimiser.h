@@ -373,7 +373,7 @@ public:
 };
 
 /*
- * Bundle of device-objects which will be shared across several ranks and
+ * Bundle of device-objects
  */
 class MlDeviceBundle
 {
