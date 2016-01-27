@@ -1995,10 +1995,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		CudaGlobalPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, cudaMLO->devBundle->allocator);
-
-		std::vector<CudaGlobalPtr<XFLOAT> > reals(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
-		std::vector<CudaGlobalPtr<XFLOAT> > imags(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
-		std::vector<CudaGlobalPtr<XFLOAT> > weights(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
 		std::vector<CudaGlobalPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
 
 		int classPos = 0;
@@ -2042,18 +2038,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			eulers[exp_iclass].cp_to_device();
 
 			CUDA_CPU_TOC("generateEulerMatricesProjector");
-
-			reals[exp_iclass].setSize(orientation_num * image_size);
-			reals[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
-			reals[exp_iclass].device_alloc();
-
-			imags[exp_iclass].setSize(orientation_num * image_size);
-			imags[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
-			imags[exp_iclass].device_alloc();
-
-			weights[exp_iclass].setSize(orientation_num * image_size);
-			weights[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
-			weights[exp_iclass].device_alloc();
 
 
 			/*======================================================
@@ -2105,13 +2089,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~Fimgs_nomask_imag,
 					&sorted_weights.d_ptr[classPos],
 					~ctfs,
-					~Minvsigma2s,
 					~wdiff2s_sum,
 					&wdiff2s_AA(AAXA_pos),
 					&wdiff2s_XA(AAXA_pos),
-					~reals[exp_iclass],
-					~imags[exp_iclass],
-					~weights[exp_iclass],
 					op,
 					baseMLO,
 					orientation_num,
@@ -2122,9 +2102,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					exp_iclass,
 					part_scale,
 					cudaMLO->classStreams[exp_iclass]);
-
-			AAXA_pos += orientation_num*image_size;
-			classPos += orientation_num*translation_num;
 
 			/*======================================================
 								BACKPROJECTION
@@ -2138,14 +2115,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TIC("backproject");
 
 			cudaMLO->devBundle->cudaBackprojectors[exp_iclass].backproject(
-				~reals[exp_iclass],
-				~imags[exp_iclass],
-				~weights[exp_iclass],
+				~Fimgs_nomask_real,
+				~Fimgs_nomask_imag,
+				&sorted_weights.d_ptr[classPos],
+				~Minvsigma2s,
+				~ctfs,
+				translation_num,
+				(XFLOAT) op.significant_weight[ipart],
+				(XFLOAT) op.sum_weight[ipart],
 				~eulers[exp_iclass],
 				op.local_Minvsigma2s[0].xdim,
 				op.local_Minvsigma2s[0].ydim,
 				orientation_num,
 				cudaMLO->classStreams[exp_iclass]);
+
+			AAXA_pos += orientation_num*image_size;
+			classPos += orientation_num*translation_num;
 
 			CUDA_CPU_TOC("backproject");
 
@@ -2154,6 +2139,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 		} // end loop iclass
+
+		CUSTOM_ALLOCATOR_REGION_NAME("UNSET");
 
 		// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
 		// its absence in other parts of the code has caused issues. It is also very low-cost.

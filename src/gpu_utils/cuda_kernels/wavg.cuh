@@ -21,13 +21,9 @@ __global__ void cuda_kernel_wavg(
 		XFLOAT *g_imgs_nomask_imag,
 		XFLOAT* g_weights,
 		XFLOAT* g_ctfs,
-		XFLOAT* g_Minvsigma2s,
 		XFLOAT *g_wdiff2s_parts,
 		XFLOAT *g_wdiff2s_AA,
 		XFLOAT *g_wdiff2s_XA,
-		XFLOAT *g_wavgs_real,
-		XFLOAT *g_wavgs_imag,
-		XFLOAT* g_Fweights,
 		unsigned long translation_num,
 		XFLOAT weight_norm,
 		XFLOAT significant_weight,
@@ -46,27 +42,17 @@ __global__ void cuda_kernel_wavg(
 	__syncthreads();
 
 	unsigned pass_num(ceilfracf(image_size,WAVG_BLOCK_SIZE)),pixel;
-	XFLOAT Fweight;
-
-	__shared__ XFLOAT s_wavgs_real[WAVG_BLOCK_SIZE];
-	__shared__ XFLOAT s_wavgs_imag[WAVG_BLOCK_SIZE];
 	__shared__ XFLOAT s_wdiff2s_parts[WAVG_BLOCK_SIZE];
-	__shared__ XFLOAT s_Minvsigma2s[WAVG_BLOCK_SIZE];
 	__shared__ XFLOAT s_sumXA[WAVG_BLOCK_SIZE];
 	__shared__ XFLOAT s_sumA2[WAVG_BLOCK_SIZE];
 
 	for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 	{
-		s_wavgs_real[tid]  = 0.0f;
-		s_wavgs_imag[tid]  = 0.0f;
 		s_wdiff2s_parts[tid] = 0.0f;
 		s_sumXA[tid] = 0.0f;
 		s_sumA2[tid] = 0.0f;
-		Fweight = 0.0f;
 
 		pixel = pass * WAVG_BLOCK_SIZE + tid;
-		s_Minvsigma2s[tid]=g_Minvsigma2s[pixel];
-		XFLOAT ctf =  g_ctfs[pixel];
 
 		if(pixel<image_size)
 		{
@@ -97,8 +83,8 @@ __global__ void cuda_kernel_wavg(
 
 			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
 			{
-				ref_real *= ctf;
-				ref_imag *= ctf;
+				ref_real *= g_ctfs[pixel];
+				ref_imag *= g_ctfs[pixel];
 			}
 			else
 			{
@@ -123,21 +109,8 @@ __global__ void cuda_kernel_wavg(
 
 					s_sumXA[tid] +=  weight * ( ref_real * g_imgs_real[img_pixel_idx] + ref_imag * g_imgs_imag[img_pixel_idx]);
 					s_sumA2[tid] +=  weight * ( ref_real*ref_real  +  ref_imag*ref_imag );
-
-					XFLOAT weightxinvsigma2 = weight * ctf * s_Minvsigma2s[tid];
-
-					s_wavgs_real[tid] += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-					s_wavgs_imag[tid] += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
-
-					Fweight += weightxinvsigma2 * ctf;
 				}
 			}
-
-			unsigned long ref_pixel = bid * image_size + pixel;
-
-			g_wavgs_real[ref_pixel] = s_wavgs_real[tid];
-			g_wavgs_imag[ref_pixel] = s_wavgs_imag[tid];
-			g_Fweights[ref_pixel] = Fweight; //TODO should be buffered into shared
 
 			cuda_atomic_add(&g_wdiff2s_XA[pixel], s_sumXA[tid]);
 			cuda_atomic_add(&g_wdiff2s_AA[pixel], s_sumA2[tid]);
