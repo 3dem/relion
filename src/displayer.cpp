@@ -530,7 +530,7 @@ int multiViewerCanvas::handle(int ev)
 						{ "Invert selection" },
 						{ "Select all classes below" },
 						{ "Select all classes above" },
-						{ "Print metadata this class" },
+						{ "Show metadata this class" },
 						{ "Show original image" },
 						{ "Show particles from selected classes" },
 						{ "Save selected classes" },
@@ -558,7 +558,7 @@ int multiViewerCanvas::handle(int ev)
 						selectFromHereBelow(ipos);
 					else if ( strcmp(m->label(), "Select all classes above") == 0 )
 						selectFromHereAbove(ipos);
-					else if ( strcmp(m->label(), "Print metadata this class") == 0 )
+					else if ( strcmp(m->label(), "Show metadata this class") == 0 )
 						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Show original image") == 0 )
 						showOriginalImage(ipos);
@@ -584,7 +584,7 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show average of selection" },
 						{ "Show stddev of selection" },
 						{ "Show original image" },
-						{ "Print metadata to screen" },
+						{ "Show metadata" },
 						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
@@ -609,7 +609,7 @@ int multiViewerCanvas::handle(int ev)
 						selectFromHereBelow(ipos);
 					else if ( strcmp(m->label(), "Select all above") == 0 )
 						selectFromHereAbove(ipos);
-					else if ( strcmp(m->label(), "Print metadata to screen") == 0 )
+					else if ( strcmp(m->label(), "Show metadata") == 0 )
 						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Show average of selection") == 0 )
 						showAverage(SELECTED, false);
@@ -698,7 +698,10 @@ void multiViewerCanvas::selectFromHereAbove(int iposp)
 }
 void multiViewerCanvas::printMetaData(int ipos)
 {
-	boxes[ipos]->MDimg.write(std::cout);
+	 std::ostringstream stream;
+	 boxes[ipos]->MDimg.write(stream);
+	 std::string str =  stream.str();
+	 fl_message( str.c_str());
 }
 
 void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
@@ -987,7 +990,7 @@ int singleViewerCanvas::handle(int ev)
 	else if (ev==FL_PUSH && Fl::event_button() == FL_RIGHT_MOUSE)
 	{
 		Fl_Menu_Item rclick_menu[] = {
-			{ "Print metadata" },
+			{ "Show metadata" },
 			{ "Help" },
 			{ "Quit" },
 			{ 0 }
@@ -995,7 +998,7 @@ int singleViewerCanvas::handle(int ev)
 		const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 		if ( !m )
 			return 0;
-		if ( strcmp(m->label(), "Print metadata") == 0 )
+		if ( strcmp(m->label(), "Show metadata") == 0 )
 			printMetaData();
 		else if ( strcmp(m->label(), "Help") == 0 )
 			printHelp();
@@ -1937,7 +1940,7 @@ int Displayer::run()
         if (lowpass > 0.)
         	lowPassFilterMap(img(), lowpass, angpix);
         if (highpass > 0.)
-        	highPassFilterMap(img(), highpass, angpix);
+        	highPassFilterMap(img(), highpass, angpix, 25); // use a rather soft high-pass edge of 25 pixels wide
         basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
         if (fn_coords=="")
             fn_coords = fn_in.withoutExtension()+"_coords.star";
