@@ -179,44 +179,12 @@ void MlOptimiserMpi::initialise()
 
 	if (do_gpu)
 	{
+
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		// Handle GPU (device) assignments for each rank, if speficied
-		size_t pos = 0;
-		std::string delim = ":";
-		std::vector < std::string > allRankIDs;
-		std::string thisRankIDs, thisThreadID;
-		while ((pos = gpu_ids.find(delim)) != std::string::npos)
-		{
-			thisRankIDs = gpu_ids.substr(0, pos);
-//		    std::cout << "in loop " << thisRankIDs << std::endl;
-		    gpu_ids.erase(0, pos + delim.length());
-		    allRankIDs.push_back(thisRankIDs);
-		}
-		allRankIDs.push_back(gpu_ids);
-
 		std::vector < std::vector < std::string > > allThreadIDs;
-		allThreadIDs.resize(allRankIDs.size());
-		//Now handle the thread assignements in each rank
-		for (int i = 0; i < allRankIDs.size(); i++)
-		{
-			pos=0;
-			delim = ",";
-//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
-			while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
-			{
-				thisThreadID = allRankIDs[i].substr(0, pos);
-//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
-				allRankIDs[i].erase(0, pos + delim.length());
-				allThreadIDs[i].push_back(thisThreadID);
-			}
-			allThreadIDs[i].push_back(allRankIDs[i]);
-		}
-
-//		for (int i = 0; i < allThreadIDs.size(); i++)
-//			for (int j = 0; j < allThreadIDs[i].size(); j++)
-//				std::cout << " final " << i << "," << j<< " = "  << allThreadIDs[i][j] << std::endl;
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 		// Sequential initialisation of GPUs on all ranks
 		bool fullAutomaticMapping(true);
@@ -2388,3 +2356,36 @@ void MlOptimiserMpi::iterate()
 
 }
 
+void MlOptimiserMpi::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
+{
+	// Handle GPU (device) assignments for each rank, if speficied
+	size_t pos = 0;
+	std::string delim = ":";
+	std::vector < std::string > allRankIDs;
+	std::string thisRankIDs, thisThreadID;
+	while ((pos = tangled.find(delim)) != std::string::npos)
+	{
+		thisRankIDs = tangled.substr(0, pos);
+//		    std::cout << "in loop " << thisRankIDs << std::endl;
+		tangled.erase(0, pos + delim.length());
+		allRankIDs.push_back(thisRankIDs);
+	}
+	allRankIDs.push_back(tangled);
+
+	untangled.resize(allRankIDs.size());
+	//Now handle the thread assignements in each rank
+	for (int i = 0; i < allRankIDs.size(); i++)
+	{
+		pos=0;
+		delim = ",";
+//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
+		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
+		{
+			thisThreadID = allRankIDs[i].substr(0, pos);
+//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
+			allRankIDs[i].erase(0, pos + delim.length());
+			untangled[i].push_back(thisThreadID);
+		}
+		untangled[i].push_back(allRankIDs[i]);
+	}
+}
