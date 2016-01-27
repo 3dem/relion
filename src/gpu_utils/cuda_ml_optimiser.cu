@@ -42,6 +42,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
 #endif
 	//FourierTransformer transformer;
+	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
 
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
@@ -562,6 +563,8 @@ void getAllSquaredDifferencesCoarse(
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF1);
 #endif
 
+	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
+
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
@@ -839,6 +842,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2);
 #endif
 
+	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	op.min_diff2.clear();
@@ -1116,6 +1120,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
 	}
 #endif
+
+	CUSTOM_ALLOCATOR_REGION_NAME("CASDTW");
+
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
@@ -1841,6 +1848,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                     TRANSLATIONS
 		======================================================*/
 
+		CUSTOM_ALLOCATOR_REGION_NAME("TRANS_3");
+
 		CUDA_CPU_TIC("translation_3");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
@@ -1973,6 +1982,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                      CLASS LOOP
 		======================================================*/
 
+		CUSTOM_ALLOCATOR_REGION_NAME("wdiff2s");
+
 		CudaGlobalPtr<XFLOAT> wdiff2s_AA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_XA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->devBundle->allocator);
@@ -1986,6 +1997,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		wdiff2s_sum.device_alloc();
 		wdiff2s_sum.device_init(0.f);
+
+		CUSTOM_ALLOCATOR_REGION_NAME("BP_data");
 
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		CudaGlobalPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, cudaMLO->devBundle->allocator);
@@ -2189,8 +2202,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 	} // end loop ipart
 	CUDA_CPU_TOC("maximization");
-
-
 
 
 	CUDA_CPU_TIC("store_post_gpu");
