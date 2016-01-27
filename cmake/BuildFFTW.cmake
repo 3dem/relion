@@ -2,6 +2,18 @@ message(STATUS "-------------------------------------------------")
 message(STATUS "-------- WILL USE LOCALY BUILT FFTW LIBS --------")  
 message(STATUS "-------------------------------------------------") 
 
+set(FFTW_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fftw")
+
+if(DoublePrec_CPU)
+   # set fftw lib to use double precision
+    set(libfft "fftw3")
+	set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
+else(DoublePrec_CPU)
+	# set fftw lib to use single precision
+	set(libfft "fftw3f")
+	set(ext_conf_flags_fft --enable-shared --enable-float --prefix=${FFTW_EXTERNAL_PATH})
+endif(DoublePrec_CPU)	
+
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
 
 find_path(FFTW_PATH         NAMES fftw3.h         PATHS ${FFTW_EXTERNAL_PATH}/include NO_DEFAULT_PATH)
@@ -13,14 +25,7 @@ if(FFTW_PATH AND FFTW_INCLUDES AND FFTW_LIBRARIES)
     message( STATUS "Found previously built external (non-system) FFTW library")
 endif()
 ## ----------------------------------------------------------------- NEW EXT LIBS? --  
- 
-if(DoublePrec_CPU)
-   # set fftw lib to use double precision
-	set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
-else(DoublePrec_CPU)
-	# set fftw lib to use single precision
-	set(ext_conf_flags_fft --enable-shared --enable-float --prefix=${FFTW_EXTERNAL_PATH})
-endif(DoublePrec_CPU)	
+
 
 if(NOT FFTW_FOUND)
 
@@ -39,8 +44,6 @@ if(NOT FFTW_FOUND)
 
     set(FFTW_FFTW3_LIB_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
     set(FFTW_FFTW3_BUILD_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
-    
-    set(FFTW_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external")
    
     set(CMAKE_INSTALL_PREFIX  ${FFTW_EXTERNAL_PATH})
     externalproject_add(FFTW3
@@ -50,6 +53,7 @@ if(NOT FFTW_FOUND)
     SOURCE_DIR ${FFTW_FFTW3_LIB_DIR}
     CONFIGURE_COMMAND <SOURCE_DIR>/configure ${ext_conf_flags_fft}
     INSTALL_DIR ${FFTW_EXTERNAL_PATH}/fftw3
+    BINARY_DIR ${FFTW_EXTERNAL_PATH}/fftw3
     BUILD_COMMAND ${MAKE}
 #	LOG_CONFIGURE
 #	LOG_BUILD
@@ -60,3 +64,5 @@ if(NOT FFTW_FOUND)
     
 endif()
 
+message(STATUS "FFTW_INCLUDES:     ${FFTW_INCLUDES}")
+message(STATUS "FFTW_LIBRARIES:    ${FFTW_LIBRARIES}")

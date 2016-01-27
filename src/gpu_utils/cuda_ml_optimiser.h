@@ -373,7 +373,7 @@ public:
 };
 
 /*
- * Bundle of device-objects which will be shared across several ranks and
+ * Bundle of device-objects
  */
 class MlDeviceBundle
 {
@@ -384,7 +384,6 @@ public:
 
 	//The CUDA accelerated back-projector set
 	std::vector< CudaBackprojector > cudaBackprojectors;
-	std::vector< cudaStream_t > bpStreams;
 
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
@@ -418,10 +417,6 @@ public:
 		cudaBackprojectors.clear();
 		//Delete this lastly
 		delete allocator;
-
-		for (int i = 0; i < bpStreams.size(); i++)
-			HANDLE_ERROR(cudaStreamDestroy(bpStreams[i]));
-
 	}
 
 };

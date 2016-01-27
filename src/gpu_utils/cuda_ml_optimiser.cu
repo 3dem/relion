@@ -42,6 +42,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
 #endif
 	//FourierTransformer transformer;
+	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
 
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
@@ -562,6 +563,8 @@ void getAllSquaredDifferencesCoarse(
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF1);
 #endif
 
+	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
+
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
@@ -746,6 +749,7 @@ void getAllSquaredDifferencesCoarse(
 			Fimgs_real.put_on_device();
 			Fimgs_imag.put_on_device();
 		}
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		CUDA_CPU_TOC("translation_1");
 
@@ -838,6 +842,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2);
 #endif
 
+	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
 	CUDA_CPU_TIC("diff_pre_gpu");
 
 	op.min_diff2.clear();
@@ -1079,7 +1084,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
+
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
@@ -1111,6 +1120,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
 	}
 #endif
+
+
 	op.sum_weight.clear();
 	op.sum_weight.resize(sp.nr_particles, 0.);
 
@@ -1120,6 +1131,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	RFLOAT pdf_orientation_mean(0);
 	unsigned pdf_orientation_count(0);
+
+	CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_PDF");
 
 	pdf_orientation.device_alloc();
 	pdf_offset.device_alloc();
@@ -1288,7 +1301,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			pdf_offset.cp_to_device();
 			CUDA_CPU_TOC("get_offset_priors");
 
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 			{
 				CUDA_CPU_TIC("sumweight1");
 				long int block_num;
@@ -1350,12 +1363,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			if(exp_ipass!=0)
-			{
-				PassWeights[ipart].weights.cp_to_host();
-			}
+				PassWeights[ipart].weights.cp_to_host(); // note that the host-pointer is shared: we're copying to Mweight.
 		}
-
 	} // end loop ipart
+
 	if (exp_ipass==0)
 		op.Mcoarse_significant.resizeNoCp(1,1,sp.nr_particles, XSIZE(op.Mweight));
 
@@ -1384,10 +1395,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else if (exp_ipass!=0)
 		{
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 			size_t weightSize = PassWeights[ipart].weights.getSize();
 
 			CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
 			CudaGlobalPtr<XFLOAT> cumulative_sum(weightSize, cudaMLO->devBundle->allocator);
+
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
+
 			sorted.device_alloc();
 			cumulative_sum.device_alloc();
 
@@ -1404,12 +1419,17 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		else
 		{
 			CUDA_CPU_TIC("sort");
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 			//Wrap the current ipart data in a new pointer
 			CudaGlobalPtr<XFLOAT> unsorted_ipart(Mweight,
 					ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 					(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
 			CudaGlobalPtr<XFLOAT> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
+
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
+
 			filtered.device_alloc();
 
 			MoreThanCubOpt<XFLOAT> moreThanOpt(0.);
@@ -1476,8 +1496,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
 					cudaMLO->devBundle->allocator);
 
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
 			Mcoarse_significant.device_alloc();
 
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 			arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, (XFLOAT) my_significant_weight);
 			Mcoarse_significant.cp_to_host();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -1834,6 +1856,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                     TRANSLATIONS
 		======================================================*/
 
+		CUSTOM_ALLOCATOR_REGION_NAME("TRANS_3");
+
 		CUDA_CPU_TIC("translation_3");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
@@ -1966,8 +1990,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                      CLASS LOOP
 		======================================================*/
 
-		CudaGlobalPtr<XFLOAT> wdiff2s_AA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> wdiff2s_XA(ProjectionData[ipart].orientationNumAllClasses*image_size, 0, cudaMLO->devBundle->allocator);
+		CUSTOM_ALLOCATOR_REGION_NAME("wdiff2s");
+
+		CudaGlobalPtr<XFLOAT> wdiff2s_AA(baseMLO->mymodel.nr_classes*image_size, 0, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> wdiff2s_XA(baseMLO->mymodel.nr_classes*image_size, 0, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->devBundle->allocator);
 
 		wdiff2s_AA.device_alloc();
@@ -1980,12 +2006,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		wdiff2s_sum.device_alloc();
 		wdiff2s_sum.device_init(0.f);
 
+		CUSTOM_ALLOCATOR_REGION_NAME("BP_data");
+
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		CudaGlobalPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, cudaMLO->devBundle->allocator);
-
-		std::vector<CudaGlobalPtr<XFLOAT> > reals(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
-		std::vector<CudaGlobalPtr<XFLOAT> > imags(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
-		std::vector<CudaGlobalPtr<XFLOAT> > weights(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
 		std::vector<CudaGlobalPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
 
 		int classPos = 0;
@@ -2014,7 +2038,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			eulers[exp_iclass].setSize(orientation_num * 9);
-			eulers[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
+			eulers[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
 			eulers[exp_iclass].host_alloc();
 
 			CUDA_CPU_TIC("generateEulerMatricesProjector");
@@ -2029,18 +2053,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			eulers[exp_iclass].cp_to_device();
 
 			CUDA_CPU_TOC("generateEulerMatricesProjector");
-
-			reals[exp_iclass].setSize(orientation_num * image_size);
-			reals[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
-			reals[exp_iclass].device_alloc();
-
-			imags[exp_iclass].setSize(orientation_num * image_size);
-			imags[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
-			imags[exp_iclass].device_alloc();
-
-			weights[exp_iclass].setSize(orientation_num * image_size);
-			weights[exp_iclass].setStream(cudaMLO->devBundle->cudaBackprojectors[exp_iclass].getStream());
-			weights[exp_iclass].device_alloc();
 
 
 			/*======================================================
@@ -2060,6 +2072,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TOC("pre_wavg_map");
 		}
 		sorted_weights.put_on_device();
+
+		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		classPos = 0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2087,13 +2104,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~Fimgs_nomask_imag,
 					&sorted_weights.d_ptr[classPos],
 					~ctfs,
-					~Minvsigma2s,
 					~wdiff2s_sum,
 					&wdiff2s_AA(AAXA_pos),
 					&wdiff2s_XA(AAXA_pos),
-					~reals[exp_iclass],
-					~imags[exp_iclass],
-					~weights[exp_iclass],
 					op,
 					baseMLO,
 					orientation_num,
@@ -2104,9 +2117,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					exp_iclass,
 					part_scale,
 					cudaMLO->classStreams[exp_iclass]);
-
-			AAXA_pos += orientation_num*image_size;
-			classPos += orientation_num*translation_num;
 
 			/*======================================================
 								BACKPROJECTION
@@ -2120,14 +2130,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CUDA_CPU_TIC("backproject");
 
 			cudaMLO->devBundle->cudaBackprojectors[exp_iclass].backproject(
-				~reals[exp_iclass],
-				~imags[exp_iclass],
-				~weights[exp_iclass],
+				~Fimgs_nomask_real,
+				~Fimgs_nomask_imag,
+				&sorted_weights.d_ptr[classPos],
+				~Minvsigma2s,
+				~ctfs,
+				translation_num,
+				(XFLOAT) op.significant_weight[ipart],
+				(XFLOAT) op.sum_weight[ipart],
 				~eulers[exp_iclass],
 				op.local_Minvsigma2s[0].xdim,
 				op.local_Minvsigma2s[0].ydim,
 				orientation_num,
 				cudaMLO->classStreams[exp_iclass]);
+
+			AAXA_pos += image_size;
+			classPos += orientation_num*translation_num;
 
 			CUDA_CPU_TOC("backproject");
 
@@ -2136,7 +2154,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 		} // end loop iclass
+
+		CUSTOM_ALLOCATOR_REGION_NAME("UNSET");
+
+		// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
+		// its absence in other parts of the code has caused issues. It is also very low-cost.
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		wdiff2s_AA.cp_to_host();
 		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
@@ -2158,7 +2184,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[ipart], ires) += wdiff2s_XA[AAXA_pos+j];
 				}
 			}
-			AAXA_pos+=ProjectionData[ipart].orientation_num[exp_iclass]*image_size;
+			AAXA_pos += image_size;
 		} // end loop iclass
 		for (long int j = 0; j < image_size; j++)
 		{
@@ -2171,8 +2197,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 	} // end loop ipart
 	CUDA_CPU_TOC("maximization");
-
-
 
 
 	CUDA_CPU_TIC("store_post_gpu");
@@ -2340,14 +2364,6 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
-
-	//Loop over classes
-	bpStreams.resize(nr_classes, 0);
-	for (int iclass = 0; iclass < nr_classes; iclass++)
-	{
-		HANDLE_ERROR(cudaStreamCreateWithPriority(&bpStreams[iclass], cudaStreamNonBlocking, 1)); //Lower priority stream (1)
-		cudaBackprojectors[iclass].setStream(bpStreams[iclass]);
-	}
 
 	/*======================================================
 	                    CUSTOM ALLOCATOR
