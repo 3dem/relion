@@ -23,6 +23,13 @@
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
+template <typename T>
+  T StringToNumber ( const std::string &Text )
+  {
+     std::istringstream ss(Text);
+     T result;
+     return ss >> result ? result : 0;
+  }
 
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
@@ -175,30 +182,101 @@ void MlOptimiserMpi::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
+		// Handle GPU (device) assignments for each rank, if speficied
+		size_t pos = 0;
+		std::string delim = ":";
+		std::vector < std::string > allRankIDs;
+		std::string thisRankIDs, thisThreadID;
+		while ((pos = gpu_ids.find(delim)) != std::string::npos)
+		{
+			thisRankIDs = gpu_ids.substr(0, pos);
+//		    std::cout << "in loop " << thisRankIDs << std::endl;
+		    gpu_ids.erase(0, pos + delim.length());
+		    allRankIDs.push_back(thisRankIDs);
+		}
+		allRankIDs.push_back(gpu_ids);
+
+		std::vector < std::vector < std::string > > allThreadIDs;
+		allThreadIDs.resize(allRankIDs.size());
+		//Now handle the thread assignements in each rank
+		for (int i = 0; i < allRankIDs.size(); i++)
+		{
+			pos=0;
+			delim = ",";
+//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
+			while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
+			{
+				thisThreadID = allRankIDs[i].substr(0, pos);
+//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
+				allRankIDs[i].erase(0, pos + delim.length());
+				allThreadIDs[i].push_back(thisThreadID);
+			}
+			allThreadIDs[i].push_back(allRankIDs[i]);
+		}
+
+//		for (int i = 0; i < allThreadIDs.size(); i++)
+//			for (int j = 0; j < allThreadIDs[i].size(); j++)
+//				std::cout << " final " << i << "," << j<< " = "  << allThreadIDs[i][j] << std::endl;
+
 		// Sequential initialisation of GPUs on all ranks
+		bool fullAutomaticMapping(true);
+		bool semiAutomaticMapping(true);
 		for (int rank = 0; rank < node->size; rank++)
 		{
+			fullAutomaticMapping = true;
+			semiAutomaticMapping = true; // possible to set fully manual for specific ranks
 			if (rank == node->rank && !node->isMaster()) //Device not initialized on master rank
 			{
-				if (!std::isdigit(*gpu_ids.begin()))
-					std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-				else if(gpu_ids.length()<nr_threads)
-					REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+				if (rank>allThreadIDs.size())
+				{
+					std::cout << "gpu-ids not specified this rank, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+				}
+				else
+				{
+					fullAutomaticMapping=false;
+					if(allThreadIDs[rank-1].size()!=nr_threads)
+					{
+						std::cout << " Slave " << rank << " will distribute threads over devices ";
+						for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
+							std::cout << " "  << allThreadIDs[rank-1][j];
+						std::cout  << std::endl;
+					}
+					else
+					{
+						semiAutomaticMapping = false;
+						std::cout << " Using explicit indexing on slave " << node->rank << " to assign devices ";
+								for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
+							std::cout << " "  << allThreadIDs[rank-1][j];
+						std::cout  << std::endl;
+					}
+				}
 
 				for (int i = 0; i < nr_threads; i ++)
 				{
 					int dev_id;
-					if (!std::isdigit(*gpu_ids.begin()))
+					if (semiAutomaticMapping)
 					{
 						// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
-						if (node->size > 1)
-							dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
+						if (fullAutomaticMapping)
+						{
+							if(node->size > 1)
+								dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
+							else
+								dev_id = i%devCount;
+						}
 						else
-							dev_id = i%devCount;
+						{
+							if(node->size > 1)
+								dev_id = (i*(allThreadIDs[rank-1].size()-1))%allThreadIDs[rank-1].size();
+							else
+								dev_id = i%allThreadIDs[rank-1].size();
+							dev_id =  StringToNumber<int >(allThreadIDs[rank-1][dev_id]);
+						}
 					}
-					else
-						dev_id = (int)(gpu_ids[i]-'0');
-
+					else // not semiAutomatic => explicit
+					{
+						dev_id = StringToNumber<int >(allThreadIDs[rank-1][i]);
+					}
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
 					//Only make a new bundle of not existing on device

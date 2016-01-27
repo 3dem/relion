@@ -1,10 +1,10 @@
 #ifndef CUDA_BACKPROJECTOR_H_
 #define CUDA_BACKPROJECTOR_H_
 
+#include <cuda_runtime.h>
 #include "src/complex.h"
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
-#include <cuda_runtime.h>
 
 class CudaBackprojector
 {
@@ -36,9 +36,14 @@ public:
 	void initMdl();
 
 	void backproject(
-			XFLOAT *d_real,
-			XFLOAT *d_imag,
-			XFLOAT *d_weight,
+			XFLOAT *d_imgs_nomask_real,
+			XFLOAT *d_imgs_nomask_imag,
+			XFLOAT* d_weights,
+			XFLOAT* d_Minvsigma2s,
+			XFLOAT* d_ctfs,
+			unsigned long translation_num,
+			XFLOAT significant_weight,
+			XFLOAT weight_norm,
 			XFLOAT *d_eulers,
 			int imgX,
 			int imgY,

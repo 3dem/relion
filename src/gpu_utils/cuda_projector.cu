@@ -211,7 +211,7 @@ void CudaProjector::initMdl(Complex *data)
 	{
 		// -- make extents for automatic pitching (aligment) of allocated 3D arrays
 		cudaMemcpy3DParms copyParams = {0};
-		copyParams.extent = make_cudaExtent(mdlX, mdlY, mdlZ); //MARKER
+		copyParams.extent = make_cudaExtent(mdlX, mdlY, mdlZ);
 		copyParams.kind   = cudaMemcpyHostToDevice;
 
 		// -- Copy data

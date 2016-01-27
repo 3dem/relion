@@ -23,6 +23,7 @@ if(NOT GUI)
     list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
     list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/maingui.cpp")
     list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/manualpick.cpp")
+    list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/pipeliner.cpp")
 endif(NOT GUI)
 
 if (CUDA_FOUND)

@@ -148,7 +148,11 @@ bool calcCCofHelicalSymmetry(
 	sin_rec.resize(rec_len);
 	cos_rec.resize(rec_len);
 	for (int id = 0; id < rec_len; id++)
+#ifdef RELION_SINGLE_PRECISION
+		sincosf(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+#else
 		sincos(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+#endif
 
 	rise_pix = fabs(rise_pix);
 
@@ -740,7 +744,11 @@ void imposeHelicalSymmetryInRealSpace(
 	sin_rec.resize(rec_len);
 	cos_rec.resize(rec_len);
 	for (int id = 0; id < rec_len; id++)
+#ifdef RELION_SINGLE_PRECISION
+		sincosf(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+#else
 		sincos(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+#endif
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
 	{
