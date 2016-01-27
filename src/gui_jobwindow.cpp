@@ -569,7 +569,9 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input files:", "Micrographs/*.mrcs", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. ");
+	fn_in.place(current_y, "Input files:", "Micrographs/*.mrcs", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. \n \n \
+Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
+For any other import, the exact syntax of the wildcard doesn't matter, or one can also import a single file, i.e. without a wildcard.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
