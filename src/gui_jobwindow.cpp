@@ -4705,12 +4705,14 @@ void PostJobWindow::read(std::string fn, bool &_is_continue)
 		_is_continue = is_continue;
 	}
 }
+
 void PostJobWindow::toggle_new_continue(bool _is_continue)
 {
+	is_continue = _is_continue;
+
 	fn_in.deactivate(is_continue);
 	fn_mask.deactivate(is_continue);
 
-	is_continue = _is_continue;
 }
 
 void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
