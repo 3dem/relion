@@ -653,7 +653,8 @@ void checkHelicalParametersFor3DHelicalReference(
 	if ( (sphere_radius_pix < 2.) || (sphere_radius_pix > half_box_len)
 			|| ( (cyl_inner_radius_pix + 2.) > cyl_outer_radius_pix)
 			|| (cyl_outer_radius_pix < 2.) || (cyl_outer_radius_pix > half_box_len)
-			|| ( (sphere_radius_pix + 0.001) < cyl_outer_radius_pix ) )
+			//|| ( (sphere_radius_pix + 0.001) < cyl_outer_radius_pix ) )
+			|| (sphere_radius_pix < cyl_outer_radius_pix) )
 	{
 		std::cout << "sphere_radius_pix= " << sphere_radius_pix << ", half_box_len= " << half_box_len
 				<< ", cyl_inner_radius_pix= " << cyl_inner_radius_pix << ", cyl_outer_radius_pix= " << cyl_outer_radius_pix << std::endl;
@@ -1542,8 +1543,12 @@ void extractCoordsForAllHelicalSegments(
     half_box_size_pix = box_size_pix / 2.;
 
     // Read input STAR file
-    MD_in.clear();
-    MD_in.read(fn_in);
+	MD_in.clear();
+	MD_out.clear();
+	MD_in.read(fn_in);
+	if (MD_in.numberOfObjects() < 1) // Handle empty input files
+		return;
+
     if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) )
     	REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): Input STAR file does not contain X and Y coordinates!");
     if (MD_in.numberOfObjects() % 2)
@@ -2136,7 +2141,11 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 	half_box_size_pix = box_size_pix / 2.;
 
 	MD_in.clear();
+	MD_out.clear();
 	MD_in.read(fn_in);
+	if (MD_in.numberOfObjects() < 1) // Handle empty input files
+		return;
+
 	if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X))
 			|| (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y))
 			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
@@ -2146,7 +2155,6 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Prior information of helical segments is missing!");
 
-	MD_out.clear();
 	int nr_segments = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
 	{
@@ -3540,6 +3548,9 @@ void updateAngularPriorsForHelicalReconstruction(MetaDataTable& MD)
 	bool have_psi = MD.containsLabel(EMDL_ORIENT_PSI);
 	bool have_tilt_prior = MD.containsLabel(EMDL_ORIENT_TILT_PRIOR);
 	bool have_psi_prior = MD.containsLabel(EMDL_ORIENT_PSI_PRIOR);
+
+	if ( (!have_tilt_prior) && (!have_psi_prior) )
+		return;
 
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{

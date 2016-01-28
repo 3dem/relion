@@ -2311,7 +2311,7 @@ void MlOptimiserMpi::iterate()
 
 		if (node->isMaster())
 		{
-			if (do_helical_refine)
+			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
 			{
 				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
 			}

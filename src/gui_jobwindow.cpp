@@ -2218,17 +2218,33 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helix_group->end();
 
-	do_bimodal_psi.place(current_y, "Do bimodal angular searches?", false, "Do bimodal search for psi angles? \
-Set to Yes if you want to classify 2D helical segments with priors of psi angles. The priors should be bimodal due to unknown polarities of the segments.", helix_group);
+	do_helix.place(current_y, "Classify 2D helical segments?", false, "Set to Yes if you want to classify 2D helical segments. Note that the helical segments should come with priors of psi angles", helix_group);
 
 	helix_group->begin();
 
+	bimodal_psi_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	bimodal_psi_group->end();
+
+	do_bimodal_psi.place(current_y, "Do bimodal angular searches?", true, "Do bimodal search for psi angles? \
+Set to Yes if you want to classify 2D helical segments with priors of psi angles. The priors should be bimodal due to unknown polarities of the segments.\
+If it is set to No, ordinary angular searches will be performed.\n\nThis option will be invalid if you choose not to perform image alignment on 'Sampling' tab.", bimodal_psi_group);
+
+	bimodal_psi_group->begin();
+
 	range_psi.place(current_y, "Angular search range - psi (deg):", 6, 3, 30, 1, "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the psi priors estimated through helical segment picking. \
-A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of angular searches should be much larger than the sampling.");
+A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of angular searches should be much larger than the sampling.\
+\n\nThis option will be invalid if you choose not to perform image alignment on 'Sampling' tab.");
+
+	bimodal_psi_group->end();
+	do_bimodal_psi.cb_menu_i(); // to make default effective
+
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of the tubes. You may want to copy the value from previous particle extraction job. \
+If negative value is provided, this option is disabled and ordinary circular masks will be applied. Sometimes '--dont_check_norm' option is useful to prevent errors in normalisation of helical segments.");
 
 	helix_group->end();
-	do_bimodal_psi.cb_menu_i(); // to make default effective
+	do_helix.cb_menu_i(); // to make default effective
 
 	tab5->end();
 
@@ -2271,8 +2287,10 @@ void Class2DJobWindow::write(std::string fn)
 	offset_step.writeValue(fh);
 
 	// Helix
+	do_helix.writeValue(fh);
 	do_bimodal_psi.writeValue(fh);
 	range_psi.writeValue(fh);
+	helical_tube_outer_diameter.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -2309,8 +2327,10 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		offset_step.readValue(fh);
 
 		// Helix
+		do_helix.readValue(fh);
 		do_bimodal_psi.readValue(fh);
 		range_psi.readValue(fh);
+		helical_tube_outer_diameter.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -2410,10 +2430,16 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	}
 
 	// Helix
-	if (do_bimodal_psi.getValue())
+	if (do_helix.getValue())
 	{
-		command += " --bimodal_psi";
-		command += " --sigma_psi " + floatToString(range_psi.getValue() / 3.);
+		if ( (do_bimodal_psi.getValue()) && (dont_skip_align.getValue()) )
+		{
+			RFLOAT val = range_psi.getValue();
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --bimodal_psi --sigma_psi " + floatToString(val / 3.);
+		}
+		command += " --helical_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
 	}
 
 	// Always do norm and scale correction
@@ -2650,7 +2676,7 @@ in the previous iteration will get higher weights than those further away.");
 	do_helix.place(current_y, "Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.", helix_group);
 	helix_group->begin();
 	helical_tube_inner_diameter.placeOnSameYPosition(current_y, "Tube diameter - inner, outer (A):", "Tube diameter - inner (A):", "-1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
-	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "0", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
+	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "-1", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
 particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
@@ -2695,7 +2721,7 @@ A Gaussian prior (also see previous option) will be applied, so that orientation
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
 tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
-A range of 15 degrees means sigma = 5 degrees. No priors will be applied if these values are set to negative.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
@@ -2964,15 +2990,14 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	}
 
 	// Sampling
-	int iover = 1;
-	command += " --oversampling " + floatToString((float)iover);
-
 	if (!dont_skip_align.getValue())
 	{
 		command += " --skip_align ";
 	}
 	else
 	{
+		int iover = 1;
+		command += " --oversampling " + floatToString((float)iover);
 		for (int i = 0; i < 10; i++)
 		{
 			if (strcmp((sampling.getValue()).c_str(), sampling_options[i].label()) == 0)
@@ -3021,16 +3046,19 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
 				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
 		}
-		command += " --helical_bimodal_search";
-		RFLOAT val;
-		val = textToFloat(range_tilt.getValue());
-		val = (val < 0.) ? (0.) : (val);
-		val = (val > 90.) ? (90.) : (val);
-		command += " --sigma_tilt " + floatToString(val / 3.);
-		val = textToFloat(range_psi.getValue());
-		val = (val < 0.) ? (0.) : (val);
-		val = (val > 90.) ? (90.) : (val);
-		command += " --sigma_psi " + floatToString(val / 3.);
+		if ( (dont_skip_align.getValue()) && (!do_local_ang_searches.getValue()) )
+		{
+			command += " --helical_bimodal_search";
+			RFLOAT val;
+			val = textToFloat(range_tilt.getValue());
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --sigma_tilt " + floatToString(val / 3.);
+			val = textToFloat(range_psi.getValue());
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --sigma_psi " + floatToString(val / 3.);
+		}
 	}
 
 	// Running stuff
@@ -3250,7 +3278,7 @@ will be centered at the rotations determined for the corresponding particle wher
 	do_helix.place(current_y, "Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.", helix_group);
 	helix_group->begin();
 	helical_tube_inner_diameter.placeOnSameYPosition(current_y, "Tube diameter - inner, outer (A):", "Tube diameter - inner (A):", "-1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
-	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "0", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
+	helical_tube_outer_diameter.placeOnSameYPosition(current_y, "", "Tube diameter - outer (A):", "-1", "Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
 particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
@@ -3295,7 +3323,7 @@ A Gaussian prior (also see previous option) will be applied, so that orientation
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
 tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
-A range of 15 degrees means sigma = 5 degrees. No priors will be applied if these values are set to negative.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+A range of 15 degrees means sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective

@@ -494,10 +494,12 @@ public:
 	SliderEntry offset_step;
 
 	// Helix
+	BooleanEntry do_helix;
 	BooleanEntry do_bimodal_psi;
 	SliderEntry range_psi;
+	SliderEntry helical_tube_outer_diameter;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
+	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group, *bimodal_psi_group;
 
 public:
 

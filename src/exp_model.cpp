@@ -1163,7 +1163,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		if (!have_tiltpsi_prior)
 		{
 			if (!have_tiltpsi)
-				REPORT_ERROR("exp_model.cpp: void Experiment::read(): Tilt and psi priors of helical segments are needed for 3D reconstruction!");
+				REPORT_ERROR("exp_model.cpp: Experiment::read(): Tilt and psi priors of helical segments are missing!");
 		}
 	}
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)

@@ -230,6 +230,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	if (parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?"))
 		do_skip_align = true;
+	else
+		do_skip_align = false; // do_skip_align should normally be false...
 
 	if (parser.checkOption("--skip_rotate", "Skip rotational assignment (only translate and classify)?"))
 		do_skip_rotate = true;
@@ -640,7 +642,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
     // Then read in sampling, mydata and mymodel stuff
     // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
     bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
-    mydata.read(fn_data, false, false, do_preread, do_helical_refine);
+    bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+    mydata.read(fn_data, false, false, do_preread, is_helical_segment);
     if (do_split_random_halves)
     {
 		if (rank % 2 == 1)
@@ -1020,9 +1023,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 
 		// Read in the experimental image metadata
-		 // If do_preread_images: only the master reads all images into RAM
+		// If do_preread_images: only the master reads all images into RAM
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
-		mydata.read(fn_data, true, false, do_preread, do_helical_refine); // true means ignore original particle name
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		mydata.read(fn_data, true, false, do_preread, is_helical_segment); // true means ignore original particle name
 
 		if (fn_body_masks != "")
 		{
@@ -1131,8 +1135,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 			REPORT_ERROR("ERROR: cannot do multi-body refinement for helices!");
 
 		// TODO: check this!!!
-		//if (do_shifts_onthefly)
-		//	REPORT_ERROR("ERROR: cannot calculate phase-shift AB matrices on-the-fly for helices!");
+		if (do_shifts_onthefly)
+			REPORT_ERROR("ERROR: cannot calculate phase-shift AB matrices on-the-fly for helices!");
 
 		// Set particle diameter to 90% the box size if user does not give this parameter
 		if (particle_diameter < 0.)
@@ -1190,6 +1194,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (do_helical_symmetry_local_refinement)
 			REPORT_ERROR("ERROR: cannot do local refinement of helical parameters for non-helical segments!");
 	}
+	if ( (mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.) && (particle_diameter < helical_tube_outer_diameter) )
+		REPORT_ERROR("ERROR: 2D classification: Helical tube diameter should be smaller than particle diameter!");
 
 	if (do_always_join_random_halves)
 		std::cout << " Joining half-reconstructions at each iteration: this is a developmental option to test sub-optimal FSC usage only! " << std::endl;
@@ -1382,7 +1388,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			long int group_id = mydata.getGroupId(part_id);
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
-			RFLOAT psi_deg, tilt_deg;
+			RFLOAT psi_deg = 0., tilt_deg = 0.;
+			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 
 			// TMP test for debuging
 			if (group_id < 0 || group_id >= mymodel.nr_groups)
@@ -1398,17 +1405,17 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
-			if (do_helical_refine)
+			if (is_helical_segment)
 			{
 				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg))
 				{
 					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg))
-						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Helical reconstruction - Psi priors are missing!");
+						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Psi priors of helical segments are missing!");
 				}
 				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg))
 				{
 					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg))
-						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Helical reconstruction - Tilt priors are missing!");
+						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Tilt priors of helical segments are missing!");
 				}
 			}
 
@@ -1431,14 +1438,14 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
 				cyl_radius_pix = helical_tube_outer_diameter / (2. * mymodel.pixel_size);
 				sphere_radius_pix = particle_diameter / (2. * mymodel.pixel_size);
-				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), do_helical_refine, cyl_radius_pix, tilt_deg, psi_deg);
+				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), is_helical_segment, cyl_radius_pix, tilt_deg, psi_deg);
 
 				// Average should be close to zero, i.e. max +/-50% of stddev...
 				// Stddev should be close to one, i.e. larger than 0.5 and smaller than 2)
 				if (ABS(sum/sum2) > 0.5 || sum2 < 0.5 || sum2 > 2.0)
 				{
 					std::cerr << " fn_img= " << fn_img << " bg_avg= " << sum << " bg_stddev= " << sum2 << std::flush;
-					if (do_helical_refine)
+					if (is_helical_segment)
 						std::cerr << " tube_bg_radius= " << cyl_radius_pix << " psi_deg= " << psi_deg << " tilt_deg= " << tilt_deg << " (this is a particle from a helix)" << std::flush;
 					else
 						std::cerr << " bg_radius= " << sphere_radius_pix << std::flush;
@@ -1456,7 +1463,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			if (do_zero_mask)
 			{
 				// May24,2015 - Shaoda & Sjors, Helical refinement
-				if (do_helical_refine)
+				if (is_helical_segment)
 				{
 					softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
 							(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
@@ -1717,7 +1724,8 @@ void MlOptimiser::iterate()
 		if (do_helical_refine)
 		{
 			makeGoodHelixForEachRef();
-			updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+			if ( (!do_skip_align) && (!do_skip_rotate) )
+				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
 		}
 
 		// Apply masks to the reference images
@@ -3675,6 +3683,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		exp_Fimgs_nomask.at(ipart) = Fimg;
 
 		MultidimArray<RFLOAT> Mnoise;
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 		if (!do_zero_mask)
 		{
 			// Make a noisy background image with the same spectrum as the sigma2_noise
@@ -3718,7 +3727,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			Mnoise.setXmippOrigin();
 
 			// May24,2014 - Shaoda & Sjors, Helical refinement
-			if (do_helical_refine)
+			if (is_helical_segment)
 			{
 				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
 						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge, &Mnoise);
@@ -3729,7 +3738,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		else
 		{
 			// May24,2014 - Shaoda & Sjors, Helical refinement
-			if (do_helical_refine)
+			if (is_helical_segment)
 			{
 				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
 						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);

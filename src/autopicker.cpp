@@ -73,9 +73,6 @@ void AutoPicker::read(int argc, char **argv)
 	{
 		if ( (helical_tube_curvature_factor_max < 0.0001) || (helical_tube_curvature_factor_max > 1.0001) )
 			REPORT_ERROR("Error: Maximum curvature factor should be 0~1!");
-
-		if (helical_tube_diameter > particle_diameter)
-			REPORT_ERROR("Error: Tube diameter should be smaller than particle diameter!");
 	}
 }
 
@@ -239,7 +236,13 @@ void AutoPicker::initialise()
 		particle_radius2*= particle_radius2;
 	}
 
-
+	if ( (verb > 0) && (autopick_helical_segments))
+	{
+		std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
+		std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
+	}
+	if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
+		REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
 
 
 	// Get the squared particle radius (in integer pixels)
