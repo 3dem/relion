@@ -14,6 +14,8 @@ class CudaProjector
 	    mdlInitY, mdlInitZ,
 	    padding_factor;
 
+	size_t allocaton_size;
+
 #ifndef CUDA_NO_TEXTURES
 
 #if(COMPLEXTEXTURE)
@@ -36,7 +38,8 @@ public:
 			mdlX(0), mdlY(0), mdlZ(0),
 			mdlXYZ(0), mdlMaxR(0),
 			mdlInitY(0), mdlInitZ(0),
-			padding_factor(0)
+			padding_factor(0),
+			allocaton_size(0)
 	{
 #ifndef CUDA_NO_TEXTURES
 
@@ -59,7 +62,7 @@ public:
 #endif
 	}
 
-	void setMdlDim(
+	size_t setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int maxr, int paddingFactor);

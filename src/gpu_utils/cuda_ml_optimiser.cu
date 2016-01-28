@@ -2365,14 +2365,83 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+	printf(" DEBUG: Custom allocator is disabled.\n");
+#else
+
+	int memAlignmentSize;
+	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
+	allocator = new CudaCustomAllocator(0, memAlignmentSize);
+
+#endif
+};
+
+void MlDeviceBundle::resetData()
+{
+	unsigned nr_classes = baseMLO->mymodel.nr_classes;
+	HANDLE_ERROR(cudaSetDevice(device_id));
+
+	//Can we pre-generate projector plan and corresponding euler matrices for all particles
+	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
+		generateProjectionPlanOnTheFly = true;
+	else
+		generateProjectionPlanOnTheFly = false;
+
+	coarseProjectionPlans.clear();
+
+	allocator->syncReadyEvents();
+	allocator->freeReadyAllocs();
+
+#ifdef DEBUG_CUDA
+
+	if (allocator->getNumberOfAllocs() != 0)
+	{
+		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
+		allocator->printState();
+		fflush(stdout);
+		raise(SIGSEGV);
+	}
+
+#endif
+
+	allocator->resize(0);
+
+	/*======================================================
+	              PROJECTOR AND BACKPROJECTOR
+	======================================================*/
+
+	size_t extraAllocationSpace(0);
+
+	//Loop over classes
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
+		extraAllocationSpace += cudaProjectors[iclass].setMdlDim(
+				baseMLO->mymodel.PPref[iclass].data.xdim,
+				baseMLO->mymodel.PPref[iclass].data.ydim,
+				baseMLO->mymodel.PPref[iclass].data.zdim,
+				baseMLO->mymodel.PPref[iclass].data.yinit,
+				baseMLO->mymodel.PPref[iclass].data.zinit,
+				baseMLO->mymodel.PPref[iclass].r_max,
+				baseMLO->mymodel.PPref[iclass].padding_factor);
+
+		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
+
+		extraAllocationSpace += cudaBackprojectors[iclass].setMdlDim(
+				baseMLO->wsum_model.BPref[iclass].data.xdim,
+				baseMLO->wsum_model.BPref[iclass].data.ydim,
+				baseMLO->wsum_model.BPref[iclass].data.zdim,
+				baseMLO->wsum_model.BPref[iclass].data.yinit,
+				baseMLO->wsum_model.BPref[iclass].data.zinit,
+				baseMLO->wsum_model.BPref[iclass].r_max,
+				baseMLO->wsum_model.BPref[iclass].padding_factor);
+
+		cudaBackprojectors[iclass].initMdl();
+	}
+
 	/*======================================================
 	                    CUSTOM ALLOCATOR
 	======================================================*/
 
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-	printf(" DEBUG: Custom allocator is disabled.\n");
-	allocator = new CudaCustomAllocator(0, 1);
-#else
 	size_t allocationSize(0);
 
 	size_t free, total;
@@ -2389,77 +2458,29 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
 		printf("  Total available size %zu MB\n", free/(1000*1000));
 		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
 	}
 
-	int memAlignmentSize;
-	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, dev_id );
-
 #ifdef DEBUG_CUDA
-	printf(" DEBUG: Custom allocator assigned %zu MB on device id %d.\n", allocationSize / (1000*1000), dev_id);
+	printf(" DEBUG: Custom allocator assigned %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
 #endif
 
-	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
-#endif
-};
+	size_t actualAllocationSize = allocationSize - extraAllocationSpace - MEMORY_OVERHEAD_MB * 1000 * 1000;
 
-void MlDeviceBundle::resetData()
-{
-	unsigned nr_classes = baseMLO->mymodel.nr_classes;
-	HANDLE_ERROR(cudaSetDevice(device_id));
+	if (actualAllocationSize < 0)
+		REPORT_ERROR("More GPU memory is required.");
+
+	allocator->resize(actualAllocationSize);
+
 
 	/*======================================================
-	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
+	                    PROJECTION PLAN
 	======================================================*/
-
-	//Can we pre-generate projector plan and corresponding euler matrices for all particles
-	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
-		generateProjectionPlanOnTheFly = true;
-	else
-		generateProjectionPlanOnTheFly = false;
-
-	coarseProjectionPlans.clear();
-
-#ifdef DEBUG_CUDA
-
-	allocator->syncReadyEvents();
-	allocator->freeReadyAllocs();
-	if (allocator->getNumberOfAllocs() != 0)
-	{
-		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-		allocator->printState();
-		fflush(stdout);
-		raise(SIGSEGV);
-	}
-
-#endif
 
 	coarseProjectionPlans.resize(nr_classes, allocator);
 
-	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		cudaProjectors[iclass].setMdlDim(
-				baseMLO->mymodel.PPref[iclass].data.xdim,
-				baseMLO->mymodel.PPref[iclass].data.ydim,
-				baseMLO->mymodel.PPref[iclass].data.zdim,
-				baseMLO->mymodel.PPref[iclass].data.yinit,
-				baseMLO->mymodel.PPref[iclass].data.zinit,
-				baseMLO->mymodel.PPref[iclass].r_max,
-				baseMLO->mymodel.PPref[iclass].padding_factor);
-
-		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
-
-		cudaBackprojectors[iclass].setMdlDim(
-				baseMLO->wsum_model.BPref[iclass].data.xdim,
-				baseMLO->wsum_model.BPref[iclass].data.ydim,
-				baseMLO->wsum_model.BPref[iclass].data.zdim,
-				baseMLO->wsum_model.BPref[iclass].data.yinit,
-				baseMLO->wsum_model.BPref[iclass].data.zinit,
-				baseMLO->wsum_model.BPref[iclass].r_max,
-				baseMLO->wsum_model.BPref[iclass].padding_factor);
-
-		cudaBackprojectors[iclass].initMdl();
-
 		//If doing predefined projector plan at all and is this class significant
 		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)
 		{

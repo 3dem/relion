@@ -2,7 +2,7 @@
 #include <signal.h>
 
 
-void CudaProjector::setMdlDim(
+size_t CudaProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
 		int maxr, int paddingFactor)
@@ -14,7 +14,9 @@ void CudaProjector::setMdlDim(
 		initz == mdlInitZ &&
 		maxr == mdlMaxR &&
 		paddingFactor == padding_factor)
-		return;
+		return allocaton_size;
+
+	clear();
 
 	mdlX = xdim;
 	mdlY = ydim;
@@ -28,7 +30,7 @@ void CudaProjector::setMdlDim(
 	mdlMaxR = maxr;
 	padding_factor = paddingFactor;
 
-	clear();
+	size_t free1, free2, total;
 
 #ifndef CUDA_NO_TEXTURES
 #if(COMPLEXTEXTURE)
@@ -53,7 +55,9 @@ void CudaProjector::setMdlDim(
 		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
 
 		// -- Allocate and copy data using very celver CUDA memcpy-functions
+		HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMalloc3DArray(texArrayComplex, &desc, volumeSize));
+		HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.res.array.array = *texArrayComplex;
@@ -61,7 +65,9 @@ void CudaProjector::setMdlDim(
 	}
 	else // 2D model
 	{
+		HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMallocPitch(&texArrayComplex2D, &pitch2D, sizeof(CUDACOMPLEX)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.resType = cudaResourceTypePitch2D;
@@ -108,9 +114,12 @@ void CudaProjector::setMdlDim(
 		// -- make extents for automatic pitch:ing (aligment) of allocated 3D arrays
 		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
 
-		// -- Allocate and copy data using very celver CUDA memcpy-functions
+
+		// -- Allocate and copy data using very clever CUDA memcpy-functions
+		HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMalloc3DArray(texArrayReal, &desc, volumeSize));
 		HANDLE_ERROR(cudaMalloc3DArray(texArrayImag, &desc, volumeSize));
+		HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_real.res.array.array = *texArrayReal;
@@ -120,8 +129,10 @@ void CudaProjector::setMdlDim(
 	}
 	else // 2D model
 	{
+		HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMallocPitch(&texArrayReal2D, &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
 		HANDLE_ERROR(cudaMallocPitch(&texArrayImag2D, &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_real.resType = cudaResourceTypePitch2D;
@@ -152,10 +163,15 @@ void CudaProjector::setMdlDim(
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
 #endif
 #else
+	HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
+	HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 #endif
+
+	allocaton_size = free1 - free2;
+	return allocaton_size;
 }
 
 #if(!COMPLEXTEXTURE)
@@ -265,6 +281,16 @@ void CudaProjector::clear()
 
 void CudaProjector::clear()
 {
+	mdlX = 0;
+	mdlY = 0;
+	mdlZ = 0;
+	mdlXYZ = 0;
+	mdlInitY = 0;
+	mdlInitZ = 0;
+	mdlMaxR = 0;
+	padding_factor = 0;
+	allocaton_size = 0;
+
 	if (mdlReal != 0)
 	{
 #ifndef CUDA_NO_TEXTURES
