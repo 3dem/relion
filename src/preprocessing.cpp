@@ -491,7 +491,6 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	if (MDin.numberOfObjects() > 0)
 	{
 
-
 		// Correct for bias in the picked coordinates
 		if (ABS(extract_bias_x) > 0 || ABS(extract_bias_y) > 0)
 		{
@@ -762,7 +761,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				fn_img.compose(fn_output_img_root, my_current_nr_images + ipos + 1, "mrc");
 			else
 				fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
-			if (do_movie_extract)
+			if (do_movie_extract && !MD.containsLabel(EMDL_PARTICLE_ORI_NAME))
 			{
 				FileName fn_part;
 				fn_part.compose(ipos + 1,  fn_oristack); // start image counting in stacks at 1!
@@ -985,6 +984,11 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
 		angpix2 = 10000. * dstep2 / mag2;
 		RFLOAT rescale_fndata = angpix2 / angpix;
+
+		// Th current rlnImageName becomes the new rlnOriginalParticleName
+		std::string name;
+		MDresult.getValue(EMDL_IMAGE_NAME, name);
+		MDresult.setValue(EMDL_PARTICLE_ORI_NAME, name);
 
 		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y));
 		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z));
