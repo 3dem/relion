@@ -17,6 +17,7 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#include <cuda_runtime.h>
 #include "src/autopicker_mpi.h"
 
 void AutoPickerMpi::read(int argc, char **argv)
@@ -40,6 +41,27 @@ void AutoPickerMpi::read(int argc, char **argv)
 
 
 }
+
+int AutoPickerMpi::deviceInitialise()
+{
+	int devCount;
+	cudaGetDeviceCount(&devCount);
+
+	std::vector < std::vector < std::string > > allThreadIDs;
+	untangleDeviceIDs(gpu_ids, allThreadIDs);
+
+	// Sequential initialisation of GPUs on all ranks
+	int dev_id;
+	if (!std::isdigit(*gpu_ids.begin()))
+		dev_id = node->rank%devCount;
+	else
+		dev_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
+
+	std::cout << " rank " << node->rank << " mapped to device " << dev_id << std::endl;
+
+	return(dev_id);
+}
+
 void AutoPickerMpi::run()
 {
 
