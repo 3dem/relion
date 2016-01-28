@@ -902,7 +902,7 @@ void MlOptimiser::initialise()
 		// Sequential initialisation of GPUs on all ranks
 		bool fullAutomaticMapping(true);
 		bool semiAutomaticMapping(true);
-		if (allThreadIDs[0].size()==0)
+		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 		else
 		{
@@ -935,7 +935,8 @@ void MlOptimiser::initialise()
 				else
 					dev_id = i%allThreadIDs[0].size();
 
-				dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
+				if(std::isdigit(*allThreadIDs[0][dev_id].c_str()))
+					dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
 			}
 			else // not semiAutomatic => explicit
 			{
