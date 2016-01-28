@@ -12,7 +12,7 @@
 #ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
 #define CUSTOM_ALLOCATOR_REGION_NAME( name ) (fprintf(stderr, "\n%s", name))
 #else
-#define CUSTOM_ALLOCATOR_REGION_NAME( name ) (name) //Do nothing
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
 #endif
 
 #ifdef DEBUG_CUDA

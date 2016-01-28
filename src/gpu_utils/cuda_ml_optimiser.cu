@@ -2369,6 +2369,25 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	printf(" DEBUG: Custom allocator is disabled.\n");
 #else
 
+	size_t allocationSize(0);
+
+	size_t free, total;
+	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+	if (baseMLO->available_gpu_memory > 0)
+		allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	else
+		allocationSize = (float)free * .7;
+
+	if (allocationSize > free)
+	{
+		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
+		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
+		printf("  Total available size %zu MB\n", free/(1000*1000));
+		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
+	}
+
 	int memAlignmentSize;
 	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
 	allocator = new CudaCustomAllocator(0, memAlignmentSize);
@@ -2462,13 +2481,20 @@ void MlDeviceBundle::resetData()
 	}
 
 #ifdef DEBUG_CUDA
-	printf(" DEBUG: Custom allocator assigned %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
+	printf(" DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
 #endif
 
-	size_t actualAllocationSize = allocationSize - extraAllocationSpace - MEMORY_OVERHEAD_MB * 1000 * 1000;
+	int actualAllocationSize = (int) allocationSize - (int) extraAllocationSpace - (int) MEMORY_OVERHEAD_MB * 1000 * 1000;
 
 	if (actualAllocationSize < 0)
-		REPORT_ERROR("More GPU memory is required.");
+	{
+		printf("\n\nINFO: Additional Allocation Size: %d MB\n", (int) extraAllocationSpace/(1000*1000));
+		printf(    "INFO: Overhead Allocation Size:   %d MB\n", (int) MEMORY_OVERHEAD_MB);
+		printf(    "INFO: Left for Custom Allocator:  %d MB\n", (int) actualAllocationSize/(1000*1000));
+		printf("EORROR: More GPU memory is required.\n\n");
+		fflush(stdout);
+		raise(SIGSEGV);
+	}
 
 	allocator->resize(actualAllocationSize);
 

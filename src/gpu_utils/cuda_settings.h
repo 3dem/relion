@@ -45,7 +45,7 @@
 
 #define NR_CLASS_MUTEXES 5
 
-//The approximate amount of memory that each process occupies by default on a device (in MBs)
-#define MEMORY_OVERHEAD_MB 100
+//The approximate minimum amount of memory each process occupies on a device (in MBs)
+#define MEMORY_OVERHEAD_MB 200
 
 #endif /* CUDA_SETTINGS_H_ */
