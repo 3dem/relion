@@ -935,11 +935,11 @@ void MlOptimiser::initialise()
 				else
 					dev_id = i%allThreadIDs[0].size();
 
-				dev_id =  StringToNumber<int >(allThreadIDs[0][dev_id]);
+				dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
 			}
 			else // not semiAutomatic => explicit
 			{
-				dev_id = StringToNumber<int >(allThreadIDs[0][i]);
+				dev_id = textToInteger(allThreadIDs[0][i].c_str());
 			}                                       
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 

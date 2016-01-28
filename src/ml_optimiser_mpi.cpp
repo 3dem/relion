@@ -231,12 +231,12 @@ void MlOptimiserMpi::initialise()
 								dev_id = (i*(allThreadIDs[rank-1].size()-1))%allThreadIDs[rank-1].size();
 							else
 								dev_id = i%allThreadIDs[rank-1].size();
-							dev_id =  StringToNumber<int >(allThreadIDs[rank-1][dev_id]);
+							dev_id =  textToInteger(allThreadIDs[rank-1][dev_id].c_str());
 						}
 					}
 					else // not semiAutomatic => explicit
 					{
-						dev_id = StringToNumber<int >(allThreadIDs[rank-1][i]);
+						dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
 					}
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 

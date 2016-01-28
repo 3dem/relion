@@ -79,13 +79,6 @@
 #define MAX_NR_ITER_WO_RESOL_GAIN 1
 #define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES 1
 
-template <typename T>
-  T StringToNumber ( const std::string &Text )
-  {
-     std::istringstream ss(Text);
-     T result;
-     return ss >> result ? result : 0;
-  }
 // for profiling
 //#define TIMING
 
