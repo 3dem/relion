@@ -220,9 +220,56 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CUDA_CPU_TIC("selfTranslate");
 		// Apply (rounded) old offsets first
 		my_old_offset.selfROUND();
-		selfTranslate(img(), my_old_offset, DONT_WRAP);
+
+		int img_size = img.data.nzyxdim;
+		CudaGlobalPtr<XFLOAT> d_img(img_size,0,cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> temp(img_size,0,cudaMLO->devBundle->allocator);
+		d_img.device_alloc();
+		temp.device_alloc();
+		d_img.device_init(0);
+		for (int i=0; i<img_size; i++)
+			temp[i] = img.data.data[i];
+		temp.cp_to_device();
+		temp.streamSync();
+
+		int STBsize = ( (int) ceilf(( float)img_size /(float)BLOCK_SIZE));
+		cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
+								~temp,  // translate from temp...
+								~d_img, // ... into d_img
+								img_size,
+								img.data.xdim,
+								img.data.ydim,
+								XX(my_old_offset),
+								YY(my_old_offset));
+
+		d_img.cp_to_host();
+		d_img.streamSync();
+		for (int i=0; i<img_size; i++)
+			img.data.data[i] = d_img[i];
+
+//		selfTranslate(img(), my_old_offset, DONT_WRAP);
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
-			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+		{
+			for (int i=0; i<img_size; i++)
+				temp[i] = img.data.data[i];
+			temp.cp_to_device();
+			temp.streamSync();
+			cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
+											~temp,  // translate from temp...
+											~d_img, // ... into d_img
+											img_size,
+											img.data.xdim,
+											img.data.ydim,
+											XX(my_old_offset),
+											YY(my_old_offset));
+
+			d_img.cp_to_host();
+			d_img.streamSync();
+
+			for (int i=0; i<img_size; i++)
+				rec_img.data.data[i] = d_img[i];
+//			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+		}
 
 		op.old_offset[ipart] = my_old_offset;
 		// Also store priors on translations
