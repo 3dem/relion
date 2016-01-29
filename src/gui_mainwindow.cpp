@@ -116,10 +116,12 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
     menubar->add("File/Save job settings",  FL_ALT+'s', cb_save, this);
+    menubar->add("File/Load job settings",  FL_ALT+'l', cb_load, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
     menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
     menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
     menubar->add("File/Show initial screen",  FL_ALT+'a', cb_show_initial_screen, this);
+    menubar->add("File/Empty trash",  FL_ALT+'t', cb_empty_trash, this);
     menubar->add("File/About",  FL_ALT+'a', cb_about, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
     menubar->add("Autorun/Run scheduled jobs", 0, cb_start_pipeliner, this);
@@ -1300,6 +1302,7 @@ void RelionMainWindow::cb_toggle_continue_i()
 	if (is_main_continue)
 	{
 		run_button->label("Continue now");
+		run_button->color(GUI_BUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
 		alias_current_job->deactivate();
@@ -1307,6 +1310,7 @@ void RelionMainWindow::cb_toggle_continue_i()
 	else
 	{
 		run_button->label("Run now!");
+		run_button->color(GUI_RUNBUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(16);
 		alias_current_job->activate();
@@ -1613,7 +1617,7 @@ void RelionMainWindow::cb_cleanup_i()
 	int proceed = proceed =  fl_choice(ask.c_str(), "Don't delete", "Delete", NULL);
 	if (proceed)
 	{
-	    std::cerr << "cleanup todo" << std::endl;
+	    std::cout << "cleanup todo" << std::endl;
 	}
 
 }
@@ -1655,6 +1659,13 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 				return;
 			std::string al2(palias);
 			alias = al2;
+		}
+
+		//remove spaces from any potential alias
+		for (int i = 0; i < alias.length(); i++)
+		{
+			if (alias[i] == ' ')
+				alias[i] = '_';
 		}
 
 		// Make sure the alias ends with a slash
@@ -1710,7 +1721,7 @@ void RelionMainWindow::cb_mark_as_finished_i()
 
 	if (current_job < 0)
 	{
-		std::cout << " You can only mark existing jobs as finished ... " << std::endl;
+		fl_message("You can only mark existing jobs as finished!");
 		return;
 	}
 
@@ -1756,8 +1767,7 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		}
 		else
 		{
-			std::cout << " You are trying to mark a relion_refine job as finished that hasn't even started. This will be ignored. " << std::endl;
-			std::cout << " Perhaps you wanted to delete it instead?" << std::endl;
+			fl_message(" You are trying to mark a relion_refine job as finished that hasn't even started. \n This will be ignored. Perhaps you wanted to delete it instead?");
 			pipeline.processList[current_job].status = PROC_RUNNING;
 		}
 	}
@@ -1815,6 +1825,42 @@ void RelionMainWindow::cb_save_i()
 	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
 
 }
+
+// Load button call-back function
+void RelionMainWindow::cb_load(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_load_i();
+}
+
+void RelionMainWindow::cb_load_i()
+{
+
+	fn_settings = "";
+	jobCommunicate(DONT_WRITE, DO_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
+
+}
+
+// Empty-trash button call-back function
+void RelionMainWindow::cb_empty_trash(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_empty_trash_i();
+}
+
+void RelionMainWindow::cb_empty_trash_i()
+{
+	std::string ask = "Are you sure you want to remove the entire Trash folder?";
+	int proceed =  fl_choice(ask.c_str(), "Don't empty trash", "Empty Trash", NULL);
+	if (proceed)
+	{
+		std::string command = "rm -rf Trash";
+		std::cout << " Executing: " << command << std::endl;
+		int res = system(command.c_str());
+	}
+}
+
+
 void RelionMainWindow::cb_print_notes(Fl_Widget*, void* v)
 {
   	 RelionMainWindow* T=(RelionMainWindow*)v;

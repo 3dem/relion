@@ -228,6 +228,12 @@ private:
     static void cb_save(Fl_Widget*, void*);
     inline void cb_save_i();
 
+    static void cb_load(Fl_Widget*, void*);
+    inline void cb_load_i();
+
+    static void cb_empty_trash(Fl_Widget*, void*);
+    inline void cb_empty_trash_i();
+
     static void cb_print_notes(Fl_Widget*, void*);
     inline void cb_print_notes_i();
 

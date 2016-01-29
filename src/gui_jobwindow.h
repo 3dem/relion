@@ -59,9 +59,14 @@ static Fl_Menu_Item sampling_options[] = {
 static Fl_Menu_Item node_type_options[] = {
 		      {"2D micrograph movies (*.mrcs)"},
 	          {"2D micrographs/tomograms (*.mrc)"},
-		      {"2D/3D particle coordinates (*.box, *_pick.star)"},
+	          {"2D/3D particle coordinates (*.box, *_pick.star)"},
+	          {"Particles STAR file (.star)"},
+	          {"Movie-particles STAR file (.star)"},
+	          {"2D references STAR file (.star)"},
+	          {"Micrographs STAR file (.star)"},
 		      {"3D reference (.mrc)"},
 		      {"3D mask (.mrc)"},
+		      {"Unfiltered half-map (unfil.mrc)"},
 		      {0} // this should be the last entry
 };
 

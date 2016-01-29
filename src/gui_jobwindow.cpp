@@ -569,10 +569,11 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_in.place(current_y, "Input files:", "Micrographs/*.mrcs", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards, that you want to import into a STAR file, which will also be saved as a data Node. \n \n \
+	fn_in.place(current_y, "Input files:", "Micrographs/*.mrcs", "Input file (*.*)", NULL, "Select any file(s), possibly using Linux wildcards for 2D micrographs or 3D tomograms that you want to import into a STAR file, which will also be saved as a data Node. \n \n \
 Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
-For any other import, the exact syntax of the wildcard doesn't matter, or one can also import a single file, i.e. without a wildcard.\n \n \
-Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere.");
+Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
+Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
+For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -582,7 +583,7 @@ Also note that micrographs, movies and coordinate files all need to be in the sa
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_importrun.job", is_continue);
+	read(".gui_import", is_continue);
 
 }
 
@@ -590,7 +591,7 @@ void ImportJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_importrun.job";
+		fn=".gui_import";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -606,6 +607,11 @@ void ImportJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_import";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -668,23 +674,38 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command = " touch " + outputname + fn_suffix;
 		commands.push_back(command);
 	}
-	else if (node_type.getValue() == "3D reference (.mrc)")
+	else if (node_type.getValue() == "Particles STAR file (.star)" ||
+			 node_type.getValue() == "Movie-particles STAR file (.star)" ||
+			 node_type.getValue() == "Micrographs STAR file (.star)" ||
+			 node_type.getValue() == "2D references STAR file (.star)" ||
+			 node_type.getValue() == "3D reference (.mrc)" ||
+			 node_type.getValue() == "3D mask (.mrc)" ||
+			 node_type.getValue() == "Unfiltered half-map (unfil.mrc)")
 	{
 		FileName fnt = "/" + fn_in.getValue();
 		fnt = fnt.afterLastOf("/");
 		command = "cp " + fn_in.getValue() + " " + outputname + fnt;
 		commands.push_back(command);
-		Node node(outputname + fnt, NODE_3DREF);
+
+		int mynodetype;
+		if (node_type.getValue() == "Particles STAR file (.star)")
+			mynodetype = NODE_PART_DATA;
+		else if (node_type.getValue() == "Movie-particles STAR file (.star)")
+			mynodetype = NODE_MOVIE_DATA;
+		else if (node_type.getValue() == "Micrographs STAR file (.star)")
+			mynodetype = NODE_MICS;
+		else if (node_type.getValue() == "2D references STAR file (.star)")
+			mynodetype = NODE_2DREFS;
+		else if (node_type.getValue() == "3D reference (.mrc)")
+			mynodetype = NODE_3DREF;
+		else if (node_type.getValue() == "3D mask (.mrc)")
+			mynodetype = NODE_MASK;
+		else if (node_type.getValue() == "Unfiltered half-map (unfil.mrc)")
+			mynodetype = NODE_HALFMAP;
+
+		Node node(outputname + fnt, mynodetype);
 		pipelineOutputNodes.push_back(node);
-	}
-	else if (node_type.getValue() == "3D mask (.mrc)")
-	{
-		FileName fnt = "/" + fn_in.getValue();
-		fnt = fnt.afterLastOf("/");
-		command = "cp " + fn_in.getValue() + " " + outputname + fnt;
-		commands.push_back(command);
-		Node node(outputname + fnt, NODE_MASK);
-		pipelineOutputNodes.push_back(node);
+
 	}
 	else
 	{
@@ -736,7 +757,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_motioncorrrun.job", is_continue);
+	read(".gui_motioncorr", is_continue);
 }
 
 
@@ -745,7 +766,7 @@ void MotioncorrJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_motioncorrrun.job";
+		fn=".gui_motioncorr";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -767,6 +788,11 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_motioncorr";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -952,14 +978,14 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_ctffindrun.job", is_continue);
+	read(".gui_ctffind", is_continue);
 }
 
 void CtffindJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_ctffindrun.job";
+		fn=".gui_ctffind";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -990,6 +1016,11 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_ctffind";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -1132,7 +1163,7 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 
 	current_y += STEPY/2;
 	lowpass.place(current_y, "Lowpass filter (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the micrographs. Give a negative value to skip the lowpass filter.");
-	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. ");
+	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. Useful values are often in the range of 200-400 Angstroms.");
 	angpix.place(current_y, "Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
 
 	current_y += STEPY/2;
@@ -1163,14 +1194,14 @@ Particles that are not in this STAR file, but present in the picked coordinates 
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_manualpickrun.job", is_continue);
+	read(".gui_manualpick", is_continue);
 }
 
 void ManualpickJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_manualpickrun.job";
+		fn=".gui_manualpick";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1197,6 +1228,11 @@ void ManualpickJobWindow::write(std::string fn)
 void ManualpickJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_manualpick";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -1318,7 +1354,7 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 
 
 	lowpass.place(current_y, "Lowpass filter refences (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
-	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. ");
+	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter.  Useful values are often in the range of 200-400 Angstroms.");
 	angpix.place(current_y, "Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
 
 	// Add a little spacer
@@ -1386,14 +1422,14 @@ Helical tubes with shorter lengths will not be picked. Note that a long helical 
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_autopickrun.job", is_continue);
+	read(".gui_autopick", is_continue);
 }
 
 void AutopickJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_autopickrun.job";
+		fn=".gui_autopick";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1424,6 +1460,11 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_autopick";
+
 	if (openReadFile(fn, fh))
 	{
 
@@ -1688,7 +1729,7 @@ The optimal inter-box distance might also depend on the box size, the helical ri
 	tab4->end();
 
 	// read settings if hidden file exists
-	read(".gui_extractrun.job", is_continue);
+	read(".gui_extract", is_continue);
 }
 
 
@@ -1696,7 +1737,7 @@ void ExtractJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_extractrun.job";
+		fn=".gui_extract";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1738,6 +1779,11 @@ void ExtractJobWindow::write(std::string fn)
 void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_extract";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -1966,14 +2012,14 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_sortrun.job", is_continue);
+	read(".gui_sort", is_continue);
 }
 
 void SortJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_sortrun.job";
+		fn=".gui_sort";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -1988,6 +2034,11 @@ void SortJobWindow::write(std::string fn)
 void SortJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_sort";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -2249,7 +2300,7 @@ If negative value is provided, this option is disabled and ordinary circular mas
 	tab5->end();
 
 	// read settings if hidden file exists
-	read(".gui_class2drun.job", is_continue);
+	read(".gui_class2d", is_continue);
 
 }
 
@@ -2257,7 +2308,7 @@ void Class2DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_class2drun.job";
+		fn=".gui_class2d";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2299,6 +2350,11 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_class2d";
+
 	if (openReadFile(fn, fh))
 	{
 
@@ -2728,7 +2784,7 @@ A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid 
 	tab6->end();
 
 	// read settings if hidden file exists
-	read(".gui_class3drun.job", is_continue);
+	read(".gui_class3d", is_continue);
 
 }
 
@@ -2736,7 +2792,7 @@ void Class3DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_class3drun.job";
+		fn=".gui_class3d";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -2801,6 +2857,11 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_class3d";
+
 	if (openReadFile(fn, fh))
 	{
 
@@ -3331,7 +3392,7 @@ A range of 15 degrees means sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARAT
 	tab7->end();
 
 	// read settings if hidden file exists
-	read(".gui_auto3drun.job", is_continue);
+	read(".gui_auto3d", is_continue);
 
 }
 
@@ -3339,7 +3400,7 @@ void Auto3DJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_auto3drun.job";
+		fn=".gui_auto3d";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3406,6 +3467,11 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_auto3d";
+
 	if (openReadFile(fn, fh))
 	{
 
@@ -3830,14 +3896,14 @@ Helical rise is a positive value in Angstroms.\n\nPlease copy the refined helica
 	tab5->end();
 
 	// read settings if hidden file exists
-	read(".gui_polishrun.job", is_continue);
+	read(".gui_polish", is_continue);
 }
 
 void PolishJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_polishrun.job";
+		fn=".gui_polish";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -3864,6 +3930,11 @@ void PolishJobWindow::write(std::string fn)
 void PolishJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_polish";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -4004,7 +4075,7 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_particleselectrun.job", is_continue);
+	read(".gui_particleselect", is_continue);
 }
 
 
@@ -4013,7 +4084,7 @@ void ClassSelectJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_particleselectrun.job";
+		fn=".gui_particleselect";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4032,6 +4103,11 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_particleselect";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -4189,7 +4265,7 @@ The central part of the box contains more reliable information compared to the t
 	tab3->end();
 
 	// read settings if hidden file exists
-	read(".gui_maskcreaterun.job", is_continue);
+	read(".gui_maskcreate", is_continue);
 }
 
 
@@ -4198,7 +4274,7 @@ void MaskCreateJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_maskcreaterun.job";
+		fn=".gui_maskcreate";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4219,6 +4295,11 @@ void MaskCreateJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_maskcreate";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -4323,7 +4404,7 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	tab1->end();
 
 	// read settings if hidden file exists
-	read(".gui_joinstarrun.job", is_continue);
+	read(".gui_joinstar", is_continue);
 }
 
 
@@ -4332,7 +4413,7 @@ void JoinStarJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_joinstarrun.job";
+		fn=".gui_joinstar";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4356,6 +4437,11 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_joinstar";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -4514,7 +4600,7 @@ However, if the phases have been flipped, you should tell the program about it b
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_subtractrun.job", is_continue);
+	read(".gui_subtract", is_continue);
 }
 
 
@@ -4523,7 +4609,7 @@ void SubtractJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_subtractrun.job";
+		fn=".gui_subtract";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4543,6 +4629,11 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 {
 
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_subtract";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -4689,14 +4780,14 @@ In such cases, set this option to Yes and provide an ad-hoc filter as described 
 
 
 	// read settings if hidden file exists
-	read(".gui_postrun.job", is_continue);
+	read(".gui_post", is_continue);
 }
 
 void PostJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_postrun.job";
+		fn=".gui_post";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4716,6 +4807,11 @@ void PostJobWindow::write(std::string fn)
 void PostJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_post";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
@@ -4851,14 +4947,14 @@ Note that values larger than zero will be changed to 1 by ResMap, therefore the 
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_resmaprun.job", is_continue);
+	read(".gui_resmap", is_continue);
 }
 
 void ResmapJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmaprun.job";
+		fn=".gui_resmap";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4875,6 +4971,11 @@ void ResmapJobWindow::write(std::string fn)
 void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 {
 	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_resmap";
+
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
