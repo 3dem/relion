@@ -12,7 +12,7 @@
 #ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
 #define CUSTOM_ALLOCATOR_REGION_NAME( name ) (fprintf(stderr, "\n%s", name))
 #else
-#define CUSTOM_ALLOCATOR_REGION_NAME( name ) (name) //Do nothing
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
 #endif
 
 #ifdef DEBUG_CUDA
@@ -405,12 +405,8 @@ private:
 #endif
 	};
 
-public:
-
-	CudaCustomAllocator(size_t size, size_t alignmentSize):
-		totalSize(size), alignmentSize(alignmentSize), first(0)
+	void _setup()
 	{
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		first = new Alloc();
 
 		first->prev = NULL;
@@ -418,12 +414,35 @@ public:
 		first->size = totalSize;
 		first->free = true;
 
-		HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), size));
+		if (totalSize > 0)
+			HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), totalSize));
+	}
 
-//		pthread_mutexattr_t mutex_attr;
-//		pthread_mutexattr_init(&mutex_attr);
-//		pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
-//		int mutex_error = pthread_mutex_init(&mutex, &mutex_attr);
+	void _clear()
+	{
+		if (first->ptr != NULL)
+			DEBUG_HANDLE_ERROR(cudaFree( first->ptr ));
+
+		first->ptr = NULL;
+
+		Alloc *a = first, *nL;
+
+		while (a != NULL)
+		{
+			nL = a->next;
+			delete a;
+			a = nL;
+		}
+	}
+
+public:
+
+	CudaCustomAllocator(size_t size, size_t alignmentSize):
+		totalSize(size), alignmentSize(alignmentSize), first(0)
+	{
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
+		_setup();
+
 		int mutex_error = pthread_mutex_init(&mutex, NULL);
 
 		if (mutex_error != 0)
@@ -433,6 +452,17 @@ public:
 			raise(SIGSEGV);
 		}
 #endif
+	}
+
+	void resize(size_t size)
+	{
+		pthread_mutex_lock(&mutex);
+
+		_clear();
+		totalSize = size;
+		_setup();
+
+		pthread_mutex_unlock(&mutex);
 	}
 
 
@@ -530,16 +560,7 @@ public:
 
 		pthread_mutex_lock(&mutex);
 
-		DEBUG_HANDLE_ERROR(cudaFree( first->ptr ));
-
-		Alloc *a = first, *nL;
-
-		while (a != NULL)
-		{
-			nL = a->next;
-			delete a;
-			a = nL;
-		}
+		_clear();
 
 		pthread_mutex_unlock(&mutex);
 		pthread_mutex_destroy(&mutex);
@@ -755,6 +776,12 @@ public:
 
 	void setSize(size_t s) { size = s; };
 	size_t getSize() { return size; };
+
+
+	void setAllocator(CudaCustomAllocator *a) {
+		free_device_if_set();
+		allocator = a;
+	};
 
 	void markReadyEvent()
 	{

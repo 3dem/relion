@@ -2483,14 +2483,10 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
-	/*======================================================
-	                    CUSTOM ALLOCATOR
-	======================================================*/
-
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 	printf(" DEBUG: Custom allocator is disabled.\n");
-	allocator = new CudaCustomAllocator(0, 1);
 #else
+
 	size_t allocationSize(0);
 
 	size_t free, total;
@@ -2507,16 +2503,13 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
 		printf("  Total available size %zu MB\n", free/(1000*1000));
 		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
 	}
 
 	int memAlignmentSize;
-	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, dev_id );
+	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
+	allocator = new CudaCustomAllocator(0, memAlignmentSize);
 
-#ifdef DEBUG_CUDA
-	printf(" DEBUG: Custom allocator assigned %zu MB on device id %d.\n", allocationSize / (1000*1000), dev_id);
-#endif
-
-	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
 #endif
 };
 
@@ -2524,10 +2517,6 @@ void MlDeviceBundle::resetData()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 	HANDLE_ERROR(cudaSetDevice(device_id));
-
-	/*======================================================
-	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
-	======================================================*/
 
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
 	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
@@ -2537,10 +2526,11 @@ void MlDeviceBundle::resetData()
 
 	coarseProjectionPlans.clear();
 
-#ifdef DEBUG_CUDA
-
 	allocator->syncReadyEvents();
 	allocator->freeReadyAllocs();
+
+#ifdef DEBUG_CUDA
+
 	if (allocator->getNumberOfAllocs() != 0)
 	{
 		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
@@ -2551,12 +2541,18 @@ void MlDeviceBundle::resetData()
 
 #endif
 
-	coarseProjectionPlans.resize(nr_classes, allocator);
+	allocator->resize(0);
+
+	/*======================================================
+	              PROJECTOR AND BACKPROJECTOR
+	======================================================*/
+
+	size_t extraAllocationSpace(0);
 
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		cudaProjectors[iclass].setMdlDim(
+		extraAllocationSpace += cudaProjectors[iclass].setMdlDim(
 				baseMLO->mymodel.PPref[iclass].data.xdim,
 				baseMLO->mymodel.PPref[iclass].data.ydim,
 				baseMLO->mymodel.PPref[iclass].data.zdim,
@@ -2567,7 +2563,7 @@ void MlDeviceBundle::resetData()
 
 		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
 
-		cudaBackprojectors[iclass].setMdlDim(
+		extraAllocationSpace += cudaBackprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
 				baseMLO->wsum_model.BPref[iclass].data.ydim,
 				baseMLO->wsum_model.BPref[iclass].data.zdim,
@@ -2577,7 +2573,58 @@ void MlDeviceBundle::resetData()
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
 
 		cudaBackprojectors[iclass].initMdl();
+	}
 
+	/*======================================================
+	                    CUSTOM ALLOCATOR
+	======================================================*/
+
+	size_t allocationSize(0);
+
+	size_t free, total;
+	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+	if (baseMLO->available_gpu_memory > 0)
+		allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	else
+		allocationSize = (float)free * .7;
+
+	if (allocationSize > free)
+	{
+		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
+		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
+		printf("  Total available size %zu MB\n", free/(1000*1000));
+		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
+	}
+
+#ifdef DEBUG_CUDA
+	printf(" DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
+#endif
+
+	int actualAllocationSize = (int) allocationSize - (int) extraAllocationSpace - (int) MEMORY_OVERHEAD_MB * 1000 * 1000;
+
+	if (actualAllocationSize < 0)
+	{
+		printf("\n\nINFO: Additional Allocation Size: %d MB\n", (int) extraAllocationSpace/(1000*1000));
+		printf(    "INFO: Overhead Allocation Size:   %d MB\n", (int) MEMORY_OVERHEAD_MB);
+		printf(    "INFO: Left for Custom Allocator:  %d MB\n", (int) actualAllocationSize/(1000*1000));
+		printf("EORROR: More GPU memory is required.\n\n");
+		fflush(stdout);
+		raise(SIGSEGV);
+	}
+
+	allocator->resize(actualAllocationSize);
+
+
+	/*======================================================
+	                    PROJECTION PLAN
+	======================================================*/
+
+	coarseProjectionPlans.resize(nr_classes, allocator);
+
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
 		//If doing predefined projector plan at all and is this class significant
 		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)
 		{
