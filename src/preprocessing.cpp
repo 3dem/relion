@@ -761,7 +761,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				fn_img.compose(fn_output_img_root, my_current_nr_images + ipos + 1, "mrc");
 			else
 				fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
-			if (do_movie_extract && !MD.containsLabel(EMDL_PARTICLE_ORI_NAME))
+			if (do_movie_extract && fn_data == "")
 			{
 				FileName fn_part;
 				fn_part.compose(ipos + 1,  fn_oristack); // start image counting in stacks at 1!
@@ -985,11 +985,6 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		angpix2 = 10000. * dstep2 / mag2;
 		RFLOAT rescale_fndata = angpix2 / angpix;
 
-		// Th current rlnImageName becomes the new rlnOriginalParticleName
-		std::string name;
-		MDresult.getValue(EMDL_IMAGE_NAME, name);
-		MDresult.setValue(EMDL_PARTICLE_ORI_NAME, name);
-
 		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y));
 		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z));
 
@@ -1004,6 +999,17 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		{
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDresult)
 			{
+				// The current rlnImageName becomes the new rlnOriginalParticleName
+				FileName fn_curr_img, fnt, uniqdate;
+				long int my_nr;
+				MDresult.getValue(EMDL_IMAGE_NAME, fn_curr_img);
+				fn_curr_img.decompose(my_nr, fnt);
+				// Remove the uniqdate if present
+				size_t slashpos = findUniqueDateSubstring(fnt, uniqdate);
+				FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fnt.substr(slashpos+15) : fnt;
+				fn_curr_img.compose(my_nr, fn_nouniqdate); // fn_img = integerToString(n) + "@" + fn_exp;
+				MDresult.setValue(EMDL_PARTICLE_ORI_NAME, fn_curr_img);
+
 				if (do_contains_xy)
 				{
 					MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);

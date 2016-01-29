@@ -499,8 +499,8 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 		long int my_nr;
 		fn_curr_img.decompose(my_nr, fnt);
 		// Remove the uniqdate if present
-		size_t slashpos = findUniqueDateSubstring(fn_curr_img, uniqdate);
-		FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fn_curr_img.substr(slashpos+15) : fn_curr_img;
+		size_t slashpos = findUniqueDateSubstring(fnt, uniqdate);
+		FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fnt.substr(slashpos+15) : fnt;
 		fn_curr_img.compose(my_nr, fn_nouniqdate); // fn_img = integerToString(n) + "@" + fn_exp;
 		fn_curr_imgs.push_back(fn_curr_img);
 		fn_curr_groups.push_back(groups[group_id-1].name);
