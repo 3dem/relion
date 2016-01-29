@@ -211,6 +211,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CUDA_CPU_TIC("selfTranslate");
 
+		/* FIXME :  For some reason the device-allocation inside "selfTranslate" takes a much longer time than expected.
+		 * 			I tried moving it up and placing the size under a bunch of if()-cases, but this simply transferred the
+		 * 			allocation-cost to that region. /BjoernF,160129
+		 */
+
 		// Apply (rounded) old offsets first
 		my_old_offset.selfROUND();
 
@@ -240,7 +245,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TOC("norm_corr");
 		}
 
-		CUDA_CPU_TIC("kenrel_translate");
+		CUDA_CPU_TIC("kernel_translate");
 		cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
 								~temp,  // translate from temp...
 								~d_img, // ... into d_img
@@ -249,7 +254,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 								img.data.ydim,
 								XX(my_old_offset),
 								YY(my_old_offset));
-		CUDA_CPU_TOC("kenrel_translate");
+		CUDA_CPU_TOC("kernel_translate");
 //		d_img.cp_to_host();
 //		d_img.streamSync();
 //		for (int i=0; i<img_size; i++)
@@ -540,35 +545,31 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 			else
 			{
-				CudaGlobalPtr<XFLOAT> dev_spectrum(baseMLO->mymodel.ori_size/2 + 1,0,cudaMLO->devBundle->allocator);
-				CudaGlobalPtr<XFLOAT> dev_Xi2(1, 0, cudaMLO->devBundle->allocator);
-				dev_spectrum.device_alloc();
-				dev_spectrum.device_init(0);
-				dev_Xi2.device_alloc();
-				dev_Xi2.device_init(0);
-				dev_spectrum.streamSync();
+				CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
+				spectrumAndXi2.device_alloc();
+				spectrumAndXi2.device_init(0);
+				spectrumAndXi2.streamSync();
 
 				dim3 gridSize = CEIL((float)(cudaMLO->transformer2.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
 				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
 						~cudaMLO->transformer2.fouriers,
-						~dev_spectrum,
+						~spectrumAndXi2,
 						cudaMLO->transformer2.fouriers.getSize(),
-						dev_spectrum.getSize(),
+						spectrumAndXi2.getSize()-1,
 						cudaMLO->transformer2.xFSize,
 						cudaMLO->transformer2.yFSize,
-						(baseMLO->mymodel.current_size/2)+1,
-						~dev_Xi2);
+						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 
-				dev_spectrum.streamSync();
-				dev_spectrum.cp_to_host();
-				dev_Xi2.cp_to_host();
-				dev_spectrum.streamSync();
+				spectrumAndXi2.streamSync();
+				spectrumAndXi2.cp_to_host();
+				spectrumAndXi2.streamSync();
 
 				op.power_imgs.at(ipart).resize(baseMLO->mymodel.ori_size/2 + 1);
 
-				for (int i = 0; i < baseMLO->mymodel.ori_size/2 + 1; i ++)
-					op.power_imgs.at(ipart).data[i] = dev_spectrum[i];
-				op.highres_Xi2_imgs.at(ipart) = dev_Xi2[0];
+				for (int i = 0; i<(spectrumAndXi2.getSize()-1); i ++)
+					op.power_imgs.at(ipart).data[i] = spectrumAndXi2[i];
+				op.highres_Xi2_imgs.at(ipart) = spectrumAndXi2[spectrumAndXi2.getSize()-1];
 			}
 		}
 		else
