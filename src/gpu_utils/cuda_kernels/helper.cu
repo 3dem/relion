@@ -306,6 +306,60 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 		}
 }
 
+__global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
+											XFLOAT * g_spectrum,
+											int image_size,
+											int spectrum_size,
+											int xdim,
+											int ydim,
+											int res_limit,
+											XFLOAT * g_highres_Xi2)
+{
+	int tid = threadIdx.x;
+	int bid =  blockIdx.x;
+	unsigned pass_num(ceilfracf(image_size,POWERCLASS_BLOCK_SIZE));
+
+	XFLOAT normFaux;
+	__shared__ XFLOAT s_highres_Xi2[POWERCLASS_BLOCK_SIZE];
+	s_highres_Xi2[tid] = (XFLOAT)0.;
+
+	int x,y,xp,yp;
+	int pixel=tid + bid*POWERCLASS_BLOCK_SIZE;
+
+	if(pixel<image_size)
+	{
+		x = pixel % xdim;
+		y = (pixel-x) / (xdim);
+
+		xp = x;
+		yp = ((y<xdim) ? y : y-ydim);
+#if defined(CUDA_DOUBLE_PRECISION)
+		int ires = __double2int_rn(sqrt((XFLOAT)(xp*xp + yp*yp)));
+#else
+		int ires = __float2int_rn(sqrtf((XFLOAT)(xp*xp + yp*yp)));
+#endif
+		if((ires>0.f) && (ires<spectrum_size) && !(xp==0 && yp<0.f))
+		{
+			normFaux = g_image[pixel].x*g_image[pixel].x + g_image[pixel].y*g_image[pixel].y;
+			cuda_atomic_add(&g_spectrum[ires], normFaux);
+			if(ires>=res_limit)
+				s_highres_Xi2[tid] = normFaux;
+		}
+	}
+
+	// Reduce the higres_Xi2-values for all threads. (I tried a straight atomic-write: for 128 threads it was ~3x slower)
+	__syncthreads();
+	for(int j=(POWERCLASS_BLOCK_SIZE/2); j>0.f; j/=2)
+	{
+		if(tid<j)
+			s_highres_Xi2[tid] += s_highres_Xi2[tid+j];
+		__syncthreads();
+	}
+	if(tid==0)
+		cuda_atomic_add(&g_highres_Xi2[0], s_highres_Xi2[0]);
+
+}
+
 __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 int image_size,
 										 int xdim,

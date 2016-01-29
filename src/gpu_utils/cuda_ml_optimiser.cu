@@ -431,44 +431,83 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CUDA_CPU_TOC("transform");
 
-		CUDA_CPU_TIC("cpResults");
-		cudaMLO->transformer2.fouriers.cp_to_host();
-		cudaMLO->transformer2.fouriers.streamSync();
+		bool powerClassOnGPU(true); //keep it like this until stable
 
-		Faux.initZeros(img().ydim, img().xdim/2+1);
-		for (int i = 0; i < Faux.nzyxdim; i ++)
+		if(!powerClassOnGPU)
 		{
-			Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
-			Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
-		}
-		CUDA_CPU_TOC("cpResults");
+			CUDA_CPU_TIC("cpResults");
+			cudaMLO->transformer2.fouriers.cp_to_host();
+			cudaMLO->transformer2.fouriers.streamSync();
 
+			Faux.initZeros(img().ydim, img().xdim/2+1);
+			for (int i = 0; i < Faux.nzyxdim; i ++)
+			{
+				Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
+				Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
+			}
+			CUDA_CPU_TOC("cpResults");
+		}
 
 		CUDA_CPU_TIC("powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			MultidimArray<RFLOAT> spectrum;
-			spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
-			RFLOAT highres_Xi2 = 0.;
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+			if(!powerClassOnGPU)
 			{
-				int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
-				// Skip Hermitian pairs in the x==0 column
-
-				if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
+				MultidimArray<RFLOAT> spectrum;
+				spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
+				RFLOAT highres_Xi2 = 0.;
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 				{
-					RFLOAT normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
-					DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
-					// Store sumXi2 from current_size until ori_size
-					if (ires >= baseMLO->mymodel.current_size/2 + 1)
-						highres_Xi2 += normFaux;
-				}
-			}
+					int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
+					// Skip Hermitian pairs in the x==0 column
 
-			// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
-			op.power_imgs.at(ipart) = spectrum;
-			op.highres_Xi2_imgs.at(ipart) = highres_Xi2;
+					if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
+					{
+						RFLOAT normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
+						DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
+						// Store sumXi2 from current_size until ori_size
+						if (ires >= baseMLO->mymodel.current_size/2 + 1)
+							highres_Xi2 += normFaux;
+					}
+				}
+
+				// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
+				op.power_imgs.at(ipart) = spectrum;
+				op.highres_Xi2_imgs.at(ipart) = highres_Xi2;
+			}
+			else
+			{
+				CudaGlobalPtr<XFLOAT> dev_spectrum(baseMLO->mymodel.ori_size/2 + 1,0,cudaMLO->devBundle->allocator);
+				CudaGlobalPtr<XFLOAT> dev_Xi2(1, 0, cudaMLO->devBundle->allocator);
+				dev_spectrum.device_alloc();
+				dev_spectrum.device_init(0);
+				dev_Xi2.device_alloc();
+				dev_Xi2.device_init(0);
+				dev_spectrum.streamSync();
+
+				dim3 gridSize = CEIL((float)(cudaMLO->transformer2.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
+				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+						~cudaMLO->transformer2.fouriers,
+						~dev_spectrum,
+						cudaMLO->transformer2.fouriers.getSize(),
+						dev_spectrum.getSize(),
+						cudaMLO->transformer2.xFSize,
+						cudaMLO->transformer2.yFSize,
+						(baseMLO->mymodel.current_size/2)+1,
+						~dev_Xi2);
+
+				dev_spectrum.streamSync();
+				dev_spectrum.cp_to_host();
+				dev_Xi2.cp_to_host();
+				dev_spectrum.streamSync();
+
+				op.power_imgs.at(ipart).resize(baseMLO->mymodel.ori_size/2 + 1);
+
+				for (int i = 0; i < baseMLO->mymodel.ori_size/2 + 1; i ++)
+					op.power_imgs.at(ipart).data[i] = dev_spectrum[i];
+				op.highres_Xi2_imgs.at(ipart) = dev_Xi2[0];
+			}
 		}
 		else
 		{
@@ -478,12 +517,28 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		CUDA_CPU_TIC("windowFourierTransform2");
-		windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		windowFourierTransform2(
+				cudaMLO->transformer2.fouriers,
+				d_Fimg,
+				(int)cudaMLO->transformer2.xFSize,(int)cudaMLO->transformer2.yFSize, 1, //Input dimensions
+				(int)current_size_x, (int)current_size_y, 1  //Output dimensions
+				);
 		CUDA_CPU_TOC("windowFourierTransform2");
 		// Also store its CTF
 		CUDA_CPU_TIC("ctfCorr");
-		Fctf.resize(Fimg);
+		CUDA_CPU_TIC("cpFimg2Host_2");
+		d_Fimg.streamSync();
+		d_Fimg.cp_to_host();
+		d_Fimg.streamSync();
+		for (int i = 0; i < Fimg.nzyxdim; i ++)
+		{
+			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
+			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
+		}
+		CUDA_CPU_TOC("cpFimg2Host_2");
 
+		Fctf.resize(Fimg);
 		// Now calculate the actual CTF
 		if (baseMLO->do_ctf_correction)
 		{
