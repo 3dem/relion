@@ -209,15 +209,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TOC("setXmippOrigin");
 		}
 
-		// Apply the norm_correction term
-		CUDA_CPU_TIC("normCorr");
-		if (baseMLO->do_norm_correction)
-		{
-			img() *=baseMLO->mymodel.avg_norm_correction / normcorr;
-		}
-		CUDA_CPU_TOC("normCorr");
-
 		CUDA_CPU_TIC("selfTranslate");
+
 		// Apply (rounded) old offsets first
 		my_old_offset.selfROUND();
 
@@ -227,12 +220,27 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		d_img.device_alloc();
 		temp.device_alloc();
 		d_img.device_init(0);
+
 		for (int i=0; i<img_size; i++)
 			temp[i] = img.data.data[i];
+
 		temp.cp_to_device();
 		temp.streamSync();
 
 		int STBsize = ( (int) ceilf(( float)img_size /(float)BLOCK_SIZE));
+		// Apply the norm_correction term
+		if (baseMLO->do_norm_correction)
+		{
+			CUDA_CPU_TIC("norm_corr");
+			cuda_kernel_multi<<<STBsize,BLOCK_SIZE>>>(
+									~temp,
+									(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr),
+									img_size);
+			temp.streamSync();
+			CUDA_CPU_TOC("norm_corr");
+		}
+
+		CUDA_CPU_TIC("kenrel_translate");
 		cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
 								~temp,  // translate from temp...
 								~d_img, // ... into d_img
@@ -241,17 +249,17 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 								img.data.ydim,
 								XX(my_old_offset),
 								YY(my_old_offset));
-
-		d_img.cp_to_host();
-		d_img.streamSync();
-		for (int i=0; i<img_size; i++)
-			img.data.data[i] = d_img[i];
+		CUDA_CPU_TOC("kenrel_translate");
+//		d_img.cp_to_host();
+//		d_img.streamSync();
+//		for (int i=0; i<img_size; i++)
+//			img.data.data[i] = d_img[i];
 
 //		selfTranslate(img(), my_old_offset, DONT_WRAP);
-		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) //rec_img is NOT norm_corrected in the CPU-code, so nor do we.
 		{
 			for (int i=0; i<img_size; i++)
-				temp[i] = img.data.data[i];
+				temp[i] = rec_img.data.data[i];
 			temp.cp_to_device();
 			temp.streamSync();
 			cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
@@ -263,33 +271,35 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 											XX(my_old_offset),
 											YY(my_old_offset));
 
-			d_img.cp_to_host();
-			d_img.streamSync();
-
-			for (int i=0; i<img_size; i++)
-				rec_img.data.data[i] = d_img[i];
+//			d_img.cp_to_host();
+//			d_img.streamSync();
+//
+//			for (int i=0; i<img_size; i++)
+//				rec_img.data.data[i] = d_img[i];
 //			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
 		}
 
 		op.old_offset[ipart] = my_old_offset;
 		// Also store priors on translations
 		op.prior[ipart] = my_prior;
+
 		CUDA_CPU_TOC("selfTranslate");
 
-		// Always store FT of image without mask (to be used for the reconstruction)
-		MultidimArray<RFLOAT> img_aux;
-		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
+//		// Always store FT of image without mask (to be used for the reconstruction)
+//		MultidimArray<RFLOAT> img_aux;
+//		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 
 		CUDA_CPU_TIC("calcFimg");
 		unsigned current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		unsigned current_size_y = baseMLO->mymodel.current_size;
 
-		cudaMLO->transformer1.setSize(img_aux.xdim,img_aux.ydim);
+		cudaMLO->transformer1.setSize(img().xdim,img().ydim);
 
-		for (int i = 0; i < img_aux.nzyxdim; i ++)
-			cudaMLO->transformer1.reals[i] = (XFLOAT) img_aux.data[i];
-
-		cudaMLO->transformer1.reals.cp_to_device();
+		d_img.cp_on_device(cudaMLO->transformer1.reals);
+//		for (int i = 0; i < img_aux.nzyxdim; i ++)
+//			cudaMLO->transformer1.reals[i] = (XFLOAT) img_aux.data[i];
+//
+//		cudaMLO->transformer1.reals.cp_to_device();
 
 		runCenterFFT(
 				cudaMLO->transformer1.reals,
@@ -311,10 +321,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		windowFourierTransform2(
 				cudaMLO->transformer1.fouriers,
 				d_Fimg,
-				img_aux.xdim/2+1,img_aux.ydim, 1, //Input dimensions
+				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
 				current_size_x, current_size_y, 1 //Output dimensions
 				);
-
 		CUDA_CPU_TOC("calcFimg");
 
 		CUDA_CPU_TIC("cpFimg2Host");
@@ -396,6 +405,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TOC("setXmippOrigin");
 
 			CUDA_CPU_TIC("softMaskOutsideMap");
+			d_img.cp_to_host();
+			d_img.streamSync();
+			for (int i=0; i<img_size; i++)
+				img.data.data[i] = d_img[i];
 			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
 			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
@@ -413,14 +426,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			bool do_softmaskOnGpu = true;
 			if(do_softmaskOnGpu)
 			{
-				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
-				dev_img.device_alloc();
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-					dev_img[n]=(XFLOAT)img.data.data[n];
-
-				dev_img.cp_to_device();
+//				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
+//				dev_img.device_alloc();
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+//					dev_img[n]=(XFLOAT)img.data.data[n];
+//
+//				dev_img.cp_to_device();
 				dim3 block_dim = 1; //TODO
-				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~dev_img,
+				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
 																					img().nzyxdim,
 																					img.data.xdim,
 																					img.data.ydim,
@@ -433,12 +446,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																					radius_p,
 																					cosine_width);
 
-				dev_img.cp_to_host();
+				d_img.cp_to_host();
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 				{
-					img.data.data[n]=(RFLOAT)dev_img[n];
+					img.data.data[n]=(RFLOAT)d_img[n];
 				}
 			}
 			else
@@ -453,14 +466,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		CUDA_CPU_TOC("zeroMask");
 
+		CUDA_CPU_TIC("setSize");
+		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
+		CUDA_CPU_TOC("setSize");
 
 		CUDA_CPU_TIC("transform");
-		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
 
-		for (int i = 0; i < img().nzyxdim; i ++)
-			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
-
-		cudaMLO->transformer2.reals.cp_to_device();
+		d_img.cp_on_device(cudaMLO->transformer2.reals);
+//		for (int i = 0; i < img().nzyxdim; i ++)
+//			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
+//		cudaMLO->transformer2.reals.cp_to_device();
 
 		runCenterFFT(
 				cudaMLO->transformer2.reals,
