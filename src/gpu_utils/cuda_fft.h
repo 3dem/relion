@@ -50,6 +50,36 @@ public:
 		CFallocator(allocator)
 	{};
 
+	long int estimate(int batch)
+	{
+		long int needed;
+
+	    int idist = ySize*xSize;
+	    int odist = ySize*(xSize/2+1);
+
+	    int inembed[] = {ySize, xSize};
+	    int onembed[] = {ySize, xSize/2+1};
+
+	    int istride = 1;
+	    int ostride = 1;
+
+	    int nR[2] = {ySize, xSize};
+	    size_t biggness;
+
+#ifdef CUDA_DOUBLE_PRECISION
+		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batch, &biggness));
+		needed = (long int)biggness;
+		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batch, &biggness));
+		needed += (long int)biggness;
+#else
+		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batch, &biggness));
+		needed = (long int)biggness;
+		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
+		needed += (long int)biggness;
+#endif
+		return needed;
+	}
+
 	void setSize(size_t x, size_t y, int batch = 1)
 	{
 		if (x == xSize && y == ySize && batch == batchSize[0] && planSet)
@@ -165,36 +195,6 @@ public:
 //		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward,  2, nC, 0,0,0,0,0,0, CUFFT_C2R, batchSize));
 
 		planSet = true;
-	}
-
-	long int estimate(int batch)
-	{
-		long int needed;
-
-	    int idist = ySize*xSize;
-	    int odist = ySize*(xSize/2+1);
-
-	    int inembed[] = {ySize, xSize};
-	    int onembed[] = {ySize, xSize/2+1};
-
-	    int istride = 1;
-	    int ostride = 1;
-
-	    int nR[2] = {ySize, xSize};
-	    size_t biggness;
-
-#ifdef CUDA_DOUBLE_PRECISION
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batch, &biggness));
-		needed = (long int)biggness;
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batch, &biggness));
-		needed += (long int)biggness;
-#else
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batch, &biggness));
-		needed = (long int)biggness;
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
-		needed += (long int)biggness;
-#endif
-		return needed;
 	}
 
 	void forward()

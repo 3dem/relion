@@ -23,19 +23,19 @@
 									// its ceil:ed multiple exceeding imagesize by too much.
 
 
-#define D2C_BLOCK_SIZE_3D 128
-#define D2C_BLOCK_SIZE_2D 512
+#define D2C_BLOCK_SIZE_3D 		128
+#define D2C_BLOCK_SIZE_2D 		512
 #define D2C_EULERS_PER_BLOCK_3D 16
 #define D2C_EULERS_PER_BLOCK_2D 4
 
 
-#define WAVG_BLOCK_SIZE 256
-#define SUMW_BLOCK_SIZE 32
-#define SOFTMASK_BLOCK_SIZE 1024
-#define CFTT_BLOCK_SIZE 128
-#define PROBRATIO_BLOCK_SIZE 128
-
-#define PROJDIFF_CHUNK_SIZE 14
+#define WAVG_BLOCK_SIZE 	 	256
+#define SUMW_BLOCK_SIZE 	  	32
+#define SOFTMASK_BLOCK_SIZE 	1024
+#define CFTT_BLOCK_SIZE 	 	128
+#define PROBRATIO_BLOCK_SIZE 	128
+#define POWERCLASS_BLOCK_SIZE 	128
+#define PROJDIFF_CHUNK_SIZE 	14
 
 #define REF_GROUP_SIZE 3			// -- Number of references to be treated per block --
 									// This applies to wavg and reduces global memory
@@ -44,5 +44,8 @@
 									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE XFLOATS. // DEPRECATED
 
 #define NR_CLASS_MUTEXES 5
+
+//The approximate minimum amount of memory each process occupies on a device (in MBs)
+#define MEMORY_OVERHEAD_MB 200
 
 #endif /* CUDA_SETTINGS_H_ */

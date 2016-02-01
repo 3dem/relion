@@ -13,6 +13,8 @@ class CudaBackprojector
 	    maxR, maxR2,
 	    padding_factor;
 
+	size_t allocaton_size;
+
 	XFLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
 
 	cudaStream_t stream;
@@ -24,11 +26,12 @@ public:
 				mdlInitY(0), mdlInitZ(0),
 				maxR(0), maxR2(0),
 				padding_factor(0),
+				allocaton_size(0),
 				d_mdlReal(NULL), d_mdlImag(NULL), d_mdlWeight(NULL),
 				stream(0)
 	{}
 
-	void setMdlDim(
+	size_t setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, int paddingFactor);

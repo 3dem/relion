@@ -17,6 +17,7 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#include <cuda_runtime.h>
 #include "src/autopicker.h"
 #include "src/gpu_utils/cuda_autopicker.h"
 //#define DEBUG
@@ -39,6 +40,7 @@ void AutoPicker::read(int argc, char **argv)
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 
 	int ref_section = parser.addSection("References options");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
@@ -308,7 +310,7 @@ void AutoPicker::initialise()
 			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
 	}
 
-	printf("workSize = %d, corresponding to a resolution of %g for these settings.", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
+	printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
 
 	if (min_particle_distance < 0)
 	{
@@ -400,13 +402,30 @@ void AutoPicker::initialise()
 
 		}
 	}
-	if (do_gpu)
-		cudaPicker = (void*) new AutoPickerCuda(this, 0);
 
 #ifdef DEBUG
 	std::cerr << "Finishing initialise" << std::endl;
 #endif
 
+}
+int AutoPicker::deviceInitialise()
+{
+	int devCount;
+	cudaGetDeviceCount(&devCount);
+
+	std::vector < std::vector < std::string > > allThreadIDs;
+	untangleDeviceIDs(gpu_ids, allThreadIDs);
+
+	// Sequential initialisation of GPUs on all ranks
+	int dev_id;
+	if (!std::isdigit(*gpu_ids.begin()))
+		dev_id = 0;
+	else
+		dev_id = textToInteger((allThreadIDs[0][0]).c_str());
+
+	std::cout << " Using device " << dev_id << std::endl;
+
+	return(dev_id);
 }
 
 void AutoPicker::run()
@@ -2235,4 +2254,37 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 
 }
 
+void AutoPicker::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
+{
+	// Handle GPU (device) assignments for each rank, if speficied
+	size_t pos = 0;
+	std::string delim = ":";
+	std::vector < std::string > allRankIDs;
+	std::string thisRankIDs, thisThreadID;
+	while ((pos = tangled.find(delim)) != std::string::npos)
+	{
+		thisRankIDs = tangled.substr(0, pos);
+//		    std::cout << "in loop " << thisRankIDs << std::endl;
+		tangled.erase(0, pos + delim.length());
+		allRankIDs.push_back(thisRankIDs);
+	}
+	allRankIDs.push_back(tangled);
+
+	untangled.resize(allRankIDs.size());
+	//Now handle the thread assignements in each rank
+	for (int i = 0; i < allRankIDs.size(); i++)
+	{
+		pos=0;
+		delim = ",";
+//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
+		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
+		{
+			thisThreadID = allRankIDs[i].substr(0, pos);
+//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
+			allRankIDs[i].erase(0, pos + delim.length());
+			untangled[i].push_back(thisThreadID);
+		}
+		untangled[i].push_back(allRankIDs[i]);
+	}
+}
 
