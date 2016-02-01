@@ -840,6 +840,15 @@ public:
 	// Get metadata array of a subset of particles from the experimental model
 	void getMetaAndImageDataSubset(int first_ori_particle_id, int last_ori_particle_id, bool do_also_imagedata = true);
 
+	/*
+	 * Takes a string with device-indices which is
+	 *  	: delimited for ranks
+	 *  	, delimited for threads within each rank
+	 * and outputs a rank-major array which supplies
+	 * a mapping as input for distribution of ranks
+	 * and threads over the availiable/specfied GPUs.
+	 */
+	void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled);
 };
 
 // Global call to threaded core of doThreadExpectationSomeParticles

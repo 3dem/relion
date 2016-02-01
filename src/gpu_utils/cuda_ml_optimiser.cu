@@ -209,40 +209,102 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TOC("setXmippOrigin");
 		}
 
-		// Apply the norm_correction term
-		CUDA_CPU_TIC("normCorr");
-		if (baseMLO->do_norm_correction)
-		{
-			img() *=baseMLO->mymodel.avg_norm_correction / normcorr;
-		}
-		CUDA_CPU_TOC("normCorr");
-
 		CUDA_CPU_TIC("selfTranslate");
+
+		/* FIXME :  For some reason the device-allocation inside "selfTranslate" takes a much longer time than expected.
+		 * 			I tried moving it up and placing the size under a bunch of if()-cases, but this simply transferred the
+		 * 			allocation-cost to that region. /BjoernF,160129
+		 */
+
 		// Apply (rounded) old offsets first
 		my_old_offset.selfROUND();
-		selfTranslate(img(), my_old_offset, DONT_WRAP);
-		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
-			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+
+		int img_size = img.data.nzyxdim;
+		CudaGlobalPtr<XFLOAT> d_img(img_size,0,cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> temp(img_size,0,cudaMLO->devBundle->allocator);
+		d_img.device_alloc();
+		temp.device_alloc();
+		d_img.device_init(0);
+
+		for (int i=0; i<img_size; i++)
+			temp[i] = img.data.data[i];
+
+		temp.cp_to_device();
+		temp.streamSync();
+
+		int STBsize = ( (int) ceilf(( float)img_size /(float)BLOCK_SIZE));
+		// Apply the norm_correction term
+		if (baseMLO->do_norm_correction)
+		{
+			CUDA_CPU_TIC("norm_corr");
+			cuda_kernel_multi<<<STBsize,BLOCK_SIZE>>>(
+									~temp,
+									(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr),
+									img_size);
+			temp.streamSync();
+			CUDA_CPU_TOC("norm_corr");
+		}
+
+		CUDA_CPU_TIC("kernel_translate");
+		cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
+								~temp,  // translate from temp...
+								~d_img, // ... into d_img
+								img_size,
+								img.data.xdim,
+								img.data.ydim,
+								XX(my_old_offset),
+								YY(my_old_offset));
+		CUDA_CPU_TOC("kernel_translate");
+//		d_img.cp_to_host();
+//		d_img.streamSync();
+//		for (int i=0; i<img_size; i++)
+//			img.data.data[i] = d_img[i];
+
+//		selfTranslate(img(), my_old_offset, DONT_WRAP);
+		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) //rec_img is NOT norm_corrected in the CPU-code, so nor do we.
+		{
+			for (int i=0; i<img_size; i++)
+				temp[i] = rec_img.data.data[i];
+			temp.cp_to_device();
+			temp.streamSync();
+			cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
+											~temp,  // translate from temp...
+											~d_img, // ... into d_img
+											img_size,
+											img.data.xdim,
+											img.data.ydim,
+											XX(my_old_offset),
+											YY(my_old_offset));
+
+//			d_img.cp_to_host();
+//			d_img.streamSync();
+//
+//			for (int i=0; i<img_size; i++)
+//				rec_img.data.data[i] = d_img[i];
+//			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+		}
 
 		op.old_offset[ipart] = my_old_offset;
 		// Also store priors on translations
 		op.prior[ipart] = my_prior;
+
 		CUDA_CPU_TOC("selfTranslate");
 
-		// Always store FT of image without mask (to be used for the reconstruction)
-		MultidimArray<RFLOAT> img_aux;
-		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
+//		// Always store FT of image without mask (to be used for the reconstruction)
+//		MultidimArray<RFLOAT> img_aux;
+//		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 
 		CUDA_CPU_TIC("calcFimg");
 		unsigned current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		unsigned current_size_y = baseMLO->mymodel.current_size;
 
-		cudaMLO->transformer1.setSize(img_aux.xdim,img_aux.ydim);
+		cudaMLO->transformer1.setSize(img().xdim,img().ydim);
 
-		for (int i = 0; i < img_aux.nzyxdim; i ++)
-			cudaMLO->transformer1.reals[i] = (XFLOAT) img_aux.data[i];
-
-		cudaMLO->transformer1.reals.cp_to_device();
+		d_img.cp_on_device(cudaMLO->transformer1.reals);
+//		for (int i = 0; i < img_aux.nzyxdim; i ++)
+//			cudaMLO->transformer1.reals[i] = (XFLOAT) img_aux.data[i];
+//
+//		cudaMLO->transformer1.reals.cp_to_device();
 
 		runCenterFFT(
 				cudaMLO->transformer1.reals,
@@ -258,16 +320,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
 						cudaMLO->transformer1.fouriers.getSize()*2);
 
-		CudaGlobalPtr<cufftComplex> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
 		d_Fimg.device_alloc();
 
 		windowFourierTransform2(
 				cudaMLO->transformer1.fouriers,
 				d_Fimg,
-				img_aux.xdim/2+1,img_aux.ydim, 1, //Input dimensions
+				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
 				current_size_x, current_size_y, 1 //Output dimensions
 				);
-
 		CUDA_CPU_TOC("calcFimg");
 
 		CUDA_CPU_TIC("cpFimg2Host");
@@ -349,6 +410,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CUDA_CPU_TOC("setXmippOrigin");
 
 			CUDA_CPU_TIC("softMaskOutsideMap");
+			d_img.cp_to_host();
+			d_img.streamSync();
+			for (int i=0; i<img_size; i++)
+				img.data.data[i] = d_img[i];
 			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
 			CUDA_CPU_TOC("softMaskOutsideMap");
 		}
@@ -366,14 +431,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			bool do_softmaskOnGpu = true;
 			if(do_softmaskOnGpu)
 			{
-				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
-				dev_img.device_alloc();
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-					dev_img[n]=(XFLOAT)img.data.data[n];
-
-				dev_img.cp_to_device();
+//				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
+//				dev_img.device_alloc();
+//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+//					dev_img[n]=(XFLOAT)img.data.data[n];
+//
+//				dev_img.cp_to_device();
 				dim3 block_dim = 1; //TODO
-				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~dev_img,
+				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
 																					img().nzyxdim,
 																					img.data.xdim,
 																					img.data.ydim,
@@ -386,12 +451,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																					radius_p,
 																					cosine_width);
 
-				dev_img.cp_to_host();
+				d_img.cp_to_host();
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 				{
-					img.data.data[n]=(RFLOAT)dev_img[n];
+					img.data.data[n]=(RFLOAT)d_img[n];
 				}
 			}
 			else
@@ -406,14 +471,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		CUDA_CPU_TOC("zeroMask");
 
+		CUDA_CPU_TIC("setSize");
+		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
+		CUDA_CPU_TOC("setSize");
 
 		CUDA_CPU_TIC("transform");
-		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
 
-		for (int i = 0; i < img().nzyxdim; i ++)
-			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
-
-		cudaMLO->transformer2.reals.cp_to_device();
+		d_img.cp_on_device(cudaMLO->transformer2.reals);
+//		for (int i = 0; i < img().nzyxdim; i ++)
+//			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
+//		cudaMLO->transformer2.reals.cp_to_device();
 
 		runCenterFFT(
 				cudaMLO->transformer2.reals,
@@ -431,44 +498,79 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CUDA_CPU_TOC("transform");
 
-		CUDA_CPU_TIC("cpResults");
-		cudaMLO->transformer2.fouriers.cp_to_host();
-		cudaMLO->transformer2.fouriers.streamSync();
+		bool powerClassOnGPU(true); //keep it like this until stable
 
-		Faux.initZeros(img().ydim, img().xdim/2+1);
-		for (int i = 0; i < Faux.nzyxdim; i ++)
+		if(!powerClassOnGPU)
 		{
-			Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
-			Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
-		}
-		CUDA_CPU_TOC("cpResults");
+			CUDA_CPU_TIC("cpResults");
+			cudaMLO->transformer2.fouriers.cp_to_host();
+			cudaMLO->transformer2.fouriers.streamSync();
 
+			Faux.initZeros(img().ydim, img().xdim/2+1);
+			for (int i = 0; i < Faux.nzyxdim; i ++)
+			{
+				Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
+				Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
+			}
+			CUDA_CPU_TOC("cpResults");
+		}
 
 		CUDA_CPU_TIC("powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			MultidimArray<RFLOAT> spectrum;
-			spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
-			RFLOAT highres_Xi2 = 0.;
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+			if(!powerClassOnGPU)
 			{
-				int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
-				// Skip Hermitian pairs in the x==0 column
-
-				if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
+				MultidimArray<RFLOAT> spectrum;
+				spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
+				RFLOAT highres_Xi2 = 0.;
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 				{
-					RFLOAT normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
-					DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
-					// Store sumXi2 from current_size until ori_size
-					if (ires >= baseMLO->mymodel.current_size/2 + 1)
-						highres_Xi2 += normFaux;
-				}
-			}
+					int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
+					// Skip Hermitian pairs in the x==0 column
 
-			// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
-			op.power_imgs.at(ipart) = spectrum;
-			op.highres_Xi2_imgs.at(ipart) = highres_Xi2;
+					if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
+					{
+						RFLOAT normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
+						DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
+						// Store sumXi2 from current_size until ori_size
+						if (ires >= baseMLO->mymodel.current_size/2 + 1)
+							highres_Xi2 += normFaux;
+					}
+				}
+
+				// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
+				op.power_imgs.at(ipart) = spectrum;
+				op.highres_Xi2_imgs.at(ipart) = highres_Xi2;
+			}
+			else
+			{
+				CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
+				spectrumAndXi2.device_alloc();
+				spectrumAndXi2.device_init(0);
+				spectrumAndXi2.streamSync();
+
+				dim3 gridSize = CEIL((float)(cudaMLO->transformer2.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
+				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+						~cudaMLO->transformer2.fouriers,
+						~spectrumAndXi2,
+						cudaMLO->transformer2.fouriers.getSize(),
+						spectrumAndXi2.getSize()-1,
+						cudaMLO->transformer2.xFSize,
+						cudaMLO->transformer2.yFSize,
+						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+
+				spectrumAndXi2.streamSync();
+				spectrumAndXi2.cp_to_host();
+				spectrumAndXi2.streamSync();
+
+				op.power_imgs.at(ipart).resize(baseMLO->mymodel.ori_size/2 + 1);
+
+				for (int i = 0; i<(spectrumAndXi2.getSize()-1); i ++)
+					op.power_imgs.at(ipart).data[i] = spectrumAndXi2[i];
+				op.highres_Xi2_imgs.at(ipart) = spectrumAndXi2[spectrumAndXi2.getSize()-1];
+			}
 		}
 		else
 		{
@@ -478,12 +580,28 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		CUDA_CPU_TIC("windowFourierTransform2");
-		windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		windowFourierTransform2(
+				cudaMLO->transformer2.fouriers,
+				d_Fimg,
+				(int)cudaMLO->transformer2.xFSize,(int)cudaMLO->transformer2.yFSize, 1, //Input dimensions
+				(int)current_size_x, (int)current_size_y, 1  //Output dimensions
+				);
 		CUDA_CPU_TOC("windowFourierTransform2");
 		// Also store its CTF
 		CUDA_CPU_TIC("ctfCorr");
-		Fctf.resize(Fimg);
+		CUDA_CPU_TIC("cpFimg2Host_2");
+		d_Fimg.streamSync();
+		d_Fimg.cp_to_host();
+		d_Fimg.streamSync();
+		for (int i = 0; i < Fimg.nzyxdim; i ++)
+		{
+			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
+			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
+		}
+		CUDA_CPU_TOC("cpFimg2Host_2");
 
+		Fctf.resize(Fimg);
 		// Now calculate the actual CTF
 		if (baseMLO->do_ctf_correction)
 		{
@@ -2365,14 +2483,10 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
-	/*======================================================
-	                    CUSTOM ALLOCATOR
-	======================================================*/
-
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 	printf(" DEBUG: Custom allocator is disabled.\n");
-	allocator = new CudaCustomAllocator(0, 1);
 #else
+
 	size_t allocationSize(0);
 
 	size_t free, total;
@@ -2389,16 +2503,13 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
 		printf("  Total available size %zu MB\n", free/(1000*1000));
 		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
 	}
 
 	int memAlignmentSize;
-	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, dev_id );
+	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
+	allocator = new CudaCustomAllocator(0, memAlignmentSize);
 
-#ifdef DEBUG_CUDA
-	printf(" DEBUG: Custom allocator assigned %zu MB on device id %d.\n", allocationSize / (1000*1000), dev_id);
-#endif
-
-	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
 #endif
 };
 
@@ -2406,10 +2517,6 @@ void MlDeviceBundle::resetData()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 	HANDLE_ERROR(cudaSetDevice(device_id));
-
-	/*======================================================
-	   PROJECTOR, PROJECTOR PLAN AND BACKPROJECTOR SETUP
-	======================================================*/
 
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
 	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
@@ -2419,10 +2526,11 @@ void MlDeviceBundle::resetData()
 
 	coarseProjectionPlans.clear();
 
-#ifdef DEBUG_CUDA
-
 	allocator->syncReadyEvents();
 	allocator->freeReadyAllocs();
+
+#ifdef DEBUG_CUDA
+
 	if (allocator->getNumberOfAllocs() != 0)
 	{
 		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
@@ -2433,12 +2541,18 @@ void MlDeviceBundle::resetData()
 
 #endif
 
-	coarseProjectionPlans.resize(nr_classes, allocator);
+	allocator->resize(0);
+
+	/*======================================================
+	              PROJECTOR AND BACKPROJECTOR
+	======================================================*/
+
+	size_t extraAllocationSpace(0);
 
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		cudaProjectors[iclass].setMdlDim(
+		extraAllocationSpace += cudaProjectors[iclass].setMdlDim(
 				baseMLO->mymodel.PPref[iclass].data.xdim,
 				baseMLO->mymodel.PPref[iclass].data.ydim,
 				baseMLO->mymodel.PPref[iclass].data.zdim,
@@ -2449,7 +2563,7 @@ void MlDeviceBundle::resetData()
 
 		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
 
-		cudaBackprojectors[iclass].setMdlDim(
+		extraAllocationSpace += cudaBackprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
 				baseMLO->wsum_model.BPref[iclass].data.ydim,
 				baseMLO->wsum_model.BPref[iclass].data.zdim,
@@ -2459,7 +2573,58 @@ void MlDeviceBundle::resetData()
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
 
 		cudaBackprojectors[iclass].initMdl();
+	}
 
+	/*======================================================
+	                    CUSTOM ALLOCATOR
+	======================================================*/
+
+	size_t allocationSize(0);
+
+	size_t free, total;
+	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+	if (baseMLO->available_gpu_memory > 0)
+		allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	else
+		allocationSize = (float)free * .7;
+
+	if (allocationSize > free)
+	{
+		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
+		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
+		printf("  Total available size %zu MB\n", free/(1000*1000));
+		allocationSize = (float)free * .7; //Lets leave some for other processes for now
+		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
+	}
+
+#ifdef DEBUG_CUDA
+	printf(" DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
+#endif
+
+	int actualAllocationSize = (int) allocationSize - (int) extraAllocationSpace - (int) MEMORY_OVERHEAD_MB * 1000 * 1000;
+
+	if (actualAllocationSize < 0)
+	{
+		printf("\n\nINFO: Additional Allocation Size: %d MB\n", (int) extraAllocationSpace/(1000*1000));
+		printf(    "INFO: Overhead Allocation Size:   %d MB\n", (int) MEMORY_OVERHEAD_MB);
+		printf(    "INFO: Left for Custom Allocator:  %d MB\n", (int) actualAllocationSize/(1000*1000));
+		printf("ERROR: More GPU memory is required.\n\n");
+		fflush(stdout);
+		raise(SIGSEGV);
+	}
+
+	allocator->resize(actualAllocationSize);
+
+
+	/*======================================================
+	                    PROJECTION PLAN
+	======================================================*/
+
+	coarseProjectionPlans.resize(nr_classes, allocator);
+
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
 		//If doing predefined projector plan at all and is this class significant
 		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)
 		{

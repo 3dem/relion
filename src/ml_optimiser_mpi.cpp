@@ -23,13 +23,6 @@
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
-template <typename T>
-  T StringToNumber ( const std::string &Text )
-  {
-     std::istringstream ss(Text);
-     T result;
-     return ss >> result ? result : 0;
-  }
 
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
@@ -179,44 +172,12 @@ void MlOptimiserMpi::initialise()
 
 	if (do_gpu)
 	{
+
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		// Handle GPU (device) assignments for each rank, if speficied
-		size_t pos = 0;
-		std::string delim = ":";
-		std::vector < std::string > allRankIDs;
-		std::string thisRankIDs, thisThreadID;
-		while ((pos = gpu_ids.find(delim)) != std::string::npos)
-		{
-			thisRankIDs = gpu_ids.substr(0, pos);
-//		    std::cout << "in loop " << thisRankIDs << std::endl;
-		    gpu_ids.erase(0, pos + delim.length());
-		    allRankIDs.push_back(thisRankIDs);
-		}
-		allRankIDs.push_back(gpu_ids);
-
 		std::vector < std::vector < std::string > > allThreadIDs;
-		allThreadIDs.resize(allRankIDs.size());
-		//Now handle the thread assignements in each rank
-		for (int i = 0; i < allRankIDs.size(); i++)
-		{
-			pos=0;
-			delim = ",";
-//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
-			while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
-			{
-				thisThreadID = allRankIDs[i].substr(0, pos);
-//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
-				allRankIDs[i].erase(0, pos + delim.length());
-				allThreadIDs[i].push_back(thisThreadID);
-			}
-			allThreadIDs[i].push_back(allRankIDs[i]);
-		}
-
-//		for (int i = 0; i < allThreadIDs.size(); i++)
-//			for (int j = 0; j < allThreadIDs[i].size(); j++)
-//				std::cout << " final " << i << "," << j<< " = "  << allThreadIDs[i][j] << std::endl;
+		MlOptimiser::untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 		// Sequential initialisation of GPUs on all ranks
 		bool fullAutomaticMapping(true);
@@ -227,7 +188,7 @@ void MlOptimiserMpi::initialise()
 			semiAutomaticMapping = true; // possible to set fully manual for specific ranks
 			if (rank == node->rank && !node->isMaster()) //Device not initialized on master rank
 			{
-				if (rank>allThreadIDs.size())
+				if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 				{
 					std::cout << "gpu-ids not specified this rank, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 				}
@@ -270,12 +231,12 @@ void MlOptimiserMpi::initialise()
 								dev_id = (i*(allThreadIDs[rank-1].size()-1))%allThreadIDs[rank-1].size();
 							else
 								dev_id = i%allThreadIDs[rank-1].size();
-							dev_id =  StringToNumber<int >(allThreadIDs[rank-1][dev_id]);
+							dev_id =  textToInteger(allThreadIDs[rank-1][dev_id].c_str());
 						}
 					}
 					else // not semiAutomatic => explicit
 					{
-						dev_id = StringToNumber<int >(allThreadIDs[rank-1][i]);
+						dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
 					}
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
@@ -2387,4 +2348,3 @@ void MlOptimiserMpi::iterate()
 	MPI_Barrier(MPI_COMM_WORLD);
 
 }
-

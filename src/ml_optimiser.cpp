@@ -896,19 +896,53 @@ void MlOptimiser::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		if (!std::isdigit(*gpu_ids.begin()))
-			std::cout << " No gpu-ids specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-		else if(gpu_ids.length()<nr_threads)
-			REPORT_ERROR("You did not supply enough gpu ids to supply all the threads you wanted");
+		std::vector < std::vector < std::string > > allThreadIDs;
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
+
+		// Sequential initialisation of GPUs on all ranks
+		bool fullAutomaticMapping(true);
+		bool semiAutomaticMapping(true);
+		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		else
+		{
+			fullAutomaticMapping=false;
+			if(allThreadIDs[0].size()!=nr_threads)
+			{
+				std::cout << " Will distribute threads over devices ";
+				for (int j = 0; j < allThreadIDs[0].size(); j++)
+					std::cout << " "  << allThreadIDs[0][j];
+				std::cout  << std::endl;
+			}
+			else
+			{
+				semiAutomaticMapping = false;
+				std::cout << " Using explicit indexing to assign devices ";
+				for (int j = 0; j < allThreadIDs[0].size(); j++)
+					std::cout << " "  << allThreadIDs[0][j];
+				std::cout  << std::endl;
+			}
+		}
 
 		for (int i = 0; i < nr_threads; i ++)
 		{
 			int dev_id;
-			if (!std::isdigit(*gpu_ids.begin()))
-				dev_id = i%devCount;
-			else
-				dev_id = (int)(gpu_ids[i]-'0');
-
+			if (semiAutomaticMapping)
+			{
+				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+				if (fullAutomaticMapping)
+					dev_id = i%devCount;
+				else
+				{
+					dev_id = i%allThreadIDs[0].size();
+					if(std::isdigit(*allThreadIDs[0][dev_id].c_str()))
+						dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
+				}
+			}
+			else // not semiAutomatic => explicit
+			{
+				dev_id = textToInteger(allThreadIDs[0][i].c_str());
+			}                                       
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
 			//Only make a new bundle of not existing on device
@@ -1892,7 +1926,7 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
 		{
 			( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
 
@@ -4896,6 +4930,63 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 		}
 		else
 		{
+			// Extra normalization
+			RFLOAT pdf_orientation_mean(0),pdf_offset_mean(0);
+			unsigned pdf_orientation_count(0), pdf_offset_count(0);
+			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
+			{
+				for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
+					for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
+					{
+						if (do_skip_align || do_skip_rotate)
+							pdf_orientation_mean += mymodel.pdf_class[exp_iclass];
+						else if (mymodel.orientational_prior_mode == NOPRIOR)
+							pdf_orientation_mean += DIRECT_MULTIDIM_ELEM(mymodel.pdf_direction[exp_iclass], idir);
+						else
+							pdf_orientation_mean += exp_directions_prior[idir] * exp_psi_prior[ipsi];
+						pdf_orientation_count++;
+					}
+
+				RFLOAT myprior_x, myprior_y, myprior_z;
+				if (mymodel.ref_dim == 2)
+				{
+					myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
+					myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
+				}
+				else
+				{
+					myprior_x = XX(exp_prior[ipart]);
+					myprior_y = YY(exp_prior[ipart]);
+					if (mymodel.data_dim == 3)
+						myprior_z = ZZ(exp_prior[ipart]);
+				}
+				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++)
+				{
+					RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
+					RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
+					RFLOAT tdiff2 = 0.;
+					if (do_helical_refine == false)
+						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
+					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+					if (mymodel.data_dim == 3)
+					{
+						RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
+						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+					}
+					// P(offset|sigma2_offset)
+					// This is the probability of the offset, given the model offset and variance.
+					RFLOAT pdf_offset;
+					if (mymodel.sigma2_offset < 0.0001)
+						pdf_offset_mean += ( tdiff2 > 0.) ? 0. : 1.;
+					else
+						pdf_offset_mean += exp ( tdiff2 / (-2. * mymodel.sigma2_offset) ) / ( 2. * PI * mymodel.sigma2_offset );
+					pdf_offset_count ++;
+				}
+			}
+			pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
+			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
+
+
 			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 			{
@@ -4945,6 +5036,10 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							// are assigning a gaussian prior to all parameters.
 							pdf_orientation = exp_directions_prior[idir] * exp_psi_prior[ipsi];
 						}
+
+						if (pdf_orientation_mean != 0.)
+							pdf_orientation /= pdf_orientation_mean;
+
 						// Loop over all translations
 						long int ihidden = iorientclass * exp_nr_trans;
 						for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
@@ -4983,6 +5078,9 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
 							else
 								pdf_offset = exp ( tdiff2 / (-2. * mymodel.sigma2_offset) ) / ( 2. * PI * mymodel.sigma2_offset );
+
+							if (pdf_offset_mean != 0.)
+								pdf_offset /= pdf_offset_mean;
 
 							// TMP DEBUGGING
 							if (mymodel.orientational_prior_mode != NOPRIOR && (pdf_offset==0. || pdf_orientation==0.))
@@ -7263,6 +7361,38 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			}
 		}
     }
-
 }
 
+void MlOptimiser::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
+{
+	// Handle GPU (device) assignments for each rank, if speficied
+	size_t pos = 0;
+	std::string delim = ":";
+	std::vector < std::string > allRankIDs;
+	std::string thisRankIDs, thisThreadID;
+	while ((pos = tangled.find(delim)) != std::string::npos)
+	{
+		thisRankIDs = tangled.substr(0, pos);
+//		    std::cout << "in loop " << thisRankIDs << std::endl;
+		tangled.erase(0, pos + delim.length());
+		allRankIDs.push_back(thisRankIDs);
+	}
+	allRankIDs.push_back(tangled);
+
+	untangled.resize(allRankIDs.size());
+	//Now handle the thread assignements in each rank
+	for (int i = 0; i < allRankIDs.size(); i++)
+	{
+		pos=0;
+		delim = ",";
+//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
+		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
+		{
+			thisThreadID = allRankIDs[i].substr(0, pos);
+//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
+			allRankIDs[i].erase(0, pos + delim.length());
+			untangled[i].push_back(thisThreadID);
+		}
+		untangled[i].push_back(allRankIDs[i]);
+	}
+}

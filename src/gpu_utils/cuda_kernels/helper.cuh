@@ -63,6 +63,31 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT radius_p,
 												XFLOAT cosine_width	);
 
+__global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
+											XFLOAT * g_image_out,
+											int image_size,
+											int xdim,
+											int ydim, //not used
+											int dx,
+											int dy);
+
+__global__ void cuda_kernel_selfTranslate2D(	XFLOAT * g_image_in,
+												XFLOAT * g_image_out,
+												int image_size,
+												int xdim,
+												int ydim, //not used
+												int dx,
+												int dy);
+
+__global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
+											XFLOAT * g_spectrum,
+											int image_size,
+											int spectrum_size,
+											int xdim,
+											int ydim,
+											int res_limit,
+											XFLOAT * g_highres_Xi2);
+
 __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 int image_size,
 										 int xdim,

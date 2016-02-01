@@ -8,7 +8,7 @@
 #define BACKPROJECTION4_PREFETCH_COUNT 3
 #define BP_2D_BLOCK_SIZE 128
 
-void CudaBackprojector::setMdlDim(
+size_t CudaBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, int paddingFactor)
@@ -21,6 +21,7 @@ void CudaBackprojector::setMdlDim(
 		max_r != maxR ||
 		paddingFactor != padding_factor)
 	{
+		clear();
 
 		mdlX = xdim;
 		mdlY = ydim;
@@ -33,13 +34,15 @@ void CudaBackprojector::setMdlDim(
 		maxR2 = max_r*max_r;
 		padding_factor = paddingFactor;
 
-		clear();
-
 		//Allocate space for model
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal,   mdlXYZ * sizeof(XFLOAT)));
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag,   mdlXYZ * sizeof(XFLOAT)));
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
+
+		allocaton_size = mdlXYZ * sizeof(XFLOAT) * 3;
 	}
+
+	return allocaton_size;
 }
 
 void CudaBackprojector::initMdl()
@@ -456,6 +459,17 @@ void CudaBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 
 void CudaBackprojector::clear()
 {
+	mdlX = 0;
+	mdlY = 0;
+	mdlZ = 0;
+	mdlXYZ = 0;
+	mdlInitY = 0;
+	mdlInitZ = 0;
+	maxR = 0;
+	maxR2 = 0;
+	padding_factor = 0;
+	allocaton_size = 0;
+
 	if (d_mdlReal != NULL)
 	{
 		DEBUG_HANDLE_ERROR(cudaFree(d_mdlReal));
