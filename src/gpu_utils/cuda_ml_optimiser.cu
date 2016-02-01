@@ -2609,7 +2609,7 @@ void MlDeviceBundle::resetData()
 		printf("\n\nINFO: Additional Allocation Size: %d MB\n", (int) extraAllocationSpace/(1000*1000));
 		printf(    "INFO: Overhead Allocation Size:   %d MB\n", (int) MEMORY_OVERHEAD_MB);
 		printf(    "INFO: Left for Custom Allocator:  %d MB\n", (int) actualAllocationSize/(1000*1000));
-		printf("EORROR: More GPU memory is required.\n\n");
+		printf("ERROR: More GPU memory is required.\n\n");
 		fflush(stdout);
 		raise(SIGSEGV);
 	}
