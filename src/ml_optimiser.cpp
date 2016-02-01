@@ -933,10 +933,11 @@ void MlOptimiser::initialise()
 				if (fullAutomaticMapping)
 					dev_id = i%devCount;
 				else
+				{
 					dev_id = i%allThreadIDs[0].size();
-
-				if(std::isdigit(*allThreadIDs[0][dev_id].c_str()))
-					dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
+					if(std::isdigit(*allThreadIDs[0][dev_id].c_str()))
+						dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
+				}
 			}
 			else // not semiAutomatic => explicit
 			{
@@ -1925,7 +1926,7 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
 		{
 			( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
 
