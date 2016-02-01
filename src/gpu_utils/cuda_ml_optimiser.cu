@@ -320,7 +320,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
 						cudaMLO->transformer1.fouriers.getSize()*2);
 
-		CudaGlobalPtr<cufftComplex> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
 		d_Fimg.device_alloc();
 
 		windowFourierTransform2(
