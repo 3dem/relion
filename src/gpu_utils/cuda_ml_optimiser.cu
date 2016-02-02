@@ -2602,13 +2602,15 @@ void MlDeviceBundle::resetData()
 	printf(" DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
 #endif
 
-	int actualAllocationSize = (int) allocationSize - (int) extraAllocationSpace - (int) MEMORY_OVERHEAD_MB * 1000 * 1000;
+	size_t reserved = extraAllocationSpace + (size_t)(MEMORY_OVERHEAD_MB * 1000 * 1000);
+	size_t actualAllocationSize =  allocationSize - reserved;
 
-	if (actualAllocationSize < 0)
+	if (reserved > allocationSize) // then actualAllocationSize would be negative. It's size_t, so it won't be negative, but it DOES mean there isn't enough left.
 	{
-		printf("\n\nINFO: Additional Allocation Size: %d MB\n", (int) extraAllocationSpace/(1000*1000));
-		printf(    "INFO: Overhead Allocation Size:   %d MB\n", (int) MEMORY_OVERHEAD_MB);
-		printf(    "INFO: Left for Custom Allocator:  %d MB\n", (int) actualAllocationSize/(1000*1000));
+		printf("\n\nINFO: Allocation Size:            %li MB\n", allocationSize/(1000*1000));
+		printf(    "INFO: Previously allocated:       %li MB\n", extraAllocationSpace/(1000*1000));
+		printf(    "INFO: Overhead:                   %li MB\n", MEMORY_OVERHEAD_MB);
+		printf(    "INFO: Left for Custom Allocator:  %li MB\n", actualAllocationSize/(1000*1000));
 		printf("ERROR: More GPU memory is required.\n\n");
 		fflush(stdout);
 		raise(SIGSEGV);
