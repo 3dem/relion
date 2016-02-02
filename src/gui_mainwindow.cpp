@@ -550,7 +550,10 @@ void RelionMainWindow::loadJobFromPipeline()
     	is_main_continue = false;
     cb_toggle_continue_i();
 
-    alias_current_job->value(pipeline.processList[current_job].name.c_str());
+    if (pipeline.processList[current_job].alias != "None")
+    	alias_current_job->value(pipeline.processList[current_job].alias.c_str());
+    else
+    	alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
 	cb_fill_stdout_i();
 }
@@ -1393,6 +1396,9 @@ void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
 
+	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
+	pipeline.read();
+
 	// Get the command line arguments from the currently active jobwindow,
 	jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DO_MKDIR);
 
@@ -1632,7 +1638,7 @@ void RelionMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
 
 void RelionMainWindow::cb_set_alias_i(std::string alias)
 {
-	FileName before_uniqdate, uniqdate;
+	FileName before_uniqdate, uniqdate, default_ask;
 	before_uniqdate = pipeline.processList[current_job].name;
 	size_t slashpos = findUniqueDateSubstring(before_uniqdate, uniqdate);
 	before_uniqdate = before_uniqdate.beforeFirstOf(uniqdate);
@@ -1642,8 +1648,12 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 	if (fn_alias != "None")
 	{
 		std::remove((fn_alias.beforeLastOf("/")).c_str());
+		default_ask = fn_alias.without(before_uniqdate);
+		if (default_ask[default_ask.length()-1] == '/')
+			default_ask = default_ask.beforeLastOf("/");
 	}
-
+	else
+		default_ask = uniqdate;
 
 	bool is_done = false;
 	while (!is_done)
@@ -1653,7 +1663,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		if (alias == "" || findUniqueDateSubstring(alias, uniqdate)!= std::string::npos ) // if an alias is provided, just check it is unique, otherwise ask
 		{
 			const char * palias;
-			palias =  fl_input("Rename to: ", uniqdate.c_str());
+			palias =  fl_input("Rename to: ", default_ask.c_str());
 			// TODO: check for cancel
 			if (palias == NULL)
 				return;
@@ -1682,7 +1692,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 				break;
 			}
 		}
-		if (!is_unique)
+		if (!is_unique || alias.length() < 1)
 		{
 			 fl_message("Alias is not unique, please provide another one");
 			 alias="";
