@@ -677,7 +677,7 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	else if (node_type.getValue() == "Particles STAR file (.star)" ||
 			 node_type.getValue() == "Movie-particles STAR file (.star)" ||
 			 node_type.getValue() == "Micrographs STAR file (.star)" ||
-			 node_type.getValue() == "2D references STAR file (.star)" ||
+			 node_type.getValue() == "2D references (.star or .mrcs)" ||
 			 node_type.getValue() == "3D reference (.mrc)" ||
 			 node_type.getValue() == "3D mask (.mrc)" ||
 			 node_type.getValue() == "Unfiltered half-map (unfil.mrc)")
@@ -694,7 +694,7 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			mynodetype = NODE_MOVIE_DATA;
 		else if (node_type.getValue() == "Micrographs STAR file (.star)")
 			mynodetype = NODE_MICS;
-		else if (node_type.getValue() == "2D references STAR file (.star)")
+		else if (node_type.getValue() == "2D references (.star or .mrcs)")
 			mynodetype = NODE_2DREFS;
 		else if (node_type.getValue() == "3D reference (.mrc)")
 			mynodetype = NODE_3DREF;
@@ -1338,7 +1338,7 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	resetHeight();
 
 	fn_input_autopick.place(current_y, "Input micrographs for autopick:", NODE_MICS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
-	fn_refs_autopick.place(current_y, "References:", NODE_2DREFS, "", "Input references (*.{star})", "Input STAR file with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
+	fn_refs_autopick.place(current_y, "References:", NODE_2DREFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 
 	// Add a little spacer
 	current_y += STEPY/2;

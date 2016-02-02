@@ -62,7 +62,7 @@ static Fl_Menu_Item node_type_options[] = {
 	          {"2D/3D particle coordinates (*.box, *_pick.star)"},
 	          {"Particles STAR file (.star)"},
 	          {"Movie-particles STAR file (.star)"},
-	          {"2D references STAR file (.star)"},
+	          {"2D references (.star or .mrcs)"},
 	          {"Micrographs STAR file (.star)"},
 		      {"3D reference (.mrc)"},
 		      {"3D mask (.mrc)"},
