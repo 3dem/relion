@@ -225,9 +225,9 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	FileName fnt;
 
 	// Check whether there is an alias for the corresponding process
-	if (node.outputFromProcess < 0)
-		REPORT_ERROR("Pipeline ERROR: node " + node.name + " does not seem to come from any process in the pipeline..." );
-	FileName fn_alias  = processList[node.outputFromProcess].alias;
+	//if (node.outputFromProcess < 0)
+	//	REPORT_ERROR("Pipeline ERROR: node " + node.name + " does not seem to come from any process in the pipeline..." );
+	FileName fn_alias = (node.outputFromProcess < 0) ? "None" : processList[node.outputFromProcess].alias;
 
 	if (fn_alias != "None")
 	{
@@ -267,10 +267,10 @@ void PipeLine::makeNodeDirectory()
 	for (long int i = 0; i < nodeList.size(); i++)
 	{
 		int myproc = nodeList[i].outputFromProcess;
-		if (myproc < 0)
-			REPORT_ERROR("PipeLine::makeNodeDirectory ERROR: cannot get from which process node " + nodeList[i].name + " is coming.");
-		bool touch_if_not_exist = (processList[myproc].status == PROC_SCHEDULED_CONT ||
-								   processList[myproc].status == PROC_SCHEDULED_NEW);
+		//if (myproc < 0)
+		//	REPORT_ERROR("PipeLine::makeNodeDirectory ERROR: cannot get from which process node " + nodeList[i].name + " is coming.");
+		bool touch_if_not_exist = (myproc < 0) ? false : (processList[myproc].status == PROC_SCHEDULED_CONT ||
+								   	   	   	   	   	   	  processList[myproc].status == PROC_SCHEDULED_NEW);
 		touchTemporaryNodeFile(nodeList[i], touch_if_not_exist);
 	}
 
