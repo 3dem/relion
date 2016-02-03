@@ -1478,6 +1478,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CUDA_CPU_TOC("sumweight1");
 			} // end loop exp_iclass
 
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			if(exp_ipass!=0)
