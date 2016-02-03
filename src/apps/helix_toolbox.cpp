@@ -734,12 +734,16 @@ public:
 
 	void run()
 	{
-		MetaDataTable MD;
-		MD.read(fn_in);
-		sortHelicalTubeID(MD);
+		Image<RFLOAT> img;
+		img.read(fn_in);
+		amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
+		img.write(fn_out);
+		//MetaDataTable MD;
+		//MD.read(fn_in);
+		//sortHelicalTubeID(MD);
 		//updateAngularPriorsForHelicalReconstruction(MD, 200., true);
 		//testDataFileTransformXY(MD);
-		MD.write(fn_out);
+		//MD.write(fn_out);
 
 
 

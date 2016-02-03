@@ -1180,3 +1180,81 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT 
 	}
 
 }
+
+bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type)
+{
+	long int Xdim, Ydim, Zdim, Ndim, XYdim, maxr2;
+	RFLOAT bg_val, bg_pix, bd_val, bd_pix, val;
+	FourierTransformer transformer;
+	MultidimArray<Complex > Faux;
+	MultidimArray<RFLOAT > out;
+
+	out.clear();
+	Faux.clear();
+
+	// Check dimensions
+    v.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	if ( (Zdim > 1) || (Ndim > 1) )
+		return false;
+	if (Xdim * Ydim <= 16)
+		REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray is too small.");
+
+	// Calculate background and border values
+	bg_val = bg_pix = bd_val = bd_pix = 0.;
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(v)
+	{
+		bg_val += DIRECT_A2D_ELEM(v, i, j);
+		bg_pix += 1.;
+		if ( (i == 0) || (j == 0) || (i == (YSIZE(v) - 1)) || (j == (XSIZE(v) - 1)) )
+		{
+			bd_val += DIRECT_A2D_ELEM(v, i, j);
+			bd_pix += 1.;
+		}
+	}
+	if ( (bg_pix < 1.) || (bd_pix < 1.) )
+		REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray is too small.");
+	bg_val /= bg_pix;
+	bd_val /= bd_pix;
+	// DEBUG
+	//std::cout << "bg_val = " << bg_val << ", bg_pix = " << bg_pix << std::endl;
+	//std::cout << "bd_val = " << bd_val << ", bd_pix = " << bd_pix << std::endl;
+
+	// Pad and float output MultidimArray (2x original size)
+	XYdim = (Xdim > Ydim) ? (Xdim * 2) : (Ydim * 2);
+	out.resize(XYdim, XYdim);
+	out.initConstant(bd_val - bg_val);
+	out.setXmippOrigin();
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(v)
+	{
+		A2D_ELEM(out, i + FIRST_XMIPP_INDEX(YSIZE(v)), j + FIRST_XMIPP_INDEX(XSIZE(v))) = DIRECT_A2D_ELEM(v, i, j) - bg_val;
+	}
+
+	// Fourier Transform
+	CenterFFT(out, true);
+    transformer.FourierTransform(out, Faux, false); // TODO: false???
+
+    // Write to output files
+    out.setXmippOrigin();
+    out.initZeros(XYdim, XYdim);
+    maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
+    {
+    	if ( (ip > STARTINGY(out)) && (ip < FINISHINGY(out))
+    			&& (jp > STARTINGX(out)) && (jp < FINISHINGX(out))
+    			&& ((ip * ip + jp * jp) < maxr2) )
+    	{
+    		if (output_map_type == AMPLITUDE_MAP)
+    			val = FFTW2D_ELEM(Faux, ip, jp).abs();
+    		else if (output_map_type == PHASE_MAP)
+    			val = (180.) * (FFTW2D_ELEM(Faux, ip, jp).arg()) / PI;
+    		else
+    			REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR Unknown type of output map.");
+
+    		A2D_ELEM(out, -ip, -jp) = A2D_ELEM(out, ip, jp) = val;
+    	}
+    }
+    A2D_ELEM(out, 0, 0) = 0.;
+    amp.clear();
+    amp = out;
+    return true;
+}

@@ -397,13 +397,27 @@ void HealpixSampling::setTranslations(
 }
 
 /* Set only a single translation */
-void HealpixSampling::addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear)
+void HealpixSampling::addOneTranslation(
+		RFLOAT offset_x,
+		RFLOAT offset_y,
+		RFLOAT offset_z,
+		bool do_clear,
+		bool do_helical_refine,
+		RFLOAT psi_deg,
+		RFLOAT tilt_deg)
 {
 	if (do_clear)
 	{
 		translations_x.clear();
 		translations_y.clear();
 		translations_z.clear();
+	}
+	if (do_helical_refine)
+	{
+		if (is_3d_trans)
+			transformCartesianAndHelicalCoords(offset_x, offset_y, offset_z, offset_x, offset_y, offset_z, psi_deg, tilt_deg, 3, CART_TO_HELICAL_COORDS);
+		else
+			transformCartesianAndHelicalCoords(offset_x, offset_y, offset_z, offset_x, offset_y, offset_z, psi_deg, tilt_deg, 2, CART_TO_HELICAL_COORDS);
 	}
 	translations_x.push_back(offset_x);
 	translations_y.push_back(offset_y);

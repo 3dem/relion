@@ -201,8 +201,8 @@ void createCylindricalReference(
 void transformCartesianAndHelicalCoords(
 		Matrix1D<RFLOAT>& in,
 		Matrix1D<RFLOAT>& out,
-		RFLOAT psi,
-		RFLOAT tilt,
+		RFLOAT psi_deg,
+		RFLOAT tilt_deg,
 		bool direction);
 
 void transformCartesianAndHelicalCoords(
@@ -212,8 +212,8 @@ void transformCartesianAndHelicalCoords(
 		RFLOAT& xout,
 		RFLOAT& yout,
 		RFLOAT& zout,
-		RFLOAT psi,
-		RFLOAT tilt,
+		RFLOAT psi_deg,
+		RFLOAT tilt_deg,
 		int dim,
 		bool direction);
 

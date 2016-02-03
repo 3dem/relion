@@ -28,6 +28,7 @@
 #include "src/symmetries.h"
 #include "src/euler.h"
 #include "src/transformations.h"
+#include "src/helix.h"
 
 // For the angular searches
 #define NOPRIOR 0
@@ -195,7 +196,14 @@ public:
     		RFLOAT helical_twist_deg = 0.);
 
     /* Add a single translation */
-    void addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear = false);
+    void addOneTranslation(
+    		RFLOAT offset_x,
+    		RFLOAT offset_y,
+    		RFLOAT offset_z,
+    		bool do_clear = false,
+    		bool do_helical_refine = false,
+			RFLOAT psi_deg = 0.,
+			RFLOAT tilt_deg = 0.);
 
     /* Set the non-oversampled lists of directions and in-plane rotations */
     void setOrientations(int _order = -1, RFLOAT _psi_step = -1.);

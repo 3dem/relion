@@ -534,6 +534,8 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show original image" },
 						{ "Show particles from selected classes" },
 						{ "Save selected classes" },
+						{ "Show Fourier amplitudes (2x)" },
+						{ "Show Fourier phase angles (2x)" },
 						{ "Quit" },
 						{ 0 }
 					};
@@ -569,6 +571,10 @@ int multiViewerCanvas::handle(int ev)
 						saveSelected(SELECTED);
 						saveSelectedParticles(SELECTED);
 					}
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
+						showFourierAmplitudes(ipos);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
+						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 				}
@@ -586,6 +592,8 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show original image" },
 						{ "Show metadata" },
 						{ "Save STAR with selected images" },
+						{ "Show Fourier amplitudes (2x)" },
+						{ "Show Fourier phase angles (2x)" },
 						{ "Quit" },
 						{ 0 }
 					};
@@ -619,6 +627,10 @@ int multiViewerCanvas::handle(int ev)
 						showOriginalImage(ipos);
 					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
 						saveSelected(SELECTED);
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
+						showFourierAmplitudes(ipos);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
+						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 
@@ -756,7 +768,7 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	FileName fn_img;
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
 
-	std::string cl = "relion_display  --i " + fn_img + " --scale " + integerToString(ori_scale);
+	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
     if (sigma_contrast > 0.)
     	cl += " --sigma_contrast " + floatToString(sigma_contrast);
 	// send job in the background
@@ -781,6 +793,53 @@ void multiViewerCanvas::showOriginalImage(int ipos)
     */
 }
 
+void multiViewerCanvas::showFourierAmplitudes(int ipos)
+{
+
+	// Make system call because otherwise the green drawing for distance measurements doesn't work....
+	FileName fn_img;
+	Image<RFLOAT> img;
+	boxes[ipos]->MDimg.getValue(display_label, fn_img);
+	img.read(fn_img, false);
+	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+	{
+		 std::string str = "Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.";
+		 fl_message(str.c_str());
+		 return;
+	}
+
+	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
+    if (sigma_contrast > 0.)
+    	cl += " --sigma_contrast " + floatToString(sigma_contrast);
+    cl += " --show_fourier_amplitudes";
+	// send job in the background
+	cl += " &";
+
+	int res = system(cl.c_str());
+}
+
+void multiViewerCanvas::showFourierPhaseAngles(int ipos)
+{
+
+	// Make system call because otherwise the green drawing for distance measurements doesn't work....
+	FileName fn_img;
+	Image<RFLOAT> img;
+	boxes[ipos]->MDimg.getValue(display_label, fn_img);
+	img.read(fn_img, false);
+	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+	{
+		 std::string str = "Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.";
+		 fl_message(str.c_str());
+		 return;
+	}
+
+	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
+	cl += " --show_fourier_phase_angles";
+	// send job in the background
+	cl += " &";
+
+	int res = system(cl.c_str());
+}
 
 void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTable &MDpart)
 {
@@ -1708,6 +1767,8 @@ void Displayer::read(int argc, char **argv)
 	maxval = textToFloat(parser.getOption("--white", "Pixel value for white (default is auto-contrast)", "0"));
 	sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean", "0"));
 	do_read_whole_stacks = parser.checkOption("--read_whole_stack", "Read entire stacks at once (to speed up when many images of each stack are displayed)");
+	show_fourier_amplitudes = parser.checkOption("--show_fourier_amplitudes", "Show amplitudes of 2D Fourier transform?");
+	show_fourier_phase_angles = parser.checkOption("--show_fourier_phase_angles", "Show phase angles of 2D Fourier transforms?");
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -1828,6 +1889,20 @@ void Displayer::initialise()
 		{
 			REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, so please also provide --angpix.");
 		}
+    }
+
+    if (show_fourier_amplitudes && show_fourier_phase_angles)
+    	REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
+    if (show_fourier_amplitudes || show_fourier_phase_angles)
+    {
+    	if (do_pick)
+    		REPORT_ERROR("Displayer::initialise ERROR: cannot pick particles from Fourier maps!");
+    	if (fn_in.isStarFile())
+    		REPORT_ERROR("Displayer::initialise ERROR: use single 2D image files as input!");
+    	Image<RFLOAT> img;
+    	img.read(fn_in, false); // dont read data yet: only header to get size
+    	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+    		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
     }
 
 }
@@ -2038,8 +2113,24 @@ int Displayer::run()
 
             MDin.addObject();
             MDin.setValue(EMDL_IMAGE_NAME, fn_in);
-            basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
-            win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+            RFLOAT new_scale = scale;
+            if (show_fourier_amplitudes || show_fourier_phase_angles)
+            	new_scale *= 2.;
+            basisViewerWindow win(CEIL(new_scale*XSIZE(img())), CEIL(new_scale*YSIZE(img())), fn_in.c_str());
+            if (show_fourier_amplitudes)
+            {
+            	amplitudeOrPhaseMap(img(), img(), AMPLITUDE_MAP);
+            	win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+            }
+            else if (show_fourier_phase_angles)
+            {
+            	amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
+            	win.fillSingleViewerCanvas(img(), -180., 180., 0., scale);
+            }
+            else
+            {
+                win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+            }
         }
 
     }

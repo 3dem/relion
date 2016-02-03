@@ -233,6 +233,8 @@ private:
 	void printMetaData(int ipos);
 	void showAverage(bool selected, bool show_stddev=false);
 	void showOriginalImage(int ipos);
+	void showFourierAmplitudes(int ipos);
+	void showFourierPhaseAngles(int ipos);
 	void makeStarFileSelectedParticles(bool save_selected, MetaDataTable &MDpart);
 	void saveSelectedParticles(bool save_selected);
 	void showSelectedParticles(bool save_selected);
@@ -501,6 +503,12 @@ public:
 
 	// Pixel size to calculate lowpass filter in Angstroms
 	RFLOAT angpix;
+
+	// Show Fourier amplitudes?
+	bool show_fourier_amplitudes;
+
+	// Show Fourier phase angles?
+	bool show_fourier_phase_angles;
 
 public:
 	// Read command line arguments
