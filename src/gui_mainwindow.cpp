@@ -1397,7 +1397,7 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-	pipeline.read();
+	pipeline.read(true); // true means: only_read if_file_exists
 
 	// Get the command line arguments from the currently active jobwindow,
 	jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DO_MKDIR);
@@ -1420,10 +1420,11 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
 	if (!only_schedule && is_main_continue)
 	{
-		bool is_refine = (pipeline.processList[current_job].type == PROC_2DCLASS ||
+		bool skip_this = (pipeline.processList[current_job].type == PROC_2DCLASS ||
 				pipeline.processList[current_job].type == PROC_3DCLASS ||
-				pipeline.processList[current_job].type == PROC_3DAUTO);
-		if (!is_refine )
+				pipeline.processList[current_job].type == PROC_3DAUTO ||
+				pipeline.processList[current_job].type == PROC_MANUALPICK);
+		if (!skip_this )
 		{
 			for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
 			{
@@ -1467,9 +1468,12 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		cb_edit_note_i();
 
 		// Also set alias from the alias_current_job input
-		std::string alias= (std::string)alias_current_job->value();
-		if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
-			cb_set_alias_i(alias);
+		if (!is_main_continue)
+		{
+			std::string alias= (std::string)alias_current_job->value();
+			if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
+				cb_set_alias_i(alias);
+		}
 	}
 
 	// Copy pipeline star file as backup to the output directory
@@ -1577,12 +1581,12 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			{
 				FileName alldirs = pipeline.processList[i].name;
 				alldirs = alldirs.beforeLastOf("/");
-                                // Move entire output directory (with subdirectory structure) to the Trash folder
-                                FileName firstdirs = alldirs.beforeLastOf("/");
-                                std::string command = "mkdir -p Trash/" + firstdirs;
-                                int res = system(command.c_str());
-                                command= "mv -f " + alldirs + " Trash/" + firstdirs+"/.";
-                                res = system(command.c_str());
+				// Move entire output directory (with subdirectory structure) to the Trash folder
+				FileName firstdirs = alldirs.beforeLastOf("/");
+				std::string command = "mkdir -p Trash/" + firstdirs;
+				int res = system(command.c_str());
+				command= "mv -f " + alldirs + " Trash/" + firstdirs+"/.";
+				res = system(command.c_str());
 				// Also remove the symlink if it exists
 				FileName fn_alias = (pipeline.processList[i]).alias;
 				if (fn_alias != "None")
