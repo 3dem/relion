@@ -68,7 +68,6 @@ static SubtractJobWindow *job_subtract;
 static PostJobWindow *job_post;
 static PolishJobWindow *job_polish;
 static ResmapJobWindow *job_resmap;
-static PublishJobWindow *job_publish;
 // Run button
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;

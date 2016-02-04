@@ -295,6 +295,7 @@ enum EMDLabel
     EMDL_PARTICLE_NR_FRAMES,
     EMDL_PARTICLE_PMAX,
 
+    EMDL_PIPELINE_JOB_COUNTER,
     EMDL_PIPELINE_NODE_NAME,
     EMDL_PIPELINE_NODE_TYPE,
     EMDL_PIPELINE_PROCESS_ALIAS,
@@ -665,6 +666,7 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_PMAX, EMDL_DOUBLE, "rlnMaxValueProbDistribution", "Maximum value of the (normalised) probability function for a particle"); /**< particle, Maximum value of probability distribution */
 
 
+        EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");

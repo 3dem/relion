@@ -153,7 +153,7 @@ public:
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
 
 	// Initialise pipeiline stuff for each job, return outputname
-	void initialisePipeline(std::string &outputname, std::string defaultname);
+	void initialisePipeline(std::string &outputname, std::string defaultname, int job_counter);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
@@ -217,7 +217,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -252,7 +252,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -286,7 +286,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -330,7 +330,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -373,7 +373,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -433,7 +433,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -465,7 +465,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -523,7 +523,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -605,7 +605,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -690,7 +690,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -742,7 +742,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -777,7 +777,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -813,7 +813,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -852,7 +852,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -888,7 +888,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -932,7 +932,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -968,32 +968,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
-
-};
-
-
-class PublishJobWindow : public RelionJobWindow
-{
-public:
-
-	// I/O
-	textOnlyEntry cite_text;
-	textOnlyEntry cite_external_text;
-
-public:
-
-	// Constructor
-	PublishJobWindow();
-
-	// Destructor
-	~PublishJobWindow(){};
-
-	// what happens if you change continue old run radiobutton
-	void toggle_new_continue(bool is_continue);
-
-	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 

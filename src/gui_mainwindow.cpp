@@ -754,7 +754,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_import->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_import->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_import->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_MOTIONCORR:
@@ -766,7 +766,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_motioncorr->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_motioncorr->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_motioncorr->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_MANUALPICK:
@@ -778,7 +778,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_manualpick->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_manualpick->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_manualpick->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_CTFFIND:
@@ -790,7 +790,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_ctffind->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_ctffind->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_ctffind->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_AUTOPICK:
@@ -802,7 +802,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_autopick->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_autopick->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_autopick->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_EXTRACT:
@@ -814,7 +814,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_extract->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_extract->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_extract->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_SORT:
@@ -826,7 +826,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_sort->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_sort->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_sort->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_CLASSSELECT:
@@ -838,7 +838,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_classselect->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_classselect->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_classselect->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_2DCLASS:
@@ -850,7 +850,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_class2d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_class2d->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_class2d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_3DCLASS:
@@ -862,7 +862,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_class3d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_class3d->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_class3d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_3DAUTO:
@@ -874,7 +874,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_auto3d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_auto3d->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_auto3d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_POLISH:
@@ -886,7 +886,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_polish->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_polish->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_polish->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_MASKCREATE:
@@ -898,7 +898,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_maskcreate->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_maskcreate->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_maskcreate->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_JOINSTAR:
@@ -910,7 +910,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_joinstar->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_joinstar->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_joinstar->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_SUBTRACT:
@@ -922,7 +922,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_subtract->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_subtract->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_subtract->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_POST:
@@ -934,7 +934,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_post->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_post->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_post->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_RESMAP:
@@ -946,7 +946,7 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 		if (do_toggle_continue)
 			job_resmap->toggle_new_continue(is_main_continue);
 		if (do_commandline)
-			job_resmap->getCommands(global_outputname, commands, final_command, do_makedir);
+			job_resmap->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	} // end switch
@@ -1675,34 +1675,48 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 			alias = al2;
 		}
 
-		//remove spaces from any potential alias
-		for (int i = 0; i < alias.length(); i++)
-		{
-			if (alias[i] == ' ')
-				alias[i] = '_';
-		}
 
-		// Make sure the alias ends with a slash
-		if (alias[alias.length()-1] != '/')
-			alias += "/";
-
-		// Check uniqueness of the alias
-		bool is_unique = true;
-		for (size_t i = 0; i < pipeline.processList.size(); i++)
+		if (alias.length() < 2)
 		{
-			if ( pipeline.processList[i].alias == before_uniqdate + alias && alias != "None")
-			{
-				is_unique = false;
-				break;
-			}
+			 fl_message("Alias cannot be less than 2 characters, please provide another one");
+			 alias="";
 		}
-		if (!is_unique || alias.length() < 1)
+		else if (alias.length() > 2 && alias[0]=='j' && alias[1]=='o' && alias[2]=='b')
 		{
-			 fl_message("Alias is not unique, please provide another one");
+			 fl_message("Alias cannot start with 'job', please provide another one");
 			 alias="";
 		}
 		else
-			is_done = true;
+		{
+			//remove spaces from any potential alias
+			for (int i = 0; i < alias.length(); i++)
+			{
+				if (alias[i] == ' ')
+					alias[i] = '_';
+			}
+
+			// Make sure the alias ends with a slash
+			if (alias[alias.length()-1] != '/')
+				alias += "/";
+
+			// Check uniqueness of the alias
+			bool is_unique = true;
+			for (size_t i = 0; i < pipeline.processList.size(); i++)
+			{
+				if ( pipeline.processList[i].alias == before_uniqdate + alias && alias != "None")
+				{
+					is_unique = false;
+					break;
+				}
+			}
+			if (!is_unique || alias.length() < 1)
+			{
+				 fl_message("Alias is not unique, please provide another one");
+				 alias="";
+			}
+			else
+				is_done = true;
+		}
 	}
 
 	// No alias if the alias contains a uniquedate string because of continuation of relion_refine jobs

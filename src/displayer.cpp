@@ -532,10 +532,10 @@ int multiViewerCanvas::handle(int ev)
 						{ "Select all classes above" },
 						{ "Show metadata this class" },
 						{ "Show original image" },
-						{ "Show particles from selected classes" },
-						{ "Save selected classes" },
 						{ "Show Fourier amplitudes (2x)" },
 						{ "Show Fourier phase angles (2x)" },
+						{ "Show particles from selected classes" },
+						{ "Save selected classes" },
 						{ "Quit" },
 						{ 0 }
 					};
@@ -564,6 +564,10 @@ int multiViewerCanvas::handle(int ev)
 						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Show original image") == 0 )
 						showOriginalImage(ipos);
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
+						showFourierAmplitudes(ipos);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
+						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(SELECTED);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
@@ -571,10 +575,6 @@ int multiViewerCanvas::handle(int ev)
 						saveSelected(SELECTED);
 						saveSelectedParticles(SELECTED);
 					}
-					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
-						showFourierAmplitudes(ipos);
-					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
-						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 				}
@@ -590,10 +590,10 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show average of selection" },
 						{ "Show stddev of selection" },
 						{ "Show original image" },
-						{ "Show metadata" },
-						{ "Save STAR with selected images" },
 						{ "Show Fourier amplitudes (2x)" },
 						{ "Show Fourier phase angles (2x)" },
+						{ "Show metadata" },
+						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
 					};
@@ -617,20 +617,20 @@ int multiViewerCanvas::handle(int ev)
 						selectFromHereBelow(ipos);
 					else if ( strcmp(m->label(), "Select all above") == 0 )
 						selectFromHereAbove(ipos);
-					else if ( strcmp(m->label(), "Show metadata") == 0 )
-						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Show average of selection") == 0 )
 						showAverage(SELECTED, false);
 					else if ( strcmp(m->label(), "Show stddev of selection") == 0 )
 						showAverage(SELECTED, true);
-					else if ( strcmp(m->label(),  "Show original image") == 0 )
+					else if ( strcmp(m->label(), "Show original image") == 0 )
 						showOriginalImage(ipos);
-					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
-						saveSelected(SELECTED);
 					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
 						showFourierAmplitudes(ipos);
 					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
 						showFourierPhaseAngles(ipos);
+					else if ( strcmp(m->label(), "Show metadata") == 0 )
+						printMetaData(ipos);
+					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
+						saveSelected(SELECTED);
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 

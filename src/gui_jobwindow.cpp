@@ -445,14 +445,14 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 
 }
 
-void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname)
+void RelionJobWindow::initialisePipeline(std::string &outputname, std::string defaultname, int job_counter)
 {
 
 	pipelineOutputNodes.clear();
 	pipelineInputNodes.clear();
 
 	if (outputname == "") // for continue jobs, use the same outputname
-		outputname = defaultname + "/" + getUniqDateString() + "/";
+		outputname = defaultname + "/job" + integerToString(job_counter, 3) + "/";
 
 	pipelineOutputName = outputname;
 
@@ -629,11 +629,12 @@ void ImportJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Import");
+	initialisePipeline(outputname, "Import", job_counter);
 
 	std::string command;
 	FileName outputstar;
@@ -829,11 +830,11 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "MotionCorr");
+	initialisePipeline(outputname, "MotionCorr", job_counter);
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -1074,11 +1075,11 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "CtfFind");
+	initialisePipeline(outputname, "CtfFind", job_counter);
 	std::string command;
 
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
@@ -1264,11 +1265,12 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "ManualPick");
+	initialisePipeline(outputname, "ManualPick", job_counter);
 
 	std::string command;
 	command="`which relion_manualpick`";
@@ -1509,12 +1511,12 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 
 	commands.clear();
-	initialisePipeline(outputname, "AutoPick");
+	initialisePipeline(outputname, "AutoPick", job_counter);
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -1856,12 +1858,13 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 
 	commands.clear();
-	initialisePipeline(outputname, "Extract");
+	initialisePipeline(outputname, "Extract", job_counter);
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -2062,11 +2065,12 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Sort");
+	initialisePipeline(outputname, "Sort", job_counter);
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -2407,11 +2411,12 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Class2D");
+	initialisePipeline(outputname, "Class2D", job_counter);
 
 	std::string command;
 	if (nr_mpi.getValue() > 1)
@@ -2970,13 +2975,14 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
 	std::string command;
 
-	initialisePipeline(outputname, "Class3D");
+	initialisePipeline(outputname, "Class3D", job_counter);
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -3591,13 +3597,14 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	range_psi.deactivate(is_continue);
 }
 
-void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
 	std::string command;
 
-	initialisePipeline(outputname, "Refine3D");
+	initialisePipeline(outputname, "Refine3D", job_counter);
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
@@ -3969,11 +3976,12 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 	commands.clear();
 	std::string command;
-	initialisePipeline(outputname, "Polish");
+	initialisePipeline(outputname, "Polish", job_counter);
 
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_particle_polish_mpi`";
@@ -4140,11 +4148,11 @@ void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Select");
+	initialisePipeline(outputname, "Select", job_counter);
 
 	std::string command;
 	command="`which relion_display`";
@@ -4326,11 +4334,11 @@ void MaskCreateJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "MaskCreate");
+	initialisePipeline(outputname, "MaskCreate", job_counter);
 
 	std::string command;
 	command="`which relion_mask_create`";
@@ -4481,11 +4489,11 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "JoinStar");
+	initialisePipeline(outputname, "JoinStar", job_counter);
 
 	std::string command;
 	command="`which relion_star_combine`";
@@ -4666,11 +4674,11 @@ void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 }
 
 void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir)
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Subtract");
+	initialisePipeline(outputname, "Subtract", job_counter);
 
 	std::string command;
 	command="`which relion_project`";
@@ -4839,12 +4847,13 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 
 	commands.clear();
-	initialisePipeline(outputname, "PostProcess");
+	initialisePipeline(outputname, "PostProcess", job_counter);
 	std::string command;
 
 	command="`which relion_postprocess`";
@@ -5002,14 +5011,15 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
 {
 
 	// TODO
 	double angpix = 1;
 
 	commands.clear();
-	initialisePipeline(outputname, "Resmap");
+	initialisePipeline(outputname, "Resmap", job_counter);
 
 	std::string command;
 	if (fn_resmap.getValue().length() == 0)
@@ -5064,7 +5074,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
-
+/*
 PublishJobWindow::PublishJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
@@ -5113,20 +5123,5 @@ Please also cite the following EXTERNAL programs: \n \n \
 
 }
 
-void PublishJobWindow::toggle_new_continue(bool _is_continue)
-{
-	is_continue = _is_continue;
-	// never submit this to queue, as ResMap needs user interaction
-	do_queue.deactivate(true);
-}
-
-void PublishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
-{
-	commands.clear();
-	std::string command = " echo 'Sorry, you still need to write your own paper... ;-)' ";
-
-	commands.push_back(command);
-	outputname = "run_publish";
-	prepareFinalCommand(outputname, commands, final_command);
-}
+*/
 

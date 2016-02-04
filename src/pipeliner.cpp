@@ -143,6 +143,7 @@ long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
 	if (!is_found)
 	{
 		processList.push_back(_Process);
+		job_counter++;
 	}
 	else if (!do_overwrite)
 	{
@@ -322,7 +323,16 @@ void PipeLine::read(bool only_read_if_file_exists)
 			REPORT_ERROR( (std::string) "PipeLine::read: File " + fn + " cannot be read." );
 	}
 
-    MetaDataTable MDnode, MDproc, MDedge1, MDedge2;
+    MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
+
+    // This if allows for older version of the pipeline without the jobcounter
+    // TODO: remove after alpha-testing
+    if (MDgen.readStar(in, "pipeline_general"))
+    {
+        MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+    }
+
+
     MDnode.readStar(in, "pipeline_nodes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
@@ -427,10 +437,16 @@ void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deletePro
     if (do_delete && (deleteNode.size() != nodeList.size()) )
     	REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteNode vector!");
 
-    MetaDataTable MDnode, MDproc, MDedge1, MDedge2;
+    MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
 #ifdef DEBUG
     std::cerr << " writing pipeline as " << fn << std::endl;
 #endif
+
+    MDgen.setName("pipeline_general");
+    MDgen.setIsList(true);
+    MDgen.addObject();
+    MDgen.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+    MDgen.write(fh);
 
     MDproc.setName("pipeline_processes");
     for(long int i=0 ; i < processList.size() ; i++)

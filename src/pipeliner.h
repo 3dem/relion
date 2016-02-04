@@ -148,6 +148,8 @@ class PipeLine
 {
 
 	public:
+	int job_counter;
+
 	std::string name;
 	std::vector<Node> nodeList; //list of all Nodes in the pipeline
 	std::vector<Process> processList; //list of all Processes in the pipeline
@@ -155,6 +157,7 @@ class PipeLine
 	PipeLine()
 	{
 		name = "default";
+		job_counter = 1;
 	}
 
 	~PipeLine()
@@ -166,6 +169,7 @@ class PipeLine
 	{
 		nodeList.clear();
 		processList.clear();
+		job_counter = 1;
 	}
 
 	void setName(std::string _name)

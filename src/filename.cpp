@@ -414,24 +414,6 @@ bool exists(const FileName &fn)
     return true;
 }
 
-std::string getUniqDateString()
-{
-
-	time_t now = time(0);
-	tm *ltm = localtime(&now);
-	std::string uniqstr = integerToString(ltm->tm_year%100, 2);
-	uniqstr+= integerToString(1 + ltm->tm_mon, 2);
-	uniqstr+= integerToString(ltm->tm_mday, 2);
-	uniqstr+= ".";
-	uniqstr+= integerToString(ltm->tm_hour, 2);
-	uniqstr+= integerToString(ltm->tm_min, 2);
-	uniqstr+= integerToString(ltm->tm_sec, 2);
-
-	return uniqstr;
-
-
-}
-
 size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
 {
 	size_t slashpos = 0;
@@ -440,16 +422,25 @@ size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
 	{
 		i++;
 		slashpos = fnt.find("/", slashpos+1);
-		if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
+		if (fnt[slashpos+1]=='j' && fnt[slashpos+2]=='o' && fnt[slashpos+3]=='b' &&
+			std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]))
+		{
+			uniqdate = fnt.substr(slashpos+1,6);
+			return slashpos;
+		}
+		// Temporary to allow recognition of older unique runnames with 12 digits
+		// TODO: remove after alpha-testing of relion-2.0
+		else if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
 		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
 		    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
 		    (fnt[slashpos+7] == '.' || fnt[slashpos+7] == '-') &&
 		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
 		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
-			{
-				uniqdate = fnt.substr(slashpos+1,13);
-				return slashpos;
-			}
+		{
+			uniqdate = fnt.substr(slashpos+1,13);
+			return slashpos;
+		}
+
 
 		if (i>100)
 			REPORT_ERROR("findUniqueDateSubstring: BUG or found more than 100 directories deep structure?");
@@ -464,7 +455,12 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
 {
 	FileName uniqdate;
 	size_t slashpos = findUniqueDateSubstring(fn_input, uniqdate);
-	FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+15) : fn_input;
+	FileName fn_nouniqdate;
+	// TODO remove if after alpha-testing of relion-2.0
+	if (uniqdate.length() > 7)
+		fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+15) : fn_input;
+	else
+		fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+8) : fn_input;
 	return fn_new_outputdir + fn_nouniqdate;
 }
 
