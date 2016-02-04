@@ -212,7 +212,7 @@ class PipeLine
 	void write(std::vector<bool> &deleteNode, std::vector<bool> &deleteProcess);
 
 	// Read in the pipeline from a STAR file
-	void read();
+	void read(bool only_read_if_file_exists=false);
 
 };
 

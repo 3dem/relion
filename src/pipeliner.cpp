@@ -305,7 +305,7 @@ void PipeLine::checkProcessCompletion()
 
 }
 
-void PipeLine::read()
+void PipeLine::read(bool only_read_if_file_exists)
 {
 
 	// Start from scratch
@@ -313,8 +313,14 @@ void PipeLine::read()
 
 	FileName fn = name + "_pipeline.star";
 	std::ifstream in(fn.c_str(), std::ios_base::in);
-    if (in.fail())
-        REPORT_ERROR( (std::string) "PipeLine::read: File " + fn + " cannot be read." );
+
+	if (in.fail())
+	{
+		if (only_read_if_file_exists)
+			return;
+		else
+			REPORT_ERROR( (std::string) "PipeLine::read: File " + fn + " cannot be read." );
+	}
 
     MetaDataTable MDnode, MDproc, MDedge1, MDedge2;
     MDnode.readStar(in, "pipeline_nodes");
@@ -353,6 +359,7 @@ void PipeLine::read()
 			if (fn_alias[fn_alias.length()-1] == '/')
 				fn_alias = fn_alias.beforeLastOf("/");
 			// Only make the alias if it doesn't exist yet, otherwise you end up with recursive ones.
+
 			if (!exists(fn_alias))
 			{
 				std::string command = " ln -s ../" + name + " " + fn_alias;
