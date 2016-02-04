@@ -119,6 +119,7 @@ void deviceInitValue(CudaGlobalPtr<T> &data, T value)
 			~data,
 			value,
 			data.getSize());
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
 
 #define WEIGHT_MAP_BLOCK_SIZE 512
@@ -166,6 +167,7 @@ void arrayOverThreshold(CudaGlobalPtr<T> &data, CudaGlobalPtr<bool> &passed, T t
 			~passed,
 			threshold,
 			data.getSize());
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
 
 #define FIND_IN_CUMULATIVE_BLOCK_SIZE 512
@@ -403,6 +405,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 										  YSIZE(v),
 										  xshift,
 										  yshift);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 		img_in.cp_to_host();
 
@@ -540,6 +543,7 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 			ySize,
 			xshift,
 			yshift);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 //	HANDLE_ERROR(cudaStreamSynchronize(0));
 //	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.

@@ -416,6 +416,7 @@ void CudaBackprojector::backproject(
 				imgX*imgY,
 				mdlX,
 				mdlInitY);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 	else
 	{
@@ -442,6 +443,7 @@ void CudaBackprojector::backproject(
 				mdlY,
 				mdlInitY,
 				mdlInitZ);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
 

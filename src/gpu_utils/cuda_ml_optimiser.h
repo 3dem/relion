@@ -429,6 +429,7 @@ public:
 
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
+	cudaError_t errorStatus;
 
 	cudaStream_t stream1;
 	cudaStream_t stream2;

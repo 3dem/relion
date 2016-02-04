@@ -143,6 +143,7 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 												  ~d_Fmsk,
 												  ~d_Fcov,
 												  d_Fmic.getSize());
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_0");
 
 	CUDA_CPU_TIC("PRE-window_0");
@@ -162,13 +163,14 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 											 cudaTransformer.reals.d_ptr,
 										     (XFLOAT) normfft,
 										     cudaTransformer.reals.size);
-
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TIC("PRE-multi_1");
 	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer.reals.d_ptr,
 											 cudaTransformer.reals.d_ptr,
 											 d_Mstddev.d_ptr,
 											 (XFLOAT) -1,
 										     cudaTransformer.reals.size);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_1");
 
 	CUDA_CPU_TIC("PRE-CenterFFT_0");
@@ -187,6 +189,7 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 													  ~d_Fmic2,
 													  ~d_Fcov,
 													  d_Fmsk.size);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_2");
 
 
@@ -209,6 +212,7 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 														  cudaTransformer.reals.d_ptr,
 														  normfft,
 														  d_Mstddev.size);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_3");
 
 	CUDA_CPU_TIC("PRE-CenterFFT_1");
@@ -467,6 +471,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				(XFLOAT*)~micTransformer.fouriers,
 				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
 				micTransformer.fouriers.getSize()*2);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("FourierTransform_0");
 
 		CUDA_CPU_TIC("F_cp");
@@ -482,6 +487,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		cuda_kernel_square<<<FMultiBsize,BLOCK_SIZE>>>(
 				~micTransformer.reals,
 				micTransformer.reals.getSize());
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("SquareImic");
 
 		CUDA_CPU_TIC("FourierTransform_1");
@@ -491,6 +497,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				(XFLOAT*)~micTransformer.fouriers,
 				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
 				micTransformer.fouriers.getSize()*2);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("FourierTransform_1");
 
 
@@ -715,6 +722,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 															  DEG2RAD(basePckr->psi_sampling),
 															  projKernel
 														);
+			LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			CUDA_CPU_TOC("Projection");
 
 			/*
@@ -791,6 +799,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   d_FauxNpsi.d_ptr,
 														  	  	  d_Fmic.d_ptr,
 														  	  	  FauxStride);
+			LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			CUDA_CPU_TOC("convol");
 
 			for (int psiIter = 0; psiIter < cudaTransformer.psiIters; psiIter++) // psi-batches for possible memory-limits
@@ -850,6 +859,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						(XFLOAT) expected_Pratio,
 						cudaTransformer.batchSize[psiIter]
 						);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 				CUDA_CPU_TOC("probRatio");
 			    CUDA_CPU_TOC("OneRotation");

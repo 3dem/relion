@@ -341,6 +341,7 @@ void runWavgKernel(
 			baseMLO->refs_are_ctf_corrected,
 			part_scale
 			);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
@@ -374,6 +375,7 @@ void mapAllWeightsToMweights(
 			d_mweights,
 			orientation_num,
 			translation_num);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
 
 
@@ -397,6 +399,7 @@ size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT thres
 				threshold,
 				data.getSize()-1,
 				~idx);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		idx.cp_to_host();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
 
@@ -452,6 +455,7 @@ void runDiff2KernelCoarse(
 					diff2s,
 					translation_num,
 					image_size);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
 
 			if (rest != 0)
@@ -468,6 +472,7 @@ void runDiff2KernelCoarse(
 					&diff2s[translation_num*even_orientation_num],
 					translation_num,
 					image_size);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
 
 		}
@@ -499,6 +504,7 @@ void runDiff2KernelCoarse(
 					diff2s,
 					translation_num,
 					image_size);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
 
 			if (rest != 0)
@@ -515,6 +521,7 @@ void runDiff2KernelCoarse(
 					&diff2s[translation_num*even_orientation_num],
 					translation_num,
 					image_size);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
 		}
 	}
@@ -544,6 +551,7 @@ void runDiff2KernelCoarse(
 				translation_num,
 				image_size,
 				(XFLOAT) op.local_sqrtXi2[ipart]);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
 
@@ -612,6 +620,7 @@ void runDiff2KernelFine(
 				trans_idx,
 				job_idx,
 				job_num);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
     }
     else
     {
@@ -653,6 +662,7 @@ void runDiff2KernelFine(
 				trans_idx,
 				job_idx,
 				job_num);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
     }
 
 }
@@ -690,6 +700,7 @@ void windowFourierTransform2(
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
 				max_r2 );
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 	else
 	{
@@ -702,6 +713,7 @@ void windowFourierTransform2(
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
 
@@ -741,6 +753,7 @@ void windowFourierTransform2(
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
 				max_r2 );
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 	else
 	{
@@ -751,6 +764,7 @@ void windowFourierTransform2(
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
 

@@ -241,6 +241,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 									~temp,
 									(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr),
 									img_size);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 			temp.streamSync();
 			CUDA_CPU_TOC("norm_corr");
 		}
@@ -254,6 +255,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 								img.data.ydim,
 								XX(my_old_offset),
 								YY(my_old_offset));
+		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 		CUDA_CPU_TOC("kernel_translate");
 //		d_img.cp_to_host();
 //		d_img.streamSync();
@@ -275,6 +277,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 											img.data.ydim,
 											XX(my_old_offset),
 											YY(my_old_offset));
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 //			d_img.cp_to_host();
 //			d_img.streamSync();
@@ -319,6 +322,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						(XFLOAT*)~cudaMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
 						cudaMLO->transformer1.fouriers.getSize()*2);
+		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
 		d_Fimg.device_alloc();
@@ -450,6 +454,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																					radius,
 																					radius_p,
 																					cosine_width);
+				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 				d_img.cp_to_host();
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -495,6 +500,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						(XFLOAT*)~cudaMLO->transformer2.fouriers,
 						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer2.reals.getSize())),
 						cudaMLO->transformer2.fouriers.getSize()*2);
+		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 		CUDA_CPU_TOC("transform");
 
@@ -560,6 +566,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						cudaMLO->transformer2.yFSize,
 						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
 						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 				spectrumAndXi2.streamSync();
 				spectrumAndXi2.cp_to_host();
@@ -1446,7 +1453,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							(XFLOAT)op.min_diff2[ipart],
 							sp.nr_dir*sp.nr_psi,
 							sp.nr_trans);
-
+					LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 //					CUDA_GPU_TAC("cuda_kernel_sumweight");
 				}
 				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -1473,6 +1480,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							~FPCMasks[ipart][exp_iclass].jobOrigin,
 							~FPCMasks[ipart][exp_iclass].jobExtent,
 							FPCMasks[ipart][exp_iclass].jobNum);
+							LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 //					CUDA_GPU_TAC("cuda_kernel_sumweight");
 				}
 				CUDA_CPU_TOC("sumweight1");
@@ -1861,6 +1869,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~FPCMasks[ipart][exp_iclass].jobOrigin,
 					~FPCMasks[ipart][exp_iclass].jobExtent
 						);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 			partial_pos+=block_num;
 		}
 		CUDA_CPU_TIC("collect_data_2_post_kernel");
@@ -2681,6 +2690,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDev
 	======================================================*/
 
 	device_id = dev_id;
+	errorStatus = (cudaError_t)0; // init as cudaSuccess (==0)
 
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
@@ -2701,6 +2711,7 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDev
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)
 		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
+
 
 	refIs3D = baseMLO->mymodel.ref_dim == 3;
 };
