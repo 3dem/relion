@@ -17,6 +17,7 @@
 
 #ifdef DEBUG_CUDA
 #define DEBUG_HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
+#define LAUNCH_HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 #else
 #define DEBUG_HANDLE_ERROR( err ) (err) //Do nothing
 #endif
@@ -28,13 +29,17 @@ static void HandleError( cudaError_t err, const char *file, int line )
     if (err != cudaSuccess)
     {
 #ifdef DEBUG_CUDA
-        printf( "DEBUG_ERROR: %s in %s at line %d\n",
-        		cudaGetErrorString( err ), file, line );
+#ifdef LAUNCH_CHECK
+    	printf( "KERNEL_ERROR: %s in %s at line %d (error-code %d)\n",
+#else
+    	printf( "DEBUG_ERROR: %s in %s at line %d (error-code %d)\n",
+#endif
+    			cudaGetErrorString( err ), file, line, err );
         fflush(stdout);
 		raise(SIGSEGV);
 #else
-        printf( "ERROR: %s in %s at line %d\n",
-        		cudaGetErrorString( err ), file, line );
+        printf( "ERROR: %s in %s at line %d (error-code %d)\n",
+        		cudaGetErrorString( err ), file, line, err );
         fflush(stdout);
 		raise(SIGSEGV);
 #endif
@@ -44,8 +49,8 @@ static void HandleError( cudaError_t err, const char *file, int line )
 	cudaError_t peek = cudaPeekAtLastError();
     if (peek != cudaSuccess)
     {
-        printf( "DEBUG_ERROR: %s in %s at line %d\n",
-        		cudaGetErrorString( peek ), file, line );
+        printf( "DEBUG_ERROR: %s in %s at line %d (error-code %d)\n",
+        		cudaGetErrorString( peek ), file, line, err );
         fflush(stdout);
 		raise(SIGSEGV);
     }
@@ -123,11 +128,9 @@ void cudaMemInit( T *ptr, int value, size_t size, cudaStream_t &stream)
 
 class CudaCustomAllocator
 {
-
 	typedef unsigned char BYTE;
 
 public:
-
 	class Alloc
 	{
 		friend class CudaCustomAllocator;
@@ -405,8 +408,12 @@ private:
 #endif
 	};
 
-	void _setup()
+public:
+
+	CudaCustomAllocator(size_t size, size_t alignmentSize):
+		totalSize(size), alignmentSize(alignmentSize), first(0)
 	{
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		first = new Alloc();
 
 		first->prev = NULL;
@@ -414,35 +421,12 @@ private:
 		first->size = totalSize;
 		first->free = true;
 
-		if (totalSize > 0)
-			HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), totalSize));
-	}
+		HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), size));
 
-	void _clear()
-	{
-		if (first->ptr != NULL)
-			DEBUG_HANDLE_ERROR(cudaFree( first->ptr ));
-
-		first->ptr = NULL;
-
-		Alloc *a = first, *nL;
-
-		while (a != NULL)
-		{
-			nL = a->next;
-			delete a;
-			a = nL;
-		}
-	}
-
-public:
-
-	CudaCustomAllocator(size_t size, size_t alignmentSize):
-		totalSize(size), alignmentSize(alignmentSize), first(0)
-	{
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
-		_setup();
-
+//		pthread_mutexattr_t mutex_attr;
+//		pthread_mutexattr_init(&mutex_attr);
+//		pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
+//		int mutex_error = pthread_mutex_init(&mutex, &mutex_attr);
 		int mutex_error = pthread_mutex_init(&mutex, NULL);
 
 		if (mutex_error != 0)
@@ -454,25 +438,10 @@ public:
 #endif
 	}
 
-	void resize(size_t size)
-	{
-		pthread_mutex_lock(&mutex);
-
-		_clear();
-		totalSize = size;
-		_setup();
-
-		pthread_mutex_unlock(&mutex);
-	}
-
 
 	inline
 	Alloc* alloc(size_t size)
 	{
-
-#ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
-		fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
-#endif
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
 		Alloc *nAlloc = new Alloc();
 		nAlloc->size = size;
@@ -560,7 +529,16 @@ public:
 
 		pthread_mutex_lock(&mutex);
 
-		_clear();
+		DEBUG_HANDLE_ERROR(cudaFree( first->ptr ));
+
+		Alloc *a = first, *nL;
+
+		while (a != NULL)
+		{
+			nL = a->next;
+			delete a;
+			a = nL;
+		}
 
 		pthread_mutex_unlock(&mutex);
 		pthread_mutex_destroy(&mutex);
@@ -776,12 +754,6 @@ public:
 
 	void setSize(size_t s) { size = s; };
 	size_t getSize() { return size; };
-
-
-	void setAllocator(CudaCustomAllocator *a) {
-		free_device_if_set();
-		allocator = a;
-	};
 
 	void markReadyEvent()
 	{
