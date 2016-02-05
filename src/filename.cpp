@@ -414,53 +414,55 @@ bool exists(const FileName &fn)
     return true;
 }
 
-size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
+bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
+
 	size_t slashpos = 0;
 	int i = 0;
-	while (slashpos < fnt.length())
+	while (slashpos < fn_in.length())
 	{
 		i++;
-		slashpos = fnt.find("/", slashpos+1);
-		if (fnt[slashpos+1]=='j' && fnt[slashpos+2]=='o' && fnt[slashpos+3]=='b' &&
-			std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]))
+		slashpos = fn_in.find("/", slashpos+1);
+		if (fn_in[slashpos+1]=='j' && fn_in[slashpos+2]=='o' && fn_in[slashpos+3]=='b' &&
+			std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]))
 		{
-			uniqdate = fnt.substr(slashpos+1,6);
-			return slashpos;
+			// find the second slash
+			size_t slashpos2 = fn_in.find("/", slashpos+6);
+			if (slashpos2 == std::string::npos)
+				slashpos2 = fn_in.length() - 1;
+			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
+			fn_jobnr = fn_in.substr(slashpos+1, slashpos2-slashpos); // this has the second slash
+			fn_post = fn_in.substr(slashpos2+1); // this has the rest
+			return true;
 		}
-		// Temporary to allow recognition of older unique runnames with 12 digits
-		// TODO: remove after alpha-testing of relion-2.0
-		else if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
-		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
-		    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
-		    (fnt[slashpos+7] == '.' || fnt[slashpos+7] == '-') &&
-		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
-		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
+	    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
+		else if (std::isdigit(fn_in[slashpos+1]) && std::isdigit(fn_in[slashpos+2]) && std::isdigit(fn_in[slashpos+3]) &&
+		    std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]) &&
+		    (fn_in[slashpos+7] == '.' || fn_in[slashpos+7] == '-') &&
+		    std::isdigit(fn_in[slashpos+8]) && std::isdigit(fn_in[slashpos+9]) && std::isdigit(fn_in[slashpos+10]) &&
+		    std::isdigit(fn_in[slashpos+11]) && std::isdigit(fn_in[slashpos+12]) && std::isdigit(fn_in[slashpos+13]) )
 		{
-			uniqdate = fnt.substr(slashpos+1,13);
-			return slashpos;
+			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
+			fn_jobnr = fn_in.substr(slashpos+1,14); // this has the second slash
+			fn_post = fn_in.substr(slashpos+15); // this has the rest
+			return true;
 		}
-
-
-		if (i>100)
-			REPORT_ERROR("findUniqueDateSubstring: BUG or found more than 100 directories deep structure?");
+		if (i>20)
+			REPORT_ERROR("decomposePipelineFileName: BUG or found more than 20 directories deep structure for pipeline filename: " + fn_in);
 	}
+	// This was not a pipeline filename
+	fn_pre="";
+	fn_jobnr="";
+	fn_post=fn_in;
+	return false;
 
-	// Not found
-	uniqdate="";
-	return std::string::npos;
 }
 
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir)
 {
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_input, uniqdate);
-	FileName fn_nouniqdate;
-	// TODO remove if after alpha-testing of relion-2.0
-	if (uniqdate.length() > 7)
-		fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+15) : fn_input;
-	else
-		fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+8) : fn_input;
-	return fn_new_outputdir + fn_nouniqdate;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_input, fn_pre, fn_jobnr, fn_post);
+	std::cerr << "newoutputfile= " << fn_pre + fn_new_outputdir + fn_post << std::endl;
+	return fn_pre + fn_new_outputdir + fn_post;
 }
 

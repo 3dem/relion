@@ -235,15 +235,15 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 		// Make sure fn_alias ends with a slash
 		if (fn_alias[fn_alias.length()-1] != '/')
 			fn_alias += "/";
-		FileName uniqdate;
-		size_t slashpos = findUniqueDateSubstring(node.name, uniqdate);
-		FileName fn_after_uniqdate = (slashpos!= std::string::npos) ? node.name.substr(slashpos+15) : node.name;
-		fnt = fn_alias + fn_after_uniqdate;
+		FileName fn_pre, fn_jobnr, fn_post;
+		if (decomposePipelineFileName(node.name, fn_pre, fn_jobnr, fn_post))
+			fnt = fn_alias + fn_post;
+		else
+			REPORT_ERROR("PipeLine::touchTemporaryNodeFile ERROR: invalid node name: " + node.name);
 	}
 	else
-	{
 		fnt = node.name;
-	}
+
 	if (exists(node.name) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node

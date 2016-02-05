@@ -963,13 +963,11 @@ void Preprocessing::performPerImageOperations(
 MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 {
 
-	// Get the micropgraph name without the UNIQDATE string
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
-	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
-
+	// Get the micropgraph name without the UNIQDATE string into fn_post, and only read that micrograph in the MDresult table
+	FileName fn_pre, fn_jobnr, fn_post;
 	MetaDataTable MDresult;
-	MDresult.read(fn_data, "", NULL, fn_mic_nouniqdate);
+	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	MDresult.read(fn_data, "", NULL, fn_post);
 
 	if (!MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) || !MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 	{
@@ -1004,10 +1002,9 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				long int my_nr;
 				MDresult.getValue(EMDL_IMAGE_NAME, fn_curr_img);
 				fn_curr_img.decompose(my_nr, fnt);
-				// Remove the uniqdate if present
-				size_t slashpos = findUniqueDateSubstring(fnt, uniqdate);
-				FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fnt.substr(slashpos+15) : fnt;
-				fn_curr_img.compose(my_nr, fn_nouniqdate); // fn_img = integerToString(n) + "@" + fn_exp;
+				// Remove uniq-id prefixes from the filename
+				decomposePipelineFileName(fnt, fn_pre, fn_jobnr, fn_post);
+				fn_curr_img.compose(my_nr, fn_post); // fn_img = integerToString(n) + "@" + fn_exp;
 				MDresult.setValue(EMDL_PARTICLE_ORI_NAME, fn_curr_img);
 
 				if (do_contains_xy)
@@ -1057,11 +1054,9 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 FileName Preprocessing::getCoordinateFileName(FileName fn_mic)
 {
 
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
-	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
-	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
-	FileName fn_coord = fn_coord_dir + fn_mic_nouniqdate + fn_coord_suffix;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	FileName fn_coord = fn_coord_dir + fn_post.withoutExtension() + fn_coord_suffix;
 	return fn_coord;
 }
 
@@ -1069,11 +1064,9 @@ FileName Preprocessing::getCoordinateFileName(FileName fn_mic)
 FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 {
 
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
-	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
-	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
-	FileName fn_part = fn_part_dir + fn_mic_nouniqdate;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	FileName fn_part = fn_part_dir + fn_post.withoutExtension();
 	if (do_movie_extract)
 		fn_part += "_" + movie_name;
 	return fn_part;
@@ -1082,10 +1075,9 @@ FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 FileName Preprocessing::getOriginalStackNameWithoutUniqDate(FileName fn_mic)
 {
 
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
-	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
-	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension() + ".mrcs";
-	return fn_mic_nouniqdate;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	return fn_post.withoutExtension() + ".mrcs";
+
 }
 

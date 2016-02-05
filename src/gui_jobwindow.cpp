@@ -452,7 +452,12 @@ void RelionJobWindow::initialisePipeline(std::string &outputname, std::string de
 	pipelineInputNodes.clear();
 
 	if (outputname == "") // for continue jobs, use the same outputname
-		outputname = defaultname + "/job" + integerToString(job_counter, 3) + "/";
+	{
+		if (job_counter < 1000)
+			outputname = defaultname + "/job" + integerToString(job_counter, 3) + "/";
+		else
+			outputname = defaultname + "/job" + integerToString(job_counter) + "/";
+	}
 
 	pipelineOutputName = outputname;
 

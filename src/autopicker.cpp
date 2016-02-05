@@ -2032,12 +2032,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 FileName AutoPicker::getOutputRootName(FileName fn_mic)
 {
 
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
-	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
-	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
-	FileName fn_part = fn_odir + fn_mic_nouniqdate;
-	return fn_part;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	return fn_odir + fn_post.withoutExtension();
 
 }
 

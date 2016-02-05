@@ -457,9 +457,11 @@ public:
 };
 
 // The following 2 functions are for the pipelining of RELION-2.0
-// Finds the 6-digit UNIQDATE substring from a larger string, as used in relion-2.0 pipeline
-// This function returns the position of the slash right before the UNIQDATE entry, and the entry itself is in
-size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate);
+// Finds the 160101.093245 or job001 UNIQ-ID substring from a larger string, as used in relion-2.0 pipeline
+// It returns the part before that id (+trailing slash), the id itself (plus trailing slash) and the part after the id
+// The function returns true if the input filename was a pipeline one, and false otherwise
+// If the input filename wasn't a pipeline one, then fn_post is set to the input filename and the fn_pre and fn_jobnr are left empty
+bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post);
 
 // Replaces the UNIQDATE substring and its preceding Directory-structure from fn_input, and adds fn_new_outputdir in front of it
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir);

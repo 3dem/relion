@@ -498,10 +498,10 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 		FileName uniqdate, fnt;
 		long int my_nr;
 		fn_curr_img.decompose(my_nr, fnt);
-		// Remove the uniqdate if present
-		size_t slashpos = findUniqueDateSubstring(fnt, uniqdate);
-		FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fnt.substr(slashpos+15) : fnt;
-		fn_curr_img.compose(my_nr, fn_nouniqdate); // fn_img = integerToString(n) + "@" + fn_exp;
+		FileName fn_pre, fn_jobnr, fn_post;
+		// Remove the uniq jobname if present
+		decomposePipelineFileName(fnt, fn_pre, fn_jobnr, fn_post);
+		fn_curr_img.compose(my_nr, fn_post);
 		fn_curr_imgs.push_back(fn_curr_img);
 		fn_curr_groups.push_back(groups[group_id-1].name);
 		count_frames.push_back(0);

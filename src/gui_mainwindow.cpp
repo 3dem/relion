@@ -1642,29 +1642,29 @@ void RelionMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
 
 void RelionMainWindow::cb_set_alias_i(std::string alias)
 {
-	FileName before_uniqdate, uniqdate, default_ask;
-	before_uniqdate = pipeline.processList[current_job].name;
-	size_t slashpos = findUniqueDateSubstring(before_uniqdate, uniqdate);
-	before_uniqdate = before_uniqdate.beforeFirstOf(uniqdate);
+
+	FileName fn_pre, fn_jobnr, fn_post, fn_dummy, default_ask;
+	if (!decomposePipelineFileName(pipeline.processList[current_job].name, fn_pre, fn_jobnr, fn_post))
+		REPORT_ERROR("RelionMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
 
 	// If alias already exists: remove that symlink
 	FileName fn_alias = pipeline.processList[current_job].alias;
 	if (fn_alias != "None")
 	{
 		std::remove((fn_alias.beforeLastOf("/")).c_str());
-		default_ask = fn_alias.without(before_uniqdate);
+		default_ask = fn_alias.without(fn_pre);
 		if (default_ask[default_ask.length()-1] == '/')
 			default_ask = default_ask.beforeLastOf("/");
 	}
 	else
-		default_ask = uniqdate;
+		default_ask = fn_jobnr.beforeLastOf("/");
 
 	bool is_done = false;
 	while (!is_done)
 	{
 		// If the alias already contains a uniquedate string it may be a continuation of a relion_refine job
 		// (where alias_current_job contains a different uniqdate than the outputname of the job)
-		if (alias == "" || findUniqueDateSubstring(alias, uniqdate)!= std::string::npos ) // if an alias is provided, just check it is unique, otherwise ask
+		if (alias == "" || decomposePipelineFileName(alias, fn_dummy, fn_dummy, fn_dummy) ) // if an alias is provided, just check it is unique, otherwise ask
 		{
 			const char * palias;
 			palias =  fl_input("Rename to: ", default_ask.c_str());
@@ -1674,7 +1674,6 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 			std::string al2(palias);
 			alias = al2;
 		}
-
 
 		if (alias.length() < 2)
 		{
@@ -1703,7 +1702,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 			bool is_unique = true;
 			for (size_t i = 0; i < pipeline.processList.size(); i++)
 			{
-				if ( pipeline.processList[i].alias == before_uniqdate + alias && alias != "None")
+				if ( pipeline.processList[i].alias == fn_pre + alias && alias != "None")
 				{
 					is_unique = false;
 					break;
@@ -1724,9 +1723,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 	if (alias == "None" )
 		pipeline.processList[current_job].alias = "None";
 	else
-	{
-		pipeline.processList[current_job].alias = before_uniqdate + alias;
-	}
+		pipeline.processList[current_job].alias = fn_pre + alias;
 
 	// Write new pipeline to disc and read in again
 	std::vector<bool> dummy;
