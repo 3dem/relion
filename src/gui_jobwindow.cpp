@@ -4932,8 +4932,7 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THR
 
 	current_y += STEPY /2 ;
 
-	fn_mask.place(current_y, "User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A binary (!) mask with values 0 for solvent and 1 for protein. \
-Note that values larger than zero will be changed to 1 by ResMap, therefore the continuous masks from the postprocessing may be too wide. If left empty (default), then ResMap will determine its own mask");
+	fn_mask.place(current_y, "User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 
 	tab1->end();
 
