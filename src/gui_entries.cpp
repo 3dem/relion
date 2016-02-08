@@ -509,7 +509,7 @@ void InputNodeEntry::cb_browse_node_i() {
 
     // Get rid of the .Nodes/type/ directory-name again
     std::string replace = std::string(relname);
-    std::string replace2 = replace.substr(fn_dir.length()+1, replace.length());
+    std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
     char relname2[FL_PATH_MAX];
     strcpy(relname2, replace2.c_str());
 

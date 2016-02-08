@@ -712,8 +712,16 @@ void multiViewerCanvas::printMetaData(int ipos)
 {
 	 std::ostringstream stream;
 	 boxes[ipos]->MDimg.write(stream);
-	 std::string str =  stream.str();
+	 FileName str =  stream.str();
+	 // Grrr: somehow fl_message sometimes does not display the @ character (nor anything that comes after it)
+	 size_t pos = str.find('@', 0);
+	 while (pos != std::string::npos)
+	 {
+		 str.replace(pos, 1, (std::string)"(at)" );
+		 pos = str.find('@', pos);
+	 }
 	 fl_message( str.c_str());
+
 }
 
 void multiViewerCanvas::showAverage(bool selected, bool show_stddev)

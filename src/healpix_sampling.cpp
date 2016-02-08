@@ -369,8 +369,7 @@ void HealpixSampling::setTranslations(
 				for (long int iz = -maxp; iz <= maxp; iz++)
 				{
 					zoff = iz * offset_step;
-					max2 += zoff * zoff;
-					if (max2 <= (offset_range * offset_range))
+					if (max2 + zoff * zoff <= (offset_range * offset_range))
 					{
 						translations_x.push_back(xoff);
 						translations_y.push_back(yoff);
