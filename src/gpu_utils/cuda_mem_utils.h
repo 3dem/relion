@@ -104,14 +104,14 @@ void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t &stream)
 
 template< typename T>
 static inline
-void cudaMemInit( T *ptr, int value, size_t size)
+void cudaMemInit( T *ptr, T value, size_t size)
 {
 	DEBUG_HANDLE_ERROR(cudaMemset( ptr, value, size * sizeof(T)));
 };
 
 template< typename T>
 static inline
-void cudaMemInit( T *ptr, int value, size_t size, cudaStream_t &stream)
+void cudaMemInit( T *ptr, T value, size_t size, cudaStream_t &stream)
 {
 	DEBUG_HANDLE_ERROR(cudaMemsetAsync( ptr, value, size * sizeof(T), stream));
 };
@@ -942,7 +942,7 @@ public:
 	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
 	 */
 	inline
-	void cp_on_device(CudaGlobalPtr<T> devPtr)
+	void cp_on_device(CudaGlobalPtr<T> &devPtr)
 	{
 #ifdef DEBUG_CUDA
 		if (devPtr.size == 0)
