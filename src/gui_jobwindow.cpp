@@ -712,6 +712,33 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		Node node(outputname + fnt, mynodetype);
 		pipelineOutputNodes.push_back(node);
 
+		// Also get the other half-map
+		if (mynodetype == NODE_HALFMAP)
+		{
+			FileName fn_inb = fn_in.getValue();
+			size_t pos = fn_inb.find("half1");
+			if (pos != std::string::npos)
+			{
+				fn_inb.replace(pos, 5, "half2");
+
+			}
+			else
+			{
+				pos = fn_inb.find("half2");
+				if (pos != std::string::npos)
+				{
+					fn_inb.replace(pos, 5, "half1");
+				}
+			}
+			fnt = "/" + fn_inb;
+			fnt = fnt.afterLastOf("/");
+			command = "cp " + fn_inb + " " + outputname + fnt;
+			commands.push_back(command);
+
+			Node node2(outputname + fnt, mynodetype);
+			pipelineOutputNodes.push_back(node2);
+		}
+
 	}
 	else
 	{
@@ -4934,6 +4961,10 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THR
 
 	fn_mask.place(current_y, "User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 
+	current_y += STEPY/2;
+
+	angpix.place(current_y, "Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
+
 	tab1->end();
 
 	tab2->begin();
@@ -4973,6 +5004,7 @@ void ResmapJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 	fn_resmap.writeValue(fh);
 	fn_in.writeValue(fh);
+	angpix.writeValue(fh);
 	pval.writeValue(fh);
 	minres.writeValue(fh);
 	maxres.writeValue(fh);
@@ -4994,6 +5026,7 @@ void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 	{
 		fn_resmap.readValue(fh);
 		fn_in.readValue(fh);
+		angpix.readValue(fh);
 		pval.readValue(fh);
 		minres.readValue(fh);
 		maxres.readValue(fh);
@@ -5010,6 +5043,12 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 
 	fn_resmap.deactivate(is_continue);
 	fn_in.deactivate(is_continue);
+	angpix.deactivate(is_continue);
+	pval.deactivate(is_continue);
+	minres.deactivate(is_continue);
+	maxres.deactivate(is_continue);
+	stepres.deactivate(is_continue);
+	fn_mask.deactivate(is_continue);
 
 	// never submit this to queue, as ResMap needs user interaction
 	do_queue.deactivate(true);
@@ -5019,19 +5058,14 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
-	// TODO
-	double angpix = 1;
-
 	commands.clear();
 	initialisePipeline(outputname, "Resmap", job_counter);
 
-	std::string command;
 	if (fn_resmap.getValue().length() == 0)
 	{
 		std::cerr << "ResmapJobWindow::getCommands ERROR: please provide an executable for the ResMap program." << std::endl;
 		exit(1);
 	}
-	command = fn_resmap.getValue();
 
 	// Get the two half-reconstruction names from the single one
 	std::string fn_half1, fn_half2;
@@ -5046,16 +5080,24 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		std::cerr << "ResMapJobWindow::getCommands ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
 		exit(1);
 	}
+
+	// Make symbolic links to the half-maps in the output directory
+	commands.push_back("ln -s ../../" + fn_half1 + " " + outputname + "half1.mrc");
+	commands.push_back("ln -s ../../" + fn_half2 + " " + outputname + "half2.mrc");
+
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
 	Node node2(fn_mask.getValue(), fn_mask.type);
 	pipelineInputNodes.push_back(node2);
+
+	Node node3(outputname + "half1_resmap.mrc", NODE_RESMAP);
+	pipelineOutputNodes.push_back(node3);
+
+	std::string command = fn_resmap.getValue();
 	command += " --maskVol=" + fn_mask.getValue();
-
-
-	command += " --vis2D --noguiSplit " + fn_half1 + " " + fn_half2;
-	command += " --vxSize=" + floatToString(angpix);
+	command += " --noguiSplit " + outputname + "half1.mrc " +  outputname + "half2.mrc";
+	command += " --vxSize=" + floatToString(angpix.getValue());
 	command += " --pVal=" + floatToString(pval.getValue());
 	command += " --minRes=" + floatToString(minres.getValue());
 	command += " --maxRes=" + floatToString(maxres.getValue());
@@ -5063,17 +5105,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
-
 	commands.push_back(command);
-
-	// Copy the resmap file to the ResMap directory
-	FileName fn_out = fn_in.getValue();
-	fn_out = fn_out.insertBeforeExtension("_resmap");
-	std::string command2 = "cp " + fn_out + " " + outputname + "resmap.mrc";
-
-	commands.push_back(command2);
-	Node node3(outputname + "resmap.mrc", NODE_RESMAP);
-	pipelineOutputNodes.push_back(node3);
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }

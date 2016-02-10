@@ -946,6 +946,7 @@ public:
 
 	// Params
 	FileNameEntry fn_resmap;
+	SliderEntry angpix;
 	SliderEntry pval;
 	SliderEntry minres;
 	SliderEntry maxres;
