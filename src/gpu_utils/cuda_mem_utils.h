@@ -1196,7 +1196,7 @@ class cudaStager
 {
 public:
 	CudaGlobalPtr<T> AllData;
-	unsigned long size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
+	size_t size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
 
 	/*======================================================
 				CONSTRUCTORS WITH ALLOCATORS
@@ -1240,7 +1240,7 @@ public:
 			printf("trying to host-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=size;
 		if(AllData.h_ptr==NULL)
 			AllData.host_alloc();
@@ -1248,14 +1248,14 @@ public:
 			printf("WARNING : host_alloc when host-ptr is non-null");
 		AllData.size=temp_size;
 	}
-	void prepare_host(int alloc_size)
+	void prepare_host(size_t alloc_size)
 	{
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
 		if(AllData.h_ptr==NULL)
 			AllData.host_alloc();
@@ -1270,7 +1270,7 @@ public:
 			printf("trying to host-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=size;
 		if(AllData.d_ptr==NULL)
 			AllData.device_alloc();
@@ -1278,14 +1278,14 @@ public:
 			printf("WARNING : device_alloc when dev-ptr is non-null");
 		AllData.size=temp_size;
 	}
-	void prepare_device(int alloc_size)
+	void prepare_device(size_t alloc_size)
 	{
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
 		if(AllData.d_ptr==NULL)
 			AllData.device_alloc();
@@ -1298,7 +1298,7 @@ public:
 		 prepare_host();
 		 prepare_device();
 	}
-	void prepare(int alloc_size)
+	void prepare(size_t alloc_size)
 	{
 		 prepare_host(alloc_size);
 		 prepare_device(alloc_size);
@@ -1315,7 +1315,7 @@ public:
 			exit( EXIT_FAILURE );
 		}
 
-		for(int i=0 ; i<input.size; i++)
+		for(size_t i=0 ; i<input.size; i++)
 			AllData.h_ptr[AllData.size+i] = input.h_ptr[i];
 
 		// reset the staged object to this new position (TODO: disable for pinned mem)
