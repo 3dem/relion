@@ -2336,12 +2336,13 @@ void MlOptimiserMpi::iterate()
 		if (node->rank == 1)
 			timer.printTimes(false);
 #endif
-                for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-                    ((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
+		for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+			((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
 
-	for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-		((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
     }
+
+	// Hopefully this barrier will prevent some bus errors
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
