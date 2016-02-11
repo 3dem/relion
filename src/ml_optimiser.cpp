@@ -414,8 +414,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
     helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
     helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
-    do_helical_bimodal_orient_searches = parser.checkOption("--helical_bimodal_search", "Perform bimodal searches of orientations (psi and tilt angles) for helical segments in the first few iterations?");
     do_helical_symmetry_local_refinement = parser.checkOption("--helical_symmetry_search", "Perform local refinement of helical symmetry?");
+    helical_sigma_segment_distance = textToFloat(parser.getOption("--helical_sigma_segment_distance", "Sigma of helical segment distance (in Angstroms)", "-1."));
     mymodel.initialiseHelicalParametersLists(helical_twist_initial, helical_rise_initial);
     mymodel.is_helix = do_helical_refine;
 
@@ -615,10 +615,10 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		helical_tube_inner_diameter = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter))
 		helical_tube_outer_diameter = -1.;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, do_helical_bimodal_orient_searches))
-    	do_helical_bimodal_orient_searches = false;
     if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement))
     	do_helical_symmetry_local_refinement = false;
+    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, helical_sigma_segment_distance))
+    	helical_sigma_segment_distance = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
 
@@ -756,8 +756,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, do_helical_bimodal_orient_searches);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, helical_sigma_segment_distance);
 	    MD.setValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged);
 	    MD.setValue(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, has_high_fsc_at_limit);
 	    MD.setValue(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, has_large_incr_size_iter_ago);
@@ -1214,17 +1214,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 				(particle_diameter / 2.),
 				(helical_tube_inner_diameter / 2.),
 				(helical_tube_outer_diameter / 2.));
-
-		if ( (do_helical_bimodal_orient_searches) && (mymodel.sigma2_rot > 0.) )
-		{
-			if ( !((mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.)) )
-				REPORT_ERROR("ERROR: Rot but not tilt prior exists! It is not reasonable for 3D helical reconstruction!");
-		}
 	}
 	else
 	{
-		if (do_helical_bimodal_orient_searches)
-			REPORT_ERROR("ERROR: cannot do bimodal searches of orientations for non-helical segments!");
 		if (do_helical_symmetry_local_refinement)
 			REPORT_ERROR("ERROR: cannot do local refinement of helical parameters for non-helical segments!");
 	}
@@ -1759,7 +1751,25 @@ void MlOptimiser::iterate()
 		{
 			makeGoodHelixForEachRef();
 			if ( (!do_skip_align) && (!do_skip_rotate) )
-				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+			{
+				if (helical_sigma_segment_distance < 0.)
+				{
+					updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+				}
+				else
+				{
+					int nr_same_polarity = 0, nr_opposite_polarity = 0;
+					bool do_class3d_with_one_class = ( (mymodel.ref_dim == 3) && (mymodel.nr_classes == 1) );
+					updatePriorsForHelicalReconstruction(
+							mydata.MDimg,
+							helical_sigma_segment_distance / mymodel.pixel_size,
+							nr_opposite_polarity,
+							((do_auto_refine) || (do_class3d_with_one_class)));
+					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+					if (verb > 0)
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << std::endl;
+				}
+			}
 		}
 
 		// Apply masks to the reference images
@@ -2028,16 +2038,11 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 		// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
 		if (do_helical_refine)
 		{
-			bool use_bimodal_psi, use_bimodal_tilt;
-			use_bimodal_psi = use_bimodal_tilt = false;
-			if ( (do_helical_bimodal_orient_searches) && ((sqrt(mymodel.sigma2_tilt) > 0.) || (sqrt(mymodel.sigma2_psi) > 0.)) )
-				use_bimodal_psi = use_bimodal_tilt = true;
-			if ( (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
-				use_bimodal_psi = use_bimodal_tilt = false;
+			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 			sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(ran_rot, ran_tilt, ran_psi,
 									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 									pointer_dir_nonzeroprior, directions_prior, pointer_psi_nonzeroprior, psi_prior,
-									use_bimodal_psi, use_bimodal_tilt);
+									do_auto_refine_local_searches);
 		}
 		else
 		{
@@ -3416,6 +3421,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			RFLOAT prior_rot =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
 			RFLOAT prior_tilt = (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
+			RFLOAT prior_psi_flip_ratio =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
@@ -3424,22 +3430,19 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
+				prior_psi_flip_ratio = 0.5;
 
 			////////// How does this work now: each particle has a different sampling object?!!!
 			// Select only those orientations that have non-zero prior probability
 			// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
 			if (do_helical_refine)
 			{
-				bool use_bimodal_psi, use_bimodal_tilt;
-				use_bimodal_psi = use_bimodal_tilt = false;
-				if ( (do_helical_bimodal_orient_searches) && ((sqrt(mymodel.sigma2_tilt) > 0.) || (sqrt(mymodel.sigma2_psi) > 0.)) )
-					use_bimodal_psi = use_bimodal_tilt = true;
-				if ( (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
-					use_bimodal_psi = use_bimodal_tilt = false;
+				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 				sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 										exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior,
-										use_bimodal_psi, use_bimodal_tilt);
+										do_auto_refine_local_searches, prior_psi_flip_ratio);
 			}
 			else
 			{
@@ -7332,6 +7335,8 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			if (mymodel.data_dim == 3)
 				if (!mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_PRIOR, DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ZOFF_PRIOR), part_id))
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ZOFF_PRIOR) = 999.;
+			if (!mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO,  DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_PSI_PRIOR_FLIP_RATIO), part_id))
+				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_PSI_PRIOR_FLIP_RATIO) = 999.;
 
 			// For multi-body refinement
 			if (mymodel.nr_bodies > 1)

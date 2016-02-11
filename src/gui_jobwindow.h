@@ -413,6 +413,7 @@ public:
 	SliderEntry helical_nr_asu;
 	SliderEntry helical_rise;
 	SliderEntry helical_tube_outer_diameter;
+	BooleanEntry helical_bimodal_angular_priors;
 
 	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group, *helix_group, *helical_tubes_group;
 
@@ -504,7 +505,7 @@ public:
 	SliderEntry range_psi;
 	SliderEntry helical_tube_outer_diameter;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group, *bimodal_psi_group;
+	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
 
 public:
 
@@ -567,9 +568,7 @@ public:
 	SliderEntry sigma_angles;
 
 	// Helix
-	//textOnlyEntry helix_text;
 	BooleanEntry do_helix;
-	//BooleanEntry do_bimodal;
 	AnyEntry helical_tube_inner_diameter;
 	AnyEntry helical_tube_outer_diameter;
 	SliderEntry helical_nr_asu;
@@ -652,9 +651,7 @@ public:
 	SliderEntry movie_sigma_angles;
 
 	// Helix
-	//textOnlyEntry helix_text;
 	BooleanEntry do_helix;
-	//BooleanEntry do_bimodal;
 	AnyEntry helical_tube_inner_diameter;
 	AnyEntry helical_tube_outer_diameter;
 	SliderEntry helical_nr_asu;

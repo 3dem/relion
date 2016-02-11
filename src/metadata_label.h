@@ -231,7 +231,6 @@ enum EMDLabel
     EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
     EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
     EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
-    EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS,
     EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
     EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
@@ -601,7 +600,6 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, EMDL_BOOL, "rlnHelicalBimodalOrientations", "Flag to indicate that bimodal orientations are searched for helical segments in the first few iterations");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaSegmentDistance", "Sigma of helical segment distance (in Angstroms)");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");

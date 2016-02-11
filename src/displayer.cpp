@@ -542,7 +542,7 @@ int multiViewerCanvas::handle(int ev)
 
 					if (!do_allow_save)
 				    {
-						rclick_menu[9].deactivate();
+						rclick_menu[11].deactivate();
 				    }
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -599,7 +599,7 @@ int multiViewerCanvas::handle(int ev)
 					};
 					if (!do_allow_save)
 				    {
-						rclick_menu[10].deactivate();
+						rclick_menu[12].deactivate();
 				    }
 
 					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);

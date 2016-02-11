@@ -60,10 +60,11 @@
 #define METADATA_XOFF_PRIOR 21
 #define METADATA_YOFF_PRIOR 22
 #define METADATA_ZOFF_PRIOR 23
+#define METADATA_PSI_PRIOR_FLIP_RATIO 24
 
-#define METADATA_BEAMTILT_X 24
-#define METADATA_BEAMTILT_Y 25
-#define METADATA_LINE_LENGTH_BEFORE_BODIES 26
+#define METADATA_BEAMTILT_X 25
+#define METADATA_BEAMTILT_Y 26
+#define METADATA_LINE_LENGTH_BEFORE_BODIES 27
 #define METADATA_NR_BODY_PARAMS 7
 
 #define DO_WRITE_DATA true
@@ -386,11 +387,11 @@ public:
 	// Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)
 	RFLOAT helical_tube_outer_diameter;
 
-	// Flag whether to do bimodal searches of orientations for helical segments in the first few iterations
-	bool do_helical_bimodal_orient_searches;
-
 	// Flag whether to do local refinement of helical parameters
 	bool do_helical_symmetry_local_refinement;
+
+	// Sigma of helical segment distance (In Angstroms)
+	RFLOAT helical_sigma_segment_distance;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -591,8 +592,8 @@ public:
 		helical_z_percentage(0),
 		helical_tube_inner_diameter(0),
 		helical_tube_outer_diameter(0),
-		do_helical_bimodal_orient_searches(0),
-		do_helical_symmetry_local_refinement(0)
+		do_helical_symmetry_local_refinement(0),
+		helical_sigma_segment_distance(0)
 	{};
 
 	/** ========================== I/O operations  =========================== */

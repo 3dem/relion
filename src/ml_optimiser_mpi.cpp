@@ -2274,7 +2274,23 @@ void MlOptimiserMpi::iterate()
 		{
 			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
 			{
-				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+				if (helical_sigma_segment_distance < 0.)
+				{
+					updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+				}
+				else
+				{
+					int nr_same_polarity = 0, nr_opposite_polarity = 0;
+					bool do_class3d_with_one_class = ( (mymodel.ref_dim == 3) && (mymodel.nr_classes == 1) );
+					updatePriorsForHelicalReconstruction(
+							mydata.MDimg,
+							helical_sigma_segment_distance / mymodel.pixel_size,
+							nr_opposite_polarity,
+							((do_auto_refine) || (do_class3d_with_one_class)));
+					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+					if (verb > 0)
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << std::endl;
+				}
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);

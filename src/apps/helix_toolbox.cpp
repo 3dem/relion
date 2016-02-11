@@ -155,7 +155,7 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (Jan 20, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (Feb 10, 2015)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_create_cylinder_3D = parser.checkOption("--cylinder", "Create a cylinder as 3D initial reference");
@@ -272,9 +272,9 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Extract coordinates of helical segments from specified straight tubes" << std::endl;
-				std::cout << "  USAGE (EMAN2 format)  : --extract_emn --i_root _boxes.txt  --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320" << std::endl;
-				std::cout << "  USAGE (RELION format) : --extract_rln --i_root _tubes.star --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320" << std::endl;
-				std::cout << "  USAGE (XIMDISP format): --extract_xim --i_root .mrc.coords --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320" << std::endl;
+				std::cout << "  USAGE (EMAN2 format)  : --extract_emn --i_root _boxes.txt  --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (RELION format) : --extract_rln --i_root _tubes.star --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (XIMDISP format): --extract_xim --i_root .mrc.coords --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -295,6 +295,7 @@ public:
 					Xdim,
 					Ydim,
 					boxdim,
+					do_bimodal_searches,
 					format_tag);
 		}
 		else if (do_convert_coords_emn2rln || do_convert_coords_xim2rln)
@@ -303,8 +304,8 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Convert EMAN2 / XIMDISP coordinates of helical segments into RELION STAR format" << std::endl;
-				std::cout << "  USAGE (EMAN2 format)  : --coords_emn2rln --i_root _helix_ptcl_coords.txt --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320" << std::endl;
-				std::cout << "  USAGE (XIMDISP format): --coords_xim2rln --i_root .mrc.coords            --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320" << std::endl;
+				std::cout << "  USAGE (EMAN2 format)  : --coords_emn2rln --i_root _helix_ptcl_coords.txt --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (XIMDISP format): --coords_xim2rln --i_root .mrc.coords            --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -320,6 +321,7 @@ public:
 					Xdim,
 					Ydim,
 					boxdim,
+					do_bimodal_searches,
 					format_tag);
 		}
 		else if (do_combine_GCTF_results)
@@ -734,10 +736,29 @@ public:
 
 	void run()
 	{
-		Image<RFLOAT> img;
-		img.read(fn_in);
-		amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
-		img.write(fn_out);
+		FileName fns_in, fa, fb;
+		std::vector<FileName> fn_in_list;
+		MetaDataTable MD_out;
+		std::string cl;
+
+		fns_in = "*" + fn_in;
+		fns_in.globFiles(fn_in_list);
+		if (fn_in_list.size() < 1)
+			REPORT_ERROR("helix_toolbox.cpp: No input files are found!");
+		for (int ii = 0; ii < fn_in_list.size(); ii++)
+		{
+			fb = fa = fn_in_list[ii];
+			fb[0] = 'f';
+			cl = "cp " + fa + " " + fb;
+			int res = system(cl.c_str());
+		}
+
+
+
+		//Image<RFLOAT> img;
+		//img.read(fn_in);
+		//amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
+		//img.write(fn_out);
 		//MetaDataTable MD;
 		//MD.read(fn_in);
 		//sortHelicalTubeID(MD);

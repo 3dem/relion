@@ -462,7 +462,6 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
 {
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_input, fn_pre, fn_jobnr, fn_post);
-	std::cerr << "newoutputfile= " << fn_pre + fn_new_outputdir + fn_post << std::endl;
 	return fn_pre + fn_new_outputdir + fn_post;
 }
 

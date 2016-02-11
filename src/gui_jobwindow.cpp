@@ -1739,6 +1739,9 @@ The name of the MCR stacks should be the rootname of the micrographs + '_moviero
 	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of helical tubes.");
 
+	helical_bimodal_angular_priors.place(current_y, "Use bimodal angular priors?", true, "Normally it should be set to Yes and bimodal angular priors will be applied in the following classification and refinement jobs. \
+Set to No if the 3D helix looks the same when rotated upside down.");
+
 	helical_tubes_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helical_tubes_group->end();
 
@@ -1807,6 +1810,7 @@ void ExtractJobWindow::write(std::string fn)
 	helical_nr_asu.writeValue(fh);
 	helical_rise.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
+	helical_bimodal_angular_priors.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -1853,6 +1857,7 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		helical_nr_asu.readValue(fh);
 		helical_rise.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
+		helical_bimodal_angular_priors.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -1887,6 +1892,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	helical_nr_asu.deactivate(is_continue);
 	helical_rise.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
+	helical_bimodal_angular_priors.deactivate(is_continue);
 
 }
 
@@ -1986,6 +1992,8 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	{
 		command += " --helix";
 		command += " --helical_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		if (helical_bimodal_angular_priors.getValue())
+			command += " --helical_bimodal_angular_priors";
 		if (do_extract_helical_tubes.getValue())
 		{
 			command += " --helical_tubes";
@@ -2309,26 +2317,18 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 
 	helix_group->begin();
 
-	bimodal_psi_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	bimodal_psi_group->end();
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of the tubes. You may want to copy the value from previous particle extraction job. \
+If negative value is provided, this option is disabled and ordinary circular masks will be applied. Sometimes '--dont_check_norm' option is useful to prevent errors in normalisation of helical segments.");
 
 	do_bimodal_psi.place(current_y, "Do bimodal angular searches?", true, "Do bimodal search for psi angles? \
-Set to Yes if you want to classify 2D helical segments with priors of psi angles. The priors should be bimodal due to unknown polarities of the segments.\
-If it is set to No, ordinary angular searches will be performed.\n\nThis option will be invalid if you choose not to perform image alignment on 'Sampling' tab.", bimodal_psi_group);
-
-	bimodal_psi_group->begin();
+Set to Yes if you want to classify 2D helical segments with priors of psi angles. The priors should be bimodal due to unknown polarities of the segments. \
+Set to No if the 3D helix looks the same when rotated upside down. If it is set to No, ordinary angular searches will be performed.\n\nThis option will be invalid if you choose not to perform image alignment on 'Sampling' tab.");
 
 	range_psi.place(current_y, "Angular search range - psi (deg):", 6, 3, 30, 1, "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the psi priors estimated through helical segment picking. \
 A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of angular searches should be much larger than the sampling.\
 \n\nThis option will be invalid if you choose not to perform image alignment on 'Sampling' tab.");
-
-	bimodal_psi_group->end();
-	do_bimodal_psi.cb_menu_i(); // to make default effective
-
-	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
-This value should be slightly larger than the actual width of the tubes. You may want to copy the value from previous particle extraction job. \
-If negative value is provided, this option is disabled and ordinary circular masks will be applied. Sometimes '--dont_check_norm' option is useful to prevent errors in normalisation of helical segments.");
 
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
@@ -2525,14 +2525,18 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// Helix
 	if (do_helix.getValue())
 	{
-		if ( (do_bimodal_psi.getValue()) && (dont_skip_align.getValue()) )
+		command += " --helical_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+
+		if (dont_skip_align.getValue())
 		{
+			if (do_bimodal_psi.getValue())
+				command += " --bimodal_psi";
+
 			RFLOAT val = range_psi.getValue();
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
-			command += " --bimodal_psi --sigma_psi " + floatToString(val / 3.);
+			command += " --sigma_psi " + floatToString(val / 3.);
 		}
-		command += " --helical_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
 	}
 
 	// Always do norm and scale correction
@@ -2802,11 +2806,6 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
 number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
 helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
-	/*
-	do_bimodal.place(current_y, "Do bimodal searches?", true, "If set to Yes, then perform bimodal searches of psi and tilt angles around their priors. \
-Angular priors can be estimated through autopicking of helical segments or previous runs of 3D classification or refinement. It must be set to Yes if \
-helical segments are picked using autopicking or '--extract' option in relion_helix_toolbox.");
-	*/
 	range_tilt.placeOnSameYPosition(current_y, "Angular search range - tilt, psi (deg):", "Angular search range - tilt (deg):", "15", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	range_psi.placeOnSameYPosition(current_y, "", "Angular search range - psi (deg):", "15", "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
@@ -2870,7 +2869,6 @@ void Class3DJobWindow::write(std::string fn)
 
 	// Helix
 	do_helix.writeValue(fh);
-	//do_bimodal.writeValue(fh);
 	helical_tube_inner_diameter.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 	helical_nr_asu.writeValue(fh);
@@ -2938,7 +2936,6 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 
 		// Helix
 		do_helix.readValue(fh);
-		//do_bimodal.readValue(fh);
 		helical_tube_inner_diameter.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
 		helical_nr_asu.readValue(fh);
@@ -2985,7 +2982,6 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	// Helix
 	do_helix.deactivate(is_continue);
-	//do_bimodal.deactivate(is_continue);
 	helical_tube_inner_diameter.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
@@ -3147,7 +3143,6 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		}
 		if ( (dont_skip_align.getValue()) && (!do_local_ang_searches.getValue()) )
 		{
-			command += " --helical_bimodal_search";
 			RFLOAT val;
 			val = textToFloat(range_tilt.getValue());
 			val = (val < 0.) ? (0.) : (val);
@@ -3410,11 +3405,6 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
 number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
 helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
-	/*
-	do_bimodal.place(current_y, "Do bimodal searches?", true, "If set to Yes, then perform bimodal searches of psi and tilt angles around their priors. \
-Angular priors can be estimated through autopicking of helical segments or previous runs of 3D classification or refinement. It must be set to Yes if \
-helical segments are picked using autopicking or '--extract' option in relion_helix_toolbox.");
-	*/
 	range_tilt.placeOnSameYPosition(current_y, "Angular search range - tilt, psi (deg):", "Angular search range - tilt (deg):", "15", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	range_psi.placeOnSameYPosition(current_y, "", "Angular search range - psi (deg):", "15", "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
@@ -3481,7 +3471,6 @@ void Auto3DJobWindow::write(std::string fn)
 
 	// Helix
 	do_helix.writeValue(fh);
-	//do_bimodal.writeValue(fh);
 	helical_tube_inner_diameter.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 	helical_nr_asu.writeValue(fh);
@@ -3551,7 +3540,6 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 
 		// Helix
 		do_helix.readValue(fh);
-		//do_bimodal.readValue(fh);
 		helical_tube_inner_diameter.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
 		helical_nr_asu.readValue(fh);
@@ -3611,7 +3599,6 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	// Helix
 	do_helix.deactivate(is_continue);
-	//do_bimodal.deactivate(is_continue);
 	helical_tube_inner_diameter.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
@@ -3789,7 +3776,6 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
 				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
 		}
-		command += " --helical_bimodal_search";
 		RFLOAT val;
 		val = textToFloat(range_tilt.getValue());
 		val = (val < 0.) ? (0.) : (val);

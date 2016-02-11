@@ -157,6 +157,9 @@ public:
 	// Helical rise in Angstroms
 	RFLOAT helical_rise;
 
+	// Add bimodal angular priors for helical segments
+	bool bimodal_angular_priors;
+
 	// Use input stack to perform the image modifications
 	FileName fn_operate_in;
 

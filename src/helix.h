@@ -35,6 +35,8 @@
 #define RELION_STAR_FORMAT 0
 #define XIMDISP_COORDS_FORMAT 1
 #define EMAN2_FORMAT 2
+#define UNIMODAL_PSI_PRIOR_FLIP_RATIO (0.)
+#define BIMODAL_PSI_PRIOR_FLIP_RATIO (0.5)
 
 class HelicalSymmetryItem
 {
@@ -259,6 +261,7 @@ void extractHelicalSegmentsFromTubes_Multiple(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int format_tag);
 
 void extractCoordsForAllHelicalSegments(
@@ -270,6 +273,7 @@ void extractCoordsForAllHelicalSegments(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int& total_segments,
 		int& total_tubes);
 
@@ -312,6 +316,7 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize,
+		bool bimodal_angular_priors,
 		int format_tag);
 
 void convertHelicalSegmentCoordsToMetaDataTable(
@@ -320,6 +325,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int& total_segments);
 
 void convertXimdispHelicalSegmentCoordsToMetaDataTable(
@@ -328,6 +334,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int& total_segments,
 		int& total_tubes);
 
@@ -340,6 +347,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int& total_segments,
 		int& total_tubes);
 
@@ -349,6 +357,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int& total_segments,
 		int& total_tubes);
 
@@ -361,6 +370,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
+		bool bimodal_angular_priors,
 		int& total_segments,
 		int& total_tubes);
 
@@ -450,15 +460,93 @@ void flipPsiTiltForHelicalSegment(
 		RFLOAT& new_psi,
 		RFLOAT& new_tilt);
 
-/*
-void updateAngularPriorsForHelicalReconstruction(
+// TESTING...
+class HelicalSegmentPriorInfoEntry
+{
+public:
+	std::string helical_tube_name;
+	long int MDobjectID;
+	RFLOAT psi_deg, psi_prior_deg;
+	RFLOAT tilt_deg, tilt_prior_deg;
+	//RFLOAT dx_pix, dx_prior_pix;
+	//RFLOAT dy_pix, dy_prior_pix;
+	//RFLOAT dz_pix, dz_prior_pix;
+	RFLOAT track_pos_pix;
+	bool has_wrong_polarity;
+	RFLOAT psi_flip_ratio;
+	int subset;
+
+	bool operator<(const HelicalSegmentPriorInfoEntry &rhs) const
+	{
+		if ( (helical_tube_name.length() == 0) || (rhs.helical_tube_name.length() == 0) )
+		{
+			std::cerr << "Compare # " << MDobjectID << " with # " << rhs.MDobjectID << std::endl;
+			REPORT_ERROR("helix.h::HelicalSegmentPriorInfoEntry::operator<(): Name string of helical segments are empty!");
+		}
+
+		if (helical_tube_name != rhs.helical_tube_name)
+			return (helical_tube_name < rhs.helical_tube_name);
+
+		if (fabs(track_pos_pix - rhs.track_pos_pix) < (1e-5))
+		{
+			std::cerr << "Compare # " << MDobjectID << " with # " << rhs.MDobjectID << std::endl;
+			REPORT_ERROR("helix.h::HelicalSegmentPriorInfoEntry::operator<(): A pair of same helical segments is found!");
+		}
+
+		return (track_pos_pix < rhs.track_pos_pix);
+	};
+
+	void clear()
+	{
+		helical_tube_name.clear();
+		MDobjectID = -1;
+		psi_deg = psi_prior_deg = tilt_deg = tilt_prior_deg = 0.;
+		//dx_pix = dx_prior_pix = dy_pix = dy_prior_pix = dz_pix = dz_prior_pix = 0.;
+		track_pos_pix = 0.;
+		has_wrong_polarity = false;
+		psi_flip_ratio = 0.;
+		subset = 0;
+	};
+
+	HelicalSegmentPriorInfoEntry()
+	{
+		clear();
+	};
+
+	~HelicalSegmentPriorInfoEntry()
+	{
+		clear();
+	};
+
+	void checkPolarity()
+	{
+		RFLOAT diff_psi = ABS(psi_deg - psi_prior_deg);
+		if (diff_psi > 180.)
+			diff_psi = ABS(diff_psi - 360.);
+		if (diff_psi > 90.)
+			has_wrong_polarity = true;
+		else
+			has_wrong_polarity = false;
+	};
+};
+
+void updatePriorsForOneHelicalTube(
+		std::vector<HelicalSegmentPriorInfoEntry>& list,
+		int sid,
+		int eid,
+		RFLOAT sigma_segment_dist,
+		RFLOAT sigma_cutoff,
+		bool is_3D,
+		bool do_local_average_tilt,
+		int& nr_wrong_polarity);
+
+void updatePriorsForHelicalReconstruction(
 		MetaDataTable& MD,
 		RFLOAT sigma_segment_dist,
-		int& total_same_psi,
-		int& total_opposite_psi,
-		bool do_local_average_tilt = true,
+		int& total_opposite_polarity,
+		bool do_local_average_tilt,
 		RFLOAT sigma_cutoff = 3.);
-*/
+// TESTING...
 
 void updateAngularPriorsForHelicalReconstruction(MetaDataTable& MD);
 
