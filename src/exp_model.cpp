@@ -23,7 +23,11 @@ void ExpOriginalParticle::addParticle(long int _particle_id, int _random_subset,
 {
 	// Keep random_subsets equal in each original particle
 	if (random_subset != _random_subset)
-		REPORT_ERROR("ExpOriginalParticle:addParticle: incompatible random subsets between particle and its original particle");
+	{
+		std::cerr << " random_subset= " << random_subset << " _random_subset= " << _random_subset << std::endl;
+		std::cerr << " particles_id.size()= " << particles_id.size() << " name= " << std::endl;
+		REPORT_ERROR("ExpOriginalParticle:addParticle: incompatible random subsets between particle and its original particle.");
+	}
 	particles_id.push_back(_particle_id);
 	particles_order.push_back(_order);
 }

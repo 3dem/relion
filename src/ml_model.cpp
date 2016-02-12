@@ -727,7 +727,10 @@ void MlModel::expandToMovieFrames(Experiment &moviedata, int running_avg_side)
 		if (nr_frames_in_group[group_id] < 0)
 			nr_frames_in_group[group_id] = nframes;
 		else if (nr_frames_in_group[group_id] != nframes)
-			REPORT_ERROR((std::string)"MlModel::expandToMovieFrames ERROR: unequal number of frames in group" + moviemodel.group_names[group_id]);
+		{
+			std::cerr << "nr_frames_in_group[group_id]= " << nr_frames_in_group[group_id] << " nframes= " << nframes << std::endl;
+			REPORT_ERROR((std::string)"MlModel::expandToMovieFrames ERROR: unequal number of frames in group " + moviemodel.group_names[group_id]);
+		}
 	}
 
 	// Correct the input sigma2noise spectra by a factor of nframes
