@@ -148,125 +148,119 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	run_button->callback( cb_run, this);
 
     // Fill browser in the right order
-	browser = new Fl_Hold_Browser(10,MENUHEIGHT+10,WCOL0-20,h-MENUHEIGHT-70);
+	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
     current_job = -1;
-    for (int itype = 0; itype < NR_BROWSE_TABS; itype++)
-    {
 
-        browse_grp[itype] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
-        switch (itype)
-    	{
-    	case PROC_IMPORT:
-    	{
-    		browser->add("Import");
-    		job_import = new ImportJobWindow();
-    		browse_grp[itype]->end();
-    		break;
-    	}
-    	case PROC_MOTIONCORR:
-    	{
-    		browser->add("Motion correction");
-    		job_motioncorr = new MotioncorrJobWindow();
-    		break;
-    	}
-    	case PROC_CTFFIND:
-    	{
-    		browser->add("CTF estimation");
-			job_ctffind = new CtffindJobWindow();
-			break;
-    	}
-    	case PROC_MANUALPICK:
-    	{
-    		browser->add("Manual picking");
-        	job_manualpick = new ManualpickJobWindow();
-    		break;
-    	}
-    	case PROC_AUTOPICK:
-    	{
-    		browser->add("Auto-picking");
-			job_autopick = new AutopickJobWindow();
-			break;
-    	}
-    	case PROC_EXTRACT:
-    	{
-    		browser->add("Particle extraction");
-			job_extract = new ExtractJobWindow();
-			break;
-    	}
-    	case PROC_SORT:
-    	{
-    		browser->add("Particle sorting");
-        	job_sort = new SortJobWindow();
-        	break;
-    	}
-    	case PROC_CLASSSELECT:
-    	{
-    		browser->add("Subset selection");
-			job_classselect = new ClassSelectJobWindow();
-			break;
-		}
-    	case PROC_2DCLASS:
-		{
-    		browser->add("2D classification");
-			job_class2d = new Class2DJobWindow();
-			break;
-		}
-    	case PROC_3DCLASS:
-    	{
-    		browser->add("3D classification");
-        	job_class3d = new Class3DJobWindow();
-        	break;
-    	}
-    	case PROC_3DAUTO:
-    	{
-    		browser->add("3D auto-refine");
-			job_auto3d = new Auto3DJobWindow();
-			break;
-		}
-    	case PROC_POLISH:
-		{
-    		browser->add("Particle polishing");
-			job_polish = new PolishJobWindow();
-			break;
-		}
-    	case PROC_MASKCREATE:
-    	{
-    		browser->add("Mask creation");
-			job_maskcreate = new MaskCreateJobWindow();
-			break;
-		}
-    	case PROC_JOINSTAR:
-    	{
-    		browser->add("Join star files");
-			job_joinstar = new JoinStarJobWindow();
-			break;
-		}
-    	case PROC_SUBTRACT:
-    	{
-    		browser->add("Particle subtraction");
-    		job_subtract = new SubtractJobWindow();
-			break;
-		}
-    	case PROC_POST:
-		{
-    		browser->add("Post-processing");
-			job_post = new PostJobWindow();
-			break;
-		}
-    	case PROC_RESMAP:
-		{
-    		browser->add("Local resolution");
-			job_resmap = new ResmapJobWindow();
-			break;
-		}
-    	default:
-    	{
-           	break;
-    	}
-    	} // end switch
-    	browse_grp[itype]->end();
-    }
+    browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[0] = PROC_IMPORT;
+    browser->add("Import");
+    job_import = new ImportJobWindow();
+    browse_grp[0]->end();
+
+    browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[1] = PROC_MOTIONCORR;
+    browser->add("Motion correction");
+	job_motioncorr = new MotioncorrJobWindow();
+    browse_grp[1]->end();
+
+    browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[2] = PROC_CTFFIND;
+    browser->add("CTF estimation");
+    job_ctffind = new CtffindJobWindow();
+    browse_grp[2]->end();
+
+    browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[3] = PROC_MANUALPICK;
+	browser->add("Manual picking");
+	job_manualpick = new ManualpickJobWindow();
+    browse_grp[3]->end();
+
+    browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[4] = PROC_AUTOPICK;
+	browser->add("Auto-picking");
+	job_autopick = new AutopickJobWindow();
+    browse_grp[4]->end();
+
+    browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[5] = PROC_EXTRACT;
+	browser->add("Particle extraction");
+	job_extract = new ExtractJobWindow();
+    browse_grp[5]->end();
+
+    browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[6] = PROC_SORT;
+	browser->add("Particle sorting");
+	job_sort = new SortJobWindow();
+    browse_grp[6]->end();
+
+    browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[7] = PROC_CLASSSELECT;
+	browser->add("Subset selection");
+	job_classselect = new ClassSelectJobWindow();
+    browse_grp[7]->end();
+
+    browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[8] = PROC_2DCLASS;
+	browser->add("2D classification");
+	job_class2d = new Class2DJobWindow();
+    browse_grp[8]->end();
+
+    browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[9] = PROC_3DCLASS;
+	browser->add("3D classification");
+	job_class3d = new Class3DJobWindow();
+    browse_grp[9]->end();
+
+    browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[10] = PROC_3DAUTO;
+	browser->add("3D auto-refine");
+	job_auto3d = new Auto3DJobWindow();
+    browse_grp[10]->end();
+
+    browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[11] = PROC_MOVIEREFINE;
+	browser->add("Movie refinement");
+	job_movierefine = new MovieRefineJobWindow();
+    browse_grp[11]->end();
+
+    browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[12] = PROC_POLISH;
+	browser->add("Particle polishing");
+	job_polish = new PolishJobWindow();
+    browse_grp[12]->end();
+
+    browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[13] = PROC_MASKCREATE;
+	browser->add("Mask creation");
+	job_maskcreate = new MaskCreateJobWindow();
+    browse_grp[13]->end();
+
+    browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[14] = PROC_JOINSTAR;
+	browser->add("Join star files");
+	job_joinstar = new JoinStarJobWindow();
+    browse_grp[14]->end();
+
+    browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[15] = PROC_SUBTRACT;
+	browser->add("Particle subtraction");
+	job_subtract = new SubtractJobWindow();
+    browse_grp[15]->end();
+
+    browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[16] = PROC_POST;
+	browser->add("Post-processing");
+	job_post = new PostJobWindow();
+    browse_grp[16]->end();
+
+    browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_jobtype[17] = PROC_RESMAP;
+	browser->add("Local resolution");
+	job_resmap = new ResmapJobWindow();
+    browse_grp[17]->end();
+
     browser->callback(cb_select_browsegroup);
+    browser->textsize(RLN_FONTSIZE);
     browser->end();
     browser->select(1); // just start from the beginning
 
@@ -337,6 +331,11 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     scheduled_job_browser->callback(cb_select_scheduled_job);
     input_job_browser->callback(cb_select_input_job);
     output_job_browser->callback(cb_select_output_job);
+    finished_job_browser->textsize(RLN_FONTSIZE);
+    running_job_browser->textsize(RLN_FONTSIZE);
+    scheduled_job_browser->textsize(RLN_FONTSIZE);
+    input_job_browser->textsize(RLN_FONTSIZE);
+    output_job_browser->textsize(RLN_FONTSIZE);
 
     finished_job_browser->end();
     running_job_browser->end();
@@ -357,6 +356,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     disp_stdout->buffer(textbuff_stdout);
     disp_stderr->buffer(textbuff_stderr);
     disp_stderr->textcolor(FL_RED);
+    disp_stdout->textsize(RLN_FONTSIZE);
+    disp_stderr->textsize(RLN_FONTSIZE-1);
     disp_stdout->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stderr->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stdout->scrollbar_width(0);
@@ -521,10 +522,10 @@ void RelionMainWindow::loadJobFromPipeline()
 
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
 	{
-		if ( t == itype )
+		if ( browse_jobtype[t] == itype )
 		{
 			browse_grp[t]->show();
-			browser->value(itype+1);
+			browser->value(t+1);
 		}
 		else
 		{
@@ -560,7 +561,7 @@ void RelionMainWindow::loadJobFromPipeline()
 
 long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
 {
-	int itype = (this_job > 0) ? this_job : (browser->value() - 1); // browser starts counting at 1 ...
+	int itype = (this_job > 0) ? this_job : (browse_jobtype[browser->value() - 1]); // browser starts counting at 1 ...
 	std::vector<Node> inputnodes;
 	std::vector<Node> outputnodes;
 	std::string oname;
@@ -647,9 +648,15 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 		oname = job_auto3d->pipelineOutputName;
 		break;
 	}
+	case PROC_MOVIEREFINE:
+	{
+		inputnodes = job_movierefine->pipelineInputNodes;
+		outputnodes= job_movierefine->pipelineOutputNodes;
+		oname = job_movierefine->pipelineOutputName;
+		break;
+	}
 	case PROC_POLISH:
 	{
-
 		inputnodes = job_polish->pipelineInputNodes;
 		outputnodes= job_polish->pipelineOutputNodes;
 		oname = job_polish->pipelineOutputName;
@@ -718,7 +725,7 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 
 void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job)
 {
-	int itype = (this_job > 0) ? this_job : (browser->value() - 1); // browser starts counting at 1 ....
+	int itype = (this_job > 0) ? this_job : (browse_jobtype[browser->value() - 1]); // browser starts counting at 1 ....
 	show_initial_screen = false;
 
 	bool is_scheduled=false;
@@ -727,20 +734,11 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 
 	if (do_commandline)
 	{
-		global_outputname = ""; // default is that all new jobs get a new uniqdate directory
-		// relion_refine jobs get a new directory for continuation jobs, but NOT for execution of scheduled jobs
-		int mytype = (current_job >= 0) ? pipeline.processList[current_job].type : -1;
-		if (mytype == PROC_2DCLASS || mytype == PROC_3DCLASS || mytype == PROC_3DAUTO)
-		{
-			if (is_scheduled)
-				global_outputname = fn_settings.beforeLastOf("/") + "/";
-		}
-		// All other jobs: for either continuation OR scheduled jobs: do NOT get a new directory
+		// Except for continuation or scheduled jobs, all jobs get a new unique directory
+		if (is_main_continue || is_scheduled)
+			global_outputname = fn_settings.beforeLastOf("/") + "/";
 		else
-		{
-			if (is_main_continue || is_scheduled)
-				global_outputname = fn_settings.beforeLastOf("/") + "/";
-		}
+			global_outputname = "";
 	}
 
 	switch (itype)
@@ -875,6 +873,18 @@ void RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_auto3d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
 			job_auto3d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
+		break;
+	}
+	case PROC_MOVIEREFINE:
+	{
+		if (do_write)
+			job_movierefine->write(fn_settings);
+		if (do_read)
+			job_movierefine->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_movierefine->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			job_movierefine->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_POLISH:
@@ -1013,7 +1023,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 				// Do we want to run this as NEW or CONTINUED NEXT TIME?
 				int mytype = pipeline.processList[current_job].type;
 				// The following jobtypes have functionality to only do the unfinished part of the job
-				if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT)
+				if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
 					pipeline.processList[current_job].status = PROC_SCHEDULED_CONT;
 				else
 					pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
@@ -1459,6 +1469,19 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		std::cout << "Executing: " << final_command << std::endl;
 		int res = system(final_command.c_str());
 
+		// Also print the final_command to the note for future reference
+		FileName fn_note = pipeline.processList[current_job].name + "note.txt";
+		std::ofstream ofs;
+		ofs.open (fn_note.c_str(), std::ofstream::out | std::ofstream::app);
+
+		// current date/time based on current system
+		time_t now = time(0);
+		ofs << std::endl << " ++++ Executing new job on " << ctime(&now);
+		ofs <<  " ++++ with the following command(s): " << std::endl;
+		for (size_t icom = 0; icom < commands.size(); icom++)
+			ofs << commands[icom] << std::endl;
+		ofs <<  " ++++ " << std::endl;
+		ofs.close();
 	}
 
 	// Open the edit note window

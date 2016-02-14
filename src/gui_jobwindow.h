@@ -37,7 +37,7 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
-#define DEFAULTMOTIONCORRLOCATION "/public/EM/motioncorr/motioncorr"
+#define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -401,12 +401,6 @@ public:
 	SliderEntry black_dust;
 	BooleanEntry do_invert;
 
-	// movies
-	BooleanEntry do_movie_extract;
-	AnyEntry movie_rootname;
-	SliderEntry first_movie_frame;
-	SliderEntry last_movie_frame;
-
 	// Helix
 	BooleanEntry do_extract_helix;
 	BooleanEntry do_extract_helical_tubes;
@@ -642,14 +636,6 @@ public:
 	SliderEntry offset_step;
 	RadioEntry auto_local_sampling;
 
-	// Movies
-	BooleanEntry do_movies;
-	InputNodeEntry fn_movie_star;
-	SliderEntry movie_runavg_window;
-	SliderEntry movie_sigma_offset;
-	BooleanEntry do_alsorot_movies;
-	SliderEntry movie_sigma_angles;
-
 	// Helix
 	BooleanEntry do_helix;
 	AnyEntry helical_tube_inner_diameter;
@@ -668,7 +654,7 @@ public:
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
 
-	Fl_Group *ctf_group, *movie_group, *alsorot_movie_group, *helix_group, *helix_symmetry_search_group;
+	Fl_Group *ctf_group, *helix_group, *helix_symmetry_search_group;
 
 public:
 
@@ -677,6 +663,60 @@ public:
 
 	// Destructor
 	~Auto3DJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter);
+
+};
+
+class MovieRefineJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	FileNameEntry fn_cont;
+	InputNodeEntry fn_movie_star;
+	AnyEntry movie_rootname;
+
+	// Extract movie-particles
+	SliderEntry first_movie_frame;
+	SliderEntry last_movie_frame;
+	SliderEntry max_mpi_nodes;
+	SliderEntry extract_size;
+	BooleanEntry do_set_angpix;
+	SliderEntry angpix;
+	BooleanEntry do_rescale;
+	SliderEntry rescale;
+	BooleanEntry do_norm;
+	SliderEntry bg_diameter;
+	SliderEntry white_dust;
+	SliderEntry black_dust;
+	BooleanEntry do_invert;
+
+	// Movies
+	BooleanEntry do_movies_per_micrograph;
+	SliderEntry movie_runavg_window;
+	SliderEntry movie_sigma_offset;
+	BooleanEntry do_alsorot_movies;
+	SliderEntry movie_sigma_angles;
+
+	Fl_Group *norm_group, *rescale_group, *alsorot_movie_group;
+
+public:
+
+	// Constructor
+	MovieRefineJobWindow();
+
+	// Destructor
+	~MovieRefineJobWindow(){};
 
 	// write/read settings to disc
 	void write(std::string fn);

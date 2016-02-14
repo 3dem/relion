@@ -346,6 +346,7 @@ enum EMDLabel
     EMDL_SELECTED,
     EMDL_SELECT_PARTICLES_ZSCORE,
     EMDL_SORTED_IDX,
+    EMDL_STARFILE_MOVIE_PARTICLES,
     EMDL_PERFRAME_CUMULATIVE_WEIGHT,
     EMDL_PERFRAME_RELATIVE_WEIGHT,
 
@@ -713,7 +714,8 @@ private:
         EMDL::addLabel(EMDL_SELECTED, EMDL_BOOL, "rlnSelected", "Flag whether an entry in a metadatatable is selected in the viewer or not");
         EMDL::addLabel(EMDL_SELECT_PARTICLES_ZSCORE, EMDL_DOUBLE, "rlnParticleSelectZScore", "Sum of Z-scores from particle_select. High Z-scores are likely to be outliers.");
         EMDL::addLabel(EMDL_SORTED_IDX, EMDL_LONG, "rlnSortedIndex", "Index of a metadata entry after sorting (first sorted index is 0).");
-		EMDL::addLabel(EMDL_PERFRAME_CUMULATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameCumulativeWeight", "Sum of the resolution-dependent relative weights from the first frame until the given frame");
+        EMDL::addLabel(EMDL_STARFILE_MOVIE_PARTICLES, EMDL_STRING, "rlnStarFileMovieParticles", "Filename of a STAR file with movie-particles in it");
+        EMDL::addLabel(EMDL_PERFRAME_CUMULATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameCumulativeWeight", "Sum of the resolution-dependent relative weights from the first frame until the given frame");
 		EMDL::addLabel(EMDL_PERFRAME_RELATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameRelativeWeight", "The resolution-dependent relative weights for a given frame");
 
         EMDL::addLabel(EMDL_RESOLUTION, EMDL_DOUBLE, "rlnResolution", "Resolution (in 1/Angstroms)");

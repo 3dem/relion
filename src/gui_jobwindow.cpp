@@ -489,12 +489,12 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	else
 	{
 		// If there are multiple commands, then join them all on a single line (final_command)
-		// Also add mpirun in front of the first command if no submission via the queue is done
+		// Also add mpirun in front of those commands that have _mpi` in it (if no submission via the queue is done)
 		std::string one_command;
 		final_command = "";
 		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
-			if (has_mpi && nr_mpi.getValue() > 1 && icom == 0)
+			if (has_mpi && nr_mpi.getValue() > 1 && (commands[icom]).find("_mpi`") != std::string::npos)
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
 			else
 				one_command = commands[icom];
@@ -759,7 +759,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	tab1->label("I/O");
 	resetHeight();
 
-	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
+	input_star_mics.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	tab1->end();
 
 	tab2->begin();
@@ -884,6 +884,8 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	pipelineOutputName = outputname;
 	Node node2(outputname + "corrected_micrographs.star", NODE_MICS);
 	pipelineOutputNodes.push_back(node2);
+	Node node3(outputname + "corrected_micrograph_movies.star", NODE_MOVIES);
+	pipelineOutputNodes.push_back(node3);
 
 	// Motioncorr-specific stuff
 	command += " --bin_factor " + integerToString(bin_factor.getValue());
@@ -1625,7 +1627,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 }
 
 
-ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
+ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
 {
 	type = PROC_EXTRACT;
 
@@ -1669,7 +1671,7 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	resetHeight();
 
 	extract_size.place(current_y,"Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
-	do_invert.place(current_y, "Invert contrast?", false, "If set to Yes, the contrast in the particles will be inverted.");
+	do_invert.place(current_y, "Invert contrast?", true, "If set to Yes, the contrast in the particles will be inverted.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1705,28 +1707,7 @@ Pixels values higher than this many times the image stddev will be replaced with
 
 	tab2->end();
 	tab3->begin();
-	tab3->label("movies");
-	resetHeight();
-	movie_extract_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	movie_extract_group->end();
-
-	do_movie_extract.place(current_y, "Extract from movies?", false, "If set to yes, then particles will be extracted from all frames of the MRC stacks that hold the movies.\n \
-The name of the MCR stacks should be the rootname of the micrographs + '_movierootname.mrcs', where the movierootname is given below.", movie_extract_group);
-
-	movie_extract_group->begin();
-
-	movie_rootname.place(current_y, "Rootname of movies files:", "movie", "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs");
-
-	first_movie_frame.place(current_y, "First movie frame to extract: ", 1, 1, 20, 1, "Extract from this movie frame onwards. The first frame is number 1.");
-
-	last_movie_frame.place(current_y, "Last movie frame to extract: ", 0, 0, 64, 1, "Extract until this movie frame. Zero means: extract all frames in the movie. You may want to specify the last frame number though, as it will be useful to detect movies which accidentally have fewer frames.");
-
-	movie_extract_group->end();
-	do_movie_extract.cb_menu_i();
-
-	tab3->end();
-	tab4->begin();
-	tab4->label("Helix");
+	tab3->label("Helix");
 	resetHeight();
 
 	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -1763,7 +1744,7 @@ The optimal inter-box distance might also depend on the box size, the helical ri
 
 	do_extract_helix.cb_menu_i();
 
-	tab4->end();
+	tab3->end();
 
 	// read settings if hidden file exists
 	read(".gui_extract", is_continue);
@@ -1797,12 +1778,6 @@ void ExtractJobWindow::write(std::string fn)
 	white_dust.writeValue(fh);
 	black_dust.writeValue(fh);
 	do_invert.writeValue(fh);
-
-	// movies
-	do_movie_extract.writeValue(fh);
-	movie_rootname.writeValue(fh);
-	first_movie_frame.writeValue(fh);
-	last_movie_frame.writeValue(fh);
 
 	// Helix
 	do_extract_helix.writeValue(fh);
@@ -1845,12 +1820,6 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		black_dust.readValue(fh);
 		do_invert.readValue(fh);
 
-		// movies
-		do_movie_extract.readValue(fh);
-		movie_rootname.readValue(fh);
-		first_movie_frame.readValue(fh);
-		last_movie_frame.readValue(fh);
-
 		// Helix
 		do_extract_helix.readValue(fh);
 		do_extract_helical_tubes.readValue(fh);
@@ -1875,6 +1844,8 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	do_reextract.deactivate(is_continue);
 	fndata_reextract.deactivate(is_continue);
 	do_recenter.deactivate(is_continue);
+
+	// extract
 	extract_size.deactivate(is_continue);
 	do_rescale.deactivate(is_continue);
 	rescale.deactivate(is_continue);
@@ -1883,10 +1854,8 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	white_dust.deactivate(is_continue);
 	black_dust.deactivate(is_continue);
 	do_invert.deactivate(is_continue);
-	do_movie_extract.deactivate(is_continue);
-	movie_rootname.deactivate(is_continue);
-	first_movie_frame.deactivate(is_continue);
-	last_movie_frame.deactivate(is_continue);
+
+	// Helix
 	do_extract_helix.deactivate(is_continue);
 	do_extract_helical_tubes.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
@@ -1936,31 +1905,14 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	}
 
 	// Output
-	FileName fn_ostar;
-	if (do_movie_extract.getValue())
-	{
-		fn_ostar = outputname + "particles_" + movie_rootname.getValue() + ".star";
-		Node node3(fn_ostar, NODE_MOVIE_DATA);
-		pipelineOutputNodes.push_back(node3);
-	}
-	else
-	{
-		fn_ostar = outputname + "particles.star";
-		Node node3(fn_ostar, NODE_PART_DATA);
-		pipelineOutputNodes.push_back(node3);
-	}
+	FileName fn_ostar = outputname + "particles.star";
+	Node node3(fn_ostar, NODE_PART_DATA);
+	pipelineOutputNodes.push_back(node3);
 	command += " --part_star " + fn_ostar;
-	command += " --part_dir " + outputname;
 
+	command += " --part_dir " + outputname;
 	command += " --extract";
 	command += " --extract_size " + floatToString(extract_size.getValue());
-	if (do_movie_extract.getValue())
-	{
-		command += " --extract_movies";
-		command += " --movie_rootname " + movie_rootname.getValue();
-		command += " --first_movie_frame " + floatToString(first_movie_frame.getValue());
-		command += " --last_movie_frame " + floatToString(last_movie_frame.getValue());
-	}
 
 	// Operate stuff
 	// Get an integer number for the bg_radius
@@ -2456,21 +2408,28 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-	command += " --o " + outputname + "run";;
+    FileName fn_run = "run";
+	if (is_continue)
+    {
+		int pos_it = fn_cont.getValue().rfind("_it");
+		int pos_op = fn_cont.getValue().rfind("_optimiser");
+		if (pos_it < 0 || pos_op < 0)
+			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
+		fn_run += "_ct" + floatToString(it);
+		command += " --continue " + fn_cont.getValue();
+    }
+
+    command += " --o " + outputname + fn_run;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
 
-	if (is_continue)
-	{
-		command += " --continue " + fn_cont.getValue();
-		Node node(fn_cont.getValue(), NODE_OPTIMISER);
-		pipelineInputNodes.push_back(node);
-	}
-	else
+	if (!is_continue)
 	{
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 	}
+
 	// Parallel disc I/O?
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
@@ -3017,16 +2976,22 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	else
 		command="`which relion_refine`";
 
-	command += " --o " + outputname + "run";;
+    FileName fn_run = "run";
+	if (is_continue)
+    {
+		int pos_it = fn_cont.getValue().rfind("_it");
+		int pos_op = fn_cont.getValue().rfind("_optimiser");
+		if (pos_it < 0 || pos_op < 0)
+			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
+		fn_run += "_ct" + floatToString(it);
+		command += " --continue " + fn_cont.getValue();
+    }
+
+    command += " --o " + outputname + fn_run;
 	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
 
-	if (is_continue)
-	{
-		command += " --continue " + fn_cont.getValue();
-		Node node(fn_cont.getValue(), NODE_OPTIMISER);
-		pipelineInputNodes.push_back(node);
-	}
-	else
+	if (!is_continue)
 	{
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
@@ -3043,6 +3008,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --ini_high " + floatToString(ini_high.getValue());
 
 	}
+
 	// Parallel disc I/O?
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
@@ -3169,7 +3135,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(7, HAS_MPI, HAS_THREAD)
+Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_3DAUTO;
@@ -3185,8 +3151,7 @@ nor will it be possible to perform noise spectra estimation or intensity scale c
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
-with X being the iteration from which one continues the previous run. \n \
-Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
+with X being the iteration from which one continues the previous run.");
 
 	fn_ref.place(current_y, "Reference map:", NODE_3DREF, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. \
 	Make sure this map has the same dimensions and the same pixel size as your input images.");
@@ -3323,47 +3288,8 @@ increase the angular samplings, local angular searches of -6/+6 times the sampli
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
 
 	tab5->end();
-	tab4->end();
 	tab6->begin();
-	tab6->label("Movies");
-	resetHeight();
-	movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	movie_group->end();
-
-	do_movies.place(current_y, "Realign movie frames?", false, "If set to Yes, then running averages of the individual frames of recorded movies will be aligned as independent particles.", movie_group);
-
-	movie_group->begin();
-
-	fn_movie_star.place(current_y, "Input movie frames STAR file:", NODE_MOVIE_DATA, "", "STAR Files (*.{star})", "Select the output STAR file from the preprocessing \
-procedure of the movie frames.");
-
-	movie_runavg_window.place(current_y, "Running average window:", 5, 1, 15, 1, "The individual movie frames will be averaged using a running \
-average window with the specified width. Use an odd number. The optimal value will depend on the SNR in the individual movie frames. For ribosomes, we used a value of 5, where \
-each movie frame integrated approximately 1 electron per squared Angstrom.");
-
-	movie_sigma_offset.place(current_y, "Stddev on the translations (pix):", 1., 0.5, 10, 0.5, "A Gaussian prior with the specified standard deviation \
-will be centered at the rotations determined for the corresponding particle where all movie-frames were averaged. For ribosomes, we used a value of 2 pixels");
-
-	alsorot_movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	alsorot_movie_group->end();
-
-	do_alsorot_movies.place(current_y, "Also include rotational searches?", false, "If set to Yes, then running averages of the individual frames of recorded movies will also be aligned rotationally. \n \
-If one wants to perform particle polishing, then rotational alignments of the movie frames is NOT necessary and will only take more computing time.", alsorot_movie_group);
-
-	alsorot_movie_group->begin();
-
-	movie_sigma_angles.place(current_y, "Stddev on the rotations (deg):", 1., 0.5, 10, 0.5, "A Gaussian prior with the specified standard deviation \
-will be centered at the rotations determined for the corresponding particle where all movie-frames were averaged. For ribosomes, we used a value of 1 degree");
-
-	alsorot_movie_group->end();
-	do_alsorot_movies.cb_menu_i(); // to make default effective
-
-	movie_group->end();
-	do_movies.cb_menu_i(); // to make default effective
-
-	tab6->end();
-	tab7->begin();
-	tab7->label("Helix");
+	tab6->label("Helix");
 	resetHeight();
 	helix_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helix_group->end();
@@ -3417,7 +3343,7 @@ A range of 15 degrees means sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARAT
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
 
-	tab7->end();
+	tab6->end();
 
 	// read settings if hidden file exists
 	read(".gui_auto3d", is_continue);
@@ -3460,14 +3386,6 @@ void Auto3DJobWindow::write(std::string fn)
 	offset_range.writeValue(fh);
 	offset_step.writeValue(fh);
 	auto_local_sampling.writeValue(fh);
-
-	// Movies
-	do_movies.writeValue(fh);
-	fn_movie_star.writeValue(fh);
-	movie_runavg_window.writeValue(fh);
-	movie_sigma_offset.writeValue(fh);
-	do_alsorot_movies.writeValue(fh);
-	movie_sigma_angles.writeValue(fh);
 
 	// Helix
 	do_helix.writeValue(fh);
@@ -3530,14 +3448,6 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		offset_step.readValue(fh);
 		auto_local_sampling.readValue(fh);
 
-		// Movies
-		do_movies.readValue(fh);
-		fn_movie_star.readValue(fh);
-		movie_runavg_window.readValue(fh);
-		movie_sigma_offset.readValue(fh);
-		do_alsorot_movies.readValue(fh);
-		movie_sigma_angles.readValue(fh);
-
 		// Helix
 		do_helix.readValue(fh);
 		helical_tube_inner_diameter.readValue(fh);
@@ -3589,14 +3499,6 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	offset_step.deactivate(is_continue);
 	auto_local_sampling.deactivate(is_continue);
 
-	// Movies
-	do_movies.deactivate(!is_continue);
-	fn_movie_star.deactivate(!is_continue);
-	movie_runavg_window.deactivate(!is_continue);
-	movie_sigma_offset.deactivate(!is_continue);
-	do_alsorot_movies.deactivate(!is_continue);
-	movie_sigma_angles.deactivate(!is_continue);
-
 	// Helix
 	do_helix.deactivate(is_continue);
 	helical_tube_inner_diameter.deactivate(is_continue);
@@ -3630,17 +3532,23 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	else
 		command="`which relion_refine`";
 
-	command += " --o " + outputname + "run";
-	// TODO: add bodies!! (probably in next version)
-	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, do_movies.getValue(), do_alsorot_movies.getValue() );
-
+    FileName fn_run = "run";
 	if (is_continue)
-	{
+    {
+		int pos_it = fn_cont.getValue().rfind("_it");
+		int pos_op = fn_cont.getValue().rfind("_optimiser");
+		if (pos_it < 0 || pos_op < 0)
+			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
+		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + fn_cont.getValue();
-		Node node(fn_cont.getValue(), NODE_OPTIMISER);
-		pipelineInputNodes.push_back(node);
-	}
-	else
+    }
+
+    command += " --o " + outputname + fn_run;
+	// TODO: add bodies!! (probably in next version)
+	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, false, false); // false false means dont do movies
+
+	if (!is_continue)
 	{
 		command += " --auto_refine --split_random_halves --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
@@ -3695,102 +3603,427 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		pipelineInputNodes.push_back(node);
 	}
 
-	// Sampling
-	int iover = 1;
-	command += " --oversampling " + floatToString((float)iover);
-
-	for (int i = 0; i < 10; i++)
-	{
-		if (strcmp((sampling.getValue()).c_str(), sampling_options[i].label()) == 0)
-		{
-			// The sampling given in the GUI will be the oversampled one!
-			command += " --healpix_order " + floatToString((float)i + 1 - iover);
-			break;
-		}
-
-	}
-	// Minimum sampling rate to perform local searches (may be changed upon continuation
-	for (int i = 0; i < 10; i++)
-	{
-		if (strcmp((auto_local_sampling.getValue()).c_str(), sampling_options[i].label()) == 0)
-		{
-			command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
-			break;
-		}
-	}
-
-	// Offset range
-	command += " --offset_range " + floatToString(offset_range.getValue());
-	// The sampling given in the GUI will be the oversampled one!
-	command += " --offset_step " + floatToString(offset_step.getValue() * pow(2., iover));
-
-	// Provide symmetry, and always do norm and scale correction
 	if (!is_continue)
 	{
+		// Sampling
+		int iover = 1;
+		command += " --oversampling " + floatToString((float)iover);
+		for (int i = 0; i < 10; i++)
+		{
+			if (strcmp((sampling.getValue()).c_str(), sampling_options[i].label()) == 0)
+			{
+				// The sampling given in the GUI will be the oversampled one!
+				command += " --healpix_order " + floatToString((float)i + 1 - iover);
+				break;
+			}
+
+		}
+		// Minimum sampling rate to perform local searches (may be changed upon continuation
+		for (int i = 0; i < 10; i++)
+		{
+			if (strcmp((auto_local_sampling.getValue()).c_str(), sampling_options[i].label()) == 0)
+			{
+				command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
+				break;
+			}
+		}
+
+		// Offset range
+		command += " --offset_range " + floatToString(offset_range.getValue());
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --offset_step " + floatToString(offset_step.getValue() * pow(2., iover));
 
 		command += " --sym " + sym_name.getValue();
                 // Always join low-res data, as some D&I point group refinements may fall into different hands!
                 command += " --low_resol_join_halves 40";
 		command += " --norm --scale ";
-	}
 
-	// Movies
-	if (is_continue && do_movies.getValue())
-	{
-		command += " --realign_movie_frames " + fn_movie_star.getValue();
-		Node node(fn_movie_star.getValue(), fn_movie_star.type);
-		pipelineInputNodes.push_back(node);
-		command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
-		command += " --sigma_off " + floatToString(movie_sigma_offset.getValue());
-
-		if (do_alsorot_movies.getValue())
+		// Helix
+		if (do_helix.getValue())
 		{
-			command += " --sigma_ang " + floatToString(movie_sigma_angles.getValue());
+			command += " --helix";
+			if (textToFloat(helical_tube_inner_diameter.getValue()) > 0.)
+				command += " --helical_inner_diameter " + floatToString(textToFloat(helical_tube_inner_diameter.getValue()));
+			command += " --helical_outer_diameter " + floatToString(textToFloat(helical_tube_outer_diameter.getValue()));
+			command += " --helical_z_percentage " + floatToString(helical_z_percentage.getValue() / 100.);
+			command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+			command += " --helical_twist_initial " + floatToString(textToFloat(helical_twist_initial.getValue()));
+			command += " --helical_rise_initial " + floatToString(textToFloat(helical_rise_initial.getValue()));
+			if (do_local_search_helical_symmetry.getValue())
+			{
+				command += " --helical_symmetry_search";
+				command += " --helical_twist_min " + floatToString(textToFloat(helical_twist_min.getValue()));
+				command += " --helical_twist_max " + floatToString(textToFloat(helical_twist_max.getValue()));
+				if (textToFloat(helical_twist_inistep.getValue()) > 0.)
+					command += " --helical_twist_inistep " + floatToString(textToFloat(helical_twist_inistep.getValue()));
+				command += " --helical_rise_min " + floatToString(textToFloat(helical_rise_min.getValue()));
+				command += " --helical_rise_max " + floatToString(textToFloat(helical_rise_max.getValue()));
+				if (textToFloat(helical_rise_inistep.getValue()) > 0.)
+					command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
+			}
+			RFLOAT val;
+			val = textToFloat(range_tilt.getValue());
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --sigma_tilt " + floatToString(val / 3.);
+			val = textToFloat(range_psi.getValue());
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --sigma_psi " + floatToString(val / 3.);
 		}
-		else
-		{
-			command += " --skip_rotate --skip_maximize ";
-		}
-	}
-
-	// Helix
-	if ( (!is_continue) && (do_helix.getValue()) )
-	{
-		command += " --helix";
-		if (textToFloat(helical_tube_inner_diameter.getValue()) > 0.)
-			command += " --helical_inner_diameter " + floatToString(textToFloat(helical_tube_inner_diameter.getValue()));
-		command += " --helical_outer_diameter " + floatToString(textToFloat(helical_tube_outer_diameter.getValue()));
-		command += " --helical_z_percentage " + floatToString(helical_z_percentage.getValue() / 100.);
-		command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
-		command += " --helical_twist_initial " + floatToString(textToFloat(helical_twist_initial.getValue()));
-		command += " --helical_rise_initial " + floatToString(textToFloat(helical_rise_initial.getValue()));
-		if (do_local_search_helical_symmetry.getValue())
-		{
-			command += " --helical_symmetry_search";
-			command += " --helical_twist_min " + floatToString(textToFloat(helical_twist_min.getValue()));
-			command += " --helical_twist_max " + floatToString(textToFloat(helical_twist_max.getValue()));
-			if (textToFloat(helical_twist_inistep.getValue()) > 0.)
-				command += " --helical_twist_inistep " + floatToString(textToFloat(helical_twist_inistep.getValue()));
-			command += " --helical_rise_min " + floatToString(textToFloat(helical_rise_min.getValue()));
-			command += " --helical_rise_max " + floatToString(textToFloat(helical_rise_max.getValue()));
-			if (textToFloat(helical_rise_inistep.getValue()) > 0.)
-				command += " --helical_rise_inistep " + floatToString(textToFloat(helical_rise_inistep.getValue()));
-		}
-		RFLOAT val;
-		val = textToFloat(range_tilt.getValue());
-		val = (val < 0.) ? (0.) : (val);
-		val = (val > 90.) ? (90.) : (val);
-		command += " --sigma_tilt " + floatToString(val / 3.);
-		val = textToFloat(range_psi.getValue());
-		val = (val < 0.) ? (0.) : (val);
-		val = (val > 90.) ? (90.) : (val);
-		command += " --sigma_psi " + floatToString(val / 3.);
 	}
 
 	// Running stuff
 	command += " --j " + floatToString(nr_threads.getValue());
 	if (!is_continue)
 		command += " --memory_per_thread " + floatToString(ram_per_thread.getValue());
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
+MovieRefineJobWindow::MovieRefineJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
+{
+
+	type = PROC_MOVIEREFINE;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	fn_movie_star.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR Files (*.{star})", "Select the STAR file with the input movie micrographs, either from an Import or a Motion correction job.");
+    movie_rootname.place(current_y, "Rootname of movies files:", "movie", "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs. If you've run the MOTIONCORR wrapper in RELION, then the correct rootname is 'movie'.");
+
+    // Add a little spacer
+	current_y += STEPY/2;
+
+	fn_cont.place(current_y, "Continue 3D auto-refine from: ", "", "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration \
+from which you want to continue a previous run. \
+Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
+If they are the same, the program will automatically add a '_ctX' to the output rootname, \
+with X being the iteration from which one continues the previous run. \n \
+Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("extract");
+	resetHeight();
+
+	first_movie_frame.place(current_y, "First movie frame to extract: ", 1, 1, 20, 1, "Extract from this movie frame onwards. The first frame is number 1.");
+	last_movie_frame.place(current_y, "Last movie frame to extract: ", 0, 0, 64, 1, "Extract until this movie frame. Zero means: extract all frames in the movie. You may want to specify the last frame number though, as it will be useful to detect movies which accidentally have fewer frames.");
+	max_mpi_nodes.place(current_y, "Maximum number of MPI nodes: ", 8, 2, 24, 1, "The number of MPI nodes used by the relion_preprocess program will be limited to this value, regardless of the number of MPI nodes requested on the Running tab (which is also used for the refinement step). This is useful to protect the file system from too heavy disk I/O.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	extract_size.place(current_y,"Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). Use the same as for the refined particles!");
+	do_invert.place(current_y, "Invert contrast?", true, "If set to Yes, the contrast in the particles will be inverted. Use the same as for the refined particles!");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	rescale_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	rescale_group->end();
+	do_rescale.place(current_y, "Rescale particles?", false, "If set to Yes, particles will be re-scaled. Note that the particle diameter below will be in the down-scaled images.", rescale_group);
+	rescale_group->begin();
+	rescale.place(current_y, "Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number. Use the same as for the refined particles! ");
+	rescale_group->end();
+	do_rescale.cb_menu_i();
+
+	tab2->end();
+	tab3->begin();
+	tab3->label("normalise");
+	resetHeight();
+
+	norm_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	norm_group->end();
+	do_norm.place(current_y, "Normalize movie-particles?", true, "If set to Yes, particles will be normalized in the way RELION prefers it. Use the same values as for the refined particles!", norm_group);
+
+	norm_group->begin();
+
+
+	bg_diameter.place(current_y, "Diameter background circle (pix): ", -1, -1, 600, 10, " Use the same as for the refined particles! Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
+The background area is defined as all pixels outside a circle with this given diameter in pixels (before rescaling). When specifying a negative value, a default value of 75% of the Particle box size will be used.");
+
+	white_dust.place(current_y, "Stddev for white dust removal: ", -1, -1, 10, 0.1, " Use the same as for the refined particles! Remove very white pixels from the extracted particles. \
+Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
+
+	black_dust.place(current_y, "Stddev for black dust removal: ", -1, -1, 10, 0.1, " Use the same as for the refined particles! Remove very black pixels from the extracted particles. \
+Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
+	norm_group->end();
+	do_norm.cb_menu_i();
+
+
+
+	tab3->end();
+	tab4->begin();
+	tab4->label("refine");
+	resetHeight();
+
+	movie_runavg_window.place(current_y, "Running average window:", 5, 1, 15, 1, "The individual movie frames will be averaged using a running \
+average window with the specified width. Use an odd number. The optimal value will depend on the SNR in the individual movie frames. For ribosomes, we used a value of 5, where \
+each movie frame integrated approximately 1 electron per squared Angstrom.");
+
+	movie_sigma_offset.place(current_y, "Stddev on the translations (pix):", 1., 0.5, 10, 0.5, "A Gaussian prior with the specified standard deviation \
+will be centered at the rotations determined for the corresponding particle where all movie-frames were averaged. For ribosomes, we used a value of 2 pixels");
+
+	alsorot_movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	alsorot_movie_group->end();
+
+	do_alsorot_movies.place(current_y, "Also include rotational searches?", false, "If set to Yes, then running averages of the individual frames of recorded movies will also be aligned rotationally. \n \
+If one wants to perform particle polishing, then rotational alignments of the movie frames is NOT necessary and will only take more computing time.", alsorot_movie_group);
+
+	alsorot_movie_group->begin();
+
+	movie_sigma_angles.place(current_y, "Stddev on the rotations (deg):", 1., 0.5, 10, 0.5, "A Gaussian prior with the specified standard deviation \
+will be centered at the rotations determined for the corresponding particle where all movie-frames were averaged. For ribosomes, we used a value of 1 degree");
+
+	alsorot_movie_group->end();
+	do_alsorot_movies.cb_menu_i(); // to make default effective
+
+	do_movies_per_micrograph.place(current_y, "Process per-micrograph?", true, "If set to Yes, then each micrograph is processed individually. This can only be done if rotational searches are NOT included (i.e. only in preparation for particle polishing). Processing each micrograph \n \
+individually has the advantage of very low RAM-usage, but may come at an increased cost in CPU time, as the parallelisation efficiency goes down, especially when there are very few particles per micrograph.");
+
+
+	tab4->end();
+
+	// read settings if hidden file exists
+	read(".gui_movierefine", is_continue);
+
+}
+
+void MovieRefineJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_movierefine";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	// I/O
+	fn_cont.writeValue(fh);
+	fn_movie_star.writeValue(fh);
+	movie_rootname.writeValue(fh);
+
+	// Extract movie-particles
+	first_movie_frame.writeValue(fh);
+	last_movie_frame.writeValue(fh);
+	max_mpi_nodes.writeValue(fh);
+	extract_size.writeValue(fh);
+	do_rescale.writeValue(fh);
+	rescale.writeValue(fh);
+	do_norm.writeValue(fh);
+	bg_diameter.writeValue(fh);
+	white_dust.writeValue(fh);
+	black_dust.writeValue(fh);
+	do_invert.writeValue(fh);
+
+	// Refine Movies
+	movie_runavg_window.writeValue(fh);
+	movie_sigma_offset.writeValue(fh);
+	do_alsorot_movies.writeValue(fh);
+	movie_sigma_angles.writeValue(fh);
+	do_movies_per_micrograph.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+
+void MovieRefineJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_movierefine";
+
+	if (openReadFile(fn, fh))
+	{
+
+		// I/O
+		fn_cont.readValue(fh);
+		fn_movie_star.readValue(fh);
+		movie_rootname.readValue(fh);
+
+		// Extract movie-particles
+		first_movie_frame.readValue(fh);
+		last_movie_frame.readValue(fh);
+		max_mpi_nodes.readValue(fh);
+		extract_size.readValue(fh);
+		do_rescale.readValue(fh);
+		rescale.readValue(fh);
+		do_norm.readValue(fh);
+		bg_diameter.readValue(fh);
+		white_dust.readValue(fh);
+		black_dust.readValue(fh);
+		do_invert.readValue(fh);
+
+		// Refine Movies
+		movie_runavg_window.readValue(fh);
+		movie_sigma_offset.readValue(fh);
+		do_alsorot_movies.readValue(fh);
+		movie_sigma_angles.readValue(fh);
+		do_movies_per_micrograph.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+
+	fn_cont.deactivate(is_continue);
+	fn_movie_star.deactivate(is_continue);
+	movie_rootname.deactivate(is_continue);
+
+	// Extract movie-particles
+	first_movie_frame.deactivate(is_continue);
+	last_movie_frame.deactivate(is_continue);
+	max_mpi_nodes.deactivate(is_continue);
+	extract_size.deactivate(is_continue);
+	do_rescale.deactivate(is_continue);
+	rescale.deactivate(is_continue);
+	do_norm.deactivate(is_continue);
+	bg_diameter.deactivate(is_continue);
+	white_dust.deactivate(is_continue);
+	black_dust.deactivate(is_continue);
+	do_invert.deactivate(is_continue);
+
+	// Movies
+	movie_runavg_window.deactivate(is_continue);
+	movie_sigma_offset.deactivate(is_continue);
+	do_alsorot_movies.deactivate(is_continue);
+	movie_sigma_angles.deactivate(is_continue);
+
+}
+
+void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
+{
+
+	commands.clear();
+	std::string command;
+
+	initialisePipeline(outputname, "MovieRefine", job_counter);
+
+	// A. First get the extract command
+	if (nr_mpi.getValue() > 1)
+		command="`which relion_preprocess_mpi`";
+	else
+		command="`which relion_preprocess`";
+
+	// Input
+	command += " --i " + fn_movie_star.getValue();
+	Node node(fn_movie_star.getValue(), fn_movie_star.type);
+	pipelineInputNodes.push_back(node);
+
+	// Get the data.star to be used for re-extraction from the optimiser name
+	FileName fn_data = fn_cont.getValue();
+	fn_data = fn_data.without("optimiser.star") + "data.star";
+	command += " --reextract_data_star " + fn_data;
+	Node node2(fn_cont.getValue(), NODE_OPTIMISER);
+	pipelineInputNodes.push_back(node2);
+
+	// Output files of the extraction: to be used in the second step: movie-refinement
+	command += " --part_dir " + outputname;
+	FileName fn_ostar = outputname + "particles_" + movie_rootname.getValue() + ".star";
+	command += " --part_star " + fn_ostar;
+	FileName fn_olist = outputname + "micrographs_" + movie_rootname.getValue() + "_list.star";
+	command += " --list_star " + fn_olist;
+
+	// Extraction parameters
+	command += " --extract --extract_movies";
+	command += " --extract_size " + floatToString(extract_size.getValue());
+	command += " --movie_name " + movie_rootname.getValue();
+	command += " --first_movie_frame " + floatToString(first_movie_frame.getValue());
+	command += " --last_movie_frame " + floatToString(last_movie_frame.getValue());
+	// Limit MPI nodes
+	if (nr_mpi.getValue() > ROUND(max_mpi_nodes.getValue()))
+		command += " --max_mpi_nodes " + floatToString(max_mpi_nodes.getValue());
+
+	// Operate stuff
+	// Get an integer number for the bg_radius
+	RFLOAT bg_radius = (bg_diameter.getValue() < 0.) ? 0.75 * extract_size.getValue() : bg_diameter.getValue();
+	bg_radius /= 2.; // Go from diameter to radius
+	if (do_rescale.getValue())
+	{
+		command += " --scale " + floatToString(rescale.getValue());
+		bg_radius *= rescale.getValue() / extract_size.getValue();
+	}
+	if (do_norm.getValue())
+	{
+		// Get an integer number for the bg_radius
+		bg_radius = (int)bg_radius;
+		command += " --norm --bg_radius " + floatToString(bg_radius);
+		command += " --white_dust " + floatToString(white_dust.getValue());
+		command += " --black_dust " + floatToString(black_dust.getValue());
+	}
+	if (do_invert.getValue())
+		command += " --invert_contrast ";
+
+	if (is_continue)
+		command += " --only_extract_unfinished ";
+
+	// Other arguments for extraction
+	command += " " + other_args.getValue();
+	commands.push_back(command);
+
+	// Also touch the suffix file. Do this after the first command had completed
+	// TODO: test this!!!
+	command = "echo " + fn_movie_star.getValue() + " > " +  outputname + "coords_suffix_extract.star";
+	commands.push_back(command.c_str());
+	Node node3(outputname + "coords_suffix_extract.star", NODE_MIC_COORDS);
+	pipelineOutputNodes.push_back(node3);
+
+
+	// B. Then get the actual movie-refinement command
+	if (nr_mpi.getValue() > 1)
+		command="`which relion_refine_mpi`";
+	else
+		command="`which relion_refine`";
+
+	command += " --o " + outputname + "run";
+	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, true, do_alsorot_movies.getValue() );
+
+	command += " --continue " + fn_cont.getValue();
+
+	if (do_movies_per_micrograph.getValue())
+	{
+		if (do_alsorot_movies.getValue())
+			REPORT_ERROR("MovieRefineJobWindow ERROR: you can only process micrographs individually if you switch OFF the rotational searches.");
+		command += " --process_movies_per_micrograph --realign_movie_frames " + fn_olist;
+
+		if (is_continue)
+			command += " --only_do_unfinished_movies ";
+	}
+	else
+	{
+		command += " --realign_movie_frames " + fn_ostar;
+	}
+
+	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
+	command += " --sigma_off " + floatToString(movie_sigma_offset.getValue());
+
+	if (do_alsorot_movies.getValue())
+	{
+		command += " --sigma_ang " + floatToString(movie_sigma_angles.getValue());
+	}
+	else
+	{
+		command += " --skip_rotate --skip_maximize ";
+	}
+
+	// Running stuff
+	command += " --j " + floatToString(nr_threads.getValue());
 
 	// Other arguments
 	command += " " + other_args.getValue();

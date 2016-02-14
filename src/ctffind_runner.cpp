@@ -380,13 +380,15 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 			command += " --do_validation ";
 
 		for (size_t i = 0; i<allmicnames.size(); i++)
-			command += allmicnames[i];
+			command += " " + allmicnames[i];
 
 		// TODO: better control over which GPU to use. For now, gid = rank!
 		command += " --gid " + integerToString(rank);
 
 		// Redirect all gctf output
 		command += " >> " + fn_out + "gctf" + integerToString(rank)+".out  2>> " + fn_out + "gctf" + integerToString(rank)+".err";
+
+		//std::cerr << " command= " << command << std::endl;
 		int res = system(command.c_str());
 
 		// Cleanup all the symbolic links again

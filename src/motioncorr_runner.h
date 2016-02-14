@@ -65,7 +65,7 @@ public:
 	bool continue_old;
 
 	// Output STAR file
-	MetaDataTable MDout;
+	MetaDataTable MDavg, MDmov;
 
 public:
 	// Read command line arguments

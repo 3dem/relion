@@ -37,6 +37,8 @@
 #define DONT_GET_CL false
 #define DO_MKDIR true
 #define DONT_MKDIR false
+// font size of browser windows on the main GUI
+#define RLN_FONTSIZE 14
 
 // Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
 #define MAX_JOBS_BROWSER 50
@@ -44,6 +46,7 @@
 // This class organises the main winfow of the relion GUI
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
+static int browse_jobtype[NR_BROWSE_TABS]; // this allow non-consecutive numbering of jobtypes in the job browser
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
@@ -61,6 +64,7 @@ static SortJobWindow *job_sort;
 static Class2DJobWindow *job_class2d;
 static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
+static MovieRefineJobWindow *job_movierefine;
 static ClassSelectJobWindow *job_classselect;
 static MaskCreateJobWindow *job_maskcreate;
 static JoinStarJobWindow *job_joinstar;

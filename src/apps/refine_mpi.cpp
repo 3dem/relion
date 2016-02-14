@@ -30,11 +30,21 @@ int main(int argc, char **argv)
     	// Read in parameters from the command line
     	optimiser.read(argc, argv);
 
-    	// Set things up
-    	optimiser.initialise();
+    	// Dirty hack to loop around movies one micrograph at a time
+    	if (optimiser.do_movies_per_micrograph && optimiser.fn_data_movie != "" && optimiser.do_skip_maximization)
+    	{
+    		optimiser.processMoviesPerMicrograph();
+    	}
+    	else
+    	{
+    		// normal code
 
-    	// Iterate
-    	optimiser.iterate();
+			// Set things up
+			optimiser.initialise();
+
+			// Iterate
+			optimiser.iterate();
+    	}
 
     }
     catch (RelionError XE)

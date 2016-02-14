@@ -105,7 +105,8 @@ class Node
 #define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define NR_BROWSE_TABS      17
+#define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
+#define NR_BROWSE_TABS      18
 
 // Status a Process may have
 #define PROC_RUNNING   0

@@ -25,6 +25,9 @@ void PreprocessingMpi::read(int argc, char **argv)
     node = new MpiNode(argc, argv);
 
     // First read in non-parallelisation-dependent variables
+	int mpi_section = parser.addSection("MPI options");
+    max_mpi_nodes =textToInteger(parser.getOption("--max_mpi_nodes", "Limit the number of effective MPI nodes to protect from too heavy disk I/O (thus ignoring larger values from mpirun)", "8"));
+
     Preprocessing::read(argc, argv, node->rank);
 
     // Don't put any output to screen for mpi slaves
@@ -42,10 +45,14 @@ void PreprocessingMpi::read(int argc, char **argv)
 void PreprocessingMpi::runExtractParticles()
 {
 
-	// Each node does part of the work
+	// Total number of nodes is limited to max_mpi_nodes
+	if (node->rank >= max_mpi_nodes)
+		return;
+
+	// Each node until max_mpi_nodes does part of the work
 	long int nr_mics = MDmics.numberOfObjects();
 	long int my_first_mic, my_last_mic, my_nr_mics;
-	divide_equally(nr_mics, node->size, node->rank, my_first_mic, my_last_mic);
+	divide_equally(nr_mics, max_mpi_nodes, node->rank, my_first_mic, my_last_mic);
 	my_nr_mics = my_last_mic - my_first_mic + 1;
 
 	int barstep;
@@ -63,7 +70,10 @@ void PreprocessingMpi::runExtractParticles()
 	{
 		if (imic >= my_first_mic && imic <= my_last_mic)
 		{
-			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+			if (do_movie_extract)
+				MDmics.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
+			else
+				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 			// Check new-style outputdirectory exists and make it if not!
 			FileName fn_dir = getOutputFileNameRoot(fn_mic);

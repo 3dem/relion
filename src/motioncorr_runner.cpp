@@ -66,7 +66,8 @@ void MotioncorrRunner::initialise()
 			fn_motioncorr_exe = (std::string)penv;
 	}
 
-	MDout.clear();
+	MDavg.clear();
+	MDmov.clear();
 
 	FileName fn_avg, fn_mov;
 
@@ -84,8 +85,10 @@ void MotioncorrRunner::initialise()
 
 			// For output STAR file
 			getOutputFileNames(fn_mic, fn_avg, fn_mov);
-			MDout.addObject(MDin.getObject());
-			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			MDmov.addObject();
+			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+			MDavg.addObject();
+			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 	else
@@ -96,8 +99,10 @@ void MotioncorrRunner::initialise()
 		for (size_t imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			getOutputFileNames(fn_micrographs[imic], fn_avg, fn_mov);
-			MDout.addObject();
-			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			MDmov.addObject();
+			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+			MDavg.addObject();
+			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 
@@ -194,8 +199,9 @@ void MotioncorrRunner::run()
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
-	// Write out STAR file at the end
-	MDout.write(fn_out + "/corrected_micrographs.star");
+	// Write out STAR files at the end
+	MDavg.write(fn_out + "/corrected_micrographs.star");
+	MDmov.write(fn_out + "/corrected_micrograph_movies.star");
 
 }
 

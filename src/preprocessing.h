@@ -46,7 +46,7 @@ public:
 	int verb;
 
 	// Name for directory of output Particle stacks and Particle STAR file
-	FileName fn_part_dir, fn_part_star;
+	FileName fn_part_dir, fn_part_star, fn_list_star;
 
 	// Does the input micrograph STAR file have CTF information?
 	bool star_has_ctf;
@@ -227,7 +227,6 @@ public:
 	FileName getCoordinateFileName(FileName fn_mic);
 	MetaDataTable getCoordinateMetaDataTable(FileName fn_mic);
 	FileName getOutputFileNameRoot(FileName fn_mic);
-	FileName getOriginalStackNameWithoutUniqDate(FileName fn_mic);
 
 };
 

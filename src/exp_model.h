@@ -317,15 +317,19 @@ public:
 	void clear()
 	{
 		groups.clear();
+		groups.reserve(MAX_NR_MICROGRAPHS);
 		micrographs.clear();
 		micrographs.reserve(MAX_NR_MICROGRAPHS);
-		groups.reserve(MAX_NR_MICROGRAPHS);
+		average_micrographs.clear();
 		particles.clear(); // reserve upon reading
 		ori_particles.clear(); // TODO: reserve upon reading
+		nr_ori_particles_subset1 = nr_ori_particles_subset2 = 0;
+		nr_bodies = 1;
 		MDexp.clear();
 		MDexp.setIsList(true);
 		MDimg.clear();
 		MDimg.setIsList(false);
+		MDbodies.clear();
 		MDmic.clear();
 		MDmic.setIsList(false);
 		MDimg.setName("images");
@@ -385,7 +389,7 @@ public:
 	// rlnParticleName entries in the movie-frame Experiment should coincide with rlnImageName entries in the current Experiment
 	// the entries rlnAngleRot, rlnAngleTilt, rlnAnglePsi, rlnOriginX and rlnOriginY will be taken from the current Experiment and
 	// copied into the new moevieframe Experiment. In addition, these values will be used to center the corresponding Priors
-	void expandToMovieFrames(FileName fn_data_movie, int verb = 0);
+	//void expandToMovieFrames(FileName fn_data_movie, int verb = 0);
 
 	// Make sure the particles inside each orriginal_particle are in the right order
 	// After they have been ordered, get rid of the particles_order vector inside the ori_particles

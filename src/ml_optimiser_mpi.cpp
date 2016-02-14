@@ -39,8 +39,11 @@ void MlOptimiserMpi::read(int argc, char **argv)
     node = new MpiNode(argc, argv);
 
     // First read in non-parallelisation-dependent variables
-    MlOptimiser::read(argc, argv, node->rank);
+	int mpi_section = parser.addSection("MPI options");
     fn_scratch = parser.getOption("--scratchdir", "Directory (with absolute path, and visible to all nodes) for temporary files", "");
+    only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
+
+    MlOptimiser::read(argc, argv, node->rank);
 
     // Don't put any output to screen for mpi slaves
     verb = (node->isMaster()) ? 1 : 0;
@@ -73,7 +76,8 @@ void MlOptimiserMpi::initialise()
 #endif
 
     // Print information about MPI nodes:
-    printMpiNodesMachineNames(*node, nr_threads);
+    if (!do_movies_per_micrograph)
+    	printMpiNodesMachineNames(*node, nr_threads);
 
     MlOptimiser::initialiseGeneral(node->rank);
 
@@ -2166,7 +2170,8 @@ void MlOptimiserMpi::iterate()
 				// The master only writes the data file (he's the only one who has and manages these data!)
 				iter = -1; // write output file without iteration number
 				MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-				std::cout << " Auto-refine: Skipping maximization step, so stopping now... " << std::endl;
+				if (verb > 0)
+					std::cout << " Auto-refine: Skipping maximization step, so stopping now... " << std::endl;
 			}
 			break;
 		}
@@ -2363,5 +2368,85 @@ void MlOptimiserMpi::iterate()
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
 	MPI_Barrier(MPI_COMM_WORLD);
+
+}
+
+void MlOptimiserMpi::processMoviesPerMicrograph()
+{
+	if (!(do_movies_per_micrograph && fn_data_movie != "" && do_skip_maximization))
+		REPORT_ERROR("MlOptimiserMpi::processMoviesPerMicrograp BUG: you should not be here...");
+
+	// Read in a list with all micrographs and basically run the entire relion_refine procedure separately for each micropgraph
+	// Only save some time reading in stuff...
+
+	MetaDataTable MDmics;
+	MDmics.read(fn_data_movie);
+
+	// Get some params to allow looping from the same starting point
+	FileName fn_opt = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
+	FileName fn_out_ori = fn_out.beforeLastOf("/");
+	int iter_ori = iter;
+
+	// Print out the MPI nodes, as this is disabled inside the loop
+	printMpiNodesMachineNames(*node, nr_threads);
+
+	// Now loop over all micrographs
+	bool is_first = true;
+	if (node->isMaster())
+	{
+		std::cout << " + Performing the movie-refinement independently for each micrograph ..." << std::endl;
+		init_progress_bar(MDmics.numberOfObjects());
+	}
+
+	int imic = 0;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
+	{
+		FileName fn_star;
+		MDmics.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
+		fn_data_movie = fn_star;
+		fn_out = fn_out_ori + "/" + fn_post.without("_extract.star");
+
+		FileName fn_data = fn_out + "_data.star";
+		// Set new output star file back into MDmics, to be written out at the end
+		MDmics.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_data);
+
+		if (!(only_do_unfinished_movies && exists(fn_data)))
+		{
+			// Make output directory structure like the input Micrographs
+			std::string command = "mkdir -p " + fn_out.beforeLastOf("/");
+			std::system(command.c_str());
+
+			// be quiet
+			verb = 0;
+
+			// Initialise a lot of stuff
+			// In theory, I could save time omitting part of this. In practice it's complicated...
+			initialise();
+
+			// Run the final iteration for this micrograph
+			iterate();
+
+			// Read the start back in
+			MlOptimiser::read(fn_opt, node->rank, true, false); // true means skip data reading and false means dont skip model reading!
+
+			if (node->isMaster())
+				progress_bar(imic);
+		}
+
+		imic++;
+	}
+
+	if (node->isMaster())
+	{
+		progress_bar(MDmics.numberOfObjects());
+
+		// At the end, the master also writes out a STAR file with the output STAR files of all micrographs
+		MDmics.write(fn_out_ori + "/run_data.star");
+	}
+
+
+
 
 }

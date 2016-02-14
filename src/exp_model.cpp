@@ -25,7 +25,7 @@ void ExpOriginalParticle::addParticle(long int _particle_id, int _random_subset,
 	if (random_subset != _random_subset)
 	{
 		std::cerr << " random_subset= " << random_subset << " _random_subset= " << _random_subset << std::endl;
-		std::cerr << " particles_id.size()= " << particles_id.size() << " name= " << std::endl;
+		std::cerr << " particles_id.size()= " << particles_id.size() << " name= "<<name << std::endl;
 		REPORT_ERROR("ExpOriginalParticle:addParticle: incompatible random subsets between particle and its original particle.");
 	}
 	particles_id.push_back(_particle_id);
@@ -436,7 +436,7 @@ void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_
 	}
 }
 
-
+/*
 void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 {
 
@@ -730,6 +730,7 @@ void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 
 
 }
+*/
 void Experiment::orderParticlesInOriginalParticles()
 {
 	// If the orders are negative (-1) then dont sort anything
@@ -853,7 +854,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			fn_img.compose(n+1, fn_exp); // fn_img = integerToString(n) + "@" + fn_exp;
 			// Add the particle to my_area = 0
 			part_id = addParticle(group_id, mic_id);
-                        MDimg.addObject();
+			MDimg.addObject();
 			if (do_preread_images)
 			{
 				Image<RFLOAT> img;
@@ -874,11 +875,11 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		MDimg.read(fn_exp);
 
 #ifdef DEBUG_READ
-	std::cerr << "Done reading MDimg" << std::endl;
-	timer.toc(tread);
-	timer.tic(tsort);
-	//std::cerr << "Press any key to continue..." << std::endl;
-	//std::cin >> c;
+		std::cerr << "Done reading MDimg" << std::endl;
+		timer.toc(tread);
+		timer.tic(tsort);
+		//std::cerr << "Press any key to continue..." << std::endl;
+		//std::cin >> c;
 #endif
 
 		// Sort input particles on micrographname
@@ -911,12 +912,13 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		}
 #ifdef DEBUG_READ
 	std::cerr << "Done sorting MDimg" << std::endl;
+	std::cerr << " MDimg.numberOfObjects()= " << MDimg.numberOfObjects() << std::endl;
 	timer.toc(tsort);
 	timer.tic(tfill);
 	long nr_read = 0;
 #endif
-                // allocate 1 block of memory
-                particles.reserve(MDimg.numberOfObjects());
+		// allocate 1 block of memory
+		particles.reserve(MDimg.numberOfObjects());
 
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
 		long int last_oripart_idx = -1;
@@ -924,10 +926,10 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 		{
 			// Add new micrographs or get mic_id for existing micrograph
-  	                mic_id = -1;
-                        long int idx = micrographs.size();
+			mic_id = -1;
+			long int idx = micrographs.size();
 			long int avg_mic_idx = average_micrographs.size() - 1;
-                        std::string last_mic_name = (idx > 0) ? micrographs[idx-1].name : "";
+			std::string last_mic_name = (idx > 0) ? micrographs[idx-1].name : "";
 			FileName mic_name=""; // Filename instead of string because will decompose below
 			std::string mic_name_after_at="", group_name="", last_mic_name_after_at="", last_ori_mic_name="";
 			if (is_mic_a_movie)
@@ -966,10 +968,9 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 						if (average_micrographs.size() == 1)
 						{
 							nr_frames = micrographs.size();
+							if (nr_frames == 0)
+								REPORT_ERROR("Experiment::read ERROR: numner of frames is zero!");
 							ori_particles.reserve(MDimg.numberOfObjects()/nr_frames);
-#ifdef DEBUG_READ
-							std::cerr << "nr_frames = " << nr_frames << std::endl;
-#endif
 						}
 					}
 				}
@@ -1008,7 +1009,11 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 					if (MDimg.containsLabel(EMDL_MLMODEL_GROUP_NAME))
 						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name);
 					else
-						group_name = mic_name;
+					{
+						FileName fn_pre, fn_jobnr, fn_post;
+						decomposePipelineFileName(mic_name, fn_pre, fn_jobnr, fn_post);
+						group_name = fn_post;
+					}
 
 					// If this group did not exist yet, add it to the experiment
 					group_id = -1;
@@ -1048,15 +1053,15 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			timer.tic(tori);
 #endif
 
-                        if (do_preread_images)
-                        {
-                            FileName fn_img;
-                            MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-                            Image<RFLOAT> img;
-                            img.read(fn_img);
-                            img().setXmippOrigin();
-                            particles[part_id].img = img();
-                        }
+			if (do_preread_images)
+			{
+				FileName fn_img;
+				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				Image<RFLOAT> img;
+				img.read(fn_img);
+				img().setXmippOrigin();
+				particles[part_id].img = img();
+			}
 
 			// Add this particle to an existing OriginalParticle, or create a new OriginalParticle
 			std::string ori_part_name;

@@ -148,6 +148,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	fn_data_movie = parser.getOption("--realign_movie_frames", "Input STAR file with the movie frames", "");
 
+	do_movies_per_micrograph = parser.checkOption("--process_movies_per_micrograph", "Perform movie-processing one micrograph at a time (this reduces RAM costs for large data sets)");
+
 	// TODO: add this to EMDL_OPTIMISER and read/write of optimiser.star
 	nr_frames_per_prior = textToInteger(parser.getOption("--nr_frames_prior", "Number of movie frames to calculate running-average priors", "5"));
 
@@ -528,7 +530,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 }
 
 
-void MlOptimiser::read(FileName fn_in, int rank)
+void MlOptimiser::read(FileName fn_in, int rank, bool do_skip_data, bool do_skip_model)
 {
 
 #ifdef DEBUG_READ
@@ -641,19 +643,26 @@ void MlOptimiser::read(FileName fn_in, int rank)
 
     // Then read in sampling, mydata and mymodel stuff
     // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
-    bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
-    bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-    mydata.read(fn_data, false, false, do_preread, is_helical_segment);
-    if (do_split_random_halves)
+    if (!do_skip_data)
     {
-		if (rank % 2 == 1)
-			mymodel.read(fn_model);
-		else
-			mymodel.read(fn_model2);
+		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		mydata.read(fn_data, false, false, do_preread, is_helical_segment);
     }
-    else
+
+    if (!do_skip_model)
     {
-    	mymodel.read(fn_model);
+		if (do_split_random_halves)
+		{
+			if (rank % 2 == 1)
+				mymodel.read(fn_model);
+			else
+				mymodel.read(fn_model2);
+		}
+		else
+		{
+			mymodel.read(fn_model);
+		}
     }
 	sampling.read(fn_sampling);
 
@@ -873,7 +882,8 @@ void MlOptimiser::initialise()
 	}
 
 	// Write out initial mymodel
-	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+	if (!do_movies_per_micrograph)
+		write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 
 
 	// Do this after writing out the model, so that still the random halves are written in separate files.
@@ -1124,9 +1134,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	else if (fn_data_movie != "" && !do_realign_movies)
 	{
 
-		if (verb > 0)
-			std::cout << " Expanding current model for movie frames... " << std::endl;
-
 		do_realign_movies = true;
 		nr_iter_wo_resol_gain = -1;
 		nr_iter_wo_large_hidden_variable_changes = 0;
@@ -1136,7 +1143,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 		current_changes_optimal_offsets = 999.;
 
 		// If we're realigning movie frames, then now read in the metadata of the movie frames and combine with the metadata of the average images
-		mydata.expandToMovieFrames(fn_data_movie, verb);
+		if (verb > 0)
+			std::cout << " Reading in pre-expanded data model for movie frames... " << std::endl;
+
+		mydata.read(fn_data_movie);
 
 		// Now also modify the model to contain many more groups....
 		// each groups has to become Nframes groups (get Nframes from new mydata)
@@ -2084,7 +2094,7 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 	// That makes a total of 2*2 + 5 = 9 * a RFLOAT array of size BPref
 	RFLOAT total_mem_Gb_max = Gb * 9 * MULTIDIM_SIZE((wsum_model.BPref[0]).data);
 
-	if (myverb > 0)
+	if (myverb > 0 && verb > 0)
 	{
 		// Calculate number of sampled hidden variables:
 		int nr_ang_steps = CEIL(PI * particle_diameter * mymodel.current_resolution);
@@ -2105,7 +2115,7 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 		}
 	}
 
-	if (myverb > 0)
+	if (myverb > 0 && verb > 0)
 	{
 		std::cout << " Estimated memory for expectation step  > " << total_mem_Gb_exp << " Gb, available memory = "<<available_memory * nr_threads<<" Gb."<<std::endl;
 		std::cout << " Estimated memory for maximization step > " << total_mem_Gb_max << " Gb, available memory = "<<available_memory * nr_threads<<" Gb."<<std::endl;
@@ -6735,7 +6745,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 
 }
 
-void MlOptimiser::updateAngularSampling(bool verb)
+void MlOptimiser::updateAngularSampling(bool myverb)
 {
 
 	if (!do_split_random_halves)
@@ -6930,7 +6940,7 @@ void MlOptimiser::updateAngularSampling(bool verb)
 	}
 
 	// Print to screen
-	if (verb)
+	if (myverb && verb > 0)
 	{
 		std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
 		if (sampling.orientational_prior_mode == NOPRIOR)
@@ -6986,16 +6996,19 @@ void MlOptimiser::checkConvergence()
 void MlOptimiser::printConvergenceStats()
 {
 
-	std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-	std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-	std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-			<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
-
-	if (has_converged)
+	if (verb > 0)
 	{
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		if (!do_realign_movies)
-			std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
+		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
+				<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+
+		if (has_converged)
+		{
+			std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+			if (!do_realign_movies)
+				std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+		}
 	}
 
 }
