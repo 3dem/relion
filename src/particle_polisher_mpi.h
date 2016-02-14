@@ -55,7 +55,7 @@ public:
 	void reconstructShinyParticlesAndFscWeight(int ipass);
 
 	// Parallelized optimisation of beamtilt for all micrographs
-	void optimiseBeamTilt();
+	//void optimiseBeamTiltAndDefocus();
 
 	// Parallelized run function
     void run();

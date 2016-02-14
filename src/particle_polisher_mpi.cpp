@@ -44,7 +44,7 @@ void ParticlePolisherMpi::read(int argc, char **argv)
 void ParticlePolisherMpi::fitMovementsAllMicrographs()
 {
 
-	int total_nr_micrographs = exp_model.average_micrographs.size();
+	long int total_nr_micrographs = fn_stars.size();
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
@@ -76,30 +76,6 @@ void ParticlePolisherMpi::fitMovementsAllMicrographs()
 		progress_bar(my_nr_micrographs);
 	}
 
-	// Combine results from all nodes
-	MultidimArray<RFLOAT> allnodes_fitted_movements;
-	allnodes_fitted_movements.resize(fitted_movements);
-	MPI_Allreduce(MULTIDIM_ARRAY(fitted_movements), MULTIDIM_ARRAY(allnodes_fitted_movements), MULTIDIM_SIZE(fitted_movements), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	fitted_movements = allnodes_fitted_movements;
-
-    // Set the fitted movements in the xoff and yoff columns of the exp_model.MDimg
-    for (long int ipart = 0; ipart < exp_model.numberOfParticles(); ipart++)
-	{
-		long int part_id = exp_model.particles[ipart].id;
-		RFLOAT xoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 0);
-		RFLOAT yoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 1);
-		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_X, xoff, part_id);
-		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, yoff, part_id);
-	}
-
-    if (node->isMaster())
-    {
-		// Write out the STAR file with all the fitted movements
-		FileName fn_tmp = fn_out + "fitted_tracks.star";
-		exp_model.MDimg.write(fn_tmp);
-		std::cout << " + Written out all fitted movements in STAR file: " << fn_tmp << std::endl;
-    }
-
 
 }
 
@@ -107,7 +83,7 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 {
 
 	FileName fn_star = fn_out + "bfactors.star";
-	if (!do_start_all_over && readStarFileBfactors(fn_star))
+	if (only_do_unfinished && readStarFileBfactors(fn_star))
 	{
 		if (verb > 0)
 			std::cout << " + " << fn_star << " already exists: skipping calculation average of per-frame B-factors." <<std::endl;
@@ -209,14 +185,14 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 void ParticlePolisherMpi::polishParticlesAllMicrographs()
 {
 
-	if (!do_start_all_over && exists(fn_out + "shiny.star"))
+	if (only_do_unfinished && exists(fn_out + "shiny.star"))
 	{
 		if (verb > 0)
 			std::cout << std::endl << " + " << fn_out << "shiny.star already exists: skipping polishing of the particles." << std::endl;
 		return;
 	}
 
-	int total_nr_micrographs = exp_model.average_micrographs.size();
+	long int total_nr_micrographs = fn_stars.size();
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
@@ -256,13 +232,14 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 		std::cout << "+ Reconstructing two halves of shiny particles ..." << std::endl;
 
 	// Re-read the shiny particles' metadatatable (ignore original particle names here...)
+	Experiment exp_model;
 	exp_model.read(fn_out + "shiny.star", true);
 
 	 // Do the reconstructions for both halves
 	if (node->rank == 0)
-		reconstructShinyParticlesOneHalf(1);
+		reconstructShinyParticlesOneHalf(1, exp_model);
 	else if (node->rank == 1)
-		reconstructShinyParticlesOneHalf(2);
+		reconstructShinyParticlesOneHalf(2, exp_model);
 
 	// Wait until both reconstructions have been done
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -329,7 +306,8 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 
 }
 
-void ParticlePolisherMpi::optimiseBeamTilt()
+/*
+void ParticlePolisherMpi::optimiseBeamTiltAndDefocus()
 {
 
 	// This function assumes the shiny particles are in exp_mdel.MDimg!!
@@ -400,6 +378,7 @@ void ParticlePolisherMpi::optimiseBeamTilt()
 		exp_model.MDimg.write(fn_out + "shiny.star");
 
 }
+*/
 
 void ParticlePolisherMpi::run()
 {
@@ -417,12 +396,14 @@ void ParticlePolisherMpi::run()
 	// Now reconstruct with all polished particles: two independent halves, FSC-weighting of the sum of the two...
 	reconstructShinyParticlesAndFscWeight(1);
 
+	/*
 	// Optimise beam-tilt and defocus per beamtilt group and/or micrograph
 	optimiseBeamTiltAndDefocus();
 
 	// Reconstruct again two halves to see whether the beamtilt and/or defocus optimisation has helped
 	if (beamtilt_max > 0. || defocus_shift_max > 0.)
 		reconstructShinyParticlesAndFscWeight(2);
+	*/
 
 	if (verb > 0)
 		std::cout << " done!" << std::endl;

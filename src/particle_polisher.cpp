@@ -30,7 +30,9 @@ void ParticlePolisher::read(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output directory", "Polish/");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 	running_average_width = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "5"));
+	// TODO: remove do_start_all_over!!!
 	do_start_all_over = parser.checkOption("--dont_read_old_files", "Do not read intermediate results from disc, but re-do all calculations from scratch");
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
 
 	int fit_section = parser.addSection("Beam-induced movement fitting options");
 	sigma_neighbour_distance = textToFloat(parser.getOption("--sigma_nb", "Standard deviation for a Gaussian weight on the particle distance", "100."));
@@ -53,7 +55,6 @@ void ParticlePolisher::read(int argc, char **argv)
 	helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
 	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, positive values for right-handedness)", "0."));
 	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
-
 	fn_mask = parser.getOption("--mask", "Postprocessing mask for B-factor determination of per-frame reconstructions (1=protein, 0=solvent, all values in range [0,1])", "");
 
 	int ctf_section = parser.addSection("CTF options");
@@ -96,38 +97,99 @@ void ParticlePolisher::usage()
 
 void ParticlePolisher::initialise()
 {
-#ifndef DEBUG_TILT
+
     if (verb > 0)
     	std::cout << " + Reading the input STAR file ... " << std::endl;
-    exp_model.read(fn_in, false, true); // false means NOT do_ignore_particle_name here, true means DO_ignore_group_name...
 
-	// Pre-size the fitted_movements array (for parallelised output...)
-	long int total_nr_images = exp_model.numberOfParticles();
-	fitted_movements.resize(total_nr_images, 2);
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length()-1] != '/')
+		fn_out += "/";
 
-	last_frame = (last_frame < 0) ? exp_model.ori_particles[0].particles_id.size() : last_frame;
+	MetaDataTable MDin, MDonemic;
+    MDin.read(fn_in);
+
+    if (MDin.containsLabel(EMDL_STARFILE_MOVIE_PARTICLES))
+    {
+    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+		{
+    		FileName fnt;
+    		MDin.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fnt);
+    		fn_stars.push_back(fnt);
+		}
+    }
+    else
+    {
+    	// Break up the original STAR file into pieces, one for each micrograph, and write these to disc
+    	MDin.newSort(EMDL_MICROGRAPH_NAME, false, true); // false=no reverse, true= do sort only on string after "@"
+
+    	FileName fn_old="", fn_curr, fn_pre, fn_jobnr, fn_post;
+    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+    	{
+    		MDin.getValue(EMDL_MICROGRAPH_NAME, fn_curr);
+    		fn_curr=fn_curr.substr(fn_curr.find("@")+1);
+    		decomposePipelineFileName(fn_curr, fn_pre, fn_jobnr, fn_curr);
+
+    		if (fn_curr != fn_old && fn_old != "")
+    		{
+    			FileName fn_star = fn_out + fn_old.withoutExtension()+"_input.star";
+				FileName fn_dir = fn_star.beforeLastOf("/");
+				if (!exists(fn_dir))
+					int res = system(("mkdir -p " + fn_dir).c_str());
+				fn_stars.push_back(fn_star);
+				MDonemic.write(fn_star);
+				MDonemic.clear();
+    		}
+
+    		MDonemic.addObject(MDin.getObject());
+			// Reset the old micrograph name
+    		fn_old=fn_curr;
+    	} // end loop all objects in input STAR file
+
+    	// Also write the last MDonemic
+		FileName fn_star = fn_out + fn_old.withoutExtension()+"_input.star";
+		FileName fn_dir = fn_star.beforeLastOf("/");
+		if (!exists(fn_dir))
+			int res = system(("mkdir -p " + fn_dir).c_str());
+		fn_stars.push_back(fn_star);
+		MDonemic.write(fn_star);
+		MDonemic.clear();
+    }
+
+    // Read in first micrograph STAR file to get some general informatopm
+    MDonemic.read(fn_stars[0]);
+
+    if (last_frame < 0)
+    	MDonemic.getValue(EMDL_PARTICLE_NR_FRAMES, last_frame);
+
 	perframe_bfactors.initZeros( 3 * (last_frame - first_frame + 1)); // now store bfactor, offset and corr_coeff
-#endif
 
 	// Get the pixel size from the input STAR file
 	if (angpix < 0.)
 	{
-		if (exp_model.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && exp_model.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		if (MDonemic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDonemic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 		{
 			RFLOAT mag, dstep;
-			exp_model.MDimg.goToObject(0);
-			exp_model.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			exp_model.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			MDonemic.goToObject(0);
+			MDonemic.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MDonemic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;
 			if (verb > 0)
 				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
 		}
 		else
 		{
-			REPORT_ERROR("ParticlePolisher::initialise ERROR: The input STAR file does not contain information about the pixel size. Please provide --angpix");
+			REPORT_ERROR("ParticlePolisher::initialise ERROR: The input STAR files do not contain information about the pixel size. Please provide --angpix");
 		}
 	}
-    if (do_weighting)
+
+	// Get the original image size
+	FileName fn_img;
+	MDonemic.getValue(EMDL_IMAGE_NAME, fn_img);
+	Image<RFLOAT> It;
+	It.read(fn_img, false); // false means only read header
+	ori_size = XSIZE(It());
+
+	if (do_weighting)
     {
 
     	if (fn_mask == "")
@@ -135,14 +197,16 @@ void ParticlePolisher::initialise()
 
     	// Read in the Imask
     	Imask.read(fn_mask);
-    	ori_size = XSIZE(Imask());
+    	if (ori_size != XSIZE(Imask()))
+    	{
+    		std::cerr << " image box size= " << ori_size << " mask box size= " << XSIZE(Imask()) << std::endl;
+    		REPORT_ERROR("ParticlePolisher:: ERROR: size of the mask is not equal to the size of the movie-particles.");
+    	}
     }
 
 	if (do_normalise && bg_radius < 0)
 	{
-		int image_size;
-		exp_model.MDexp.getValue(EMDL_IMAGE_SIZE, image_size);
-		bg_radius = ROUND(0.375 * image_size);
+		bg_radius = ROUND(0.375 * ori_size);
 
 		if (verb > 0)
 			std::cout << " + Using default particle diameter of 75% of the box size, so bg_radius= " << bg_radius << std::endl;
@@ -155,10 +219,6 @@ void ParticlePolisher::initialise()
 			REPORT_ERROR("ERROR: Invalid helical twist or rise!");
 	}
 
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
-
 	fn_olddir = "";
 }
 
@@ -168,7 +228,7 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 
 	// Loop over all average micrographs
 	int barstep;
-	int my_nr_micrographs = exp_model.average_micrographs.size();
+	long int my_nr_micrographs = fn_stars.size();
 	if (verb > 0)
 	{
 		std::cout << " + Fitting straight paths for beam-induced movements in all micrographs ... " << std::endl;
@@ -184,26 +244,10 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 		fitMovementsOneMicrograph(i);
 	}
 
-    // Set the fitted movements in the xoff and yoff columns of the exp_model.MDimg
-    for (long int ipart = 0; ipart < exp_model.numberOfParticles(); ipart++)
-
-	{
-		long int part_id = exp_model.particles[ipart].id;
-		RFLOAT xoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 0);
-		RFLOAT yoff = DIRECT_A2D_ELEM(fitted_movements, part_id, 1);
-		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_X, xoff, part_id);
-		exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, yoff, part_id);
-	}
-
     if (verb > 0)
 	{
 		progress_bar(my_nr_micrographs);
 	}
-
-	// Write out the STAR file with all the fitted movements
-	FileName fn_tmp = fn_out + "fitted_tracks.star";
-	exp_model.MDimg.write(fn_tmp);
-	std::cout << " + Written out all fitted movements in STAR file: " << fn_tmp << std::endl;
 
 
 }
@@ -213,16 +257,26 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 {
 
+	FileName fn_fit = fn_stars[imic].withoutExtension() + "_fit.star";
+	if (only_do_unfinished && exists(fn_fit))
+		return;
+
 	std::vector<RFLOAT> x_pick, y_pick, x_off_prior, y_off_prior, x_start, x_end, dummy; // X and Y-coordinates for the average particles in the micrograph
 	std::vector< std::vector<RFLOAT> > x_off, y_off; // X and Y shifts w.r.t. the average for each movie frame
 	RFLOAT x_pick_p, y_pick_p, x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
 
+	Experiment exp_model;
+	exp_model.read(fn_stars[imic]);
+
+	// Just testing
+	if (exp_model.average_micrographs.size()>1)
+		REPORT_ERROR("BUG: exp_model.average_micrographs.size()= " + integerToString(exp_model.average_micrographs.size()));
 
 	// Loop over all original_particles in this average_micrograph
 	// And fill the x_pick, y_;pick, x_off and y_off vectors
-	for (long int ipar = 0; ipar < (exp_model.average_micrographs[imic]).ori_particles_id.size(); ipar++)
+	for (long int ipar = 0; ipar < (exp_model.average_micrographs[0]).ori_particles_id.size(); ipar++)
 	{
-		long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
+		long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
 
 		x_off.push_back(dummy);
 		y_off.push_back(dummy);
@@ -263,9 +317,9 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	RFLOAT gauss_const = 1. / sqrt(2 * PI * sigma_neighbour_distance * sigma_neighbour_distance);
 	RFLOAT min2sigma2 = - 2. * sigma_neighbour_distance * sigma_neighbour_distance;
 	// Loop over all ori_particles
-	for (long int ipar = 0; ipar < (exp_model.average_micrographs[imic]).ori_particles_id.size(); ipar++)
+	for (long int ipar = 0; ipar < (exp_model.average_micrographs[0]).ori_particles_id.size(); ipar++)
 	{
-		long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
+		long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
 
 		// Sjors 14sep2015: bug reported by Kailu Yang
 		RFLOAT my_pick_x = x_pick[ipar] - x_off_prior[ipar];
@@ -338,10 +392,14 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 			}
 
 			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[i_frame];
-			A2D_ELEM(fitted_movements, part_id, 0) = x_off_p + x_off_prior[ipar];
-			A2D_ELEM(fitted_movements, part_id, 1) = y_off_p + y_off_prior[ipar];
+			exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_X, x_off_p + x_off_prior[ipar], part_id);
+			exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, y_off_p + y_off_prior[ipar], part_id);
 		}
 	}
+
+	// Write the STAR file with the fitted coordinates
+	exp_model.write(fn_fit);
+
 
 }
 
@@ -349,7 +407,7 @@ void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 {
 
 	FileName fn_star = fn_out + "bfactors.star";
-	if (!do_start_all_over && readStarFileBfactors(fn_star))
+	if (only_do_unfinished && readStarFileBfactors(fn_star))
 	{
 		if (verb > 0)
 			std::cout << " + " << fn_star << " already exists: skipping calculation of per-frame B-factors." <<std::endl;
@@ -522,7 +580,7 @@ void ParticlePolisher::calculateAverageAllSingleFrameReconstructions(int this_ha
 	FileName fn_sum;
 	fn_sum = fn_out + "avgframes_half" + integerToString(this_half) + "_class001_unfil.mrc";
 
-	if (!do_start_all_over && exists(fn_sum))
+	if (only_do_unfinished && exists(fn_sum))
 	{
 		if (verb > 0)
 			std::cout << std::endl << " + " << fn_sum << " already exists: skipping calculation average of all frames." << std::endl;
@@ -565,85 +623,93 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 		return;
 	}
 
-	int image_size, current_size;
-	// get image size from metadatatable
-	exp_model.MDexp.getValue(EMDL_IMAGE_SIZE, image_size);
 	// Set current_size
+	int current_size;
 	if (perframe_highres > 0.)
-		current_size = 2 * ROUND(image_size * angpix / perframe_highres);
+		current_size = 2 * ROUND(ori_size * angpix / perframe_highres);
 	else
-		current_size = image_size;
-	BackProjector backprojector(image_size, 3, fn_sym);
+		current_size = ori_size;
+	BackProjector backprojector(ori_size, 3, fn_sym);
 	backprojector.initZeros(current_size);
 
-	CTF ctf;
-	std::string dum;
-	Matrix2D<RFLOAT> A3D;
-	MultidimArray<Complex > Faux, F2D, F2Dp, Fsub;
-	MultidimArray<RFLOAT> Fweight, Fctf;
-	Image<RFLOAT> img, vol;
-	RFLOAT xtrans, ytrans;
-	RFLOAT rot, tilt, psi;
-	int i_half;
-	long int i_frame;
-	FileName fn_img, fn_mic;
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(exp_model.MDimg)
+	// Loop over all individual micrographs
+	for (long int imic = 0; imic < fn_stars.size(); imic++)
 	{
+		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_stars[imic] : fn_stars[imic].withoutExtension() + "_fit.star";
 
-		exp_model.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, i_half);
-		exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-		fn_mic.decompose(i_frame, dum);
-		// If we used --avg_movie_frame upon extraction, now count less
-		// e.g. instead of counting 4, 8, 12 count 1, 2, 3
-		i_frame /= step_frame;
+		Experiment exp_model;
+		exp_model.read(fn_fit);
 
-		// TODO!! Make a running average window here
-		if (ABS(i_frame - this_frame) <= frame_running_average/2 && i_half == this_half)
+		CTF ctf;
+		std::string dum;
+		Matrix2D<RFLOAT> A3D;
+		MultidimArray<Complex > Faux, F2D, F2Dp, Fsub;
+		MultidimArray<RFLOAT> Fweight, Fctf;
+		Image<RFLOAT> img;
+		RFLOAT xtrans, ytrans;
+		RFLOAT rot, tilt, psi;
+		int i_half;
+		long int i_frame;
+		FileName fn_img, fn_mic;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(exp_model.MDimg)
 		{
-			exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-			img.read(fn_img);
-			CenterFFT(img(), true);
-			FourierTransformer transformer;
-			transformer.FourierTransform(img(), F2Dp);
-			windowFourierTransform(F2Dp, F2D, current_size);
 
-			// Use the prior-angles, as these were determined from the average particles
-			// The individual-frame-determined angles would be too noisy....
-			exp_model.MDimg.getValue(EMDL_ORIENT_ROT_PRIOR, rot);
-			exp_model.MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt);
-			exp_model.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi);
-			Euler_angles2matrix(rot, tilt, psi, A3D);
+			exp_model.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, i_half);
+			exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+			fn_mic.decompose(i_frame, dum);
+			// If we used --avg_movie_frame upon extraction, now count less
+			// e.g. instead of counting 4, 8, 12 count 1, 2, 3
+			i_frame /= step_frame;
 
-			// Translations
-			xtrans=ytrans=0.;
-			exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_X, xtrans);
-			exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_Y, ytrans);
-			if (ABS(xtrans) > 0. || ABS(ytrans) > 0. )
-				shiftImageInFourierTransform(F2D, F2D, image_size, xtrans, ytrans );
-
-			// CTF
-			Fctf.resize(F2D);
-			Fctf.initConstant(1.);
-			if (do_ctf)
+			// TODO!! Make a running average window here
+			if (ABS(i_frame - this_frame) <= frame_running_average/2 && i_half == this_half)
 			{
-				ctf.read(exp_model.MDimg, exp_model.MDimg);
-				ctf.getFftwImage(Fctf, image_size, image_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+				exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				img.read(fn_img);
+				CenterFFT(img(), true);
+				FourierTransformer transformer;
+				transformer.FourierTransform(img(), F2Dp);
+				windowFourierTransform(F2Dp, F2D, current_size);
+
+				// Use the prior-angles, as these were determined from the average particles
+				// The individual-frame-determined angles would be too noisy....
+				exp_model.MDimg.getValue(EMDL_ORIENT_ROT_PRIOR, rot);
+				exp_model.MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt);
+				exp_model.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi);
+				Euler_angles2matrix(rot, tilt, psi, A3D);
+
+				// Translations
+				xtrans=ytrans=0.;
+				exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_X, xtrans);
+				exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_Y, ytrans);
+				if (ABS(xtrans) > 0. || ABS(ytrans) > 0. )
+					shiftImageInFourierTransform(F2D, F2D, ori_size, xtrans, ytrans );
+
+				// CTF
+				Fctf.resize(F2D);
+				Fctf.initConstant(1.);
+				if (do_ctf)
 				{
-					DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-					DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					ctf.read(exp_model.MDimg, exp_model.MDimg);
+					ctf.getFftwImage(Fctf, ori_size, ori_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+					{
+						DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
 				}
+
+				backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
 			}
 
-			backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
-		}
-
-	}
+		} // end loop over all movie frames in exp_model
+	} // end loop over all micrographs in fn_stars
 
 	backprojector.symmetrise(helical_nr_asu, helical_twist, helical_rise / angpix);
 
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;
+	Image<RFLOAT> vol;
 	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy);
 
 	vol.write(fn_vol);
@@ -742,7 +808,7 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 void ParticlePolisher::polishParticlesAllMicrographs()
 {
 
-	if (!do_start_all_over && exists(fn_out + "shiny.star"))
+	if (only_do_unfinished && exists(fn_out + "shiny.star"))
 	{
 		if (verb > 0)
 			std::cout << std::endl << " + " << fn_out << "shiny.star already exists: skipping polishing of the particles." << std::endl;
@@ -752,7 +818,7 @@ void ParticlePolisher::polishParticlesAllMicrographs()
 
 	// Loop over all average micrographs
 	int barstep;
-	int my_nr_micrographs = exp_model.average_micrographs.size();
+	long int my_nr_micrographs = fn_stars.size();
 	if (verb > 0)
 	{
 		std::cout << " + Write out polished particles for all " << my_nr_micrographs << " micrographs ... " << std::endl;
@@ -791,15 +857,23 @@ void ParticlePolisher::changeParticleStackName(FileName &fn_part)
 void ParticlePolisher::writeStarFilePolishedParticles()
 {
 
-	// Also write the STAR file with the MetaData of the polished particles
+	// Also write the STAR file with the MetaData of all polished particles
 	// Loop over all original_particles in this average_micrograph
 
 	MDshiny.clear();
-	for (long int imic = 0; imic < exp_model.average_micrographs.size(); imic++)
+	for (long int imic = 0; imic < fn_stars.size(); imic++)
 	{
-		for (long int ipar = 0; ipar < exp_model.average_micrographs[imic].ori_particles_id.size(); ipar++)
+		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_stars[imic] : fn_stars[imic].withoutExtension() + "_fit.star";
+		Experiment exp_model;
+		exp_model.read(fn_fit);
+
+		// Just testing
+		if (exp_model.average_micrographs.size()>1)
+			REPORT_ERROR("BUG: exp_model.average_micrographs.size()= " + integerToString(exp_model.average_micrographs.size()));
+
+		for (long int ipar = 0; ipar < exp_model.average_micrographs[0].ori_particles_id.size(); ipar++)
 		{
-			long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
+			long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
 			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[first_frame - 1];
 
 			// Get the corresponding line from the input STAR file
@@ -850,6 +924,14 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 {
 
+	FileName fn_fit = (fitting_mode == NO_FIT) ? fn_stars[imic] : fn_stars[imic].withoutExtension() + "_fit.star";
+	Experiment exp_model;
+	exp_model.read(fn_fit);
+
+	// Just testing
+	if (exp_model.average_micrographs.size()>1)
+		REPORT_ERROR("BUG: exp_model.average_micrographs.size()= " + integerToString(exp_model.average_micrographs.size()));
+
 	// Then read in all individual movie frames, apply frame x,y-movements as phase shifts and calculate polished (shiny) particles
 	// as average of the re-aligned frames
 	RFLOAT x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
@@ -862,9 +944,9 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 	RFLOAT all_minval = 99999., all_maxval = -99999., all_avg = 0., all_stddev = 0.;
 
 	// Loop over all original_particles in this average_micrograph
-	for (long int ipar = 0; ipar < exp_model.average_micrographs[imic].ori_particles_id.size(); ipar++)
+	for (long int ipar = 0; ipar < exp_model.average_micrographs[0].ori_particles_id.size(); ipar++)
 	{
-		long int ori_part_id = exp_model.average_micrographs[imic].ori_particles_id[ipar];
+		long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
 
 		// Loop over all frames for motion corrections and possibly dose-dependent weighting
 		for (long int i_frame = first_frame; i_frame <= last_frame; i_frame++ )
@@ -875,16 +957,8 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 			exp_model.MDimg.getValue(EMDL_PARTICLE_ORI_NAME, fn_part, part_id);
 			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR, x_off_prior_p, part_id);
 			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, y_off_prior_p, part_id);
-			if (fitting_mode != NO_FIT)
-			{
-				x_off_p = A2D_ELEM(fitted_movements, part_id, 0);
-				y_off_p = A2D_ELEM(fitted_movements, part_id, 1);
-			}
-			else
-			{
-				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, x_off_p, part_id);
-				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, y_off_p, part_id);
-			}
+			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, x_off_p, part_id);
+			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, y_off_p, part_id);
 
 			img.read(fn_img);
 			RFLOAT ori_size= XSIZE(img());
@@ -970,10 +1044,10 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		}
 
 		// When last particle, also write the correct header
-		if (ipar == exp_model.average_micrographs[imic].ori_particles_id.size() - 1)
+		if (ipar == exp_model.average_micrographs[0].ori_particles_id.size() - 1)
 		{
-			all_avg /= exp_model.average_micrographs[imic].ori_particles_id.size();
-			all_stddev = sqrt(all_stddev/exp_model.average_micrographs[imic].ori_particles_id.size());
+			all_avg /= exp_model.average_micrographs[0].ori_particles_id.size();
+			all_stddev = sqrt(all_stddev/exp_model.average_micrographs[0].ori_particles_id.size());
 			img.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, all_minval);
 			img.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, all_maxval);
 			img.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, all_avg);
@@ -996,15 +1070,16 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 		std::cout << "+ Reconstructing two halves of shiny particles ..." << std::endl;
 
 	// Re-read the shiny particles' MetaDataTable into exp_model
+	Experiment exp_model;
 	exp_model.read(fn_out + "shiny.star", true);
 
 	// Do the reconstructions for both halves
-	reconstructShinyParticlesOneHalf(1);
-	reconstructShinyParticlesOneHalf(2);
+	reconstructShinyParticlesOneHalf(1, exp_model);
+	reconstructShinyParticlesOneHalf(2, exp_model);
 
 
 	FileName fn_post = (ipass == 1) ? "shiny_post" : "shiny_post2";
-	if (!do_start_all_over && exists(fn_out + fn_post + "_masked.mrc")
+	if (only_do_unfinished && exists(fn_out + fn_post + "_masked.mrc")
 					       && exists(fn_out + fn_post + ".star") )
 	{
 		if (verb > 0)
@@ -1061,8 +1136,9 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 
 }
 
-void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
+void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experiment &exp_model)
 {
+
 
 	FileName fn_vol = fn_out + "shiny_half" + integerToString(this_half) + "_class001_unfil.mrc";
 	if (!do_start_all_over && exists(fn_vol))
@@ -1073,12 +1149,9 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 	}
 
 	// get image size, angpix (from metadatatable), fn_sym
-	int image_size;
-	exp_model.MDexp.getValue(EMDL_IMAGE_SIZE, image_size);
-	BackProjector backprojector(image_size, 3, fn_sym);
+	BackProjector backprojector(ori_size, 3, fn_sym);
 	backprojector.initZeros();
-	Projector projector(image_size);
-
+	Projector projector(ori_size);
 
 	CTF ctf;
 	std::string dum;
@@ -1116,7 +1189,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 			exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_X, xtrans);
 			exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_Y, ytrans);
 			if (ABS(xtrans) > 0. || ABS(ytrans) > 0. )
-				shiftImageInFourierTransform(F2D, F2D, image_size, xtrans, ytrans );
+				shiftImageInFourierTransform(F2D, F2D, ori_size, xtrans, ytrans );
 
 			// CTF
 			Fctf.resize(F2D);
@@ -1124,7 +1197,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 			if (do_ctf)
 			{
 				ctf.read(exp_model.MDimg, exp_model.MDimg);
-				ctf.getFftwImage(Fctf, image_size, image_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+				ctf.getFftwImage(Fctf, ori_size, ori_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 				{
 					DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
@@ -1148,7 +1221,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half)
 
 }
 
-
+/*
 
 void ParticlePolisher::optimiseBeamTiltAndDefocus()
 {
@@ -1170,7 +1243,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocus()
 
 	// Loop over all average micrographs
 	int barstep;
-	int my_nr_micrographs = exp_model.micrographs.size();
+	int my_nr_micrographs = fn_stars.size();
 	if (verb > 0)
 	{
 		std::cout << " + Optimising beamtilts in all micrographs ... " << std::endl;
@@ -1627,7 +1700,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
 
 	}
 }
-
+*/
 void ParticlePolisher::run()
 {
 
@@ -1645,12 +1718,14 @@ void ParticlePolisher::run()
 	// Now reconstruct with all polished particles: two independent halves, FSC-weighting of the sum of the two...
 	reconstructShinyParticlesAndFscWeight(1);
 
+	/*
 	// Optimise beam-tilt and defocus per beamtilt group and/or micrograph
 	optimiseBeamTiltAndDefocus();
 
 	// Reconstruct again two halves to see whether the beamtilt and/or defocus optimisation has helped
 	if (beamtilt_max > 0. || defocus_shift_max > 0.)
 		reconstructShinyParticlesAndFscWeight(2);
+	*/
 
 	if (verb > 0)
 		std::cout << " done!" << std::endl;

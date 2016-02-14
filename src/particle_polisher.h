@@ -49,8 +49,8 @@ public:
 	// Input & Output rootname
 	FileName fn_in, fn_out, fn_sym, fn_mask;
 
-	// The experimental model
-	Experiment exp_model;
+	// list of input STAR files
+	std::vector<FileName> fn_stars;
 
 	// Standard deviation for a Gaussian-weight on the distance between particles in the micrograph
 	RFLOAT sigma_neighbour_distance;
@@ -61,6 +61,7 @@ public:
 	// Flag to indicate all calculations have to be repeated from scratch
 	// if false, then intermediate files are re-read from disc and earlier calculations are skipped
 	bool do_start_all_over;
+	bool only_do_unfinished;
 
 	// First and last frame numbers to include in the average, Also step if one had used --avg_movie_frames in the extraction
 	int first_frame, last_frame, step_frame;
@@ -212,8 +213,9 @@ public:
 	void reconstructShinyParticlesAndFscWeight(int ipass);
 
 	// Reconstruct one half of the shiny particles
-	void reconstructShinyParticlesOneHalf(int ihalf);
+	void reconstructShinyParticlesOneHalf(int ihalf, Experiment &exp_model);
 
+	/*
 	// Optimize the beam tilt and defocus for all beamtilt groups and/or micrographs
 	void optimiseBeamTiltAndDefocus();
 
@@ -228,7 +230,7 @@ public:
 
 	// Initialise some arrays for parallelisation purposes
 	void initialiseSquaredDifferenceVectors();
-
+	*/
 
 };
 

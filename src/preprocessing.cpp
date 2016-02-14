@@ -1007,7 +1007,8 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 	// Also, when movies, replace _moviename.mrcs with .mrc
 	if (do_movie_extract)
-		fn_post = fn_post.beforeFirstOf("_" + movie_name + ".mrcs") + ".mrc";
+		// by saying beforeFirstOf("_" + movie_name + ".mrc" instead of ".mrcs" also movies that had an .mrc extension will be handled correctly
+		fn_post = fn_post.beforeFirstOf("_" + movie_name + ".mrc") + ".mrc";
 	//std::cerr << " fn_post= "<< fn_post << std::endl;
 	MDresult.read(fn_data, "", NULL, fn_post);
 
