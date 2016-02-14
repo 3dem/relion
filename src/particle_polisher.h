@@ -60,7 +60,6 @@ public:
 
 	// Flag to indicate all calculations have to be repeated from scratch
 	// if false, then intermediate files are re-read from disc and earlier calculations are skipped
-	bool do_start_all_over;
 	bool only_do_unfinished;
 
 	// First and last frame numbers to include in the average, Also step if one had used --avg_movie_frames in the extraction
@@ -126,6 +125,7 @@ public:
 
 	// Maximum beam tilt to analyse, and step-size to sample in X and Y
 	RFLOAT beamtilt_max, beamtilt_step;
+
 	// Number of sampled beamtilts
 	int nr_sampled_beam_tilts;
 

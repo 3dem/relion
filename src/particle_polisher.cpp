@@ -30,8 +30,6 @@ void ParticlePolisher::read(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output directory", "Polish/");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 	running_average_width = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "5"));
-	// TODO: remove do_start_all_over!!!
-	do_start_all_over = parser.checkOption("--dont_read_old_files", "Do not read intermediate results from disc, but re-do all calculations from scratch");
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
 
 	int fit_section = parser.addSection("Beam-induced movement fitting options");
@@ -62,8 +60,8 @@ void ParticlePolisher::read(int argc, char **argv)
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
-	defocus_shift_max = textToFloat(parser.getOption("--defocus_shift_max", "Maximum shift in defocus (in A) to search for each particle", "0"));
-	defocus_shift_step = textToFloat(parser.getOption("--defocus_shift_step", "Maximum shift in defocus (in A) to search for each particle", "100"));
+	//defocus_shift_max = textToFloat(parser.getOption("--defocus_shift_max", "Maximum shift in defocus (in A) to search for each particle", "0"));
+	//defocus_shift_step = textToFloat(parser.getOption("--defocus_shift_step", "Maximum shift in defocus (in A) to search for each particle", "100"));
 
 	int norm_section = parser.addSection("Normalisation options");
 	do_normalise = !parser.checkOption("--skip_normalise", "Do not normalise the polsihed particles?");
@@ -72,10 +70,12 @@ void ParticlePolisher::read(int argc, char **argv)
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 
+	/*
 	int beamtilt_section = parser.addSection("Beamtilt refinement options");
 	beamtilt_max = textToFloat(parser.getOption("--beamtilt_max", "Maximum beamtilt (in mrad) to search", "0."));
 	beamtilt_step = textToFloat(parser.getOption("--beamtilt_step", "Step-size for beamtilt searches (in mrad)", "0.2"));
 	minres_beamtilt = textToFloat(parser.getOption("--minres_beamtilt", "Lowest resolution to include in beam-tilt correction (in A)", "6"));
+	*/
 
 	int out_section = parser.addSection("Polished particles output options");
 	first_frame = textToInteger(parser.getOption("--first_frame", "First frame to include in the polished particles", "1"));
@@ -397,8 +397,12 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 		}
 	}
 
-	// Write the STAR file with the fitted coordinates
-	exp_model.write(fn_fit);
+	// Write the STAR file with the fitted coordinates, make directory if it doesn't exist
+	FileName fn_dir = fn_fit.beforeLastOf("/");
+	if (!exists(fn_dir))
+		int res = system(("mkdir -p " + fn_dir).c_str());
+
+	exp_model.MDimg.write(fn_fit);
 
 
 }
@@ -616,7 +620,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 	FileName fn_vol;
 	fn_vol.compose(fn_out + "frame", this_frame, "", 3);
 	fn_vol += "_half" + integerToString(this_half) + "_class001_unfil.mrc";
-	if (!do_start_all_over && exists(fn_vol))
+	if (only_do_unfinished && exists(fn_vol))
 	{
 		if (verb > 0)
 			std::cout << std::endl << " + " << fn_vol << " already exists: skipping per-frame reconstruction." << std::endl;
@@ -1141,7 +1145,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 
 
 	FileName fn_vol = fn_out + "shiny_half" + integerToString(this_half) + "_class001_unfil.mrc";
-	if (!do_start_all_over && exists(fn_vol))
+	if (only_do_unfinished && exists(fn_vol))
 	{
 		if (verb > 0)
 			std::cout << std::endl << " + " << fn_vol << " already exists: skipping shiny-particle reconstruction." << std::endl;

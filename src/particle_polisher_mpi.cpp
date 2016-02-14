@@ -249,7 +249,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 	if (node->rank == 0)
 	{
 
-		if (!do_start_all_over && exists(fn_out + fn_post + "_masked.mrc")
+		if (only_do_unfinished && exists(fn_out + fn_post + "_masked.mrc")
 						       && exists(fn_out + fn_post + ".star") )
 		{
 			if (verb > 0)

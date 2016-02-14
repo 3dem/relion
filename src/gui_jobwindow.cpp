@@ -4256,8 +4256,8 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
 
 	// If this is not a continue job, then re-start from scratch....
-	if (!is_continue)
-		command += " --dont_read_old_files ";
+	if (is_continue)
+		command += " --only_do_unfinished ";
 
 	// Beam-induced movement fitting options
 	if (do_fit_movement.getValue())
