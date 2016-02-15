@@ -298,10 +298,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 
 		CUDA_CPU_TIC("calcFimg");
-		unsigned current_size_x = baseMLO->mymodel.current_size / 2 + 1;
-		unsigned current_size_y = baseMLO->mymodel.current_size;
+		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
+		size_t current_size_y = baseMLO->mymodel.current_size;
 
 		cudaMLO->transformer1.setSize(img().xdim,img().ydim);
+		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
+		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
+		cudaMLO->transformer1.reals.streamSync();
+		cudaMLO->transformer1.fouriers.streamSync();
 
 		d_img.cp_on_device(cudaMLO->transformer1.reals);
 //		for (int i = 0; i < img_aux.nzyxdim; i ++)
@@ -316,9 +320,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				false
 				);
 
+		cudaMLO->transformer1.reals.streamSync();
+
 		cudaMLO->transformer1.forward();
+		cudaMLO->transformer1.fouriers.streamSync();
+
 		int FMultiBsize = ( (int) ceilf(( float)cudaMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
 						(XFLOAT*)~cudaMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
 						cudaMLO->transformer1.fouriers.getSize()*2);
@@ -327,13 +335,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
 		d_Fimg.device_alloc();
 
+		cudaMLO->transformer1.fouriers.streamSync();
+
 		windowFourierTransform2(
 				cudaMLO->transformer1.fouriers,
 				d_Fimg,
 				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
-				current_size_x, current_size_y, 1 //Output dimensions
+				current_size_x, current_size_y, 1  //Output dimensions
 				);
 		CUDA_CPU_TOC("calcFimg");
+		cudaMLO->transformer1.fouriers.streamSync();
 
 		CUDA_CPU_TIC("cpFimg2Host");
 		d_Fimg.cp_to_host();
@@ -478,6 +489,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CUDA_CPU_TIC("setSize");
 		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
+		deviceInitValue(cudaMLO->transformer2.reals, (XFLOAT)0.);
+		deviceInitComplexValue(cudaMLO->transformer2.fouriers, (XFLOAT)0.);
+		cudaMLO->transformer2.reals.streamSync();
+		cudaMLO->transformer2.fouriers.streamSync();
 		CUDA_CPU_TOC("setSize");
 
 		CUDA_CPU_TIC("transform");
@@ -487,22 +502,27 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
 //		cudaMLO->transformer2.reals.cp_to_device();
 
-		runCenterFFT(
+		runCenterFFT(								// runs on input GlobalPtr.stream
 				cudaMLO->transformer2.reals,
 				(int)cudaMLO->transformer2.xSize,
 				(int)cudaMLO->transformer2.ySize,
 				false
 				);
 
+		cudaMLO->transformer2.reals.streamSync();
 		cudaMLO->transformer2.forward();
+		cudaMLO->transformer2.fouriers.streamSync();
+
 		int FMultiBsize2 = ( (int) ceilf(( float)cudaMLO->transformer2.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE>>>(
+		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE,0,cudaMLO->transformer2.fouriers.getStream()>>>(
 						(XFLOAT*)~cudaMLO->transformer2.fouriers,
 						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer2.reals.getSize())),
 						cudaMLO->transformer2.fouriers.getSize()*2);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 		CUDA_CPU_TOC("transform");
+
+		cudaMLO->transformer2.fouriers.streamSync();
 
 		bool powerClassOnGPU(true); //keep it like this until stable
 
@@ -588,11 +608,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// So resize the Fourier transforms
 		CUDA_CPU_TIC("windowFourierTransform2");
 		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
+		cudaMLO->transformer2.fouriers.streamSync();
 		windowFourierTransform2(
 				cudaMLO->transformer2.fouriers,
 				d_Fimg,
-				(int)cudaMLO->transformer2.xFSize,(int)cudaMLO->transformer2.yFSize, 1, //Input dimensions
-				(int)current_size_x, (int)current_size_y, 1  //Output dimensions
+				cudaMLO->transformer2.xFSize,cudaMLO->transformer2.yFSize, 1, //Input dimensions
+				current_size_x, current_size_y, 1,  //Output dimensions
+				1, 	//Npsi
+				0,	//pos
+				cudaMLO->transformer2.fouriers.getStream()
 				);
 		CUDA_CPU_TOC("windowFourierTransform2");
 		// Also store its CTF
@@ -784,7 +808,11 @@ void getAllSquaredDifferencesCoarse(
 		if (do_CC)
 		{
 			Fimgs_real.device_alloc(image_size * translation_num);
+			deviceInitValue(Fimgs_real, (XFLOAT)0.);
 			Fimgs_imag.device_alloc(image_size * translation_num);
+			deviceInitValue(Fimgs_imag, (XFLOAT)0.);
+			Fimgs_real.streamSync();
+			Fimgs_imag.streamSync();
 
 			if (baseMLO->do_shifts_onthefly)
 			{
@@ -846,6 +874,14 @@ void getAllSquaredDifferencesCoarse(
 			Fimgs_real.host_alloc();
 			Fimgs_imag.host_alloc();
 
+			Fimgs_real.device_alloc();
+			deviceInitValue(Fimgs_real, (XFLOAT)0.);
+			Fimgs_imag.device_alloc();
+			deviceInitValue(Fimgs_imag, (XFLOAT)0.);
+
+			Fimgs_real.streamSync();
+			Fimgs_imag.streamSync();
+
 			std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 			XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
@@ -871,8 +907,8 @@ void getAllSquaredDifferencesCoarse(
 
 			trans_x.put_on_device();
 			trans_y.put_on_device();
-			Fimgs_real.put_on_device();
-			Fimgs_imag.put_on_device();
+			Fimgs_real.cp_to_device();
+			Fimgs_imag.cp_to_device();
 		}
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
@@ -1006,9 +1042,15 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CudaGlobalPtr<XFLOAT> Fimgs_real(cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> Fimgs_imag(cudaMLO->devBundle->allocator);
+		Fimgs_real.setSize(image_size * translation_num);
+		Fimgs_imag.setSize(image_size * translation_num);
 
-		Fimgs_real.device_alloc(image_size * translation_num);
-		Fimgs_imag.device_alloc(image_size * translation_num);
+		Fimgs_real.device_alloc();
+		deviceInitValue(Fimgs_real, (XFLOAT)0.);
+		Fimgs_imag.device_alloc();
+		deviceInitValue(Fimgs_imag, (XFLOAT)0.);
+		Fimgs_real.streamSync();
+		Fimgs_imag.streamSync();
 
 		if (baseMLO->do_shifts_onthefly)
 		{
@@ -1018,7 +1060,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 					sp.itrans_min * sp.nr_oversampled_trans,
 					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
 					cudaMLO->devBundle->allocator,
-					0, //stream
+					Fimgs_real.getStream(), //stream
 					baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
 					baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
 
@@ -1036,6 +1078,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				else
 					cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
 			}
+			Fimgs_real.streamSync();
 		}
 		else
 		{
@@ -1055,6 +1098,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			Fimgs_real.cp_to_device();
 			Fimgs_imag.cp_to_device();
+			Fimgs_real.streamSync();
+			Fimgs_imag.streamSync();
 		}
 
 		CUDA_CPU_TOC("translation_2");
@@ -1145,6 +1190,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CUDA_CPU_TOC("generateEulerMatrices");
 			}
 		}
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		// copy stagers to device
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
@@ -1209,11 +1257,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 			} // end if class significant
 		} // end loop iclass
-
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-
+		
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");
@@ -2620,7 +2667,7 @@ void MlDeviceBundle::resetData()
 	{
 		printf("\n\nINFO: Allocation Size:            %li MB\n", allocationSize/(1000*1000));
 		printf(    "INFO: Previously allocated:       %li MB\n", extraAllocationSpace/(1000*1000));
-		printf(    "INFO: Overhead:                   %li MB\n", MEMORY_OVERHEAD_MB);
+		printf(    "INFO: Overhead:                   %li MB\n", (size_t) MEMORY_OVERHEAD_MB);
 		printf(    "INFO: Left for Custom Allocator:  %li MB\n", actualAllocationSize/(1000*1000));
 		printf("ERROR: More GPU memory is required.\n\n");
 		fflush(stdout);
@@ -2705,8 +2752,8 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDev
 
 	devBundle = bundle;
 
-	HANDLE_ERROR(cudaStreamCreate(&stream1));
-	HANDLE_ERROR(cudaStreamCreate(&stream2));
+//	HANDLE_ERROR(cudaStreamCreate(&stream1));
+//	HANDLE_ERROR(cudaStreamCreate(&stream2));
 
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)

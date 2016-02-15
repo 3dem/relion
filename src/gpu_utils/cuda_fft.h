@@ -52,7 +52,7 @@ public:
 
 	long int estimate(int batch)
 	{
-		long int needed;
+		size_t needed;
 
 	    int idist = ySize*xSize;
 	    int odist = ySize*(xSize/2+1);
@@ -68,14 +68,14 @@ public:
 
 #ifdef CUDA_DOUBLE_PRECISION
 		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batch, &biggness));
-		needed = (long int)biggness;
+		needed = biggness;
 		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batch, &biggness));
-		needed += (long int)biggness;
+		needed += biggness;
 #else
 		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batch, &biggness));
-		needed = (long int)biggness;
+		needed = biggness;
 		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
-		needed += (long int)biggness;
+		needed += biggness;
 #endif
 		return needed;
 	}
@@ -95,9 +95,9 @@ public:
 		xFSize = x/2 + 1;
 		yFSize = y;
 
-		long int baseNeed = (xSize*ySize*sizeof(cufftReal) + xFSize*yFSize*sizeof(cufftComplex));
-		long int avail  = CFallocator->getLargestContinuousFreeSpace();
-		long int needed = baseNeed*batchSize[0] + estimate(batchSize[0]);
+		size_t baseNeed = (xSize*ySize*sizeof(XFLOAT) + xFSize*yFSize*sizeof(CUDACOMPLEX));
+		size_t avail  = CFallocator->getLargestContinuousFreeSpace();
+		size_t needed = baseNeed*batchSize[0] + estimate(batchSize[0]);
 		double memFrac = (double)needed / (double)avail;
 
 //		std::cout << std::endl << "needed = ";
@@ -111,13 +111,13 @@ public:
 		if(memFrac>1)
 		{
 			psiIters = CEIL(memFrac);
-			psiSpace = CEIL((float) batch / (float)psiIters);
+			psiSpace = CEIL((double) batch / (double)psiIters);
 			needed = baseNeed*psiSpace + estimate(psiSpace);
 
 			while(needed>avail && psiSpace>1)
 			{
 				psiIters++;
-				psiSpace = CEIL((float) batch / (float)psiIters);
+				psiSpace = CEIL((double) batch / (double)psiIters);
 				needed = baseNeed*psiSpace + estimate(psiSpace);
 			}
 
@@ -171,6 +171,8 @@ public:
 #ifdef CUDA_DOUBLE_PRECISION
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batchSize[0]));
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batchSize[0]));
+		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanForward, fouriers.getStream()));
+		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanBackward, reals.getStream()));
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_D2Z) );
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_Z2D) );
 
@@ -191,6 +193,8 @@ public:
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
 	    HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batchSize[0]));
 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batchSize[0]));
+		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanForward, fouriers.getStream()));
+		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanBackward, reals.getStream()));
 //		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,   2, nR, 0,0,0,0,0,0, CUFFT_R2C, batchSize));
 //		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward,  2, nC, 0,0,0,0,0,0, CUFFT_C2R, batchSize));
 

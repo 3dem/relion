@@ -101,6 +101,20 @@ void runWavgKernel(
 
 #define INIT_VALUE_BLOCK_SIZE 512
 template< typename T>
+__global__ void cuda_kernel_init_complex_value(
+		T *data,
+		XFLOAT value,
+		size_t size)
+{
+	size_t idx = blockIdx.x * INIT_VALUE_BLOCK_SIZE + threadIdx.x;
+	if (idx < size)
+	{
+		data[idx].x = value;
+		data[idx].y = value;
+	}
+}
+
+template< typename T>
 __global__ void cuda_kernel_init_value(
 		T *data,
 		T value,
@@ -112,6 +126,16 @@ __global__ void cuda_kernel_init_value(
 }
 
 template< typename T>
+void deviceInitComplexValue(CudaGlobalPtr<T> &data, XFLOAT value)
+{
+	int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_complex_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			data.getSize());
+}
+
+template< typename T>
 void deviceInitValue(CudaGlobalPtr<T> &data, T value)
 {
 	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
@@ -120,6 +144,16 @@ void deviceInitValue(CudaGlobalPtr<T> &data, T value)
 			value,
 			data.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+}
+
+template< typename T>
+void deviceInitValue(CudaGlobalPtr<T> &data, T value, size_t Size)
+{
+	int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			Size);
 }
 
 #define WEIGHT_MAP_BLOCK_SIZE 512
@@ -288,18 +322,18 @@ template<bool check_max_r2>
 __global__ void cuda_kernel_window_fourier_transform(
 		CUDACOMPLEX *g_in,
 		CUDACOMPLEX *g_out,
-		unsigned iX, unsigned iY, unsigned iZ, unsigned iYX, //Input dimensions
-		unsigned oX, unsigned oY, unsigned oZ, unsigned oYX, //Output dimensions
-		unsigned max_idx,
-		unsigned max_r2 = 0
+		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
+		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
+		size_t max_idx,
+		size_t max_r2 = 0
 		)
 {
-	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
-	long int oOFF = oX*oY*oZ*blockIdx.y;
-	long int iOFF = iX*iY*iZ*blockIdx.y;
+	size_t n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
+	size_t oOFF = oX*oY*oZ*blockIdx.y;
+	size_t iOFF = iX*iY*iZ*blockIdx.y;
 	if (n >= max_idx) return;
 
-	int k, i, kp, ip, jp;
+	long int k, i, kp, ip, jp;
 
 	if (check_max_r2)
 	{
@@ -323,17 +357,18 @@ __global__ void cuda_kernel_window_fourier_transform(
 		jp = n % oX;
 	}
 
-	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + oOFF].x = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + iOFF].x;
-	g_out[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + oOFF].y = g_in[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + iOFF].y;
+	long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
+	long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
+	g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
 }
 
 void windowFourierTransform2(
 		CudaGlobalPtr<CUDACOMPLEX > &d_in,
 		CudaGlobalPtr<CUDACOMPLEX > &d_out,
-		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
-		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
-		long int Npsi = 1,
-		long int pos = 0,
+		size_t iX, size_t iY, size_t iZ, //Input dimensions
+		size_t oX, size_t oY, size_t oZ,  //Output dimensions
+		size_t Npsi = 1,
+		size_t pos = 0,
 		cudaStream_t stream = 0);
 
 
@@ -536,7 +571,7 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 	}
 
 	dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
-	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE>>>(
+	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
 			~img_in,
 			xSize*ySize,
 			xSize,

@@ -139,14 +139,14 @@ void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t &stream)
 
 template< typename T>
 static inline
-void cudaMemInit( T *ptr, int value, size_t size)
+void cudaMemInit( T *ptr, T value, size_t size)
 {
 	DEBUG_HANDLE_ERROR(cudaMemset( ptr, value, size * sizeof(T)));
 };
 
 template< typename T>
 static inline
-void cudaMemInit( T *ptr, int value, size_t size, cudaStream_t &stream)
+void cudaMemInit( T *ptr, T value, size_t size, cudaStream_t &stream)
 {
 	DEBUG_HANDLE_ERROR(cudaMemsetAsync( ptr, value, size * sizeof(T), stream));
 };
@@ -527,13 +527,13 @@ public:
 		if (curAlloc == NULL)
 		{
 #ifdef DEBUG_CUDA
-			int spaceDiff = _getTotalFreeSpace();
+			size_t spaceDiff = _getTotalFreeSpace();
 #endif
 			_syncReadyEvents();
 			_freeReadyAllocs();
 #ifdef DEBUG_CUDA
-			spaceDiff = ( (int) _getTotalFreeSpace() ) - spaceDiff;
-			printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %d B.\n", spaceDiff);
+			spaceDiff =  _getTotalFreeSpace() - spaceDiff;
+			printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
 #endif
 
 			curAlloc = _getFirstSuitedFree(size); //Is there space now?
@@ -977,7 +977,7 @@ public:
 	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
 	 */
 	inline
-	void cp_on_device(CudaGlobalPtr<T> devPtr)
+	void cp_on_device(CudaGlobalPtr<T> &devPtr)
 	{
 #ifdef DEBUG_CUDA
 		if (devPtr.size == 0)
@@ -1027,7 +1027,7 @@ public:
 	 * Copy a number (thisSize) of bytes from device to the host pointer
 	 */
 	inline
-	void cp_to_host(int thisSize)
+	void cp_to_host(size_t thisSize)
 	{
 #ifdef DEBUG_CUDA
 		if (d_ptr == NULL)
@@ -1042,7 +1042,7 @@ public:
 	 * Copy a number (thisSize) of bytes from device to a specific host pointer
 	 */
 	inline
-	void cp_to_host(T* hstPtr, int thisSize)
+	void cp_to_host(T* hstPtr, size_t thisSize)
 	{
 #ifdef DEBUG_CUDA
 		if (d_ptr == NULL)
@@ -1231,7 +1231,7 @@ class cudaStager
 {
 public:
 	CudaGlobalPtr<T> AllData;
-	unsigned long size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
+	size_t size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
 
 	/*======================================================
 				CONSTRUCTORS WITH ALLOCATORS
@@ -1275,7 +1275,7 @@ public:
 			printf("trying to host-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=size;
 		if(AllData.h_ptr==NULL)
 			AllData.host_alloc();
@@ -1283,14 +1283,14 @@ public:
 			printf("WARNING : host_alloc when host-ptr is non-null");
 		AllData.size=temp_size;
 	}
-	void prepare_host(int alloc_size)
+	void prepare_host(size_t alloc_size)
 	{
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
 		if(AllData.h_ptr==NULL)
 			AllData.host_alloc();
@@ -1305,7 +1305,7 @@ public:
 			printf("trying to host-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=size;
 		if(AllData.d_ptr==NULL)
 			AllData.device_alloc();
@@ -1313,14 +1313,14 @@ public:
 			printf("WARNING : device_alloc when dev-ptr is non-null");
 		AllData.size=temp_size;
 	}
-	void prepare_device(int alloc_size)
+	void prepare_device(size_t alloc_size)
 	{
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
 			raise(SIGSEGV);
 		}
-		int temp_size=AllData.size;
+		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
 		if(AllData.d_ptr==NULL)
 			AllData.device_alloc();
@@ -1333,7 +1333,7 @@ public:
 		 prepare_host();
 		 prepare_device();
 	}
-	void prepare(int alloc_size)
+	void prepare(size_t alloc_size)
 	{
 		 prepare_host(alloc_size);
 		 prepare_device(alloc_size);
@@ -1350,7 +1350,7 @@ public:
 			exit( EXIT_FAILURE );
 		}
 
-		for(int i=0 ; i<input.size; i++)
+		for(size_t i=0 ; i<input.size; i++)
 			AllData.h_ptr[AllData.size+i] = input.h_ptr[i];
 
 		// reset the staged object to this new position (TODO: disable for pinned mem)

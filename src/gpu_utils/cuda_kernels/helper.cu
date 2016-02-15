@@ -153,10 +153,11 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 	s_thr_wsum_sigma2_offset[tid]       = (XFLOAT)0.0;
 
 	long int pos = d_job_idx[bid];
-    int job_size = d_job_num[bid];
+    	int job_size = d_job_num[bid];
 	pos += tid;	   					// pos is updated to be thread-resolved
 
     int pass_num = ceilfracf(job_size,SUMW_BLOCK_SIZE);
+    __syncthreads();
     for (int pass = 0; pass < pass_num; pass++, pos+=SUMW_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
     {
     	if ((pass*SUMW_BLOCK_SIZE+tid)<job_size) // if there is a translation that needs to be done still for this thread
@@ -176,6 +177,7 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 			s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy];
     	}
     }
+    __syncthreads();
     // Reduction of all treanslations this orientation
 	for(int j=(SUMW_BLOCK_SIZE/2); j>0; j/=2)
 	{
