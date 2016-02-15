@@ -96,8 +96,12 @@ public:
 		yFSize = y;
 
 		size_t baseNeed = (xSize*ySize*sizeof(XFLOAT) + xFSize*yFSize*sizeof(CUDACOMPLEX));
-		size_t avail  = CFallocator->getLargestContinuousFreeSpace();
 		size_t needed = baseNeed*batchSize[0] + estimate(batchSize[0]);
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
+		size_t avail  = CFallocator->getLargestContinuousFreeSpace();
+#else
+		size_t avail  = needed;
+#endif
 		double memFrac = (double)needed / (double)avail;
 
 //		std::cout << std::endl << "needed = ";
@@ -149,6 +153,7 @@ public:
 		fouriers.device_alloc();
 		fouriers.host_alloc();
 
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		avail  = CFallocator->getLargestContinuousFreeSpace();
 		needed = estimate(batchSize[0]);
 
@@ -157,6 +162,7 @@ public:
 //		std::cout << "avail  = ";
 //		printf("%15li\n", avail);
 
+#endif
 	    int idist = y*x;
 	    int odist = y*(x/2+1);
 

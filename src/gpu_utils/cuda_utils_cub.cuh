@@ -33,8 +33,10 @@ if (ptr.size == 0)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with null allocator.\n");
+#endif
 #endif
 	CudaGlobalPtr<cub::KeyValuePair<int, T> >  max_pair(1, ptr.getStream(), ptr.getAllocator());
 	max_pair.device_alloc();
@@ -69,8 +71,10 @@ if (ptr.size == 0)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with null allocator.\n");
+#endif
 #endif
 	CudaGlobalPtr<cub::KeyValuePair<int, T> >  min_pair(1, ptr.getStream(), ptr.getAllocator());
 	min_pair.device_alloc();
@@ -105,8 +109,10 @@ if (ptr.size == 0)
 	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null allocator.\n");
+#endif
 #endif
 	CudaGlobalPtr<T >  max_val(1, ptr.getStream(), ptr.getAllocator());
 	max_val.device_alloc();
@@ -137,8 +143,10 @@ if (ptr.size == 0)
 	printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
 	printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getMinOnDevice called with null allocator.\n");
+#endif
 #endif
 	CudaGlobalPtr<T >  min_val(1, ptr.getStream(), ptr.getAllocator());
 	min_val.device_alloc();
@@ -169,8 +177,10 @@ if (ptr.size == 0)
 	printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
 	printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getSumOnDevice called with null allocator.\n");
+#endif
 #endif
 	CudaGlobalPtr<T >  val(1, ptr.getStream(), ptr.getAllocator());
 	val.device_alloc();
@@ -201,8 +211,10 @@ if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: sortOnDevice called with pointer of zero size.\n");
 if (in.d_ptr == NULL || out.d_ptr == NULL)
 	printf("DEBUG_ERROR: sortOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: sortOnDevice called with null allocator.\n");
+#endif
 #endif
 	size_t temp_storage_size = 0;
 
@@ -229,8 +241,10 @@ if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with pointer of zero size.\n");
 if (in.d_ptr == NULL || out.d_ptr == NULL)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with null allocator.\n");
+#endif
 #endif
 	size_t temp_storage_size = 0;
 
@@ -333,8 +347,10 @@ if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: filterOnDevice called with pointer of zero size.\n");
 if (in.d_ptr == NULL || out.d_ptr == NULL)
 	printf("DEBUG_ERROR: filterOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: filterOnDevice called with null allocator.\n");
+#endif
 #endif
 	stream = stream == 0 ? in.getStream() : stream;
 
@@ -383,10 +399,11 @@ if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: scanOnDevice called with pointer of zero size.\n");
 if (in.d_ptr == NULL || out.d_ptr == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null device pointer.\n");
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null allocator.\n");
 #endif
-
+#endif
 	stream = stream == 0 ? in.getStream() : stream;
 
 	AllocatorThrustWrapper alloc(in.getAllocator());

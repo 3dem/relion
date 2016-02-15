@@ -607,10 +607,14 @@ public:
 	inline
 	void free(Alloc* a)
 	{
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		pthread_mutex_lock(&mutex);
+#endif
 		_free(a);
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		pthread_mutex_unlock(&mutex);
-	};
+#endif
+	}
 
 	inline
 	void syncReadyEvents()

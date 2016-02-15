@@ -2584,11 +2584,12 @@ void MlDeviceBundle::resetData()
 
 	coarseProjectionPlans.clear();
 
+
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 	allocator->syncReadyEvents();
 	allocator->freeReadyAllocs();
 
 #ifdef DEBUG_CUDA
-
 	if (allocator->getNumberOfAllocs() != 0)
 	{
 		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
@@ -2600,7 +2601,7 @@ void MlDeviceBundle::resetData()
 #endif
 
 	allocator->resize(0);
-
+#endif
 	/*======================================================
 	              PROJECTOR AND BACKPROJECTOR
 	======================================================*/
@@ -2673,9 +2674,9 @@ void MlDeviceBundle::resetData()
 		fflush(stdout);
 		raise(SIGSEGV);
 	}
-
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 	allocator->resize(actualAllocationSize);
-
+#endif
 
 	/*======================================================
 	                    PROJECTION PLAN
