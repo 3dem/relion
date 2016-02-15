@@ -2658,7 +2658,7 @@ void MlDeviceBundle::resetData()
 	{
 		printf("\n\nINFO: Allocation Size:            %li MB\n", allocationSize/(1000*1000));
 		printf(    "INFO: Previously allocated:       %li MB\n", extraAllocationSpace/(1000*1000));
-		printf(    "INFO: Overhead:                   %li MB\n", MEMORY_OVERHEAD_MB);
+		printf(    "INFO: Overhead:                   %li MB\n", (size_t) MEMORY_OVERHEAD_MB);
 		printf(    "INFO: Left for Custom Allocator:  %li MB\n", actualAllocationSize/(1000*1000));
 		printf("ERROR: More GPU memory is required.\n\n");
 		fflush(stdout);
@@ -2742,8 +2742,8 @@ MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDev
 
 	devBundle = bundle;
 
-	HANDLE_ERROR(cudaStreamCreate(&stream1));
-	HANDLE_ERROR(cudaStreamCreate(&stream2));
+//	HANDLE_ERROR(cudaStreamCreate(&stream1));
+//	HANDLE_ERROR(cudaStreamCreate(&stream2));
 
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)

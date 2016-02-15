@@ -492,13 +492,13 @@ public:
 		if (curAlloc == NULL)
 		{
 #ifdef DEBUG_CUDA
-			int spaceDiff = _getTotalFreeSpace();
+			size_t spaceDiff = _getTotalFreeSpace();
 #endif
 			_syncReadyEvents();
 			_freeReadyAllocs();
 #ifdef DEBUG_CUDA
-			spaceDiff = ( (int) _getTotalFreeSpace() ) - spaceDiff;
-			printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %d B.\n", spaceDiff);
+			spaceDiff =  _getTotalFreeSpace() - spaceDiff;
+			printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
 #endif
 
 			curAlloc = _getFirstSuitedFree(size); //Is there space now?
@@ -992,7 +992,7 @@ public:
 	 * Copy a number (thisSize) of bytes from device to the host pointer
 	 */
 	inline
-	void cp_to_host(int thisSize)
+	void cp_to_host(size_t thisSize)
 	{
 #ifdef DEBUG_CUDA
 		if (d_ptr == NULL)
@@ -1007,7 +1007,7 @@ public:
 	 * Copy a number (thisSize) of bytes from device to a specific host pointer
 	 */
 	inline
-	void cp_to_host(T* hstPtr, int thisSize)
+	void cp_to_host(T* hstPtr, size_t thisSize)
 	{
 #ifdef DEBUG_CUDA
 		if (d_ptr == NULL)
