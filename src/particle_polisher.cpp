@@ -88,6 +88,10 @@ void ParticlePolisher::read(int argc, char **argv)
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length()-1] != '/')
+		fn_out += "/";
+
 }
 
 void ParticlePolisher::usage()
@@ -95,68 +99,116 @@ void ParticlePolisher::usage()
 	parser.writeUsage(std::cerr);
 }
 
-void ParticlePolisher::initialise()
+void ParticlePolisher::generateMicrographList()
 {
 
-    if (verb > 0)
-    	std::cout << " + Reading the input STAR file ... " << std::endl;
-
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
-
-	MetaDataTable MDin, MDonemic;
-    MDin.read(fn_in);
-
-    if (MDin.containsLabel(EMDL_STARFILE_MOVIE_PARTICLES))
+    if (only_do_unfinished && exists(fn_out+"micrograph_list.star"))
     {
-    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+    	std::cout << " + Reading in pre-existing micrograph_list.star file "<<std::endl;
+
+    	MetaDataTable MDmics;
+		MDmics.read(fn_out+"micrograph_list.star");
+		fn_mics.clear();
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 		{
-    		FileName fnt;
-    		MDin.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fnt);
-    		fn_stars.push_back(fnt);
+			FileName fn_mic;
+			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+			fn_mics.push_back(fn_mic);
 		}
     }
     else
     {
-    	// Break up the original STAR file into pieces, one for each micrograph, and write these to disc
-    	MDin.newSort(EMDL_MICROGRAPH_NAME, false, true); // false=no reverse, true= do sort only on string after "@"
 
-    	FileName fn_old="", fn_curr, fn_pre, fn_jobnr, fn_post;
-    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
-    	{
-    		MDin.getValue(EMDL_MICROGRAPH_NAME, fn_curr);
-    		fn_curr=fn_curr.substr(fn_curr.find("@")+1);
-    		decomposePipelineFileName(fn_curr, fn_pre, fn_jobnr, fn_curr);
+		if (verb > 0)
+			std::cout << " + Reading the input STAR file ... " << std::endl;
 
-    		if (fn_curr != fn_old && fn_old != "")
-    		{
-    			FileName fn_star = fn_out + fn_old.withoutExtension()+"_input.star";
-				FileName fn_dir = fn_star.beforeLastOf("/");
-				if (!exists(fn_dir))
-					int res = system(("mkdir -p " + fn_dir).c_str());
-				fn_stars.push_back(fn_star);
-				MDonemic.write(fn_star);
-				MDonemic.clear();
-    		}
+		MetaDataTable MDin;
+		MDin.read(fn_in);
 
-    		MDonemic.addObject(MDin.getObject());
-			// Reset the old micrograph name
-    		fn_old=fn_curr;
-    	} // end loop all objects in input STAR file
+		// list of input STAR files
+		std::vector<FileName> fn_stars;
+		bool input_is_movie_data = false;
+		if (MDin.containsLabel(EMDL_STARFILE_MOVIE_PARTICLES))
+		{
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+			{
+				FileName fnt;
+				MDin.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fnt);
+				fn_stars.push_back(fnt);
+			}
+		}
+		else
+		{
+			// The input is already a movie-data file
+			fn_stars.push_back(fn_in);
+			input_is_movie_data = true;
+		}
 
-    	// Also write the last MDonemic
-		FileName fn_star = fn_out + fn_old.withoutExtension()+"_input.star";
-		FileName fn_dir = fn_star.beforeLastOf("/");
-		if (!exists(fn_dir))
-			int res = system(("mkdir -p " + fn_dir).c_str());
-		fn_stars.push_back(fn_star);
-		MDonemic.write(fn_star);
-		MDonemic.clear();
+		// Now break up all STAR files into pieces, one for each micrograph and store in fn_mics
+		for (int istar = 0; istar < fn_stars.size(); istar++)
+		{
+
+			// No need to re-read MDin if the input was already movie data!
+			if (!input_is_movie_data)
+				MDin.read(fn_stars[istar]);
+
+			MDin.newSort(EMDL_MICROGRAPH_NAME, false, true); // false=no reverse, true= do sort only on string after "@"
+
+			FileName fn_old="", fn_curr, fn_pre, fn_jobnr, fn_post;
+			MetaDataTable MDonemic;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+			{
+				MDin.getValue(EMDL_MICROGRAPH_NAME, fn_curr);
+				fn_curr=fn_curr.substr(fn_curr.find("@")+1);
+				decomposePipelineFileName(fn_curr, fn_pre, fn_jobnr, fn_curr);
+
+				if (fn_curr != fn_old && fn_old != "")
+				{
+					FileName fn_star = fn_out + fn_old.withoutExtension()+"_input.star";
+					fn_mics.push_back(fn_star);
+					FileName fn_dir = fn_star.beforeLastOf("/");
+					if (!exists(fn_dir))
+						int res = system(("mkdir -p " + fn_dir).c_str());
+					MDonemic.write(fn_star);
+					MDonemic.clear();
+				}
+
+				MDonemic.addObject(MDin.getObject());
+
+				// Reset the old micrograph name
+				fn_old=fn_curr;
+
+			} // end loop all objects in input STAR file
+
+			// Also write the last MDonemic
+			FileName fn_star = fn_out + fn_old.withoutExtension()+"_input.star";
+			fn_mics.push_back(fn_star);
+			FileName fn_dir = fn_star.beforeLastOf("/");
+			if (!exists(fn_dir))
+				int res = system(("mkdir -p " + fn_dir).c_str());
+			MDonemic.write(fn_star);
+			MDonemic.clear();
+
+		} // end loop over all fn_stars
+
+		// Write fn_mics into a STAR file to disk (this is used by MPI version to read back in for all slaves, and may be generally useful for tracing errors)
+		MetaDataTable MDmics;
+		for (long int imic = 0; imic < fn_mics.size(); imic++)
+		{
+			MDmics.addObject();
+			MDmics.setValue(EMDL_MICROGRAPH_NAME, fn_mics[imic]);
+		}
+		MDmics.write(fn_out+"micrograph_list.star");
     }
+}
 
-    // Read in first micrograph STAR file to get some general informatopm
-    MDonemic.read(fn_stars[0]);
+
+void ParticlePolisher::initialise()
+{
+
+	// Read in first micrograph STAR file to get some general informatopm
+    MetaDataTable MDonemic;
+	MDonemic.read(fn_mics[0]);
 
     if (last_frame < 0)
     	MDonemic.getValue(EMDL_PARTICLE_NR_FRAMES, last_frame);
@@ -228,10 +280,10 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 
 	// Loop over all average micrographs
 	int barstep;
-	long int my_nr_micrographs = fn_stars.size();
+	long int my_nr_micrographs = fn_mics.size();
 	if (verb > 0)
 	{
-		std::cout << " + Fitting straight paths for beam-induced movements in all micrographs ... " << std::endl;
+		std::cout << " + Fitting straight paths for beam-induced movements in all " << my_nr_micrographs << " micrographs ... " << std::endl;
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
 	}
@@ -257,7 +309,7 @@ void ParticlePolisher::fitMovementsAllMicrographs()
 void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 {
 
-	FileName fn_fit = fn_stars[imic].withoutExtension() + "_fit.star";
+	FileName fn_fit = fn_mics[imic].withoutExtension() + "_fit.star";
 	if (only_do_unfinished && exists(fn_fit))
 		return;
 
@@ -266,7 +318,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	RFLOAT x_pick_p, y_pick_p, x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
 
 	Experiment exp_model;
-	exp_model.read(fn_stars[imic]);
+	exp_model.read(fn_mics[imic]);
 
 	// Just testing
 	if (exp_model.average_micrographs.size()>1)
@@ -637,9 +689,9 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 	backprojector.initZeros(current_size);
 
 	// Loop over all individual micrographs
-	for (long int imic = 0; imic < fn_stars.size(); imic++)
+	for (long int imic = 0; imic < fn_mics.size(); imic++)
 	{
-		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_stars[imic] : fn_stars[imic].withoutExtension() + "_fit.star";
+		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_mics[imic] : fn_mics[imic].withoutExtension() + "_fit.star";
 
 		Experiment exp_model;
 		exp_model.read(fn_fit);
@@ -707,7 +759,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 			}
 
 		} // end loop over all movie frames in exp_model
-	} // end loop over all micrographs in fn_stars
+	} // end loop over all micrographs in fn_mics
 
 	backprojector.symmetrise(helical_nr_asu, helical_twist, helical_rise / angpix);
 
@@ -800,6 +852,13 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 		}
 		MDout.write(fn_root_half + "_guinier.star");
 
+		// Check if any points were included in the Guinier plot
+		if (guinier.size() < 3)
+		{
+			std::cerr << " WARNING: insufficient number of points in the Guinier plot of movie frame: " << this_frame << std::endl;
+			std::cerr << " Consider lowering the lowres-limit, or average over multiple frames in the B-factor estimation." << std::endl;
+		}
+
 		// Now do the fit
 		fitStraightLine(guinier, bfactor, offset, corr_coeff);
 		// this is the B-factor relative to the average from all single-frame reconstructions!
@@ -822,7 +881,7 @@ void ParticlePolisher::polishParticlesAllMicrographs()
 
 	// Loop over all average micrographs
 	int barstep;
-	long int my_nr_micrographs = fn_stars.size();
+	long int my_nr_micrographs = fn_mics.size();
 	if (verb > 0)
 	{
 		std::cout << " + Write out polished particles for all " << my_nr_micrographs << " micrographs ... " << std::endl;
@@ -865,9 +924,9 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 	// Loop over all original_particles in this average_micrograph
 
 	MDshiny.clear();
-	for (long int imic = 0; imic < fn_stars.size(); imic++)
+	for (long int imic = 0; imic < fn_mics.size(); imic++)
 	{
-		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_stars[imic] : fn_stars[imic].withoutExtension() + "_fit.star";
+		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_mics[imic] : fn_mics[imic].withoutExtension() + "_fit.star";
 		Experiment exp_model;
 		exp_model.read(fn_fit);
 
@@ -928,7 +987,7 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 {
 
-	FileName fn_fit = (fitting_mode == NO_FIT) ? fn_stars[imic] : fn_stars[imic].withoutExtension() + "_fit.star";
+	FileName fn_fit = (fitting_mode == NO_FIT) ? fn_mics[imic] : fn_mics[imic].withoutExtension() + "_fit.star";
 	Experiment exp_model;
 	exp_model.read(fn_fit);
 
@@ -1114,9 +1173,16 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 
 		maxres_model = prm.global_resol;
 	}
+	std::cout << " Resolution of reconstructions from shiny particles: " << maxres_model << std::endl;
+	std::cout << " But you probably want to re-run at least a 3D auto-refinement with the shiny particles." << std::endl;
 
+
+	/*
+	 * This is needed for defocus & beamtilt refinement
+	 *
 	if (verb > 0)
 		std::cout << " + Setting Fourier transforms of the two shiny half-reconstructions ..." << std::endl;
+
 
 	MultidimArray<RFLOAT> dum;
 	Image<RFLOAT> refvol;
@@ -1137,6 +1203,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 	PPrefvol_half2.r_min_nn = 10;
 	PPrefvol_half2.data_dim = 2;
 	PPrefvol_half2.computeFourierTransformMap(refvol(), dum);
+	*/
 
 }
 
@@ -1247,7 +1314,7 @@ void ParticlePolisher::optimiseBeamTiltAndDefocus()
 
 	// Loop over all average micrographs
 	int barstep;
-	int my_nr_micrographs = fn_stars.size();
+	int my_nr_micrographs = fn_mics.size();
 	if (verb > 0)
 	{
 		std::cout << " + Optimising beamtilts in all micrographs ... " << std::endl;

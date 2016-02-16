@@ -874,6 +874,21 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		// Just read first data block
 		MDimg.read(fn_exp);
 
+		// If this for movie-processing, then the STAR file might be a list of STAR files with original movie particles.
+		// If that is the case: then just append all into a new MDimg.
+		if (MDimg.containsLabel(EMDL_STARFILE_MOVIE_PARTICLES))
+		{
+			MetaDataTable MDjoined, MDone;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+			{
+				FileName fn_star;
+				MDimg.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
+				MDone.read(fn_star);
+				MDjoined.append(MDone);
+			}
+			MDimg = MDjoined;
+		}
+
 #ifdef DEBUG_READ
 		std::cerr << "Done reading MDimg" << std::endl;
 		timer.toc(tread);

@@ -40,11 +40,37 @@ void ParticlePolisherMpi::read(int argc, char **argv)
 
 
 }
+
+void ParticlePolisherMpi::generateMicrographList()
+{
+	// Only the master makes the list of micrographs and the STAR files of movie-particles in each of them
+	if (node->isMaster())
+		ParticlePolisher::generateMicrographList();
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	// All slaves read the list in
+	if (!node->isMaster())
+	{
+		MetaDataTable MDmics;
+		MDmics.read(fn_out+"micrograph_list.star");
+
+		fn_mics.clear();
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
+		{
+			FileName fn_mic;
+			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+			fn_mics.push_back(fn_mic);
+		}
+	}
+
+}
+
 // Fit the beam-induced translations for all average micrographs
 void ParticlePolisherMpi::fitMovementsAllMicrographs()
 {
 
-	long int total_nr_micrographs = fn_stars.size();
+	long int total_nr_micrographs = fn_mics.size();
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
@@ -192,7 +218,7 @@ void ParticlePolisherMpi::polishParticlesAllMicrographs()
 		return;
 	}
 
-	long int total_nr_micrographs = fn_stars.size();
+	long int total_nr_micrographs = fn_mics.size();
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
@@ -275,12 +301,20 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 			prm.fn_mask = fn_mask;
 			prm.do_auto_bfac = false;
 			prm.do_fsc_weighting = true;
+			prm.verb=0;
 			prm.run();
 
 			maxres_model = prm.global_resol;
 		}
+
+		std::cout << " Resolution of reconstructions from shiny particles: " << maxres_model << std::endl;
+		std::cout << " But you probably want to re-run at least a 3D auto-refinement with the shiny particles." << std::endl;
+
 	}
 
+	/*
+	 * This is needed for defocus and beam-tilt refinement
+	 *
 	// Wait until the FSC-weighting has been done
 	MPI_Barrier(MPI_COMM_WORLD);
 
@@ -303,7 +337,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 	PPrefvol_half2.r_min_nn = 10;
 	PPrefvol_half2.data_dim = 2;
 	PPrefvol_half2.computeFourierTransformMap(refvol(), dum);
-
+	*/
 }
 
 /*
@@ -387,8 +421,8 @@ void ParticlePolisherMpi::run()
 		fitMovementsAllMicrographs();
 
 	// Perform single-frame reconstructions to estimate dose-dependent B-factors
-        if (do_weighting)
-            calculateAllSingleFrameReconstructionsAndBfactors();
+	if (do_weighting)
+		calculateAllSingleFrameReconstructionsAndBfactors();
 
 	// Write out the polished particles
 	polishParticlesAllMicrographs();

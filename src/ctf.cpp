@@ -167,7 +167,9 @@ void CTF::initialise()
     K1 = PI / 2 * 2 * lambda;
     K2 = PI / 2 * local_Cs * lambda * lambda * lambda;
     K3 = sqrt(1-Q0*Q0);
-    K4 = -Bfac / 4.;
+    //K4 = -Bfac / 4.;
+    // For now switch off B-factor weighting on the CTF!
+    K4 = 0.;
 
     if (Q0 < 0. || Q0 > 1.)
     	REPORT_ERROR("CTF::initialise ERROR: AmplitudeContrast Q0 cannot be smaller than zero or larger than one!");

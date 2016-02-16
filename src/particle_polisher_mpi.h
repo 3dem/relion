@@ -42,7 +42,10 @@ public:
      */
     void read(int argc, char **argv);
 
-	// Parallelized fit the beam-induced translations for all average micrographs
+    // Parallel version of making the list
+    void generateMicrographList();
+
+    // Parallelized fit the beam-induced translations for all average micrographs
 	void fitMovementsAllMicrographs();
 
 	// Parallelized calculation of B-factors for single-frame reconstructions

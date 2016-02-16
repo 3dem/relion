@@ -148,7 +148,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	fn_data_movie = parser.getOption("--realign_movie_frames", "Input STAR file with the movie frames", "");
 
-	do_movies_per_micrograph = parser.checkOption("--process_movies_per_micrograph", "Perform movie-processing one micrograph at a time (this reduces RAM costs for large data sets)");
+	do_movies_in_batches = parser.checkOption("--process_movies_in_batches", "Perform movie-processing one micrograph at a time (this reduces RAM costs for large data sets)");
 
 	// TODO: add this to EMDL_OPTIMISER and read/write of optimiser.star
 	nr_frames_per_prior = textToInteger(parser.getOption("--nr_frames_prior", "Number of movie frames to calculate running-average priors", "5"));
@@ -532,7 +532,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 void MlOptimiser::read(FileName fn_in, int rank, bool do_skip_data, bool do_skip_model)
 {
-
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
@@ -643,6 +642,9 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_skip_data, bool do_skip
 
     // Then read in sampling, mydata and mymodel stuff
     // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
+#ifdef DEBUG_READ
+    std::cerr<<"MlOptimiser::readStar before data."<<std::endl;
+#endif
     if (!do_skip_data)
     {
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
@@ -650,6 +652,9 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_skip_data, bool do_skip
 		mydata.read(fn_data, false, false, do_preread, is_helical_segment);
     }
 
+#ifdef DEBUG_READ
+    std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
+#endif
     if (!do_skip_model)
     {
 		if (do_split_random_halves)
@@ -664,6 +669,9 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_skip_data, bool do_skip
 			mymodel.read(fn_model);
 		}
     }
+#ifdef DEBUG_READ
+    std::cerr<<"MlOptimiser::readStar before sampling."<<std::endl;
+#endif
 	sampling.read(fn_sampling);
 
 #ifdef DEBUG_READ
@@ -882,9 +890,8 @@ void MlOptimiser::initialise()
 	}
 
 	// Write out initial mymodel
-	if (!do_movies_per_micrograph)
+	if (!do_movies_in_batches)
 		write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
 
 	// Do this after writing out the model, so that still the random halves are written in separate files.
 	if (do_realign_movies)
@@ -2094,7 +2101,7 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 	// That makes a total of 2*2 + 5 = 9 * a RFLOAT array of size BPref
 	RFLOAT total_mem_Gb_max = Gb * 9 * MULTIDIM_SIZE((wsum_model.BPref[0]).data);
 
-	if (myverb > 0 && verb > 0)
+	if (myverb > 0 && !(do_movies_in_batches && do_realign_movies))
 	{
 		// Calculate number of sampled hidden variables:
 		int nr_ang_steps = CEIL(PI * particle_diameter * mymodel.current_resolution);
@@ -2115,7 +2122,7 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 		}
 	}
 
-	if (myverb > 0 && verb > 0)
+	if (myverb > 0 &&  !(do_movies_in_batches && do_realign_movies))
 	{
 		std::cout << " Estimated memory for expectation step  > " << total_mem_Gb_exp << " Gb, available memory = "<<available_memory * nr_threads<<" Gb."<<std::endl;
 		std::cout << " Estimated memory for maximization step > " << total_mem_Gb_max << " Gb, available memory = "<<available_memory * nr_threads<<" Gb."<<std::endl;
@@ -6940,7 +6947,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 	}
 
 	// Print to screen
-	if (myverb && verb > 0)
+	if (myverb && !(do_movies_in_batches && do_realign_movies))
 	{
 		std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
 		if (sampling.orientational_prior_mode == NOPRIOR)

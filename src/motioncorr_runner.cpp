@@ -209,42 +209,62 @@ void MotioncorrRunner::run()
 void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 {
 
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+
+	for (int ipass = 0; ipass < 3; ipass++)
+	{
+		FileName fn_avg, fn_mov;
+		getOutputFileNames(fn_mic, fn_avg, fn_mov);
 
 
-	FileName fn_out = fn_avg.withoutExtension() + ".out";
-	FileName fn_log = fn_avg.withoutExtension() + ".log";
-	FileName fn_err = fn_avg.withoutExtension() + ".err";
-	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
+		FileName fn_out = fn_avg.withoutExtension() + ".out";
+		FileName fn_log = fn_avg.withoutExtension() + ".log";
+		FileName fn_err = fn_avg.withoutExtension() + ".err";
+		FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
-	std::string command = fn_motioncorr_exe + " ";
+		std::string command = fn_motioncorr_exe + " ";
 
-	command += fn_mic + " -fcs " + fn_avg;
-	command += " -flg " + fn_log;
-	command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
-	command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
+		command += fn_mic + " -fcs " + fn_avg;
+		command += " -flg " + fn_log;
+		command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
+		command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
 
-	if (do_save_movies)
-		command += " -dsp 0 -ssc 1 -fct " + fn_mov;
+		if (do_save_movies)
+			command += " -dsp 0 -ssc 1 -fct " + fn_mov;
 
-	if (bin_factor > 1)
-		command += " -bin " + integerToString(bin_factor);
+		if (bin_factor > 1)
+			command += " -bin " + integerToString(bin_factor);
 
-	if (fn_other_args.length() > 0)
-		command += " " + fn_other_args;
+		if (fn_other_args.length() > 0)
+			command += " " + fn_other_args;
 
-	// TODO: think about GPU and MPI interplay!
-	command += " -gpu " + integerToString(rank);
+		// TODO: think about GPU and MPI interplay!
+		command += " -gpu " + integerToString(rank);
 
-	command += " >> " + fn_out + " 2>> " + fn_err;
+		command += " >> " + fn_out + " 2>> " + fn_err;
 
-	// Save the command that was executed
-	std::ofstream fh;
-	fh.open(fn_cmd.c_str(), std::ios::out);
-	fh << command << std::endl;
-	fh.close();
+		// Save the command that was executed
+		std::ofstream fh;
+		fh.open(fn_cmd.c_str(), std::ios::out);
+		fh << command << std::endl;
+		fh.close();
 
-	int res = system(command.c_str());
+		int res = system(command.c_str());
+
+		// After motion-correction, check for all-zero average micrographs
+		Image<RFLOAT> Itest;
+		Itest.read(fn_avg, false);
+		RFLOAT avg, stddev;
+		Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+		Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+		if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+		{
+			break;
+		}
+		else if (ipass == 2)
+		{
+			std::cerr << " WARNING: " << fn_avg << " still had zero mean and variance after 3 attempts! " << std::endl;
+		}
+
+	}
 
 }

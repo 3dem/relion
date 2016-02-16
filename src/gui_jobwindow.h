@@ -702,7 +702,7 @@ public:
 	BooleanEntry do_invert;
 
 	// Movies
-	BooleanEntry do_movies_per_micrograph;
+	SliderEntry join_nr_mics;
 	SliderEntry movie_runavg_window;
 	SliderEntry movie_sigma_offset;
 	BooleanEntry do_alsorot_movies;

@@ -3709,6 +3709,12 @@ If they are the same, the program will automatically add a '_ctX' to the output 
 with X being the iteration from which one continues the previous run. \n \
 Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
 
+    // Add a little spacer
+	current_y += STEPY/2;
+
+	join_nr_mics.place(current_y, "Process micrographs in batches of: ", -1, 10, 200, 10, "All movie-particles will be extracted from each micrograph separately, but the resulting STAR files will be joined together into batches of the size specified here. The movie-refinement will be performed on these batches. \
+Very large batches cost more RAM, but the parallelisation in smaller batches is poorer. If a negative number is given, all micrographs are processed in one batch. Note that movie-refinement that INCLUDE rotational searches cannot be performed in batches!");
+
 	tab1->end();
 
 	tab2->begin();
@@ -3787,10 +3793,6 @@ will be centered at the rotations determined for the corresponding particle wher
 	alsorot_movie_group->end();
 	do_alsorot_movies.cb_menu_i(); // to make default effective
 
-	do_movies_per_micrograph.place(current_y, "Process per-micrograph?", true, "If set to Yes, then each micrograph is processed individually. This can only be done if rotational searches are NOT included (i.e. only in preparation for particle polishing). Processing each micrograph \n \
-individually has the advantage of very low RAM-usage, but may come at an increased cost in CPU time, as the parallelisation efficiency goes down, especially when there are very few particles per micrograph.");
-
-
 	tab4->end();
 
 	// read settings if hidden file exists
@@ -3811,6 +3813,7 @@ void MovieRefineJobWindow::write(std::string fn)
 	fn_cont.writeValue(fh);
 	fn_movie_star.writeValue(fh);
 	movie_rootname.writeValue(fh);
+	join_nr_mics.writeValue(fh);
 
 	// Extract movie-particles
 	first_movie_frame.writeValue(fh);
@@ -3830,7 +3833,6 @@ void MovieRefineJobWindow::write(std::string fn)
 	movie_sigma_offset.writeValue(fh);
 	do_alsorot_movies.writeValue(fh);
 	movie_sigma_angles.writeValue(fh);
-	do_movies_per_micrograph.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -3851,6 +3853,7 @@ void MovieRefineJobWindow::read(std::string fn, bool &_is_continue)
 		fn_cont.readValue(fh);
 		fn_movie_star.readValue(fh);
 		movie_rootname.readValue(fh);
+		join_nr_mics.readValue(fh);
 
 		// Extract movie-particles
 		first_movie_frame.readValue(fh);
@@ -3870,7 +3873,6 @@ void MovieRefineJobWindow::read(std::string fn, bool &_is_continue)
 		movie_sigma_offset.readValue(fh);
 		do_alsorot_movies.readValue(fh);
 		movie_sigma_angles.readValue(fh);
-		do_movies_per_micrograph.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3884,6 +3886,7 @@ void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
 	fn_cont.deactivate(is_continue);
 	fn_movie_star.deactivate(is_continue);
 	movie_rootname.deactivate(is_continue);
+	join_nr_mics.deactivate(is_continue);
 
 	// Extract movie-particles
 	first_movie_frame.deactivate(is_continue);
@@ -3935,10 +3938,16 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 	// Output files of the extraction: to be used in the second step: movie-refinement
 	command += " --part_dir " + outputname;
+
 	FileName fn_ostar = outputname + "particles_" + movie_rootname.getValue() + ".star";
-	command += " --part_star " + fn_ostar;
 	FileName fn_olist = outputname + "micrographs_" + movie_rootname.getValue() + "_list.star";
 	command += " --list_star " + fn_olist;
+	command += " --join_nr_mics " + floatToString(join_nr_mics.getValue());
+	if (join_nr_mics.getValue() <= 0)
+	{
+		// Only write out a STAR file with all movie-particles if we're NOT processing on a per-micrograph basis
+		command += " --part_star " + fn_ostar;
+	}
 
 	// Extraction parameters
 	command += " --extract --extract_movies";
@@ -3996,11 +4005,12 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 	command += " --continue " + fn_cont.getValue();
 
-	if (do_movies_per_micrograph.getValue())
+	if (join_nr_mics.getValue() > 0)
 	{
 		if (do_alsorot_movies.getValue())
-			REPORT_ERROR("MovieRefineJobWindow ERROR: you can only process micrographs individually if you switch OFF the rotational searches.");
-		command += " --process_movies_per_micrograph --realign_movie_frames " + fn_olist;
+			REPORT_ERROR("MovieRefineJobWindow ERROR: you can process micrographs into batches if you switch OFF the rotational searches.");
+
+		command += " --process_movies_in_batches --realign_movie_frames " + fn_olist;
 
 		if (is_continue)
 			command += " --only_do_unfinished_movies ";

@@ -360,7 +360,7 @@ public:
 
     // Process movies one micrograph at a time?
     // This prevents memory problems with very large data sets, but may negatively affect overall parallelization efficiency
-    bool do_movies_per_micrograph;
+    bool do_movies_in_batches;
 
 	// Starfile with the movie-frames
 	FileName fn_data_movie;

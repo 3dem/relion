@@ -29,6 +29,7 @@
 #include  <stdio.h>
 #include <src/time.h>
 #include "src/metadata_table.h"
+#include "src/image.h"
 
 class MotioncorrRunner
 {

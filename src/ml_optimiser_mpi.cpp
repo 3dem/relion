@@ -39,11 +39,11 @@ void MlOptimiserMpi::read(int argc, char **argv)
     node = new MpiNode(argc, argv);
 
     // First read in non-parallelisation-dependent variables
-	int mpi_section = parser.addSection("MPI options");
+    MlOptimiser::read(argc, argv, node->rank);
+
+    int mpi_section = parser.addSection("MPI options");
     fn_scratch = parser.getOption("--scratchdir", "Directory (with absolute path, and visible to all nodes) for temporary files", "");
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
-
-    MlOptimiser::read(argc, argv, node->rank);
 
     // Don't put any output to screen for mpi slaves
     verb = (node->isMaster()) ? 1 : 0;
@@ -76,7 +76,7 @@ void MlOptimiserMpi::initialise()
 #endif
 
     // Print information about MPI nodes:
-    if (!do_movies_per_micrograph)
+    if (!do_movies_in_batches)
     	printMpiNodesMachineNames(*node, nr_threads);
 
     MlOptimiser::initialiseGeneral(node->rank);
@@ -130,12 +130,13 @@ void MlOptimiserMpi::initialise()
 
 	// Only master writes out initial mymodel (do not gather metadata yet)
 	int nr_subsets = (do_split_random_halves) ? 2 : 1;
-	if (node->isMaster())
+	if (node->isMaster() && !do_movies_in_batches)
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
 	else if (node->rank <= nr_subsets)
 	{
 		//Only the first_slave of each subset writes model to disc
-		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
+		if (!do_movies_in_batches)
+			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
 
 		bool do_warn = false;
 		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
@@ -2373,32 +2374,31 @@ void MlOptimiserMpi::iterate()
 
 void MlOptimiserMpi::processMoviesPerMicrograph()
 {
-	if (!(do_movies_per_micrograph && fn_data_movie != "" && do_skip_maximization))
+	if (!(do_movies_in_batches && fn_data_movie != "" && do_skip_maximization))
 		REPORT_ERROR("MlOptimiserMpi::processMoviesPerMicrograp BUG: you should not be here...");
 
 	// Read in a list with all micrographs and basically run the entire relion_refine procedure separately for each micropgraph
 	// Only save some time reading in stuff...
 
-	MetaDataTable MDmics;
-	MDmics.read(fn_data_movie);
-
 	// Get some params to allow looping from the same starting point
 	FileName fn_opt = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
 	FileName fn_out_ori = fn_out.beforeLastOf("/");
-	int iter_ori = iter;
 
 	// Print out the MPI nodes, as this is disabled inside the loop
 	printMpiNodesMachineNames(*node, nr_threads);
 
+	MetaDataTable MDmics;
+	MDmics.read(fn_data_movie);
+
 	// Now loop over all micrographs
-	bool is_first = true;
 	if (node->isMaster())
 	{
-		std::cout << " + Performing the movie-refinement independently for each micrograph ..." << std::endl;
+		std::cout << " + Performing movie-refinement in " << MDmics.numberOfObjects() << " batches ..." << std::endl;
 		init_progress_bar(MDmics.numberOfObjects());
 	}
 
 	int imic = 0;
+	FileName fn_olddir="";
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 	{
 		FileName fn_star;
@@ -2406,7 +2406,7 @@ void MlOptimiserMpi::processMoviesPerMicrograph()
 		FileName fn_pre, fn_jobnr, fn_post;
 		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
 		fn_data_movie = fn_star;
-		fn_out = fn_out_ori + "/" + fn_post.without("_extract.star");
+		fn_out = fn_out_ori + "/" + fn_post.without(".star");
 
 		FileName fn_data = fn_out + "_data.star";
 		// Set new output star file back into MDmics, to be written out at the end
@@ -2415,8 +2415,13 @@ void MlOptimiserMpi::processMoviesPerMicrograph()
 		if (!(only_do_unfinished_movies && exists(fn_data)))
 		{
 			// Make output directory structure like the input Micrographs
-			std::string command = "mkdir -p " + fn_out.beforeLastOf("/");
-			std::system(command.c_str());
+			FileName fn_dir = fn_out.beforeLastOf("/");
+			if (fn_dir != fn_olddir)
+			{
+				std::string command = "mkdir -p " + fn_dir;
+				std::system(command.c_str());
+				fn_olddir = fn_dir;
+			}
 
 			// be quiet
 			verb = 0;
@@ -2425,10 +2430,11 @@ void MlOptimiserMpi::processMoviesPerMicrograph()
 			// In theory, I could save time omitting part of this. In practice it's complicated...
 			initialise();
 
-			// Run the final iteration for this micrograph
+			// Run the final iteration for this batch
 			iterate();
 
 			// Read the start back in
+			// (I tried skipping reading of model, but for the moment that doesn't work..)
 			MlOptimiser::read(fn_opt, node->rank, true, false); // true means skip data reading and false means dont skip model reading!
 
 			if (node->isMaster())
@@ -2444,6 +2450,10 @@ void MlOptimiserMpi::processMoviesPerMicrograph()
 
 		// At the end, the master also writes out a STAR file with the output STAR files of all micrographs
 		MDmics.write(fn_out_ori + "/run_data.star");
+
+		// For stdout
+		std::cout << " Done!" << std::endl;
+
 	}
 
 

@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include <src/image.h>
+#include <src/filename.h>
 #include <src/metadata_table.h>
 
 class star_combine_parameters
@@ -52,8 +53,8 @@ class star_combine_parameters
 	void run()
 	{
 
-		std::vector<std::string> fns_in;
-		tokenize(fn_in, fns_in);
+		std::vector<FileName> fns_in;
+		fn_in.globFiles(fns_in);
 		MetaDataTable MDout;
 		std::vector<MetaDataTable> MDsin;
 

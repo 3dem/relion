@@ -91,6 +91,9 @@ public:
 	// STAR file with refined particle coordinates (to re-extract particles, for example with different binning)
 	FileName fn_data;
 
+	// How many micrographs are joined together in batches of movie-particles?
+	int join_nr_mics;
+
 	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
 	bool do_recenter;
 

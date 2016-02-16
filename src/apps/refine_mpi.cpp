@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     	optimiser.read(argc, argv);
 
     	// Dirty hack to loop around movies one micrograph at a time
-    	if (optimiser.do_movies_per_micrograph && optimiser.fn_data_movie != "" && optimiser.do_skip_maximization)
+    	if (optimiser.do_movies_in_batches && optimiser.fn_data_movie != "" && optimiser.do_skip_maximization)
     	{
     		optimiser.processMoviesPerMicrograph();
     	}

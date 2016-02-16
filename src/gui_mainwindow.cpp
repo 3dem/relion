@@ -1466,7 +1466,7 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	if (!only_schedule)
 	{
-		std::cout << "Executing: " << final_command << std::endl;
+		//std::cout << "Executing: " << final_command << std::endl;
 		int res = system(final_command.c_str());
 
 		// Also print the final_command to the note for future reference

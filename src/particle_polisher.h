@@ -49,8 +49,8 @@ public:
 	// Input & Output rootname
 	FileName fn_in, fn_out, fn_sym, fn_mask;
 
-	// list of input STAR files
-	std::vector<FileName> fn_stars;
+	// list of individual micrographs
+	std::vector<FileName> fn_mics;
 
 	// Standard deviation for a Gaussian-weight on the distance between particles in the micrograph
 	RFLOAT sigma_neighbour_distance;
@@ -106,7 +106,7 @@ public:
 	MetaDataTable MDshiny;
 
 	// Reference volume reconstructed from the initially-polished particles to be used for per-particle CTF-refinement and beamtilt-refinement
-	Projector PPrefvol_half1, PPrefvol_half2;
+	//Projector PPrefvol_half1, PPrefvol_half2;
 
 	// Normalise the polished particles?
 	bool do_normalise;
@@ -165,6 +165,9 @@ public:
 
 	// Initialise some stuff after reading
 	void initialise();
+
+	// Generate a list of all individual micrographs
+	void generateMicrographList();
 
 	// General Running
 	void run();
