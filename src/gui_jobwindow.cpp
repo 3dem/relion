@@ -3723,6 +3723,7 @@ Very large batches cost more RAM, but the parallelisation in smaller batches is 
 
 	first_movie_frame.place(current_y, "First movie frame to extract: ", 1, 1, 20, 1, "Extract from this movie frame onwards. The first frame is number 1.");
 	last_movie_frame.place(current_y, "Last movie frame to extract: ", 0, 0, 64, 1, "Extract until this movie frame. Zero means: extract all frames in the movie. You may want to specify the last frame number though, as it will be useful to detect movies which accidentally have fewer frames.");
+	avg_movie_frames.place(current_y, "Average every so many frames: ", 1, 1, 8, 1, "Average every so many movie frames together upon the extraction. This will reduce computational costs in movie-refinement and polishing, but too large values will affect the results. Default is a value of 1, so no averaging");
 	max_mpi_nodes.place(current_y, "Maximum number of MPI nodes: ", 8, 2, 24, 1, "The number of MPI nodes used by the relion_preprocess program will be limited to this value, regardless of the number of MPI nodes requested on the Running tab (which is also used for the refinement step). This is useful to protect the file system from too heavy disk I/O.");
 
 	// Add a little spacer
@@ -3818,6 +3819,7 @@ void MovieRefineJobWindow::write(std::string fn)
 	// Extract movie-particles
 	first_movie_frame.writeValue(fh);
 	last_movie_frame.writeValue(fh);
+	avg_movie_frames.writeValue(fh);
 	max_mpi_nodes.writeValue(fh);
 	extract_size.writeValue(fh);
 	do_rescale.writeValue(fh);
@@ -3858,6 +3860,7 @@ void MovieRefineJobWindow::read(std::string fn, bool &_is_continue)
 		// Extract movie-particles
 		first_movie_frame.readValue(fh);
 		last_movie_frame.readValue(fh);
+		avg_movie_frames.readValue(fh);
 		max_mpi_nodes.readValue(fh);
 		extract_size.readValue(fh);
 		do_rescale.readValue(fh);
@@ -3891,6 +3894,7 @@ void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
 	// Extract movie-particles
 	first_movie_frame.deactivate(is_continue);
 	last_movie_frame.deactivate(is_continue);
+	avg_movie_frames.deactivate(is_continue);
 	max_mpi_nodes.deactivate(is_continue);
 	extract_size.deactivate(is_continue);
 	do_rescale.deactivate(is_continue);
@@ -3955,6 +3959,7 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	command += " --movie_name " + movie_rootname.getValue();
 	command += " --first_movie_frame " + floatToString(first_movie_frame.getValue());
 	command += " --last_movie_frame " + floatToString(last_movie_frame.getValue());
+	command += " --avg_movie_frames " + floatToString(avg_movie_frames.getValue());
 	// Limit MPI nodes
 	if (nr_mpi.getValue() > ROUND(max_mpi_nodes.getValue()))
 		command += " --max_mpi_nodes " + floatToString(max_mpi_nodes.getValue());
@@ -4056,6 +4061,9 @@ PolishJobWindow::PolishJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 	fn_in.place(current_y, "Input STAR file with aligned movies:", NODE_MOVIE_DATA, "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
 
 	fn_mask.place(current_y, "Mask for the reconstructions", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
+
+	current_y += STEPY/2;
+	avg_movie_frames.place(current_y, "Average every so many frames: ", 1, 1, 8, 1, "Give the same value as used for extraction in the movie-refinement step.");
 
 	tab1->end();
 	tab2->begin();
@@ -4177,6 +4185,7 @@ void PolishJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 	fn_in.writeValue(fh);
 	fn_mask.writeValue(fh);
+	avg_movie_frames.writeValue(fh);
 	movie_runavg_window.writeValue(fh);
 	do_fit_movement.writeValue(fh);
 	sigma_nb.writeValue(fh);
@@ -4208,6 +4217,7 @@ void PolishJobWindow::read(std::string fn, bool &_is_continue)
 	{
 		fn_in.readValue(fh);
 		fn_mask.readValue(fh);
+		avg_movie_frames.readValue(fh);
 		movie_runavg_window.readValue(fh);
 		do_fit_movement.readValue(fh);
 		sigma_nb.readValue(fh);
@@ -4234,6 +4244,7 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 
 	fn_in.deactivate(is_continue);
 	fn_mask.deactivate(is_continue);
+	avg_movie_frames.deactivate(is_continue);
 
 }
 
@@ -4258,11 +4269,11 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	Node node2(fn_mask.getValue(), fn_mask.type);
 	pipelineInputNodes.push_back(node2);
 
-	// TODO!!
 	command += " --o " + outputname;
 	Node node3(outputname + "shiny.star", NODE_PART_DATA);
 	pipelineOutputNodes.push_back(node3);
 
+	command += " --avg_movie_frames " + floatToString(avg_movie_frames.getValue());
 	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
 
 	// If this is not a continue job, then re-start from scratch....

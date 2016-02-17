@@ -689,6 +689,7 @@ public:
 	// Extract movie-particles
 	SliderEntry first_movie_frame;
 	SliderEntry last_movie_frame;
+	SliderEntry avg_movie_frames;
 	SliderEntry max_mpi_nodes;
 	SliderEntry extract_size;
 	BooleanEntry do_set_angpix;
@@ -738,6 +739,7 @@ public:
 	// I/O
 	InputNodeEntry fn_in;
 	InputNodeEntry fn_mask;
+	SliderEntry avg_movie_frames;
 
 	// Movements
 	SliderEntry movie_runavg_window;
