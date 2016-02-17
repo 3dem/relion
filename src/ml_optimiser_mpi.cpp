@@ -2426,7 +2426,7 @@ void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
 			iterate();
 
 			// Read the start back in
-			// (I tried doing only partial re-starts, but these attempts all lead to larger differences from processing without batches...)
+			// (I tried doing only partial re-starts, but these attempts all lead to (small) differences from processing without batches...)
 			MlOptimiser::read(argc, argv, node->rank);
 
 		}
