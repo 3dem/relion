@@ -4001,7 +4001,7 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command="`which relion_refine`";
 
 	command += " --o " + outputname + "run";
-	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, true, do_alsorot_movies.getValue() );
+	pipelineOutputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, 1, true, do_alsorot_movies.getValue() );
 
 	command += " --continue " + fn_cont.getValue();
 

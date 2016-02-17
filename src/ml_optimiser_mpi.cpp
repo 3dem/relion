@@ -75,7 +75,7 @@ void MlOptimiserMpi::initialise()
     std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
 #endif
 
-    // Print information about MPI nodes:
+	// Print information about MPI nodes:
     if (!do_movies_in_batches)
     	printMpiNodesMachineNames(*node, nr_threads);
 
@@ -300,8 +300,8 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	if (do_split_random_halves)
 		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
 
-	// Randomise the order of the particles
-    mydata.randomiseOriginalParticlesOrder(random_seed, do_split_random_halves);
+	// Randomise the order of the particles, this also separates the two random subsets: half1 is first half, half2 is second
+	mydata.randomiseOriginalParticlesOrder(random_seed, do_split_random_halves, do_movies_in_batches);
 
     // Also randomize random-number-generator for perturbations on the angles
     init_random_generator(random_seed);
@@ -729,8 +729,6 @@ void MlOptimiserMpi::expectation()
 
     	try
     	{
-			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
-
     		if (do_gpu)
     		{
     			for (int i = 0; i < cudaMlOptimisers.size(); i ++)
@@ -752,7 +750,6 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 				timer.tic(TIMING_MPISLAVEWAIT1);
 #endif
-
 				//Receive a new bunch of particles
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, 0, MPITAG_JOB_REPLY, MPI_COMM_WORLD, status);
 #ifdef TIMING
@@ -2372,48 +2369,43 @@ void MlOptimiserMpi::iterate()
 
 }
 
-void MlOptimiserMpi::processMoviesPerMicrograph()
+void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
 {
+
 	if (!(do_movies_in_batches && fn_data_movie != "" && do_skip_maximization))
 		REPORT_ERROR("MlOptimiserMpi::processMoviesPerMicrograp BUG: you should not be here...");
-
-	// Read in a list with all micrographs and basically run the entire relion_refine procedure separately for each micropgraph
-	// Only save some time reading in stuff...
-
-	// Get some params to allow looping from the same starting point
-	FileName fn_opt = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
-	FileName fn_out_ori = fn_out.beforeLastOf("/");
 
 	// Print out the MPI nodes, as this is disabled inside the loop
 	printMpiNodesMachineNames(*node, nr_threads);
 
-	MetaDataTable MDmics;
-	MDmics.read(fn_data_movie);
+	// Read in a list with all micrographs and basically run the entire relion_refine procedure separately for each micropgraph
+	// Only save some time reading in stuff...
+	MetaDataTable MDbatches;
+	MDbatches.read(fn_data_movie);
+	int nr_batches = MDbatches.numberOfObjects();
 
-	// Now loop over all micrographs
-	if (node->isMaster())
-	{
-		std::cout << " + Performing movie-refinement in " << MDmics.numberOfObjects() << " batches ..." << std::endl;
-		init_progress_bar(MDmics.numberOfObjects());
-	}
-
+	// Get original outname
+	FileName fn_out_ori = fn_out.beforeLastOf("/");
 	int imic = 0;
-	FileName fn_olddir="";
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
+	FileName fn_pre, fn_jobnr, fn_post, fn_olddir="";
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbatches)
 	{
 		FileName fn_star;
-		MDmics.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
-		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
+		MDbatches.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
 		fn_data_movie = fn_star;
+		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
 		fn_out = fn_out_ori + "/" + fn_post.without(".star");
 
+		// Set new output star file back into MDbatches, to be written out at the end
 		FileName fn_data = fn_out + "_data.star";
-		// Set new output star file back into MDmics, to be written out at the end
-		MDmics.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_data);
+		MDbatches.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_data);
 
 		if (!(only_do_unfinished_movies && exists(fn_data)))
 		{
+
+			if (node->isMaster())
+				std::cout <<std::endl << " + Now processing movie batch " << imic+1 << " out of " << nr_batches <<std::endl <<std::endl;
+
 			// Make output directory structure like the input Micrographs
 			FileName fn_dir = fn_out.beforeLastOf("/");
 			if (fn_dir != fn_olddir)
@@ -2424,21 +2416,19 @@ void MlOptimiserMpi::processMoviesPerMicrograph()
 			}
 
 			// be quiet
-			verb = 0;
+			verb = node->isMaster();
 
 			// Initialise a lot of stuff
-			// In theory, I could save time omitting part of this. In practice it's complicated...
+			// (In theory, I could save time omitting part of this. In practice it's complicated...)
 			initialise();
 
 			// Run the final iteration for this batch
 			iterate();
 
 			// Read the start back in
-			// (I tried skipping reading of model, but for the moment that doesn't work..)
-			MlOptimiser::read(fn_opt, node->rank, true, false); // true means skip data reading and false means dont skip model reading!
+			// (I tried doing only partial re-starts, but these attempts all lead to larger differences from processing without batches...)
+			MlOptimiser::read(argc, argv, node->rank);
 
-			if (node->isMaster())
-				progress_bar(imic);
 		}
 
 		imic++;
@@ -2446,13 +2436,9 @@ void MlOptimiserMpi::processMoviesPerMicrograph()
 
 	if (node->isMaster())
 	{
-		progress_bar(MDmics.numberOfObjects());
-
 		// At the end, the master also writes out a STAR file with the output STAR files of all micrographs
-		MDmics.write(fn_out_ori + "/run_data.star");
-
-		// For stdout
-		std::cout << " Done!" << std::endl;
+		MDbatches.write(fn_out_ori + "/run_data.star");
+		std::cout << " Done processing all movie batches!" << std::endl;
 
 	}
 

@@ -614,7 +614,7 @@ public:
 	void parseContinue(int argc, char **argv);
 
 	/// Read from STAR file
-	void read(FileName fn_in, int rank = 0, bool do_skip_data = false, bool do_skip_model = false);
+	void read(FileName fn_in, int rank = 0);
 
 	// Write files to disc
 	void write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset = 0);
