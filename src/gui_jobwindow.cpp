@@ -31,12 +31,12 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	if (iter < 0)
 	{
 		// 3D auto-refine
-		fn_out = outputname+"run";
+		fn_out = outputname;
 	}
 	else
 	{
 		// 2D or 3D classification
-		fn_out.compose(outputname+"run_it", iter, "", 3);
+		fn_out.compose(outputname+"_it", iter, "", 3);
 	}
 
 	// Data and model.star files
@@ -2421,7 +2421,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
     }
 
     command += " --o " + outputname + fn_run;
-	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
+	pipelineOutputNodes = getOutputNodesRefine(outputname + fn_run, nr_iter.getValue(), nr_classes.getValue(), 2, 1);
 
 	if (!is_continue)
 	{
@@ -2989,7 +2989,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
     }
 
     command += " --o " + outputname + fn_run;
-	pipelineOutputNodes = getOutputNodesRefine(outputname, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
+	pipelineOutputNodes = getOutputNodesRefine(outputname + fn_run, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
 
 	if (!is_continue)
 	{
@@ -3546,7 +3546,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
     command += " --o " + outputname + fn_run;
 	// TODO: add bodies!! (probably in next version)
-	pipelineOutputNodes = getOutputNodesRefine(outputname, -1, 1, 3, 1, false, false); // false false means dont do movies
+	pipelineOutputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, 1, false, false); // false false means dont do movies
 
 	if (!is_continue)
 	{
