@@ -247,8 +247,11 @@ int manualpickerGuiWindow::fill()
 		Fl_Check_Button *mycheck = new Fl_Check_Button(4, current_y, ystep-8, ystep-8, "");
 		mycheck->callback(cb_selectmic, &(imics[imic]));
 		mycheck->value(1);
+		if (!do_allow_save)
+			mycheck->deactivate();
 		selected.push_back(true);
 		check_buttons.push_back(mycheck);
+
 
 		Fl_Text_Buffer *textbuff = new Fl_Text_Buffer();
 		textbuff->text(fn_mic.c_str());

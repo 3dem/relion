@@ -1309,7 +1309,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	std::string command;
 	command="`which relion_manualpick`";
 
-	command += " --allow_save --i " + fn_in.getValue();
+	command += " --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
@@ -1319,11 +1319,6 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	FileName fn_suffix = outputname + "coords_suffix_manualpick.star";
 	Node node2(fn_suffix, NODE_MIC_COORDS);
 	pipelineOutputNodes.push_back(node2);
-
-	FileName fn_outstar = outputname + "micrographs_selected.star";
-	Node node3(fn_outstar, NODE_MICS);
-	pipelineOutputNodes.push_back(node3);
-	command += " --selection " + fn_outstar;
 
 	command += " --scale " + floatToString(micscale.getValue());
 	command += " --sigma_contrast " + floatToString(sigma_contrast.getValue());
@@ -4333,9 +4328,10 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_model.place(current_y, "Select 2D/3D classes:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
-	fn_mic.place(current_y, "OR select micrographs:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
-	fn_data.place(current_y, "OR select individual particles:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
+	fn_model.place(current_y, "Select classes from model.star:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
+	fn_mic.place(current_y, "OR select from micrographs.star:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
+	fn_data.place(current_y, "OR select from particles.star:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
+	fn_coords.place(current_y, "OR select from picked coords:", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "A coordinate suffix .star file to select micrographs while inspecting coordinates (and/or CTFs).");
 
 	tab1->end();
 
@@ -4372,6 +4368,7 @@ void ClassSelectJobWindow::write(std::string fn)
 	fn_model.writeValue(fh);
 	fn_data.writeValue(fh);
 	fn_mic.writeValue(fh);
+	fn_coords.writeValue(fh);
 	do_recenter.writeValue(fh);
 	do_regroup.writeValue(fh);
 	nr_groups.writeValue(fh);
@@ -4394,6 +4391,7 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 		fn_model.readValue(fh);
 		fn_data.readValue(fh);
 		fn_mic.readValue(fh);
+		fn_coords.readValue(fh);
 		do_recenter.readValue(fh);
 		do_regroup.readValue(fh);
 		nr_groups.readValue(fh);
@@ -4411,6 +4409,17 @@ void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 	fn_model.deactivate(is_continue);
 	fn_data.deactivate(is_continue);
 	fn_mic.deactivate(is_continue);
+	fn_coords.deactivate(is_continue);
+
+	// For new jobs, always reset the input fields to empty
+	if (!is_continue)
+	{
+		fn_model.setValue("");
+		fn_data.setValue("");
+		fn_mic.setValue("");
+		fn_coords.setValue("");
+	}
+
 	do_recenter.deactivate(is_continue);
 	do_regroup.deactivate(is_continue);
 	nr_groups.deactivate(is_continue);
@@ -4478,14 +4487,77 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		Node node2(fn_parts, NODE_PART_DATA);
 		pipelineOutputNodes.push_back(node2);
 	}
+	else if  (fn_coords.getValue() != "")
+	{
+
+    	ManualpickJobWindow global_manualpickjob;
+
+    	FileName fn_job = ".gui_manualpickrun.job";
+		bool iscont=false;
+		if (exists(fn_job))
+			global_manualpickjob.read(fn_job.c_str(), iscont);
+		else
+			REPORT_ERROR("RelionMainWindow::cb_display_io_node_i ERROR: Save a Manual picking job parameters (using the File menu) before displaying coordinate files. ");
+
+		// Get the name of the micrograph STAR file from reading the suffix file
+	    FileName fn_suffix = fn_coords.getValue();
+
+		std::ifstream in(fn_suffix.data(), std::ios_base::in);
+		FileName fn_star;
+		in >> fn_star ;
+		in.close();
+		FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
+		fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
+		fn_suffix = fn_suffix.withoutExtension();
+
+		// Launch the manualpicker...
+		command="`which relion_manualpick` --i " + fn_star;
+		command += " --odir " + fn_dirs;
+		command += " --pickname " + fn_suffix;
+
+		// The output selection
+		FileName fn_outstar = outputname + "micrographs_selected.star";
+		Node node3(fn_outstar, NODE_MICS);
+		pipelineOutputNodes.push_back(node3);
+		command += " --selection " + fn_outstar;
+		command += " --allow_save  --selection " + fn_outstar;
+
+		// All the stuff from the saved global_manualpickjob
+		command += " --scale " + floatToString(global_manualpickjob.micscale.getValue());
+		command += " --sigma_contrast " + floatToString(global_manualpickjob.sigma_contrast.getValue());
+		command += " --black " + floatToString(global_manualpickjob.black_val.getValue());
+		command += " --white " + floatToString(global_manualpickjob.white_val.getValue());
+
+		if (global_manualpickjob.lowpass.getValue() > 0.)
+			command += " --lowpass " + floatToString(global_manualpickjob.lowpass.getValue());
+		if (global_manualpickjob.highpass.getValue() > 0.)
+			command += " --highpass " + floatToString(global_manualpickjob.highpass.getValue());
+		if (global_manualpickjob.angpix.getValue() > 0.)
+			command += " --angpix " + floatToString(global_manualpickjob.angpix.getValue());
+
+		command += " --ctf_scale " + floatToString(global_manualpickjob.ctfscale.getValue());
+
+		command += " --particle_diameter " + floatToString(global_manualpickjob.diameter.getValue());
+
+		if (global_manualpickjob.do_color.getValue())
+		{
+			command += " --color_label " + global_manualpickjob.color_label.getValue();
+			command += " --blue " + floatToString(global_manualpickjob.blue_value.getValue());
+			command += " --red " + floatToString(global_manualpickjob.red_value.getValue());
+			if (global_manualpickjob.fn_color.getValue().length() > 0)
+				command += " --color_star " + global_manualpickjob.fn_color.getValue();
+		}
+
+		// Other arguments for extraction
+		command += " " + global_manualpickjob.other_args.getValue() + " &";
+
+	}
 
 	// Re-grouping
-	if (do_regroup.getValue())
+	if (do_regroup.getValue() && fn_coords.getValue() == "")
 	{
 		command += " --regroup " + floatToString(nr_groups.getValue());
 	}
-
-
 
 	// Other arguments
 	command += " " + other_args.getValue();

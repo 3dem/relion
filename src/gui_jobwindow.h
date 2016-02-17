@@ -793,6 +793,7 @@ public:
 	InputNodeEntry fn_model;
 	InputNodeEntry fn_data;
 	InputNodeEntry fn_mic;
+	InputNodeEntry fn_coords;
 
 	BooleanEntry do_recenter;
 	BooleanEntry do_regroup;
