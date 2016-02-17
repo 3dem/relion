@@ -143,6 +143,6 @@ void PreprocessingMpi::run()
 		Preprocessing::runOperateOnInputFile();
 
 	if (verb > 0)
-		std::cout << " Done!" <<std::endl;
+		std::cout << " Done preprocessing!" <<std::endl;
 
 }

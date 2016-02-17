@@ -291,19 +291,14 @@ void Preprocessing::joinAllStarFiles()
 				}
 
 				//std::cerr << " join_nr_mics= " << join_nr_mics << " %=" <<((imic+1) % join_nr_mics)<<std::endl;
-				if ( ((imic+1) % join_nr_mics) == 0 || (imic+1) == MDmics.numberOfObjects())
+				if ( (((imic+1) % join_nr_mics) == 0 || (imic+1) == MDmics.numberOfObjects()) && MDbatch.numberOfObjects() > 0)
 				{
 					ibatch++;
 					FileName fn_batch = fn_ostar + integerToString(ibatch,3) + ".star";
-
-					// Check there are any existing fn_star files in MDbatch
-					if (MDbatch.numberOfObjects() > 0)
-					{
-						MDbatch.write(fn_batch);
-						MDbatch.clear();
-						MDmicnames.addObject();
-						MDmicnames.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_batch);
-					}
+					MDbatch.write(fn_batch);
+					MDbatch.clear();
+					MDmicnames.addObject();
+					MDmicnames.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_batch);
 				}
 			}
 			else
