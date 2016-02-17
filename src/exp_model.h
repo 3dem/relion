@@ -380,7 +380,8 @@ public:
 	void divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
 	// Randomise the order of the original_particles
-	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false);
+	// 17022016 SHWS: introduced always_do_this to allow looping multiple times over relion_refine for movie-processing in batches
+	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false, bool always_do_this = false);
 
 	// calculate maximum number of images for a particle (possibly within a range of particles)
 	int maxNumberOfImagesPerOriginalParticle(long int first_particle_id = -1, long int last_particle_id = -1);
