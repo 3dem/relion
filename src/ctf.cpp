@@ -83,11 +83,15 @@ void CTF::read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID)
 		if (!MD2.getValue(EMDL_CTF_Q0, Q0, objectID))
 			Q0=0;
 
+	if (!MD1.getValue(EMDL_CTF_PHASESHIFT, phase_shift, objectID))
+		if (!MD2.getValue(EMDL_CTF_PHASESHIFT, phase_shift, objectID))
+			phase_shift=0;
+
 	initialise();
 
 }
 void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
-		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale)
+		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale, RFLOAT _phase_shift)
 {
 	kV              = _voltage;
 	DeltafU         = _defU;
@@ -97,6 +101,7 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	Bfac            = _Bfac;
 	scale           = _scale;
 	Q0              = _Q0;
+	phase_shift     = _phase_shift;
 
 	initialise();
 }
@@ -118,6 +123,7 @@ void CTF::write(MetaDataTable &MD)
     MD.setValue(EMDL_CTF_CS, Cs);
     MD.setValue(EMDL_CTF_BFACTOR, Bfac);
     MD.setValue(EMDL_CTF_SCALEFACTOR, scale);
+    MD.setValue(EMDL_CTF_PHASESHIFT, phase_shift);
     MD.setValue(EMDL_CTF_Q0, Q0);
 }
 
@@ -134,7 +140,7 @@ void CTF::write(std::ostream &out)
 void CTF::clear()
 {
     kV = 200;
-    DeltafU = DeltafV = azimuthal_angle = 0;
+    DeltafU = DeltafV = azimuthal_angle = phase_shift = 0;
     Cs = Bfac = 0;
     Q0 = 0;
     scale = 1;

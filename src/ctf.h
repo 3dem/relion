@@ -118,6 +118,9 @@ public:
     // Overall scale-factor of CTF
     RFLOAT scale;
 
+    // Phase-shift from a phase-plate (in rad)
+    RFLOAT phase_shift;
+
     /** Empty constructor. */
     CTF() { clear(); }
 
@@ -130,7 +133,7 @@ public:
 
     /** Just set all values explicitly */
     void setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
-    		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1.);
+    		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.);
 
     /** Read from a single MetaDataTable */
     void read(MetaDataTable &MD);
@@ -165,7 +168,7 @@ public:
         }
         else
         {
-            retval = -(K3*sin(argument) - Q0*cos(argument)); // Q0 should be positive
+            retval = -(K3*sin(argument + phase_shift) - Q0*cos(argument + phase_shift)); // Q0 should be positive
         }
         if (do_damping)
         {

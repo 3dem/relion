@@ -82,6 +82,7 @@ enum EMDLabel
     EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
     EMDL_CTF_LENS_STABILITY, ///< Lens stability
     EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination
+    EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
     EMDL_CTF_CONVERGENCE_CONE, ///< Convergence cone
     EMDL_CTF_LONGITUDINAL_DISPLACEMENT, ///< Longitudinal displacement
     EMDL_CTF_TRANSVERSAL_DISPLACEMENT, ///< Transversal displacemente
@@ -453,6 +454,7 @@ private:
         EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
         EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
         EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
+        EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in rad)");
         EMDL::addLabel(EMDL_CTF_CONVERGENCE_CONE, EMDL_DOUBLE, "rlnConvergenceCone", "Convergence cone (in mrad)");
         EMDL::addLabel(EMDL_CTF_LONGITUDINAL_DISPLACEMENT, EMDL_DOUBLE, "rlnLongitudinalDisplacement", "Longitudinal displacement (in Angstroms)");
         EMDL::addLabel(EMDL_CTF_TRANSVERSAL_DISPLACEMENT, EMDL_DOUBLE, "rlnTransversalDisplacement", "Transversal displacement (in Angstroms)");
