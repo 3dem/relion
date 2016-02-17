@@ -700,7 +700,10 @@ void MlModel::expandToMovieFrames(Experiment &moviedata, int running_avg_side)
 			}
 		}
 		if (my_curr_group_nr < 0)
+		{
+			std::cerr << " last curr_name= " << curr_name << " last movie_name= "<< movie_name << " movie_name.contains(curr_name)=" <<movie_name.contains(curr_name)<<std::endl;
 			REPORT_ERROR("MlModel::expandToMovieFrames ERROR: cannot find rlnMicrographName or rlnGroupName for movie frame: " + movie_name);
+		}
 
 		moviemodel.sigma2_noise.push_back(sigma2_noise[my_curr_group_nr]);
 		moviemodel.scale_correction.push_back(scale_correction[my_curr_group_nr]);
