@@ -206,9 +206,13 @@ public:
 		inline
 		void markReadyEvent(cudaStream_t stream = 0)
 		{
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 			//TODO add a debug warning if event already set
 			DEBUG_HANDLE_ERROR(cudaEventCreate(&readyEvent));
 			DEBUG_HANDLE_ERROR(cudaEventRecord(readyEvent, stream));
+#else
+			;
+#endif
 		}
 
 		inline

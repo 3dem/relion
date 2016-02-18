@@ -231,6 +231,9 @@ if (in.getAllocator() == NULL)
 
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+	HANDLE_ERROR(cudaFree(alloc->getPtr()));
+#endif
 }
 
 template <typename T>
@@ -261,6 +264,10 @@ if (in.getAllocator() == NULL)
 
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();
+
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+	HANDLE_ERROR(cudaFree(alloc->getPtr()));
+#endif
 }
 
 class AllocatorThrustWrapper
