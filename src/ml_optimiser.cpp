@@ -1663,7 +1663,9 @@ void MlOptimiser::iterateWrapUp()
     delete exp_ipart_ThreadTaskDistributor;
     for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
     	delete (MlOptimiserCuda *) cudaMlOptimisers[i];
-
+	if(do_gpu)
+		for (unsigned i = 0; i < cudaMlDeviceBundles.size(); i ++)
+			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetDevice();
 }
 
 void MlOptimiser::iterate()

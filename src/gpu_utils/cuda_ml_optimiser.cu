@@ -2728,6 +2728,11 @@ void MlDeviceBundle::resetData()
 	}
 };
 
+void MlDeviceBundle::resetDevice()
+{
+	HANDLE_ERROR(cudaDeviceReset());
+};
+
 MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* bundle) :
 		baseMLO(baseMLOptimiser), transformer1(0, bundle->allocator), transformer2(0, bundle->allocator)
 {

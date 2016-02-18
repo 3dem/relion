@@ -922,6 +922,25 @@ public:
 		host_alloc();
 	}
 
+	void resize_host(size_t newSize)
+	{
+#ifdef DEBUG_CUDA
+		if (size==0)
+			printf("DEBUG_WARNING: Resizing from size zero (permitted).\n");
+#endif
+	    T* newArr = new T[newSize];
+	    memcpy( newArr, h_ptr, newSize * sizeof(T) );
+
+	    size = newSize;
+#ifdef DEBUG_CUDA
+		if (d_ptr!=NULL)
+			printf("DEBUG_WARNING: Resizing host with present device allocation.\n");
+#endif
+	    free_host();
+	    setHstPtr(newArr);
+	    h_do_free=true;
+	}
+
 	/**
 	 * Initiate device memory with provided value
 	 */

@@ -273,19 +273,37 @@ public:
 		ihidden_overs.setSize(newSize);
 	}
 
-	void dual_alloc_all()
+	void resize_host_all(size_t newSize)
+	{
+		weights.resize_host(newSize);
+		rot_id.resize_host(newSize);
+		rot_idx.resize_host(newSize);
+		trans_idx.resize_host(newSize);
+		ihidden_overs.resize_host(newSize);
+	}
+
+	void host_alloc_all()
 	{
 		weights.host_alloc();
 		rot_id.host_alloc();
 		rot_idx.host_alloc();
 		trans_idx.host_alloc();
 		ihidden_overs.host_alloc();
-		//-----------------------
+	}
+
+	void device_alloc_all()
+	{
 		weights.device_alloc();
 		rot_id.device_alloc();
 		rot_idx.device_alloc();
 		trans_idx.device_alloc();
 		ihidden_overs.device_alloc();
+	}
+
+	void dual_alloc_all()
+	{
+		host_alloc_all();
+		device_alloc_all();
 	}
 };
 
@@ -401,6 +419,8 @@ public:
 	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id);
 
 	void resetData();
+
+	void resetDevice();
 
 	void syncAllBackprojects()
 	{
