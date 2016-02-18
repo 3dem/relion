@@ -2582,8 +2582,14 @@ void MlDeviceBundle::resetData()
 	else
 		generateProjectionPlanOnTheFly = false;
 
-	coarseProjectionPlans.clear();
+	// clear() called on std::vector appears to set size=0, even if we have an explicit
+	// destructor for each member, so we need to set the size to what is was before
+	cudaProjectors.clear();
+	cudaBackprojectors.clear();
+	cudaProjectors.resize(nr_classes);
+	cudaBackprojectors.resize(nr_classes);
 
+	coarseProjectionPlans.clear();
 
 #ifndef CUDA_NO_CUSTOM_ALLOCATION
 	allocator->syncReadyEvents();
@@ -2726,11 +2732,6 @@ void MlDeviceBundle::resetData()
 					);
 		}
 	}
-};
-
-void MlDeviceBundle::resetDevice()
-{
-	HANDLE_ERROR(cudaDeviceReset());
 };
 
 MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* bundle) :

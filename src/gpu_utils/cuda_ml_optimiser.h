@@ -420,7 +420,10 @@ public:
 
 	void resetData();
 
-	void resetDevice();
+	void resetDevice()
+	{
+		HANDLE_ERROR(cudaDeviceReset());
+	}
 
 	void syncAllBackprojects()
 	{
@@ -434,7 +437,6 @@ public:
 		cudaProjectors.clear();
 		cudaBackprojectors.clear();
 		coarseProjectionPlans.clear();
-		cudaBackprojectors.clear();
 		//Delete this lastly
 		delete allocator;
 	}

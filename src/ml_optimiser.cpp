@@ -1665,7 +1665,15 @@ void MlOptimiser::iterateWrapUp()
     	delete (MlOptimiserCuda *) cudaMlOptimisers[i];
 	if(do_gpu)
 		for (unsigned i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		{
+			for (unsigned j = 0; j < ((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaProjectors.size(); j++)
+			{
+				((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaProjectors[j].clear();
+				((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaBackprojectors[j].clear();
+				((MlDeviceBundle *) cudaMlDeviceBundles[i])->coarseProjectionPlans[j].clear();
+			}
 			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetDevice();
+		}
 }
 
 void MlOptimiser::iterate()
