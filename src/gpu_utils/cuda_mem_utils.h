@@ -878,13 +878,14 @@ public:
 			printf("DEBUG_WARNING: Device double allocation.\n");
 #endif
 		d_do_free = true;
-
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		if (CustomAlloc)
 		{
 			alloc = allocator->alloc(size * sizeof(T));
 			d_ptr = (T*) alloc->getPtr();
 		}
 		else
+#endif
 			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
@@ -1179,7 +1180,7 @@ public:
 			printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
 #endif
 		d_do_free = false;
-
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		if (CustomAlloc)
 		{
 			if (alloc->getReadyEvent() == 0)
@@ -1189,6 +1190,7 @@ public:
 			alloc = NULL;
 		}
 		else
+#endif
 			DEBUG_HANDLE_ERROR(cudaFree(d_ptr));
 		d_ptr = 0;
 	}
