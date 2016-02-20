@@ -205,6 +205,12 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		{
 			canvas.do_class = false;
 		}
+
+		// Pre-load existing backup_selection.star file
+		FileName fn_sel = fn_selected_imgs.beforeLastOf("/")+"/backup_selection.star";
+		if (fn_selected_imgs != "" && exists(fn_sel))
+			canvas.loadBackupSelection(false); // false means dont ask for filename
+
 		resizable(*this);
 		show();
 		return Fl::run();
@@ -416,8 +422,6 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 	if (nr_imgs > 1)
 		progress_bar(nr_imgs);
 
-
-
 }
 int basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
@@ -572,6 +576,7 @@ int multiViewerCanvas::handle(int ev)
 						showSelectedParticles(SELECTED);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
+						saveBackupSelection();
 						saveSelected(SELECTED);
 						saveSelectedParticles(SELECTED);
 					}
@@ -630,7 +635,10 @@ int multiViewerCanvas::handle(int ev)
 					else if ( strcmp(m->label(), "Show metadata") == 0 )
 						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
+					{
+						saveBackupSelection();
 						saveSelected(SELECTED);
+					}
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 
@@ -645,33 +653,79 @@ int multiViewerCanvas::handle(int ev)
 
 void multiViewerCanvas::saveBackupSelection()
 {
+	std::vector<bool> selected(boxes.size());
+	for (long int ipos = 0; ipos < boxes.size(); ipos++)
+	{
+		long int my_sorted_ipos;
+		if (boxes[ipos]->MDimg.containsLabel(EMDL_SORTED_IDX))
+			boxes[ipos]->MDimg.getValue(EMDL_SORTED_IDX, my_sorted_ipos);
+		else
+			my_sorted_ipos = ipos;
+		selected[my_sorted_ipos] = boxes[ipos]->selected;
+	}
+
 	MetaDataTable MDout;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
 		MDout.addObject();
-		MDout.setValue(EMDL_SELECTED, boxes[ipos]->selected);
+		MDout.setValue(EMDL_SELECTED, selected[ipos]);
 	}
-	MDout.write(".relion_display_backup_selection.star");
-	std::cout <<" Written out .relion_display_backup_selection.star" << std::endl;
+
+	FileName fnt = fn_selected_imgs.beforeLastOf("/") + "/backup_selection.star";
+	MDout.write(fnt);
+	std::cout <<" Written out " << fnt << std::endl;
 }
 
-void multiViewerCanvas::loadBackupSelection()
+void multiViewerCanvas::loadBackupSelection(bool do_ask)
 {
+
+	FileName fn_sel;
+	if (do_ask)
+	{
+		FileName fn_dir = fn_selected_imgs.beforeLastOf("/")+"/.";
+		Fl_File_Chooser chooser(fn_dir.c_str(), "(backup_selection.star)",Fl_File_Chooser::SINGLE,"Choose selection file to load");      // chooser type
+		chooser.show();
+		// Block until user picks something.
+		while(chooser.shown())
+			{ Fl::wait(); }
+
+		// User hit cancel?
+		if ( chooser.value() == NULL )
+			return;
+
+		FileName fnt(chooser.value());
+		fn_sel = fnt;
+	}
+	else
+		fn_sel = fn_selected_imgs.beforeLastOf("/")+"/backup_selection.star";
+
 	MetaDataTable MDin;
-	MDin.read(".relion_display_backup_selection.star");
+	MDin.read(fn_sel);
 	if (MDin.numberOfObjects() != boxes.size())
 		REPORT_ERROR("multiViewerCanvas::loadBackupSelection ERROR: .relion_display_backup_selection.star does not have the expected number of entries...");
 
+	std::vector<bool> selected(boxes.size());
 	long int ipos = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
 		bool is_selected;
 		MDin.getValue(EMDL_SELECTED, is_selected);
-		if (is_selected)
+		selected[ipos] = is_selected;
+		ipos++;
+	}
+
+	for (long int ipos = 0; ipos < boxes.size(); ipos++)
+	{
+		long int my_sorted_ipos;
+		if (boxes[ipos]->MDimg.containsLabel(EMDL_SORTED_IDX))
+			boxes[ipos]->MDimg.getValue(EMDL_SORTED_IDX, my_sorted_ipos);
+		else
+			my_sorted_ipos = ipos;
+
+		if (selected[my_sorted_ipos])
 			boxes[ipos]->select();
 		else
 			boxes[ipos]->unSelect();
-		ipos++;
 	}
 
 }

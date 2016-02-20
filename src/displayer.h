@@ -240,7 +240,9 @@ private:
 	void showSelectedParticles(bool save_selected);
 	void saveSelected(bool save_selected);
 	void saveBackupSelection();
-	void loadBackupSelection();
+	// Allow re-loading of existing backup selection
+public:
+	void loadBackupSelection(bool do_ask = true);
 
 };
 
