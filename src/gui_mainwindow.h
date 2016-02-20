@@ -27,6 +27,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <algorithm>
+#include <iostream>
+#include <vector>
 #define DO_WRITE true
 #define DONT_WRITE false
 #define DO_READ true
@@ -82,7 +85,6 @@ static Fl_Text_Display *disp_stdout;
 static Fl_Text_Display *disp_stderr;
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
-static Fl_Text_Buffer *textbuff_note;
 
 static FileName fn_settings;
 // Initial screen
@@ -97,6 +99,9 @@ static PipeLine pipeline;
 static int current_job;
 static FileName global_outputname;
 
+// Order jobs in finished window alphabetically?
+static bool do_order_alphabetically;
+
 class NoteEditorWindow : public Fl_Window
 {
 
@@ -104,6 +109,7 @@ public:
 
 	FileName fn_note;
 	Fl_Text_Editor *editor;
+	Fl_Text_Buffer *textbuff_note;
 	NoteEditorWindow(int w, int h, const char* t, FileName _fn_note);
 
 	~NoteEditorWindow() {};
@@ -211,8 +217,13 @@ private:
     static void cb_delete(Fl_Widget*, void*);
     inline void cb_delete_i(bool do_ask = true, bool do_recursive = true);
 
-    static void cb_cleanup(Fl_Widget*, void*);
-    inline void cb_cleanup_i();
+    static void cb_gently_clean_all_jobs(Fl_Widget*, void*);
+    static void cb_harshly_clean_all_jobs(Fl_Widget*, void*);
+    inline void cb_clean_all_jobs_i(bool do_harsh);
+
+    static void cb_gentle_cleanup(Fl_Widget*, void*);
+    static void cb_harsh_cleanup(Fl_Widget*, void*);
+    inline void cb_cleanup_i(int myjob = -1, bool do_verb = true, bool do_harsh = false);
 
     static void cb_set_alias(Fl_Widget*, void*);
     inline void cb_set_alias_i(std::string newalias = "");
@@ -233,6 +244,13 @@ private:
 
     static void cb_load(Fl_Widget*, void*);
     inline void cb_load_i();
+
+    static void cb_import(Fl_Widget*, void*);
+    static void cb_undelete_job(Fl_Widget*, void*);
+    inline void cb_import_i(bool is_undelete);
+
+    static void cb_order_jobs_alphabetically(Fl_Widget*, void*);
+    static void cb_order_jobs_chronologically(Fl_Widget*, void*);
 
     static void cb_empty_trash(Fl_Widget*, void*);
     inline void cb_empty_trash_i();

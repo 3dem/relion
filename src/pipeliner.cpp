@@ -155,6 +155,7 @@ long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
 void PipeLine::deleteProcess(int ipos, bool recursive)
 {
 
+	FileName fn_del = processList[ipos].name;
 	std::vector<bool> deleteProcesses, deleteNodes;
 	deleteProcesses.resize(processList.size(), false);
 	deleteNodes.resize(nodeList.size(), false);
@@ -193,11 +194,10 @@ void PipeLine::deleteProcess(int ipos, bool recursive)
 	}
 
 	// Write new pipeline to disc and read in again
-	write(deleteNodes, deleteProcesses);
+	write(fn_del, deleteNodes, deleteProcesses);
 	read();
 
 }
-
 
 long int PipeLine::findNodeByName(std::string name)
 {
@@ -215,6 +215,19 @@ long int PipeLine::findProcessByName(std::string name)
 	for(long int ipos = 0 ; ipos < processList.size() ; ipos++)
 	{
 		if(processList[ipos].name == name)
+			return ipos;
+	}
+	return -1;
+}
+
+long int PipeLine::findProcessByAlias(std::string name)
+{
+	if (name == "None")
+		return -1;
+
+	for(long int ipos = 0 ; ipos < processList.size() ; ipos++)
+	{
+		if(processList[ipos].alias == name)
 			return ipos;
 	}
 	return -1;
@@ -252,6 +265,8 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 		int res = system(command.c_str());
 		command = "touch " + fn_dir + fn_type + fnt;
 		res = system(command.c_str());
+		command = "chmod 777 " + fn_dir + fn_type + fnt;
+		res = system(command.c_str());
 		return true;
 	}
 	else
@@ -274,6 +289,8 @@ void PipeLine::makeNodeDirectory()
 								   	   	   	   	   	   	  processList[myproc].status == PROC_SCHEDULED_NEW);
 		touchTemporaryNodeFile(nodeList[i], touch_if_not_exist);
 	}
+	command = "chmod 777 -R " + fn_dir;
+	res = system(command.c_str());
 
 }
 
@@ -306,6 +323,97 @@ void PipeLine::checkProcessCompletion()
 
 }
 
+// Import a job into the pipeline
+bool PipeLine::importPipeline(std::string _name)
+{
+
+	if (_name == name)
+	{
+		std::cerr << " importPipeline WARNING: ignoring request to import myself! "<<std::endl;
+		return false;
+	}
+
+	PipeLine mini_pipeline;
+	mini_pipeline.setName(_name);
+	mini_pipeline.read();
+
+	// TODO: vectors that map imported process and nodes numbers to the new ones!!
+	std::vector<long int> imported_process_nr;
+	std::vector<long int> imported_node_nr;
+	long int ori_nr_proc = processList.size();
+	long int ori_nr_node = nodeList.size();
+
+	bool imported = false;
+	for (int iproc = 0; iproc < mini_pipeline.processList.size(); iproc++)
+	{
+		// Check that the new processes all have unique names
+		if (findProcessByName(mini_pipeline.processList[iproc].name) >= 0)
+			REPORT_ERROR("importPipeline ERROR: cannot import pipeline with non-unique job name: " + mini_pipeline.processList[iproc].name);
+
+		if (findProcessByAlias(mini_pipeline.processList[iproc].alias) >= 0)
+		{
+			std::cerr << "importPipeline WARNING: resetting non-unique imported alias: " << mini_pipeline.processList[iproc].alias << std::endl;
+			mini_pipeline.processList[iproc].alias = "None";
+		}
+
+		imported_process_nr.push_back(processList.size());
+		processList.push_back(mini_pipeline.processList[iproc]);
+		imported = true;
+
+	}
+
+	if (imported)
+	{
+		for (int inode = 0; inode < mini_pipeline.nodeList.size(); inode++)
+		{
+			// Only push_back nodes that weren't present yet
+			int mynode = findNodeByName(mini_pipeline.nodeList[inode].name);
+			if (mynode < 0)
+			{
+				imported_node_nr.push_back(nodeList.size());
+				nodeList.push_back(mini_pipeline.nodeList[inode]);
+			}
+			else
+			{
+				//std::cerr << "mynode= "<<mynode << " name=" << nodeList[mynode].name << std::endl;
+				imported_node_nr.push_back(mynode);
+			}
+		}
+
+		// Now fix the numbers of the lists in the imported processes and nodes
+		for (int iproc = ori_nr_proc; iproc < processList.size(); iproc++)
+		{
+			for (int inode = 0; inode < processList[iproc].inputNodeList.size(); inode++)
+			{
+				int ori_node = processList[iproc].inputNodeList[inode];
+				//std::cerr << " ori_node=" << ori_node << " name= "<<nodeList[ori_node].name << std::endl;
+				//std::cerr << " imported_node_nr[ori_node]= " << imported_node_nr[ori_node] << " name= "<<nodeList[imported_node_nr[ori_node]].name<<std::endl;
+				processList[iproc].inputNodeList[inode] = imported_node_nr[ori_node];
+			}
+			for (int inode = 0; inode < processList[iproc].outputNodeList.size(); inode++)
+			{
+				int ori_node = processList[iproc].outputNodeList[inode];
+				processList[iproc].outputNodeList[inode] = imported_node_nr[ori_node];
+			}
+		}
+		for (int inode = ori_nr_node; inode < nodeList.size(); inode++)
+		{
+			for (int iproc = 0; iproc < nodeList[inode].inputForProcessList.size(); iproc++)
+			{
+				int ori_proc = nodeList[inode].inputForProcessList[iproc];
+				nodeList[inode].inputForProcessList[iproc] = imported_process_nr[ori_proc];
+			}
+			int ori_proc2 = nodeList[inode].outputFromProcess;
+			nodeList[inode].outputFromProcess = imported_process_nr[ori_proc2];
+		}
+
+	}
+
+	return imported;
+
+}
+
+// Read pipeline from STAR file
 void PipeLine::read(bool only_read_if_file_exists)
 {
 
@@ -374,6 +482,7 @@ void PipeLine::read(bool only_read_if_file_exists)
 			{
 				std::string command = " ln -s ../" + name + " " + fn_alias;
 				int res= system(command.c_str());
+
 			}
 		}
 	}
@@ -389,13 +498,25 @@ void PipeLine::read(bool only_read_if_file_exists)
 
 		// Now fill in all To and FromEdgeLists of all Nodes
 		long int myProcess = findProcessByName(procname);
+		bool found_both = true;
 		if (myProcess < 0 || myProcess >= processList.size())
-			REPORT_ERROR("PipeLine::read ERROR: cannot find to-process with name: " + procname);
+		{
+			std::cerr << "PipeLine WARNING: cannot find child process with name: " << procname << std::endl;
+			found_both = false;
+			//REPORT_ERROR("PipeLine::read ERROR: cannot find to-process with name: " + procname);
+		}
 		long int fromNode = findNodeByName(fromnodename);
 		if (fromNode < 0 || fromNode >= nodeList.size())
-			REPORT_ERROR("PipeLine::read ERROR: cannot find from-node with name: " + fromnodename);
-		processList[myProcess].inputNodeList.push_back(fromNode);
-		nodeList[fromNode].inputForProcessList.push_back(myProcess);
+		{
+			std::cerr << "PipeLine WARNING: cannot find parent node with name: " << fromnodename << std::endl;
+			found_both = false;
+			//REPORT_ERROR("PipeLine::read ERROR: cannot find from-node with name: " + fromnodename);
+		}
+		if (found_both)
+		{
+			processList[myProcess].inputNodeList.push_back(fromNode);
+			nodeList[fromNode].inputForProcessList.push_back(myProcess);
+		}
 	}
 
     // Read in all output (Process->Node) edges
@@ -409,14 +530,25 @@ void PipeLine::read(bool only_read_if_file_exists)
 
 		// Now fill in all To and FromEdgeLists of all Nodes
 		long int myProcess = findProcessByName(procname);
+		bool found_both = true;
 		if (myProcess < 0 || myProcess >= processList.size())
-			REPORT_ERROR("PipeLine::read ERROR: cannot find from-process with name: " + procname);
+		{
+			std::cerr << "PipeLine WARNING: cannot find parent process with name: " << procname << std::endl;
+			found_both = false;
+			//REPORT_ERROR("PipeLine::read ERROR: cannot find from-process with name: " + procname);
+		}
 		long int toNode = findNodeByName(tonodename);
 		if (toNode < 0 || toNode  >= nodeList.size())
-			REPORT_ERROR("PipeLine::read ERROR: cannot find to-node with name: " + tonodename);
-
-		processList[myProcess].outputNodeList.push_back(toNode);
-		nodeList[toNode].outputFromProcess = myProcess;
+		{
+			std::cerr << "PipeLine WARNING: cannot find child node with name: " << tonodename << std::endl;
+			found_both = false;
+			//REPORT_ERROR("PipeLine::read ERROR: cannot find to-node with name: " + tonodename);
+		}
+		if (found_both)
+		{
+			processList[myProcess].outputNodeList.push_back(toNode);
+			nodeList[toNode].outputFromProcess = myProcess;
+		}
 	}
 
 	// Close file handler
@@ -427,17 +559,25 @@ void PipeLine::read(bool only_read_if_file_exists)
 
 }
 
-void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deleteProcess)
+void PipeLine::write(FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
 {
-    std::ofstream  fh;
+    std::ofstream  fh, fh_del;
     FileName fn = name + "_pipeline.star";
     fh.open(fn.c_str(), std::ios::out);
 
-    bool do_delete = (deleteProcess.size() == processList.size());
-    if (do_delete && (deleteNode.size() != nodeList.size()) )
-    	REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteNode vector!");
+    if (fn_del != "")
+    {
+        FileName fnt = fn_del + "deleted_pipeline.star";
+        fh_del.open(fnt.c_str(), std::ios::out);
+        if (deleteNode.size() != nodeList.size())
+        	REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteNode vector!");
+        if (deleteProcess.size() != processList.size())
+        	REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteProcess vector!");
+    }
 
     MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
+    MetaDataTable MDgen_del, MDnode_del, MDproc_del, MDedge1_del, MDedge2_del;
+
 #ifdef DEBUG
     std::cerr << " writing pipeline as " << fn << std::endl;
 #endif
@@ -448,10 +588,20 @@ void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deletePro
     MDgen.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
     MDgen.write(fh);
 
+    if (fn_del != "")
+    {
+		MDgen_del.setName("pipeline_general");
+		MDgen_del.setIsList(true);
+		MDgen_del.addObject();
+		MDgen_del.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+		MDgen_del.write(fh_del);
+    }
+
     MDproc.setName("pipeline_processes");
+    MDproc_del.setName("pipeline_processes");
     for(long int i=0 ; i < processList.size() ; i++)
     {
-    	if (!do_delete || !deleteProcess[i])
+    	if (fn_del == "" || !deleteProcess[i])
     	{
 			MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
@@ -459,39 +609,67 @@ void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deletePro
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
     	}
+    	else
+    	{
+			MDproc_del.addObject();
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+    	}
+
     }
 #ifdef DEBUG
     MDproc.write(std::cerr);
 #endif
     MDproc.write(fh);
+    if (fn_del != "")
+    	MDproc_del.write(fh_del);
 
     MDnode.setName("pipeline_nodes");
+    MDnode_del.setName("pipeline_nodes");
     for(long int i=0 ; i < nodeList.size() ; i++)
     {
-    	if (!do_delete || !deleteNode[i])
+    	if (fn_del == "" || !deleteNode[i])
     	{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
 			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+    	}
+    	else
+    	{
+			MDnode_del.addObject();
+			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
+			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+
     	}
     }
 #ifdef DEBUG
     MDnode.write(std::cerr);
 #endif
     MDnode.write(fh);
+    if (fn_del != "")
+    	MDnode_del.write(fh_del);
 
     // Also write all (Node->Process) edges to a single table
     MDedge1.setName("pipeline_input_edges");
+    MDedge1_del.setName("pipeline_input_edges");
     for(long int i=0 ; i < processList.size() ; i++)
     {
 		for (long int j=0; j < ((processList[i]).inputNodeList).size(); j++)
 		{
 			long int inputNode = ((processList[i]).inputNodeList)[j];
-	    	if (!do_delete || (!deleteProcess[i] && !deleteNode[inputNode]) )
+	    	if (fn_del == "" || (!deleteProcess[i] && !deleteNode[inputNode]) )
 	    	{
 				MDedge1.addObject();
 				MDedge1.setValue(EMDL_PIPELINE_EDGE_FROM, nodeList[inputNode].name);
 				MDedge1.setValue(EMDL_PIPELINE_EDGE_PROCESS, processList[i].name);
+	    	}
+	    	else
+	    	{
+				MDedge1_del.addObject();
+				MDedge1_del.setValue(EMDL_PIPELINE_EDGE_FROM, nodeList[inputNode].name);
+				MDedge1_del.setValue(EMDL_PIPELINE_EDGE_PROCESS, processList[i].name);
 	    	}
     	}
     }
@@ -499,29 +677,42 @@ void PipeLine::write(std::vector<bool> &deleteNode, std::vector<bool> &deletePro
     MDedge1.write(std::cerr);
 #endif
     MDedge1.write(fh);
+    if (fn_del != "")
+        MDedge1_del.write(fh_del);
 
     // Also write all (Process->Node) edges to a single table
     MDedge2.setName("pipeline_output_edges");
+    MDedge2_del.setName("pipeline_output_edges");
     for(long int i=0 ; i < processList.size() ; i++)
     {
     	for (long int j=0; j < ((processList[i]).outputNodeList).size(); j++)
     	{
     		long int outputNode = ((processList[i]).outputNodeList)[j];
-	    	if (!do_delete || (!deleteProcess[i] && !deleteNode[outputNode]) )
+	    	if (fn_del == "" || (!deleteProcess[i] && !deleteNode[outputNode]) )
 	    	{
 				MDedge2.addObject();
 				MDedge2.setValue(EMDL_PIPELINE_EDGE_PROCESS,  processList[i].name);
 				MDedge2.setValue(EMDL_PIPELINE_EDGE_TO, nodeList[outputNode].name);
 	    	}
+	    	else
+	    	{
+				MDedge2_del.addObject();
+				MDedge2_del.setValue(EMDL_PIPELINE_EDGE_PROCESS,  processList[i].name);
+				MDedge2_del.setValue(EMDL_PIPELINE_EDGE_TO, nodeList[outputNode].name);
+	    	}
     	}
     }
     MDedge2.write(fh);
+    if (fn_del != "")
+        MDedge2_del.write(fh_del);
+
 #ifdef DEBUG
     MDedge2.write(std::cerr);
 #endif
 
     fh.close();
-
+    if (fn_del != "")
+    	fh_del.close();
 }
 
 

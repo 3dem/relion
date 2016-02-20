@@ -432,9 +432,10 @@ public:
 
     /** From a wild-card containing filename get a vector with all existing filenames,
      * return number of existing filenames
+     * If do_clear, the output vector will be clear when starting, when false, files will just be added to the vector
      *
      */
-    int globFiles(std::vector<FileName> &files) const;
+    int globFiles(std::vector<FileName> &files, bool do_clear = true) const;
     //@}
 };
 

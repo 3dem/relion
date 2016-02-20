@@ -1147,11 +1147,11 @@ private:
             ext_name.contains("stk") || ext_name.contains("vol"))//mrc stack MUST go BEFORE plain MRC
             err = readSPIDER(select_img);
         else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) )//mrc stack MUST go BEFORE plain MRC
-            err = readMRC(select_img, true);
+            err = readMRC(select_img, true, name);
         else if (select_img >= 0 && ext_name.contains("mrc"))
         	REPORT_ERROR("Image::read ERROR: stacks of images in MRC-format should have extension .mrcs; .mrc extensions are reserved for 3D maps.");
         else if (ext_name.contains("mrc")) // mrc 3D map
-            err = readMRC(select_img, false);
+            err = readMRC(select_img, false, name);
         else if (ext_name.contains("img") || ext_name.contains("hed"))//
             err = readIMAGIC(select_img);//imagic is always an stack
         else

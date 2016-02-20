@@ -73,6 +73,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 {
 
 	show_initial_screen = true;
+	do_order_alphabetically = false;
 
 	FileName fn_lock=".gui_projectdir";
 	if (!exists(fn_lock))
@@ -115,15 +116,23 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
-    menubar->add("File/Save job settings",  FL_ALT+'s', cb_save, this);
-    menubar->add("File/Load job settings",  FL_ALT+'l', cb_load, this);
-    menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
-    menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
+    //menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
     menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
-    menubar->add("File/Show initial screen",  FL_ALT+'a', cb_show_initial_screen, this);
-    menubar->add("File/Empty trash",  FL_ALT+'t', cb_empty_trash, this);
-    menubar->add("File/About",  FL_ALT+'a', cb_about, this);
+    menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
+    menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
+    menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
+    menubar->add("File/About", 0, cb_about, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
+
+    menubar->add("Jobs/Save job settings",  FL_ALT+'s', cb_save, this);
+    menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
+    menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
+    menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
+    menubar->add("Jobs/Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+    menubar->add("Jobs/_Import job(s)",  FL_ALT+'i', cb_import, this);
+    menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
+    menubar->add("Jobs/Harshly clean all jobs",  FL_ALT+'h', cb_harshly_clean_all_jobs, this);
+
     menubar->add("Autorun/Run scheduled jobs", 0, cb_start_pipeliner, this);
     menubar->add("Autorun/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
 
@@ -275,7 +284,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
     menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
-    //menubar2->add("Job actions/Clean up", 0, cb_cleanup, this);
+    menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
+    menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
     menubar2->add("Job actions/Delete", 0, cb_delete, this);
 
     // Fl_input with the alias of the new job (or the name of an existing one)
@@ -374,46 +384,74 @@ void RelionMainWindow::fillRunningJobLists()
 {
     // Clear whatever was in there
 	finished_job_browser->clear();
-	running_job_browser->clear();
-	scheduled_job_browser->clear();
 	finished_processes.clear();
+	running_job_browser->clear();
 	running_processes.clear();
+	scheduled_job_browser->clear();
 	scheduled_processes.clear();
 
-	// Fill the Jobs browsers
-    // For finished jobs search backwards, so that last jobs are at the top
-    for (long int i = pipeline.processList.size() -1; i >= 0; i--)
-    {
-    	if (pipeline.processList[i].status == PROC_FINISHED)
-    	{
-    		finished_processes.push_back(i);
-    		if (pipeline.processList[i].alias != "None")
-    			finished_job_browser->add(pipeline.processList[i].alias.c_str());
-    		else
-    			finished_job_browser->add(pipeline.processList[i].name.c_str());
-    	}
-    }
-    // For running and scheduled jobs search forwards, so that last jobs are at the bottom
-    for (long int i = 0; i < pipeline.processList.size(); i++)
-    {
-    	if (pipeline.processList[i].status == PROC_RUNNING)
-    	{
-       		running_processes.push_back(i);
-       		if (pipeline.processList[i].alias != "None")
-       			running_job_browser->add(pipeline.processList[i].alias.c_str());
-        	else
-        		running_job_browser->add(pipeline.processList[i].name.c_str());
-    	}
-    	else if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
-    			 pipeline.processList[i].status == PROC_SCHEDULED_CONT)
-    	{
-    		scheduled_processes.push_back(i);
-    		if (pipeline.processList[i].alias != "None")
-    		    scheduled_job_browser->add(pipeline.processList[i].alias.c_str());
-    		else
-    		    scheduled_job_browser->add(pipeline.processList[i].name.c_str());
-    	}
-    }
+	// Fill the finished Jobs browsers
+	if (do_order_alphabetically)
+	{
+		// Only re-order the finished jobs!
+        std::vector<std::pair<std::string,long int> > vp;
+		for (long int i = pipeline.processList.size() -1; i >= 0; i--)
+		{
+			if (pipeline.processList[i].alias != "None")
+				vp.push_back(std::make_pair(pipeline.processList[i].alias, i));
+			else
+				vp.push_back(std::make_pair(pipeline.processList[i].name, i));
+		}
+        // Sort on the first elements of the pairs
+        std::sort(vp.begin(), vp.end());
+
+		for (long int ip = 0; ip < vp.size(); ip++)
+		{
+			long int i = vp[ip].second;
+			if (pipeline.processList[i].status == PROC_FINISHED)
+			{
+				finished_processes.push_back(i);
+				finished_job_browser->add(vp[ip].first.c_str());
+			}
+		}
+	}
+	else
+	{
+		// For finished jobs search backwards, so that last jobs are at the top
+		for (long int i = pipeline.processList.size() -1; i >= 0; i--)
+		{
+			if (pipeline.processList[i].status == PROC_FINISHED)
+			{
+				finished_processes.push_back(i);
+				if (pipeline.processList[i].alias != "None")
+					finished_job_browser->add(pipeline.processList[i].alias.c_str());
+				else
+					finished_job_browser->add(pipeline.processList[i].name.c_str());
+			}
+		}
+	}
+
+	// For running and scheduled jobs search forwards, so that last jobs are at the bottom
+	for (long int i = 0; i < pipeline.processList.size(); i++)
+	{
+		if (pipeline.processList[i].status == PROC_RUNNING)
+		{
+			running_processes.push_back(i);
+			if (pipeline.processList[i].alias != "None")
+				running_job_browser->add(pipeline.processList[i].alias.c_str());
+			else
+				running_job_browser->add(pipeline.processList[i].name.c_str());
+		}
+		else if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
+				 pipeline.processList[i].status == PROC_SCHEDULED_CONT)
+		{
+			scheduled_processes.push_back(i);
+			if (pipeline.processList[i].alias != "None")
+				scheduled_job_browser->add(pipeline.processList[i].alias.c_str());
+			else
+				scheduled_job_browser->add(pipeline.processList[i].name.c_str());
+		}
+	}
 
 }
 
@@ -549,6 +587,7 @@ void RelionMainWindow::loadJobFromPipeline()
     	is_main_continue = true;
     else
     	is_main_continue = false;
+
     cb_toggle_continue_i();
 
     if (pipeline.processList[current_job].alias != "None")
@@ -704,21 +743,31 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 	}
 	}
 
+	// Also write a mini-pipeline in the output directory
+	PipeLine mini_pipeline;
+	mini_pipeline.setName(oname+"job");
 
 	// Add Process to the processList of the pipeline
 	Process process(oname, itype, as_status);
 	long int myProcess = pipeline.addNewProcess(process, do_overwrite);
+	mini_pipeline.addNewProcess(process);
 
 	// Add all input nodes
 	for (int i=0; i < inputnodes.size(); i++)
+	{
 		pipeline.addNewInputEdge(inputnodes[i], myProcess);
+		mini_pipeline.addNewInputEdge(inputnodes[i], 0);
+	}
 	// Add all output nodes
 	for (int i=0; i < outputnodes.size(); i++)
+	{
 		pipeline.addNewOutputEdge(myProcess, outputnodes[i]);
+		mini_pipeline.addNewOutputEdge(0, outputnodes[i]);
+	}
 
 	// Write the pipeline to an updated STAR file
-	std::vector<bool> dummy;
-	pipeline.write(dummy, dummy);
+	pipeline.write();
+	mini_pipeline.write();
 
 	return myProcess;
 }
@@ -983,7 +1032,6 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		REPORT_ERROR(" relion_pipeliner ERROR: there are no scheduled jobs. Exiting...");
 
 
-	std::vector<bool> dummy;
 	std::vector<long int> my_scheduled_processes = scheduled_processes;
 	int repeat = 0;
 	for (repeat = 0 ; repeat < nr_repeat; repeat++)
@@ -1028,7 +1076,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 				else
 					pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
 				// Write the pipeline to an updated STAR file, and read back in again to update the lists
-				pipeline.write(dummy, dummy);
+				pipeline.write();
 			}
 		}
 
@@ -1055,7 +1103,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 			pipeline.processList[my_scheduled_processes[i]].status = PROC_FINISHED;
 		}
 		// Write the pipeline to an updated STAR file
-		pipeline.write(dummy, dummy);
+		pipeline.write();
 		// Remove the temporary file
 		std::remove(fn_check.c_str());
 		exit(0);
@@ -1529,6 +1577,7 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	std::vector<bool> deleteProcesses, deleteNodes;
 	deleteProcesses.resize(pipeline.processList.size(), false);
 	deleteNodes.resize(pipeline.nodeList.size(), false);
+	FileName fn_del = pipeline.processList[current_job].name;
 
 	std::vector<long int> to_delete_processes;
 	to_delete_processes.push_back(current_job);
@@ -1586,7 +1635,10 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 		for (size_t i = 0; i < deleteProcesses.size(); i++)
 		{
 			if (deleteProcesses[i])
-				ask += " - " + pipeline.processList[i].name + "\n";
+			{
+				std::string name = (pipeline.processList[i].alias == "None") ? pipeline.processList[i].name : pipeline.processList[i].alias;
+				ask += " - " + name + "\n";
+			}
 		}
 		proceed =  fl_choice(ask.c_str(), "Don't move", "Move", NULL);
 	}
@@ -1597,7 +1649,12 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	if (proceed)
 	{
 
+
+		// Write new pipeline to disc and read in again
+		pipeline.write(fn_del, deleteNodes, deleteProcesses);
+
 		// Delete the output directories for all selected processes from the hard disk
+		// Do this after pipeline.write to get the deleted_pipeline.star still in the correct directory
 		for (int i = 0; i < deleteProcesses.size(); i++)
 		{
 			if (deleteProcesses[i])
@@ -1619,8 +1676,7 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			}
 		}
 
-		// Write new pipeline to disc and read in again
-		pipeline.write(deleteNodes, deleteProcesses);
+		// Read new pipeline back in again
 		pipeline.read();
 
 		// Update all job lists in the main GUI
@@ -1630,28 +1686,339 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_cleanup(Fl_Widget* o, void* v) {
+void RelionMainWindow::cb_gently_clean_all_jobs(Fl_Widget* o, void* v) {
 
     RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_cleanup_i();
+    T->cb_clean_all_jobs_i(false);
 }
 
-void RelionMainWindow::cb_cleanup_i()
+// Run button call-back functions
+void RelionMainWindow::cb_harshly_clean_all_jobs(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_clean_all_jobs_i(true);
+}
+
+void RelionMainWindow::cb_clean_all_jobs_i(bool do_harsh)
 {
 
-	if (current_job < 0)
+
+	int proceed = 1;
+	std::string ask;
+	if (do_harsh)
 	{
-		std::cout << " You can only clean up existing jobs ... " << std::endl;
+		ask = "Are you sure you want to harshly clean up intermediate files from the entire pipeline? \n\n\
+Harsh cleaning will remove micrographs, movies and particle stacks from all MotionCorr, Extract, MovieRefine, \n\
+Polish and Subtract directories. This means you will NOT be able to use those images in subsequent runs anymore, \n\
+although you could always recreate the data by continuing the job (possibly at considerable computing costs).\n \n \
+You can protect specific jobs from harsh cleaning by creating a file called \"NO_HARSH_CLEAN\" inside their directory,\n\
+e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of currently protected jobs (if any):\n \n";
+
+		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
+		{
+			if (pipeline.processList[myjob].status == PROC_FINISHED &&
+					(pipeline.processList[myjob].type == PROC_MOTIONCORR ||
+					pipeline.processList[myjob].type == PROC_EXTRACT ||
+					pipeline.processList[myjob].type == PROC_MOVIEREFINE ||
+					pipeline.processList[myjob].type == PROC_POLISH ||
+					pipeline.processList[myjob].type == PROC_SUBTRACT) )
+			{
+				if (exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
+					ask += pipeline.processList[myjob].name + " \n";
+			}
+		}
+	}
+	else
+	{
+		ask = "Are you sure you want to gently clean up intermediate files from the entire pipeline?";
+	}
+
+	proceed = fl_choice(ask.c_str(), "Don't clean up", "Clean up", NULL);
+	if (proceed)
+	{
+		std::string how = (do_harsh) ? "Harshly" : "Gently";
+		std::cout << how << " cleaning all finished jobs ..." << std::endl;
+		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
+		{
+			if (pipeline.processList[myjob].status == PROC_FINISHED)
+			{
+				if (do_harsh && exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
+					continue;
+				cb_cleanup_i(myjob, false, do_harsh); // false means no verb
+			}
+		}
+		fl_message("Done cleaning! Don't forget the files are all still in the Trash folder. Use the \"Empty Trash\" option from the File menu to permanently delete them.");
+	}
+}
+
+// Run button call-back functions
+void RelionMainWindow::cb_gentle_cleanup(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_cleanup_i(-1, true, false);
+}
+
+void RelionMainWindow::cb_harsh_cleanup(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_cleanup_i(-1, true, true);
+}
+
+void RelionMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
+{
+	// Allow cleaning the currently selected job from the GUI
+	if (myjob < 0)
+		myjob = current_job;
+
+	if (myjob < 0 || pipeline.processList[myjob].status != PROC_FINISHED)
+	{
+		fl_message(" You can only clean up finished jobs ... ");
 		return;
 	}
 
-	std::string ask;
-	ask = "Are you sure you want to delete intermediate files from " + pipeline.processList[current_job].name + "?";
-	int proceed = proceed =  fl_choice(ask.c_str(), "Don't delete", "Delete", NULL);
+	// These job types do not have cleanup:
+	if (pipeline.processList[myjob].type == PROC_IMPORT ||
+		pipeline.processList[myjob].type == PROC_MANUALPICK ||
+		pipeline.processList[myjob].type == PROC_SORT ||
+		pipeline.processList[myjob].type == PROC_CLASSSELECT ||
+		pipeline.processList[myjob].type == PROC_MASKCREATE ||
+		pipeline.processList[myjob].type == PROC_JOINSTAR ||
+		pipeline.processList[myjob].type == PROC_RESMAP)
+		return;
+
+	int proceed = 1;
+	if (do_verb)
+	{
+		std::string ask;
+		ask = "Are you sure you want to clean up intermediate files from " + pipeline.processList[myjob].name + "?";
+		proceed = fl_choice(ask.c_str(), "Don't clean up", "Clean up", NULL);
+	}
+
 	if (proceed)
 	{
-	    std::cout << "cleanup todo" << std::endl;
-	}
+
+		// Find any subdirectories
+		std::vector<FileName> fns_subdir;
+		FileName fn_curr_dir = "";
+		int idir = -1, istop = 0;
+		bool is_first = true;
+		// Recursively find all subdirectories
+		while (idir < istop)
+		{
+			FileName fn_curr_dir = (is_first) ? pipeline.processList[myjob].name : pipeline.processList[myjob].name + fns_subdir[idir];
+			DIR *dir = opendir(fn_curr_dir.c_str());
+			struct dirent *entry = readdir(dir);
+			while (entry != NULL)
+			{
+				// Only want directories, and not '.' or '..'
+				if (entry->d_type == DT_DIR && (entry->d_name[0] != '.'))
+				{
+					FileName fnt = (is_first) ? entry->d_name : fns_subdir[idir] + entry->d_name;
+					fns_subdir.push_back(fnt + "/");
+				}
+				entry = readdir(dir);
+			}
+			closedir(dir);
+			istop = fns_subdir.size();
+			idir++;
+			is_first = false;
+		}
+
+		std::vector<FileName> fns_del;
+		FileName fn_pattern;
+
+		// In all jobs cleanup the .old files (from continuation runs)
+		fn_pattern = pipeline.processList[myjob].name + "*.old";
+		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+
+		////////// Now see which jobs needs cleaning up
+		if (pipeline.processList[myjob].type == PROC_MOTIONCORR)
+		{
+
+			for (int idir = 0; idir < fns_subdir.size(); idir++)
+			{
+				if (do_harsh)
+				{
+					//remove entire directory
+					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
+				}
+				else
+				{
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.com";
+					fn_pattern.globFiles(fns_del, false);
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.err";
+					fn_pattern.globFiles(fns_del, false);
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.out";
+					fn_pattern.globFiles(fns_del, false);
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.log";
+					fn_pattern.globFiles(fns_del, false);
+				}
+			}
+
+		} // end if motioncorr
+		else if (pipeline.processList[myjob].type == PROC_CTFFIND)
+		{
+
+			fn_pattern = pipeline.processList[myjob].name + "gctf*.out";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			fn_pattern = pipeline.processList[myjob].name + "gctf*.err";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			for (int idir = 0; idir < fns_subdir.size(); idir++)
+			{
+				//remove entire Micrographs directory structure
+				fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
+			}
+
+		} // end if ctffind
+		else if (pipeline.processList[myjob].type == PROC_AUTOPICK)
+		{
+
+			for (int idir = 0; idir < fns_subdir.size(); idir++)
+			{
+				// remove the Spider files with the FOM maps
+				fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.spi";
+				fn_pattern.globFiles(fns_del, false);
+			}
+
+		} // end if autopick
+		else if (pipeline.processList[myjob].type == PROC_EXTRACT)
+		{
+
+			for (int idir = 0; idir < fns_subdir.size(); idir++)
+			{
+				if (do_harsh)
+				{
+					//remove entire directory (STAR files and particle stacks!
+					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
+				}
+				else
+				{
+					// only remove the STAR files with the metadata (this will only give moderate file savings)
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*_extract.star";
+					fn_pattern.globFiles(fns_del, false);
+				}
+			}
+
+		} // end if extract
+		else if (pipeline.processList[myjob].type == PROC_2DCLASS ||
+				 pipeline.processList[myjob].type == PROC_3DCLASS ||
+				 pipeline.processList[myjob].type == PROC_3DAUTO)
+	    {
+
+			// First find the _data.star from each iteration
+			std::vector<FileName> fns_iter;
+			fn_pattern = pipeline.processList[myjob].name + "*_it[0-9][0-9][0-9]_data.star";
+			fn_pattern.globFiles(fns_iter);
+			for (int ifile = 0; ifile < fns_iter.size(); ifile++)
+			{
+				FileName fn_file = (fns_iter[ifile]).without("_data.star");
+				// Find the iterations to keep: i.e. those that are part of the pipeline
+				bool is_in_pipeline = false;
+				for (long int inode = 0; inode < pipeline.nodeList.size(); inode++)
+				{
+					FileName fn_node = pipeline.nodeList[inode].name;
+					if (fn_node.contains(fn_file))
+					{
+						is_in_pipeline = true;
+						break;
+					}
+				}
+				// Delete all files from this iteration
+				if (!is_in_pipeline)
+				{
+					fn_pattern = fn_file + "*";
+					fn_pattern.globFiles(fns_del, false);
+				}
+
+			} //end loop over ifile (i.e. the _data.star files from all iterations)
+
+		} // end if refine job
+		else if (pipeline.processList[myjob].type == PROC_MOVIEREFINE)
+		{
+
+			fn_pattern = pipeline.processList[myjob].name + "batch*mics_nr[0-9][0-9][0-9].star";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			fn_pattern = pipeline.processList[myjob].name + "run_it[0-9][0-9][0-9]*";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			for (int idir = 0; idir < fns_subdir.size(); idir++)
+			{
+				if (do_harsh)
+				{
+					//remove entire Micrographs directory (STAR files and particle stacks!)
+					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
+				}
+				else
+				{
+					// only remove the STAR files with the metadata (this will only give moderate file savings)
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*_extract.star";
+					fn_pattern.globFiles(fns_del, false);
+				}
+			}
+
+		} // end if movierefine
+		else if (pipeline.processList[myjob].type == PROC_POLISH)
+		{
+
+			fn_pattern = pipeline.processList[myjob].name + "*.mrc";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			fn_pattern = pipeline.processList[myjob].name + "shiny*xml";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			for (int idir = 0; idir < fns_subdir.size(); idir++)
+			{
+				if (do_harsh)
+				{
+					//remove entire Micrographs directory (STAR files and particle stacks!)
+					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
+				}
+				else
+				{
+					// only remove the STAR files with the metadata (this will only give moderate file savings)
+					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.star";
+					fn_pattern.globFiles(fns_del, false);
+				}
+			}
+
+		} // end if polish
+		else if (pipeline.processList[myjob].type == PROC_SUBTRACT)
+		{
+
+			if (do_harsh)
+			{
+				fn_pattern = pipeline.processList[myjob].name + "subtracted.*";
+				fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+			}
+
+		} // end if subtract
+		else if (pipeline.processList[myjob].type == PROC_POST)
+		{
+
+			fn_pattern = pipeline.processList[myjob].name + "*masked.mrc";
+			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+
+		} // end if postprocess
+
+            
+		// Now actually move all the files
+		FileName fn_old_dir = "";
+		for (long int idel = 0; idel < fns_del.size(); idel++)
+		{
+			FileName fn_dest = "Trash/" + fns_del[idel];
+			FileName fn_dir = fn_dest.beforeLastOf("/");
+			if (fn_dir != fn_old_dir && ! exists(fn_dir))
+			{
+				std::string command = "mkdir -p " + fn_dir;
+				int res = system(command.c_str());
+			}
+			// by removing entire directories, it could be the file is gone already
+			if (exists(fns_del[idel]))
+			{
+				std::string command = "mv -f " + fns_del[idel] + " "+ fn_dir;
+				//std::cerr << command << std::endl;
+				int res = system(command.c_str());
+			}
+		} // end loop over all files to be deleted
+
+	} // end if proceed
 
 }
 
@@ -1749,8 +2116,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		pipeline.processList[current_job].alias = fn_pre + alias;
 
 	// Write new pipeline to disc and read in again
-	std::vector<bool> dummy;
-	pipeline.write(dummy, dummy);
+	pipeline.write();
 	pipeline.read();
 
 }
@@ -1821,14 +2187,14 @@ void RelionMainWindow::cb_mark_as_finished_i()
 	}
 
 	// Write new pipeline to disc and read in again
-	std::vector<bool> dummy;
-	pipeline.write(dummy, dummy);
+	pipeline.write();
 	pipeline.read();
 
 	// Update all job lists in the main GUI
 	updateJobLists();
 
 }
+
 
 void RelionMainWindow::cb_edit_note(Fl_Widget*, void* v)
 {
@@ -1887,6 +2253,90 @@ void RelionMainWindow::cb_load_i()
 	fn_settings = "";
 	jobCommunicate(DONT_WRITE, DO_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
 
+}
+
+// Load button call-back function
+void RelionMainWindow::cb_import(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_import_i(false);
+}
+
+// Load button call-back function
+void RelionMainWindow::cb_undelete_job(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_import_i(true);
+}
+
+void RelionMainWindow::cb_import_i(bool is_undelete)
+{
+
+	std::string fn_dir = (is_undelete) ? "./Trash/." : ".";
+	std::string fn_filter = "Pipeline STAR files (*_pipeline.star)";
+	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
+	chooser.show();
+	// Block until user picks something.
+	while(chooser.shown())
+		{ Fl::wait(); }
+
+	// User hit cancel?
+	if ( chooser.value() == NULL )
+		return;
+
+	char relname[FL_PATH_MAX];
+    fl_filename_relative(relname,sizeof(relname),chooser.value());
+	FileName fn_pipe(relname);
+
+
+    pipeline.importPipeline(fn_pipe.beforeLastOf("_pipeline.star"));
+
+	if (is_undelete)
+	{
+		// Copy all processes in the STAR file back into the ProjectDirectory
+		MetaDataTable MDproc;
+		MDproc.read(fn_pipe, "pipeline_processes");
+		std::cout <<"  Undeleting from Trash ... " << std::endl;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
+		{
+			FileName fn_proc;
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, fn_proc);
+
+			// Copy the job back from the Trash folder
+			FileName fn_dest = fn_proc.beforeLastOf("/"); //gets rid of ending "/"
+			FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
+			if (!exists(fn_dir_dest))
+			{
+				std::string command = "mkdir -p " + fn_dir_dest;
+				int res = system(command.c_str());
+			}
+			std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
+			std::cout << command << std::endl;
+			int res = system(command.c_str());
+		}
+		std::cout << " Done undeleting! " << std::endl;
+	}
+
+	// Write the new pipeline to disk and reread it back in again
+	pipeline.write();
+	pipeline.read();
+
+}
+
+// Re-order running and finished job lists
+void RelionMainWindow::cb_order_jobs_alphabetically(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    do_order_alphabetically = true;
+    T->fillRunningJobLists();
+}
+
+// Re-order running and finished job lists
+void RelionMainWindow::cb_order_jobs_chronologically(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    do_order_alphabetically = false;
+    T->fillRunningJobLists();
 }
 
 // Empty-trash button call-back function

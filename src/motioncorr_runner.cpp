@@ -251,20 +251,22 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 		int res = system(command.c_str());
 
 		// After motion-correction, check for all-zero average micrographs
-		Image<RFLOAT> Itest;
-		Itest.read(fn_avg, false);
-		RFLOAT avg, stddev;
-		Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-		Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
-		if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+		if (exists(fn_avg))
 		{
-			break;
+			Image<RFLOAT> Itest;
+			Itest.read(fn_avg, false);
+			RFLOAT avg, stddev;
+			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+			if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+			{
+				break;
+			}
 		}
 		else if (ipass == 2)
 		{
-			std::cerr << " WARNING: " << fn_avg << " still had zero mean and variance after 3 attempts! " << std::endl;
+			std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
 		}
-
 	}
 
 }

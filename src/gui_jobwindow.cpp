@@ -785,6 +785,10 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
 	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
 	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions in MOTIONCOR");
+	bfactor.place(current_y, "Bfactor:", 150, 0, 1500, 50, "The B-factor (in pixel^2) that MOTIONCORR will apply to the micrographs. The MOTIONCORR Readme.txt says: A bfactor 150 or 200pix^2 is good for most cryoEM image with 2x binned super-resolution image. For unbined image, a larger bfactor is needed.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 	other_motioncorr_args.place(current_y, "Other MOTIONCORR arguments", "", "Additional arguments that need to be passed to MOTIONCORR.");
 
 	tab2->end();
@@ -812,6 +816,7 @@ void MotioncorrJobWindow::write(std::string fn)
 	first_frame_sum.writeValue(fh);
 	last_frame_sum.writeValue(fh);
 	do_save_movies.writeValue(fh);
+	bfactor.writeValue(fh);
 	other_motioncorr_args.writeValue(fh);
 
 	closeWriteFile(fh, fn);
@@ -837,6 +842,7 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		first_frame_sum.readValue(fh);
 		last_frame_sum.readValue(fh);
 		do_save_movies.readValue(fh);
+		bfactor.readValue(fh);
 		other_motioncorr_args.readValue(fh);
 
 		closeReadFile(fh);
@@ -857,6 +863,7 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	first_frame_sum.deactivate(is_continue);
 	last_frame_sum.deactivate(is_continue);
 	do_save_movies.deactivate(is_continue);
+	bfactor.deactivate(is_continue);
 	other_motioncorr_args.deactivate(is_continue);
 
 }
@@ -888,12 +895,14 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	pipelineOutputNodes.push_back(node3);
 
 	// Motioncorr-specific stuff
-	command += " --bin_factor " + integerToString(bin_factor.getValue());
+	command += " --bin_factor " + floatToString(bin_factor.getValue());
 	command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
-	command += " --first_frame_ali " + integerToString(first_frame_ali.getValue());
-	command += " --last_frame_ali " + integerToString(last_frame_ali.getValue());
-	command += " --first_frame_sum " + integerToString(first_frame_sum.getValue());
-	command += " --last_frame_sum " + integerToString(last_frame_sum.getValue());
+	command += " --first_frame_ali " + floatToString(first_frame_ali.getValue());
+	command += " --last_frame_ali " + floatToString(last_frame_ali.getValue());
+	command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
+	command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
+	command += " --bft " + floatToString(bfactor.getValue());
+
 	if (do_save_movies.getValue())
 		command += " --save_movies ";
 
@@ -1387,6 +1396,7 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	lowpass.place(current_y, "Lowpass filter refences (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
 	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter.  Useful values are often in the range of 200-400 Angstroms.");
 	angpix.place(current_y, "Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+	particle_diameter.place(current_y, "Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1473,6 +1483,7 @@ void AutopickJobWindow::write(std::string fn)
 	lowpass.writeValue(fh);
 	highpass.writeValue(fh);
 	angpix.writeValue(fh);
+	particle_diameter.writeValue(fh);
 	psi_sampling_autopick.writeValue(fh);
 	do_write_fom_maps.writeValue(fh);
 	do_read_fom_maps.writeValue(fh);
@@ -1507,6 +1518,7 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		lowpass.readValue(fh);
 		highpass.readValue(fh);
 		angpix.readValue(fh);
+		particle_diameter.readValue(fh);
 		psi_sampling_autopick.readValue(fh);
 		do_write_fom_maps.readValue(fh);
 		do_read_fom_maps.readValue(fh);
@@ -1535,6 +1547,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 	lowpass.deactivate(is_continue);
 	highpass.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+	particle_diameter.deactivate(is_continue);
 	psi_sampling_autopick.deactivate(is_continue);
 
 }
@@ -1585,6 +1598,8 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command += " --highpass " + floatToString(highpass.getValue());
 	if (angpix.getValue() > 0.)
 		command += " --angpix " + floatToString(angpix.getValue());
+	if (particle_diameter.getValue() > 0.)
+		command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 
 	if (do_write_fom_maps.getValue())
 		command += " --write_fom_maps ";
@@ -2510,6 +2525,56 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
+
+/*
+void jobwindow_refine_cleanup(std::string &outputname)
+{
+
+	std::vector<FileName> fns_iter;
+	FileName fn_pattern =outputname + "run_it*_data.star";
+	fn_pattern.globFiles(fns_iter);
+	FileName fn_old_dir = "";
+	for (int ifile = 0; ifile < fns_iter.size(); ifile++)
+	{
+		FileName fn_file = fns_iter[ifile].afterLastOf("/");
+
+		// Find the iteration to keep: those that are part of the pipeline
+		bool is_in_pipeline = false;
+		for (long int inode = 0; inode < pipeline.nodeList.size(); inode++)
+		{
+			FileName fn_node = pipeline.nodeList[inode].name;
+			if (fn_node.contains(fn_file))
+			{
+				is_in_pipeline = true;
+				break;
+			}
+		}
+
+		if (!is_in_pipeline)
+		{
+			std::vector<FileName> fns_thisiter;
+			fn_file = fn_file.without("_data.star")+"*";
+			fn_file.globFiles(fns_thisiter);
+			for (int ifile2 = 0; ifile2 < fns_thisiter.size(); ifile2++)
+			{
+				FileName fn_dest = "Trash/" + fns_thisiter[ifile2];
+				FileName fn_dir = fn_dest.beforeLastOf("/");
+				if (fn_dir != fn_old_dir && ! exists(fn_dir))
+				{
+					std::string command = "mkdir -p " + fn_dir;
+					int res = system(command.c_str());
+				}
+				std::string command = "mv -f " + fns_thisiter[ifile2] + " "+ fn_dir;
+				std::cout << " would do: " << command << std::endl;
+				//int res = system(command.c_str());
+			}
+
+		}
+
+	}
+
+}
+*/
 
 Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 {
@@ -4398,6 +4463,13 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
+
+		// For re-setting of new jobs
+		ori_fn_model = fn_model.getValue();
+		ori_fn_data = fn_data.getValue();
+		ori_fn_mic = fn_mic.getValue();
+		ori_fn_coords = fn_coords.getValue();
+
 	}
 }
 
@@ -4412,12 +4484,19 @@ void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 	fn_coords.deactivate(is_continue);
 
 	// For new jobs, always reset the input fields to empty
-	if (!is_continue)
+	if (!_is_continue)
 	{
 		fn_model.setValue("");
 		fn_data.setValue("");
 		fn_mic.setValue("");
 		fn_coords.setValue("");
+	}
+	else
+	{
+		fn_model.setValue(ori_fn_model.c_str());
+		fn_data.setValue(ori_fn_data.c_str());
+		fn_mic.setValue(ori_fn_mic.c_str());
+		fn_coords.setValue(ori_fn_coords.c_str());
 	}
 
 	do_recenter.deactivate(is_continue);
@@ -4501,17 +4580,26 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 		// Get the name of the micrograph STAR file from reading the suffix file
 	    FileName fn_suffix = fn_coords.getValue();
-
-		std::ifstream in(fn_suffix.data(), std::ios_base::in);
 		FileName fn_star;
-		in >> fn_star ;
-		in.close();
-		FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
+	    if (is_continue)
+	    {
+	    	fn_star = outputname + "micrographs_selected.star.old:star";
+	    }
+	    else
+	    {
+	    	std::ifstream in(fn_suffix.data(), std::ios_base::in);
+	    	in >> fn_star ;
+	    	in.close();
+	    }
+	    FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
 		fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
 		fn_suffix = fn_suffix.withoutExtension();
 
 		// Launch the manualpicker...
 		command="`which relion_manualpick` --i " + fn_star;
+		Node node4(fn_coords.getValue(), fn_coords.type);
+		pipelineInputNodes.push_back(node4);
+
 		command += " --odir " + fn_dirs;
 		command += " --pickname " + fn_suffix;
 
@@ -4563,6 +4651,13 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
+
+	// For picked coordinates: also write the selected STAR file in the ccoord_suffix file
+	if  (fn_coords.getValue() != "" &&!is_continue)
+	{
+		std::string command2 = "echo " + outputname + "micrographs_selected.star > " + fn_coords.getValue();
+		commands.push_back(command2);
+	}
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 

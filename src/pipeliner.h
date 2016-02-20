@@ -144,7 +144,6 @@ class Process
 
 };
 
-
 class PipeLine
 {
 
@@ -199,9 +198,10 @@ class PipeLine
 	// Delete a process and its output nodes (and all input edges) from the pipeline
 	void deleteProcess(int ipos, bool recursive = false);
 
-	// Find nodes or process
+	// Find nodes or process (by name or alias)
 	long int findNodeByName(std::string name);
 	long int findProcessByName(std::string name);
+	long int findProcessByAlias(std::string name);
 
 	// Touch each individual Node name in the temporary Nodes directory
 	// Return true if Node output file exists and temporary file is written, false otherwise
@@ -213,8 +213,12 @@ class PipeLine
 	// Check for process completion by cheking for the presence of all outputNode filenames
 	void checkProcessCompletion();
 
+	// Import a job into the pipeline
+	// Return true if at least one process is imported correctly
+	bool importPipeline(std::string _name);
+
 	// Write out the pipeline to a STAR file
-	void write(std::vector<bool> &deleteNode, std::vector<bool> &deleteProcess);
+	void write(FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
 
 	// Read in the pipeline from a STAR file
 	void read(bool only_read_if_file_exists=false);

@@ -308,9 +308,10 @@ bool FileName::isStarFile() const
     size_t found=this->find('@');
     if (found!=std::string::npos)
         return false;
-    found=this->find(':');
-    if (found!=std::string::npos)
-        return false;
+    // Allow :star to indicate that file really is a STAR file!
+    //found=this->find(':');
+    //if (found!=std::string::npos)
+    //    return false;
     found=this->find('#');
     if (found!=std::string::npos)
         return false;
@@ -392,16 +393,19 @@ void FileName::copyFile(const FileName & target) const
     f2<<f1.rdbuf();
 }
 
-int FileName::globFiles(std::vector<FileName> &files) const
+int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 {
+	if (do_clear)
+		files.clear();
+
 	glob_t glob_result;
 	glob((*this).c_str(), GLOB_TILDE, NULL, &glob_result);
-	files.clear();
 	for(unsigned  int  i = 0; i < glob_result.gl_pathc; ++i)
 	{
 		files.push_back(std::string(glob_result.gl_pathv[i]));
 	}
 	globfree(&glob_result);
+
 	return files.size();
 }
 

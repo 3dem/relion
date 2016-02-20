@@ -232,6 +232,7 @@ public:
 	SliderEntry last_frame_ali;
 	SliderEntry first_frame_sum;
 	SliderEntry last_frame_sum;
+	SliderEntry bfactor;
 	AnyEntry other_motioncorr_args;
 	BooleanEntry do_save_movies;
 
@@ -302,6 +303,7 @@ public:
 	SliderEntry lowpass;
 	SliderEntry highpass;
 	SliderEntry angpix;
+	SliderEntry particle_diameter;
 	SliderEntry psi_sampling_autopick;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
@@ -463,7 +465,6 @@ public:
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
-
 
 class Class2DJobWindow : public RelionJobWindow
 {
@@ -794,6 +795,9 @@ public:
 	InputNodeEntry fn_data;
 	InputNodeEntry fn_mic;
 	InputNodeEntry fn_coords;
+
+	// Allow clearing of input fields for a new job
+	FileName ori_fn_model, ori_fn_data, ori_fn_mic, ori_fn_coords;
 
 	BooleanEntry do_recenter;
 	BooleanEntry do_regroup;

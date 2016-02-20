@@ -181,7 +181,6 @@ void AutoPicker::initialise()
 		{
 			Istk().getImage(n, Iref());
 			Iref().setXmippOrigin();
-			Iref().printShape();
 			Mrefs.push_back(Iref());
 		}
 	}

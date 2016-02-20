@@ -705,9 +705,12 @@ int MetaDataTable::read(const FileName &filename, const std::string &name, std::
     // Clear current table
     clear();
 
-    std::ifstream in(filename.data(), std::ios_base::in);
+    // Check for an :star extension
+    FileName fn_read = filename.removeFileFormat();
+
+    std::ifstream in(fn_read.data(), std::ios_base::in);
     if (in.fail())
-        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + filename + " does not exists" );
+        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exists" );
 
     FileName ext = filename.getFileFormat();
     if (ext =="star")

@@ -140,7 +140,7 @@ int systype()
 /** MRC Reader
   * @ingroup MRC
 */
-int readMRC(long int img_select, bool isStack=false)
+int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 {
 #undef DEBUG
 //#define DEBUG
@@ -150,7 +150,7 @@ int readMRC(long int img_select, bool isStack=false)
 
     MRChead*        header = (MRChead *) askMemory(sizeof(MRChead));
     if ( fread( header, MRCSIZE, 1, fimg ) < 1 )
-    	REPORT_ERROR("rwMRC: error in reading header ...");
+    	REPORT_ERROR("rwMRC: error in reading header of image " + name);
 
     // Determine byte order and swap bytes if from little-endian machine
     swap = 0;
@@ -170,7 +170,7 @@ int readMRC(long int img_select, bool isStack=false)
 
     // Convert VAX floating point types if necessary
     if ( header->amin > header->amax )
-        REPORT_ERROR("readMRC: amin > max: VAX floating point conversion unsupported");
+        REPORT_ERROR("readMRC: amin > max: VAX floating point conversion unsupported for image " + name);
     long int _xDim,_yDim,_zDim;
     long int _nDim;
     _xDim = (int) header->nx;
@@ -187,10 +187,9 @@ int readMRC(long int img_select, bool isStack=false)
         std::stringstream Num2;
         if ( img_select > (int)_nDim )
         {
-            Num  << img_select;
+        	Num  << img_select;
             Num2 << _nDim;
-            REPORT_ERROR((std::string)"readMRC: Image number " + Num.str() +
-                         " exceeds stack size " + Num2.str());
+            REPORT_ERROR((std::string)"readMRC: Image number " + Num.str() + " exceeds stack size " + Num2.str() + " of image " + name);
         }
     }
     else
