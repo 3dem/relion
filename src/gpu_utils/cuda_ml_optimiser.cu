@@ -2550,18 +2550,19 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-	if (baseMLO->available_gpu_memory > 0)
-		allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	if (baseMLO->requested_gpu_memory > 0)
+		allocationSize = baseMLO->requested_gpu_memory;
 	else
-		allocationSize = (float)free * .7;
+		allocationSize = (double)free * .7;
 
 	if (allocationSize > free)
 	{
-		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
-		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
-		printf("  Total available size %zu MB\n", free/(1000*1000));
-		allocationSize = (float)free * .7; //Lets leave some for other processes for now
-		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
+		printf(" WARNING: Requested memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
+		printf("  Requested size       %zu MB\n", (size_t) ((double)baseMLO->requested_gpu_memory/(1000*1000)));
+		printf("  Total available size %zu MB\n", (size_t) ((double)free/(1000*1000)));
+		allocationSize = (size_t) ((double)free * .7); //Lets leave some for other processes for now
+		printf("  Assigned size        %zu MB\n", (size_t) ((double)allocationSize/(1000*1000)));
+		baseMLO->available_gpu_memory = allocationSize;
 	}
 
 	int memAlignmentSize;
@@ -2649,18 +2650,19 @@ void MlDeviceBundle::resetData()
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-	if (baseMLO->available_gpu_memory > 0)
-		allocationSize = baseMLO->available_gpu_memory * (1000*1000*1000);
+	if (baseMLO->requested_gpu_memory > 0)
+		allocationSize = baseMLO->requested_gpu_memory;
 	else
-		allocationSize = (float)free * .7;
+		allocationSize = (double)free * .7;
 
 	if (allocationSize > free)
 	{
-		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
-		printf("  Required size        %zu MB\n", (size_t) baseMLO->available_gpu_memory*1000);
-		printf("  Total available size %zu MB\n", free/(1000*1000));
-		allocationSize = (float)free * .7; //Lets leave some for other processes for now
-		baseMLO->available_gpu_memory = allocationSize/(1000*1000);
+		printf(" WARNING: Requested memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
+		printf("  Requested size       %zu MB\n", (size_t) ((double)baseMLO->requested_gpu_memory/(1000*1000)));
+		printf("  Total available size %zu MB\n", (size_t) ((double)free/(1000*1000)));
+		allocationSize = (size_t) ((double)free * .7); //Lets leave some for other processes for now
+		printf("  Assigned size        %zu MB\n", (size_t) ((double)allocationSize/(1000*1000)));
+		baseMLO->available_gpu_memory = allocationSize;
 	}
 
 #ifdef DEBUG_CUDA

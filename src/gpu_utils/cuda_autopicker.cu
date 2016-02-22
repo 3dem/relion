@@ -61,8 +61,8 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	size_t free, total;
 	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-	if (basePckr->available_gpu_memory > 0)
-		allocationSize = basePckr->available_gpu_memory * (1000*1000*1000);
+	if (basePckr->requested_gpu_memory > 0)
+		allocationSize = basePckr->requested_gpu_memory * (1000*1000*1000);
 	else
 		allocationSize = (float)free * .5;
 

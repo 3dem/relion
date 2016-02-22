@@ -142,7 +142,7 @@ void trim(std::string& str)
 
 /* NOTE: not a very safe implemenation but standard c functions do not retrieve
  * more than 6 significative digits */
-RFLOAT textToDouble(const char* str, int _errno, std::string errmsg)
+double textToDouble(const char* str, int _errno, std::string errmsg)
 {
     RFLOAT retval;
     int ok;

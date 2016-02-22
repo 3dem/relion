@@ -265,7 +265,13 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "-1"));
+	double temp_reqSize = textToDouble(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "0"));
+	temp_reqSize *= 1000*1000*1000;
+	if(temp_reqSize<0)
+		REPORT_ERROR("Cannot use negative GPU-mem size request");
+	else
+		requested_gpu_memory =  temp_reqSize;
+
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 
 	if (do_gpu)
@@ -441,7 +447,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	available_gpu_memory = textToFloat(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "-1"));
+	double temp_reqSize = textToDouble(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "0"));
+	temp_reqSize *= 1000*1000*1000;
+	if(temp_reqSize<0)
+		REPORT_ERROR("Cannot use negative GPU-mem size request");
+	else
+		requested_gpu_memory = temp_reqSize;
 
 	if (do_skip_align)
 		do_gpu = false;

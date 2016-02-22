@@ -112,9 +112,22 @@ int bestPrecision(float F, int _width);
  * RFLOAT key = textToDouble(firstToken(line), 1602, "Error reading key");
  * @endcode
  */
-RFLOAT textToDouble(const char* str,
+double textToDouble(const char* str,
                     int _errno = 2101,
                     std::string errmsg = "Error in textToDouble");
+
+/** String (STL) to double conversion.
+ *
+ * @code
+ * double key = textToDouble(str, 1602, "Error reading key");
+ * @endcode
+ */
+inline double textToDouble(const std::string& str,
+                         int _errno = 2101,
+                         std::string errmsg = "Error in textToDouble")
+{
+    return textToDouble(str.c_str(), _errno, errmsg);
+}
 
 /** String (char*) to float conversion.
  *
