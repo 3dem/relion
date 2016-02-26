@@ -1949,7 +1949,7 @@ void MlOptimiser::expectation()
 	{
 		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
 		{
-			( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+			( (MlDeviceBundle*) cudaMlDeviceBundles[i])->syncAllBackprojects();
 
 			for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
 			{
@@ -1958,17 +1958,14 @@ void MlOptimiser::expectation()
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+				( (MlDeviceBundle*) cudaMlDeviceBundles[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
-				int my_mutex = iclass % NR_CLASS_MUTEXES;
-				pthread_mutex_lock(&global_mutex2[my_mutex]);
 				for (unsigned long n = 0; n < s; n++)
 				{
 					wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) reals[n];
 					wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) imags[n];
 					wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) weights[n];
 				}
-				pthread_mutex_unlock(&global_mutex2[my_mutex]);
 
 				delete [] reals;
 				delete [] imags;

@@ -48,17 +48,10 @@ static void HandleError( cudaError_t err, const char *file, int line )
 
     if (err != cudaSuccess)
     {
-#ifdef DEBUG_CUDA
-        printf( "DEBUG_ERROR: %s in %s at line %d (error-code %d)\n",
-                        cudaGetErrorString( err ), file, line, err );
-        fflush(stdout);
-//              raise(SIGSEGV);
-#else
-        printf( "ERROR: %s in %s at line %d (error-code %d)\n",
-                        cudaGetErrorString( err ), file, line, err );
-        fflush(stdout);
-                raise(SIGSEGV);
-#endif
+		printf( "ERROR: %s in %s at line %d (error-code %d)\n",
+						cudaGetErrorString( err ), file, line, err );
+		fflush(stdout);
+		raise(SIGSEGV);
     }
 
 //#ifdef DEBUG_CUDA

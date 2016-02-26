@@ -860,9 +860,9 @@ void MlOptimiserMpi::expectation()
 
 			if (do_gpu)
 			{
-				for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+				for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
 				{
-					( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->syncAllBackprojects();
+					( (MlDeviceBundle*) cudaMlDeviceBundles[i])->syncAllBackprojects();
 
 					for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
 					{
@@ -871,7 +871,7 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						( (MlOptimiserCuda*) cudaMlOptimisers[i])->devBundle->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+						( (MlDeviceBundle*) cudaMlDeviceBundles[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{
