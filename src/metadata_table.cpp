@@ -176,6 +176,9 @@ long int MetaDataTable::numberOfObjects() const
 
 void MetaDataTable::clear()
 {
+    for (long int i = 0; i < objects.size(); i++)
+    	objects[i]->clear();
+
     objects.clear();
     comment.clear();
     name.clear();
