@@ -253,13 +253,13 @@ void CtffindRunner::joinCtffindResults()
 	    MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
 	    MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
 	    MDctf.setValue(EMDL_CTF_FOM, CC);
-	    if (maxres > 0.)
-	    	MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+	    MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+	    MDctf.setValue(EMDL_CTF_BFACTOR, bfac);
+	    /*
 	    if (bfac > 0.)
-	    	MDctf.setValue(EMDL_CTF_BFACTOR, bfac);
 	    if (valscore > 0.)
 	    	MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
-
+		*/
     }
 	MDctf.write(fn_out+"micrographs_ctf.star");
 	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
@@ -487,6 +487,9 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     // The loop statement may be necessary for data blocks that have a list AND a table inside them
     bool Final_is_found = false;
     bool Cs_is_found = false;
+    bool found_bfac = false;
+    bool found_maxres = false;
+    bool found_valscore = false;
     std::string line;
     std::vector<std::string> words;
     while (getline(in, line, '\n'))
@@ -523,6 +526,7 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
     	{
             tokenize(line, words);
             maxres = textToFloat(words[words.size()-1]);
+            found_maxres = true;
     	}
 
     	if (do_use_gctf && line.find("Estimated Bfactor:") != std::string::npos)
@@ -530,20 +534,29 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
             tokenize(line, words);
              if (words.size() < 4)
              	REPORT_ERROR("ERROR: Unexpected number of words on Resolution limit line in " + fn_log);
-             bfac = textToFloat(words[3]);
+             bfac = textToFloat(words[words.size()-1]);
+             found_bfac = true;
     	}
 
     	if (do_use_gctf && line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
     	{
             tokenize(line, words);
             valscore = textToFloat(words[words.size()-1]);
+            found_valscore = true;
     	}
+
     }
 
     if (!Cs_is_found && die_if_not_found)
     	REPORT_ERROR("ERROR: cannot find line with Cs[mm], HT[kV], etc values in " + fn_log);
     if (!Final_is_found && die_if_not_found)
     	REPORT_ERROR("ERROR: cannot find line with Final values in " + fn_log);
+    if (!found_bfac)
+    	bfac = 0.;
+    if (!found_maxres)
+    	maxres = 0.;
+    if (!found_valscore)
+    	valscore = 0.;
 
     in.close();
 
