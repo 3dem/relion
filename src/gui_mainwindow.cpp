@@ -32,7 +32,7 @@ NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn
 	if (exists(fn_note))
 		int errno = textbuff_note->loadfile(fn_note.c_str());
 	else
-		textbuff_note->text("Describe what this job is about here...");
+		textbuff_note->text("Describe what this job or project is about here...");
 
 	// Button to exit
 	Fl_Button *cancel_button = new Fl_Button(w-200, h-40, 80, 30, "Cancel");
@@ -117,6 +117,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
     //menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
+    menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
     menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
     menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
@@ -1481,7 +1482,8 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		bool skip_this = (pipeline.processList[current_job].type == PROC_2DCLASS ||
 				pipeline.processList[current_job].type == PROC_3DCLASS ||
 				pipeline.processList[current_job].type == PROC_3DAUTO ||
-				pipeline.processList[current_job].type == PROC_MANUALPICK);
+				pipeline.processList[current_job].type == PROC_MANUALPICK ||
+				pipeline.processList[current_job].type == PROC_CLASSSELECT);
 		if (!skip_this )
 		{
 			for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
@@ -2203,15 +2205,32 @@ void RelionMainWindow::cb_edit_note(Fl_Widget*, void* v)
 
 }
 
-void RelionMainWindow::cb_edit_note_i()
+void RelionMainWindow::cb_edit_project_note(Fl_Widget*, void* v)
 {
-	if (current_job < 0)
+  	RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_edit_note_i(true); // true means is_project_note
+}
+
+void RelionMainWindow::cb_edit_note_i(bool is_project_note)
+{
+
+	FileName fn_note;
+	std::string title;
+	if (is_project_note)
 	{
-		std::cout << " You can only edit the note for existing jobs ... " << std::endl;
-		return;
+		fn_note = "project_note.txt";
+		title = "Overall project notes";
 	}
-	FileName fn_note = pipeline.processList[current_job].name + "note.txt";
-	std::string title = (pipeline.processList[current_job].alias == "None") ? pipeline.processList[current_job].name : pipeline.processList[current_job].alias;
+	else
+	{
+		if (current_job < 0)
+		{
+			std::cout << " You can only edit the note for existing jobs ... " << std::endl;
+			return;
+		}
+		FileName fn_note = pipeline.processList[current_job].name + "note.txt";
+		title = (pipeline.processList[current_job].alias == "None") ? pipeline.processList[current_job].name : pipeline.processList[current_job].alias;
+	}
 	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note);
 	w->show();
 
@@ -2358,7 +2377,6 @@ void RelionMainWindow::cb_empty_trash_i()
 	}
 }
 
-
 void RelionMainWindow::cb_print_notes(Fl_Widget*, void* v)
 {
   	 RelionMainWindow* T=(RelionMainWindow*)v;
@@ -2393,6 +2411,7 @@ void RelionMainWindow::cb_print_notes_i()
 	}
 
 }
+
 void RelionMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 {
   	 RelionMainWindow* T=(RelionMainWindow*)v;
