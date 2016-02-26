@@ -207,8 +207,15 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		}
 
 		// Pre-load existing backup_selection.star file
-		FileName fn_sel = fn_selected_imgs.beforeLastOf("/")+"/backup_selection.star";
-		if (fn_selected_imgs != "" && exists(fn_sel))
+		FileName fn_sel, fn_dir;
+		if (fn_selected_imgs != "")
+			fn_dir = fn_selected_imgs.beforeLastOf("/");
+		else if (fn_selected_parts != "")
+			fn_dir = fn_selected_parts.beforeLastOf("/");
+		else
+			fn_dir = ".";
+		fn_dir += "/backup_selection.star";
+		if (exists(fn_dir))
 			canvas.loadBackupSelection(false); // false means dont ask for filename
 
 		resizable(*this);
@@ -671,18 +678,32 @@ void multiViewerCanvas::saveBackupSelection()
 		MDout.setValue(EMDL_SELECTED, selected[ipos]);
 	}
 
-	FileName fnt = fn_selected_imgs.beforeLastOf("/") + "/backup_selection.star";
-	MDout.write(fnt);
-	std::cout <<" Written out " << fnt << std::endl;
+	FileName fn_dir;
+	if (fn_selected_imgs != "")
+		fn_dir = fn_selected_imgs.beforeLastOf("/");
+	else if (fn_selected_parts != "")
+		fn_dir = fn_selected_parts.beforeLastOf("/");
+	else
+		fn_dir = ".";
+	fn_dir += "/backup_selection.star";
+
+	MDout.write(fn_dir);
+	std::cout <<" Written out " << fn_dir << std::endl;
 }
 
 void multiViewerCanvas::loadBackupSelection(bool do_ask)
 {
 
-	FileName fn_sel;
+	FileName fn_sel, fn_dir;
+	if (fn_selected_imgs != "")
+		fn_dir = fn_selected_imgs.beforeLastOf("/");
+	else if (fn_selected_parts != "")
+		fn_dir = fn_selected_parts.beforeLastOf("/");
+	else
+		fn_dir = ".";
+	fn_dir += "/";
 	if (do_ask)
 	{
-		FileName fn_dir = fn_selected_imgs.beforeLastOf("/")+"/.";
 		Fl_File_Chooser chooser(fn_dir.c_str(), "(backup_selection.star)",Fl_File_Chooser::SINGLE,"Choose selection file to load");      // chooser type
 		chooser.show();
 		// Block until user picks something.
@@ -697,7 +718,7 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 		fn_sel = fnt;
 	}
 	else
-		fn_sel = fn_selected_imgs.beforeLastOf("/")+"/backup_selection.star";
+		fn_sel = fn_dir+"backup_selection.star";
 
 	MetaDataTable MDin;
 	MDin.read(fn_sel);
