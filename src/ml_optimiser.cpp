@@ -1149,9 +1149,13 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		mydata.read(fn_data_movie);
 
-		// Now also modify the model to contain many more groups....
-		// each groups has to become Nframes groups (get Nframes from new mydata)
-		mymodel.expandToMovieFrames(mydata, movie_frame_running_avg_side);
+		int nframes;
+		mydata.MDimg.getValue(EMDL_PARTICLE_NR_FRAMES, nframes, 0);
+		// Correct the input sigma2noise spectra by a factor of nframes
+		for (int i=0; i < mymodel.nr_groups; i++)
+		{
+			mymodel.sigma2_noise[i] *= (RFLOAT)nframes/((RFLOAT)(2 * movie_frame_running_avg_side + 1));
+		}
 
 		// Don't do norm correction for realignment of movies.
 		do_norm_correction = false;
@@ -6999,19 +7003,16 @@ void MlOptimiser::checkConvergence()
 void MlOptimiser::printConvergenceStats()
 {
 
-	if (verb > 0)
-	{
-		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-				<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+	std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
+	std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+	std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
+			<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
 
-		if (has_converged)
-		{
-			std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-			if (!do_realign_movies)
-				std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-		}
+	if (has_converged)
+	{
+		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+		if (!do_realign_movies)
+			std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
 	}
 
 }

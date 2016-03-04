@@ -53,6 +53,9 @@ public:
 	// Binning factor for binning inside MOTIONCORR
 	int bin_factor;
 
+	// B-factor for MOTIONCORR
+	double bfactor;
+
 	// Also save the aligned movies?
 	bool do_save_movies;
 

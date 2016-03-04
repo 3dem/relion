@@ -354,7 +354,7 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 	allmicnames.push_back(outputfile);
 
 	// Execute Gctf every 20 images, and always for the last one
-	if (imic+1%20 || is_last)
+	if ( ((imic+1)%20) == 0 || is_last)
 	{
 		std::string command = fn_gctf_exe;
 		//command +=  " --ctfstar " + fn_out + "tt_micrographs_ctf.star";

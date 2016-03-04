@@ -54,10 +54,16 @@ class star_combine_parameters
 	{
 
 		std::vector<FileName> fns_in;
-		fn_in.globFiles(fns_in);
+		std::vector<std::string> words;
+		tokenize(fn_in, words);
+		for (int iword = 0; iword < words.size(); iword++)
+		{
+			FileName fnt = words[iword];
+			fnt.globFiles(fns_in, false);
+		}
+
 		MetaDataTable MDout;
 		std::vector<MetaDataTable> MDsin;
-
 		for (int i = 0; i < fns_in.size(); i++)
 		{
 			MetaDataTable MDin;

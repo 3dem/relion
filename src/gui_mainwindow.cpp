@@ -1281,8 +1281,10 @@ void RelionMainWindow::cb_display_io_node_i()
 		if (exists(fn_job))
 			global_manualpickjob.read(fn_job.c_str(), iscont);
 		else
-			REPORT_ERROR("RelionMainWindow::cb_display_io_node_i ERROR: Save a Manual picking job parameters (using the File menu) before displaying coordinate files. ");
-
+		{
+			fl_message("ERROR: Save a Manual picking job parameters (using the File menu) before displaying coordinate files. ");
+			return;
+		}
 
 		// Get the name of the micrograph STAR file from reading the suffix file
 	    FileName fn_suffix = pipeline.nodeList[mynode].name;
@@ -2228,7 +2230,7 @@ void RelionMainWindow::cb_edit_note_i(bool is_project_note)
 			std::cout << " You can only edit the note for existing jobs ... " << std::endl;
 			return;
 		}
-		FileName fn_note = pipeline.processList[current_job].name + "note.txt";
+		fn_note = pipeline.processList[current_job].name + "note.txt";
 		title = (pipeline.processList[current_job].alias == "None") ? pipeline.processList[current_job].name : pipeline.processList[current_job].alias;
 	}
 	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note);
@@ -2292,7 +2294,7 @@ void RelionMainWindow::cb_import_i(bool is_undelete)
 {
 
 	std::string fn_dir = (is_undelete) ? "./Trash/." : ".";
-	std::string fn_filter = "Pipeline STAR files (*_pipeline.star)";
+	std::string fn_filter = (is_undelete) ? "Pipeline STAR files (job_pipeline.star)" : "Pipeline STAR files (*_pipeline.star)";
 	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
 	chooser.show();
 	// Block until user picks something.
@@ -2464,7 +2466,7 @@ void RelionMainWindow::cb_start_pipeliner_i()
 	// Ask how many times to repeat
 	const char * answer;
 	std::string default_answer="1";
-	answer =  fl_input("Repeat how often? ", default_answer.c_str());
+	answer =  fl_input("Repeat how many times? ", default_answer.c_str());
 	if (answer == NULL)
 		nr_repeat = 1;
 	else

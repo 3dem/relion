@@ -142,7 +142,6 @@ MetaDataTable& MetaDataTable::operator =(const MetaDataTable &MD)
         this->setName(MD.getName());
         this->isList = MD.isList;
         this->activeLabels = MD.activeLabels;
-        this->objects.clear();
         this->objects.resize(MD.objects.size());
         for (long int idx = 0; idx < MD.objects.size(); idx++)
         {
@@ -997,7 +996,9 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 
 	MetaDataTable MDc;
 
-	if (MDin.size() == 1 )
+	if (MDin.size() == 0)
+		REPORT_ERROR("combineMetaDataTables ERROR: No input STAR files selected!");
+	else if (MDin.size() == 1 )
 		MDc = MDin[0];
 	else
 	{

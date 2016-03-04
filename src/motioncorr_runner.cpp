@@ -32,6 +32,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	bin_factor =  textToInteger(parser.getOption("--bin_factor", "Binning factor (integer) for scaling inside MOTIONCORR", "1"));
+	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCORR", "150"));
 	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
 	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
@@ -227,12 +228,14 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 		command += " -flg " + fn_log;
 		command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
 		command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
+		command += " -bft " + floatToString(bfactor);
 
 		if (do_save_movies)
 			command += " -dsp 0 -ssc 1 -fct " + fn_mov;
 
 		if (bin_factor > 1)
 			command += " -bin " + integerToString(bin_factor);
+
 
 		if (fn_other_args.length() > 0)
 			command += " " + fn_other_args;

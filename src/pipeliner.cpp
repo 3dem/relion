@@ -476,8 +476,8 @@ void PipeLine::read(bool only_read_if_file_exists)
 			FileName fn_alias = alias;
 			if (fn_alias[fn_alias.length()-1] == '/')
 				fn_alias = fn_alias.beforeLastOf("/");
-			// Only make the alias if it doesn't exist yet, otherwise you end up with recursive ones.
 
+			// Only make the alias if it doesn't exist yet, otherwise you end up with recursive ones.
 			if (!exists(fn_alias))
 			{
 				std::string command = " ln -s ../" + name + " " + fn_alias;

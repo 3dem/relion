@@ -329,11 +329,6 @@ public:
 	void readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected);
 
-	// Given the Experiment of the already expanded dataset of movieframes, expand the current MlModel to contain all movie frames
-	// Make a new group for each unique rlnGroupName in the expanded Experiment, copying the values from the groups in the current MlModel
-	// For that: remove "00000i@" as well as movie extension from the rlnGroupName in the expanded Experiment and compare with group_names in current MlModel
-	void expandToMovieFrames(Experiment &moviedataexpand, int running_avg_side);
-
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
 	RFLOAT getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(RFLOAT)ipix; }
