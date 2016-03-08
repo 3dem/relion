@@ -858,6 +858,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			}
 			MD.setValue(EMDL_IMAGE_NAME, fn_img);
 			MD.setValue(EMDL_MICROGRAPH_NAME, fn_frame);
+			if (do_movie_extract)
+				MD.setValue(EMDL_PARTICLE_NR_FRAMES, movie_last_frame - movie_first_frame + 1);
 
 			// Also fill in the CTF parameters
 			if (star_has_ctf)
@@ -1108,9 +1110,6 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				MDresult.setValue(EMDL_ORIENT_PSI_PRIOR, psi);
 				MDresult.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR, xoff);
 				MDresult.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, yoff);
-
-				int nr_frames = movie_last_frame - movie_first_frame + 1;
-				MDresult.setValue(EMDL_PARTICLE_NR_FRAMES, nr_frames);
 			}
 			else
 			{
