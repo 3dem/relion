@@ -46,7 +46,8 @@ void MlOptimiserMpi::read(int argc, char **argv)
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
 
     // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? 1 : 0;
+    if (verb != 0)
+    	verb = (node->isMaster()) ? 1 : 0;
 
 //#define DEBUG_BODIES
 #ifdef DEBUG_BODIES
@@ -1444,12 +1445,13 @@ void MlOptimiserMpi::maximization()
 					if (node->rank == reconstruct_rank2)
 					{
 						// Rank 2 does not need to do the joined reconstruction
+						/*
 						if (!do_join_random_halves)
 							wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
-
+						*/
 						// But rank 2 always does the unfiltered reconstruction
 						if (do_auto_refine && has_converged)
 							readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 2);
@@ -1921,7 +1923,12 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 	if ( (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 	{
 		Image<RFLOAT> It;
+//#define DEBUG_RECONSTRUCTION
+#ifdef DEBUG_RECONSTRUCTION
+		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+#else
 		FileName fn_root = fn_out + "_half" + integerToString(node->rank);;
+#endif
 
 		// Write out temporary arrays for all classes
 		for (int iclass = 0; iclass < mymodel.nr_bodies * mymodel.nr_classes; iclass++)
@@ -1953,7 +1960,12 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 {
 	MultidimArray<RFLOAT> dummy;
 	Image<RFLOAT> Iunreg, Itmp;
+
+#ifdef DEBUG_RECONSTRUCTION
+		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+#else
 	FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
+#endif
 	fn_root.compose(fn_root+"_class", iclass+1, "", 3);
 
 	// Read temporary arrays back in
@@ -2017,9 +2029,11 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 
 
 	// remove temporary arrays from the disc
+#ifndef DEBUG_RECONSTRUCTION
 	remove((fn_root+"_data_real.mrc").c_str());
 	remove((fn_root+"_data_imag.mrc").c_str());
 	remove((fn_root+"_weight.mrc").c_str());
+#endif
 
 }
 
@@ -2207,7 +2221,9 @@ void MlOptimiserMpi::iterate()
 		symmetriseReconstructions();
 
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
+#ifndef DEBUG_RECONSTRUCTION
 		if (do_auto_refine && has_converged)
+#endif
 			writeTemporaryDataAndWeightArrays();
 
 		// Inside iterative refinement: do FSC-calculation BEFORE the solvent flattening, otherwise over-estimation of resolution
