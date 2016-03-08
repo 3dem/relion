@@ -460,27 +460,6 @@ public:
 	bool do_shifts_onthefly;
 	std::vector<MultidimArray<Complex> > global_fftshifts_ab_coarse, global_fftshifts_ab_current, global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
 
-	/** Some global variables that are only for thread visibility */
-	/// Taken from getAllSquaredDifferences
-	/*
-	std::vector<MultidimArray<Complex > > exp_Fimgs, exp_Fimgs_nomask, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > exp_Fctfs, exp_local_Fctfs, exp_local_Minvsigma2s;
-	Matrix2D<RFLOAT> exp_R_mic;
-	int exp_iseries, exp_iclass, exp_ipass, exp_iimage, exp_ipart, exp_current_image_size, exp_current_oversampling, exp_nr_ori_particles, exp_nr_particles, exp_nr_images;
-	long int exp_nr_oversampled_rot, exp_nr_oversampled_trans, exp_nr_rot, exp_nr_dir, exp_nr_psi, exp_nr_trans;
-	long int exp_part_id, exp_my_first_ori_particle, exp_my_last_ori_particle
-	std::vector<int> exp_starting_image_no;
-	std::vector<long int> exp_ipart_to_part_id, exp_ipart_to_ori_part_id, exp_ipart_to_ori_part_nframe, exp_iimg_to_ipart;
-	std::vector<RFLOAT> exp_highres_Xi2_imgs, exp_min_diff2, exp_local_sqrtXi2, exp_local_oldcc;
-	MultidimArray<RFLOAT> exp_Mweight;
-	MultidimArray<bool> exp_Mcoarse_significant;
-	// And from storeWeightedSums
-	std::vector<RFLOAT> exp_sum_weight, exp_significant_weight, exp_max_weight;
-	std::vector<Matrix1D<RFLOAT> > exp_old_offset, exp_prior;
-	std::vector<RFLOAT> exp_wsum_norm_correction;
-	std::vector<MultidimArray<RFLOAT> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA, exp_power_imgs;
-	RFLOAT exp_thisparticle_sumweight;
-	*/
 	//TMP DEBUGGING
 	MultidimArray<RFLOAT> DEBUGGING_COPY_exp_Mweight;
 
