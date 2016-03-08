@@ -672,12 +672,13 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		commands.push_back(command);
 		// Get the coordinate-file suffix separately
 		FileName fn_suffix = fn_in.getValue();
+		FileName fn_suffix2 = fn_suffix.beforeLastOf("*");
 		fn_suffix = fn_suffix.afterLastOf("*");
 		fn_suffix = "coords_suffix" + fn_suffix;
 		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
 		// Make a suffix file, which contains the actual suffix as a suffix
-		command = " touch " + outputname + fn_suffix;
+		command = " echo \\\"" + fn_suffix2 + "*.mrc\\\" > " + outputname + fn_suffix;
 		commands.push_back(command);
 	}
 	else if (node_type.getValue() == "Particles STAR file (.star)" ||
@@ -901,7 +902,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command += " --last_frame_ali " + floatToString(last_frame_ali.getValue());
 	command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
 	command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
-	command += " --bft " + floatToString(bfactor.getValue());
+	command += " --bfactor " + floatToString(bfactor.getValue());
 
 	if (do_save_movies.getValue())
 		command += " --save_movies ";
@@ -1198,7 +1199,7 @@ ManualpickJobWindow::ManualpickJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS
 	tab2->label("Display");
 	resetHeight();
 
-	diameter.place(current_y, "Particle diameter (pix):", 100, 0, 500, 50, "The radius of the circle used around picked particles (in original pixels). Only used for display." );
+	diameter.place(current_y, "Particle diameter (A):", 100, 0, 500, 50, "The radius of the circle used around picked particles (in original pixels). Only used for display." );
 	micscale.place(current_y, "Scale for micrographs:", 0.2, 0.1, 1, 0.05, "The micrographs will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
 	sigma_contrast.place(current_y, "Sigma contrast:", 3, 0, 10, 0.5, "The micrographs will be displayed with the black value set to the average of all values MINUS this values times the standard deviation of all values in the micrograph, and the white value will be set \
 to the average PLUS this value times the standard deviation. Use zero to set the minimum value in the micrograph to black, and the maximum value to white ");
@@ -2526,56 +2527,6 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-/*
-void jobwindow_refine_cleanup(std::string &outputname)
-{
-
-	std::vector<FileName> fns_iter;
-	FileName fn_pattern =outputname + "run_it*_data.star";
-	fn_pattern.globFiles(fns_iter);
-	FileName fn_old_dir = "";
-	for (int ifile = 0; ifile < fns_iter.size(); ifile++)
-	{
-		FileName fn_file = fns_iter[ifile].afterLastOf("/");
-
-		// Find the iteration to keep: those that are part of the pipeline
-		bool is_in_pipeline = false;
-		for (long int inode = 0; inode < pipeline.nodeList.size(); inode++)
-		{
-			FileName fn_node = pipeline.nodeList[inode].name;
-			if (fn_node.contains(fn_file))
-			{
-				is_in_pipeline = true;
-				break;
-			}
-		}
-
-		if (!is_in_pipeline)
-		{
-			std::vector<FileName> fns_thisiter;
-			fn_file = fn_file.without("_data.star")+"*";
-			fn_file.globFiles(fns_thisiter);
-			for (int ifile2 = 0; ifile2 < fns_thisiter.size(); ifile2++)
-			{
-				FileName fn_dest = "Trash/" + fns_thisiter[ifile2];
-				FileName fn_dir = fn_dest.beforeLastOf("/");
-				if (fn_dir != fn_old_dir && ! exists(fn_dir))
-				{
-					std::string command = "mkdir -p " + fn_dir;
-					int res = system(command.c_str());
-				}
-				std::string command = "mv -f " + fns_thisiter[ifile2] + " "+ fn_dir;
-				std::cout << " would do: " << command << std::endl;
-				//int res = system(command.c_str());
-			}
-
-		}
-
-	}
-
-}
-*/
-
 Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 {
 
@@ -3310,6 +3261,12 @@ This will remove noise and therefore increase sensitivity in the alignment and c
 between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
 High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	do_solvent_fsc.place(current_y, "Use solvent-flattened FSCs?", false, "If set to Yes, then instead of using unmasked maps to calculate the gold-standard FSCs during refinement, \
+masked half-maps are used and a post-processing-like correction of the FSC curves (with phase-randomisation) is performed every iteration. This only works when a reference mask is provided on the I/O tab. \
+This may yield higher-resolution maps, especially when the mask contains only a relatively small volume inside the box.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3440,6 +3397,7 @@ void Auto3DJobWindow::write(std::string fn)
 	particle_diameter.writeValue(fh);
 	do_zero_mask.writeValue(fh);
 	fn_mask.writeValue(fh);
+	do_solvent_fsc.writeValue(fh);
 
 	// Sampling
 	sampling.writeValue(fh);
@@ -3501,6 +3459,7 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		particle_diameter.readValue(fh);
 		do_zero_mask.readValue(fh);
 		fn_mask.readValue(fh);
+		do_solvent_fsc.readValue(fh);
 
 		// Sampling
 		sampling.readValue(fh);
@@ -3657,6 +3616,9 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	if (fn_mask.getValue().length() > 0)
 	{
 		command += " --solvent_mask " + fn_mask.getValue();
+
+		if (do_solvent_fsc.getValue())
+			command += " --solvent_correct_fsc ";
 
 		// TODO: what if this is a continuation run: re-put the mask as an input node? Or only if it changes? Also for 3Dclass
 		Node node(fn_mask.getValue(), fn_mask.type);
@@ -4583,7 +4545,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		FileName fn_star;
 	    if (is_continue)
 	    {
-	    	fn_star = outputname + "micrographs_selected.star.old:star";
+	    	fn_star = outputname + "micrographs_selected.star";
 	    }
 	    else
 	    {
@@ -4652,12 +4614,12 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	// For picked coordinates: also write the selected STAR file in the ccoord_suffix file
-	if  (fn_coords.getValue() != "" &&!is_continue)
-	{
-		std::string command2 = "echo " + outputname + "micrographs_selected.star > " + fn_coords.getValue();
-		commands.push_back(command2);
-	}
+	// For picked coordinates: also write the selected STAR file in the coord_suffix file
+	//if  (fn_coords.getValue() != "" &&!is_continue)
+	//{
+	//	std::string command2 = "echo " + outputname + "micrographs_selected.star > " + fn_coords.getValue();
+	//	commands.push_back(command2);
+	//}
 
 	prepareFinalCommand(outputname, commands, final_command, do_makedir);
 

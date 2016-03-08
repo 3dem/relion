@@ -1343,6 +1343,7 @@ void RelionMainWindow::cb_display_io_node_i()
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
+	std::cerr << "command= "<<command << std::endl;
 	int res= system(command.c_str());
 
 }

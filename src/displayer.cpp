@@ -723,7 +723,10 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 	MetaDataTable MDin;
 	MDin.read(fn_sel);
 	if (MDin.numberOfObjects() != boxes.size())
-		REPORT_ERROR("multiViewerCanvas::loadBackupSelection ERROR: .relion_display_backup_selection.star does not have the expected number of entries...");
+	{
+		std::cerr << "Warning: ignoring .relion_display_backup_selection.star with unexpected number of entries..." << std::endl;
+		return;
+	}
 
 	std::vector<bool> selected(boxes.size());
 	long int ipos = 0;

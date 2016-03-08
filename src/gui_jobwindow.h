@@ -629,6 +629,7 @@ public:
 	// Optimisation
 	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
+	BooleanEntry do_solvent_fsc;
 
 	// Sampling
 	textOnlyEntry autosample_text;
