@@ -2334,7 +2334,6 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 			else if (thread_id == nr_threads -1)
 				timer.tic(TIMING_ESP_ONEPARTN);
 #endif
-
 			expectationOneParticle(exp_my_first_ori_particle + ipart, thread_id);
 
 #ifdef TIMING
@@ -4794,12 +4793,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 //#define DEBUG_VERBOSE
 #ifdef DEBUG_VERBOSE
 											pthread_mutex_lock(&global_mutex);
-											if (verb > 0)
-											{
-												std::cout << " rot= " << oversampled_rot[iover_rot] << " tilt= "<< oversampled_tilt[iover_rot] << " psi= " << oversampled_psi[iover_rot] << std::endl;
-												std::cout << " xoff= " <<oversampled_translations_x[iover_trans]) <<" yoff= "<<oversampled_translations_y[iover_trans])<<std::endl;
-												std::cout << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << " thisthread_min_diff2[ipart]= " << thisthread_min_diff2[ipart] << std::endl;
-											}
+											std::cout <<" name= "<< mydata.ori_particles[my_ori_particle].name << " rot= " << oversampled_rot[iover_rot] << " tilt= "<< oversampled_tilt[iover_rot] << " psi= " << oversampled_psi[iover_rot] << std::endl;
+											std::cout <<" name= "<< mydata.ori_particles[my_ori_particle].name << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << " exp_min_diff2[ipart]= " << exp_min_diff2[ipart] << std::endl;
 											pthread_mutex_unlock(&global_mutex);
 #endif
 #ifdef DEBUG_CHECKSIZES
@@ -4941,7 +4936,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 		{
 			// Extra normalization
 			RFLOAT pdf_orientation_mean(0),pdf_offset_mean(0);
-			unsigned pdf_orientation_count(0), pdf_offset_count(0);
+			unsigned long pdf_orientation_count(0), pdf_offset_count(0);
 			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 			{
 				for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
@@ -4994,7 +4989,6 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			}
 			pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
 			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
-
 
 			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
@@ -6339,10 +6333,21 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 	sum_changes_optimal_offsets = 0.;
 	sum_changes_count = 0.;
 
+	RFLOAT ratio_orient_changes = current_changes_optimal_orientations /  sampling.getAngularSampling(adaptive_oversampling);
+	RFLOAT ratio_trans_changes = current_changes_optimal_offsets /  sampling.getTranslationalSampling(adaptive_oversampling);
+
+	/*
+	std::cout << " sampling orient= " << sampling.getAngularSampling(adaptive_oversampling) << std::endl;
+	std::cout << " ratio_orient_changes" << ratio_orient_changes << std::endl;
+	std::cout << " sampling trans= " << sampling.getTranslationalSampling(adaptive_oversampling) << std::endl;
+	std::cout << " ratio_trans_changes" << ratio_trans_changes << std::endl;
+	*/
+
 	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 3% of the smallest thus far
+	// Or if changes in offsets or orientations are smaller than 5% of the current sampling
 	if (1.03 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
-		1.03 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets &&
-		1.03 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations)
+		(ratio_trans_changes < 0.05 || 1.03 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
+		(ratio_orient_changes < 0.05 || 1.03 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
 		nr_iter_wo_large_hidden_variable_changes++;
 	else
 		nr_iter_wo_large_hidden_variable_changes = 0;
