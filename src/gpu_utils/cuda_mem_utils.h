@@ -199,13 +199,9 @@ public:
 		inline
 		void markReadyEvent(cudaStream_t stream = 0)
 		{
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 			//TODO add a debug warning if event already set
 			DEBUG_HANDLE_ERROR(cudaEventCreate(&readyEvent));
 			DEBUG_HANDLE_ERROR(cudaEventRecord(readyEvent, stream));
-#else
-			;
-#endif
 		}
 
 		inline
@@ -263,7 +259,10 @@ private:
 				if (e == cudaSuccess)
 					_free(a);
 				else if (e != cudaErrorNotReady)
+				{
+					_printState();
 					HandleError( e, __FILE__, __LINE__ );
+				}
 			}
 
 			a = a->next;
@@ -296,12 +295,6 @@ private:
 	inline
 	size_t _getTotalUsedSpace()
 	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		size_t free, total;
-		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-		return total - free;
-#else
-
 		size_t total = 0;
 		Alloc *a = first;
 
@@ -313,14 +306,10 @@ private:
 		}
 
 		return total;
-#endif
 	}
 
 	size_t _getNumberOfAllocs()
 	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		return 0;
-#else
 
 		size_t total = 0;
 		Alloc *a = first;
@@ -333,14 +322,13 @@ private:
 		}
 
 		return total;
-#endif
 	}
 
 	inline
 	size_t _getLargestContinuousFreeSpace()
 	{
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
-		return getTotalFreeSpace();
+		return _getTotalFreeSpace();
 #else
 
 		size_t largest = 0;
@@ -360,10 +348,6 @@ private:
 	inline
 	void _printState()
 	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		printf("Custom allocation is disabled.\n");
-#else
-
 		size_t total = 0;
 		Alloc *a = first;
 
@@ -381,19 +365,32 @@ private:
 		}
 
 		printf("= %luB\n", (unsigned long) total);
-#endif
 		fflush(stdout);
 	}
 
 	inline
 	void _free(Alloc* a)
 	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		DEBUG_HANDLE_ERROR(cudaFree( a->ptr ));
-		a->free = true;
-#else
+//		printf("free: %u ", a->size);
+//		_printState();
 
 		a->free = true;
+
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+
+		DEBUG_HANDLE_ERROR(cudaFree( a->ptr ));
+		a->ptr = NULL;
+
+		if ( a->prev != NULL)
+			a->prev->next = a->next;
+		else
+			first = a->next; //This is the first link
+
+		if ( a->next != NULL)
+			a->next->prev = a->prev;
+
+		delete a;
+#else
 
 		//Previous neighbor is free, concatenate
 		if ( a->prev != NULL && a->prev->free)
@@ -439,8 +436,12 @@ private:
 
 	void _setup()
 	{
-		first = new Alloc();
 
+#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		totalSize = 0;
+#endif
+
+		first = new Alloc();
 		first->prev = NULL;
 		first->next = NULL;
 		first->size = totalSize;
@@ -472,7 +473,6 @@ public:
 	CudaCustomAllocator(size_t size, size_t alignmentSize):
 		totalSize(size), alignmentSize(alignmentSize), first(0)
 	{
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		_setup();
 
 		int mutex_error = pthread_mutex_init(&mutex, NULL);
@@ -483,7 +483,6 @@ public:
 			fflush(stdout);
 			raise(SIGSEGV);
 		}
-#endif
 	}
 
 	void resize(size_t size)
@@ -501,6 +500,12 @@ public:
 	inline
 	Alloc* alloc(size_t size)
 	{
+		pthread_mutex_lock(&mutex);
+
+		_freeReadyAllocs();
+
+//		printf("alloc: %u ", size);
+//		_printState();
 
 #ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
 		fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
@@ -510,14 +515,18 @@ public:
 		nAlloc->size = size;
 		nAlloc->free = false;
 		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
+
+		//Just add to start by replacing first
+		nAlloc->next = first;
+		first->prev = nAlloc;
+		first = nAlloc;
+
+		pthread_mutex_unlock(&mutex);
 		return nAlloc;
 #else
 
 		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
 
-		pthread_mutex_lock(&mutex);
-
-		_freeReadyAllocs();
 		Alloc *curAlloc = _getFirstSuitedFree(size);
 
 		//If out of memory
@@ -588,7 +597,6 @@ public:
 
 	~CudaCustomAllocator()
 	{
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 
 		pthread_mutex_lock(&mutex);
 
@@ -596,7 +604,6 @@ public:
 
 		pthread_mutex_unlock(&mutex);
 		pthread_mutex_destroy(&mutex);
-#endif
 	}
 
 	//Thread-safe wrapper functions
@@ -604,13 +611,9 @@ public:
 	inline
 	void free(Alloc* a)
 	{
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		pthread_mutex_lock(&mutex);
-#endif
 		_free(a);
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		pthread_mutex_unlock(&mutex);
-#endif
 	}
 
 	inline
@@ -875,14 +878,12 @@ public:
 			printf("DEBUG_WARNING: Device double allocation.\n");
 #endif
 		d_do_free = true;
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		if (CustomAlloc)
 		{
 			alloc = allocator->alloc(size * sizeof(T));
 			d_ptr = (T*) alloc->getPtr();
 		}
 		else
-#endif
 			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 	}
 
@@ -1177,17 +1178,15 @@ public:
 			printf("DEBUG_WARNING: Free device memory was called on NULL pointer in free_device().\n");
 #endif
 		d_do_free = false;
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 		if (CustomAlloc)
 		{
 			if (alloc->getReadyEvent() == 0)
-				alloc->markReadyEvent();
+				alloc->markReadyEvent(stream);
 			alloc->doFreeWhenReady();
 
 			alloc = NULL;
 		}
 		else
-#endif
 			DEBUG_HANDLE_ERROR(cudaFree(d_ptr));
 		d_ptr = 0;
 	}

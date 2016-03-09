@@ -2541,9 +2541,7 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-	printf(" DEBUG: Custom allocator is disabled.\n");
-#else
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 
 	size_t allocationSize(0);
 
@@ -2565,11 +2563,12 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 		baseMLO->available_gpu_memory = allocationSize;
 	}
 
+#endif
+
 	int memAlignmentSize;
 	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
 	allocator = new CudaCustomAllocator(0, memAlignmentSize);
 
-#endif
 };
 
 void MlDeviceBundle::resetData()
@@ -2592,7 +2591,6 @@ void MlDeviceBundle::resetData()
 
 	coarseProjectionPlans.clear();
 
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
 	allocator->syncReadyEvents();
 	allocator->freeReadyAllocs();
 
@@ -2608,7 +2606,6 @@ void MlDeviceBundle::resetData()
 #endif
 
 	allocator->resize(0);
-#endif
 	/*======================================================
 	              PROJECTOR AND BACKPROJECTOR
 	======================================================*/
@@ -2682,9 +2679,8 @@ void MlDeviceBundle::resetData()
 		fflush(stdout);
 		raise(SIGSEGV);
 	}
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
+
 	allocator->resize(actualAllocationSize);
-#endif
 
 	/*======================================================
 	                    PROJECTION PLAN
