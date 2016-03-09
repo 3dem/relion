@@ -3537,7 +3537,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			}
 			else
 			{
-#define DEBUG_SIMULTANEOUS_READ
+//#define DEBUG_SIMULTANEOUS_READ
 #ifdef DEBUG_SIMULTANEOUS_READ
 				// Read from disc
 				FileName fn_img;
