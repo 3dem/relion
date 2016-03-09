@@ -344,13 +344,13 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 		{
 
 			Image<RFLOAT> stack, img;
-			fImageHandler* hFile;
+			fImageHandler hFile;
 			if (do_read_whole_stacks)
 				// Read the entire stack into memory
 				stack.read(fn_my_stack);
 			else
 				// Open the stack file
-				hFile = img.openFile(fn_my_stack);
+				hFile.openFile(fn_my_stack);
 
 			// 1. Process the current stack
 			for (long int inum = 0; inum < numbers_in_stack.size(); inum++)
@@ -411,9 +411,6 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 				boxes[my_sorted_ipos] = my_box;//boxes.push_back(my_box);
 			}
 
-			// Close the stack file again
-			if (!do_read_whole_stacks)
-				img.closeFile(hFile);
 
 			// 2. Reset numbers_in_stack and my_stack_first_ipos for next stack
 			numbers_in_stack.clear();

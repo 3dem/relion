@@ -1386,8 +1386,6 @@ void MlOptimiser::initialiseWorkLoad()
 
 	// Randomise the order of the particles
 	if (random_seed == -1) random_seed = time(NULL);
-    // This is for the division into random classes
-	mydata.randomiseOriginalParticlesOrder(random_seed);
     // Also randomize random-number-generator for perturbations on the angles
     init_random_generator(random_seed);
 
@@ -1410,10 +1408,15 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		barstep = XMIPP_MAX(1, my_nr_ori_particles / 60);
 	}
 
+
+    // Only open stacks once and then read multiple images
+	fImageHandler hFile;
+	long int dump;
+	FileName fn_open_stack="";
+
 	// Note the loop over the particles (part_id) is MPI-parallelized
 	int nr_ori_particles_done = 0;
-	Image<RFLOAT> img;
-	FileName fn_img;
+	FileName fn_img, fn_stack;
 	MultidimArray<RFLOAT> ind_spectrum, sum_spectrum, count;
 	// For spectrum calculation: recycle the transformer (so do not call getSpectrum all the time)
 	MultidimArray<Complex > Faux;
@@ -1461,13 +1464,20 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 
 			// Read image from disc
-            if (do_preread_images && do_parallel_disc_io)
+            Image<RFLOAT> img;
+			if (do_preread_images && do_parallel_disc_io)
             {
                 img() = mydata.particles[part_id].img;
             }
             else
             {
-                img.read(fn_img);
+				fn_img.decompose(dump, fn_stack);
+				if (fn_stack != fn_open_stack)
+				{
+					hFile.openFile(fn_stack, WRITE_READONLY);
+					fn_open_stack = fn_stack;
+				}
+				img.readFromOpenFile(fn_img, hFile, -1, false);
                 img().setXmippOrigin();
             }
 
@@ -2234,8 +2244,15 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	exp_my_first_ori_particle = my_first_ori_particle;
     exp_my_last_ori_particle = my_last_ori_particle;
 
-    // Store total number of particle images in this bunch of SomeParticles, and set translations and orientations for skip_align/rotate
+	// Only open/close stacks once
+    fImageHandler hFile;
+	long int dump;
+	FileName fn_img, fn_stack, fn_open_stack="";
+
+	// Store total number of particle images in this bunch of SomeParticles, and set translations and orientations for skip_align/rotate
     exp_nr_images = 0;
+    long int istop = 0;
+    exp_imgs.clear();
     for (long int ori_part_id = my_first_ori_particle; ori_part_id <= my_last_ori_particle; ori_part_id++)
 	{
 
@@ -2286,7 +2303,37 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 		// Store total number of particle images in this bunch of SomeParticles
 		exp_nr_images += mydata.ori_particles[ori_part_id].particles_id.size();
 
-	}
+		// Sjors 7 March 2016 to prevent too high disk access... Read in all pooled images simultaneously
+		// TODO: open and close stacks only once!
+		if (do_parallel_disc_io && !do_preread_images)
+		{
+			// Read in all images, only open/close common stacks once
+			for (int ipart = 0; ipart < mydata.ori_particles[ori_part_id].particles_id.size(); ipart++, istop++)
+			{
+
+				// Read from disc
+				// Get the filename
+				std::istringstream split(exp_fn_img);
+				for (int i = 0; i <= istop; i++)
+					getline(split, fn_img);
+
+				fn_img.decompose(dump, fn_stack);
+				if (fn_stack != fn_open_stack)
+				{
+					hFile.openFile(fn_stack, WRITE_READONLY);
+					fn_open_stack = fn_stack;
+				}
+			    Image<RFLOAT> img;
+				img.readFromOpenFile(fn_img, hFile, -1, false);
+				img().setXmippOrigin();
+				exp_imgs.push_back(img());
+
+			} // end loop over all particles of this ori_particle
+
+		} // end if do_parallel_disc_io
+
+	} //end loop over ori_part_id
+
 
 #ifdef DEBUG_EXPSOME
 	std::cerr << " exp_my_first_ori_particle= " << exp_my_first_ori_particle << " exp_my_last_ori_particle= " << exp_my_last_ori_particle << std::endl;
@@ -2385,7 +2432,10 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     		// Now select a single random class
     		// exp_part_id is already in randomized order (controlled by -seed)
     		// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-    		exp_iclass_min = exp_iclass_max = divide_equally_which_group(mydata.numberOfOriginalParticles(), mymodel.nr_classes, my_ori_particle);
+
+    		// Make sure random division is always the same with the same seed
+    		init_random_generator(random_seed + my_ori_particle);
+    		exp_iclass_min = exp_iclass_max = rand() % mymodel.nr_classes;
 		}
     }
 
@@ -3487,6 +3537,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			}
 			else
 			{
+#define DEBUG_SIMULTANEOUS_READ
+#ifdef DEBUG_SIMULTANEOUS_READ
 				// Read from disc
 				FileName fn_img;
 				std::istringstream split(exp_fn_img);
@@ -3495,6 +3547,27 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 				img.read(fn_img);
 				img().setXmippOrigin();
+
+				// Check that this is the same as the image in exp_imgs vector
+				Image<RFLOAT> diff;
+				if (istop >= exp_imgs.size())
+				{
+					std::cerr << " istop= " <<istop << " exp_imgs.size()= "<<exp_imgs.size()<<std::endl;
+					REPORT_ERROR("BUG: istop runs out of bounds!");
+				}
+				diff() = img() - exp_imgs[istop];
+				if (diff().computeMax() > 1e-6)
+				{
+					std::cerr << "istop= " <<istop<<" fn_img=" << fn_img << " diff avg=" << diff().computeAvg()<<std::endl;
+					diff.write("diff.spi");
+					diff()= exp_imgs[istop];
+					diff.write("preread.spi");
+					img.write("img.spi");
+					REPORT_ERROR("unequal pre-read images... BUG!");
+				}
+#else
+				img() = exp_imgs[istop];
+#endif
 			}
 			if (has_converged && do_use_reconstruct_images)
 			{
@@ -7117,7 +7190,12 @@ void MlOptimiser::setMetaDataSubset(int first_ori_particle_id, int last_ori_part
 void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_ori_particle_id, bool do_also_imagedata)
 {
 
-	// Initialise filename strings if not reading imagedata here
+    // In case we're reading images here, only open stacks once and then read multiple images
+	fImageHandler hFile;
+	FileName fn_img, fn_stack, fn_open_stack="";;
+	long int dump;
+
+    // Initialise filename strings if not reading imagedata here
 	if (!do_also_imagedata)
 	{
 		exp_fn_img = "";
@@ -7208,7 +7286,17 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 				if (do_preread_images)
 					img() = mydata.particles[part_id].img;
 				else
-					img.read(fn_img);
+				{
+					// only open new stacks
+					fn_img.decompose(dump, fn_stack);
+					if (fn_stack != fn_open_stack)
+					{
+						hFile.openFile(fn_stack, WRITE_READONLY);
+						fn_open_stack = fn_stack;
+					}
+					img.readFromOpenFile(fn_img, hFile, -1, false);
+					img().setXmippOrigin();
+				}
 				if (XSIZE(img()) != XSIZE(exp_imagedata) || YSIZE(img()) != YSIZE(exp_imagedata) )
 				{
 					std::cerr << " fn_img= " << fn_img << " XSIZE(img())= " << XSIZE(img()) << " YSIZE(img())= " << YSIZE(img()) << std::endl;

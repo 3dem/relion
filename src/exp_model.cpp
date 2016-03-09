@@ -221,8 +221,6 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 			REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: some random subset values are zero and others are not. They should all be zero, or all bigger than zero!");
 	}
 
-	//std::cerr << " all_are_zero= " << all_are_zero << " some_are_zero= " << some_are_zero << std::endl;
-
 	if (all_are_zero)
 	{
 		// Only randomise them if the random_subset values were not read in from the STAR file
@@ -367,8 +365,42 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 			}
 		}
 	}
+
+
+	// Now re-order such that half1 is in first half, and half2 is in second half of the particle list (for MPI_parallelisattion)
+
+	std::vector<long int> ori_particle_list1, ori_particle_list2;
+	// Fill the two particle lists
+	for (long int i = 0; i < ori_particles.size(); i++)
+	{
+		int random_subset = ori_particles[i].random_subset;
+		if (random_subset == 1)
+			ori_particle_list1.push_back(i);
+		else if (random_subset == 2)
+			ori_particle_list2.push_back(i);
+		else
+			REPORT_ERROR("ERROR: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
+	}
+
+	// Just a silly check for the sizes of the ori_particle_lists (to be sure)
+	if (ori_particle_list1.size() != nr_ori_particles_subset1)
+		REPORT_ERROR("ERROR: invalid ori_particle_list1 size:" + integerToString(ori_particle_list1.size()) + " != " + integerToString(nr_ori_particles_subset1));
+	if (ori_particle_list2.size() != nr_ori_particles_subset2)
+		REPORT_ERROR("ERROR: invalid ori_particle_list2 size:" + integerToString(ori_particle_list2.size()) + " != " + integerToString(nr_ori_particles_subset2));
+
+	// First fill new_ori_particles with the first subset, then with the second
+	std::vector<ExpOriginalParticle> new_ori_particles;
+
+	for (long int i = 0; i < ori_particle_list1.size(); i++)
+		new_ori_particles.push_back(ori_particles[ori_particle_list1[i]]);
+	for (long int i = 0; i < ori_particle_list2.size(); i++)
+		new_ori_particles.push_back(ori_particles[ori_particle_list2[i]]);
+
+	ori_particles=new_ori_particles;
+
 }
 
+/*
 void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves, bool always_do_this)
 {
 	//This static flag is for only randomize once
@@ -436,7 +468,6 @@ void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_
 	}
 }
 
-/*
 void Experiment::expandToMovieFrames(FileName fn_data_movie, int verb)
 {
 

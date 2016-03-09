@@ -137,6 +137,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 			else
 			{
+				/*
 				// Read from disc
 				FileName fn_img;
 				std::istringstream split(baseMLO->exp_fn_img);
@@ -145,6 +146,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 				img.read(fn_img);
 				img().setXmippOrigin();
+				*/
+				img() = baseMLO->exp_imgs[istop];
 			}
 			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 			{
@@ -2789,7 +2792,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					// Now select a single random class
 					// exp_part_id is already in randomized order (controlled by -seed)
 					// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-					sp.iclass_min = sp.iclass_max = divide_equally_which_group(baseMLO->mydata.numberOfOriginalParticles(), baseMLO->mymodel.nr_classes, op.my_ori_particle);
+		    		// Make sure random division is always the same with the same seed
+
+					init_random_generator(baseMLO->random_seed + my_ori_particle);
+		    		sp.iclass_min = sp.iclass_max = rand() % baseMLO->mymodel.nr_classes;
+
 				}
 			}
 			// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?

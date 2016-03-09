@@ -297,16 +297,12 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		}
 	}
 
-    // First split the data into two random halves and then randomise the particle order
-	if (do_split_random_halves)
-		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
-
-	// Randomise the order of the particles, this also separates the two random subsets: half1 is first half, half2 is second
-	mydata.randomiseOriginalParticlesOrder(random_seed, do_split_random_halves, do_movies_in_batches);
-
     // Also randomize random-number-generator for perturbations on the angles
     init_random_generator(random_seed);
 
+    // Split the data into two random halves
+	if (do_split_random_halves)
+		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
 
 	if (node->isMaster())
 	{

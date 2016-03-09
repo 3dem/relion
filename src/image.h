@@ -96,15 +96,123 @@ typedef enum
 } WriteMode;
 
 
-/** Open File struct
+/** File handler class
  * This struct is used to share the File handlers with Image Collection class
  */
-struct fImageHandler
+class fImageHandler
 {
+public:
     FILE*     fimg;       // Image File handler
     FILE*     fhed;       // Image File header handler
     FileName  ext_name;   // Filename extension
     bool     exist;       // Shows if the file exists
+
+    /** Empty constructor
+     */
+    fImageHandler()
+    {
+        fimg=NULL;
+        fhed=NULL;
+        ext_name="";
+        exist=false;
+    }
+
+    /** Destructor: closes file (if it still open)
+     */
+    ~fImageHandler()
+    {
+    	closeFile();
+    }
+
+    void openFile(const FileName &name, int mode = WRITE_READONLY)
+    {
+
+    	// Close any file that was left open in this handler
+    	if ( !(fimg ==NULL && fhed == NULL) )
+    		closeFile();
+
+    	FileName fileName, headName = "";
+		ext_name = name.getFileFormat();
+
+		long int dump;
+		name.decompose(dump, fileName);
+		// Subtract 1 to have numbering 0...N-1 instead of 1...N
+		if (dump > 0)
+			dump--;
+
+		fileName = fileName.removeFileFormat();
+
+		size_t found = fileName.find_first_of("%");
+		if (found!=std::string::npos)
+		  fileName = fileName.substr(0, found) ;
+
+		exist = exists(fileName);
+
+		std::string wmChar;
+
+		switch (mode)
+		{
+		case WRITE_READONLY:
+			if (!exist)
+				REPORT_ERROR((std::string) "Cannot read file " + fileName + " It does not exist" );
+			wmChar = "r";
+			break;
+		case WRITE_OVERWRITE:
+			wmChar = "w";
+			break;
+		case WRITE_APPEND:
+			if (exist)
+				wmChar = "r+";
+			else
+				wmChar = "w+";
+			break;
+		case WRITE_REPLACE:
+			wmChar = "r+";
+			break;
+		}
+
+		if (ext_name.contains("img") || ext_name.contains("hed"))
+		{
+			fileName = fileName.withoutExtension();
+			headName = fileName.addExtension("hed");
+			fileName = fileName.addExtension("img");
+		}
+
+		// Open image file
+		if ( ( fimg = fopen(fileName.c_str(), wmChar.c_str()) ) == NULL )
+			REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
+
+		if (headName != "")
+		{
+			if ( ( fhed = fopen(headName.c_str(), wmChar.c_str()) ) == NULL )
+				REPORT_ERROR((std::string)"Image::openFile cannot open: " + headName);
+		}
+		else
+			fhed = NULL;
+
+	}
+
+    void closeFile()
+    {
+        ext_name="";
+        exist=false;
+
+        // Check whether the file was closed already
+    	if (fimg == NULL && fhed == NULL)
+        	return;
+
+    	if (fclose(fimg) != 0 )
+            REPORT_ERROR((std::string)"Can not close image file ");
+    	else
+    		fimg = NULL;
+
+        if (fhed != NULL &&  fclose(fhed) != 0 )
+            REPORT_ERROR((std::string)"Can not close header file ");
+        else
+        	fhed = NULL;
+
+    }
+
 };
 
 /** Returns memory size of datatype
@@ -252,9 +360,10 @@ public:
     {
 
         int err = 0;
-        fImageHandler* hFile = openFile(name);
+        fImageHandler hFile;
+        hFile.openFile(name);
         err = _read(name, hFile, readdata, select_img, mapData, is_2D);
-        closeFile(hFile);
+        // the destructor of fImageHandler will close the file
 
         // Negative errors are bad
         return err;
@@ -263,7 +372,7 @@ public:
     /** Read function from a file that has already been opened
      *
      */
-    int readFromOpenFile(const FileName &name, fImageHandler* hFile, long int select_img, bool is_2D = false)
+    int readFromOpenFile(const FileName &name, fImageHandler &hFile, long int select_img, bool is_2D = false)
     {
     	int err = 0;
     	err = _read(name, hFile, true, select_img, false, is_2D);
@@ -284,9 +393,10 @@ public:
     {
 
         const FileName &fname = (name == "") ? filename : name;
-        fImageHandler* hFile = openFile(fname, mode);
+        fImageHandler hFile;
+        hFile.openFile(name, mode);
         _write(fname, hFile, select_img, isStack, mode);
-        closeFile(hFile);
+        // the destructor of fImageHandler will close the file
 
     }
 
@@ -998,7 +1108,6 @@ public:
 
     /** Open file function
       * Open the image file and returns its file hander.
-      */
     fImageHandler* openFile(const FileName &name, int mode = WRITE_READONLY)
     {
         fImageHandler* hFile = new fImageHandler;
@@ -1069,10 +1178,10 @@ public:
 
         return hFile;
     }
+      */
 
     /** Close file function.
       * Close the image file according to its name and file handler.
-      */
     void closeFile(fImageHandler* hFile = NULL)
     {
         FileName ext_name;
@@ -1100,9 +1209,10 @@ public:
 
         delete hFile;
     }
+     */
 
 private:
-    int _read(const FileName &name, fImageHandler* hFile, bool readdata=true, long int select_img = -1,
+    int _read(const FileName &name, fImageHandler &hFile, bool readdata=true, long int select_img = -1,
               bool mapData = false, bool is_2D = false)
     {
         int err = 0;
@@ -1113,9 +1223,9 @@ private:
         // Check whether to map the data or not
         mmapOn = mapData;
 
-        FileName ext_name = hFile->ext_name;
-        fimg = hFile->fimg;
-        fhed = hFile->fhed;
+        FileName ext_name = hFile.ext_name;
+        fimg = hFile.fimg;
+        fhed = hFile.fhed;
 
         long int dump;
         name.decompose(dump, filename);
@@ -1164,15 +1274,15 @@ private:
 
 
 
-    void _write(const FileName &name, fImageHandler* hFile, long int select_img=-1,
+    void _write(const FileName &name, fImageHandler &hFile, long int select_img=-1,
                 bool isStack=false, int mode=WRITE_OVERWRITE)
     {
         int err = 0;
 
-        FileName ext_name = hFile->ext_name;
-        fimg = hFile->fimg;
-        fhed = hFile->fhed;
-        _exists = hFile->exist;
+        FileName ext_name = hFile.ext_name;
+        fimg = hFile.fimg;
+        fhed = hFile.fhed;
+        _exists = hFile.exist;
 
         filename = name;
 
@@ -1282,11 +1392,10 @@ private:
             REPORT_ERROR((std::string)"Error writing file "+ filename + " Extension= " + ext_name);
         }
 
-        /* If initially the file did not existed, once the first image is written,
-         * then the file exists
+        /* If initially the file did not exist, once the first image is written, then the file exists
          */
         if (!_exists)
-            hFile->exist = _exists = true;
+            hFile.exist = _exists = true;
     }
 
 
