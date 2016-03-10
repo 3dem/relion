@@ -857,6 +857,11 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 	timer.tic(tread);
 #endif
 
+    // Only open stacks once and then read multiple images
+	fImageHandler hFile;
+	long int dump;
+	FileName fn_stack, fn_open_stack="";
+
 	// Initialize by emptying everything
 	clear();
 	long int group_id, mic_id, part_id;
@@ -889,7 +894,13 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 			if (do_preread_images)
 			{
 				Image<RFLOAT> img;
-				img.read(fn_img);
+				fn_img.decompose(dump, fn_stack);
+				if (fn_stack != fn_open_stack)
+				{
+					hFile.openFile(fn_stack, WRITE_READONLY);
+					fn_open_stack = fn_stack;
+				}
+				img.readFromOpenFile(fn_img, hFile, -1, false);
 				img().setXmippOrigin();
 				particles[part_id].img = img();
 			}
@@ -1104,7 +1115,13 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 				FileName fn_img;
 				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 				Image<RFLOAT> img;
-				img.read(fn_img);
+				fn_img.decompose(dump, fn_stack);
+				if (fn_stack != fn_open_stack)
+				{
+					hFile.openFile(fn_stack, WRITE_READONLY);
+					fn_open_stack = fn_stack;
+				}
+				img.readFromOpenFile(fn_img, hFile, -1, false);
 				img().setXmippOrigin();
 				particles[part_id].img = img();
 			}
