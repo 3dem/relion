@@ -473,7 +473,6 @@ public:
 	// I/O
 	FileNameEntry fn_cont;
 	InputNodeEntry fn_img;
-	BooleanEntry do_parallel_discio;
 
 	// CTF
 	BooleanEntry do_ctf_correction;
@@ -499,6 +498,12 @@ public:
 	BooleanEntry do_bimodal_psi;
 	SliderEntry range_psi;
 	SliderEntry helical_tube_outer_diameter;
+
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
 
 	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
 
@@ -534,7 +539,6 @@ public:
 	InputNodeEntry fn_ref;
 	InputNodeEntry fn_mask;
 	SliderEntry nr_classes;
-	BooleanEntry do_parallel_discio;
 
 	// Reference
 	BooleanEntry ref_correct_greyscale;
@@ -580,6 +584,12 @@ public:
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
 
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
+
 	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group;
 
 public:
@@ -613,7 +623,6 @@ public:
 	InputNodeEntry fn_img;
 	InputNodeEntry fn_ref;
 	InputNodeEntry fn_mask;
-	BooleanEntry do_parallel_discio;
 
 	// Reference
 	BooleanEntry ref_correct_greyscale;
@@ -655,6 +664,12 @@ public:
 	SliderEntry helical_z_percentage;
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
+
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
 
 	Fl_Group *ctf_group, *helix_group, *helix_symmetry_search_group;
 

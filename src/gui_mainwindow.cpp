@@ -111,14 +111,12 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	// Check which jobs have finished
 	pipeline.checkProcessCompletion();
 
-	// Make temporary directory with all NodeNames
-	pipeline.makeNodeDirectory();
-
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
     //menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
     menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
     menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
+    menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
     menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
     menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
@@ -1651,11 +1649,11 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	{
 		proceed = 1;
 	}
+
 	if (proceed)
 	{
 
-
-		// Write new pipeline to disc and read in again
+		// Write new pipeline without the deleted processes and nodes to disc and read in again
 		pipeline.write(fn_del, deleteNodes, deleteProcesses);
 
 		// Delete the output directories for all selected processes from the hard disk
@@ -1677,6 +1675,13 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 				if (fn_alias != "None")
 				{
 					int res = std::remove((fn_alias.beforeLastOf("/")).c_str());
+				}
+
+				// Also delete the entries in the .Nodes directory
+				for (int j = 0; j < pipeline.processList[i].outputNodeList.size(); j++)
+				{
+					long int inode = pipeline.processList[i].outputNodeList[j];
+					pipeline.deleteTemporaryNodeFile(pipeline.nodeList[inode]);
 				}
 			}
 		}
@@ -2413,6 +2418,17 @@ void RelionMainWindow::cb_print_notes_i()
 		}
 	}
 
+}
+
+void RelionMainWindow::cb_remake_nodesdir(Fl_Widget*, void* v)
+{
+  	 RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_remake_nodesdir_i();
+}
+
+void RelionMainWindow::cb_remake_nodesdir_i()
+{
+	pipeline.remakeNodeDirectory();
 }
 
 void RelionMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)

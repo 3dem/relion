@@ -2131,7 +2131,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 
 
-Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
+Class2DJobWindow::Class2DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_2DCLASS;
@@ -2298,6 +2298,30 @@ A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of 
 
 	tab5->end();
 
+
+	tab6->begin();
+	tab6->label("Compute");
+	resetHeight();
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", true, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
+	nr_pool.place(current_y, "Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
+This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
+
+	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
+Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
+
+
+	tab6->end();
+
+
 	// read settings if hidden file exists
 	read(".gui_class2d", is_continue);
 
@@ -2316,7 +2340,6 @@ void Class2DJobWindow::write(std::string fn)
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	nr_classes.writeValue(fh);
-	do_parallel_discio.writeValue(fh);
 
 	// CTF
 	do_ctf_correction.writeValue(fh);
@@ -2342,6 +2365,13 @@ void Class2DJobWindow::write(std::string fn)
 	range_psi.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 
+	// Compute
+	do_combine_thru_disc.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
+	nr_pool.writeValue(fh);
+	do_preread_images.writeValue(fh);
+
+
 	closeWriteFile(fh, fn);
 }
 
@@ -2361,7 +2391,6 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		nr_classes.readValue(fh);
-		do_parallel_discio.readValue(fh);
 
 		// CTF
 		do_ctf_correction.readValue(fh);
@@ -2386,6 +2415,12 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		do_bimodal_psi.readValue(fh);
 		range_psi.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
+
+		// Compute
+		do_combine_thru_disc.readValue(fh);
+		do_parallel_discio.readValue(fh);
+		nr_pool.readValue(fh);
+		do_preread_images.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -2441,9 +2476,14 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		pipelineInputNodes.push_back(node);
 	}
 
-	// Parallel disc I/O?
+	// Always do compute stuff
+	if (!do_combine_thru_disc.getValue())
+		command += " --dont_combine_weights_via_disc";
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
+	command += " --pool " + floatToString(nr_pool.getValue());
+	if (do_preread_images.getValue())
+		command += " --preread_images" ;
 
 	// CTF stuff
 	if (!is_continue)
@@ -2527,7 +2567,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
+Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(7, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_3DCLASS;
@@ -2675,11 +2715,6 @@ This is useful to prevent overfitting, as the classification runs in RELION are 
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
 
 
-	// Add a little spacer
-	current_y += STEPY/2;
-	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
-
 	tab4->end();
 
 	tab5->begin();
@@ -2789,6 +2824,29 @@ A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid 
 	do_helix.cb_menu_i(); // to make default effective
 	tab6->end();
 
+	tab7->begin();
+	tab7->label("Compute");
+	resetHeight();
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", true, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
+	nr_pool.place(current_y, "Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
+This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
+
+	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
+Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
+
+
+	tab7->end();
+
+
 	// read settings if hidden file exists
 	read(".gui_class3d", is_continue);
 
@@ -2807,7 +2865,6 @@ void Class3DJobWindow::write(std::string fn)
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
 	nr_classes.writeValue(fh);
-	do_parallel_discio.writeValue(fh);
 
 	// Reference
 	fn_ref.writeValue(fh);
@@ -2855,6 +2912,12 @@ void Class3DJobWindow::write(std::string fn)
 	range_tilt.writeValue(fh);
 	range_psi.writeValue(fh);
 
+	// Compute
+	do_combine_thru_disc.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
+	nr_pool.writeValue(fh);
+	do_preread_images.writeValue(fh);
+
 	closeWriteFile(fh, fn);
 }
 
@@ -2874,7 +2937,6 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
 		nr_classes.readValue(fh);
-		do_parallel_discio.readValue(fh);
 
 		// Reference
 		fn_ref.readValue(fh);
@@ -2921,6 +2983,12 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		helical_z_percentage.readValue(fh);
 		range_tilt.readValue(fh);
 		range_psi.readValue(fh);
+
+		// Compute
+		do_combine_thru_disc.readValue(fh);
+		do_parallel_discio.readValue(fh);
+		nr_pool.readValue(fh);
+		do_preread_images.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3020,9 +3088,14 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	}
 
-	// Parallel disc I/O?
+	// Always do compute stuff
+	if (!do_combine_thru_disc.getValue())
+		command += " --dont_combine_weights_via_disc";
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
+	command += " --pool " + floatToString(nr_pool.getValue());
+	if (do_preread_images.getValue())
+		command += " --preread_images" ;
 
 	// CTF stuff
 	if (!is_continue)
@@ -3146,7 +3219,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
-Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
+Auto3DJobWindow::Auto3DJobWindow() : RelionJobWindow(7, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_3DAUTO;
@@ -3268,13 +3341,6 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 masked half-maps are used and a post-processing-like correction of the FSC curves (with phase-randomisation) is performed every iteration. This only works when a reference mask is provided on the I/O tab. \
 This may yield higher-resolution maps, especially when the mask contains only a relatively small volume inside the box.");
 
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
-
-
 	tab4->end();
 	tab5->begin();
 	tab5->label("Auto-sampling");
@@ -3362,6 +3428,28 @@ A range of 15 degrees means sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARAT
 
 	tab6->end();
 
+	tab7->begin();
+	tab7->label("Compute");
+	resetHeight();
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", true, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
+	nr_pool.place(current_y, "Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
+This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
+
+	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
+Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
+
+
+	tab7->end();
+
 	// read settings if hidden file exists
 	read(".gui_auto3d", is_continue);
 
@@ -3379,7 +3467,6 @@ void Auto3DJobWindow::write(std::string fn)
 	// I/O
 	fn_cont.writeValue(fh);
 	fn_img.writeValue(fh);
-	do_parallel_discio.writeValue(fh);
 
 	// Reference
 	fn_ref.writeValue(fh);
@@ -3423,6 +3510,12 @@ void Auto3DJobWindow::write(std::string fn)
 	range_tilt.writeValue(fh);
 	range_psi.writeValue(fh);
 
+	// Compute
+	do_combine_thru_disc.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
+	nr_pool.writeValue(fh);
+	do_preread_images.writeValue(fh);
+
 	closeWriteFile(fh, fn);
 }
 
@@ -3441,7 +3534,6 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		// I/O
 		fn_cont.readValue(fh);
 		fn_img.readValue(fh);
-		do_parallel_discio.readValue(fh);
 
 		// Reference
 		fn_ref.readValue(fh);
@@ -3484,6 +3576,12 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		helical_z_percentage.readValue(fh);
 		range_tilt.readValue(fh);
 		range_psi.readValue(fh);
+
+		// Compute
+		do_combine_thru_disc.readValue(fh);
+		do_parallel_discio.readValue(fh);
+		nr_pool.readValue(fh);
+		do_preread_images.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -3584,9 +3682,15 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			command += " --ini_high " + floatToString(ini_high.getValue());
 
 	}
-	// Parallel disc I/O?
+
+	// Always do compute stuff
+	if (!do_combine_thru_disc.getValue())
+		command += " --dont_combine_weights_via_disc";
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
+	command += " --pool " + floatToString(nr_pool.getValue());
+	if (do_preread_images.getValue())
+		command += " --preread_images" ;
 
 	// CTF stuff
 	if (!is_continue)

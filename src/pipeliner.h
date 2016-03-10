@@ -190,7 +190,8 @@ class PipeLine
 	void addNewOutputEdge(long int output_from_process, Node &_Node);
 
 	// Check whether Node already exists in the nodeList. If not add and return pointer to new node, otherwise return pointer to existing node
-	long int addNode(Node &_Node);
+	// Also touch entry in .Nodes directory, use touch_if_not_exist for scheduled jobs
+	long int addNode(Node &_Node, bool touch_if_not_exist = false);
 
 	// Add a new Process to the list (no checks are performed)
 	long int addNewProcess(Process &_Process, bool do_overwrite = false);
@@ -207,8 +208,11 @@ class PipeLine
 	// Return true if Node output file exists and temporary file is written, false otherwise
 	bool touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist=false);
 
-	// Make empty entries of all NodeNames in a hidden directory (useful for file browsing for InputNode I/O)
-	void makeNodeDirectory();
+	// And delete these temporary files
+	void deleteTemporaryNodeFile(Node &node);
+
+	// Re-make entries of all NodeNames in the hidden .Nodes directory (for file browsing for InputNode I/O)
+	void remakeNodeDirectory();
 
 	// Check for process completion by cheking for the presence of all outputNode filenames
 	void checkProcessCompletion();

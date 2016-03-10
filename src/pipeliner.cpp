@@ -22,7 +22,7 @@
 
 //#define DEBUG
 
-long int PipeLine::addNode(Node &_Node)
+long int PipeLine::addNode(Node &_Node, bool touch_if_not_exist)
 {
 
 	if (_Node.name=="")
@@ -55,6 +55,9 @@ long int PipeLine::addNode(Node &_Node)
 	{
 		nodeList.push_back(_Node);
 	}
+
+	touchTemporaryNodeFile(nodeList[i], touch_if_not_exist);
+
 	return i;
 
 }
@@ -109,9 +112,12 @@ void PipeLine::addNewInputEdge(Node &_Node, long int myProcess)
 void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 {
 
-	// 1. Check whether Node with that name already exists in the Node list
 	long int old_size = nodeList.size();
-	long int myNode = addNode(_Node);
+
+	// 1. Check whether Node with that name already exists in the Node list
+	// Touch .Nodes entries even if they don't exist for scheduled jobs
+	bool touch_if_not_exist = (processList[myProcess].status == PROC_SCHEDULED_CONT || processList[myProcess].status == PROC_SCHEDULED_NEW);
+	long int myNode = addNode(_Node, touch_if_not_exist);
 
 	// 2. Set the output_from_process of this Node
 	nodeList[myNode].outputFromProcess = myProcess;
@@ -119,10 +125,6 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 	// 3. Only for new Nodes, add this Node to the outputNodeList of myProcess
 	if (myNode == old_size)
 		processList[myProcess].outputNodeList.push_back(myNode);
-
-	// Touch .Nodes file, even if it doesn't exist yet for scheduled jobs
-	bool touch_if_not_exist = (processList[myProcess].status == PROC_SCHEDULED_CONT || processList[myProcess].status == PROC_SCHEDULED_NEW);
-	touchTemporaryNodeFile(nodeList[myNode], touch_if_not_exist);
 
 }
 
@@ -239,8 +241,6 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	FileName fnt;
 
 	// Check whether there is an alias for the corresponding process
-	//if (node.outputFromProcess < 0)
-	//	REPORT_ERROR("Pipeline ERROR: node " + node.name + " does not seem to come from any process in the pipeline..." );
 	FileName fn_alias = (node.outputFromProcess < 0) ? "None" : processList[node.outputFromProcess].alias;
 
 	if (fn_alias != "None")
@@ -261,19 +261,52 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
 		FileName fn_type = integerToString(node.type) + "/";
-		std::string command = "mkdir -p " + fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
-		int res = system(command.c_str());
+		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
+		FileName mynode = fn_dir + fn_type + fnt;
+		std::string command;
+		if (!exists(mydir))
+		{
+			command = "mkdir -p " + mydir;
+			int res = system(command.c_str());
+		}
 		command = "touch " + fn_dir + fn_type + fnt;
-		res = system(command.c_str());
-		command = "chmod 777 " + fn_dir + fn_type + fnt;
-		res = system(command.c_str());
+		int res = system(command.c_str());
 		return true;
 	}
 	else
 		return false;
 }
 
-void PipeLine::makeNodeDirectory()
+
+void PipeLine::deleteTemporaryNodeFile(Node &node)
+{
+	FileName fn_dir = ".Nodes/";
+	FileName fnt;
+
+	// Check whether there is an alias for the corresponding process
+	FileName fn_alias = (node.outputFromProcess < 0) ? "None" : processList[node.outputFromProcess].alias;
+
+	if (fn_alias != "None")
+	{
+		// Make sure fn_alias ends with a slash
+		if (fn_alias[fn_alias.length()-1] != '/')
+			fn_alias += "/";
+		FileName fn_pre, fn_jobnr, fn_post;
+		if (decomposePipelineFileName(node.name, fn_pre, fn_jobnr, fn_post))
+			fnt = fn_alias + fn_post;
+		else
+			REPORT_ERROR("PipeLine::touchTemporaryNodeFile ERROR: invalid node name: " + node.name);
+	}
+	else
+		fnt = node.name;
+
+	FileName fn_type = integerToString(node.type) + "/";
+	std::string command = "rm -f " + fn_dir + fn_type + fnt;
+	int res = system(command.c_str());
+
+}
+
+void PipeLine::remakeNodeDirectory()
 {
 	// Clear existing directory
 	FileName fn_dir = ".Nodes/";
@@ -283,20 +316,18 @@ void PipeLine::makeNodeDirectory()
 	for (long int i = 0; i < nodeList.size(); i++)
 	{
 		int myproc = nodeList[i].outputFromProcess;
-		//if (myproc < 0)
-		//	REPORT_ERROR("PipeLine::makeNodeDirectory ERROR: cannot get from which process node " + nodeList[i].name + " is coming.");
 		bool touch_if_not_exist = (myproc < 0) ? false : (processList[myproc].status == PROC_SCHEDULED_CONT ||
 								   	   	   	   	   	   	  processList[myproc].status == PROC_SCHEDULED_NEW);
 		touchTemporaryNodeFile(nodeList[i], touch_if_not_exist);
 	}
 	command = "chmod 777 -R " + fn_dir;
 	res = system(command.c_str());
-
 }
 
 
 void PipeLine::checkProcessCompletion()
 {
+	bool something_changed = false;
 	for (long int i=0; i < processList.size(); i++)
 	{
 		// Only check running processes for file existence
@@ -317,10 +348,13 @@ void PipeLine::checkProcessCompletion()
 			if (all_exist)
 			{
 				processList[i].status = PROC_FINISHED;
+				something_changed = true;
 			}
 		}
 	}
 
+	if (something_changed)
+		write(); // write updated pipeline to disk
 }
 
 // Import a job into the pipeline
@@ -553,9 +587,6 @@ void PipeLine::read(bool only_read_if_file_exists)
 
 	// Close file handler
 	in.close();
-
-	// Re-make the .Node directory
-	makeNodeDirectory();
 
 }
 

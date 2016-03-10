@@ -259,6 +259,9 @@ private:
     static void cb_print_notes(Fl_Widget*, void*);
     inline void cb_print_notes_i();
 
+    static void cb_remake_nodesdir(Fl_Widget*, void*);
+    inline void cb_remake_nodesdir_i();
+
     static void cb_reread_pipeline(Fl_Widget*, void*);
     inline void cb_reread_pipeline_i();
 
