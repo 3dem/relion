@@ -2305,7 +2305,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 
 		// Sjors 7 March 2016 to prevent too high disk access... Read in all pooled images simultaneously
 		// TODO: open and close stacks only once!
-		if (do_parallel_disc_io && !do_preread_images)
+		// Don't do this for sub-tomograms to save RAM!
+		if (do_parallel_disc_io && !do_preread_images && !mymodel.data_dim == 3)
 		{
 			// Read in all images, only open/close common stacks once
 			for (int ipart = 0; ipart < mydata.ori_particles[ori_part_id].particles_id.size(); ipart++, istop++)
@@ -3566,7 +3567,21 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					REPORT_ERROR("unequal pre-read images... BUG!");
 				}
 #else
-				img() = exp_imgs[istop];
+				if (mymodel.data_dim == 3)
+				{
+					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
+					FileName fn_img;
+					std::istringstream split(exp_fn_img);
+					for (int i = 0; i <= istop; i++)
+						getline(split, fn_img);
+
+					img.read(fn_img);
+					img().setXmippOrigin();
+				}
+				else
+				{
+					img() = exp_imgs[istop];
+				}
 #endif
 			}
 			if (has_converged && do_use_reconstruct_images)
