@@ -411,11 +411,16 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 
 bool exists(const FileName &fn)
 {
-    FILE *aux;
+
+#ifdef EXIST_FILES_WITH_STAT
+    struct stat buffer;   
+    return (stat (fn.c_str(), &buffer) == 0); 
+#else    FILE *aux;
     if ((aux = fopen(fn.c_str(), "r")) == NULL)
         return false;
     fclose(aux);
     return true;
+#endif
 }
 
 bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)

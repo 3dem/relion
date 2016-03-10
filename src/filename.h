@@ -58,6 +58,10 @@
 #include <typeinfo>
 
 #include <glob.h>
+#define EXIST_FILES_WITH_STAT
+#ifdef EXIST_FILES_WITH_STAT
+#include <sys/stat.h>
+#endif
 
 #include "src/numerical_recipes.h"
 #include "src/macros.h"
