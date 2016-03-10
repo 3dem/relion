@@ -322,6 +322,8 @@ void Preprocessing::joinAllStarFiles()
 				{
 					RFLOAT mag = 10000;
 					RFLOAT dstep = mag * set_angpix / 10000;
+					if (do_rescale)
+						dstep *= (RFLOAT)extract_size/(RFLOAT)scale;
 					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDonestack)
 					{
 						MDonestack.setValue(EMDL_CTF_MAGNIFICATION, mag);
