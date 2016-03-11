@@ -1441,13 +1441,12 @@ void MlOptimiserMpi::maximization()
 					if (node->rank == reconstruct_rank2)
 					{
 						// Rank 2 does not need to do the joined reconstruction
-						/*
 						if (!do_join_random_halves)
 							wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
-						*/
+
 						// But rank 2 always does the unfiltered reconstruction
 						if (do_auto_refine && has_converged)
 							readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 2);
