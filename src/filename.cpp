@@ -415,7 +415,8 @@ bool exists(const FileName &fn)
 #ifdef EXIST_FILES_WITH_STAT
     struct stat buffer;   
     return (stat (fn.c_str(), &buffer) == 0); 
-#else    FILE *aux;
+#else
+    FILE *aux;
     if ((aux = fopen(fn.c_str(), "r")) == NULL)
         return false;
     fclose(aux);
