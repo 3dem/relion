@@ -2306,7 +2306,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 		// Sjors 7 March 2016 to prevent too high disk access... Read in all pooled images simultaneously
 		// TODO: open and close stacks only once!
 		// Don't do this for sub-tomograms to save RAM!
-		if (do_parallel_disc_io && !do_preread_images && !mymodel.data_dim == 3)
+		if (do_parallel_disc_io && !do_preread_images && mymodel.data_dim != 3)
 		{
 			// Read in all images, only open/close common stacks once
 			for (int ipart = 0; ipart < mydata.ori_particles[ori_part_id].particles_id.size(); ipart++, istop++)
