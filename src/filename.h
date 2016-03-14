@@ -56,12 +56,9 @@
 #include <algorithm>
 #include <vector>
 #include <typeinfo>
-
-#include <glob.h>
-#define EXIST_FILES_WITH_STAT
-#ifdef EXIST_FILES_WITH_STAT
 #include <sys/stat.h>
-#endif
+#include <glob.h>
+#include <errno.h>
 
 #include "src/numerical_recipes.h"
 #include "src/macros.h"
@@ -479,6 +476,15 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
  * @endcode
  */
 bool exists(const FileName& fn);
+
+/** Touch a file on the file system. */
+void touch(const FileName& fn);
+
+/** Copy a file */
+void copy(const FileName &fn_src, const FileName &fn_dest);
+
+/** Make a directory tree*/
+int mktree(const FileName &fn_dir, mode_t mode = 0777);
 
 /** True if the path is a directory */
 bool isDirectory (const FileName &fn);

@@ -412,16 +412,53 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 bool exists(const FileName &fn)
 {
 
-#ifdef EXIST_FILES_WITH_STAT
     struct stat buffer;   
     return (stat (fn.c_str(), &buffer) == 0); 
-#else
-    FILE *aux;
-    if ((aux = fopen(fn.c_str(), "r")) == NULL)
-        return false;
-    fclose(aux);
-    return true;
-#endif
+}
+
+void touch(const FileName &fn)
+{
+    std::ofstream  fh;
+    fh.open(fn.c_str(), std::ios::out);
+    if (!fh)
+        REPORT_ERROR( (std::string)"Filename::touch ERROR: Cannot open file: " + fn);
+    fh.close();
+}
+
+void copy(const FileName &fn_src, const FileName &fn_dest)
+{
+    std::ifstream srce( fn_src.c_str(), std::ios::binary ) ;
+    std::ofstream dest( fn_dest.c_str(), std::ios::binary ) ;
+    dest << srce.rdbuf() ;
+
+}
+
+int mktree(const FileName &fn_dir, mode_t mode)
+{
+    std::string s = fn_dir;
+	size_t pre=0,pos;
+    std::string dir;
+    int mdret;
+
+    // force trailing / so we can handle everything in loop
+    if(s[s.size()-1]!='/')
+        s+='/';
+
+    while((pos=s.find_first_of('/',pre))!=std::string::npos)
+    {
+        dir=s.substr(0,pos++);
+        pre=pos;
+        // if leading / first time is 0 length
+        if (dir.size() == 0)
+        	continue;
+
+        if ((mdret = mkdir(dir.c_str(), mode)) && errno != EEXIST)
+        {
+            return mdret;
+        }
+    }
+
+    return mdret;
 }
 
 bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
