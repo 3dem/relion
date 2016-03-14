@@ -30,7 +30,7 @@ NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn
 	editor->buffer(textbuff_note);
 	fn_note = _fn_note;
 	if (exists(fn_note))
-		int errno = textbuff_note->loadfile(fn_note.c_str());
+		int err = textbuff_note->loadfile(fn_note.c_str());
 	else
 		textbuff_note->text("Describe what this job or project is about here...");
 
@@ -64,7 +64,7 @@ void NoteEditorWindow::cb_save(Fl_Widget*, void* v)
 
 void NoteEditorWindow::cb_save_i()
 {
-	int errno = textbuff_note->savefile(fn_note.c_str());
+	int err = textbuff_note->savefile(fn_note.c_str());
 }
 
 
@@ -82,10 +82,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 		char c;
 		std::cin >> c;
 		if (c == 'y' || c == 'Y')
-		{
-			std::string command = " touch .gui_projectdir ";
-			int res= system(command.c_str());
-		}
+			touch(".gui_projectdir");
 		else
 		{
 			std::cout << " Exiting ... " << std::endl;
@@ -1397,7 +1394,7 @@ void RelionMainWindow::cb_fill_stdout_i()
 		std::ifstream in(".gui_tmpout", std::ios_base::in);
 		if (in.fail())
 			REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_out + " does not exists" );
-		int errno = textbuff_stdout->loadfile(".gui_tmpout");
+		int err = textbuff_stdout->loadfile(".gui_tmpout");
 		disp_stdout->scroll(textbuff_stdout->length(), 0);
 		in.close();
 	}
@@ -1409,7 +1406,7 @@ void RelionMainWindow::cb_fill_stdout_i()
 		std::ifstream in(fn_err.data(), std::ios_base::in);
 		if (in.fail())
 			REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_err + " does not exists" );
-		int errno = textbuff_stderr->loadfile(fn_err.c_str());
+		int err = textbuff_stderr->loadfile(fn_err.c_str());
 		disp_stderr->scroll(textbuff_stderr->length(), 0);
 		in.close();
 	}
@@ -1493,8 +1490,8 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 				std::string fn_node = pipeline.nodeList[j].name;
 				if (exists(fn_node))
 				{
-					std::string mvcommand = "mv -f " + fn_node + " " + fn_node + ".old";
-					int res = system(mvcommand.c_str());
+					std::string path2 =  fn_node + ".old";
+					rename(fn_node.c_str(), path2.c_str());
 				}
 			}
 		}
@@ -1553,10 +1550,7 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	// Copy pipeline star file as backup to the output directory
 	FileName fn_pipe = pipeline.name + "_pipeline.star";
 	if (exists(fn_pipe))
-	{
-		std::string command = "cp " + fn_pipe + " " + pipeline.processList[current_job].name;
-		int res = system(command.c_str());
-	}
+		copy(fn_pipe, pipeline.processList[current_job].name + fn_pipe);
 
 }
 
@@ -1666,23 +1660,19 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 				alldirs = alldirs.beforeLastOf("/");
 				// Move entire output directory (with subdirectory structure) to the Trash folder
 				FileName firstdirs = alldirs.beforeLastOf("/");
-				std::string command = "mkdir -p Trash/" + firstdirs;
-				int res = system(command.c_str());
-				command= "mv -f " + alldirs + " Trash/" + firstdirs+"/.";
+				FileName fn_tree="Trash/" + firstdirs;
+				int res = mktree(fn_tree);
+				std::string command = "mv -f " + alldirs + " " + "Trash/" + firstdirs+"/.";
 				res = system(command.c_str());
 				// Also remove the symlink if it exists
 				FileName fn_alias = (pipeline.processList[i]).alias;
 				if (fn_alias != "None")
 				{
-					int res = std::remove((fn_alias.beforeLastOf("/")).c_str());
+					int res = unlink((fn_alias.beforeLastOf("/")).c_str());
 				}
 
-				// Also delete the entries in the .Nodes directory
-				for (int j = 0; j < pipeline.processList[i].outputNodeList.size(); j++)
-				{
-					long int inode = pipeline.processList[i].outputNodeList[j];
-					pipeline.deleteTemporaryNodeFile(pipeline.nodeList[inode]);
-				}
+				pipeline.deleteTemporaryNodeFiles(pipeline.processList[i]);
+
 			}
 		}
 
@@ -2015,15 +2005,11 @@ void RelionMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 			FileName fn_dest = "Trash/" + fns_del[idel];
 			FileName fn_dir = fn_dest.beforeLastOf("/");
 			if (fn_dir != fn_old_dir && ! exists(fn_dir))
-			{
-				std::string command = "mkdir -p " + fn_dir;
-				int res = system(command.c_str());
-			}
+				int res = mktree(fn_dir);
 			// by removing entire directories, it could be the file is gone already
 			if (exists(fns_del[idel]))
 			{
 				std::string command = "mv -f " + fns_del[idel] + " "+ fn_dir;
-				//std::cerr << command << std::endl;
 				int res = system(command.c_str());
 			}
 		} // end loop over all files to be deleted
@@ -2049,8 +2035,10 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 
 	// If alias already exists: remove that symlink
 	FileName fn_alias = pipeline.processList[current_job].alias;
+	FileName fn_old_alias="";
 	if (fn_alias != "None")
 	{
+		fn_old_alias = fn_alias;
 		std::remove((fn_alias.beforeLastOf("/")).c_str());
 		default_ask = fn_alias.without(fn_pre);
 		if (default_ask[default_ask.length()-1] == '/')
@@ -2118,17 +2106,42 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		}
 	}
 
-	// No alias if the alias contains a uniquedate string because of continuation of relion_refine jobs
-	// (where alias_current_job contains a different uniqdate than the outputname of the job)
+	// Remove the original .Nodes entry
+	pipeline.deleteTemporaryNodeFiles(pipeline.processList[current_job]);
+
+	// No alias if the alias contains a unique jobnr string because of continuation of relion_refine jobs
+	// (where alias_current_job contains a different uniq jobnr than the outputname of the job)
 	if (alias == "None" )
+	{
 		pipeline.processList[current_job].alias = "None";
+	}
 	else
+	{
+		// If this was already an alias: remove the old symbolic link
+		if (fn_old_alias != "")
+		{
+			std::string link= fn_pre + fn_old_alias;
+			int res2 = unlink(link.c_str());
+		}
+
+		// Set the alias in the pipeline
 		pipeline.processList[current_job].alias = fn_pre + alias;
 
-	// Write new pipeline to disc and read in again
-	pipeline.write();
-	pipeline.read();
+		//Make the new symbolic link
+		FileName path1 = "../" + pipeline.processList[current_job].name;
+		FileName path2 = pipeline.processList[current_job].alias;
+		int res = symlink(path1.c_str(), path2.beforeLastOf("/").c_str());
 
+	}
+
+	// Remake the new .Nodes entry
+	pipeline.touchTemporaryNodeFiles(pipeline.processList[current_job]);
+
+	// Write new pipeline to disc
+	pipeline.write();
+
+	// Update the name in the lists
+	updateJobLists();
 }
 
 
@@ -2157,11 +2170,16 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		pipeline.processList[current_job].type == PROC_3DAUTO)
 	{
 		// Get the last iteration optimiser file
-		FileName fn_opt = pipeline.processList[current_job].name + "run*optimiser.star";
+		FileName fn_opt;
+		if (pipeline.processList[current_job].alias != "None")
+			fn_opt = pipeline.processList[current_job].alias + "run*optimiser.star";
+		else
+			fn_opt = pipeline.processList[current_job].name + "run*optimiser.star";
 		std::vector<FileName> fn_opts;
 		fn_opt.globFiles(fn_opts);
 		if (fn_opts.size() > 0)
 		{
+
 			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
 			Node node1(fn_opt, NODE_OPTIMISER);
 			pipeline.addNewOutputEdge(current_job, node1);
@@ -2196,12 +2214,11 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		}
 	}
 
-	// Write new pipeline to disc and read in again
-	pipeline.write();
-	pipeline.read();
-
 	// Update all job lists in the main GUI
 	updateJobLists();
+
+	// Write updated pipeline to disk
+	pipeline.write();
 
 }
 
@@ -2334,12 +2351,15 @@ void RelionMainWindow::cb_import_i(bool is_undelete)
 			FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
 			if (!exists(fn_dir_dest))
 			{
-				std::string command = "mkdir -p " + fn_dir_dest;
-				int res = system(command.c_str());
+				mktree(fn_dir_dest);
 			}
 			std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
 			std::cout << command << std::endl;
 			int res = system(command.c_str());
+
+			// Also re-make all entries in the .Nodes directory
+			long int myproc = pipeline.findProcessByName(fn_proc);
+			pipeline.touchTemporaryNodeFiles(pipeline.processList[myproc]);
 		}
 		std::cout << " Done undeleting! " << std::endl;
 	}
@@ -2506,15 +2526,14 @@ void RelionMainWindow::cb_start_pipeliner_i()
 		}
 	}
 
-	std::string command = "touch RUNNING_PIPELINER_" + pipeline.name;
-	int res = system(command.c_str());
-	command = "relion_pipeliner --pipeline " + pipeline.name;
+	touch("RUNNING_PIPELINER_" + pipeline.name);
+	std::string command = "relion_pipeliner --pipeline " + pipeline.name;
 
 	command += " --repeat " + integerToString(nr_repeat);
 	command += " --min_wait " + integerToString(min_wait);
 	// Run this in the background, so control returns to the window
 	command += " &";
-	res = system(command.c_str());
+	int res = system(command.c_str());
 	std::cout << " Launching: " << command << std::endl;
 	std::cout << " Stop pipeliner by deleting file PIPELINER_" + pipeline.name << std::endl;;
 }

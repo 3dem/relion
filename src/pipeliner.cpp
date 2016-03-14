@@ -26,7 +26,7 @@ long int PipeLine::addNode(Node &_Node, bool touch_if_not_exist)
 {
 
 	if (_Node.name=="")
-		REPORT_ERROR("PipeLine::addNode ERROR: Adding an empty nodename. Did you fill in all Node named correctly?");
+		REPORT_ERROR("PipeLine::addNode ERROR: Adding an empty nodename. Did you fill in all Node names correctly?");
 
 	// Check if _Node has an aliased name, and if so, revert back to the original name!
 	FileName fn_node = _Node.name;
@@ -117,10 +117,10 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 	// 1. Check whether Node with that name already exists in the Node list
 	// Touch .Nodes entries even if they don't exist for scheduled jobs
 	bool touch_if_not_exist = (processList[myProcess].status == PROC_SCHEDULED_CONT || processList[myProcess].status == PROC_SCHEDULED_NEW);
-	long int myNode = addNode(_Node, touch_if_not_exist);
 
 	// 2. Set the output_from_process of this Node
-	nodeList[myNode].outputFromProcess = myProcess;
+	_Node.outputFromProcess = myProcess;
+	long int myNode = addNode(_Node, touch_if_not_exist);
 
 	// 3. Only for new Nodes, add this Node to the outputNodeList of myProcess
 	if (myNode == old_size)
@@ -263,20 +263,32 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 		FileName fn_type = integerToString(node.type) + "/";
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
+		std::cerr << "mynodename="<<mynode<<std::endl;
 		std::string command;
 		if (!exists(mydir))
 		{
 			command = "mkdir -p " + mydir;
 			int res = system(command.c_str());
 		}
-		command = "touch " + fn_dir + fn_type + fnt;
-		int res = system(command.c_str());
+		touch(mynode);
 		return true;
 	}
 	else
 		return false;
 }
 
+void PipeLine::touchTemporaryNodeFiles(Process &process)
+{
+
+	bool touch_if_not_exist = (process.status == PROC_SCHEDULED_CONT || process.status == PROC_SCHEDULED_NEW);
+
+	for (int j = 0; j < process.outputNodeList.size(); j++)
+	{
+		long int mynode = process.outputNodeList[j];
+		touchTemporaryNodeFile(nodeList[mynode], touch_if_not_exist);
+	}
+
+}
 
 void PipeLine::deleteTemporaryNodeFile(Node &node)
 {
@@ -295,14 +307,30 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 		if (decomposePipelineFileName(node.name, fn_pre, fn_jobnr, fn_post))
 			fnt = fn_alias + fn_post;
 		else
-			REPORT_ERROR("PipeLine::touchTemporaryNodeFile ERROR: invalid node name: " + node.name);
+			REPORT_ERROR("PipeLine::deleteTemporaryNodeFile ERROR: invalid node name: " + node.name);
 	}
 	else
 		fnt = node.name;
 
 	FileName fn_type = integerToString(node.type) + "/";
-	std::string command = "rm -f " + fn_dir + fn_type + fnt;
-	int res = system(command.c_str());
+	FileName fn = fn_dir + fn_type + fnt;
+	int res = remove(fn.c_str());
+
+	// Also remove the directory if it is empty
+	// TODO: check what happens if the directory is not empty yet....
+	fn = fn.beforeLastOf("/");
+	res = remove(fn.c_str());
+
+}
+
+void PipeLine::deleteTemporaryNodeFiles(Process &process)
+{
+
+	for (int j = 0; j < process.outputNodeList.size(); j++)
+	{
+		long int mynode = process.outputNodeList[j];
+		deleteTemporaryNodeFile(nodeList[mynode]);
+	}
 
 }
 
@@ -514,9 +542,10 @@ void PipeLine::read(bool only_read_if_file_exists)
 			// Only make the alias if it doesn't exist yet, otherwise you end up with recursive ones.
 			if (!exists(fn_alias))
 			{
-				std::string command = " ln -s ../" + name + " " + fn_alias;
-				int res= system(command.c_str());
-
+				//std::string command = " ln -s ../" + name + " " + fn_alias;
+				//int res= system(command.c_str());
+				std::string path1 = "../" + name;
+				int res = symlink(path1.c_str(), fn_alias.c_str());
 			}
 		}
 	}

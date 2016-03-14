@@ -207,9 +207,11 @@ class PipeLine
 	// Touch each individual Node name in the temporary Nodes directory
 	// Return true if Node output file exists and temporary file is written, false otherwise
 	bool touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist=false);
+	void touchTemporaryNodeFiles(Process &process);
 
 	// And delete these temporary files
 	void deleteTemporaryNodeFile(Node &node);
+	void deleteTemporaryNodeFiles(Process &process);
 
 	// Re-make entries of all NodeNames in the hidden .Nodes directory (for file browsing for InputNode I/O)
 	void remakeNodeDirectory();
