@@ -76,6 +76,7 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 	{
 		// Do this before reading in the data.star file below!
 		do_preread_images   = checkParameter(argc, argv, "--preread_images");
+		do_parallel_disc_io = !checkParameter(argc, argv, "--no_parallel_disc_io");
 
 		parser.addSection("Continue options");
 		FileName fn_in = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
@@ -261,9 +262,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	x_pool = textToInteger(parser.getOption("--pool", "Number of images to pool for each thread task", "1"));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to run in parallel (only useful on multi-core machines)", "1"));
-
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
-
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 
