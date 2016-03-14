@@ -2481,9 +2481,10 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --dont_combine_weights_via_disc";
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
-	command += " --pool " + floatToString(nr_pool.getValue());
 	if (do_preread_images.getValue())
-		command += " --preread_images" ;
+		command += " --preread_images --pool 1 " ;
+	else
+		command += " --pool " + floatToString(nr_pool.getValue());
 
 	// CTF stuff
 	if (!is_continue)
@@ -3093,9 +3094,10 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --dont_combine_weights_via_disc";
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
-	command += " --pool " + floatToString(nr_pool.getValue());
 	if (do_preread_images.getValue())
-		command += " --preread_images" ;
+		command += " --preread_images --pool 1 " ;
+	else
+		command += " --pool " + floatToString(nr_pool.getValue());
 
 	// CTF stuff
 	if (!is_continue)
@@ -3688,9 +3690,10 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command += " --dont_combine_weights_via_disc";
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
-	command += " --pool " + floatToString(nr_pool.getValue());
 	if (do_preread_images.getValue())
-		command += " --preread_images" ;
+		command += " --preread_images --pool 1 " ;
+	else
+		command += " --pool " + floatToString(nr_pool.getValue());
 
 	// CTF stuff
 	if (!is_continue)
