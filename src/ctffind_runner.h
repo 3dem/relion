@@ -53,6 +53,27 @@ public:
 	// CTFFIND and Gctf executables
 	FileName fn_ctffind_exe, fn_gctf_exe;
 
+	// Is this ctffind4?
+	bool is_ctffind4;
+
+	// Number of OMP threads for CTFFIND4
+	int nr_threads;
+
+	// Calculate Thon rings from movies?
+	bool do_movie_thon_rings;
+
+	// Movie rootname
+	FileName movie_rootname;
+
+	// Number of movie frames to average
+	int avg_movie_frames;
+
+	// Estimate phaseshift from a phase-plate?
+	bool do_phaseshift;
+
+	// Min, max and step phase-shift
+	RFLOAT phase_min, phase_max, phase_step;
+
 	// use Kai Zhang's Gctf instead of CTFFIND?
 	bool do_use_gctf;
 
@@ -137,7 +158,7 @@ public:
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found = true);
+			RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, RFLOAT &phaseshift, bool die_if_not_found = true);
 };
 
 

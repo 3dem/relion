@@ -266,10 +266,15 @@ public:
 	SliderEntry ctf_win;
 	SliderEntry cs, kv, q0, angpix, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
+	BooleanEntry is_ctffind4, do_movie_thon_rings, do_phaseshift;
+	SliderEntry avg_movie_frames;
+	AnyEntry phase_min, phase_max, phase_step;
+	AnyEntry movie_rootname;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
+
 	AnyEntry other_gctf_args;
 
-	Fl_Group *gctf_group;
+	Fl_Group *gctf_group, *ctffind4_group, *movie_group, *phaseshift_group;
 
 public:
 
@@ -922,15 +927,17 @@ public:
 
 	// I/O
 	InputNodeEntry fn_in;
+	BooleanEntry do_subtract;
 	InputNodeEntry fn_data;
 	InputNodeEntry fn_mask;
+	BooleanEntry do_fliplabel;
 
 	// CTF
 	BooleanEntry do_ctf_correction;
 	BooleanEntry ctf_phase_flipped;
 	BooleanEntry ctf_intact_first_peak;
 
-	Fl_Group *ctf_group;
+	Fl_Group *ctf_group, *subtract_group;
 
 public:
 

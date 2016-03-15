@@ -923,7 +923,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 }
 
 
-CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
+CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_THREAD)
 {
 	type = PROC_CTFFIND;
 
@@ -992,7 +992,44 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 
 
 	tab4->begin();
-	tab4->label("Gctf");
+	tab4->label("CTFFIND4");
+	resetHeight();
+
+	ctffind4_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	ctffind4_group->end();
+
+	is_ctffind4.place(current_y, "Is this a CTFFIND 4.1+ executable?", false, "If set to Yes, the wrapper will use the extended functionaility of CTFFIND4 (version 4.1 or newer). This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.", ctffind4_group);
+	ctffind4_group->begin();
+
+	movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	movie_group->end();
+
+	do_movie_thon_rings.place(current_y, "Estimate Thon rongs from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access", movie_group);
+
+	movie_group->begin();
+	movie_rootname.place(current_y, "Movie rootname plus extension", "_movie.mrcs", "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");
+	avg_movie_frames.place(current_y, "Nr of movie frames to average:", 4, 1, 20, 1,"Calculate averages over so many movie frames to calculate power spectra. Often values corresponding to an accumulated dose of ~ 4 electrons per squared Angstrom work well.");
+	movie_group->end();
+	do_movie_thon_rings.cb_menu_i(); // make default active
+
+	phaseshift_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	phaseshift_group->end();
+
+	do_phaseshift.place(current_y, "Estimate phase shifts?", false, "If set to Yes, CTFFIND4 will estimate the phase shift, e.g. as introduced by a Volta phase-plate", phaseshift_group);
+
+	phaseshift_group->begin();
+	phase_min.placeOnSameYPosition(current_y, "Phase shift - Min, Max, Step (deg):", "Phase shift search (deg) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	phase_max.placeOnSameYPosition(current_y, "", "Phase shift search (deg) - Max:", "180", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	phase_step.placeOnSameYPosition(current_y, "", "Phase shift search (deg) - Step:", "10", "Minimum, maximum and step size (in degrees) for the search of the phase shift", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	phaseshift_group->end();
+	do_phaseshift.cb_menu_i(); // make default active
+
+	ctffind4_group->end();
+	is_ctffind4.cb_menu_i(); // make default active
+
+	tab4->end();
+	tab5->begin();
+	tab5->label("Gctf");
 	resetHeight();
 
 	gctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -1020,7 +1057,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREA
 	gctf_group->end();
 	use_gctf.cb_menu_i(); // make default active
 
-	tab4->end();
+	tab5->end();
 
 	// read settings if hidden file exists
 	read(".gui_ctffind", is_continue);
@@ -1036,10 +1073,12 @@ void CtffindJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star_mics.writeValue(fh);
+
 	cs.writeValue(fh);
 	kv.writeValue(fh);
 	q0.writeValue(fh);
 	angpix.writeValue(fh);
+
 	box.writeValue(fh);
 	resmin.writeValue(fh);
 	resmax.writeValue(fh);
@@ -1049,6 +1088,16 @@ void CtffindJobWindow::write(std::string fn)
 	dast.writeValue(fh);
 	fn_ctffind_exe.writeValue(fh);
 	ctf_win.writeValue(fh);
+
+	is_ctffind4.writeValue(fh);
+	do_movie_thon_rings.writeValue(fh);
+	movie_rootname.writeValue(fh);
+	avg_movie_frames.writeValue(fh);
+	do_phaseshift.writeValue(fh);
+	phase_min.writeValue(fh);
+	phase_max.writeValue(fh);
+	phase_step.writeValue(fh);
+
 	use_gctf.writeValue(fh);
 	fn_gctf_exe.writeValue(fh);
 	do_ignore_ctffind_params.writeValue(fh);
@@ -1070,10 +1119,12 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star_mics.readValue(fh);
+
 		cs.readValue(fh);
 		kv.readValue(fh);
 		q0.readValue(fh);
 		angpix.readValue(fh);
+
 		box.readValue(fh);
 		resmin.readValue(fh);
 		resmax.readValue(fh);
@@ -1082,6 +1133,16 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 		dfstep.readValue(fh);
 		dast.readValue(fh);
 		fn_ctffind_exe.readValue(fh);
+
+		is_ctffind4.readValue(fh);
+		do_movie_thon_rings.readValue(fh);
+		movie_rootname.readValue(fh);
+		avg_movie_frames.readValue(fh);
+		do_phaseshift.readValue(fh);
+		phase_min.readValue(fh);
+		phase_max.readValue(fh);
+		phase_step.readValue(fh);
+
 		ctf_win.readValue(fh);
 		use_gctf.readValue(fh);
 		fn_gctf_exe.readValue(fh);
@@ -1098,10 +1159,12 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	input_star_mics.deactivate(is_continue);
+
 	cs.deactivate(is_continue);
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+
 	box.deactivate(is_continue);
 	resmin.deactivate(is_continue);
 	resmax.deactivate(is_continue);
@@ -1111,6 +1174,15 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	dast.deactivate(is_continue);
 	fn_ctffind_exe.deactivate(is_continue);
 	ctf_win.deactivate(is_continue);
+
+	is_ctffind4.deactivate(is_continue);
+	do_movie_thon_rings.deactivate(is_continue);
+	movie_rootname.deactivate(is_continue);
+	avg_movie_frames.deactivate(is_continue);
+	do_phaseshift.deactivate(is_continue);
+	phase_min.deactivate(is_continue);
+	phase_max.deactivate(is_continue);
+	phase_step.deactivate(is_continue);
 	use_gctf.deactivate(is_continue);
 	fn_gctf_exe.deactivate(is_continue);
 	do_ignore_ctffind_params.deactivate(is_continue);
@@ -1168,6 +1240,23 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	{
 		command += " --ctffind_exe " + fn_ctffind_exe.getValue();
 		command += " --ctfWin " + floatToString(ctf_win.getValue());
+		if (is_ctffind4.getValue())
+		{
+			command += " --is_ctffind4 ";
+			command += " --j " + floatToString(nr_threads.getValue());
+			if (do_movie_thon_rings.getValue())
+			{
+				command += " --do_movie_thon_rings --avg_movie_frames " + floatToString(avg_movie_frames.getValue());
+				command += " --movie_rootname " + movie_rootname.getValue();
+			}
+			if (do_phaseshift.getValue())
+			{
+				command += " --do_phaseshift ";
+				command += " --phase_min " + floatToString(textToFloat(phase_min.getValue()));
+				command += " --phase_max " + floatToString(textToFloat(phase_max.getValue()));
+				command += " --phase_step " + floatToString(textToFloat(phase_step.getValue()));
+			}
+		}
 	}
 
 
@@ -5082,24 +5171,33 @@ SubtractJobWindow::SubtractJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_data.place(current_y, "Particles to subtract from:", NODE_PART_DATA, "", "STAR files (*.star)", "A copy of the entire set of particles in this STAR file will be made that contains the subtracted particle images.");
+	fn_data.place(current_y, "Input particles:", NODE_PART_DATA, "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
 
     current_y += STEPY/2;
+	subtract_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	subtract_group->end();
 
-    fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same data set, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
+	do_subtract.place(current_y, "Subtract partial signal?", true, "If set to Yes, a copy of the entire set of particle images in this STAR file will be made that contains the subtracted particle images.", subtract_group);
+
+	subtract_group->begin();
+	fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same data set, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
     fn_mask.place(current_y, "Mask to apply to this map:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is white (1) and the rest of the protein and the solvent is black (0).");
+    subtract_group->end();
+    do_subtract.cb_menu_i(); // make default active
 
+    do_fliplabel.place(current_y, "OR revert to original particles?", false, "If set to Yes, no signal subtraction is performed. Instead, the labels of rlnImageName and rlnImageOriginalName are flipped in the input STAR file. This will make the STAR file point back to the original, non-subtracted images.");
 
 	tab1->end();
-
 
 	tab2->begin();
 	tab2->label("CTF");
 	resetHeight();
 
+	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	ctf_group->end();
+
 	do_ctf_correction.place(current_y, "Do apply CTFs?", true, "If set to Yes, CTFs will be applied to the projections to subtract from the experimental particles", ctf_group);
 
-	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	ctf_group->begin();
 
 	ctf_phase_flipped.place(current_y, "Have data been phase-flipped?", false, "Set this to Yes if the experimental particles have been \
@@ -5133,6 +5231,8 @@ void SubtractJobWindow::write(std::string fn)
 	fn_data.writeValue(fh);
 	fn_in.writeValue(fh);
 	fn_mask.writeValue(fh);
+	do_subtract.writeValue(fh);
+	do_fliplabel.writeValue(fh);
 
 	do_ctf_correction.writeValue(fh);
 	ctf_phase_flipped.writeValue(fh);
@@ -5157,6 +5257,8 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 		fn_data.readValue(fh);
 		fn_in.readValue(fh);
 		fn_mask.readValue(fh);
+		do_subtract.readValue(fh);
+		do_fliplabel.readValue(fh);
 
 		do_ctf_correction.readValue(fh);
 		ctf_phase_flipped.readValue(fh);
@@ -5173,6 +5275,8 @@ void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 	fn_data.deactivate(is_continue);
 	fn_in.deactivate(is_continue);
 	fn_mask.deactivate(is_continue);
+	do_subtract.deactivate(is_continue);
+	do_fliplabel.deactivate(is_continue);
 
 	do_ctf_correction.deactivate(is_continue);
 	ctf_phase_flipped.deactivate(is_continue);
@@ -5189,34 +5293,48 @@ void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	initialisePipeline(outputname, "Subtract", job_counter);
 
 	std::string command;
-	command="`which relion_project`";
-
-	// I/O
-	command += " --subtract_exp --i " + fn_in.getValue();
-	Node node(fn_in.getValue(), fn_in.type);
-	pipelineInputNodes.push_back(node);
-	command += " --mask " + fn_mask.getValue();
-	Node node2(fn_mask.getValue(), fn_mask.type);
-	pipelineInputNodes.push_back(node2);
-	command += " --ang " + fn_data.getValue();
-	Node node3(fn_data.getValue(), fn_data.type);
-	pipelineInputNodes.push_back(node3);
-
-	command += " --o " + outputname + "subtracted";
-	Node node4(outputname + "subtracted.star", NODE_PART_DATA);
-	pipelineOutputNodes.push_back(node4);
-
-	if (do_ctf_correction.getValue())
+	if (do_subtract.getValue())
 	{
-		command += " --ctf --angpix -1";
-		if (ctf_phase_flipped.getValue())
-			command += " --ctf_phase_flip";
-		if (ctf_intact_first_peak.getValue())
-			command += " --ctf_intact_first_peak";
-	}
+		command="`which relion_project`";
 
-	// Other arguments
-	command += " " + other_args.getValue();
+		// I/O
+		command += " --subtract_exp --i " + fn_in.getValue();
+		Node node(fn_in.getValue(), fn_in.type);
+		pipelineInputNodes.push_back(node);
+		command += " --mask " + fn_mask.getValue();
+		Node node2(fn_mask.getValue(), fn_mask.type);
+		pipelineInputNodes.push_back(node2);
+		command += " --ang " + fn_data.getValue();
+		Node node3(fn_data.getValue(), fn_data.type);
+		pipelineInputNodes.push_back(node3);
+
+		command += " --o " + outputname + "subtracted";
+		Node node4(outputname + "subtracted.star", NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node4);
+
+		if (do_ctf_correction.getValue())
+		{
+			command += " --ctf --angpix -1";
+			if (ctf_phase_flipped.getValue())
+				command += " --ctf_phase_flip";
+			if (ctf_intact_first_peak.getValue())
+				command += " --ctf_intact_first_peak";
+		}
+
+		// Other arguments
+		command += " " + other_args.getValue();
+	}
+	else if (do_fliplabel.getValue())
+	{
+		Node node(fn_data.getValue(), fn_data.type);
+		pipelineInputNodes.push_back(node);
+
+		Node node2(outputname + "original.star", NODE_PART_DATA);
+		pipelineOutputNodes.push_back(node2);
+
+		command = "awk '{if  ($1==\"_rlnImageName\") {$1=\"_rlnImageOriginalName\"} else if ($1==\"_rlnImageOriginalName\") {$1=\"_rlnImageName\"}; print }' < ";
+		command += fn_data.getValue() + " > " + outputname + "original.star";
+	}
 
 	commands.push_back(command);
 

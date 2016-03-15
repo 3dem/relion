@@ -58,6 +58,7 @@ protected:
     RFLOAT K2;
     RFLOAT K3;
     RFLOAT K4;
+    RFLOAT K5;
 
     // Azimuthal angle in radians
     RFLOAT rad_azimuth;
@@ -160,7 +161,7 @@ public:
         RFLOAT u4 = u2 * u2;
         // if (u2>=ua2) return 0;
         RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT argument = K1 * deltaf * u2 + K2 * u4;
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5;
         RFLOAT retval;
         if (do_intact_until_first_peak && ABS(argument) < PI/2.)
         {
@@ -168,7 +169,7 @@ public:
         }
         else
         {
-            retval = -(K3*sin(argument + phase_shift) - Q0*cos(argument + phase_shift)); // Q0 should be positive
+            retval = -(K3*sin(argument) - Q0*cos(argument)); // Q0 should be positive
         }
         if (do_damping)
         {
