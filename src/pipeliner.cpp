@@ -263,7 +263,6 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 		FileName fn_type = integerToString(node.type) + "/";
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
-		std::cerr << "mynodename="<<mynode<<std::endl;
 		std::string command;
 		if (!exists(mydir))
 		{
