@@ -554,6 +554,9 @@ void RelionMainWindow::loadJobFromPipeline()
 	int itype = pipeline.processList[current_job].type;
 	fn_settings = pipeline.processList[current_job].name;
 
+	// The following line allows certain browse buttons to only open the current directory (using CURRENT_ODIR)
+	current_browse_directory = pipeline.processList[current_job].name;
+
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
 	{
 		if ( browse_jobtype[t] == itype )

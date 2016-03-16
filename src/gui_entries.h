@@ -57,6 +57,9 @@
 #include <stdlib.h>
 #include <math.h>
 
+ // forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
+extern std::string current_browse_directory;
+
 // Gui layout
 //#define XCOL1 10
 //#define XCOL2 260
