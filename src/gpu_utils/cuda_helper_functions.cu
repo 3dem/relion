@@ -726,7 +726,7 @@ void windowFourierTransform2(
 	if (iX > 1 && iY/2 + 1 != iX)
 		REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
 
-	if (oY == iX)
+	if (oX == iX)
 		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
 
 
@@ -740,7 +740,7 @@ void windowFourierTransform2(
 		return;
 	}
 
-	if (oY > iX)
+	if (oX > iX)
 	{
 		long int max_r2 = (iX - 1) * (iX - 1);
 
