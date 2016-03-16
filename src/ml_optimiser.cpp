@@ -265,6 +265,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
+	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
