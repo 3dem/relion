@@ -14,6 +14,7 @@
 
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 #include <execinfo.h>
+#include <cxxabi.h>
 #endif
 
 #ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
@@ -402,10 +403,71 @@ private:
 			if (guards[i] != GUARD_VALUE)
 			{
 				fprintf (stderr, "ERROR: CORRUPTED BYTE GUARDS DETECTED\n");
-				backtrace_symbols_fd(a->backtrace, a->backtraceSize, STDERR_FILENO);
-				fprintf (stderr, "\n");
-				fflush(stdout);
-//				raise(SIGSEGV);
+
+				char ** messages = backtrace_symbols(a->backtrace, a->backtraceSize);
+
+				// skip first stack frame (points here)
+				for (int i = 1; i < a->backtraceSize && messages != NULL; ++i)
+				{
+					char *mangled_name = 0, *offset_begin = 0, *offset_end = 0;
+
+					// find parantheses and +address offset surrounding mangled name
+					for (char *p = messages[i]; *p; ++p)
+					{
+						if (*p == '(')
+						{
+							mangled_name = p;
+						}
+						else if (*p == '+')
+						{
+							offset_begin = p;
+						}
+						else if (*p == ')')
+						{
+							offset_end = p;
+							break;
+						}
+					}
+
+					// if the line could be processed, attempt to demangle the symbol
+					if (mangled_name && offset_begin && offset_end &&
+						mangled_name < offset_begin)
+					{
+						*mangled_name++ = '\0';
+						*offset_begin++ = '\0';
+						*offset_end++ = '\0';
+
+						int status;
+						char * real_name = abi::__cxa_demangle(mangled_name, 0, 0, &status);
+
+						// if demangling is successful, output the demangled function name
+						if (status == 0)
+						{
+							std::cerr << "[bt]: (" << i << ") " << messages[i] << " : "
+									  << real_name << "+" << offset_begin << offset_end
+									  << std::endl;
+
+						}
+						// otherwise, output the mangled function name
+						else
+						{
+							std::cerr << "[bt]: (" << i << ") " << messages[i] << " : "
+									  << mangled_name << "+" << offset_begin << offset_end
+									  << std::endl;
+						}
+//						free(real_name);
+					}
+					// otherwise, print the whole line
+					else
+					{
+						std::cerr << "[bt]: (" << i << ") " << messages[i] << std::endl;
+					}
+				}
+				std::cerr << std::endl;
+
+//				free(messages);
+
+				exit(EXIT_FAILURE);
 			}
 		delete[] guards;
 #endif

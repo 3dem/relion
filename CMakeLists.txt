@@ -123,7 +123,7 @@ option(CustomAllocMemGuards "CustomAllocMemGuards" OFF)
 if(CustomAllocMemGuards)
     add_definitions(-DCUSTOM_ALLOCATOR_MEMGUARD)
     message(STATUS "Abort on out of bound write.")
-endif(NOT CustomAllocMemGuards)
+endif(CustomAllocMemGuards)
 # -------------------------------------------------------------FORCE USE OF STL-LIBS--
 option(CudaForceSTL "CudaForceSTL" OFF)
 if(CudaForceSTL)
