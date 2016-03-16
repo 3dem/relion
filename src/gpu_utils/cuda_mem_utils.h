@@ -8,6 +8,13 @@
 #include <iostream>
 #include <vector>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+#include <execinfo.h>
+#endif
 
 #ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
 #define CUSTOM_ALLOCATOR_REGION_NAME( name ) (fprintf(stderr, "\n%s", name))
@@ -48,7 +55,7 @@ static void HandleError( cudaError_t err, const char *file, int line )
 
     if (err != cudaSuccess)
     {
-		printf( "ERROR: %s in %s at line %d (error-code %d)\n",
+    	fprintf(stderr, "ERROR: %s in %s at line %d (error-code %d)\n",
 						cudaGetErrorString( err ), file, line, err );
 		fflush(stdout);
 		raise(SIGSEGV);
@@ -154,6 +161,9 @@ class CudaCustomAllocator
 
 	typedef unsigned char BYTE;
 
+	const static unsigned GUARD_SIZE = 4;
+	const static BYTE GUARD_VALUE = 145;
+
 public:
 
 	class Alloc
@@ -167,6 +177,13 @@ public:
 		bool free;
 		cudaEvent_t readyEvent; //Event record used for auto free
 		bool freeWhenReady;
+
+
+#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+		BYTE *guardPtr;
+		void *backtrace[20];
+		size_t backtraceSize;
+#endif
 
 		Alloc():
 			prev(NULL), next(NULL),
@@ -374,6 +391,25 @@ private:
 //		printf("free: %u ", a->size);
 //		_printState();
 
+
+#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+		size_t guardCount = a->size - (a->guardPtr - a->ptr);
+		BYTE *guards = new BYTE[guardCount];
+		cudaStream_t stream = 0;
+		cudaCpyDeviceToHost<BYTE>( a->guardPtr, guards, guardCount, stream);
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+		for (int i = 0; i < guardCount; i ++)
+			if (guards[i] != GUARD_VALUE)
+			{
+				fprintf (stderr, "ERROR: CORRUPTED BYTE GUARDS DETECTED\n");
+				backtrace_symbols_fd(a->backtrace, a->backtraceSize, STDERR_FILENO);
+				fprintf (stderr, "\n");
+				fflush(stdout);
+//				raise(SIGSEGV);
+			}
+		delete[] guards;
+#endif
+
 		a->free = true;
 
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
@@ -498,7 +534,7 @@ public:
 
 
 	inline
-	Alloc* alloc(size_t size)
+	Alloc* alloc(size_t requestedSize)
 	{
 		pthread_mutex_lock(&mutex);
 
@@ -507,22 +543,27 @@ public:
 //		printf("alloc: %u ", size);
 //		_printState();
 
+		size_t size = requestedSize;
+
+#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+		//Ad byte-guards
+		size += alignmentSize * GUARD_SIZE; //Ad an integer multiple of alignment size as byte guard size
+#endif
+
 #ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
 		fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
 #endif
+
 #ifdef CUDA_NO_CUSTOM_ALLOCATION
-		Alloc *nAlloc = new Alloc();
-		nAlloc->size = size;
-		nAlloc->free = false;
-		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(nAlloc->ptr), size));
+		Alloc *newAlloc = new Alloc();
+		newAlloc->size = size;
+		newAlloc->free = false;
+		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(newAlloc->ptr), size));
 
 		//Just add to start by replacing first
-		nAlloc->next = first;
-		first->prev = nAlloc;
-		first = nAlloc;
-
-		pthread_mutex_unlock(&mutex);
-		return nAlloc;
+		newAlloc->next = first;
+		first->prev = newAlloc;
+		first = newAlloc;
 #else
 
 		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
@@ -558,18 +599,17 @@ public:
 			}
 		}
 
+		Alloc *newAlloc(NULL);
+
 		if (curAlloc->size == size)
 		{
 			curAlloc->free = false;
-
-			pthread_mutex_unlock(&mutex);
-
-			return curAlloc;
+			newAlloc = curAlloc;
 		}
-		else
+		else //Or curAlloc->size is smaller than size
 		{
 			//Setup new pointer
-			Alloc *newAlloc = new Alloc();
+			newAlloc = new Alloc();
 			newAlloc->next = curAlloc;
 			newAlloc->ptr = curAlloc->ptr;
 			newAlloc->size = size;
@@ -587,12 +627,21 @@ public:
 			newAlloc->prev = curAlloc->prev;
 			newAlloc->next = curAlloc;
 			curAlloc->prev = newAlloc;
-
-			pthread_mutex_unlock(&mutex);
-
-			return newAlloc;
 		}
+
 #endif
+
+		pthread_mutex_unlock(&mutex);
+
+#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+		newAlloc->backtraceSize = backtrace(newAlloc->backtrace, 20);
+		newAlloc->guardPtr = newAlloc->ptr + requestedSize;
+		cudaStream_t stream = 0;
+		cudaMemInit<BYTE>( newAlloc->guardPtr, GUARD_VALUE, size - requestedSize, stream); //TODO switch to specialized stream
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+#endif
+
+		return newAlloc;
 	};
 
 	~CudaCustomAllocator()
