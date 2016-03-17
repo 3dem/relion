@@ -379,7 +379,12 @@ void FileNameEntry::cb_browse_i() {
     Fl::scheme("gtk+");
     Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
 
-    std::string test(directory);
+    std::string test="";
+    if (directory != NULL)
+    {
+        std::string test2(directory);
+        test = test2;
+    }
     if (test=="CURRENT_ODIR")
     	G_chooser->directory(current_browse_directory.c_str());
     else
