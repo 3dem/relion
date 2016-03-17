@@ -2274,9 +2274,13 @@ void MlOptimiserMpi::iterate()
 		maximization();
 
 		// Make sure all nodes have the same resolution, set the data_vs_prior array from half1 also for half2
+		// Because there is an if-statement on ave_Pmax to set the image size, also make sure this one is the same for both halves
 		if (do_split_random_halves)
+		{
+			node->relion_MPI_Bcast(&mymodel.ave_Pmax, 1, MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+		}
 
 #ifdef TIMING
 		timer.toc(TIMING_MAX);
