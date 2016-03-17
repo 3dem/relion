@@ -30,6 +30,16 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+// Sizing
+#define JOBCOLWIDTH (250)
+#define XJOBCOL1 (10)
+#define XJOBCOL2 (JOBCOLWIDTH + 25)
+#define XJOBCOL3 (2*JOBCOLWIDTH + 40)
+#define JOBHEIGHT (170)
+#define JOBHALFHEIGHT ( (JOBHEIGHT) / (2) )
+#define STDOUT_Y (60)
+#define STDERR_Y (170)
+
 #define DO_WRITE true
 #define DONT_WRITE false
 #define DO_READ true
@@ -80,9 +90,7 @@ static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
 static Fl_Input *alias_current_job;
-// Stdout and stderr display
-static Fl_Text_Display *disp_stdout;
-static Fl_Text_Display *disp_stderr;
+
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
 
@@ -102,6 +110,19 @@ static FileName global_outputname;
 // Order jobs in finished window alphabetically?
 static bool do_order_alphabetically;
 
+// Stdout and stderr display
+class StdOutDisplay : public Fl_Text_Display
+{
+public:
+	std::string fn_file;
+	StdOutDisplay(int X, int Y, int W, int H, const char *l = 0) : Fl_Text_Display(X, Y, W, H, l){};
+	~StdOutDisplay() {};
+	int handle(int ev);
+};
+
+static StdOutDisplay *disp_stdout;
+static StdOutDisplay *disp_stderr;
+
 class NoteEditorWindow : public Fl_Window
 {
 
@@ -110,7 +131,8 @@ public:
 	FileName fn_note;
 	Fl_Text_Editor *editor;
 	Fl_Text_Buffer *textbuff_note;
-	NoteEditorWindow(int w, int h, const char* t, FileName _fn_note);
+	bool allow_save;
+	NoteEditorWindow(int w, int h, const char* t, FileName _fn_note, bool _allow_save = true);
 
 	~NoteEditorWindow() {};
 
@@ -125,8 +147,6 @@ private:
 };
 
 
-
-
 class RelionMainWindow : public Fl_Window
 {
 
@@ -137,7 +157,10 @@ public:
 	Fl_Tabs *tabs;
 	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
 
-    // For job submission
+	// For clicking in stdout/err windows
+	StdOutDisplay *stdoutbox, *stderrbox;
+
+	// For job submission
     std::string final_command;
     std::vector<std::string> commands;
 
@@ -146,6 +169,9 @@ public:
 
     // Destructor
     ~RelionMainWindow(){};
+
+    // Handle events
+    //int handle(int ev);
 
     // Communicate with the different jobtype objects
     void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);

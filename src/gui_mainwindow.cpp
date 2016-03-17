@@ -21,30 +21,71 @@
 
 #define DEBUG
 
-
-NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn_note):Fl_Window(w,h,title)
+// The StdOutDisplay allows looking at the entire stdout or stderr file
+int StdOutDisplay::handle(int ev)
 {
+
+	if (ev==FL_PUSH && Fl::event_clicks())
+	{
+		// double-click
+		if (Fl::event_clicks())
+		{
+			FileName fn = current_browse_directory + fn_file;
+			std::string command;
+			if (exists(fn))
+			{
+				if (fn_file == "run.out")
+				{
+					std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn + " > .gui_tmpstd";
+					int res = system(command.c_str());
+					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", false); // false means dont_allow_save
+					w->show();
+					return 1;
+				}
+				else
+				{
+					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), fn, false); // false means dont_allow_save
+					w->show();
+					return 1;
+				}
+
+			}
+		} // end if double click
+	} // end if FL_PUSH
+
+	return 0;
+}
+
+NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn_note, bool _allow_save):Fl_Window(w,h,title)
+{
+	allow_save = _allow_save;
 	editor = new Fl_Text_Editor(0, 0, w, h-50);
     editor->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,10);
 	textbuff_note = new Fl_Text_Buffer;
 	editor->buffer(textbuff_note);
+	textbuff_note->transcoding_warning_action=NULL;
 	fn_note = _fn_note;
 	if (exists(fn_note))
 		int err = textbuff_note->loadfile(fn_note.c_str());
 	else
 		textbuff_note->text("Describe what this job or project is about here...");
+	editor->insert_position(editor->buffer()->length());
+	editor->show_insert_position();
+
+	if (allow_save)
+	{
+		// Button to save and exit
+		Fl_Button *save_button = new Fl_Button(w-200, h-40, 80, 30, "Save");
+		save_button->color(GUI_RUNBUTTON_COLOR);
+		save_button->labelsize(12);
+		save_button->callback( cb_save, this);
+	}
 
 	// Button to exit
-	Fl_Button *cancel_button = new Fl_Button(w-200, h-40, 80, 30, "Cancel");
+	Fl_Button *cancel_button = new Fl_Button(w-100, h-40, 80, 30, "Cancel");
 	cancel_button->color(GUI_RUNBUTTON_COLOR);
 	cancel_button->labelsize(12);
 	cancel_button->callback( cb_cancel, this);
-
-	// Button to save and exit
-	Fl_Button *save_button = new Fl_Button(w-100, h-40, 80, 30, "Save");
-	save_button->color(GUI_RUNBUTTON_COLOR);
-	save_button->labelsize(12);
-	save_button->callback( cb_save, this);
 
 
 }
@@ -270,10 +311,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     browser->select(1); // just start from the beginning
 
     // Pipeline part of the GUI
-#define JOBCOLWIDTH (250)
-#define XJOBCOL1 (10)
-#define XJOBCOL2 (JOBCOLWIDTH + 25)
-#define XJOBCOL3 (2*JOBCOLWIDTH + 40)
 
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT_START, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
@@ -294,8 +331,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	display_io_node->callback(cb_display_io_node, this);
 
 	// Add browsers for finished, running and scheduled jobs
-    int JOBHEIGHT = 170;
-    int JOBHALFHEIGHT = (JOBHEIGHT)/2;
     Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
     Fl_Text_Buffer *textbuff2 = new Fl_Text_Buffer();
     Fl_Text_Buffer *textbuff3 = new Fl_Text_Buffer();
@@ -308,9 +343,9 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     textbuff5->text("Output from this job");
     Fl_Text_Display* textdisp1 = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2, JOBCOLWIDTH, 25);
 	Fl_Text_Display* textdisp2 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START2, JOBCOLWIDTH, 25);
-	Fl_Text_Display* textdisp3 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START2+JOBHALFHEIGHT+25, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdisp3 = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START2 + JOBHALFHEIGHT + 25, JOBCOLWIDTH, 25);
 	Fl_Text_Display* textdisp4 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_EXT_START2, JOBCOLWIDTH, 25);
-	Fl_Text_Display* textdisp5 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_EXT_START2+JOBHALFHEIGHT+25, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdisp5 = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_EXT_START2 + JOBHALFHEIGHT + 25, JOBCOLWIDTH, 25);
 	textdisp1->buffer(textbuff1);
 	textdisp2->buffer(textbuff2);
 	textdisp3->buffer(textbuff3);
@@ -322,11 +357,11 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	textdisp4->color(GUI_BACKGROUND_COLOR);
 	textdisp5->color(GUI_BACKGROUND_COLOR);
 
-    finished_job_browser  = new Fl_Select_Browser(XJOBCOL1, GUIHEIGHT_EXT_START2+25, JOBCOLWIDTH, JOBHEIGHT+25);
-    running_job_browser   = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_EXT_START2+25, JOBCOLWIDTH, JOBHALFHEIGHT);
-    scheduled_job_browser = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_EXT_START2+25+JOBHALFHEIGHT+25, JOBCOLWIDTH, JOBHALFHEIGHT);
-    input_job_browser    = new Fl_Select_Browser(XJOBCOL3, GUIHEIGHT_EXT_START2+25, JOBCOLWIDTH, JOBHALFHEIGHT);
-    output_job_browser   = new Fl_Select_Browser(XJOBCOL3, GUIHEIGHT_EXT_START2+25+JOBHALFHEIGHT+25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    finished_job_browser  = new Fl_Select_Browser(XJOBCOL1, GUIHEIGHT_EXT_START2 + 25, JOBCOLWIDTH, JOBHEIGHT+25);
+    running_job_browser   = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_EXT_START2 + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    scheduled_job_browser = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_EXT_START2 + 25 + JOBHALFHEIGHT + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    input_job_browser    = new Fl_Select_Browser(XJOBCOL3,  GUIHEIGHT_EXT_START2 + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
+    output_job_browser   = new Fl_Select_Browser(XJOBCOL3,  GUIHEIGHT_EXT_START2 + 25 + JOBHALFHEIGHT + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
 
     // Fill the actual browsers
     fillRunningJobLists();
@@ -353,16 +388,16 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     textbuff_stdout = new Fl_Text_Buffer();
     textbuff_stderr = new Fl_Text_Buffer();
     // Disable warning message about UTF-8 transcoding
-    textbuff_stdout->transcoding_warning_action=NULL;
-    textbuff_stderr->transcoding_warning_action=NULL;
-	disp_stdout = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 60, w-20, 110);
-    disp_stderr = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + 170, w-20, 60);
-    textbuff_stdout->text("stdout will go here");
-    textbuff_stderr->text("stderr will go here");
+	disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y, w-20, 110);
+    disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y, w-20, 60);
+    disp_stdout->fn_file = "run.out";
+    disp_stderr->fn_file = "run.err";
+    textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
+    textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
     disp_stdout->buffer(textbuff_stdout);
     disp_stderr->buffer(textbuff_stderr);
     disp_stderr->textcolor(FL_RED);
-    disp_stdout->textsize(RLN_FONTSIZE);
+    disp_stdout->textsize(RLN_FONTSIZE-1);
     disp_stderr->textsize(RLN_FONTSIZE-1);
     disp_stdout->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stderr->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
@@ -1159,6 +1194,8 @@ void RelionMainWindow::cb_select_browsegroup_i()
 
     alias_current_job->value("Give_alias_here");
 	//current_job = -1;
+    textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
+    textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
 
 }
 
@@ -1386,35 +1423,34 @@ void RelionMainWindow::cb_toggle_continue_i()
 void RelionMainWindow::cb_fill_stdout_i()
 {
 
-	FileName fn_out= pipeline.processList[current_job].name + "run.out";
-	FileName fn_err= pipeline.processList[current_job].name + "run.err";
-
+	FileName fn_out = (current_job > 0) ? pipeline.processList[current_job].name + "run.out" : "";
+	FileName fn_err = (current_job > 0) ? pipeline.processList[current_job].name + "run.err" : "";
 	if (exists(fn_out))
 	{
 		// Remove annoying carriage returns
-		std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " > .gui_tmpout";
+		std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > .gui_tmpout";
 		int res = system(command.c_str());
 		std::ifstream in(".gui_tmpout", std::ios_base::in);
 		if (in.fail())
-			REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_out + " does not exists" );
+			REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmpout does not exists" );
 		int err = textbuff_stdout->loadfile(".gui_tmpout");
-		disp_stdout->scroll(textbuff_stdout->length(), 0);
 		in.close();
 	}
 	else
-		textbuff_stdout->text("stdout will go here");
+		textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
 
 	if (exists(fn_err))
 	{
-		std::ifstream in(fn_err.data(), std::ios_base::in);
+		std::string command = "tail -3 " + fn_err + " > .gui_tmperr";
+		int res = system(command.c_str());
+		std::ifstream in(".gui_tmperr", std::ios_base::in);
 		if (in.fail())
-			REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_err + " does not exists" );
-		int err = textbuff_stderr->loadfile(fn_err.c_str());
-		disp_stderr->scroll(textbuff_stderr->length(), 0);
+			REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmperr does not exists" );
+		int err = textbuff_stderr->loadfile(".gui_tmperr");
 		in.close();
 	}
 	else
-		textbuff_stderr->text("stderr will go here");
+		textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
 
 }
 
