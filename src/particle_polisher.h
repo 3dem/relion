@@ -218,23 +218,6 @@ public:
 	// Reconstruct one half of the shiny particles
 	void reconstructShinyParticlesOneHalf(int ihalf, Experiment &exp_model);
 
-	/*
-	// Optimize the beam tilt and defocus for all beamtilt groups and/or micrographs
-	void optimiseBeamTiltAndDefocus();
-
-	// Optimisation for each micrograph (may be run in parallel)
-	void optimiseBeamTiltAndDefocusOneMicrograph(int imic);
-
-	// After optimising, one general function to set results in the MetaDataTable (because optimisation may have been done in parallel)
-	void applyOptimisedBeamTiltsAndDefocus();
-
-	// Optimise beamtilt separately for datasets in different directories
-	void getBeamTiltGroups();
-
-	// Initialise some arrays for parallelisation purposes
-	void initialiseSquaredDifferenceVectors();
-	*/
-
 };
 
 

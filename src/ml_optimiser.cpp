@@ -1149,6 +1149,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		mydata.read(fn_data_movie);
 
+		// The group numbering might be different: re-assign groups based on group_names
+		mymodel.reassignGroupsForMovies(mydata);
+
+		// Re-normalise the power spectra of the noise, as running averages of movie frames will have more noise than the average micrographs!
 		int nframes;
 		mydata.MDimg.getValue(EMDL_PARTICLE_NR_FRAMES, nframes, 0);
 		// Correct the input sigma2noise spectra by a factor of nframes
@@ -1434,13 +1438,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			RFLOAT psi_deg = 0., tilt_deg = 0.;
 			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-
-			// TMP test for debuging
-			if (group_id < 0 || group_id >= mymodel.nr_groups)
-			{
-				std::cerr << " group_id= " << group_id << std::endl;
-				REPORT_ERROR("MlOptimiser::calculateSumOfPowerSpectraAndAverageImage: bad group_id");
-			}
 
 			// Extract the relevant MetaDataTable row from MDimg
 			MDimg = mydata.getMetaDataImage(part_id);
@@ -2045,18 +2042,6 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 		RFLOAT ran_rot, ran_tilt, ran_psi;
 		int randir = (int)(rnd_unif() * sampling.NrDirections() );
 		int ranpsi = (int)(rnd_unif() * sampling.NrPsiSamplings() );
-		if (randir == sampling.NrDirections())
-		{
-			//TMP
-			REPORT_ERROR("RANDIR WAS TOO BIG!!!!");
-			randir--;
-		}
-		if (ranpsi == sampling.NrPsiSamplings())
-		{
-			//TMP
-			REPORT_ERROR("RANPSI WAS TOO BIG!!!!");
-			ranpsi--;
-		}
 		sampling.getDirection(randir, ran_rot, ran_tilt);
 		sampling.getPsiAngle(ranpsi, ran_psi);
 		// Calculate local searches for these angles
@@ -4075,9 +4060,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					yoff += YY(comp);
 					zoff += ZZ(comp);
 
-					// TMP DEBUG SJORS 10nov2015
-					if ((mymodel.data_dim == 2) && (fabs(zoff) < (1e-5)))
-						REPORT_ERROR("POTENTIAL BUG: Shouldn't zoff be zero for 2D?");
 					shiftImageInFourierTransform(Faux, FTo, (RFLOAT)mymodel.ori_size, xoff, yoff, zoff);
 
 #ifdef DEBUG_BODIES
@@ -4368,7 +4350,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			}
 		}
 	}
-
 #ifdef TIMING
 	if (my_ori_particle == exp_my_first_ori_particle)
 	{
@@ -4561,10 +4542,6 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 								// Put it back to where it was!
 								Matrix1D<RFLOAT> comp(3);
 								comp = Abody * (mymodel.com_bodies[ibody]);
-
-								// TMP DEBUG SJORS 10nov2015
-								if ((mymodel.data_dim == 2) && (fabs(ZZ(comp)) < (1e-5)))
-									REPORT_ERROR("POTENTIAL BUG: Shouldn't ZZ(comp) be zero for 2D?");
 								shiftImageInFourierTransform(Fref, Fref, (RFLOAT)mymodel.ori_size, XX(comp), YY(comp), ZZ(comp));
 							}
 							else
@@ -5173,6 +5150,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							if (pdf_offset_mean != 0.)
 								pdf_offset /= pdf_offset_mean;
 
+							/*
 							// TMP DEBUGGING
 							if (mymodel.orientational_prior_mode != NOPRIOR && (pdf_offset==0. || pdf_orientation==0.))
 							{
@@ -5192,6 +5170,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 								REPORT_ERROR("exp_nr_oversampled_rot == 0");
 							if (exp_nr_oversampled_trans == 0)
 								REPORT_ERROR("exp_nr_oversampled_trans == 0");
+							*/
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
 							if (my_ori_particle == exp_my_first_ori_particle)
@@ -5646,10 +5625,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 								// Put it back to where it was!
 								Matrix1D<RFLOAT> comp(3);
 								comp = Abody * (mymodel.com_bodies[ibody]);
-
-								// TMP DEBUG SJORS 10nov2015
-								if ((mymodel.data_dim == 2) && (fabs(ZZ(comp)) < (1e-5)))
-									REPORT_ERROR("POTENTIAL BUG: Shouldn't ZZ(comp) be zero for 2D?");
 								shiftImageInFourierTransform(Fref, Fref, (RFLOAT)mymodel.ori_size, XX(comp), YY(comp), ZZ(comp));
 							}
 							else
@@ -6148,9 +6123,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 								//19may2015: place Fimg so that it is centered at the COM of the body
 								Matrix1D<RFLOAT> comp(3);
 								comp = Abody * (-mymodel.com_bodies[ibody]);
-								// TMP DEBUG SJORS 10nov2015
-								if ((mymodel.data_dim == 2) && (fabs(ZZ(comp)) < (1e-5)))
-									REPORT_ERROR("POTENTIAL BUG: Shouldn't ZZ(comp) be zero for 2D?");
 								shiftImageInFourierTransform(Fimg, Fimg, (RFLOAT)mymodel.ori_size, XX(comp), YY(comp), ZZ(comp));
 								(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, IS_NOT_INV, &Fweight);
 							}

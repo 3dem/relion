@@ -329,6 +329,10 @@ public:
 	void readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected);
 
+	// The group numbering in mydata may be different from the one in this model.
+	// Readjust all group_ids in the Experiment based on their group names
+	void reassignGroupsForMovies(Experiment &mydata);
+
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
 	RFLOAT getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(RFLOAT)ipix; }

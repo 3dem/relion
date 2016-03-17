@@ -320,15 +320,15 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	Experiment exp_model;
 	exp_model.read(fn_mics[imic]);
 
-	// Just testing
-	if (exp_model.average_micrographs.size()>1)
-		REPORT_ERROR("BUG: exp_model.average_micrographs.size()= " + integerToString(exp_model.average_micrographs.size()));
+	// Just testing we've read a single micrograph only!
+	if (exp_model.micrographs.size()>1)
+		REPORT_ERROR("BUG: exp_model.micrographs.size()= " + integerToString(exp_model.micrographs.size()));
 
 	// Loop over all original_particles in this average_micrograph
 	// And fill the x_pick, y_;pick, x_off and y_off vectors
-	for (long int ipar = 0; ipar < (exp_model.average_micrographs[0]).ori_particles_id.size(); ipar++)
+	for (long int ipar = 0; ipar < (exp_model.micrographs[0]).ori_particle_ids.size(); ipar++)
 	{
-		long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
+		long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
 
 		x_off.push_back(dummy);
 		y_off.push_back(dummy);
@@ -369,9 +369,9 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	RFLOAT gauss_const = 1. / sqrt(2 * PI * sigma_neighbour_distance * sigma_neighbour_distance);
 	RFLOAT min2sigma2 = - 2. * sigma_neighbour_distance * sigma_neighbour_distance;
 	// Loop over all ori_particles
-	for (long int ipar = 0; ipar < (exp_model.average_micrographs[0]).ori_particles_id.size(); ipar++)
+	for (long int ipar = 0; ipar < (exp_model.micrographs[0]).ori_particle_ids.size(); ipar++)
 	{
-		long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
+		long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
 
 		// Sjors 14sep2015: bug reported by Kailu Yang
 		RFLOAT my_pick_x = x_pick[ipar] - x_off_prior[ipar];
@@ -921,7 +921,7 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 {
 
 	// Also write the STAR file with the MetaData of all polished particles
-	// Loop over all original_particles in this average_micrograph
+	// Loop over all original_particles in this micrograph
 
 	MDshiny.clear();
 	for (long int imic = 0; imic < fn_mics.size(); imic++)
@@ -930,13 +930,13 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 		Experiment exp_model;
 		exp_model.read(fn_fit);
 
-		// Just testing
-		if (exp_model.average_micrographs.size()>1)
-			REPORT_ERROR("BUG: exp_model.average_micrographs.size()= " + integerToString(exp_model.average_micrographs.size()));
+		// Just testing we've read a single micrograph
+		if (exp_model.micrographs.size()>1)
+			REPORT_ERROR("BUG: exp_model.micrographs.size()= " + integerToString(exp_model.micrographs.size()));
 
-		for (long int ipar = 0; ipar < exp_model.average_micrographs[0].ori_particles_id.size(); ipar++)
+		for (long int ipar = 0; ipar < exp_model.micrographs[0].ori_particle_ids.size(); ipar++)
 		{
-			long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
+			long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
 			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[first_frame - 1];
 
 			// Get the corresponding line from the input STAR file
@@ -991,9 +991,9 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 	Experiment exp_model;
 	exp_model.read(fn_fit);
 
-	// Just testing
-	if (exp_model.average_micrographs.size()>1)
-		REPORT_ERROR("BUG: exp_model.average_micrographs.size()= " + integerToString(exp_model.average_micrographs.size()));
+	// Just testing we've read a single micrograph
+	if (exp_model.micrographs.size()>1)
+		REPORT_ERROR("BUG: exp_model.micrographs.size()= " + integerToString(exp_model.micrographs.size()));
 
 	// Then read in all individual movie frames, apply frame x,y-movements as phase shifts and calculate polished (shiny) particles
 	// as average of the re-aligned frames
@@ -1006,10 +1006,10 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 	RFLOAT xtrans, ytrans;
 	RFLOAT all_minval = 99999., all_maxval = -99999., all_avg = 0., all_stddev = 0.;
 
-	// Loop over all original_particles in this average_micrograph
-	for (long int ipar = 0; ipar < exp_model.average_micrographs[0].ori_particles_id.size(); ipar++)
+	// Loop over all original_particles in this micrograph
+	for (long int ipar = 0; ipar < exp_model.micrographs[0].ori_particle_ids.size(); ipar++)
 	{
-		long int ori_part_id = exp_model.average_micrographs[0].ori_particles_id[ipar];
+		long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
 
 		// Loop over all frames for motion corrections and possibly dose-dependent weighting
 		for (long int i_frame = first_frame; i_frame <= last_frame; i_frame++ )
@@ -1107,10 +1107,10 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		}
 
 		// When last particle, also write the correct header
-		if (ipar == exp_model.average_micrographs[0].ori_particles_id.size() - 1)
+		if (ipar == exp_model.micrographs[0].ori_particle_ids.size() - 1)
 		{
-			all_avg /= exp_model.average_micrographs[0].ori_particles_id.size();
-			all_stddev = sqrt(all_stddev/exp_model.average_micrographs[0].ori_particles_id.size());
+			all_avg /= exp_model.micrographs[0].ori_particle_ids.size();
+			all_stddev = sqrt(all_stddev/exp_model.micrographs[0].ori_particle_ids.size());
 			img.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, all_minval);
 			img.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, all_maxval);
 			img.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, all_avg);
@@ -1292,486 +1292,6 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 
 }
 
-/*
-
-void ParticlePolisher::optimiseBeamTiltAndDefocus()
-{
-
-	// This function assumes the shiny particles are in exp_mdel.MDimg!!
-	if (beamtilt_max <= 0. && defocus_shift_max <= 0.)
-		return;
-
-	if (minres_beamtilt < maxres_model)
-	{
-		if (verb > 0)
-			std::cout << " Skipping beamtilt correction, as the resolution of the shiny reconstruction  does not go beyond minres_beamtilt of " << minres_beamtilt << " Ang." << std::endl;
-		return;
-	}
-
-	getBeamTiltGroups();
-
-	initialiseSquaredDifferenceVectors();
-
-	// Loop over all average micrographs
-	int barstep;
-	int my_nr_micrographs = fn_mics.size();
-	if (verb > 0)
-	{
-		std::cout << " + Optimising beamtilts in all micrographs ... " << std::endl;
-		init_progress_bar(my_nr_micrographs);
-		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
-	}
-
-    for (long int i = 0; i < my_nr_micrographs; i++)
-	{
-    	if (verb > 0 && i % barstep == 0)
-			progress_bar(i);
-
-    	optimiseBeamTiltAndDefocusOneMicrograph(i);
-	}
-
-    if (verb > 0)
-	{
-		progress_bar(my_nr_micrographs);
-	}
-
-    // Now get the final optimised beamtilts!
-    applyOptimisedBeamTiltsAndDefocus();
-
-    // Write the new MDTable to disc
-	if (verb > 0)
-		exp_model.MDimg.write(fn_out + "shiny.star");
-
-}
-
-void ParticlePolisher::getBeamTiltGroups()
-{
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(exp_model.MDimg)
-	{
-
-		// Get the name of the beamtilt group (micrograph name if no groups are defined...)
-		FileName fn_group;
-		if (exp_model.MDimg.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP))
-			exp_model.MDimg.getValue(EMDL_IMAGE_BEAMTILT_GROUP, fn_group);
-		else
-			exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_group);
-
-		bool is_unique = true;
-		for (int igroup = 0; igroup < fn_beamtilt_groups.size(); igroup++)
-		{
-			if (fn_beamtilt_groups[igroup] == fn_group)
-			{
-				is_unique = false;
-				break;
-			}
-		}
-		if (is_unique)
-		{
-			fn_beamtilt_groups.push_back(fn_group);
-		}
-	}
-
-}
-
-void ParticlePolisher::initialiseSquaredDifferenceVectors()
-{
-
-	nr_sampled_beam_tilts= 0;
-	if (beamtilt_max > 0.)
-	{
-		int n_steps = CEIL(beamtilt_max / beamtilt_step);
-		for (RFLOAT tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
-		{
-			for (RFLOAT tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
-			{
-				if (sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max)
-				{
-					nr_sampled_beam_tilts++;
-				}
-			}
-		}
-		// Store squared differences for all beam tilts and for all data sets
-		diff2_beamtilt.initZeros(fn_beamtilt_groups.size(), nr_sampled_beam_tilts);
-	}
-
-	if (defocus_shift_max > 0.)
-	{
-		defocus_shift_allmics.initZeros(exp_model.micrographs.size());
-	}
-
-
-}
-
-void ParticlePolisher::applyOptimisedBeamTiltsAndDefocus()
-{
-	if (beamtilt_max > 0.)
-	{
-		// Use in two different loops
-		int n_steps = CEIL(beamtilt_max / beamtilt_step);
-
-		best_beamtilts.clear();
-		Matrix1D<RFLOAT> my_tilts(2);
-		for (int igroup = 0; igroup < fn_beamtilt_groups.size(); igroup++)
-		{
-			RFLOAT mindiff2 = LARGE_NUMBER;
-			RFLOAT best_tilt_x, best_tilt_y;
-			if (verb > 0)
-				std::cout << " + Beamtilt group " << fn_beamtilt_groups[igroup] << std::endl;
-			int n_tilt= 0;
-			for (RFLOAT tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
-			{
-				for (RFLOAT tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
-				{
-					if (sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max)
-					{
-						RFLOAT diff2 = DIRECT_A2D_ELEM(diff2_beamtilt, igroup, n_tilt);
-						if (verb > 1)
-							std::cout << " + tilt_x = " << tilt_x << " + tilt_y = " << tilt_y << " diff2= " << diff2 << std::endl;
-#ifdef DEBUG_TILT
-
-						if (verb > 0)
-							std::cerr << " igroup= " << igroup << " n_tilt= " << n_tilt
-							<< " DIRECT_A2D_ELEM(diff2_beamtilt, igroup, n_tilt)= " << DIRECT_A2D_ELEM(diff2_beamtilt, igroup, n_tilt)
-							<< " diff2= " << diff2 << " mindiff2= " << mindiff2
-							<< std::endl;
-#endif
-						if (diff2 <= mindiff2)
-						{
-							best_tilt_x = tilt_x;
-							best_tilt_y = tilt_y;
-							mindiff2 = diff2;
-						}
-						n_tilt ++;
-					}
-				}
-			}
-			if (verb > 0)
-				std::cout << " + Best tilt_x = " << best_tilt_x << " best tilt_y = " << best_tilt_y << " mindiff2= " << mindiff2 << std::endl;
-			XX(my_tilts) = best_tilt_x;
-			YY(my_tilts) = best_tilt_y;
-			best_beamtilts.push_back(my_tilts);
-		}
-	}
-
-
-	// Now set beamtilts in the MetaDataTable
-    int i_group;
-	for (long int imic = 0; imic < exp_model.micrographs.size(); imic++)
-	{
-
-		RFLOAT best_defocus_shift = (defocus_shift_max > 0.) ? DIRECT_A1D_ELEM(defocus_shift_allmics, imic) : 0.;
-		for (long int ipart = 0; ipart < exp_model.micrographs[imic].particle_ids.size(); ipart++)
-    	{
-			long int part_id = exp_model.micrographs[imic].particle_ids[ipart];
-
-    		// Set the optimised beamtilts in the MetadataTable
-    		if (beamtilt_max > 0.)
-    		{
-				// First get which beamtilt group this micrograph comes from
-				if (ipart == 0)
-				{
-					FileName fn_group;
-					if (exp_model.MDimg.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP))
-						exp_model.MDimg.getValue(EMDL_IMAGE_BEAMTILT_GROUP, fn_group, part_id);
-					else
-						exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_group, part_id);
-					bool found = false;
-					for (int igroup = 0; igroup < fn_beamtilt_groups.size(); igroup++)
-					{
-						if (fn_group == fn_beamtilt_groups[igroup])
-						{
-							i_group = igroup;
-							found = true;
-							break;
-						}
-					}
-					if (!found)
-						REPORT_ERROR("ParticlePolisher::optimiseBeamTiltOneMicrograph ERROR: could not find data set name for " + fn_group);
-
-				}
-
-				// Then set the corresponding beamtilt values for each particles
-				exp_model.MDimg.setValue(EMDL_IMAGE_BEAMTILT_X, XX(best_beamtilts[i_group]), part_id);
-				exp_model.MDimg.setValue(EMDL_IMAGE_BEAMTILT_Y, YY(best_beamtilts[i_group]), part_id);
-
-    		}
-
-			// Also set the optimised defocus values for each micrograph
-			if (defocus_shift_max > 0.)
-			{
-
-				if (ipart == 0 && verb > 0)
-					std::cout << " + Micrograph " << exp_model.micrographs[imic].name << " defocus_shift= " << best_defocus_shift << std::endl;
-
-				RFLOAT ori_defocusU, ori_defocusV;
-				exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSU, ori_defocusU, part_id);
-				exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSV, ori_defocusV, part_id);
-				exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSU, ori_defocusU + best_defocus_shift, part_id);
-				exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSV, ori_defocusV + best_defocus_shift, part_id);
-			}
-    	}
-	}
-
-
-
-}
-
-void ParticlePolisher::optimiseBeamTiltAndDefocusOneMicrograph(int imic)
-{
-
-	// get image size, angpix (from metadatatable), fn_sym
-	int image_size;
-	exp_model.MDexp.getValue(EMDL_IMAGE_SIZE, image_size);
-
-	CTF ctf;
-	Matrix2D<RFLOAT> A3D;
-	MultidimArray<Complex > F2D, F2Dtilt, Fref;
-	MultidimArray<RFLOAT> Fctf;
-	Image<RFLOAT> img;
-	FourierTransformer transformer;
-	RFLOAT xtrans, ytrans;
-	RFLOAT rot, tilt, psi;
-	FileName fn_img;
-	int i_group = -1, my_half = 0;
-
-	RFLOAT xsize = angpix * PPrefvol_half1.ori_size;
-
-	// Weighted squared-differences for all defocusses
-	int nr_sampled_defocus_shifts;
-	MultidimArray<RFLOAT> wdiff2_defocus;
-	if (defocus_shift_max > 0.)
-	{
-		nr_sampled_defocus_shifts = CEIL(defocus_shift_max / defocus_shift_step);
-		wdiff2_defocus.initZeros(2*nr_sampled_defocus_shifts + 1);
-	}
-
-	for (long int ipart = 0; ipart < exp_model.micrographs[imic].particle_ids.size(); ipart++)
-	{
-		long int part_id = exp_model.micrographs[imic].particle_ids[ipart];
-
-		// Get which beamtilt group this micrograph comes from
-		if (ipart == 0)
-		{
-			FileName fn_group;
-			if (exp_model.MDimg.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP))
-				exp_model.MDimg.getValue(EMDL_IMAGE_BEAMTILT_GROUP, fn_group, part_id);
-			else
-				exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_group, part_id);
-			bool found = false;
-			for (int igroup = 0; igroup < fn_beamtilt_groups.size(); igroup++)
-			{
-				if (fn_group == fn_beamtilt_groups[igroup])
-				{
-					i_group = igroup;
-					found = true;
-					break;
-				}
-			}
-			if (!found)
-				REPORT_ERROR("ParticlePolisher::optimiseBeamTiltOneMicrograph ERROR: could not find beamtilt group name for " + fn_group);
-
-		}
-
-
-		exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
-		img.read(fn_img);
-		CenterFFT(img(), true);
-		transformer.FourierTransform(img(), F2D);
-
-		// Which half do I belong to?
-		exp_model.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_half, part_id);
-
-		// Use the prior-angles, as these were determined from the average particles
-		// The individual-frame-determined angles would be too noisy....
-		exp_model.MDimg.getValue(EMDL_ORIENT_ROT, rot, part_id);
-		exp_model.MDimg.getValue(EMDL_ORIENT_TILT, tilt, part_id);
-		exp_model.MDimg.getValue(EMDL_ORIENT_PSI, psi, part_id);
-		Euler_angles2matrix(rot, tilt, psi, A3D);
-
-		// Get the reference projection
-		Fref.resize(F2D);
-		if (my_half == 1)
-			PPrefvol_half1.get2DFourierTransform(Fref, A3D, IS_NOT_INV);
-		else if (my_half == 2)
-			PPrefvol_half2.get2DFourierTransform(Fref, A3D, IS_NOT_INV);
-		else
-			REPORT_ERROR("ERROR unrecognised random subset, not 1 or 2...");
-
-		// Shift the experimental image
-		xtrans = ytrans = 0.;
-		exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, xtrans, part_id);
-		exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, ytrans, part_id);
-		if (ABS(xtrans) > 0. || ABS(ytrans) > 0. )
-			shiftImageInFourierTransform(F2D, F2D, image_size, xtrans, ytrans );
-
-		// apply CTF to the reference
-		if (do_ctf)
-		{
-
-			Fctf.resize(F2D);
-			ctf.read(exp_model.MDimg, exp_model.MDimg, part_id);
-
-			// Store the original values of defocusU and defocusV
-			RFLOAT ori_defocusU = ctf.DeltafU;
-			RFLOAT ori_defocusV = ctf.DeltafV;
-			RFLOAT best_defocus_shift;
-			RFLOAT mindiff_thispart = LARGE_NUMBER;
-			// Optimise per-particle CTF defocus
-			// For now only non-anisotropically
-			if (defocus_shift_max > 0.)
-			{
-
-				int n_defocus = 0;
-				for (RFLOAT defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
-						defocus_shift <= nr_sampled_defocus_shifts*defocus_shift_step;
-						defocus_shift += defocus_shift_step)
-				{
-					// Get modified CTF and apply to reference
-					ctf.DeltafU = ori_defocusU + defocus_shift;
-					ctf.DeltafV = ori_defocusV + defocus_shift;
-					ctf.initialise();
-					ctf.getFftwImage(Fctf, image_size, image_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
-
-					// Calculate squared difference with the image
-					RFLOAT diff2 = 0.;
-					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(F2D)
-					{
-						RFLOAT res = xsize/sqrt((RFLOAT)(ip * ip + jp * jp)); // get resolution in 1/pixel
-						if (res <= minres_beamtilt && res >= maxres_model)
-				    	{
-							RFLOAT diff_real = DIRECT_A2D_ELEM(Fctf, i, j) * (DIRECT_A2D_ELEM(Fref, i, j)).real - (DIRECT_A2D_ELEM(F2D, i, j)).real;
-							RFLOAT diff_imag = DIRECT_A2D_ELEM(Fctf, i, j) * (DIRECT_A2D_ELEM(Fref, i, j)).imag - (DIRECT_A2D_ELEM(F2D, i, j)).imag;
-							diff2 += (diff_real * diff_real + diff_imag * diff_imag);
-				    	}
-					}
-					// Store the accumulated squared differences...
-					if (diff2 < mindiff_thispart)
-					{
-						mindiff_thispart = diff2;
-						best_defocus_shift = defocus_shift;
-					}
-					//std::cerr << " iimg= " << iimg << " defocus_shift= " << defocus_shift << " diff2= " << diff2 << std::endl;
-
-					DIRECT_A1D_ELEM(wdiff2_defocus, n_defocus) += diff2;
-					n_defocus++;
-				}
-
-				// Set best defocus for each individual particle...
-				// TODO!!! This only works in sequential version!!!
-				//exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSU, ori_defocusU + best_defocus_shift, part_id);
-				//exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSV, ori_defocusV + best_defocus_shift, part_id);
-
-				// Re-set the original defocus values in the ctf object
-				ctf.DeltafU = ori_defocusU;
-				ctf.DeltafV = ori_defocusV;
-				ctf.initialise();
-			}
-
-
-		}
-
-		if (beamtilt_max > 0.)
-		{
-
-			if (do_ctf)
-			{
-				// After per-particle assessment, just re-read the stored CTF and apply to the reference projection
-				ctf.getFftwImage(Fctf, image_size, image_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
-				{
-					DIRECT_MULTIDIM_ELEM(Fref, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-				}
-			}
-
-			F2Dtilt.resize(F2D);
-			// Loop over all beam tilts
-			int n_tilts = 0;
-			int n_steps = CEIL(beamtilt_max / beamtilt_step);
-			for (RFLOAT tilt_y = -n_steps*beamtilt_step; tilt_y <= n_steps*beamtilt_step; tilt_y += beamtilt_step)
-			{
-				for (RFLOAT tilt_x = -n_steps*beamtilt_step; tilt_x <= n_steps*beamtilt_step; tilt_x += beamtilt_step)
-				{
-					if (sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max)
-					{
-						// Now calculate the squared differences, taking the beamtilt into account
-						applyBeamTilt(F2D, F2Dtilt, tilt_x, tilt_y, ctf.lambda, ctf.Cs, angpix, image_size);
-
-						RFLOAT diff2 = 0.;
-						RFLOAT ndiff = 0.;
-						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(F2Dtilt)
-						{
-							// Store amplitude-weighted phase difference and sum of amplitude-weights
-							RFLOAT res = xsize/sqrt((RFLOAT)(ip * ip + jp * jp)); // get resolution in 1/pixel
-							if (res <= minres_beamtilt && res >= maxres_model)
-							{
-
-								RFLOAT diff_real = (DIRECT_A2D_ELEM(Fref, i, j)).real - (DIRECT_A2D_ELEM(F2Dtilt, i, j)).real;
-								RFLOAT diff_imag = (DIRECT_A2D_ELEM(Fref, i, j)).imag - (DIRECT_A2D_ELEM(F2Dtilt, i, j)).imag;
-								diff2 += (diff_real * diff_real + diff_imag * diff_imag);
-								ndiff += 1.;
-							}
-						}
-						diff2 /= ndiff;
-
-						// Store the accumulate weighted differences...
-						DIRECT_A2D_ELEM(diff2_beamtilt, i_group, n_tilts) += diff2;
-
-						n_tilts++;
-						if (n_tilts > nr_sampled_beam_tilts)
-						{
-							std::cerr << " n_tilts= " << n_tilts << " nr_sampled_beam_tilts= " << nr_sampled_beam_tilts << " beamtilt_max= " << beamtilt_max << std::endl;
-							std::cerr << " tilt_x= " << tilt_x << " tilt_y= " << tilt_y << " beamtilt_step= " << beamtilt_step << std::endl;
-							REPORT_ERROR("BUG: too large n_tilts....");
-						}
-
-					} // end if sqrt(tilt_y*tilt_y + tilt_x*tilt_x) <= beamtilt_max
-				} // end for tilt_x
-			} // end for tilt_y
-		} // end if beamtilt_max > 0
-
-	} // end for over all particles in this micrograph
-
-
-
-	// Set optimal defocus shift averaged over all particles in this micrograph:
-	if (defocus_shift_max > 0.)
-	{
-		RFLOAT mindiff2=LARGE_NUMBER, best_defocus_shift;
-		int n_defocus = 0;
-		for (RFLOAT defocus_shift = -nr_sampled_defocus_shifts*defocus_shift_step;
-				defocus_shift <= nr_sampled_defocus_shifts*defocus_shift_step;
-				defocus_shift += defocus_shift_step)
-		{
-			RFLOAT diff2 = DIRECT_A1D_ELEM(wdiff2_defocus, n_defocus);
-			//std::cerr << std::setprecision(10) << " imic= " << imic << " defocus_shift= " << defocus_shift << " diff2= " << diff2 << std::endl;
-			if (diff2 < mindiff2)
-			{
-				mindiff2 = diff2;
-				best_defocus_shift = defocus_shift;
-			}
-			n_defocus++;
-		}
-		DIRECT_A1D_ELEM(defocus_shift_allmics, imic) = best_defocus_shift;
-
-		//exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSU, ori_defocusU + best_defocus_shift, part_id);
-		//exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSV, ori_defocusV + best_defocus_shift, part_id);
-		// Set best defocus for all particles on this micrograph
-		// TODO: this only works in sequential version!!!
-		for (long int ipart = 0; ipart < exp_model.micrographs[imic].particle_ids.size(); ipart++)
-		{
-			long int part_id = exp_model.micrographs[imic].particle_ids[ipart];
-			RFLOAT ori_defocusU, ori_defocusV;
-			exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSU, ori_defocusU, part_id);
-			exp_model.MDimg.getValue(EMDL_CTF_DEFOCUSV, ori_defocusV, part_id);
-
-
-			exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSU, ori_defocusU + best_defocus_shift, part_id);
-			exp_model.MDimg.setValue(EMDL_CTF_DEFOCUSV, ori_defocusV + best_defocus_shift, part_id);
-		}
-
-	}
-}
-*/
 void ParticlePolisher::run()
 {
 

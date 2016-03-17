@@ -659,8 +659,40 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 	initialise();
 
 	// Now set the group names from the Experiment groups list
-	for (int i=0; i<nr_groups; i++)
+	for (int i=0; i< nr_groups; i++)
 		group_names[i] = _mydata.groups[i].name;
+
+}
+
+void MlModel::reassignGroupsForMovies(Experiment &mydata)
+{
+
+	std::vector<long int> rename_ids(mydata.groups.size());
+	for (long int igr = 0; igr < mydata.groups.size(); igr++)
+	{
+		FileName data_name = mydata.groups[igr].name;
+		long int rename_id = -1;
+		for (long int id = 0; id < group_names.size(); id++)
+		{
+			if (data_name.contains(group_names[id].withoutExtension()))
+			{
+				rename_id = id;
+				break;
+			}
+		}
+
+		if (rename_id < 0)
+			REPORT_ERROR("MlModel::adjustGroupsForMovies ERROR: cannot find " + data_name + " among the groups of the model!");
+
+		rename_ids[igr] = rename_id;
+	}
+
+	// Now change the group_ids of all particles!
+	for (long int ipart = 0; ipart < mydata.particles.size(); ipart++)
+	{
+		long int old_id = mydata.particles[ipart].group_id;
+		mydata.particles[ipart].group_id = rename_ids[old_id];
+	}
 
 }
 
