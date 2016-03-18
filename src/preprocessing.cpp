@@ -158,7 +158,10 @@ void Preprocessing::initialise()
 		if (fn_data != "")
 		{
 			if (verb > 0)
-				std::cout << " + Re-extracting particles based on coordinates from input _data.star file " << fn_data << std::endl;
+			{
+				std::cout << " + Re-extracting particles based on coordinates from input _data.star file " << std::endl;
+				std::cout << " + " << fn_data << std::endl;
+			}
 			if (do_recenter && verb > 0)
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
 

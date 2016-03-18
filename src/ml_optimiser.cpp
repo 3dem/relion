@@ -956,7 +956,7 @@ void MlOptimiser::initialise()
 			else // not semiAutomatic => explicit
 			{
 				dev_id = textToInteger(allThreadIDs[0][i].c_str());
-			}                                       
+			}
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
 			//Only make a new bundle of not existing on device
@@ -1070,6 +1070,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Read in the experimental image metadata
 		// If do_preread_images: only the master reads all images into RAM
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
+		if (do_realign_movies)
+			do_preread = false; // as we will overwrite mydata.read with the movies anyway....
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 		mydata.read(fn_data, true, false, do_preread, is_helical_segment); // true means ignore original particle name
 
@@ -1136,6 +1138,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 
 		do_realign_movies = true;
+		do_parallel_disc_io = false;
 		nr_iter_wo_resol_gain = -1;
 		nr_iter_wo_large_hidden_variable_changes = 0;
 		smallest_changes_optimal_offsets = 999.;
@@ -1147,7 +1150,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (verb > 0)
 			std::cout << " Reading in pre-expanded data model for movie frames... " << std::endl;
 
-		mydata.read(fn_data_movie);
+		mydata.read(fn_data_movie, false, false, do_preread_images);
 
 		// The group numbering might be different: re-assign groups based on group_names
 		mymodel.reassignGroupsForMovies(mydata);

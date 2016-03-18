@@ -766,7 +766,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name, bo
 		timer.toc(tfill);
 		timer.tic(tdef);
 		std::cerr << " MDimg.lastObject()= " << MDimg.lastObject() << std::endl;
-		std::cerr << " nr_read= " << nr_read << " particles.size()= " << particles.size() << " ori_particles.size()= " << ori_particles.size()  << " micrographs.size()= " << micrographs.size() << " average_micrographs.size()= " << average_micrographs.size() << " groups.size()= " << groups.size() << std::endl;
+		std::cerr << " nr_read= " << nr_read << " particles.size()= " << particles.size() << " ori_particles.size()= " << ori_particles.size()  << " micrographs.size()= " << micrographs.size() << " groups.size()= " << groups.size() << std::endl;
 #endif
 
 		// Check for the presence of multiple bodies (for multi-body refinement)
