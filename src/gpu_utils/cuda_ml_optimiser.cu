@@ -896,7 +896,7 @@ void getAllSquaredDifferencesCoarse(
 
 			for (unsigned i = 0; i < op.local_Fimgs_shifted[ipart].nzyxdim; i ++)
 			{
-				XFLOAT pixel_correction = scale_correction;
+				XFLOAT pixel_correction = 1.0/scale_correction;
 				if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
 					pixel_correction /= op.local_Fctfs[ipart].data[i];
 
