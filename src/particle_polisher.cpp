@@ -29,7 +29,6 @@ void ParticlePolisher::read(int argc, char **argv)
 	fn_in = parser.getOption("--i", "STAR file with the aligned movie frames, e.g. run1_ct25_data.star");
 	fn_out = parser.getOption("--o", "Output directory", "Polish/");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
-	running_average_width = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "5"));
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
 
 	int fit_section = parser.addSection("Beam-induced movement fitting options");
@@ -69,18 +68,6 @@ void ParticlePolisher::read(int argc, char **argv)
 	do_ramp = !parser.checkOption("--no_ramp", "Just subtract the background mean in the normalisation, instead of subtracting a fitted ramping background. ");
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
-
-	/*
-	int beamtilt_section = parser.addSection("Beamtilt refinement options");
-	beamtilt_max = textToFloat(parser.getOption("--beamtilt_max", "Maximum beamtilt (in mrad) to search", "0."));
-	beamtilt_step = textToFloat(parser.getOption("--beamtilt_step", "Step-size for beamtilt searches (in mrad)", "0.2"));
-	minres_beamtilt = textToFloat(parser.getOption("--minres_beamtilt", "Lowest resolution to include in beam-tilt correction (in A)", "6"));
-	*/
-
-	int out_section = parser.addSection("Polished particles output options");
-	first_frame = textToInteger(parser.getOption("--first_frame", "First frame to include in the polished particles", "1"));
-	last_frame = textToInteger(parser.getOption("--last_frame", "First frame to include in the polished particles (default is all)", "-1"));
-	step_frame  = textToInteger(parser.getOption("--avg_movie_frames", "Give the same value as used in particle extraction (usually just 1)", "1"));
 
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
@@ -207,23 +194,42 @@ void ParticlePolisher::initialise()
 {
 
 	// Read in first micrograph STAR file to get some general informatopm
-    MetaDataTable MDonemic;
-	MDonemic.read(fn_mics[0]);
+    Experiment exp_model;
+	exp_model.read(fn_mics[0]);
 
-    if (last_frame < 0)
-    	MDonemic.getValue(EMDL_PARTICLE_NR_FRAMES, last_frame);
+	// Get the vector with which movie-frame numbers are stored here
+	movie_frame_numbers.clear();
+	for (int ipart = 0; ipart < exp_model.ori_particles[0].particles_id.size(); ipart++)
+	{
+		FileName fn_mic, dum;
+		long int i_frame;
+		long int part_id = exp_model.ori_particles[0].particles_id[ipart];
+		exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic, part_id);
+		fn_mic.decompose(i_frame, dum);
+		movie_frame_numbers.push_back(i_frame);
+		// Also get the image size
+		if (ipart == 0)
+		{
+			FileName fn_img;
+			exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
+			Image<RFLOAT> It;
+			It.read(fn_img, false); // false means only read header
+			ori_size = XSIZE(It());
+		}
+	}
 
-	perframe_bfactors.initZeros( 3 * (last_frame - first_frame + 1)); // now store bfactor, offset and corr_coeff
+	// Initialise array for storing bfactor, offset and corr_coeff
+	perframe_bfactors.initZeros( 3 * movie_frame_numbers.size());
 
 	// Get the pixel size from the input STAR file
 	if (angpix < 0.)
 	{
-		if (MDonemic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDonemic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		if (exp_model.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && exp_model.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 		{
 			RFLOAT mag, dstep;
-			MDonemic.goToObject(0);
-			MDonemic.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDonemic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			exp_model.MDimg.goToObject(0);
+			exp_model.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			exp_model.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;
 			if (verb > 0)
 				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
@@ -233,13 +239,6 @@ void ParticlePolisher::initialise()
 			REPORT_ERROR("ParticlePolisher::initialise ERROR: The input STAR files do not contain information about the pixel size. Please provide --angpix");
 		}
 	}
-
-	// Get the original image size
-	FileName fn_img;
-	MDonemic.getValue(EMDL_IMAGE_NAME, fn_img);
-	Image<RFLOAT> It;
-	It.read(fn_img, false); // false means only read header
-	ori_size = XSIZE(It());
 
 	if (do_weighting)
     {
@@ -320,6 +319,9 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	Experiment exp_model;
 	exp_model.read(fn_mics[imic]);
 
+	// Running average window with used for the determination of the frame movements, now taken from _data.star
+	int running_average_width;
+
 	// Just testing we've read a single micrograph only!
 	if (exp_model.micrographs.size()>1)
 		REPORT_ERROR("BUG: exp_model.micrographs.size()= " + integerToString(exp_model.micrographs.size()));
@@ -341,7 +343,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, y_off_p, part_id);
 			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR, x_off_prior_p, part_id);
 			exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, y_off_prior_p, part_id);
-
+			exp_model.MDimg.getValue(EMDL_PARTICLE_MOVIE_RUNNING_AVG, running_average_width, part_id);
 			// Store the value of the picked coordinates for the first movie frame
 			if (is_first)
 			{
@@ -473,7 +475,7 @@ void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 	RFLOAT bfactor, offset, corr_coeff;
 
 	// Loop over all frames to be included in the reconstruction
-	int my_nr_frames = last_frame - first_frame + 1;
+	int my_nr_frames = movie_frame_numbers.size();
 	int barstep;
 	if (verb > 0)
 	{
@@ -482,14 +484,14 @@ void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 		barstep = XMIPP_MAX(1, my_nr_frames/ 60);
 	}
 
-    for (long int i = first_frame; i <= last_frame; i++)
+	for (long int iframe = 0; iframe < movie_frame_numbers.size(); iframe++)
 	{
 
-    	calculateSingleFrameReconstruction(i, 1);
-    	calculateSingleFrameReconstruction(i, 2);
+		calculateSingleFrameReconstruction(iframe, 1);
+		calculateSingleFrameReconstruction(iframe, 2);
 
-    	if (verb > 0 && i % barstep == 0)
-    		progress_bar(i);
+		if (verb > 0 && iframe % barstep == 0)
+			progress_bar(iframe);
 
 	}
 
@@ -506,17 +508,16 @@ void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
 		init_progress_bar(my_nr_frames);
 		barstep = XMIPP_MAX(1, my_nr_frames/ 60);
 	}
-    for (long int i = first_frame; i <= last_frame; i++)
+    for (long int iframe = 0; iframe < my_nr_frames; iframe++)
 	{
 
-       	calculateBfactorSingleFrameReconstruction(i, bfactor, offset, corr_coeff);
-       	int iframe = i - first_frame;
-       	DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0) = bfactor;
-       	DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1) = offset;
-       	DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 2) = corr_coeff;
+		calculateBfactorSingleFrameReconstruction(iframe, bfactor, offset, corr_coeff);
+		DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0) = bfactor;
+		DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1) = offset;
+		DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 2) = corr_coeff;
 
-       	if (verb > 0 && i % barstep == 0)
-    		progress_bar(i);
+		if (verb > 0 && iframe % barstep == 0)
+			progress_bar(iframe);
 	}
 
 
@@ -542,13 +543,18 @@ bool ParticlePolisher::readStarFileBfactors(FileName fn_star)
 	{
 		MetaDataTable MD;
 		MD.read(fn_star);
-		int i = 0;
+		int iframe = 0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
-			MD.getValue(EMDL_POSTPROCESS_BFACTOR, DIRECT_A1D_ELEM(perframe_bfactors, i * 3 + 0) );
-			MD.getValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, DIRECT_A1D_ELEM(perframe_bfactors, i * 3 + 1) );
-			i++;
+			int itest;
+			MD.getValue(EMDL_IMAGE_FRAME_NR, itest);
+			if (itest != movie_frame_numbers[iframe])
+				REPORT_ERROR("ParticlePolisher::readStarFileBfactors BUG: itest= " + integerToString(itest) + " != " + integerToString(movie_frame_numbers[iframe]));
+			MD.getValue(EMDL_POSTPROCESS_BFACTOR, DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0) );
+			MD.getValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1) );
+			iframe++;
 		}
+		std::cerr << " read in perframe_bfactors= " << perframe_bfactors << std::endl;
 		return true;
 	}
 	else
@@ -563,12 +569,12 @@ void ParticlePolisher::writeStarFileBfactors(FileName fn_star)
 	MetaDataTable MDout;
 	MDout.setName("perframe_bfactors");
 
-	for (int i = 0; i < XSIZE(perframe_bfactors)/3; i++ )
+	for (int iframe = 0; iframe < movie_frame_numbers.size(); iframe++ )
 	{
 		MDout.addObject();
-		MDout.setValue(EMDL_IMAGE_FRAME_NR, first_frame + i);
-		MDout.setValue(EMDL_POSTPROCESS_BFACTOR, DIRECT_A1D_ELEM(perframe_bfactors, i * 3 + 0) );
-		MDout.setValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, DIRECT_A1D_ELEM(perframe_bfactors, i * 3 + 1) );
+		MDout.setValue(EMDL_IMAGE_FRAME_NR, movie_frame_numbers[iframe]);
+		MDout.setValue(EMDL_POSTPROCESS_BFACTOR, DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0) );
+		MDout.setValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1) );
 	}
 
 	MDout.write(fn_star);
@@ -584,7 +590,7 @@ void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
     // First pre-calculate the sum of all weights at every frequency
     MultidimArray<RFLOAT> sumweight_per_shell(ori_size/2), cumulative_relweight_per_shell(ori_size/2);
     sumweight_per_shell.initZeros();
-    for (int iframe = 0; iframe < XSIZE(perframe_bfactors)/3; iframe++ )
+    for (int iframe = 0; iframe < movie_frame_numbers.size(); iframe++ )
    	{
     	RFLOAT bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
     	RFLOAT offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
@@ -599,14 +605,13 @@ void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
 
     // Now calculate the relative weights and their cumulative curves
     cumulative_relweight_per_shell.initZeros();
-    for (int iframe = 0; iframe < XSIZE(perframe_bfactors)/3; iframe++ )
-    {
+	for (int iframe = 0; iframe < movie_frame_numbers.size(); iframe++ )
+	{
+		RFLOAT bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
+		RFLOAT offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
 
-    	RFLOAT bfactor = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0);
-    	RFLOAT offset = DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1);
-
-    	MetaDataTable MDout;
-		std::string fn_table = "relative_weights_frame_" + integerToString(first_frame + iframe);
+		MetaDataTable MDout;
+		std::string fn_table = "relative_weights_frame_" + integerToString(movie_frame_numbers[iframe]);
 		MDout.setName(fn_table);
 
 		for (int i = 1; i < ori_size/2; i++) // ignore origin
@@ -624,7 +629,6 @@ void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
 
 		}
 		MDout.write(fh);
-
 	}
 
     fh.close();
@@ -644,21 +648,23 @@ void ParticlePolisher::calculateAverageAllSingleFrameReconstructions(int this_ha
 	}
 
 	Image<RFLOAT> Isum, Ione;
-	for (long int this_frame = first_frame; this_frame <= last_frame; this_frame++)
+	for (long int iframe = 0; iframe < movie_frame_numbers.size(); iframe++)
 	{
-    	FileName fn_vol;
-    	fn_vol.compose(fn_out + "frame", this_frame, "", 3);
-    	fn_vol += "_half" + integerToString(this_half) + "_class001_unfil.mrc";
 
-    	if (this_frame == first_frame)
-    	{
-    		Isum.read(fn_vol);
-    	}
-    	else
-    	{
-    		Ione.read(fn_vol);
-    		Isum() += Ione();
-    	}
+		int this_frame = movie_frame_numbers[iframe];
+		FileName fn_vol;
+		fn_vol.compose(fn_out + "frame", this_frame, "", 3);
+		fn_vol += "_half" + integerToString(this_half) + "_class001_unfil.mrc";
+
+		if (iframe == 0)
+		{
+			Isum.read(fn_vol);
+		}
+		else
+		{
+			Ione.read(fn_vol);
+			Isum() += Ione();
+		}
 	}
 
 	// Write the average map to disc
@@ -666,8 +672,11 @@ void ParticlePolisher::calculateAverageAllSingleFrameReconstructions(int this_ha
 
 }
 
-void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int this_half)
+void ParticlePolisher::calculateSingleFrameReconstruction(int iframe, int this_half)
 {
+
+	// convert iframe to actual frame number in the STAR files!
+	int this_frame = movie_frame_numbers[iframe];
 
 	FileName fn_vol;
 	fn_vol.compose(fn_out + "frame", this_frame, "", 3);
@@ -692,7 +701,6 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 	for (long int imic = 0; imic < fn_mics.size(); imic++)
 	{
 		FileName fn_fit = (fitting_mode == NO_FIT) ? fn_mics[imic] : fn_mics[imic].withoutExtension() + "_fit.star";
-
 		Experiment exp_model;
 		exp_model.read(fn_fit);
 
@@ -705,20 +713,15 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 		RFLOAT xtrans, ytrans;
 		RFLOAT rot, tilt, psi;
 		int i_half;
-		long int i_frame;
+		long int my_frame;
 		FileName fn_img, fn_mic;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(exp_model.MDimg)
 		{
 
 			exp_model.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, i_half);
 			exp_model.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-			fn_mic.decompose(i_frame, dum);
-			// If we used --avg_movie_frame upon extraction, now count less
-			// e.g. instead of counting 4, 8, 12 count 1, 2, 3
-			i_frame /= step_frame;
-
-			// TODO!! Make a running average window here
-			if (ABS(i_frame - this_frame) <= frame_running_average/2 && i_half == this_half)
+			fn_mic.decompose(my_frame, dum);
+			if (ABS(my_frame - this_frame) <= frame_running_average/2 && i_half == this_half)
 			{
 				exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 				img.read(fn_img);
@@ -736,8 +739,8 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 
 				// Translations
 				xtrans=ytrans=0.;
-				exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_X, xtrans);
-				exp_model.MDimg.getValue( EMDL_ORIENT_ORIGIN_Y, ytrans);
+				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, xtrans);
+				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, ytrans);
 				if (ABS(xtrans) > 0. || ABS(ytrans) > 0. )
 					shiftImageInFourierTransform(F2D, F2D, ori_size, xtrans, ytrans );
 
@@ -772,23 +775,29 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int this_frame, int th
 
 }
 
-void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame, RFLOAT &bfactor, RFLOAT &offset, RFLOAT &corr_coeff)
+void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int iframe, RFLOAT &bfactor, RFLOAT &offset, RFLOAT &corr_coeff)
 {
 
 	if (NZYXSIZE(Imask()) == 0)
 		REPORT_ERROR("ParticlePolisher::calculateBfactorSingleFrameReconstruction BUG: first read Imask, then call this function.");
 
-	if (this_frame > 0 && XSIZE(fsc_average) == 0)
+	if (iframe > 0 && XSIZE(fsc_average) == 0)
 		REPORT_ERROR("ParticlePolisher::calculateBfactorSingleFrameReconstruction BUG: first call this function with this_frame < 0 to calculate FSC_average.");
 
 
 		// Read in the 2 half-reconstructions and calculate their FSC
 	FileName fn_root_half;
 	// Make sure that the first call to this function is with this_frame < 0!!!
-	if (this_frame < 0)
+	int this_frame;
+	if (iframe < 0)
+	{
 		fn_root_half = fn_out+"avgframes";
+	}
 	else
+	{
+		this_frame = movie_frame_numbers[iframe];
 		fn_root_half.compose(fn_out+"frame",this_frame,"", 3);
+	}
 
 	FileName fn_half1, fn_half2;
 	Image<RFLOAT> I1, I2;
@@ -801,7 +810,7 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int this_frame,
 	I2() *= Imask();
 	getFSC(I1(), I2(), fsc_frame);
 
-	if (this_frame < 0)
+	if (iframe < 0)
 	{
 		fsc_average = fsc_frame;
 		return;
@@ -937,7 +946,7 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 		for (long int ipar = 0; ipar < exp_model.micrographs[0].ori_particle_ids.size(); ipar++)
 		{
 			long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
-			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[first_frame - 1];
+			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[0];
 
 			// Get the corresponding line from the input STAR file
 			MDshiny.addObject(exp_model.MDimg.getObject(part_id));
@@ -1012,9 +1021,9 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 		long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
 
 		// Loop over all frames for motion corrections and possibly dose-dependent weighting
-		for (long int i_frame = first_frame; i_frame <= last_frame; i_frame++ )
+		for (long int iframe = 0; iframe < exp_model.ori_particles[ori_part_id].particles_id.size(); iframe++)
 		{
-			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[i_frame - 1]; // start counting frames at 0, not 1
+			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[iframe];
 
 			exp_model.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
 			exp_model.MDimg.getValue(EMDL_PARTICLE_ORI_NAME, fn_part, part_id);
@@ -1038,14 +1047,14 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 				exp_model.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, yp, part_id);
 				std::cerr << " x_off_prior_p= " << x_off_prior_p << " x_off_p= " << x_off_p << " xp= " << xp << std::endl;
 				std::cerr << " y_off_prior_p= " << y_off_prior_p << " y_off_p= " << y_off_p << " yp= " << yp << std::endl;
-				std::cerr << " iframe= " << i_frame << " XX(trans)= " << XX(trans) << " YY(trans)= " << YY(trans) << std::endl;
+				std::cerr << " iframe= " << iframe << " XX(trans)= " << XX(trans) << " YY(trans)= " << YY(trans) << std::endl;
 			}
 #endif
 
 			// Apply the phase shifts for this translation in Fourier space
 			transformer.FourierTransform(img(), Fimg);
 
-			if (i_frame == first_frame)
+			if (iframe == 0)
 			{
 				Fwsum.initZeros(Fimg);
 				Fsumw.initZeros(Fimg);
@@ -1054,9 +1063,8 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 			shiftImageInFourierTransform(Fimg, Fimg, ori_size, xtrans, ytrans);
 
 			// Apply (positive!!) B-factor weighting and store weighted sums
-			int iframe = i_frame - first_frame;
-			RFLOAT bfactor = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3*iframe + 0) : 0.;
-			RFLOAT offset  = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3*iframe + 1) : 0.;
+			RFLOAT bfactor = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3 * iframe + 0) : 0.;
+			RFLOAT offset  = (do_weighting) ? DIRECT_A1D_ELEM(perframe_bfactors, 3 * iframe + 1) : 0.;
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
 			{
 				RFLOAT res = sqrt((RFLOAT)ip * ip + jp * jp) / (XSIZE(img()) * angpix); // get resolution in 1/Angstrom
@@ -1121,7 +1129,6 @@ void ParticlePolisher::polishParticlesOneMicrograph(long int imic)
 			img.write(fn_img, -1, false, WRITE_OVERWRITE);
 		else
 			img.write(fn_img, -1, true, WRITE_APPEND);
-
 	}
 
 }
@@ -1177,34 +1184,6 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 	std::cout << " But you probably want to re-run at least a 3D auto-refinement with the shiny particles." << std::endl;
 
 
-	/*
-	 * This is needed for defocus & beamtilt refinement
-	 *
-	if (verb > 0)
-		std::cout << " + Setting Fourier transforms of the two shiny half-reconstructions ..." << std::endl;
-
-
-	MultidimArray<RFLOAT> dum;
-	Image<RFLOAT> refvol;
-	FileName fn_vol;
-	fn_vol = fn_out + "shiny_half1_class001_unfil.mrc";
-	refvol.read(fn_vol);
-	PPrefvol_half1.ori_size = XSIZE(refvol());
-	PPrefvol_half1.padding_factor = 2;
-	PPrefvol_half1.interpolator = TRILINEAR;
-	PPrefvol_half1.r_min_nn = 10;
-	PPrefvol_half1.data_dim = 2;
-	PPrefvol_half1.computeFourierTransformMap(refvol(), dum);
-	fn_vol = fn_out + "shiny_half2_class001_unfil.mrc";
-	refvol.read(fn_vol);
-	PPrefvol_half2.ori_size = XSIZE(refvol());
-	PPrefvol_half2.padding_factor = 2;
-	PPrefvol_half2.interpolator = TRILINEAR;
-	PPrefvol_half2.r_min_nn = 10;
-	PPrefvol_half2.data_dim = 2;
-	PPrefvol_half2.computeFourierTransformMap(refvol(), dum);
-	*/
-
 }
 
 void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experiment &exp_model)
@@ -1234,7 +1213,6 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 	RFLOAT xtrans, ytrans;
 	RFLOAT rot, tilt, psi;
 	int i_half;
-	long int i_frame;
 	FileName fn_img;
 
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(exp_model.MDimg)

@@ -155,8 +155,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	nr_frames_per_prior = textToInteger(parser.getOption("--nr_frames_prior", "Number of movie frames to calculate running-average priors", "5"));
 
 	// (integer-) divide running average width by 2 to have the side only
-	// TODO: add this to EMDL_OPTIMISER and read/write of optimiser.star
-	movie_frame_running_avg_side = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "3")) / 2;
+	movie_frame_running_avg_side = textToInteger(parser.getOption("--movie_frames_running_avg", "Number of movie frames in each running average", "3"));
+	movie_frame_running_avg_side /= 2;
 
 	// ORIENTATIONS
 	int orientations_section = parser.addSection("Orientations");
@@ -1158,10 +1158,20 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Re-normalise the power spectra of the noise, as running averages of movie frames will have more noise than the average micrographs!
 		int nframes;
 		mydata.MDimg.getValue(EMDL_PARTICLE_NR_FRAMES, nframes, 0);
+		int avg_frames;
+		mydata.MDimg.getValue(EMDL_PARTICLE_NR_FRAMES_AVG, avg_frames, 0);
+
+		// Also, set the width of the running averages inside the MDimg table of exp_model, for convenient hand-over to polishing
+		int ravgwidth = 2 * movie_frame_running_avg_side + 1;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
+		{
+			mydata.MDimg.setValue(EMDL_PARTICLE_MOVIE_RUNNING_AVG, ravgwidth);
+		}
+
 		// Correct the input sigma2noise spectra by a factor of nframes
 		for (int i=0; i < mymodel.nr_groups; i++)
 		{
-			mymodel.sigma2_noise[i] *= (RFLOAT)nframes/((RFLOAT)(2 * movie_frame_running_avg_side + 1));
+			mymodel.sigma2_noise[i] *= (RFLOAT)nframes/((RFLOAT)(avg_frames * 2 * movie_frame_running_avg_side + 1));
 		}
 
 		// Don't do norm correction for realignment of movies.

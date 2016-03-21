@@ -761,10 +761,8 @@ public:
 	// I/O
 	InputNodeEntry fn_in;
 	InputNodeEntry fn_mask;
-	SliderEntry avg_movie_frames;
 
 	// Movements
-	SliderEntry movie_runavg_window;
 	BooleanEntry do_fit_movement;
 	SliderEntry sigma_nb;
 

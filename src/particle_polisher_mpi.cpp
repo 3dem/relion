@@ -118,12 +118,10 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 
 	RFLOAT bfactor, offset, corr_coeff;
 
-	int total_nr_frames = last_frame - first_frame + 1;
-	long int my_first_frame, my_last_frame, my_nr_frames;
-
 	// Loop over all frames (two halves for each frame!) to be included in the reconstruction
 	// Each node does part of the work
-	divide_equally(2*total_nr_frames, node->size, node->rank, my_first_frame, my_last_frame);
+	long int my_first_frame, my_last_frame, my_nr_frames;
+	divide_equally(2*movie_frame_numbers.size(), node->size, node->rank, my_first_frame, my_last_frame);
 	my_nr_frames = my_last_frame - my_first_frame + 1;
 
 	if (verb > 0)
@@ -135,14 +133,13 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 	for (long int i = my_first_frame; i <= my_last_frame; i++)
 	{
 
-		int iframe = (i >= total_nr_frames) ? i - total_nr_frames : i;
-		iframe += first_frame;
-		int ihalf = (i >= total_nr_frames) ? 2 : 1;
+		int iframe = (i >= movie_frame_numbers.size()) ? i - movie_frame_numbers.size() : i;
+		int ihalf = (i >= movie_frame_numbers.size()) ? 2 : 1;
 
 		calculateSingleFrameReconstruction(iframe, ihalf);
 
-    	if (verb > 0)
-    		progress_bar(i - my_first_frame + 1);
+		if (verb > 0)
+			progress_bar(i - my_first_frame + 1);
 	}
 
 	if (verb > 0)
@@ -167,7 +164,7 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 
 	// Loop over all frames (two halves for each frame!) to be included in the reconstruction
 	// Each node does part of the work
-	divide_equally(total_nr_frames, node->size, node->rank, my_first_frame, my_last_frame);
+	divide_equally(movie_frame_numbers.size(), node->size, node->rank, my_first_frame, my_last_frame);
 	my_nr_frames = my_last_frame - my_first_frame + 1;
 
 	if (verb > 0)
@@ -176,17 +173,16 @@ void ParticlePolisherMpi::calculateAllSingleFrameReconstructionsAndBfactors()
 		init_progress_bar(my_nr_frames);
 	}
 
-	for (long int i = first_frame+my_first_frame; i <= first_frame+my_last_frame; i++)
+	for (long int iframe = my_first_frame; iframe <= my_last_frame; iframe++)
 	{
 
-		calculateBfactorSingleFrameReconstruction(i, bfactor, offset, corr_coeff);
-		int iframe = i - first_frame;
+		calculateBfactorSingleFrameReconstruction(iframe, bfactor, offset, corr_coeff);
 		DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 0) = bfactor;
        	DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1) = offset;
        	DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 2) = corr_coeff;
 
     	if (verb > 0)
-    		progress_bar(i - first_frame - my_first_frame + 1);
+    		progress_bar(iframe - my_first_frame + 1);
 	}
 
 	// Combine results from all nodes
@@ -312,107 +308,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 
 	}
 
-	/*
-	 * This is needed for defocus and beam-tilt refinement
-	 *
-	// Wait until the FSC-weighting has been done
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	MultidimArray<RFLOAT> dum;
-	Image<RFLOAT> refvol;
-	FileName fn_vol;
-	fn_vol = fn_out + "shiny_half1_class001_unfil.mrc";
-	refvol.read(fn_vol);
-	PPrefvol_half1.ori_size = XSIZE(refvol());
-	PPrefvol_half1.padding_factor = 2;
-	PPrefvol_half1.interpolator = TRILINEAR;
-	PPrefvol_half1.r_min_nn = 10;
-	PPrefvol_half1.data_dim = 2;
-	PPrefvol_half1.computeFourierTransformMap(refvol(), dum);
-	fn_vol = fn_out + "shiny_half2_class001_unfil.mrc";
-	refvol.read(fn_vol);
-	PPrefvol_half2.ori_size = XSIZE(refvol());
-	PPrefvol_half2.padding_factor = 2;
-	PPrefvol_half2.interpolator = TRILINEAR;
-	PPrefvol_half2.r_min_nn = 10;
-	PPrefvol_half2.data_dim = 2;
-	PPrefvol_half2.computeFourierTransformMap(refvol(), dum);
-	*/
 }
-
-/*
-void ParticlePolisherMpi::optimiseBeamTiltAndDefocus()
-{
-
-	// This function assumes the shiny particles are in exp_mdel.MDimg!!
-
-	if (beamtilt_max <= 0. && defocus_shift_max <= 0.)
-		return;
-
-	if (minres_beamtilt < maxres_model)
-	{
-		if (verb > 0)
-			std::cout << " Skipping beamtilt correction, as the resolution of the shiny reconstruction  does not go beyond minres_beamtilt of " << minres_beamtilt << " Ang." << std::endl;
-		return;
-	}
-
-	getBeamTiltGroups();
-
-	initialiseSquaredDifferenceVectors();
-
-	int total_nr_micrographs = exp_model.micrographs.size();
-
-	// Each node does part of the work
-	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
-	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
-	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
-
-	// Loop over all average micrographs
-	int barstep;
-	if (verb > 0)
-	{
-		std::cout << " + Optimising beamtilts and/or defocus values in all micrographs ... " << std::endl;
-		init_progress_bar(my_nr_micrographs);
-		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
-	}
-
-    for (long int i = my_first_micrograph; i <= my_last_micrograph; i++)
-	{
-    	if (verb > 0 && i % barstep == 0)
-			progress_bar(i);
-
-    	optimiseBeamTiltAndDefocusOneMicrograph(i);
-	}
-
-   	if (verb > 0)
-   		progress_bar(my_nr_micrographs);
-
-	// Combine results from all nodes
-	if (beamtilt_max > 0.)
-	{
-		MultidimArray<RFLOAT> allnodes_diff2_beamtilt;
-		allnodes_diff2_beamtilt.initZeros(diff2_beamtilt);
-		MPI_Allreduce(MULTIDIM_ARRAY(diff2_beamtilt), MULTIDIM_ARRAY(allnodes_diff2_beamtilt), MULTIDIM_SIZE(diff2_beamtilt), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-		diff2_beamtilt = allnodes_diff2_beamtilt;
-	}
-
-	if (defocus_shift_max > 0.)
-	{
-		MultidimArray<RFLOAT> allnodes_defocus_shift_allmics;
-		allnodes_defocus_shift_allmics.initZeros(defocus_shift_allmics);
-		MPI_Allreduce(MULTIDIM_ARRAY(defocus_shift_allmics), MULTIDIM_ARRAY(allnodes_defocus_shift_allmics), MULTIDIM_SIZE(defocus_shift_allmics), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-		defocus_shift_allmics = allnodes_defocus_shift_allmics;
-	}
-
-	// Now get the final optimised beamtilts and defocus shifts, and write results to the MetadataTable
-	applyOptimisedBeamTiltsAndDefocus();
-
-	// Write the new MDTable to disc
-	if (verb > 0)
-		exp_model.MDimg.write(fn_out + "shiny.star");
-
-}
-*/
 
 void ParticlePolisherMpi::run()
 {
@@ -429,15 +325,6 @@ void ParticlePolisherMpi::run()
 
 	// Now reconstruct with all polished particles: two independent halves, FSC-weighting of the sum of the two...
 	reconstructShinyParticlesAndFscWeight(1);
-
-	/*
-	// Optimise beam-tilt and defocus per beamtilt group and/or micrograph
-	optimiseBeamTiltAndDefocus();
-
-	// Reconstruct again two halves to see whether the beamtilt and/or defocus optimisation has helped
-	if (beamtilt_max > 0. || defocus_shift_max > 0.)
-		reconstructShinyParticlesAndFscWeight(2);
-	*/
 
 	if (verb > 0)
 		std::cout << " done!" << std::endl;

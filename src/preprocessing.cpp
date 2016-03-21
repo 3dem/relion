@@ -345,13 +345,13 @@ void Preprocessing::joinAllStarFiles()
 	if (fn_part_star != "")
 	{
 		MDout.write(fn_part_star);
-		std::cout << " Written out STAR file with all movie particles in " << fn_part_star<< std::endl;
+		std::cout << " Written out STAR file with all particles in " << fn_part_star<< std::endl;
 	}
 
     if (do_movie_extract && fn_list_star != "")
     {
-		MDmicnames.write(fn_list_star);
-		std::cout << " Written out list of movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
+    	MDmicnames.write(fn_list_star);
+    	std::cout << " Written out list of movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
     }
 
 }
@@ -864,7 +864,10 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			MD.setValue(EMDL_IMAGE_NAME, fn_img);
 			MD.setValue(EMDL_MICROGRAPH_NAME, fn_frame);
 			if (do_movie_extract)
+			{
 				MD.setValue(EMDL_PARTICLE_NR_FRAMES, movie_last_frame - movie_first_frame + 1);
+				MD.setValue(EMDL_PARTICLE_NR_FRAMES_AVG, avg_n_frames);
+			}
 
 			// Also fill in the CTF parameters
 			if (star_has_ctf)

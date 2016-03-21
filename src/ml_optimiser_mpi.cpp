@@ -2400,7 +2400,7 @@ void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
 	int nr_batches = MDbatches.numberOfObjects();
 
 	// Get original outname
-	FileName fn_out_ori = fn_out.beforeLastOf("/");
+	FileName fn_out_ori = fn_out;//.beforeLastOf("/");
 	int imic = 0;
 	FileName fn_pre, fn_jobnr, fn_post, fn_olddir="";
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbatches)
@@ -2409,7 +2409,7 @@ void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
 		MDbatches.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
 		fn_data_movie = fn_star;
 		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
-		fn_out = fn_out_ori + "/" + fn_post.without(".star");
+		fn_out = fn_out_ori + fn_post.without(".star");
 
 		// Set new output star file back into MDbatches, to be written out at the end
 		FileName fn_data = fn_out + "_data.star";
@@ -2452,9 +2452,8 @@ void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
 	if (node->isMaster())
 	{
 		// At the end, the master also writes out a STAR file with the output STAR files of all micrographs
-		MDbatches.write(fn_out_ori + "/run_data.star");
+		MDbatches.write(fn_out_ori + "_data.star");
 		std::cout << " Done processing all movie batches!" << std::endl;
-
 	}
 
 

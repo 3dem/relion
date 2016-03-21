@@ -293,6 +293,8 @@ enum EMDLabel
     EMDL_PARTICLE_ORI_NAME,
     EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES,
     EMDL_PARTICLE_NR_FRAMES,
+    EMDL_PARTICLE_NR_FRAMES_AVG,
+    EMDL_PARTICLE_MOVIE_RUNNING_AVG,
     EMDL_PARTICLE_PMAX,
 
     EMDL_PIPELINE_JOB_COUNTER,
@@ -664,6 +666,8 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_ORI_NAME, EMDL_STRING, "rlnOriginalParticleName", "Original name for a particles");
         EMDL::addLabel(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, EMDL_INT, "rlnNrOfSignificantSamples", "Number of orientational/class assignments (for a particle) with sign.probabilities in the 1st pass of adaptive oversampling"); /**< particle, Number of orientations contributing to weights*/
         EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES, EMDL_INT, "rlnNrOfFrames", "Number of movie frames that were collected for this particle");
+        EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES_AVG, EMDL_INT, "rlnAverageNrOfFrames", "Number of movie frames that one averages over upon extraction of movie-particles");
+        EMDL::addLabel(EMDL_PARTICLE_MOVIE_RUNNING_AVG, EMDL_INT, "rlnMovieFramesRunningAverage", "Number of movie frames inside the running average that will be used for movie-refinement");
         EMDL::addLabel(EMDL_PARTICLE_PMAX, EMDL_DOUBLE, "rlnMaxValueProbDistribution", "Maximum value of the (normalised) probability function for a particle"); /**< particle, Maximum value of probability distribution */
 
 

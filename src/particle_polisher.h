@@ -62,15 +62,11 @@ public:
 	// if false, then intermediate files are re-read from disc and earlier calculations are skipped
 	bool only_do_unfinished;
 
-	// First and last frame numbers to include in the average, Also step if one had used --avg_movie_frames in the extraction
-	int first_frame, last_frame, step_frame;
+	// List of frame-numbers for each movie-particle in the Experiment
+	std::vector<int> movie_frame_numbers;
 
 	// Which fitting mode (lienar/logarithmic/nofit)
 	int fitting_mode;
-
-	// Running average window with used for the determination of the frame movements
-	// This will be used to exclude the first and last few frames from the fit (but not from the polsihing!)
-	int running_average_width;
 
 	// CTF stuff for the reconstructions
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak;

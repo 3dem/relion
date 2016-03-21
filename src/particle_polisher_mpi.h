@@ -57,9 +57,6 @@ public:
 	// Calculate two half-reconstructions from shiny particles and calculate FSC-weighted average map, store that in refvol
 	void reconstructShinyParticlesAndFscWeight(int ipass);
 
-	// Parallelized optimisation of beamtilt for all micrographs
-	//void optimiseBeamTiltAndDefocus();
-
 	// Parallelized run function
     void run();
 

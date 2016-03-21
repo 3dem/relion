@@ -1520,7 +1520,8 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 				pipeline.processList[current_job].type == PROC_3DCLASS ||
 				pipeline.processList[current_job].type == PROC_3DAUTO ||
 				pipeline.processList[current_job].type == PROC_MANUALPICK ||
-				pipeline.processList[current_job].type == PROC_CLASSSELECT);
+				pipeline.processList[current_job].type == PROC_CLASSSELECT ||
+				pipeline.processList[current_job].type == PROC_MOVIEREFINE);
 		if (!skip_this )
 		{
 			for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
