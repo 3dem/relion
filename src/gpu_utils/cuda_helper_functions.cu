@@ -726,8 +726,8 @@ void windowFourierTransform2(
 	if (iX > 1 && iY/2 + 1 != iX)
 		REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
 
-	if (oX == iX)
-		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
+//	if (oX == iX)
+//		REPORT_ERROR("windowFourierTransform ERROR: there is a one-to-one map between input and output!");
 
 
 	deviceInitComplexValue(d_out, (XFLOAT)0.);
