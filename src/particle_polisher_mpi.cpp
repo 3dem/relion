@@ -320,6 +320,9 @@ void ParticlePolisherMpi::run()
 	if (do_weighting)
 		calculateAllSingleFrameReconstructionsAndBfactors();
 
+	// Make a logfile in pdf format
+	generateLogFilePDF();
+
 	// Write out the polished particles
 	polishParticlesAllMicrographs();
 

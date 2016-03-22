@@ -23,13 +23,14 @@
 #include "src/image.h"
 #include "src/metadata_table.h"
 #include "src/exp_model.h"
-#include <src/fftw.h>
-#include <src/time.h>
-#include <src/mask.h>
-#include <src/funcs.h>
-#include <src/backprojector.h>
-#include <src/ctf.h>
-#include <src/postprocessing.h>
+#include "src/fftw.h"
+#include "src/time.h"
+#include "src/mask.h"
+#include "src/funcs.h"
+#include "src/backprojector.h"
+#include "src/ctf.h"
+#include "src/postprocessing.h"
+#include "src/CPlot2D.h"
 
 #define LINEAR_FIT 0
 #define LOGARITHMIC_FIT 1
@@ -165,9 +166,6 @@ public:
 	// Generate a list of all individual micrographs
 	void generateMicrographList();
 
-	// General Running
-	void run();
-
 	// Fit the beam-induced translations for all average micrographs
 	void fitMovementsAllMicrographs();
 
@@ -213,6 +211,13 @@ public:
 
 	// Reconstruct one half of the shiny particles
 	void reconstructShinyParticlesOneHalf(int ihalf, Experiment &exp_model);
+
+	// Generate a single PDF file with motion tracks, B-factor plots etc
+	void generateLogFilePDF();
+
+	// General Running
+	void run();
+
 
 };
 

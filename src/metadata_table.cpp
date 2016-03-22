@@ -845,7 +845,73 @@ void MetaDataTable::writeValueToString(std::string & result,
     aux->writeValueToString(result, EMDL::str2Label(inputLabel));
 }
 
+void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
+		double red, double green, double blue, double linewidth, std::string marker)
+{
+	CDataSet dataSet;
+	if (marker=="")
+	{
+		dataSet.SetDrawMarker(false);
+	}
+	else
+	{
+		dataSet.SetDrawMarker(true);
+		dataSet.SetMarkerSymbol(marker);
+	}
+	dataSet.SetLineWidth(linewidth);
+	dataSet.SetDatasetColor(red, green, blue);
+	dataSet.SetDatasetTitle(EMDL::label2Str(yaxis));
 
+    RFLOAT mydbl;
+    int myint;
+    long int mylong;
+	double xval, yval;
+	for (long int idx = 0; idx < objects.size(); idx++)
+    {
+    	if (EMDL::isDouble(xaxis))
+    	{
+    		objects[idx]->getValue(xaxis, mydbl);
+    		xval = mydbl;
+    	}
+    	else if (EMDL::isInt(xaxis))
+    	{
+    		objects[idx]->getValue(xaxis, myint);
+    		xval = myint;
+    	}
+    	else if (EMDL::isLong(xaxis))
+    	{
+    		objects[idx]->getValue(xaxis, mylong);
+    		xval = mylong;
+    	}
+    	else
+    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot xaxis double, int or long int");
+
+    	if (EMDL::isDouble(yaxis))
+    	{
+    		objects[idx]->getValue(yaxis, mydbl);
+    		yval = mydbl;
+    	}
+    	else if (EMDL::isInt(yaxis))
+    	{
+    		objects[idx]->getValue(yaxis, myint);
+    		yval = myint;
+    	}
+    	else if (EMDL::isLong(yaxis))
+    	{
+    		objects[idx]->getValue(yaxis, mylong);
+    		yval = mylong;
+    	}
+    	else
+    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot yaxis double, int or long int");
+
+    	CDataPoint point(xval, yval);
+		dataSet.AddDataPoint(point);
+
+	}
+
+    plot2D->AddDataSet(dataSet);
+
+}
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,

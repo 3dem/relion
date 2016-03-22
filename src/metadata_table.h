@@ -58,6 +58,7 @@
 #endif
 #include "src/funcs.h"
 #include "src/args.h"
+#include "src/CPlot2D.h"
 #include "src/metadata_container.h"
 
 /** For all objects.
@@ -396,6 +397,10 @@ public:
 
     void writeValueToString(std::string & result,
                             const std::string & inputLabel);
+
+
+    void addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
+    		double red=0., double green=0., double blue=0., double linewidth = 1.0, std::string marker="");
 
 
 };

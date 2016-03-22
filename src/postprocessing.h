@@ -25,11 +25,11 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/healpix_sampling.h"
-#include <src/fftw.h>
-#include <src/time.h>
-#include <src/mask.h>
-#include <src/funcs.h>
-
+#include "src/fftw.h"
+#include "src/time.h"
+#include "src/mask.h"
+#include "src/funcs.h"
+#include "src/CPlot2D.h"
 
 
 class Postprocessing

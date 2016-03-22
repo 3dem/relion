@@ -2605,11 +2605,38 @@ void RelionMainWindow::cb_about_i()
 	ShowHelpText *help = new ShowHelpText("\
 RELION is written by Sjors Scheres at the MRC Laboratory of Molecular Biology (scheres@mrc-lmb.cam.ac.uk).\n \
 \n\
-If RELION is useful in your work, please cite it in the contexts as explained under the \"Publish!\" tab, or on the RELION wiki at http://www2.mrc-lmb.cam.ac.uk/relion. \n  \
-\n\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of Sjors Scheres is acknowledged appropriately. In order to maintain an overview of existing versions, he would also appreciate being \
-notified of any redistribution of (modified versions of) the code. \n \
+notified of any redistribution of (modified versions of) the code. \n \n \n \
+If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
+ * General Bayesian approach (and first mention of RELION): \n \
+     Scheres (2012) J. Mol. Biol. (PMID: 22100448)	 \n \n\
+ * RELION implementation details and the 3D auto-refine procedure: \n \
+     Scheres (2012) J. Struct. Biol. (PMID: 23000701)	 \n \n\
+ * Gold-standard FSC and the relevance of the 0.143 criterion: \n \
+     Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)	 \n \n\
+ * Movie-processing procedure: \n \
+     Bai et al. (2013) eLife (PMID: 23427024 )	 \n \n\
+ * Correction of mask effects on the FSC curve by randomised phases: \n \
+     Chen et al. (2013) Ultramicroscopy (PMID: 23872039)	 \n \n\
+ * Particle-polishing: \n \
+     Scheres (2014) eLife (PMID: 25122622)	 \n \n\
+ * Auto-picking : \n \
+     Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
+ * Sub-tomogram averaging : \n \
+     Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
+Please also cite the following EXTERNAL programs: \n \n \
+* CTFFIND for CTF-estimation: \n \
+    Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
+* MOTIONCORR for beam-induced motion correction: \n \
+    Li et al (2013) Nat. Methods (PMID: 23644547) \n \n\
+* ResMap for local-resolution estimation:  \n\
+    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
+* CTFFIND4 for CTF-estimation: \n \
+    Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
+* Gctf for CTF-estimation: \n \
+    Zhang (2016) J. Struct. Biol. (PMID: 2659270) \n \n\
+* Postscript plots are made using CPlot2D from  www.amzsaki.com\n \
 ");
 }
 

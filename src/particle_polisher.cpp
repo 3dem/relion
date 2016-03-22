@@ -312,6 +312,15 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	if (only_do_unfinished && exists(fn_fit))
 		return;
 
+
+
+	// Also write out a postscript file with the fits
+	FileName fn_eps = fn_mics[imic].withoutExtension() + "_fit.eps";
+	CPlot2D *plot2D=new CPlot2D(fn_mics[imic]);
+	plot2D->SetXAxisSize(600);
+	plot2D->SetYAxisSize(600);
+	plot2D->SetDrawLegend(false);
+
 	std::vector<RFLOAT> x_pick, y_pick, x_off_prior, y_off_prior, x_start, x_end, dummy; // X and Y-coordinates for the average particles in the micrograph
 	std::vector< std::vector<RFLOAT> > x_off, y_off; // X and Y shifts w.r.t. the average for each movie frame
 	RFLOAT x_pick_p, y_pick_p, x_off_p, y_off_p, x_off_prior_p, y_off_prior_p;
@@ -321,6 +330,8 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 
 	// Running average window with used for the determination of the frame movements, now taken from _data.star
 	int running_average_width;
+	if (!exp_model.MDimg.containsLabel(EMDL_PARTICLE_MOVIE_RUNNING_AVG))
+		REPORT_ERROR("ParticlePolisher::fitMovementsOneMicrograph ERROR: input STAR file does not contain rlnMovieFramesRunningAverage label");
 
 	// Just testing we've read a single micrograph only!
 	if (exp_model.micrographs.size()>1)
@@ -332,6 +343,9 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	{
 		long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
 
+		CDataSet dataSet;
+		dataSet.SetDrawMarker(false);
+		dataSet.SetDatasetColor(0.0,0.0,0.0);
 		x_off.push_back(dummy);
 		y_off.push_back(dummy);
 		bool is_first = true;
@@ -364,7 +378,10 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 			// Store the offsets for all movie frames, relative to the prior (to get the movements of the frames)
 			x_off[ipar].push_back(x_off_p);
 			y_off[ipar].push_back(y_off_p);
+			CDataPoint point(x_pick_p + 25*x_off_p, y_pick_p + 25*y_off_p);
+			dataSet.AddDataPoint(point);
 		}
+		plot2D->AddDataSet(dataSet);
 	}
 
 	// Now do the actual fitting
@@ -374,6 +391,10 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	for (long int ipar = 0; ipar < (exp_model.micrographs[0]).ori_particle_ids.size(); ipar++)
 	{
 		long int ori_part_id = exp_model.micrographs[0].ori_particle_ids[ipar];
+
+		CDataSet dataSet;
+		dataSet.SetDrawMarker(false);
+		dataSet.SetDatasetColor(1.0,0.0,0.0);
 
 		// Sjors 14sep2015: bug reported by Kailu Yang
 		RFLOAT my_pick_x = x_pick[ipar] - x_off_prior[ipar];
@@ -385,7 +406,6 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 		// Loop over all other ori_particles on this micrograph and determine weight for contribution to this ori_particle
 		for (long int ii = 0; ii < x_pick.size(); ii++)
 		{
-
 			// Sjors 14sep2015: bug reported by Kailu Yang
 			RFLOAT nb_pick_x = x_pick[ii] - x_off_prior[ii]; // add prior to center at average position
 			RFLOAT nb_pick_y = y_pick[ii] - y_off_prior[ii]; // add prior to center at average position
@@ -448,7 +468,16 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 			long int part_id = exp_model.ori_particles[ori_part_id].particles_id[i_frame];
 			exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_X, x_off_p + x_off_prior[ipar], part_id);
 			exp_model.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, y_off_p + y_off_prior[ipar], part_id);
+
+			if (i_frame == 0)
+			{
+				exp_model.MDimg.getValue(EMDL_IMAGE_COORD_X, x_pick_p, part_id);
+				exp_model.MDimg.getValue(EMDL_IMAGE_COORD_Y, y_pick_p, part_id);
+			}
+			CDataPoint point(x_pick_p + 25*(x_off_p + x_off_prior[ipar]), y_pick_p + 25*(y_off_p + y_off_prior[ipar]));
+			dataSet.AddDataPoint(point);
 		}
+		plot2D->AddDataSet(dataSet);
 	}
 
 	// Write the STAR file with the fitted coordinates, make directory if it doesn't exist
@@ -458,7 +487,10 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 
 	exp_model.MDimg.write(fn_fit);
 
-
+	// Write the movement plot as well
+	plot2D->SetXAxisTitle("X-coordinate");
+	plot2D->SetYAxisTitle("Y-coordinate");
+	plot2D->OutputPostScriptPlot(fn_eps);
 }
 
 void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
@@ -554,7 +586,6 @@ bool ParticlePolisher::readStarFileBfactors(FileName fn_star)
 			MD.getValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, DIRECT_A1D_ELEM(perframe_bfactors, iframe * 3 + 1) );
 			iframe++;
 		}
-		std::cerr << " read in perframe_bfactors= " << perframe_bfactors << std::endl;
 		return true;
 	}
 	else
@@ -578,6 +609,26 @@ void ParticlePolisher::writeStarFileBfactors(FileName fn_star)
 	}
 
 	MDout.write(fn_star);
+
+	CPlot2D *plot2D=new CPlot2D("Polishing B-factors");
+	plot2D->SetXAxisSize(600);
+	plot2D->SetYAxisSize(400);
+	plot2D->SetDrawLegend(false);
+	plot2D->SetXAxisTitle("movie frame");
+	plot2D->SetYAxisTitle("B-factor");
+	MDout.addToCPlot2D(plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
+	plot2D->OutputPostScriptPlot(fn_out + "bfactors.eps");
+
+	CPlot2D *plot2Db=new CPlot2D("Polishing scale-factors");
+	plot2Db->SetXAxisSize(600);
+	plot2Db->SetYAxisSize(400);
+	plot2Db->SetDrawLegend(false);
+	plot2Db->SetXAxisTitle("movie frame");
+	plot2Db->SetYAxisTitle("Scale-factor");
+	MDout.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
+	plot2Db->OutputPostScriptPlot(fn_out + "scalefactors.eps");
+
+
 }
 
 void ParticlePolisher::writeStarFileRelativeWeights(FileName fn_star)
@@ -1270,6 +1321,29 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 
 }
 
+void ParticlePolisher::generateLogFilePDF()
+{
+
+    std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+    command += fn_out + "logfile.pdf ";
+
+	command += fn_out + "bfactors.eps ";
+	command += fn_out + "scalefactors.eps ";
+    FileName fn_prev="";
+	for (long int i = 0; i < fn_mics.size(); i++)
+	{
+    	if (fn_prev != fn_mics[i].beforeLastOf("/"))
+    	{
+    		fn_prev = fn_mics[i].beforeLastOf("/");
+    		command += fn_prev+"*.eps ";
+    	}
+	}
+
+    std::cout << " Executing: "<<command << std::endl;
+    int res = system(command.c_str());
+
+}
+
 void ParticlePolisher::run()
 {
 
@@ -1281,20 +1355,14 @@ void ParticlePolisher::run()
 	if (do_weighting)
 		calculateAllSingleFrameReconstructionsAndBfactors();
 
+	// Make a logfile in pdf format
+	generateLogFilePDF();
+
 	// Write out the intermediately polished particles
 	polishParticlesAllMicrographs();
 
 	// Now reconstruct with all polished particles: two independent halves, FSC-weighting of the sum of the two...
 	reconstructShinyParticlesAndFscWeight(1);
-
-	/*
-	// Optimise beam-tilt and defocus per beamtilt group and/or micrograph
-	optimiseBeamTiltAndDefocus();
-
-	// Reconstruct again two halves to see whether the beamtilt and/or defocus optimisation has helped
-	if (beamtilt_max > 0. || defocus_shift_max > 0.)
-		reconstructShinyParticlesAndFscWeight(2);
-	*/
 
 	if (verb > 0)
 		std::cout << " done!" << std::endl;
