@@ -753,6 +753,16 @@ void Postprocessing::writeOutput()
 	}
 	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
 
+	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
+	if (!exists(fn_log))
+	{
+		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+		command += fn_log + " ";
+		command += fn_out + "_fsc.eps ";
+		command += fn_out + "_guinier.eps ";
+		std::cout << " Executing: "<<command << std::endl;
+		int res = system(command.c_str());
+	}
 
 	if (verb > 0)
 	{

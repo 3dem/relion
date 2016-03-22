@@ -1374,11 +1374,21 @@ void RelionMainWindow::cb_display_io_node_i()
 	    else
 	    	std::cout << " Only coordinates in .star format (generated in the pipeline) are allowed" << std::endl;
 	}
+	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
+	{
+		const char * default_pdf_viewer = getenv ("RELION_CTFFIND_EXECUTABLE");
+		if (default_pdf_viewer == NULL)
+		{
+			char mydefault[]=DEFAULTPDFVIEWER;
+			default_pdf_viewer=mydefault;
+		}
+		std::string myviewer(default_pdf_viewer);
+		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
+	}
 	else
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
-	std::cerr << "command= "<<command << std::endl;
 	int res= system(command.c_str());
 
 }
@@ -1521,7 +1531,8 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 				pipeline.processList[current_job].type == PROC_3DAUTO ||
 				pipeline.processList[current_job].type == PROC_MANUALPICK ||
 				pipeline.processList[current_job].type == PROC_CLASSSELECT ||
-				pipeline.processList[current_job].type == PROC_MOVIEREFINE);
+				pipeline.processList[current_job].type == PROC_MOVIEREFINE ||
+				pipeline.processList[current_job].type == PROC_POLISH);
 		if (!skip_this )
 		{
 			for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)

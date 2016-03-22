@@ -4489,6 +4489,9 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	Node node3(outputname + "shiny.star", NODE_PART_DATA);
 	pipelineOutputNodes.push_back(node3);
 
+	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+	pipelineOutputNodes.push_back(node4);
+
 	// If this is not a continue job, then re-start from scratch....
 	if (is_continue)
 		command += " --only_do_unfinished ";
@@ -5504,6 +5507,10 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	pipelineOutputNodes.push_back(node1);
 	Node node2(outputname+"postprocess_masked.mrc", NODE_FINALMAP);
 	pipelineOutputNodes.push_back(node2);
+
+	Node node2b(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+	pipelineOutputNodes.push_back(node2b);
+
 
 	// Sharpening
 	if (fn_mtf.getValue().length() > 0)

@@ -50,6 +50,7 @@ class Process;
 #define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
 #define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
+#define NODE_PDF_LOGFILE    13//PDF logfile
 
 class Node
 {

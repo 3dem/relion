@@ -924,6 +924,25 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int iframe, RFL
 		// this is the B-factor relative to the average from all single-frame reconstructions!
 		// in this case: positive values mean BETTER than average, and thus HIGHER WEIGHTS!
 		bfactor *= 4.;
+
+		CDataSet dataSet;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+		{
+			RFLOAT res2;
+			MDout.getValue(EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, res2);
+			CDataPoint point(res2, offset + (res2 * bfactor / 4.));
+			dataSet.AddDataPoint(point);
+		}
+		dataSet.SetDatasetColor(1., 0., 0.);
+		dataSet.SetDatasetTitle("Fitted straight line");
+		CPlot2D *plot2D=new CPlot2D("Guinier plot frame " + integerToString(iframe+1));
+		plot2D->SetXAxisSize(600);
+		plot2D->SetYAxisSize(400);
+		plot2D->SetXAxisTitle("resolution (1/A^2)");
+		plot2D->SetYAxisTitle("ln(amplitudes)");
+		MDout.addToCPlot2D(plot2D, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN);
+		plot2D->AddDataSet(dataSet);
+		plot2D->OutputPostScriptPlot(fn_out + "frame_"+integerToString(iframe+1, 3, '0')+"_guinier.eps");
 	}
 
 }
@@ -1324,24 +1343,28 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 void ParticlePolisher::generateLogFilePDF()
 {
 
-    std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
-    command += fn_out + "logfile.pdf ";
-
-	command += fn_out + "bfactors.eps ";
-	command += fn_out + "scalefactors.eps ";
-    FileName fn_prev="";
-	for (long int i = 0; i < fn_mics.size(); i++)
+	if (!exists(fn_out + "logfile.pdf"))
 	{
-    	if (fn_prev != fn_mics[i].beforeLastOf("/"))
-    	{
-    		fn_prev = fn_mics[i].beforeLastOf("/");
-    		command += fn_prev+"*.eps ";
-    	}
+		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+		command += fn_out + "logfile.pdf ";
+
+		command += fn_out + "bfactors.eps ";
+		command += fn_out + "scalefactors.eps ";
+		command += fn_out + "frame_???_guinier.eps ";
+
+		FileName fn_prev="";
+		for (long int i = 0; i < fn_mics.size(); i++)
+		{
+			if (fn_prev != fn_mics[i].beforeLastOf("/"))
+			{
+				fn_prev = fn_mics[i].beforeLastOf("/");
+				command += fn_prev+"/*.eps ";
+			}
+		}
+
+		std::cout << " Executing: "<<command << std::endl;
+		int res = system(command.c_str());
 	}
-
-    std::cout << " Executing: "<<command << std::endl;
-    int res = system(command.c_str());
-
 }
 
 void ParticlePolisher::run()

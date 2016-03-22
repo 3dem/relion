@@ -321,7 +321,8 @@ void ParticlePolisherMpi::run()
 		calculateAllSingleFrameReconstructionsAndBfactors();
 
 	// Make a logfile in pdf format
-	generateLogFilePDF();
+	if (node->isMaster())
+		generateLogFilePDF();
 
 	// Write out the polished particles
 	polishParticlesAllMicrographs();

@@ -52,6 +52,7 @@
 #define DONT_MKDIR false
 // font size of browser windows on the main GUI
 #define RLN_FONTSIZE 14
+#define DEFAULTPDFVIEWER "evince"
 
 // Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
 #define MAX_JOBS_BROWSER 50
