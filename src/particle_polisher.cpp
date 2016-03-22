@@ -1362,6 +1362,7 @@ void ParticlePolisher::generateLogFilePDF()
 			}
 		}
 
+		command += " > /dev/null &";
 		std::cout << " Executing: "<<command << std::endl;
 		int res = system(command.c_str());
 	}
