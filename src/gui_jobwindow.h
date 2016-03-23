@@ -115,9 +115,6 @@ public:
 	AnyEntry qsub_extra2;
 	AnyEntry other_args;
 
-    // Run buttons
-    Fl_Button *run_button, *print_CL_button, *cite_button;
-
 	// For the run tab
 	bool has_mpi;
 	bool has_thread;
@@ -131,7 +128,7 @@ public:
 public:
 	// Constructor with x, y, w, h and a title
 	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
-			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
+			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-65, const char* title = "");
 
     // Destructor
     ~RelionJobWindow() {};

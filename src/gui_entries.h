@@ -42,7 +42,8 @@
 #include <FL/Fl_Wizard.H>
 #include <FL/Fl_Text_Display.H>
 #include <FL/Fl_Text_Editor.H>
-#include <FL/Fl_JPEG_Image.H>
+#include <FL/Fl_Image.H>
+#include <FL/Fl_XPM_Image.H>
 #include "src/macros.h"
 #include "src/strings.h"
 #include <string>

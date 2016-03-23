@@ -64,7 +64,7 @@ static int browse_jobtype[NR_BROWSE_TABS]; // this allow non-consecutive numberi
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
-static Fl_JPEG_Image *jpeg_image;
+static Fl_XPM_Image *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
@@ -90,6 +90,7 @@ static ResmapJobWindow *job_resmap;
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
+static Fl_Button *forgot_button;
 static Fl_Input *alias_current_job;
 
 static Fl_Text_Buffer *textbuff_stdout;
@@ -266,6 +267,9 @@ private:
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();
+
+    static void cb_forgot(Fl_Widget*, void*);
+    inline void cb_forgot_i();
 
     static void cb_save(Fl_Widget*, void*);
     inline void cb_save_i();

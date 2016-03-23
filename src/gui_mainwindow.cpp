@@ -136,10 +136,10 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 
 	// Initial screen picture with some density and some explanation
 	//fl_register_images(); // initialize image lib
-	//image_box = new Fl_Box(0,100,w,h); // widget that will contain image
+	image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
 	// TODO: control file location and use better figure
-	//jpeg_image = new Fl_JPEG_Image("/lmb/home/scheres/bg.jpg"); // load jpeg image into ram
-	//image_box->image(jpeg_image); // attach jpg image to box
+	xpm_image = new Fl_XPM_Image("gui_background.xpm");
+	image_box->image(xpm_image); // attach xbm image to box
 
 	// Read in the pipeline STAR file if it exists
 	pipeline.name = fn_pipe;
@@ -176,130 +176,136 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     current_y = MENUHEIGHT + 10;
 
     // Add run buttons on the menubar as well
-	print_CL_button = new Fl_Button(GUIWIDTH - 330, h-89, 100, 30, "Print command");
+	print_CL_button = new Fl_Button(GUIWIDTH - 330, h-90, 100, 32, "Print command");
 	print_CL_button->color(GUI_RUNBUTTON_COLOR);
 	print_CL_button->labelsize(12);
 	print_CL_button->callback( cb_print_cl, this);
 
-	schedule_button = new Fl_Button(GUIWIDTH - 220 , h-89, 100, 30, "Schedule");
+	schedule_button = new Fl_Button(GUIWIDTH - 220 , h-90, 100, 32, "Schedule");
 	schedule_button->color(GUI_RUNBUTTON_COLOR);
 	schedule_button->labelfont(FL_ITALIC);
 	schedule_button->labelsize(14);
 	schedule_button->callback( cb_schedule, this);
 
-	run_button = new Fl_Button(GUIWIDTH - 110 , h-89, 100, 30, "Run now");
+	run_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Run now");
 	run_button->color(GUI_RUNBUTTON_COLOR);
 	run_button->labelfont(FL_ITALIC);
 	run_button->labelsize(14);
 	run_button->callback( cb_run, this);
 
-    // Fill browser in the right order
+
+	forgot_button = new Fl_Button(450, 143, 10, 32, "?");
+	forgot_button->color(GUI_BUTTON_COLOR);
+	forgot_button->labelsize(12);
+	forgot_button->callback( cb_forgot, this);
+
+	// Fill browser in the right order
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
     current_job = -1;
 
-    browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[0] = PROC_IMPORT;
     browser->add("Import");
     job_import = new ImportJobWindow();
     browse_grp[0]->end();
 
-    browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[1] = PROC_MOTIONCORR;
     browser->add("Motion correction");
 	job_motioncorr = new MotioncorrJobWindow();
     browse_grp[1]->end();
 
-    browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[2] = PROC_CTFFIND;
     browser->add("CTF estimation");
     job_ctffind = new CtffindJobWindow();
     browse_grp[2]->end();
 
-    browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[3] = PROC_MANUALPICK;
 	browser->add("Manual picking");
 	job_manualpick = new ManualpickJobWindow();
     browse_grp[3]->end();
 
-    browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[4] = PROC_AUTOPICK;
 	browser->add("Auto-picking");
 	job_autopick = new AutopickJobWindow();
     browse_grp[4]->end();
 
-    browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[5] = PROC_EXTRACT;
 	browser->add("Particle extraction");
 	job_extract = new ExtractJobWindow();
     browse_grp[5]->end();
 
-    browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[6] = PROC_SORT;
 	browser->add("Particle sorting");
 	job_sort = new SortJobWindow();
     browse_grp[6]->end();
 
-    browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[7] = PROC_CLASSSELECT;
 	browser->add("Subset selection");
 	job_classselect = new ClassSelectJobWindow();
     browse_grp[7]->end();
 
-    browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[8] = PROC_2DCLASS;
 	browser->add("2D classification");
 	job_class2d = new Class2DJobWindow();
     browse_grp[8]->end();
 
-    browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[9] = PROC_3DCLASS;
 	browser->add("3D classification");
 	job_class3d = new Class3DJobWindow();
     browse_grp[9]->end();
 
-    browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[10] = PROC_3DAUTO;
 	browser->add("3D auto-refine");
 	job_auto3d = new Auto3DJobWindow();
     browse_grp[10]->end();
 
-    browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[11] = PROC_MOVIEREFINE;
 	browser->add("Movie refinement");
 	job_movierefine = new MovieRefineJobWindow();
     browse_grp[11]->end();
 
-    browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[12] = PROC_POLISH;
 	browser->add("Particle polishing");
 	job_polish = new PolishJobWindow();
     browse_grp[12]->end();
 
-    browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[13] = PROC_MASKCREATE;
 	browser->add("Mask creation");
 	job_maskcreate = new MaskCreateJobWindow();
     browse_grp[13]->end();
 
-    browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[14] = PROC_JOINSTAR;
 	browser->add("Join star files");
 	job_joinstar = new JoinStarJobWindow();
     browse_grp[14]->end();
 
-    browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[15] = PROC_SUBTRACT;
 	browser->add("Particle subtraction");
 	job_subtract = new SubtractJobWindow();
     browse_grp[15]->end();
 
-    browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[16] = PROC_POST;
 	browser->add("Post-processing");
 	job_post = new PostJobWindow();
     browse_grp[16]->end();
 
-    browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 600-MENUHEIGHT);
+    browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
     browse_jobtype[17] = PROC_RESMAP;
 	browser->add("Local resolution");
 	job_resmap = new ResmapJobWindow();
@@ -1445,6 +1451,9 @@ void RelionMainWindow::cb_fill_stdout_i()
 			REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmpout does not exists" );
 		int err = textbuff_stdout->loadfile(".gui_tmpout");
 		in.close();
+		// Scroll to the bottom
+		disp_stdout->insert_position(textbuff_stdout->length()-1);
+		disp_stdout->show_insert_position();
 	}
 	else
 		textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
@@ -1458,6 +1467,9 @@ void RelionMainWindow::cb_fill_stdout_i()
 			REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmperr does not exists" );
 		int err = textbuff_stderr->loadfile(".gui_tmperr");
 		in.close();
+		// Scroll to the bottom
+		disp_stderr->insert_position(textbuff_stderr->length()-1);
+		disp_stderr->show_insert_position();
 	}
 	else
 		textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
@@ -1480,6 +1492,18 @@ void RelionMainWindow::cb_print_cl_i()
     for (int icom = 0; icom < commands.size(); icom++)
     	std::cout << commands[icom] << std::endl;
 
+}
+
+// Run button call-back functions
+void RelionMainWindow::cb_forgot(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_forgot_i(); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
+}
+
+void RelionMainWindow::cb_forgot_i()
+{
+	fl_message("Really?! Perhaps you should spend fewer nights at the microscope and try to sleep a bit more...");
 }
 
 // Run button call-back functions

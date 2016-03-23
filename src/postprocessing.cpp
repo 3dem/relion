@@ -761,7 +761,6 @@ void Postprocessing::writeOutput()
 		command += fn_out + "_fsc.eps ";
 		command += fn_out + "_guinier.eps ";
 		command += " > /dev/null &";
-		std::cout << " Executing: "<<command << std::endl;
 		int res = system(command.c_str());
 	}
 
