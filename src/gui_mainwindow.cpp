@@ -138,8 +138,16 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	//fl_register_images(); // initialize image lib
 	image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
 	// TODO: control file location and use better figure
-	xpm_image = new Fl_XPM_Image("gui_background.xpm");
-	image_box->image(xpm_image); // attach xbm image to box
+	FileName fn_bg = "/lmb/home/scheres/gui_background.xpm";
+	if (exists(fn_bg))
+	{
+		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
+		image_box->image(xpm_image); // attach xbm image to box
+		forgot_button = new Fl_Button(450, 143, 10, 32, "?");
+		forgot_button->color(GUI_BUTTON_COLOR);
+		forgot_button->labelsize(12);
+		forgot_button->callback( cb_forgot, this);
+	 }
 
 	// Read in the pipeline STAR file if it exists
 	pipeline.name = fn_pipe;
@@ -192,12 +200,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	run_button->labelfont(FL_ITALIC);
 	run_button->labelsize(14);
 	run_button->callback( cb_run, this);
-
-
-	forgot_button = new Fl_Button(450, 143, 10, 32, "?");
-	forgot_button->color(GUI_BUTTON_COLOR);
-	forgot_button->labelsize(12);
-	forgot_button->callback( cb_forgot, this);
 
 	// Fill browser in the right order
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
