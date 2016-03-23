@@ -60,6 +60,7 @@
 // This class organises the main winfow of the relion GUI
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
+static Fl_Group *background_grp;
 static int browse_jobtype[NR_BROWSE_TABS]; // this allow non-consecutive numbering of jobtypes in the job browser
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;

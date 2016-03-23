@@ -134,20 +134,21 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	// First setup the old part of the GUI
 	h = GUIHEIGHT_OLD;
 
-	// Initial screen picture with some density and some explanation
-	//fl_register_images(); // initialize image lib
-	image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
 	// TODO: control file location and use better figure
+	background_grp = new Fl_Group(WCOL0-10, 0 ,w-WCOL0, h-55);
 	FileName fn_bg = "/lmb/home/scheres/gui_background.xpm";
 	if (exists(fn_bg))
 	{
+		// Initial screen picture with some explanation on how to sue the GUI
+		image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
-		image_box->image(xpm_image); // attach xbm image to box
+		image_box->image(xpm_image); // attach xpm image to box
 		forgot_button = new Fl_Button(450, 143, 10, 32, "?");
 		forgot_button->color(GUI_BUTTON_COLOR);
 		forgot_button->labelsize(12);
 		forgot_button->callback( cb_forgot, this);
 	 }
+	background_grp->end();
 
 	// Read in the pipeline STAR file if it exists
 	pipeline.name = fn_pipe;
@@ -205,109 +206,109 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
     current_job = -1;
 
-    browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[0] = PROC_IMPORT;
     browser->add("Import");
     job_import = new ImportJobWindow();
     browse_grp[0]->end();
 
-    browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[1] = PROC_MOTIONCORR;
     browser->add("Motion correction");
 	job_motioncorr = new MotioncorrJobWindow();
     browse_grp[1]->end();
 
-    browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[2] = PROC_CTFFIND;
     browser->add("CTF estimation");
     job_ctffind = new CtffindJobWindow();
     browse_grp[2]->end();
 
-    browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[3] = PROC_MANUALPICK;
 	browser->add("Manual picking");
 	job_manualpick = new ManualpickJobWindow();
     browse_grp[3]->end();
 
-    browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[4] = PROC_AUTOPICK;
 	browser->add("Auto-picking");
 	job_autopick = new AutopickJobWindow();
     browse_grp[4]->end();
 
-    browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[5] = PROC_EXTRACT;
 	browser->add("Particle extraction");
 	job_extract = new ExtractJobWindow();
     browse_grp[5]->end();
 
-    browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[6] = PROC_SORT;
 	browser->add("Particle sorting");
 	job_sort = new SortJobWindow();
     browse_grp[6]->end();
 
-    browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[7] = PROC_CLASSSELECT;
 	browser->add("Subset selection");
 	job_classselect = new ClassSelectJobWindow();
     browse_grp[7]->end();
 
-    browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[8] = PROC_2DCLASS;
 	browser->add("2D classification");
 	job_class2d = new Class2DJobWindow();
     browse_grp[8]->end();
 
-    browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[9] = PROC_3DCLASS;
 	browser->add("3D classification");
 	job_class3d = new Class3DJobWindow();
     browse_grp[9]->end();
 
-    browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[10] = PROC_3DAUTO;
 	browser->add("3D auto-refine");
 	job_auto3d = new Auto3DJobWindow();
     browse_grp[10]->end();
 
-    browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[11] = PROC_MOVIEREFINE;
 	browser->add("Movie refinement");
 	job_movierefine = new MovieRefineJobWindow();
     browse_grp[11]->end();
 
-    browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[12] = PROC_POLISH;
 	browser->add("Particle polishing");
 	job_polish = new PolishJobWindow();
     browse_grp[12]->end();
 
-    browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[13] = PROC_MASKCREATE;
 	browser->add("Mask creation");
 	job_maskcreate = new MaskCreateJobWindow();
     browse_grp[13]->end();
 
-    browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[14] = PROC_JOINSTAR;
 	browser->add("Join star files");
 	job_joinstar = new JoinStarJobWindow();
     browse_grp[14]->end();
 
-    browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[15] = PROC_SUBTRACT;
 	browser->add("Particle subtraction");
 	job_subtract = new SubtractJobWindow();
     browse_grp[15]->end();
 
-    browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[16] = PROC_POST;
 	browser->add("Post-processing");
 	job_post = new PostJobWindow();
     browse_grp[16]->end();
 
-    browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 605-MENUHEIGHT);
+    browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browse_jobtype[17] = PROC_RESMAP;
 	browser->add("Local resolution");
 	job_resmap = new ResmapJobWindow();
@@ -603,14 +604,7 @@ void RelionMainWindow::loadJobFromPipeline()
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
 	{
 		if ( browse_jobtype[t] == itype )
-		{
-			browse_grp[t]->show();
 			browser->value(t+1);
-		}
-		else
-		{
-			browse_grp[t]->hide();
-		}
 	}
 
 	// the new job browser has reset current_job to -1....
@@ -1175,6 +1169,12 @@ void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_browsegroup_i()
 {
+
+	// Hide the initial screen
+	if (show_initial_screen)
+		background_grp->show();
+	else
+		background_grp->hide();
 
 	// Show the 'selected' group, hide the others
     for ( int t=0; t<NR_BROWSE_TABS; t++ )
