@@ -406,8 +406,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     disp_stdout->buffer(textbuff_stdout);
     disp_stderr->buffer(textbuff_stderr);
     disp_stderr->textcolor(FL_RED);
-    disp_stdout->textsize(RLN_FONTSIZE-1);
-    disp_stderr->textsize(RLN_FONTSIZE-1);
+    disp_stdout->textsize(RLN_FONTSIZE);
+    disp_stderr->textsize(RLN_FONTSIZE);
     disp_stdout->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stderr->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stdout->scrollbar_width(0);
@@ -601,6 +601,7 @@ void RelionMainWindow::loadJobFromPipeline()
 	// The following line allows certain browse buttons to only open the current directory (using CURRENT_ODIR)
 	current_browse_directory = pipeline.processList[current_job].name;
 
+	// What type of job is this?
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
 	{
 		if ( browse_jobtype[t] == itype )

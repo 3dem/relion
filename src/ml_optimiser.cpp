@@ -7300,6 +7300,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 				if (XSIZE(img()) != XSIZE(exp_imagedata) || YSIZE(img()) != YSIZE(exp_imagedata) )
 				{
 					std::cerr << " fn_img= " << fn_img << " XSIZE(img())= " << XSIZE(img()) << " YSIZE(img())= " << YSIZE(img()) << std::endl;
+					std::cerr << " while XSIZE(exp_imagedata)= " << XSIZE(exp_imagedata) << " and YSIZE(exp_imagedata)= " << YSIZE(exp_imagedata) << std::endl;
 					REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: incorrect image size");
 				}
 				if (has_converged && do_use_reconstruct_images)
