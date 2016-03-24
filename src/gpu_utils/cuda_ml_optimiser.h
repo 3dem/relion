@@ -179,10 +179,10 @@ public:
 	// indexes of job partition
 	//   every element in jobOrigin    is a reference to point to a position in a IndexedDataArray.weights array where that job starts RELATIVE to firstPos
 	//   every element in jobExtent    specifies the number of weights for that job
-	CudaGlobalPtr<long unsigned> jobOrigin, jobExtent;
+	CudaGlobalPtr<size_t> jobOrigin, jobExtent;
 
-	long unsigned firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
-	long unsigned weightNum, jobNum; // number of weights and jobs this class
+	size_t firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
+	size_t weightNum, jobNum; // number of weights and jobs this class
 
 	inline
 	 IndexedDataArrayMask(CudaCustomAllocator *allocator):
@@ -196,14 +196,14 @@ public:
 
 public:
 
-	void setNumberOfJobs(long int newSize)
+	void setNumberOfJobs(size_t newSize)
 	{
 		jobNum=newSize;
 		jobOrigin.setSize(newSize);
 		jobExtent.setSize(newSize);
 	}
 
-	void setNumberOfWeights(long int newSize)
+	void setNumberOfWeights(size_t newSize)
 	{
 		weightNum=newSize;
 	}
@@ -229,7 +229,7 @@ public:
 	//   trans_id  = id of trans   = which of all POSSIBLE translations                               this weight signifies
 	// -- special indices ---------------------------------
 	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
-	CudaGlobalPtr<long unsigned> rot_id, rot_idx, trans_idx, ihidden_overs;
+	CudaGlobalPtr<size_t> rot_id, rot_idx, trans_idx, ihidden_overs;
 
 	inline
 	 IndexedDataArray(CudaCustomAllocator *allocator):
@@ -264,7 +264,7 @@ public:
 
 public:
 
-	void setDataSize(long int newSize)
+	void setDataSize(size_t newSize)
 	{
 		weights.setSize(newSize);
 		rot_id.setSize(newSize);
@@ -273,19 +273,37 @@ public:
 		ihidden_overs.setSize(newSize);
 	}
 
-	void dual_alloc_all()
+	void resize_host_all(size_t newSize)
+	{
+		weights.resize_host(newSize);
+		rot_id.resize_host(newSize);
+		rot_idx.resize_host(newSize);
+		trans_idx.resize_host(newSize);
+		ihidden_overs.resize_host(newSize);
+	}
+
+	void host_alloc_all()
 	{
 		weights.host_alloc();
 		rot_id.host_alloc();
 		rot_idx.host_alloc();
 		trans_idx.host_alloc();
 		ihidden_overs.host_alloc();
-		//-----------------------
+	}
+
+	void device_alloc_all()
+	{
 		weights.device_alloc();
 		rot_id.device_alloc();
 		rot_idx.device_alloc();
 		trans_idx.device_alloc();
 		ihidden_overs.device_alloc();
+	}
+
+	void dual_alloc_all()
+	{
+		host_alloc_all();
+		device_alloc_all();
 	}
 };
 
@@ -294,15 +312,15 @@ class ProjectionParams
 {
 
 public:
-	std::vector< long unsigned > orientation_num; 					// the number of significant orientation for each class
-	long unsigned orientationNumAllClasses;							// sum of the above
+	std::vector< size_t > orientation_num; 					// the number of significant orientation for each class
+	size_t orientationNumAllClasses;							// sum of the above
 	std::vector< RFLOAT > rots, tilts, psis;
-	std::vector< long unsigned > iorientclasses, iover_rots;
+	std::vector< size_t > iorientclasses, iover_rots;
 
 	// These are arrays which detial the number of entries in each class, and where each class starts.
 	// NOTE: There is no information about which class each class_idx refers to, there is only
 	// a distinction between different classes.
-	std::vector< long unsigned > class_entries, class_idx;
+	std::vector< size_t > class_entries, class_idx;
 	inline
 	ProjectionParams():
 
@@ -320,7 +338,7 @@ public:
 	{};
 
 	inline
-	ProjectionParams(unsigned long classes):
+	ProjectionParams(size_t classes):
 
 		rots(),
 		tilts(),
@@ -340,7 +358,7 @@ public:
 
 	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
 	inline
-	ProjectionParams(ProjectionParams &parent, unsigned long start, unsigned long end):
+	ProjectionParams(ProjectionParams &parent, size_t start, size_t end):
 		rots(			&parent.rots[start],  			&parent.rots[end]),
 		tilts(			&parent.tilts[start], 			&parent.tilts[end]),
 		psis(			&parent.psis[start],  			&parent.psis[end]),
@@ -359,7 +377,7 @@ public:
 	// begins @ element class_idx[n]
 	// ends   @ element class_idx[n]+class_entries[n]
 
-	void pushBackAll(long unsigned iclass, RFLOAT NEWrot,RFLOAT NEWtilt ,RFLOAT NEWpsi, long unsigned NEWiorientclasses,long unsigned NEWiover_rots)
+	void pushBackAll(size_t iclass, RFLOAT NEWrot,RFLOAT NEWtilt ,RFLOAT NEWpsi, size_t NEWiorientclasses,size_t NEWiover_rots)
 	{
 		// incremement the counter for this class
 		class_entries[iclass]++;
@@ -402,6 +420,11 @@ public:
 
 	void resetData();
 
+	void resetDevice()
+	{
+		HANDLE_ERROR(cudaDeviceReset());
+	}
+
 	void syncAllBackprojects()
 	{
 		for (int i = 0; i < cudaBackprojectors.size(); i ++)
@@ -414,7 +437,6 @@ public:
 		cudaProjectors.clear();
 		cudaBackprojectors.clear();
 		coarseProjectionPlans.clear();
-		cudaBackprojectors.clear();
 		//Delete this lastly
 		delete allocator;
 	}
@@ -429,9 +451,10 @@ public:
 
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
+	cudaError_t errorStatus;
 
-	cudaStream_t stream1;
-	cudaStream_t stream2;
+//	cudaStream_t stream1;
+//	cudaStream_t stream2;
 
 	CudaTranslator translator_coarse1;
 	CudaTranslator translator_coarse2;
@@ -457,8 +480,8 @@ public:
 
 	~MlOptimiserCuda()
 	{
-		HANDLE_ERROR(cudaStreamDestroy(stream1));
-		HANDLE_ERROR(cudaStreamDestroy(stream2));
+//		HANDLE_ERROR(cudaStreamDestroy(stream1));
+//		HANDLE_ERROR(cudaStreamDestroy(stream2));
 
 		for (int i = 0; i < classStreams.size(); i++)
 			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
