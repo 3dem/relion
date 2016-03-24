@@ -2,6 +2,7 @@
 #define CUDA_SETTINGS_H_
 
 #define COMPLEXTEXTURE false
+#define LAUNCH_CHECK
 
 #ifdef CUDA_DOUBLE_PRECISION
 	#define XFLOAT double

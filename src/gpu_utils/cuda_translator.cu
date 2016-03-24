@@ -157,6 +157,7 @@ void CudaTranslator::translate(Plan &plan, XFLOAT *d_imgs_shifted_real, XFLOAT *
 					plan.itrans_min,
 					1
 					);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
 
 void CudaTranslator::clear()
