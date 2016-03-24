@@ -1,5 +1,6 @@
 build
+external
 #Eclipse files
 .cproject
 .project
-external
+Debug

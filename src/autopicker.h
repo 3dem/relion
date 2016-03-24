@@ -159,6 +159,7 @@ public:
 	// Available memory (in Gigabyte)
 	RFLOAT available_memory;
 	RFLOAT available_gpu_memory;
+	RFLOAT requested_gpu_memory;
 
 	// I/O Parser
 	IOParser parser;
@@ -273,7 +274,8 @@ public:
 
 	AutoPicker():
 		available_memory(0),
-		available_gpu_memory(0)
+		available_gpu_memory(0),
+		requested_gpu_memory(0)
 	{}
 
 	// Read command line arguments

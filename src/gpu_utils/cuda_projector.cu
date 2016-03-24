@@ -308,8 +308,8 @@ void CudaProjector::clear()
 		}
 		else //2D case
 		{
-			cudaFree(texArrayReal2D);
-			cudaFree(texArrayImag2D);
+			HANDLE_ERROR(cudaFree(texArrayReal2D));
+			HANDLE_ERROR(cudaFree(texArrayImag2D));
 		}
 
 		texArrayReal = 0;
@@ -322,4 +322,4 @@ void CudaProjector::clear()
 		mdlImag = 0;
 	}
 }
-#endif
+	#endif

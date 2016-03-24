@@ -247,6 +247,7 @@ if (in.getAllocator() == NULL)
 
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();
+
 }
 
 class AllocatorThrustWrapper
@@ -386,7 +387,6 @@ if (in.d_ptr == NULL || out.d_ptr == NULL)
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null allocator.\n");
 #endif
-
 	stream = stream == 0 ? in.getStream() : stream;
 
 	AllocatorThrustWrapper alloc(in.getAllocator());

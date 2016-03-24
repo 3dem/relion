@@ -267,7 +267,8 @@ public:
 
 	// Available memory (in Gigabyte)
 	RFLOAT available_memory;
-	RFLOAT available_gpu_memory;
+	size_t available_gpu_memory;
+	size_t requested_gpu_memory;
 
 	// Perform combination of weight through files written on disc
 	bool combine_weights_thru_disc;

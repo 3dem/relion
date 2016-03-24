@@ -233,14 +233,14 @@ __global__ void cuda_kernel_diff2_fine(
 				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
 					iy=d_trans_idx[d_job_idx[bid]]+itrans;
-					unsigned long img_start(iy * image_size);
-					unsigned long img_pixel_idx = img_start + pixel;
+					size_t img_start(iy * (size_t)image_size);
+					size_t img_pixel_idx = img_start + pixel;
 					diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
 					diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
 					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_corr_img[pixel]);
 				}
-				__syncthreads();
 			}
+			__syncthreads();
 		}
 		for(int j=(BLOCK_SIZE/2); j>0; j/=2)
 		{
