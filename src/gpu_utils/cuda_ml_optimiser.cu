@@ -1940,7 +1940,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			for (long int n = partial_pos; n < partial_pos+block_num; n++)
 			{
-				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n-partial_pos]];
+				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n-partial_pos]+FPCMasks[ipart][exp_iclass].firstPos];
 
 				long int mydir, idir=floor(iorient/sp.nr_psi);
 				if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
