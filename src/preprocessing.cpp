@@ -653,6 +653,10 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		MDout.setName("images");
 		MDout.write(fn_star);
 	}
+	else
+	{
+		std::cerr << " Warning: no particles on micrograph: " << fn_mic << std::endl;
+	}
 
 }
 
