@@ -2193,7 +2193,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	else if (fn_in.contains("Extract/"))
 	{
 		// TODO!
-		REPORT_ERROR("BUG: TODO!!");
+		REPORT_ERROR("ERROR: for the moment you can only use inputs from Class2D, Class3D or Refine3D runs!");
 		node_type= NODE_2DREFS;
 	}
 	command += " --ref " + fn_ref;
@@ -4572,7 +4572,7 @@ ClassSelectJobWindow::ClassSelectJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, H
 	tab2->end();
 
 	// read settings if hidden file exists
-	read(".gui_particleselect", is_continue);
+	read(".gui_select", is_continue);
 }
 
 
@@ -4581,7 +4581,7 @@ void ClassSelectJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_particleselect";
+		fn=".gui_select";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -4604,7 +4604,7 @@ void ClassSelectJobWindow::read(std::string fn, bool &_is_continue)
 
 	// Read hidden file if no name is given
 	if (fn=="")
-		fn=".gui_particleselect";
+		fn=".gui_select";
 
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))

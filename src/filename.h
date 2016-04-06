@@ -355,6 +355,11 @@ public:
      */
     FileName removeAllExtensions() const;
 
+    /**
+     *  Replace all substrings
+     */
+    void replaceAllSubstrings(std::string from, std::string to);
+
     /** Remove file format
      * @code
      * fn_proj = "g1ta00001.xmp";

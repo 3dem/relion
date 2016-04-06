@@ -507,7 +507,7 @@ long int MetaDataTable::goToObject(long int objectID)
 	}
 }
 
-void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
+long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
 	setIsList(false);
 
@@ -552,41 +552,47 @@ void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desir
 
     // Then fill the table (dont read another line until the one from above has been handled)
     bool is_first= true;
+    long int nr_objects = 0;
     while (is_first || getline(in, line, '\n'))
     {
 		is_first=false;
 
-    	if ( grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
+    	if (grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
     	{
     		line = simplify(line);
 			// Stop at empty line
 			if (line[0] == '\0')
 				break;
 
-			// Add a new line to the table
-			addObject();
-
-			// Parse data values
-			std::stringstream os2(line);
-			std::string value;
-			labelPosition = 0;
-			int counterIgnored = 0;
-			while (os2 >> value)
+			nr_objects++;
+			if (!do_only_count)
 			{
-				// TODO: handle comments here...
-				if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+				// Add a new line to the table
+				addObject();
+
+				// Parse data values
+				std::stringstream os2(line);
+				std::string value;
+				labelPosition = 0;
+				int counterIgnored = 0;
+				while (os2 >> value)
 				{
-					// Ignore this column
-					counterIgnored++;
+					// TODO: handle comments here...
+					if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+					{
+						// Ignore this column
+						counterIgnored++;
+						labelPosition++;
+						continue;
+					}
+					setValueFromString(activeLabels[labelPosition - counterIgnored], value);
 					labelPosition++;
-					continue;
 				}
-				setValueFromString(activeLabels[labelPosition - counterIgnored], value);
-				labelPosition++;
 			}
     	} // end if grep_pattern
     }
 
+    return nr_objects;
 }
 
 bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desiredLabels)
@@ -649,7 +655,7 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
      return also_has_loop;
 }
 
-int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
+long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
     std::stringstream ss;
     std::string line, token, value;
@@ -680,8 +686,7 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     				trim(line);
     				if (line.find("loop_") != std::string::npos)
     				{
-    					readStarLoop(in, desiredLabels, grep_pattern);
-    					return 1;
+    					return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
     				}
     				else if (line[0] == '_')
     				{
@@ -701,7 +706,7 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     return 0;
 }
 
-int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
+long int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
 
     // Clear current table
@@ -718,7 +723,7 @@ int MetaDataTable::read(const FileName &filename, const std::string &name, std::
     if (ext =="star")
     {
         //REPORT_ERROR("readSTAR not implemented yet...");
-        return readStar(in, name, desiredLabels, grep_pattern);
+        return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
     }
     else
     {

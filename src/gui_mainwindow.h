@@ -260,7 +260,10 @@ private:
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();
 
-    static void cb_edit_project_note(Fl_Widget*, void*);
+    static void cb_make_flowchart(Fl_Widget*, void*);
+    inline void cb_make_flowchart_i();
+
+   static void cb_edit_project_note(Fl_Widget*, void*);
     static void cb_edit_note(Fl_Widget*, void*);
     inline void cb_edit_note_i(bool is_project_note = false);
 

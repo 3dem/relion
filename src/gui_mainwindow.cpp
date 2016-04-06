@@ -326,6 +326,7 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
     menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
     menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+    menubar2->add("Job actions/Make flowchart", 0, cb_make_flowchart, this);
     menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
     menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
     menubar2->add("Job actions/Delete", 0, cb_delete, this);
@@ -779,6 +780,10 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 		REPORT_ERROR("RelionMainWindow::addToPipeLine ERROR: unrecognised type");
 	}
 	}
+
+	// Before changing the pipeline, let's read in the current version
+
+
 
 	// Also write a mini-pipeline in the output directory
 	PipeLine mini_pipeline;
@@ -2300,6 +2305,48 @@ void RelionMainWindow::cb_mark_as_finished_i()
 
 }
 
+// Run button call-back functions
+void RelionMainWindow::cb_make_flowchart(Fl_Widget* o, void* v) {
+
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_make_flowchart_i();
+}
+
+void RelionMainWindow::cb_make_flowchart_i()
+{
+	if (current_job < 0)
+	{
+		fl_message(" You can only make flowcharts for existing jobs ... ");
+		return;
+	}
+
+	const char * default_pdf_viewer = getenv ("RELION_CTFFIND_EXECUTABLE");
+	if (default_pdf_viewer == NULL)
+	{
+		char mydefault[]=DEFAULTPDFVIEWER;
+		default_pdf_viewer=mydefault;
+	}
+	std::string myviewer(default_pdf_viewer);
+
+
+	PipeLineFlowChart flowchart;
+	FileName fn_dir = pipeline.processList[current_job].name;
+	FileName fn_out = "flowchart.tex";
+	flowchart.makeAllUpwardsFlowCharts(fn_out, pipeline, current_job);
+	std::string command = "latex flowchart.tex > flowchart.log && dvipdf flowchart >>flowchart.log && mv flowchart* " + fn_dir;
+	std:: cout << " Executing: " << command << std::endl;
+	int res = std::system(command.c_str());
+	command = myviewer + " " + fn_dir + "flowchart.pdf &";
+	res = std::system(command.c_str());
+
+	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
+	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
+	pipeline.addNewOutputEdge(current_job, node);
+	pipeline.write();
+	updateJobLists();
+
+	return;
+}
 
 void RelionMainWindow::cb_edit_note(Fl_Widget*, void* v)
 {
@@ -2328,7 +2375,7 @@ void RelionMainWindow::cb_edit_note_i(bool is_project_note)
 	{
 		if (current_job < 0)
 		{
-			std::cout << " You can only edit the note for existing jobs ... " << std::endl;
+			fl_message(" You can only edit the note for existing jobs ... ");
 			return;
 		}
 		fn_note = pipeline.processList[current_job].name + "note.txt";

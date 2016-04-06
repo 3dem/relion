@@ -276,6 +276,19 @@ FileName FileName::removeAllExtensions() const
         return substr(0, first);
 }
 
+// Replace all substrings
+void FileName::replaceAllSubstrings(std::string from, std::string to)
+{
+	FileName result;
+    size_t start_pos = 0;
+    while((start_pos = (*this).find(from, start_pos)) != std::string::npos)
+    {
+        (*this).replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+    }
+
+}
+
 FileName FileName::getFileFormat() const
 {
     int first;

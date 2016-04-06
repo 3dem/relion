@@ -774,4 +774,484 @@ void PipeLine::write(FileName fn_del, std::vector<bool> deleteNode, std::vector<
     	fh_del.close();
 }
 
+std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long int lower_process, long int upper_process)
+{
+	// What is the type of the node between upper_process and lower_process?
+	bool is_found = false;
+	long int mynode = -1;
+	for (long int i = 0; i < pipeline.processList[lower_process].inputNodeList.size(); i++)
+	{
+		long int inode= pipeline.processList[lower_process].inputNodeList[i];
+		// Find this one in the outputNodeList of the upper_process
+		if (pipeline.nodeList[inode].outputFromProcess == upper_process)
+		{
+			is_found = true;
+			mynode = inode;
+			break;
+		}
+	}
 
+	if (!is_found)
+		REPORT_ERROR("PipeLineFlowChart::getDownwardsArrowLabel ERROR: cannot find node connecting " + pipeline.processList[upper_process].name + " -> " + pipeline.processList[lower_process].name);
+
+	std::string mylabel = "";
+    MetaDataTable MD;
+    long int nr_obj;
+
+    switch (pipeline.nodeList[mynode].type)
+    {
+    case NODE_MOVIES:
+    {
+    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+    	mylabel = integerToString(nr_obj) + " movies";
+    	break;
+    }
+    case NODE_MICS:
+    {
+    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+    	mylabel = integerToString(nr_obj) + " micrographs";
+        break;
+    }
+    case NODE_PART_DATA:
+    {
+    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+    	mylabel = integerToString(nr_obj) + " particles";
+        break;
+    }
+    case NODE_MOVIE_DATA:
+    {
+    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+    	mylabel = integerToString(nr_obj) + " particle movie-frames";
+        break;
+    }
+    case NODE_2DREFS:
+    {
+        mylabel = "2Drefs";
+    	break;
+    }
+    case NODE_3DREF:
+    {
+        mylabel = "3D ref";
+    	break;
+    }
+    case NODE_MASK:
+    {
+        mylabel = "mask";
+    	break;
+    }
+    case NODE_MODEL:
+    {
+    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", NULL, "", true); // true means: only count nr entries;
+    	mylabel = integerToString(nr_obj) + " classes";
+        break;
+    }
+   case NODE_OPTIMISER:
+    {
+        mylabel = "continue";
+    	break;
+    }
+    case NODE_HALFMAP:
+    {
+        mylabel = "half-map";
+    	break;
+    }
+    case NODE_FINALMAP:
+    {
+        mylabel = "final map";
+    	break;
+    }
+    case NODE_RESMAP:
+    {
+        mylabel = "local-res map";
+    	break;
+    }
+	default:
+	{
+		mylabel = "";
+		break;
+	}
+	}
+
+	return mylabel;
+
+}
+void PipeLineFlowChart::adaptNamesForTikZ(FileName &name)
+{
+	name.replaceAllSubstrings((std::string)"_", (std::string)"-");
+	name.replaceAllSubstrings((std::string)".", (std::string)"-");
+	name.replaceAllSubstrings((std::string)",", (std::string)"-");
+}
+
+long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline,
+		long int lower_process, long int new_process, std::vector<long int> &branched_procs)
+{
+
+
+	branched_procs.clear();
+    FileName procname;
+	if (pipeline.processList[new_process].alias != "None")
+		procname = pipeline.processList[new_process].alias;
+	else
+    	procname = pipeline.processList[new_process].name;
+
+	if (do_short_names)
+		procname = procname.beforeFirstOf("/");
+	else
+	{
+		FileName longname = (procname.afterFirstOf("/")).beforeLastOf("/");
+		adaptNamesForTikZ(longname);
+		procname = procname.beforeFirstOf("/") + "\\\\" + longname;
+	}
+
+	FileName new_nodename= pipeline.processList[new_process].name;
+	adaptNamesForTikZ(new_nodename);
+	FileName lower_nodename;
+
+	// First put the box of the process
+	// If this is the lowest process, don't use "above-of" statement, and don't draw an arrow
+	if (lower_process < 0)
+	{
+			fh << "\\node [block] (" << new_nodename << ") {" << procname << "};" << std::endl;
+	}
+	else
+	{
+		lower_nodename = pipeline.processList[lower_process].name;
+		adaptNamesForTikZ(lower_nodename);
+
+		fh << "\\node [block, above of="<< lower_nodename <<"] (" << new_nodename << ") {" << procname << "};" << std::endl;
+		std::string mylabel = getDownwardsArrowLabel(pipeline, lower_process, new_process);
+		// Make an arrow from the box to the node it came from
+		fh << "\\path [line] ("<< new_nodename <<") -- node[right] {" << mylabel << "} ("<< lower_nodename <<");" << std::endl;
+	}
+
+	// See if there are any branchings side-wards, e.g. masks, 2D/3D references, coords, model, optimiser, etc
+	long int result = -1;
+	if (pipeline.processList[new_process].inputNodeList.size() == 0)
+	{
+		// Reached the top of the tree!
+		return -1;
+	}
+	if (pipeline.processList[new_process].inputNodeList.size() > 1)
+	{
+
+		std::string rightname, leftname;
+		for (int inode = 0; inode < pipeline.processList[new_process].inputNodeList.size(); inode++)
+		{
+			bool is_left = false;
+			bool is_right = false;
+			bool is_upper_left = false;
+			bool is_upper_right = false;
+			std::string right_label="", left_label="";
+
+			long int inputnode = pipeline.processList[new_process].inputNodeList[inode];
+			int mynodetype = pipeline.nodeList[inputnode].type;
+
+	        switch (pipeline.processList[new_process].type)
+	        {
+	        case PROC_AUTOPICK:
+	        {
+	        	is_right = (mynodetype == NODE_2DREFS);
+	        	right_label="2D refs";
+	            break;
+	        }
+	        case PROC_EXTRACT:
+	        {
+	        	is_right = (mynodetype == NODE_MIC_COORDS || mynodetype == NODE_PART_DATA);
+	        	right_label = "coords";
+	        	break;
+	        }
+	        case PROC_SORT:
+	        {
+	        	is_right = (mynodetype == NODE_MODEL || mynodetype == NODE_2DREFS);
+	        	right_label = "refs";
+	        	break;
+	        }
+	        case PROC_3DCLASS:
+	        {
+	        	is_right = (mynodetype == NODE_3DREF);
+	        	right_label = "3D ref";
+	        	is_left = (mynodetype == NODE_MASK);
+	        	left_label = "mask";
+	        	break;
+	        }
+	        case PROC_3DAUTO:
+	        {
+	        	is_right = (mynodetype == NODE_3DREF);
+	        	right_label = "3D ref";
+	        	is_left = (mynodetype == NODE_MASK);
+	        	left_label = "mask";
+	        	break;
+	        }
+	        case PROC_MOVIEREFINE:
+	        {
+	        	is_right = (mynodetype == NODE_MOVIES);
+	        	right_label = "movies";
+	        	break;
+	        }
+	        case PROC_POLISH:
+	        {
+	        	is_left = (mynodetype == NODE_MASK);
+	        	left_label = "mask";
+	        	break;
+	        }
+	        case PROC_JOINSTAR:
+	        {
+	        	// For joinstar: there will be no parent process that returns a postive value!
+	        	// Thereby, joinstar will always end in the 2-4 input processes, each of for which a new flowchart will be made on a new tikZpicture
+	        	is_right = (inode == 0);
+	        	is_left = (inode == 1);
+	        	is_upper_right = (inode == 2);
+	        	is_upper_left = (inode == 3);
+	        	break;
+	        }
+	        case PROC_SUBTRACT:
+	        {
+	        	is_right = (mynodetype == NODE_3DREF);
+	        	right_label = "3D ref";
+	        	is_left = (mynodetype == NODE_MASK);
+	        	left_label = "mask";
+	        	break;
+	        }
+	        case PROC_POST:
+	        {
+	        	is_left = (mynodetype == NODE_MASK);
+	        	left_label = "mask";
+	        	break;
+	        }
+	        case PROC_RESMAP:
+	        {
+	        	is_left = (mynodetype == NODE_MASK);
+	        	left_label = "mask";
+	        	break;
+	        }
+	    	default:
+	    	{
+	    		break;
+	    	}
+			}
+
+
+			if (is_right || is_left || is_upper_right || is_upper_left)
+			{
+				FileName hyperrefname;
+				long int parent_process = pipeline.nodeList[inputnode].outputFromProcess;
+				// Keep track of all the side-wards branches
+				branched_procs.push_back(parent_process);
+				FileName newprocname;
+				if (pipeline.processList[parent_process].alias != "None")
+					newprocname = pipeline.processList[parent_process].alias;
+				else
+					newprocname = pipeline.processList[parent_process].name;
+				if (do_short_names)
+					newprocname = newprocname.beforeFirstOf("/");
+				else
+				{
+					FileName longname2 = (newprocname.afterFirstOf("/")).beforeLastOf("/");
+					adaptNamesForTikZ(longname2);
+					hyperrefname = "sec:" + newprocname.beforeFirstOf("/") + "/" + longname2;
+					if (pipeline.processList[parent_process].type==PROC_IMPORT)
+						newprocname = newprocname.beforeFirstOf("/") + "\\\\" + longname2;
+					else
+						newprocname = " \\hyperlink{" + hyperrefname + "}{" + newprocname.beforeFirstOf("/") + "}\\\\" + longname2;
+				}
+
+
+				FileName parent_nodename = pipeline.processList[parent_process].name;
+				adaptNamesForTikZ(parent_nodename);
+				std::string labelpos;
+				if (is_right)
+					rightname = parent_nodename;
+				if (is_left)
+					leftname = parent_nodename;
+
+				if (is_right || is_left)
+				{
+					std::string pos = (is_right) ? "right" : "left";
+					fh << "\\node [block2, "<< pos<<" of="<< new_nodename<<"] (" << parent_nodename << ") {" << newprocname << "};" << std::endl;
+				}
+				else if (is_upper_right || is_upper_left)
+				{
+					std::string abovename = (is_upper_right) ? rightname : leftname;
+					fh << "\\node [block2, above of="<< abovename <<"] (" << parent_nodename << ") {" << newprocname << "};" << std::endl;
+				}
+
+				// Make an arrow from the box to the process it came from
+				std::string arrowlabel = (is_right || is_upper_right) ? right_label : left_label;
+				fh << "\\path [line] ("<< parent_nodename <<") -- node[above] {" << arrowlabel << "} ("<< new_nodename <<");" << std::endl;
+
+			}
+			else
+				result = pipeline.nodeList[inputnode].outputFromProcess;
+		}
+
+		return result;
+	}
+	else
+	{
+		// Only a single input node: return the process that one came from
+		long int inputnode = pipeline.processList[new_process].inputNodeList[0];
+		return pipeline.nodeList[inputnode].outputFromProcess;
+	}
+
+
+}
+
+void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int from_process,
+		std::vector<long int> &all_branches)
+{
+
+	openTikZPicture(fh);
+	long int prev_process = -1;
+	long int current_process = from_process;
+	bool do_stop = false;
+	int counter = 0;
+	while (!do_stop)
+	{
+
+		std::vector<long int> branched_procs;
+		long int next_process = addProcessToUpwardsFlowChart(fh, pipeline, prev_process, current_process, branched_procs);
+
+		// Introduce a new page if the flowchart gets to long....
+		if (counter > 9)
+		{
+			closeTikZPicture(fh);
+			counter = 0;
+			next_process = current_process;
+			current_process = prev_process;
+			prev_process = -1;
+			openTikZPicture(fh);
+		}
+
+
+		if (next_process < 0)
+		{
+			do_stop = true;
+		}
+		else
+		{
+			prev_process = current_process;
+			current_process = next_process;
+		}
+
+		// See if there are any new branches, and if so add them to the all_branches vector
+		if (do_branches)
+		{
+			for (int i = 0; i <  branched_procs.size(); i++)
+			{
+				long int mybranch = branched_procs[i];
+				bool already_exists= false;
+				for (int j = 0; j < all_branches.size(); j++)
+				{
+					if (all_branches[j] == mybranch)
+					{
+						already_exists = true;
+						break;
+					}
+				}
+				if (!already_exists && pipeline.processList[mybranch].type != PROC_IMPORT)
+				{
+					all_branches.push_back(mybranch);
+				}
+			}
+		}
+
+		counter++;
+
+	}
+	closeTikZPicture(fh);
+
+}
+void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pipeline, long int from_process)
+{
+	std::ofstream fh;
+	openFlowChartFile(fn_out, fh);
+	std::vector<long int> all_branches;
+
+
+
+	std::string myorititle;
+	all_branches.push_back(from_process);
+	int i = 0;
+	while (i < all_branches.size())
+	{
+		FileName mytitle = (pipeline.processList[all_branches[i]].alias != "None") ? pipeline.processList[all_branches[i]].alias : pipeline.processList[all_branches[i]].name;
+		mytitle=mytitle.beforeLastOf("/");
+		adaptNamesForTikZ(mytitle);
+		if (i == 0)
+		{
+			std::cout << " Making first flowchart ... " <<std::endl;
+			fh << "\\section*{Branched flowchart for " << mytitle << "}" << std::endl;
+			myorititle = mytitle;
+		}
+		else
+		{
+			std::cout << " Making flowchart for branch: " << integerToString(i) << " ... " << std::endl;
+			std::string hypertarget = "sec:" + mytitle;
+			fh << "\\subsection*{Flowchart for branch " << integerToString(i)<< ": "<< mytitle << "\\hypertarget{"<<hypertarget<<"}{}}" << std::endl;
+			//fh << "\\hypertarget{" << hypertarget<<"}{.}"<<std::endl;
+			//fh << "\\newline" << std::endl;
+		}
+
+		makeOneUpwardsFlowChart(fh, pipeline, all_branches[i], all_branches);
+
+		// Always make a new page after the first general workflow
+		if (i==0)
+			fh << "\\newpage" << std::endl;
+
+		i++;
+	}
+
+	// At the end of the flowchart file, also make one with short names
+	do_short_names = true;
+	do_branches = false;
+	fh << "\\newpage"<<std::endl;
+	fh << "\\section{Overview flowchart for " << myorititle << "}" << std::endl;
+	makeOneUpwardsFlowChart(fh, pipeline,all_branches[0], all_branches);
+
+	closeFlowChartFile(fh);
+
+}
+
+void PipeLineFlowChart::openTikZPicture(std::ofstream &fh)
+{
+	fh << "\\begin{tikzpicture}[scale=1, auto]" << std::endl;
+    // Override the long-name styles with the shorter ones
+    if (do_short_names)
+    {
+    	fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
+        fh << "\\tikzstyle{block2} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 4cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
+    }
+}
+
+void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh)
+{
+	fh << "\\end{tikzpicture}" << std::endl;
+	//fh << "\\newpage" << std::endl << std::endl;
+}
+
+void PipeLineFlowChart::openFlowChartFile(FileName &fn_out, std::ofstream &fh)
+{
+
+    fh.open((fn_out).c_str(), std::ios::out);
+    if (!fh)
+        REPORT_ERROR( (std::string)"PipeLineFlowChart ERROR: Cannot write to file: " + fn_out);
+
+    // Set up the LaTex header
+    fh << "\\documentclass{article}" << std::endl;
+    fh << "\\usepackage{tikz,hyperref, sectsty,xcolor}" << std::endl;
+    fh << "\\usetikzlibrary{shapes,arrows}" << std::endl;
+    fh << "\\begin{document}" << std::endl;
+    fh << "\\subsectionfont{\\color{blue!50}}" << std::endl;
+    // These are the styles for the long names!
+    fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
+    fh << "\\tikzstyle{block2} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 5cm, text centered, rounded corners]" << std::endl;
+
+
+    fh << "\\tikzstyle{line} = [draw, very thick, color=black!50, -latex']" << std::endl << std::endl;
+}
+
+void PipeLineFlowChart::closeFlowChartFile(std::ofstream &fh)
+{
+	fh << "\\end{document}" << std::endl;
+	fh.close();
+}

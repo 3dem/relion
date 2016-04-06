@@ -364,7 +364,7 @@ public:
 
     /* Read a STAR loop structure
       */
-    void readStarLoop(std::ifstream& in, std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "");
+    long int readStarLoop(std::ifstream& in, std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
 
     /* Read a STAR list
      * The function returns true if the list is followed by a loop, false otherwise
@@ -383,10 +383,10 @@ public:
      * If no data block is found the function will return 0 and the MetaDataTable remains empty
      *
      */
-    int readStar(std::ifstream& in, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "");
+    long int readStar(std::ifstream& in, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
 
     // Read a MetaDataTable (get fileformat from extension)
-    int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "");
+    long int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
 
     // Write a MetaDataTable in STAR format
     void write(std::ostream& out = std::cout);
