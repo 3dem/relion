@@ -62,7 +62,7 @@ public:
 #endif
 	}
 
-	size_t setMdlDim(
+	void setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int maxr, int paddingFactor);

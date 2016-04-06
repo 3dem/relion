@@ -265,12 +265,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	double temp_reqSize = textToDouble(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "0"));
-	temp_reqSize *= 1000*1000*1000;
+	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in MB) to leave free after allocation.", "0"));
+	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
-		REPORT_ERROR("Cannot use negative GPU-mem size request");
+		REPORT_ERROR("Invalid free_gpu_memory value.");
 	else
-		requested_gpu_memory =  temp_reqSize;
+		requested_free_gpu_memory =  temp_reqSize;
 
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 
@@ -447,12 +447,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	double temp_reqSize = textToDouble(parser.getOption("--gpu_memory_per_mpi_rank", "Device memory (in GB) assigned to custom allocator (if enabled) for each rank", "0"));
-	temp_reqSize *= 1000*1000*1000;
+	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in MB) to leave free after allocation.", "0"));
+	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
-		REPORT_ERROR("Cannot use negative GPU-mem size request");
+		REPORT_ERROR("Invalid free_gpu_memory value.");
 	else
-		requested_gpu_memory = temp_reqSize;
+		requested_free_gpu_memory =  temp_reqSize;
 
 	if (do_skip_align)
 		do_gpu = false;
@@ -1883,13 +1883,39 @@ void MlOptimiser::expectation()
 	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
+
+	/************************************************************************/
+	//GPU memory setup
+
 	if (do_gpu)
 	{
 		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
 			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
 		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
+			((MlDeviceBundle *) cudaMlDeviceBundles[i])->setupFixedSizedObjects();
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		{
+			MlDeviceBundle * bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
+
+			HANDLE_ERROR(cudaSetDevice(bundle->device_id));
+
+			size_t free, total, allocationSize;
+			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+			if (free < requested_free_gpu_memory)
+			{
+				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", requested_free_gpu_memory);
+				allocationSize = (double)free *0.7;
+			}
+			else
+				allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000;
+
+			bundle->setupTunableSizedObjects(allocationSize);
+		}
 	}
+
+	/************************************************************************/
+
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
