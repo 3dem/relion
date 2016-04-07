@@ -1414,7 +1414,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
 			CUDA_CPU_TIC("get_offset_priors");
 
-			RFLOAT pdf_offset_mean(0);
+			double pdf_offset_mean(0);
+			std::vector<double> pdf_offset_t(pdf_offset.getSize());
 			unsigned pdf_offset_count(0);
 
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1438,10 +1439,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
-					RFLOAT pdf(0);
+					double pdf(0);
 					RFLOAT offset_x = old_offset_x - myprior_x + baseMLO->sampling.translations_x[itrans];
 					RFLOAT offset_y = old_offset_y - myprior_y + baseMLO->sampling.translations_y[itrans];
-					RFLOAT tdiff2 = offset_x * offset_x + offset_y * offset_y;
+					double tdiff2 = offset_x * offset_x + offset_y * offset_y;
 
 					if (baseMLO->mymodel.data_dim == 3)
 					{
@@ -1456,19 +1457,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					else
 						pdf = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
 
-					pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
+					pdf_offset_t[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
 					pdf_offset_mean += pdf;
 					pdf_offset_count ++;
 				}
 			}
 
-			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
+			pdf_offset_mean /= (double) pdf_offset_count;
 
 			//If mean is non-zero bring all values closer to 1 to improve numerical accuracy
 			//This factor is over all classes and is thus removed in the final normalization
 			if (pdf_offset_mean != 0.)
 				for (int i = 0; i < pdf_offset.getSize(); i ++)
-					pdf_offset[i] /= pdf_offset_mean;
+					pdf_offset[i] = pdf_offset_t[i] /  pdf_offset_mean;
 
 			pdf_offset.cp_to_device();
 			CUDA_CPU_TOC("get_offset_priors");
