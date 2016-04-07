@@ -19,6 +19,8 @@
  ***************************************************************************/
 #include "src/gui_entries.h"
 
+// This allows CURRENT_ODIR browse buttons
+std::string current_browse_directory;
 
 bool replaceStringOnce(Fl_Text_Buffer *textbuf, std::string findthis, std::string replaceby)
 {
@@ -328,7 +330,7 @@ void FileNameEntry::place(int &y,
 		const char* pattern,
 		const char* directory,
 		const char* helptext,
-		int x, int h, int wcol2, int wcol3, int wcol4 )
+		int x, int h, int wcol2, int wcol3, int wcol4)
 {
 
 	// Clear if existing
@@ -377,7 +379,16 @@ void FileNameEntry::cb_browse_i() {
     Fl::scheme("gtk+");
     Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
 
-    G_chooser->directory(directory);
+    std::string test="";
+    if (directory != NULL)
+    {
+        std::string test2(directory);
+        test = test2;
+    }
+    if (test=="CURRENT_ODIR")
+    	G_chooser->directory(current_browse_directory.c_str());
+    else
+    	G_chooser->directory(directory);
     G_chooser->color(GUI_BACKGROUND_COLOR);
     G_chooser->show();
 
@@ -509,7 +520,7 @@ void InputNodeEntry::cb_browse_node_i() {
 
     // Get rid of the .Nodes/type/ directory-name again
     std::string replace = std::string(relname);
-    std::string replace2 = replace.substr(fn_dir.length()+1, replace.length());
+    std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
     char relname2[FL_PATH_MAX];
     strcpy(relname2, replace2.c_str());
 

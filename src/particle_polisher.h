@@ -23,13 +23,14 @@
 #include "src/image.h"
 #include "src/metadata_table.h"
 #include "src/exp_model.h"
-#include <src/fftw.h>
-#include <src/time.h>
-#include <src/mask.h>
-#include <src/funcs.h>
-#include <src/backprojector.h>
-#include <src/ctf.h>
-#include <src/postprocessing.h>
+#include "src/fftw.h"
+#include "src/time.h"
+#include "src/mask.h"
+#include "src/funcs.h"
+#include "src/backprojector.h"
+#include "src/ctf.h"
+#include "src/postprocessing.h"
+#include "src/CPlot2D.h"
 
 #define LINEAR_FIT 0
 #define LOGARITHMIC_FIT 1
@@ -49,8 +50,8 @@ public:
 	// Input & Output rootname
 	FileName fn_in, fn_out, fn_sym, fn_mask;
 
-	// The experimental model
-	Experiment exp_model;
+	// list of individual micrographs
+	std::vector<FileName> fn_mics;
 
 	// Standard deviation for a Gaussian-weight on the distance between particles in the micrograph
 	RFLOAT sigma_neighbour_distance;
@@ -60,17 +61,13 @@ public:
 
 	// Flag to indicate all calculations have to be repeated from scratch
 	// if false, then intermediate files are re-read from disc and earlier calculations are skipped
-	bool do_start_all_over;
+	bool only_do_unfinished;
 
-	// First and last frame numbers to include in the average, Also step if one had used --avg_movie_frames in the extraction
-	int first_frame, last_frame, step_frame;
+	// List of frame-numbers for each movie-particle in the Experiment
+	std::vector<int> movie_frame_numbers;
 
 	// Which fitting mode (lienar/logarithmic/nofit)
 	int fitting_mode;
-
-	// Running average window with used for the determination of the frame movements
-	// This will be used to exclude the first and last few frames from the fit (but not from the polsihing!)
-	int running_average_width;
 
 	// CTF stuff for the reconstructions
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak;
@@ -106,7 +103,7 @@ public:
 	MetaDataTable MDshiny;
 
 	// Reference volume reconstructed from the initially-polished particles to be used for per-particle CTF-refinement and beamtilt-refinement
-	Projector PPrefvol_half1, PPrefvol_half2;
+	//Projector PPrefvol_half1, PPrefvol_half2;
 
 	// Normalise the polished particles?
 	bool do_normalise;
@@ -125,6 +122,7 @@ public:
 
 	// Maximum beam tilt to analyse, and step-size to sample in X and Y
 	RFLOAT beamtilt_max, beamtilt_step;
+
 	// Number of sampled beamtilts
 	int nr_sampled_beam_tilts;
 
@@ -165,8 +163,8 @@ public:
 	// Initialise some stuff after reading
 	void initialise();
 
-	// General Running
-	void run();
+	// Generate a list of all individual micrographs
+	void generateMicrographList();
 
 	// Fit the beam-induced translations for all average micrographs
 	void fitMovementsAllMicrographs();
@@ -212,22 +210,13 @@ public:
 	void reconstructShinyParticlesAndFscWeight(int ipass);
 
 	// Reconstruct one half of the shiny particles
-	void reconstructShinyParticlesOneHalf(int ihalf);
+	void reconstructShinyParticlesOneHalf(int ihalf, Experiment &exp_model);
 
-	// Optimize the beam tilt and defocus for all beamtilt groups and/or micrographs
-	void optimiseBeamTiltAndDefocus();
+	// Generate a single PDF file with motion tracks, B-factor plots etc
+	void generateLogFilePDF();
 
-	// Optimisation for each micrograph (may be run in parallel)
-	void optimiseBeamTiltAndDefocusOneMicrograph(int imic);
-
-	// After optimising, one general function to set results in the MetaDataTable (because optimisation may have been done in parallel)
-	void applyOptimisedBeamTiltsAndDefocus();
-
-	// Optimise beamtilt separately for datasets in different directories
-	void getBeamTiltGroups();
-
-	// Initialise some arrays for parallelisation purposes
-	void initialiseSquaredDifferenceVectors();
+	// General Running
+	void run();
 
 
 };

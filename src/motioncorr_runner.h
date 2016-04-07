@@ -29,6 +29,7 @@
 #include  <stdio.h>
 #include <src/time.h>
 #include "src/metadata_table.h"
+#include "src/image.h"
 
 class MotioncorrRunner
 {
@@ -52,6 +53,9 @@ public:
 	// Binning factor for binning inside MOTIONCORR
 	int bin_factor;
 
+	// B-factor for MOTIONCORR
+	double bfactor;
+
 	// Also save the aligned movies?
 	bool do_save_movies;
 
@@ -65,7 +69,7 @@ public:
 	bool continue_old;
 
 	// Output STAR file
-	MetaDataTable MDout;
+	MetaDataTable MDavg, MDmov;
 
 public:
 	// Read command line arguments

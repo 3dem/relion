@@ -183,10 +183,11 @@ public:
 		ref_dim(0),
 		data_dim(0),
 		ori_size(0),
-		pixel_size(0),
+		pixel_size (0),
 		current_size(0),
 		current_resolution(0),
 		nr_classes(0),
+		nr_bodies(0),
 		nr_groups(0),
 		nr_directions(0),
 		LL(0),
@@ -219,7 +220,70 @@ public:
 		clear();
 	}
 
-	// Clear everything
+    /** Assignment operator
+     */
+    MlModel& operator =(const MlModel &MD)
+    {
+        if (this != &MD)
+        {
+            clear();
+            ref_dim = MD.ref_dim;
+    		data_dim = MD.data_dim;
+    		ori_size = MD.ori_size;
+    		pixel_size = MD.pixel_size;
+    		current_size = MD.current_size;
+    		current_resolution = MD.current_resolution;
+    		nr_classes = MD.nr_classes;
+    		nr_bodies = MD.nr_bodies;
+    		nr_groups = MD.nr_groups;
+    		nr_directions = MD.nr_directions;
+    		LL = MD.LL;
+    		padding_factor = MD.padding_factor;
+    		interpolator = MD.interpolator;
+    		r_min_nn = MD.r_min_nn;
+    		ave_Pmax = MD.ave_Pmax;
+    		avg_norm_correction = MD.avg_norm_correction;
+    		sigma2_offset = MD.sigma2_offset;
+    		tau2_fudge_factor = MD.tau2_fudge_factor;
+    		orientational_prior_mode = MD.orientational_prior_mode;
+    		sigma2_rot = MD.sigma2_rot;
+    		sigma2_tilt = MD.sigma2_tilt;
+    		sigma2_psi = MD.sigma2_psi;
+    		is_helix = MD.is_helix;
+    		helical_nr_asu = MD.helical_nr_asu;
+    		helical_twist_min = MD.helical_twist_min;
+    		helical_twist_max = MD.helical_twist_max;
+    		helical_twist_inistep = MD.helical_twist_inistep;
+    		helical_rise_min = MD.helical_rise_min;
+    		helical_rise_max = MD.helical_rise_max;
+    		helical_rise_inistep= MD.helical_rise_inistep;
+    		Iref = MD.Iref;
+    		masks_bodies = MD.masks_bodies;
+    		com_bodies = MD.com_bodies;
+    		PPref = MD.PPref;
+    		group_names = MD.group_names;
+    		sigma2_noise = MD.sigma2_noise;
+    		scale_correction = MD.scale_correction;
+    		bfactor_correction = MD.bfactor_correction;
+    		tau2_class = MD.tau2_class;
+    		sigma2_class = MD.sigma2_class;
+    		fsc_halves_class = MD.fsc_halves_class;
+    		data_vs_prior_class = MD.data_vs_prior_class;
+    		pdf_class = MD.pdf_class;
+    		pdf_direction = MD.pdf_direction;
+    		prior_offset_class = MD.prior_offset_class;
+    		nr_particles_group = MD.nr_particles_group;
+    		acc_rot = MD.acc_rot;
+    		acc_trans = MD.acc_trans;
+    		orientability_contrib = MD.orientability_contrib;
+    		helical_twist = MD.helical_twist;
+    		helical_rise = MD.helical_rise;
+
+        }
+        return *this;
+    }
+
+    // Clear everything
 	void clear()
 	{
 		Iref.clear();
@@ -234,10 +298,11 @@ public:
 		fsc_halves_class.clear();
 		sigma2_class.clear();
 		data_vs_prior_class.clear();
+		prior_offset_class.clear();
 		pdf_class.clear();
 		pdf_direction.clear();
 		nr_particles_group.clear();
-		ref_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn = padding_factor = 0;
+		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn = padding_factor = 0;
 		ave_Pmax = avg_norm_correction = LL = sigma2_offset = tau2_fudge_factor = 0.;
 		sigma2_rot = sigma2_tilt = sigma2_psi = 0.;
 		acc_rot.clear();
@@ -264,10 +329,9 @@ public:
 	void readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected);
 
-	// Given the Experiment of the already expanded dataset of movieframes, expand the current MlModel to contain all movie frames
-	// Make a new group for each unique rlnGroupName in the expanded Experiment, copying the values from the groups in the current MlModel
-	// For that: remove "00000i@" as well as movie extension from the rlnGroupName in the expanded Experiment and compare with group_names in current MlModel
-	void expandToMovieFrames(Experiment &moviedataexpand, int running_avg_side);
+	// The group numbering in mydata may be different from the one in this model.
+	// Readjust all group_ids in the Experiment based on their group names
+	void reassignGroupsForMovies(Experiment &mydata);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 

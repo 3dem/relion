@@ -32,6 +32,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	bin_factor =  textToInteger(parser.getOption("--bin_factor", "Binning factor (integer) for scaling inside MOTIONCORR", "1"));
+	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCORR", "150"));
 	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
 	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
@@ -66,7 +67,8 @@ void MotioncorrRunner::initialise()
 			fn_motioncorr_exe = (std::string)penv;
 	}
 
-	MDout.clear();
+	MDavg.clear();
+	MDmov.clear();
 
 	FileName fn_avg, fn_mov;
 
@@ -84,8 +86,10 @@ void MotioncorrRunner::initialise()
 
 			// For output STAR file
 			getOutputFileNames(fn_mic, fn_avg, fn_mov);
-			MDout.addObject(MDin.getObject());
-			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			MDmov.addObject();
+			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+			MDavg.addObject();
+			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 	else
@@ -96,8 +100,10 @@ void MotioncorrRunner::initialise()
 		for (size_t imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 			getOutputFileNames(fn_micrographs[imic], fn_avg, fn_mov);
-			MDout.addObject();
-			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			MDmov.addObject();
+			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+			MDavg.addObject();
+			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 
@@ -194,8 +200,9 @@ void MotioncorrRunner::run()
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
-	// Write out STAR file at the end
-	MDout.write(fn_out + "/corrected_micrographs.star");
+	// Write out STAR files at the end
+	MDavg.write(fn_out + "/corrected_micrographs.star");
+	MDmov.write(fn_out + "/corrected_micrograph_movies.star");
 
 }
 
@@ -203,42 +210,66 @@ void MotioncorrRunner::run()
 void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 {
 
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+
+	for (int ipass = 0; ipass < 3; ipass++)
+	{
+		FileName fn_avg, fn_mov;
+		getOutputFileNames(fn_mic, fn_avg, fn_mov);
 
 
-	FileName fn_out = fn_avg.withoutExtension() + ".out";
-	FileName fn_log = fn_avg.withoutExtension() + ".log";
-	FileName fn_err = fn_avg.withoutExtension() + ".err";
-	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
+		FileName fn_out = fn_avg.withoutExtension() + ".out";
+		FileName fn_log = fn_avg.withoutExtension() + ".log";
+		FileName fn_err = fn_avg.withoutExtension() + ".err";
+		FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
-	std::string command = fn_motioncorr_exe + " ";
+		std::string command = fn_motioncorr_exe + " ";
 
-	command += fn_mic + " -fcs " + fn_avg;
-	command += " -flg " + fn_log;
-	command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
-	command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
+		command += fn_mic + " -fcs " + fn_avg;
+		command += " -flg " + fn_log;
+		command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
+		command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
+		command += " -bft " + floatToString(bfactor);
 
-	if (do_save_movies)
-		command += " -dsp 0 -ssc 1 -fct " + fn_mov;
+		if (do_save_movies)
+			command += " -dsp 0 -ssc 1 -fct " + fn_mov;
 
-	if (bin_factor > 1)
-		command += " -bin " + integerToString(bin_factor);
+		if (bin_factor > 1)
+			command += " -bin " + integerToString(bin_factor);
 
-	if (fn_other_args.length() > 0)
-		command += " " + fn_other_args;
 
-	// TODO: think about GPU and MPI interplay!
-	command += " -gpu " + integerToString(rank);
+		if (fn_other_args.length() > 0)
+			command += " " + fn_other_args;
 
-	command += " >> " + fn_out + " 2>> " + fn_err;
+		// TODO: think about GPU and MPI interplay!
+		command += " -gpu " + integerToString(rank);
 
-	// Save the command that was executed
-	std::ofstream fh;
-	fh.open(fn_cmd.c_str(), std::ios::out);
-	fh << command << std::endl;
-	fh.close();
+		command += " >> " + fn_out + " 2>> " + fn_err;
 
-	int res = system(command.c_str());
+		// Save the command that was executed
+		std::ofstream fh;
+		fh.open(fn_cmd.c_str(), std::ios::out);
+		fh << command << std::endl;
+		fh.close();
+
+		int res = system(command.c_str());
+
+		// After motion-correction, check for all-zero average micrographs
+		if (exists(fn_avg))
+		{
+			Image<RFLOAT> Itest;
+			Itest.read(fn_avg, false);
+			RFLOAT avg, stddev;
+			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+			if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+			{
+				break;
+			}
+		}
+		else if (ipass == 2)
+		{
+			std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+		}
+	}
 
 }

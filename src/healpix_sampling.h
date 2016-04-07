@@ -28,6 +28,7 @@
 #include "src/symmetries.h"
 #include "src/euler.h"
 #include "src/transformations.h"
+#include "src/helix.h"
 
 // For the angular searches
 #define NOPRIOR 0
@@ -195,7 +196,14 @@ public:
     		RFLOAT helical_twist_deg = 0.);
 
     /* Add a single translation */
-    void addOneTranslation(RFLOAT offset_x, RFLOAT offset_y, RFLOAT offset_z, bool do_clear = false);
+    void addOneTranslation(
+    		RFLOAT offset_x,
+    		RFLOAT offset_y,
+    		RFLOAT offset_z,
+    		bool do_clear = false,
+    		bool do_helical_refine = false,
+    		RFLOAT psi_deg = 0.,
+    		RFLOAT tilt_deg = 0.);
 
     /* Set the non-oversampled lists of directions and in-plane rotations */
     void setOrientations(int _order = -1, RFLOAT _psi_step = -1.);
@@ -231,8 +239,8 @@ public:
     		RFLOAT sigma_rot, RFLOAT sigma_tilt, RFLOAT sigma_psi,
     		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
-			bool do_helical_bimodal_search_psi = false,
-			bool do_helical_bimodal_search_tilt = false,
+    		bool do_auto_refine_local_searches,
+    		RFLOAT prior_psi_flip_ratio = 0.5,
     		RFLOAT sigma_cutoff = 3.);
 
     /** Get the symmetry group of this sampling object

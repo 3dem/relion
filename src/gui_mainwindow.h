@@ -27,6 +27,19 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <algorithm>
+#include <iostream>
+#include <vector>
+// Sizing
+#define JOBCOLWIDTH (250)
+#define XJOBCOL1 (10)
+#define XJOBCOL2 (JOBCOLWIDTH + 25)
+#define XJOBCOL3 (2*JOBCOLWIDTH + 40)
+#define JOBHEIGHT (170)
+#define JOBHALFHEIGHT ( (JOBHEIGHT) / (2) )
+#define STDOUT_Y (60)
+#define STDERR_Y (170)
+
 #define DO_WRITE true
 #define DONT_WRITE false
 #define DO_READ true
@@ -37,6 +50,9 @@
 #define DONT_GET_CL false
 #define DO_MKDIR true
 #define DONT_MKDIR false
+// font size of browser windows on the main GUI
+#define RLN_FONTSIZE 13
+#define DEFAULTPDFVIEWER "evince"
 
 // Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
 #define MAX_JOBS_BROWSER 50
@@ -44,12 +60,12 @@
 // This class organises the main winfow of the relion GUI
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
+static Fl_Group *background_grp;
+static int browse_jobtype[NR_BROWSE_TABS]; // this allow non-consecutive numbering of jobtypes in the job browser
 static Fl_Choice *display_io_node;
-static Fl_Text_Display *text_current_job;
-static Fl_Text_Buffer *textbuff_current_job;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
-static Fl_JPEG_Image *jpeg_image;
+static Fl_XPM_Image *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
@@ -63,6 +79,7 @@ static SortJobWindow *job_sort;
 static Class2DJobWindow *job_class2d;
 static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
+static MovieRefineJobWindow *job_movierefine;
 static ClassSelectJobWindow *job_classselect;
 static MaskCreateJobWindow *job_maskcreate;
 static JoinStarJobWindow *job_joinstar;
@@ -70,17 +87,15 @@ static SubtractJobWindow *job_subtract;
 static PostJobWindow *job_post;
 static PolishJobWindow *job_polish;
 static ResmapJobWindow *job_resmap;
-static PublishJobWindow *job_publish;
 // Run button
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
-// Stdout and stderr display
-static Fl_Text_Display *disp_stdout;
-static Fl_Text_Display *disp_stderr;
+static Fl_Button *forgot_button;
+static Fl_Input *alias_current_job;
+
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
-static Fl_Text_Buffer *textbuff_note;
 
 static FileName fn_settings;
 // Initial screen
@@ -95,6 +110,22 @@ static PipeLine pipeline;
 static int current_job;
 static FileName global_outputname;
 
+// Order jobs in finished window alphabetically?
+static bool do_order_alphabetically;
+
+// Stdout and stderr display
+class StdOutDisplay : public Fl_Text_Display
+{
+public:
+	std::string fn_file;
+	StdOutDisplay(int X, int Y, int W, int H, const char *l = 0) : Fl_Text_Display(X, Y, W, H, l){};
+	~StdOutDisplay() {};
+	int handle(int ev);
+};
+
+static StdOutDisplay *disp_stdout;
+static StdOutDisplay *disp_stderr;
+
 class NoteEditorWindow : public Fl_Window
 {
 
@@ -102,7 +133,9 @@ public:
 
 	FileName fn_note;
 	Fl_Text_Editor *editor;
-	NoteEditorWindow(int w, int h, const char* t, FileName _fn_note);
+	Fl_Text_Buffer *textbuff_note;
+	bool allow_save;
+	NoteEditorWindow(int w, int h, const char* t, FileName _fn_note, bool _allow_save = true);
 
 	~NoteEditorWindow() {};
 
@@ -117,8 +150,6 @@ private:
 };
 
 
-
-
 class RelionMainWindow : public Fl_Window
 {
 
@@ -129,7 +160,10 @@ public:
 	Fl_Tabs *tabs;
 	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
 
-    // For job submission
+	// For clicking in stdout/err windows
+	StdOutDisplay *stdoutbox, *stderrbox;
+
+	// For job submission
     std::string final_command;
     std::vector<std::string> commands;
 
@@ -138,6 +172,9 @@ public:
 
     // Destructor
     ~RelionMainWindow(){};
+
+    // Handle events
+    //int handle(int ev);
 
     // Communicate with the different jobtype objects
     void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
@@ -209,28 +246,59 @@ private:
     static void cb_delete(Fl_Widget*, void*);
     inline void cb_delete_i(bool do_ask = true, bool do_recursive = true);
 
-    static void cb_cleanup(Fl_Widget*, void*);
-    inline void cb_cleanup_i();
+    static void cb_gently_clean_all_jobs(Fl_Widget*, void*);
+    static void cb_harshly_clean_all_jobs(Fl_Widget*, void*);
+    inline void cb_clean_all_jobs_i(bool do_harsh);
+
+    static void cb_gentle_cleanup(Fl_Widget*, void*);
+    static void cb_harsh_cleanup(Fl_Widget*, void*);
+    inline void cb_cleanup_i(int myjob = -1, bool do_verb = true, bool do_harsh = false);
 
     static void cb_set_alias(Fl_Widget*, void*);
-    inline void cb_set_alias_i();
+    inline void cb_set_alias_i(std::string newalias = "");
 
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();
 
+    static void cb_make_flowchart(Fl_Widget*, void*);
+    inline void cb_make_flowchart_i();
+
+   static void cb_edit_project_note(Fl_Widget*, void*);
     static void cb_edit_note(Fl_Widget*, void*);
-    inline void cb_edit_note_i();
+    inline void cb_edit_note_i(bool is_project_note = false);
 
     inline void cb_fill_stdout_i();
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();
 
+    static void cb_forgot(Fl_Widget*, void*);
+    inline void cb_forgot_i();
+
     static void cb_save(Fl_Widget*, void*);
     inline void cb_save_i();
 
+    static void cb_load(Fl_Widget*, void*);
+    inline void cb_load_i();
+
+    static void cb_import(Fl_Widget*, void*);
+    static void cb_undelete_job(Fl_Widget*, void*);
+    inline void cb_import_i(bool is_undelete);
+
+    static void cb_order_jobs_alphabetically(Fl_Widget*, void*);
+    static void cb_order_jobs_chronologically(Fl_Widget*, void*);
+
+    static void cb_empty_trash(Fl_Widget*, void*);
+    inline void cb_empty_trash_i();
+
     static void cb_print_notes(Fl_Widget*, void*);
     inline void cb_print_notes_i();
+
+    static void cb_remake_nodesdir(Fl_Widget*, void*);
+    inline void cb_remake_nodesdir_i();
+
+    static void cb_reread_pipeline(Fl_Widget*, void*);
+    inline void cb_reread_pipeline_i();
 
     static void cb_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_reactivate_runbutton_i();

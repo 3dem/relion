@@ -28,7 +28,11 @@ int main(int argc, char *argv[])
     {
 		prm.read(argc, argv);
 
+		prm.generateMicrographList();
+
 		prm.initialise();
+
+		MPI_Barrier(MPI_COMM_WORLD);
 
 		prm.run();
     }

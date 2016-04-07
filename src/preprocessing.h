@@ -46,7 +46,7 @@ public:
 	int verb;
 
 	// Name for directory of output Particle stacks and Particle STAR file
-	FileName fn_part_dir, fn_part_star;
+	FileName fn_part_dir, fn_part_star, fn_list_star;
 
 	// Does the input micrograph STAR file have CTF information?
 	bool star_has_ctf;
@@ -90,6 +90,9 @@ public:
 
 	// STAR file with refined particle coordinates (to re-extract particles, for example with different binning)
 	FileName fn_data;
+
+	// How many micrographs are joined together in batches of movie-particles?
+	int join_nr_mics;
 
 	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
 	bool do_recenter;
@@ -156,6 +159,9 @@ public:
 
 	// Helical rise in Angstroms
 	RFLOAT helical_rise;
+
+	// Add bimodal angular priors for helical segments
+	bool bimodal_angular_priors;
 
 	// Use input stack to perform the image modifications
 	FileName fn_operate_in;
@@ -224,7 +230,6 @@ public:
 	FileName getCoordinateFileName(FileName fn_mic);
 	MetaDataTable getCoordinateMetaDataTable(FileName fn_mic);
 	FileName getOutputFileNameRoot(FileName fn_mic);
-	FileName getOriginalStackNameWithoutUniqDate(FileName fn_mic);
 
 };
 

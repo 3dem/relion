@@ -742,6 +742,8 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 
 #define POWER_SPECTRUM 0
 #define AMPLITUDE_SPECTRUM 1
+#define AMPLITUDE_MAP 0
+#define PHASE_MAP 1
 
 /** Get the amplitude or power_class spectrum of the map in Fourier space.
  * @ingroup FourierOperations
@@ -820,5 +822,7 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT 
 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+
+bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type);
 
 #endif // __RELIONFFTW_H

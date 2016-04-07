@@ -67,9 +67,13 @@ void CtffindRunnerMpi::run()
 				//addToGctfJobList(imic, allmicnames);
 				executeGctf(imic, allmicnames, imic == my_last_micrograph, node->rank);
 			}
+			else if (is_ctffind4)
+			{
+				executeCtffind4(imic);
+			}
 			else
 			{
-				executeCtffind(imic);
+				executeCtffind3(imic);
 			}
 
 			if (verb > 0 && imic % barstep == 0)

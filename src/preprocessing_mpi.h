@@ -36,6 +36,9 @@ public:
         delete node;
     }
 
+    // Limit the number of effective MPI nodes to this value, rather than what is given through mpirun
+    int max_mpi_nodes;
+
     /** Read
      * This could take care of mpi-parallelisation-dependent variables
      */

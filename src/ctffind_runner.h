@@ -53,6 +53,27 @@ public:
 	// CTFFIND and Gctf executables
 	FileName fn_ctffind_exe, fn_gctf_exe;
 
+	// Is this ctffind4?
+	bool is_ctffind4;
+
+	// Number of OMP threads for CTFFIND4
+	int nr_threads;
+
+	// Calculate Thon rings from movies?
+	bool do_movie_thon_rings;
+
+	// Movie rootname
+	FileName movie_rootname;
+
+	// Number of movie frames to average
+	int avg_movie_frames;
+
+	// Estimate phaseshift from a phase-plate?
+	bool do_phaseshift;
+
+	// Min, max and step phase-shift
+	RFLOAT phase_min, phase_max, phase_step;
+
 	// use Kai Zhang's Gctf instead of CTFFIND?
 	bool do_use_gctf;
 
@@ -108,6 +129,9 @@ public:
 	// Current working directory to make absolute-path symlinks
 	std::string currdir;
 
+	// Expect large astigmatism for CTFFIND4.1?
+	bool do_large_astigmatism;
+
 public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
@@ -125,7 +149,10 @@ public:
 	void joinCtffindResults();
 
 	// Execute CTFFIND for a single micrograph
-	void executeCtffind(long int imic);
+	void executeCtffind3(long int imic);
+
+	// Execute CTFFIND4.1+ for a single micrograph
+	void executeCtffind4(long int imic);
 
 	// Check micrograph size and add name to the list of micrographs to run Gctf on
 	//void addToGctfJobList(long int imic, std::vector<std::string> &allmicnames);
@@ -137,7 +164,13 @@ public:
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &bfac, RFLOAT &valscore, bool die_if_not_found = true);
+			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool die_if_not_found = true);
+	bool getCtffind3Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
+			RFLOAT &maxres, RFLOAT &valscore, bool die_if_not_found = true);
+	bool getCtffind4Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
+			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
+			RFLOAT &maxres, RFLOAT &phaseshift, bool die_if_not_found = true);
 };
 
 

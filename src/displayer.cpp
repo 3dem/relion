@@ -205,6 +205,21 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		{
 			canvas.do_class = false;
 		}
+
+		// Pre-load existing backup_selection.star file
+		FileName fn_sel, fn_dir="";
+		if (fn_selected_imgs != "")
+			fn_dir = fn_selected_imgs.beforeLastOf("/");
+		else if (fn_selected_parts != "")
+			fn_dir = fn_selected_parts.beforeLastOf("/");
+
+		if (fn_dir != "")
+		{
+			fn_dir += "/backup_selection.star";
+			if (exists(fn_dir))
+				canvas.loadBackupSelection(false); // false means dont ask for filename
+		}
+
 		resizable(*this);
 		show();
 		return Fl::run();
@@ -331,13 +346,13 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 		{
 
 			Image<RFLOAT> stack, img;
-			fImageHandler* hFile;
+			fImageHandler hFile;
 			if (do_read_whole_stacks)
 				// Read the entire stack into memory
 				stack.read(fn_my_stack);
 			else
 				// Open the stack file
-				hFile = img.openFile(fn_my_stack);
+				hFile.openFile(fn_my_stack);
 
 			// 1. Process the current stack
 			for (long int inum = 0; inum < numbers_in_stack.size(); inum++)
@@ -398,9 +413,6 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 				boxes[my_sorted_ipos] = my_box;//boxes.push_back(my_box);
 			}
 
-			// Close the stack file again
-			if (!do_read_whole_stacks)
-				img.closeFile(hFile);
 
 			// 2. Reset numbers_in_stack and my_stack_first_ipos for next stack
 			numbers_in_stack.clear();
@@ -415,8 +427,6 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 
 	if (nr_imgs > 1)
 		progress_bar(nr_imgs);
-
-
 
 }
 int basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
@@ -530,8 +540,10 @@ int multiViewerCanvas::handle(int ev)
 						{ "Invert selection" },
 						{ "Select all classes below" },
 						{ "Select all classes above" },
-						{ "Print metadata this class" },
+						{ "Show metadata this class" },
 						{ "Show original image" },
+						{ "Show Fourier amplitudes (2x)" },
+						{ "Show Fourier phase angles (2x)" },
 						{ "Show particles from selected classes" },
 						{ "Save selected classes" },
 						{ "Quit" },
@@ -540,7 +552,7 @@ int multiViewerCanvas::handle(int ev)
 
 					if (!do_allow_save)
 				    {
-						rclick_menu[9].deactivate();
+						rclick_menu[11].deactivate();
 				    }
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -558,14 +570,19 @@ int multiViewerCanvas::handle(int ev)
 						selectFromHereBelow(ipos);
 					else if ( strcmp(m->label(), "Select all classes above") == 0 )
 						selectFromHereAbove(ipos);
-					else if ( strcmp(m->label(), "Print metadata this class") == 0 )
+					else if ( strcmp(m->label(), "Show metadata this class") == 0 )
 						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Show original image") == 0 )
 						showOriginalImage(ipos);
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
+						showFourierAmplitudes(ipos);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
+						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(SELECTED);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
+						saveBackupSelection();
 						saveSelected(SELECTED);
 						saveSelectedParticles(SELECTED);
 					}
@@ -584,14 +601,16 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show average of selection" },
 						{ "Show stddev of selection" },
 						{ "Show original image" },
-						{ "Print metadata to screen" },
+						{ "Show Fourier amplitudes (2x)" },
+						{ "Show Fourier phase angles (2x)" },
+						{ "Show metadata" },
 						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
 					};
 					if (!do_allow_save)
 				    {
-						rclick_menu[10].deactivate();
+						rclick_menu[12].deactivate();
 				    }
 
 					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -609,16 +628,23 @@ int multiViewerCanvas::handle(int ev)
 						selectFromHereBelow(ipos);
 					else if ( strcmp(m->label(), "Select all above") == 0 )
 						selectFromHereAbove(ipos);
-					else if ( strcmp(m->label(), "Print metadata to screen") == 0 )
-						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Show average of selection") == 0 )
 						showAverage(SELECTED, false);
 					else if ( strcmp(m->label(), "Show stddev of selection") == 0 )
 						showAverage(SELECTED, true);
-					else if ( strcmp(m->label(),  "Show original image") == 0 )
+					else if ( strcmp(m->label(), "Show original image") == 0 )
 						showOriginalImage(ipos);
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x)") == 0 )
+						showFourierAmplitudes(ipos);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
+						showFourierPhaseAngles(ipos);
+					else if ( strcmp(m->label(), "Show metadata") == 0 )
+						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
+					{
+						saveBackupSelection();
 						saveSelected(SELECTED);
+					}
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 
@@ -633,33 +659,96 @@ int multiViewerCanvas::handle(int ev)
 
 void multiViewerCanvas::saveBackupSelection()
 {
+	std::vector<bool> selected(boxes.size());
+	for (long int ipos = 0; ipos < boxes.size(); ipos++)
+	{
+		long int my_sorted_ipos;
+		if (boxes[ipos]->MDimg.containsLabel(EMDL_SORTED_IDX))
+			boxes[ipos]->MDimg.getValue(EMDL_SORTED_IDX, my_sorted_ipos);
+		else
+			my_sorted_ipos = ipos;
+		selected[my_sorted_ipos] = boxes[ipos]->selected;
+	}
+
 	MetaDataTable MDout;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
 		MDout.addObject();
-		MDout.setValue(EMDL_SELECTED, boxes[ipos]->selected);
+		MDout.setValue(EMDL_SELECTED, selected[ipos]);
 	}
-	MDout.write(".relion_display_backup_selection.star");
-	std::cout <<" Written out .relion_display_backup_selection.star" << std::endl;
+
+	FileName fn_dir;
+	if (fn_selected_imgs != "")
+		fn_dir = fn_selected_imgs.beforeLastOf("/");
+	else if (fn_selected_parts != "")
+		fn_dir = fn_selected_parts.beforeLastOf("/");
+	else
+		fn_dir = ".";
+	fn_dir += "/backup_selection.star";
+
+	MDout.write(fn_dir);
+	std::cout <<" Written out " << fn_dir << std::endl;
 }
 
-void multiViewerCanvas::loadBackupSelection()
+void multiViewerCanvas::loadBackupSelection(bool do_ask)
 {
-	MetaDataTable MDin;
-	MDin.read(".relion_display_backup_selection.star");
-	if (MDin.numberOfObjects() != boxes.size())
-		REPORT_ERROR("multiViewerCanvas::loadBackupSelection ERROR: .relion_display_backup_selection.star does not have the expected number of entries...");
 
+	FileName fn_sel, fn_dir;
+	if (fn_selected_imgs != "")
+		fn_dir = fn_selected_imgs.beforeLastOf("/");
+	else if (fn_selected_parts != "")
+		fn_dir = fn_selected_parts.beforeLastOf("/");
+	else
+		fn_dir = ".";
+	fn_dir += "/";
+	if (do_ask)
+	{
+		Fl_File_Chooser chooser(fn_dir.c_str(), "(backup_selection.star)",Fl_File_Chooser::SINGLE,"Choose selection file to load");      // chooser type
+		chooser.show();
+		// Block until user picks something.
+		while(chooser.shown())
+			{ Fl::wait(); }
+
+		// User hit cancel?
+		if ( chooser.value() == NULL )
+			return;
+
+		FileName fnt(chooser.value());
+		fn_sel = fnt;
+	}
+	else
+		fn_sel = fn_dir+"backup_selection.star";
+
+	MetaDataTable MDin;
+	MDin.read(fn_sel);
+	if (MDin.numberOfObjects() != boxes.size())
+	{
+		std::cerr << "Warning: ignoring .relion_display_backup_selection.star with unexpected number of entries..." << std::endl;
+		return;
+	}
+
+	std::vector<bool> selected(boxes.size());
 	long int ipos = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
 		bool is_selected;
 		MDin.getValue(EMDL_SELECTED, is_selected);
-		if (is_selected)
+		selected[ipos] = is_selected;
+		ipos++;
+	}
+
+	for (long int ipos = 0; ipos < boxes.size(); ipos++)
+	{
+		long int my_sorted_ipos;
+		if (boxes[ipos]->MDimg.containsLabel(EMDL_SORTED_IDX))
+			boxes[ipos]->MDimg.getValue(EMDL_SORTED_IDX, my_sorted_ipos);
+		else
+			my_sorted_ipos = ipos;
+
+		if (selected[my_sorted_ipos])
 			boxes[ipos]->select();
 		else
 			boxes[ipos]->unSelect();
-		ipos++;
 	}
 
 }
@@ -698,7 +787,18 @@ void multiViewerCanvas::selectFromHereAbove(int iposp)
 }
 void multiViewerCanvas::printMetaData(int ipos)
 {
-	boxes[ipos]->MDimg.write(std::cout);
+	 std::ostringstream stream;
+	 boxes[ipos]->MDimg.write(stream);
+	 FileName str =  stream.str();
+	 // Grrr: somehow fl_message sometimes does not display the @ character (nor anything that comes after it)
+	 size_t pos = str.find('@', 0);
+	 while (pos != std::string::npos)
+	 {
+		 str.replace(pos, 1, (std::string)"(at)" );
+		 pos = str.find('@', pos);
+	 }
+	 fl_message( str.c_str());
+
 }
 
 void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
@@ -753,7 +853,7 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	FileName fn_img;
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
 
-	std::string cl = "relion_display  --i " + fn_img + " --scale " + integerToString(ori_scale);
+	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
     if (sigma_contrast > 0.)
     	cl += " --sigma_contrast " + floatToString(sigma_contrast);
 	// send job in the background
@@ -778,6 +878,53 @@ void multiViewerCanvas::showOriginalImage(int ipos)
     */
 }
 
+void multiViewerCanvas::showFourierAmplitudes(int ipos)
+{
+
+	// Make system call because otherwise the green drawing for distance measurements doesn't work....
+	FileName fn_img;
+	Image<RFLOAT> img;
+	boxes[ipos]->MDimg.getValue(display_label, fn_img);
+	img.read(fn_img, false);
+	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+	{
+		 std::string str = "Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.";
+		 fl_message(str.c_str());
+		 return;
+	}
+
+	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
+    if (sigma_contrast > 0.)
+    	cl += " --sigma_contrast " + floatToString(sigma_contrast);
+    cl += " --show_fourier_amplitudes";
+	// send job in the background
+	cl += " &";
+
+	int res = system(cl.c_str());
+}
+
+void multiViewerCanvas::showFourierPhaseAngles(int ipos)
+{
+
+	// Make system call because otherwise the green drawing for distance measurements doesn't work....
+	FileName fn_img;
+	Image<RFLOAT> img;
+	boxes[ipos]->MDimg.getValue(display_label, fn_img);
+	img.read(fn_img, false);
+	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+	{
+		 std::string str = "Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.";
+		 fl_message(str.c_str());
+		 return;
+	}
+
+	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
+	cl += " --show_fourier_phase_angles";
+	// send job in the background
+	cl += " &";
+
+	int res = system(cl.c_str());
+}
 
 void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTable &MDpart)
 {
@@ -987,7 +1134,7 @@ int singleViewerCanvas::handle(int ev)
 	else if (ev==FL_PUSH && Fl::event_button() == FL_RIGHT_MOUSE)
 	{
 		Fl_Menu_Item rclick_menu[] = {
-			{ "Print metadata" },
+			{ "Show metadata" },
 			{ "Help" },
 			{ "Quit" },
 			{ 0 }
@@ -995,7 +1142,7 @@ int singleViewerCanvas::handle(int ev)
 		const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 		if ( !m )
 			return 0;
-		if ( strcmp(m->label(), "Print metadata") == 0 )
+		if ( strcmp(m->label(), "Show metadata") == 0 )
 			printMetaData();
 		else if ( strcmp(m->label(), "Help") == 0 )
 			printHelp();
@@ -1705,6 +1852,8 @@ void Displayer::read(int argc, char **argv)
 	maxval = textToFloat(parser.getOption("--white", "Pixel value for white (default is auto-contrast)", "0"));
 	sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean", "0"));
 	do_read_whole_stacks = parser.checkOption("--read_whole_stack", "Read entire stacks at once (to speed up when many images of each stack are displayed)");
+	show_fourier_amplitudes = parser.checkOption("--show_fourier_amplitudes", "Show amplitudes of 2D Fourier transform?");
+	show_fourier_phase_angles = parser.checkOption("--show_fourier_phase_angles", "Show phase angles of 2D Fourier transforms?");
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -1827,6 +1976,20 @@ void Displayer::initialise()
 		}
     }
 
+    if (show_fourier_amplitudes && show_fourier_phase_angles)
+    	REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
+    if (show_fourier_amplitudes || show_fourier_phase_angles)
+    {
+    	if (do_pick)
+    		REPORT_ERROR("Displayer::initialise ERROR: cannot pick particles from Fourier maps!");
+    	if (fn_in.isStarFile())
+    		REPORT_ERROR("Displayer::initialise ERROR: use single 2D image files as input!");
+    	Image<RFLOAT> img;
+    	img.read(fn_in, false); // dont read data yet: only header to get size
+    	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+    		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
+    }
+
 }
 
 int Displayer::runGui()
@@ -1937,7 +2100,7 @@ int Displayer::run()
         if (lowpass > 0.)
         	lowPassFilterMap(img(), lowpass, angpix);
         if (highpass > 0.)
-        	highPassFilterMap(img(), highpass, angpix);
+        	highPassFilterMap(img(), highpass, angpix, 25); // use a rather soft high-pass edge of 25 pixels wide
         basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
         if (fn_coords=="")
             fn_coords = fn_in.withoutExtension()+"_coords.star";
@@ -2035,8 +2198,24 @@ int Displayer::run()
 
             MDin.addObject();
             MDin.setValue(EMDL_IMAGE_NAME, fn_in);
-            basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
-            win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+            RFLOAT new_scale = scale;
+            if (show_fourier_amplitudes || show_fourier_phase_angles)
+            	new_scale *= 2.;
+            basisViewerWindow win(CEIL(new_scale*XSIZE(img())), CEIL(new_scale*YSIZE(img())), fn_in.c_str());
+            if (show_fourier_amplitudes)
+            {
+            	amplitudeOrPhaseMap(img(), img(), AMPLITUDE_MAP);
+            	win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+            }
+            else if (show_fourier_phase_angles)
+            {
+            	amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
+            	win.fillSingleViewerCanvas(img(), -180., 180., 0., scale);
+            }
+            else
+            {
+                win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+            }
         }
 
     }

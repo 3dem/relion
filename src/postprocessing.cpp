@@ -649,6 +649,7 @@ void Postprocessing::writeOutput()
 	}
 	MDlist.write(fh);
 
+
 	MDfsc.setName("fsc");
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
 	{
@@ -683,10 +684,24 @@ void Postprocessing::writeOutput()
 	}
 	MDfsc.write(fh);
 
+	// Write a plot with the FSC curves
+	std::string title= "Final resolution = " + floatToString(global_resol, 5, 2) + " Angstroms";
+	CPlot2D *plot2D = new CPlot2D(title);
+	plot2D->SetXAxisSize(600);
+	plot2D->SetYAxisSize(400);
+	plot2D->SetXAxisTitle("resolution (1/A)");
+	plot2D->SetYAxisTitle("Fourier Shell Correlation");
+	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
+	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_UNMASKED, 0., 1., 0.);
+	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
+	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
+	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
+
 	// Also write XML file with FSC_true curve for EMDB submission
 	writeFscXml(MDfsc);
 
 	MDguinier.setName("guinier");
+	MetaDataTable MDextra1, MDextra2; // for postscript plot
 	for (int i = 0; i < guinierin.size(); i++)
 	{
 		MDguinier.addObject();
@@ -695,15 +710,59 @@ void Postprocessing::writeOutput()
 		if (fn_mtf != "")
 			MDguinier.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, guinierinvmtf[i].y);
 		if (do_fsc_weighting)
+		{
 			MDguinier.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_WEIGHTED, guinierweighted[i].y);
+			if (guinierweighted[i].y > -99.)
+			{
+				MDextra1.addObject();
+				MDextra1.setValue(EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, guinierin[i].x);
+				MDextra1.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_WEIGHTED, guinierweighted[i].y);
+			}
+		}
 		if (do_auto_bfac || ABS(adhoc_bfac) > 0.)
+		{
 			MDguinier.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, guiniersharpen[i].y);
+			if (guiniersharpen[i].y > -99.)
+			{
+				MDextra2.addObject();
+				MDextra2.setValue(EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, guinierin[i].x);
+				MDextra2.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, guiniersharpen[i].y);
+			}
+		}
 		if (do_auto_bfac)
 			MDguinier.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_INTERCEPT, global_intercept);
 	}
 	MDguinier.write(fh);
-
 	fh.close();
+
+	CPlot2D *plot2Db = new CPlot2D("Guinier plots");
+	plot2Db->SetXAxisSize(600);
+	plot2Db->SetYAxisSize(400);
+	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
+	plot2Db->SetYAxisTitle("ln(amplitudes)");
+	MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN, 0., 0., 0.);
+	if (fn_mtf != "")
+		MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, 0., 1., 0.);
+	if (do_fsc_weighting)
+	{
+		MDextra1.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_WEIGHTED, 0., 0., 1.);
+	}
+	if (do_auto_bfac || ABS(adhoc_bfac) > 0.)
+	{
+		MDextra2.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
+	}
+	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
+
+	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
+	if (!exists(fn_log))
+	{
+		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+		command += fn_log + " ";
+		command += fn_out + "_fsc.eps ";
+		command += fn_out + "_guinier.eps ";
+		command += " > /dev/null &";
+		int res = system(command.c_str());
+	}
 
 	if (verb > 0)
 	{

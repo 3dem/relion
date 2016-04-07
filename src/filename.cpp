@@ -276,6 +276,19 @@ FileName FileName::removeAllExtensions() const
         return substr(0, first);
 }
 
+// Replace all substrings
+void FileName::replaceAllSubstrings(std::string from, std::string to)
+{
+	FileName result;
+    size_t start_pos = 0;
+    while((start_pos = (*this).find(from, start_pos)) != std::string::npos)
+    {
+        (*this).replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+    }
+
+}
+
 FileName FileName::getFileFormat() const
 {
     int first;
@@ -308,9 +321,10 @@ bool FileName::isStarFile() const
     size_t found=this->find('@');
     if (found!=std::string::npos)
         return false;
-    found=this->find(':');
-    if (found!=std::string::npos)
-        return false;
+    // Allow :star to indicate that file really is a STAR file!
+    //found=this->find(':');
+    //if (found!=std::string::npos)
+    //    return false;
     found=this->find('#');
     if (found!=std::string::npos)
         return false;
@@ -392,79 +406,122 @@ void FileName::copyFile(const FileName & target) const
     f2<<f1.rdbuf();
 }
 
-int FileName::globFiles(std::vector<FileName> &files) const
+int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 {
+	if (do_clear)
+		files.clear();
+
 	glob_t glob_result;
 	glob((*this).c_str(), GLOB_TILDE, NULL, &glob_result);
-	files.clear();
 	for(unsigned  int  i = 0; i < glob_result.gl_pathc; ++i)
 	{
 		files.push_back(std::string(glob_result.gl_pathv[i]));
 	}
 	globfree(&glob_result);
+
 	return files.size();
 }
 
 bool exists(const FileName &fn)
 {
-    FILE *aux;
-    if ((aux = fopen(fn.c_str(), "r")) == NULL)
-        return false;
-    fclose(aux);
-    return true;
+
+    struct stat buffer;   
+    return (stat (fn.c_str(), &buffer) == 0); 
 }
 
-std::string getUniqDateString()
+void touch(const FileName &fn)
 {
+    std::ofstream  fh;
+    fh.open(fn.c_str(), std::ios::out);
+    if (!fh)
+        REPORT_ERROR( (std::string)"Filename::touch ERROR: Cannot open file: " + fn);
+    fh.close();
+}
 
-	time_t now = time(0);
-	tm *ltm = localtime(&now);
-	std::string uniqstr = integerToString(ltm->tm_year%100, 2);
-	uniqstr+= integerToString(1 + ltm->tm_mon, 2);
-	uniqstr+= integerToString(ltm->tm_mday, 2);
-	uniqstr+= ".";
-	uniqstr+= integerToString(ltm->tm_hour, 2);
-	uniqstr+= integerToString(ltm->tm_min, 2);
-	uniqstr+= integerToString(ltm->tm_sec, 2);
-
-	return uniqstr;
-
+void copy(const FileName &fn_src, const FileName &fn_dest)
+{
+    std::ifstream srce( fn_src.c_str(), std::ios::binary ) ;
+    std::ofstream dest( fn_dest.c_str(), std::ios::binary ) ;
+    dest << srce.rdbuf() ;
 
 }
 
-size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate)
+int mktree(const FileName &fn_dir, mode_t mode)
 {
+    std::string s = fn_dir;
+	size_t pre=0,pos;
+    std::string dir;
+    int mdret;
+
+    // force trailing / so we can handle everything in loop
+    if(s[s.size()-1]!='/')
+        s+='/';
+
+    while((pos=s.find_first_of('/',pre))!=std::string::npos)
+    {
+        dir=s.substr(0,pos++);
+        pre=pos;
+        // if leading / first time is 0 length
+        if (dir.size() == 0)
+        	continue;
+
+        if ((mdret = mkdir(dir.c_str(), mode)) && errno != EEXIST)
+        {
+            return mdret;
+        }
+    }
+
+    return mdret;
+}
+
+bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
+{
+
 	size_t slashpos = 0;
 	int i = 0;
-	while (slashpos < fnt.length())
+	while (slashpos < fn_in.length())
 	{
 		i++;
-		slashpos = fnt.find("/", slashpos+1);
-		if (std::isdigit(fnt[slashpos+1]) && std::isdigit(fnt[slashpos+2]) && std::isdigit(fnt[slashpos+3]) &&
-		    std::isdigit(fnt[slashpos+4]) && std::isdigit(fnt[slashpos+5]) && std::isdigit(fnt[slashpos+6]) &&
-		    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
-		    (fnt[slashpos+7] == '.' || fnt[slashpos+7] == '-') &&
-		    std::isdigit(fnt[slashpos+8]) && std::isdigit(fnt[slashpos+9]) && std::isdigit(fnt[slashpos+10]) &&
-		    std::isdigit(fnt[slashpos+11]) && std::isdigit(fnt[slashpos+12]) && std::isdigit(fnt[slashpos+13]) )
-			{
-				uniqdate = fnt.substr(slashpos+1,13);
-				return slashpos;
-			}
-
-		if (i>100)
-			REPORT_ERROR("findUniqueDateSubstring: BUG or found more than 100 directories deep structure?");
+		slashpos = fn_in.find("/", slashpos+1);
+		if (fn_in[slashpos+1]=='j' && fn_in[slashpos+2]=='o' && fn_in[slashpos+3]=='b' &&
+			std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]))
+		{
+			// find the second slash
+			size_t slashpos2 = fn_in.find("/", slashpos+6);
+			if (slashpos2 == std::string::npos)
+				slashpos2 = fn_in.length() - 1;
+			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
+			fn_jobnr = fn_in.substr(slashpos+1, slashpos2-slashpos); // this has the second slash
+			fn_post = fn_in.substr(slashpos2+1); // this has the rest
+			return true;
+		}
+	    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
+		else if (std::isdigit(fn_in[slashpos+1]) && std::isdigit(fn_in[slashpos+2]) && std::isdigit(fn_in[slashpos+3]) &&
+		    std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]) &&
+		    (fn_in[slashpos+7] == '.' || fn_in[slashpos+7] == '-') &&
+		    std::isdigit(fn_in[slashpos+8]) && std::isdigit(fn_in[slashpos+9]) && std::isdigit(fn_in[slashpos+10]) &&
+		    std::isdigit(fn_in[slashpos+11]) && std::isdigit(fn_in[slashpos+12]) && std::isdigit(fn_in[slashpos+13]) )
+		{
+			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
+			fn_jobnr = fn_in.substr(slashpos+1,14); // this has the second slash
+			fn_post = fn_in.substr(slashpos+15); // this has the rest
+			return true;
+		}
+		if (i>20)
+			REPORT_ERROR("decomposePipelineFileName: BUG or found more than 20 directories deep structure for pipeline filename: " + fn_in);
 	}
+	// This was not a pipeline filename
+	fn_pre="";
+	fn_jobnr="";
+	fn_post=fn_in;
+	return false;
 
-	// Not found
-	uniqdate="";
-	return std::string::npos;
 }
 
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir)
 {
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_input, uniqdate);
-	FileName fn_nouniqdate = (slashpos!= std::string::npos) ? fn_input.substr(slashpos+15) : fn_input;
-	return fn_new_outputdir + fn_nouniqdate;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_input, fn_pre, fn_jobnr, fn_post);
+	return fn_new_outputdir + fn_post;
 }
 

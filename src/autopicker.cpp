@@ -75,9 +75,6 @@ void AutoPicker::read(int argc, char **argv)
 	{
 		if ( (helical_tube_curvature_factor_max < 0.0001) || (helical_tube_curvature_factor_max > 1.0001) )
 			REPORT_ERROR("Error: Maximum curvature factor should be 0~1!");
-
-		if (helical_tube_diameter > particle_diameter)
-			REPORT_ERROR("Error: Tube diameter should be smaller than particle diameter!");
 	}
 }
 
@@ -184,7 +181,6 @@ void AutoPicker::initialise()
 		{
 			Istk().getImage(n, Iref());
 			Iref().setXmippOrigin();
-			Iref().printShape();
 			Mrefs.push_back(Iref());
 		}
 	}
@@ -241,7 +237,13 @@ void AutoPicker::initialise()
 		particle_radius2*= particle_radius2;
 	}
 
-
+	if ( (verb > 0) && (autopick_helical_segments))
+	{
+		std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
+		std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
+	}
+	if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
+		REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
 
 
 	// Get the squared particle radius (in integer pixels)
@@ -307,7 +309,7 @@ void AutoPicker::initialise()
 			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
 	}
 
-	printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
+	//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
 
 	if (min_particle_distance < 0)
 	{
@@ -1489,7 +1491,7 @@ void AutoPicker::exportHelicalTubes(
 			MDout.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 			MDout.setValue(EMDL_ORIENT_PSI_PRIOR, (-1.) * (tube_coord_list[itube][icoord].psi)); // Beware! Multiplied by -1!
 			MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, helical_tube_len);
-			MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, 0.5);
+			MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, BIMODAL_PSI_PRIOR_FLIP_RATIO);
 		}
 	}
 
@@ -2029,12 +2031,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 FileName AutoPicker::getOutputRootName(FileName fn_mic)
 {
 
-	FileName uniqdate;
-	size_t slashpos = findUniqueDateSubstring(fn_mic, uniqdate);
-	FileName fn_mic_nouniqdate = (slashpos!= std::string::npos) ? fn_mic.substr(slashpos+15) : fn_mic;
-	fn_mic_nouniqdate = fn_mic_nouniqdate.withoutExtension();
-	FileName fn_part = fn_odir + fn_mic_nouniqdate;
-	return fn_part;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	return fn_odir + fn_post.withoutExtension();
 
 }
 

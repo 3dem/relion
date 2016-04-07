@@ -142,7 +142,6 @@ MetaDataTable& MetaDataTable::operator =(const MetaDataTable &MD)
         this->setName(MD.getName());
         this->isList = MD.isList;
         this->activeLabels = MD.activeLabels;
-        this->objects.clear();
         this->objects.resize(MD.objects.size());
         for (long int idx = 0; idx < MD.objects.size(); idx++)
         {
@@ -176,6 +175,9 @@ long int MetaDataTable::numberOfObjects() const
 
 void MetaDataTable::clear()
 {
+    for (long int i = 0; i < objects.size(); i++)
+    	objects[i]->clear();
+
     objects.clear();
     comment.clear();
     name.clear();
@@ -505,7 +507,7 @@ long int MetaDataTable::goToObject(long int objectID)
 	}
 }
 
-void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
+long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
 	setIsList(false);
 
@@ -550,41 +552,47 @@ void MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desir
 
     // Then fill the table (dont read another line until the one from above has been handled)
     bool is_first= true;
+    long int nr_objects = 0;
     while (is_first || getline(in, line, '\n'))
     {
 		is_first=false;
 
-    	if ( grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
+    	if (grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
     	{
     		line = simplify(line);
 			// Stop at empty line
 			if (line[0] == '\0')
 				break;
 
-			// Add a new line to the table
-			addObject();
-
-			// Parse data values
-			std::stringstream os2(line);
-			std::string value;
-			labelPosition = 0;
-			int counterIgnored = 0;
-			while (os2 >> value)
+			nr_objects++;
+			if (!do_only_count)
 			{
-				// TODO: handle comments here...
-				if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+				// Add a new line to the table
+				addObject();
+
+				// Parse data values
+				std::stringstream os2(line);
+				std::string value;
+				labelPosition = 0;
+				int counterIgnored = 0;
+				while (os2 >> value)
 				{
-					// Ignore this column
-					counterIgnored++;
+					// TODO: handle comments here...
+					if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+					{
+						// Ignore this column
+						counterIgnored++;
+						labelPosition++;
+						continue;
+					}
+					setValueFromString(activeLabels[labelPosition - counterIgnored], value);
 					labelPosition++;
-					continue;
 				}
-				setValueFromString(activeLabels[labelPosition - counterIgnored], value);
-				labelPosition++;
 			}
     	} // end if grep_pattern
     }
 
+    return nr_objects;
 }
 
 bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desiredLabels)
@@ -647,7 +655,7 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
      return also_has_loop;
 }
 
-int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
+long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
     std::stringstream ss;
     std::string line, token, value;
@@ -678,8 +686,7 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     				trim(line);
     				if (line.find("loop_") != std::string::npos)
     				{
-    					readStarLoop(in, desiredLabels, grep_pattern);
-    					return 1;
+    					return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
     				}
     				else if (line[0] == '_')
     				{
@@ -699,21 +706,24 @@ int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vec
     return 0;
 }
 
-int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern)
+long int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
 
     // Clear current table
     clear();
 
-    std::ifstream in(filename.data(), std::ios_base::in);
+    // Check for an :star extension
+    FileName fn_read = filename.removeFileFormat();
+
+    std::ifstream in(fn_read.data(), std::ios_base::in);
     if (in.fail())
-        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + filename + " does not exists" );
+        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exists" );
 
     FileName ext = filename.getFileFormat();
     if (ext =="star")
     {
         //REPORT_ERROR("readSTAR not implemented yet...");
-        return readStar(in, name, desiredLabels, grep_pattern);
+        return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
     }
     else
     {
@@ -840,7 +850,73 @@ void MetaDataTable::writeValueToString(std::string & result,
     aux->writeValueToString(result, EMDL::str2Label(inputLabel));
 }
 
+void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
+		double red, double green, double blue, double linewidth, std::string marker)
+{
+	CDataSet dataSet;
+	if (marker=="")
+	{
+		dataSet.SetDrawMarker(false);
+	}
+	else
+	{
+		dataSet.SetDrawMarker(true);
+		dataSet.SetMarkerSymbol(marker);
+	}
+	dataSet.SetLineWidth(linewidth);
+	dataSet.SetDatasetColor(red, green, blue);
+	dataSet.SetDatasetTitle(EMDL::label2Str(yaxis));
 
+    RFLOAT mydbl;
+    int myint;
+    long int mylong;
+	double xval, yval;
+	for (long int idx = 0; idx < objects.size(); idx++)
+    {
+    	if (EMDL::isDouble(xaxis))
+    	{
+    		objects[idx]->getValue(xaxis, mydbl);
+    		xval = mydbl;
+    	}
+    	else if (EMDL::isInt(xaxis))
+    	{
+    		objects[idx]->getValue(xaxis, myint);
+    		xval = myint;
+    	}
+    	else if (EMDL::isLong(xaxis))
+    	{
+    		objects[idx]->getValue(xaxis, mylong);
+    		xval = mylong;
+    	}
+    	else
+    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot xaxis double, int or long int");
+
+    	if (EMDL::isDouble(yaxis))
+    	{
+    		objects[idx]->getValue(yaxis, mydbl);
+    		yval = mydbl;
+    	}
+    	else if (EMDL::isInt(yaxis))
+    	{
+    		objects[idx]->getValue(yaxis, myint);
+    		yval = myint;
+    	}
+    	else if (EMDL::isLong(yaxis))
+    	{
+    		objects[idx]->getValue(yaxis, mylong);
+    		yval = mylong;
+    	}
+    	else
+    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot yaxis double, int or long int");
+
+    	CDataPoint point(xval, yval);
+		dataSet.AddDataPoint(point);
+
+	}
+
+    plot2D->AddDataSet(dataSet);
+
+}
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
@@ -991,7 +1067,9 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 
 	MetaDataTable MDc;
 
-	if (MDin.size() == 1 )
+	if (MDin.size() == 0)
+		REPORT_ERROR("combineMetaDataTables ERROR: No input STAR files selected!");
+	else if (MDin.size() == 1 )
 		MDc = MDin[0];
 	else
 	{

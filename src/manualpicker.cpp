@@ -65,7 +65,10 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	if (last_pick_viewed > 0 && last_pick_viewed < count_displays.size())
 	{
 		MetaDataTable MDcoord;
-		FileName fn_coord = getOutputFileWithNewUniqueDate(global_fn_mics[last_pick_viewed].withoutExtension() + "_" + global_pickname + ".star", global_fn_odir);
+
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(global_fn_mics[last_pick_viewed], fn_pre, fn_jobnr, fn_post);
+		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
 		int my_nr_picked;
 		if (exists(fn_coord))
 		{
@@ -82,7 +85,10 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		count_displays[last_pick_viewed]->redraw();
 	}
 
-	FileName fn_coord = getOutputFileWithNewUniqueDate(global_fn_mics[imic].withoutExtension() + "_" + global_pickname + ".star", global_fn_odir);
+
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+	FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
 
 	int rad = ROUND(global_particle_diameter/(2. * global_angpix));
 	std::string command;
@@ -241,8 +247,11 @@ int manualpickerGuiWindow::fill()
 		Fl_Check_Button *mycheck = new Fl_Check_Button(4, current_y, ystep-8, ystep-8, "");
 		mycheck->callback(cb_selectmic, &(imics[imic]));
 		mycheck->value(1);
+		if (!do_allow_save)
+			mycheck->deactivate();
 		selected.push_back(true);
 		check_buttons.push_back(mycheck);
+
 
 		Fl_Text_Buffer *textbuff = new Fl_Text_Buffer();
 		textbuff->text(fn_mic.c_str());
@@ -442,7 +451,9 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	for (int imic = 0; imic < global_fn_mics.size(); imic++)
 	{
 		MetaDataTable MDcoord;
-		FileName fn_coord = getOutputFileWithNewUniqueDate(global_fn_mics[imic].withoutExtension() + "_" + global_pickname + ".star", global_fn_odir);
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
 		int my_nr_picked;
 		if (exists(fn_coord))
 		{
