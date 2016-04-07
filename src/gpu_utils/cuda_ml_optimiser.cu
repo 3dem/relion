@@ -2518,7 +2518,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 		baseMLO(baseMLOptimiser),
-		generateProjectionPlanOnTheFly(false)
+		generateProjectionPlanOnTheFly(false),
+		rank_shared_count(1)
 {
 	unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
 
@@ -2544,37 +2545,13 @@ MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
-
-	size_t allocationSize(0);
-
-	size_t free, total;
-	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-
-	if (baseMLO->requested_gpu_memory > 0)
-		allocationSize = baseMLO->requested_gpu_memory;
-	else
-		allocationSize = (double)free * .7;
-
-	if (allocationSize > free)
-	{
-		printf(" WARNING: Requested memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
-		printf("  Requested size       %zu MB\n", (size_t) ((double)baseMLO->requested_gpu_memory/(1000*1000)));
-		printf("  Total available size %zu MB\n", (size_t) ((double)free/(1000*1000)));
-		allocationSize = (size_t) ((double)free * .7); //Lets leave some for other processes for now
-		printf("  Assigned size        %zu MB\n", (size_t) ((double)allocationSize/(1000*1000)));
-		baseMLO->available_gpu_memory = allocationSize;
-	}
-
-#endif
-
 	int memAlignmentSize;
 	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
 	allocator = new CudaCustomAllocator(0, memAlignmentSize);
 
 };
 
-void MlDeviceBundle::resetData()
+void MlDeviceBundle::setupFixedSizedObjects()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 	HANDLE_ERROR(cudaSetDevice(device_id));
@@ -2613,12 +2590,10 @@ void MlDeviceBundle::resetData()
 	              PROJECTOR AND BACKPROJECTOR
 	======================================================*/
 
-	size_t extraAllocationSpace(0);
-
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		extraAllocationSpace += cudaProjectors[iclass].setMdlDim(
+		cudaProjectors[iclass].setMdlDim(
 				baseMLO->mymodel.PPref[iclass].data.xdim,
 				baseMLO->mymodel.PPref[iclass].data.ydim,
 				baseMLO->mymodel.PPref[iclass].data.zdim,
@@ -2629,7 +2604,7 @@ void MlDeviceBundle::resetData()
 
 		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
 
-		extraAllocationSpace += cudaBackprojectors[iclass].setMdlDim(
+		cudaBackprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
 				baseMLO->wsum_model.BPref[iclass].data.ydim,
 				baseMLO->wsum_model.BPref[iclass].data.zdim,
@@ -2640,50 +2615,22 @@ void MlDeviceBundle::resetData()
 
 		cudaBackprojectors[iclass].initMdl();
 	}
+}
+
+void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
+{
+	unsigned nr_classes = baseMLO->mymodel.nr_classes;
+	HANDLE_ERROR(cudaSetDevice(device_id));
 
 	/*======================================================
 	                    CUSTOM ALLOCATOR
 	======================================================*/
 
-	size_t allocationSize(0);
-
-	size_t free, total;
-	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-
-	if (baseMLO->requested_gpu_memory > 0)
-		allocationSize = baseMLO->requested_gpu_memory;
-	else
-		allocationSize = (double)free * .7;
-
-	if (allocationSize > free)
-	{
-		printf(" WARNING: Requested memory per thread, via \"--gpu_memory_per_mpi_rank\", not available on device. (Defaulting to less)\n");
-		printf("  Requested size       %zu MB\n", (size_t) ((double)baseMLO->requested_gpu_memory/(1000*1000)));
-		printf("  Total available size %zu MB\n", (size_t) ((double)free/(1000*1000)));
-		allocationSize = (size_t) ((double)free * .7); //Lets leave some for other processes for now
-		printf("  Assigned size        %zu MB\n", (size_t) ((double)allocationSize/(1000*1000)));
-		baseMLO->available_gpu_memory = allocationSize;
-	}
+	allocator->resize(allocationSize);
 
 #ifdef DEBUG_CUDA
 	printf(" DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
 #endif
-
-	size_t reserved = extraAllocationSpace + (size_t)(MEMORY_OVERHEAD_MB * 1000 * 1000);
-	size_t actualAllocationSize =  allocationSize - reserved;
-
-	if (reserved > allocationSize) // then actualAllocationSize would be negative. It's size_t, so it won't be negative, but it DOES mean there isn't enough left.
-	{
-		printf("\n\nINFO: Allocation Size:            %li MB\n", allocationSize/(1000*1000));
-		printf(    "INFO: Previously allocated:       %li MB\n", extraAllocationSpace/(1000*1000));
-		printf(    "INFO: Overhead:                   %li MB\n", (size_t) MEMORY_OVERHEAD_MB);
-		printf(    "INFO: Left for Custom Allocator:  %li MB\n", actualAllocationSize/(1000*1000));
-		printf("ERROR: More GPU memory is required.\n\n");
-		fflush(stdout);
-		raise(SIGSEGV);
-	}
-
-	allocator->resize(actualAllocationSize);
 
 	/*======================================================
 	                    PROJECTION PLAN
