@@ -50,6 +50,7 @@ class Process;
 #define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
 #define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
+#define NODE_PDF_LOGFILE    13//PDF logfile
 
 class Node
 {
@@ -105,7 +106,8 @@ class Node
 #define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define NR_BROWSE_TABS      17
+#define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
+#define NR_BROWSE_TABS      18
 
 // Status a Process may have
 #define PROC_RUNNING   0
@@ -143,11 +145,12 @@ class Process
 
 };
 
-
 class PipeLine
 {
 
 	public:
+	int job_counter;
+
 	std::string name;
 	std::vector<Node> nodeList; //list of all Nodes in the pipeline
 	std::vector<Process> processList; //list of all Processes in the pipeline
@@ -155,6 +158,7 @@ class PipeLine
 	PipeLine()
 	{
 		name = "default";
+		job_counter = 1;
 	}
 
 	~PipeLine()
@@ -166,6 +170,7 @@ class PipeLine
 	{
 		nodeList.clear();
 		processList.clear();
+		job_counter = 1;
 	}
 
 	void setName(std::string _name)
@@ -186,7 +191,8 @@ class PipeLine
 	void addNewOutputEdge(long int output_from_process, Node &_Node);
 
 	// Check whether Node already exists in the nodeList. If not add and return pointer to new node, otherwise return pointer to existing node
-	long int addNode(Node &_Node);
+	// Also touch entry in .Nodes directory, use touch_if_not_exist for scheduled jobs
+	long int addNode(Node &_Node, bool touch_if_not_exist = false);
 
 	// Add a new Process to the list (no checks are performed)
 	long int addNewProcess(Process &_Process, bool do_overwrite = false);
@@ -194,28 +200,90 @@ class PipeLine
 	// Delete a process and its output nodes (and all input edges) from the pipeline
 	void deleteProcess(int ipos, bool recursive = false);
 
-	// Find nodes or process
+	// Find nodes or process (by name or alias)
 	long int findNodeByName(std::string name);
 	long int findProcessByName(std::string name);
+	long int findProcessByAlias(std::string name);
 
 	// Touch each individual Node name in the temporary Nodes directory
 	// Return true if Node output file exists and temporary file is written, false otherwise
 	bool touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist=false);
+	void touchTemporaryNodeFiles(Process &process);
 
-	// Make empty entries of all NodeNames in a hidden directory (useful for file browsing for InputNode I/O)
-	void makeNodeDirectory();
+	// And delete these temporary files
+	void deleteTemporaryNodeFile(Node &node);
+	void deleteTemporaryNodeFiles(Process &process);
+
+	// Re-make entries of all NodeNames in the hidden .Nodes directory (for file browsing for InputNode I/O)
+	void remakeNodeDirectory();
 
 	// Check for process completion by cheking for the presence of all outputNode filenames
 	void checkProcessCompletion();
 
+	// Import a job into the pipeline
+	// Return true if at least one process is imported correctly
+	bool importPipeline(std::string _name);
+
 	// Write out the pipeline to a STAR file
-	void write(std::vector<bool> &deleteNode, std::vector<bool> &deleteProcess);
+	void write(FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
 
 	// Read in the pipeline from a STAR file
-	void read();
+	void read(bool only_read_if_file_exists=false);
+
+	// Make LaTeX and TikZ-based flowcharts
+	void makeUpwardsFlowChart(long int from_process);
 
 };
 
+
+
+class PipeLineFlowChart
+{
+public:
+
+	// Use short process names, or original, full ones
+	bool do_short_names;
+
+	// Also make upwardsFlowCharts for all branches?
+	bool do_branches;
+
+	// All the processes for which a upwardFlowChart will be made
+	std::vector<long int> todo_list;
+
+	PipeLineFlowChart()
+	{
+		do_branches= true;
+		do_short_names = false;
+	}
+
+	// Write how many particles or classes or whatever the node is that represents a downward arrow
+	std::string getDownwardsArrowLabel(PipeLine &pipeline, long int lower_process, long int new_process);
+
+	// The process will be added to the top
+	// The function returns the parent process from which the upper_node came
+	// It will return a negative value if there was no parent process
+	long int addProcessToUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int lower_process,
+			long int new_process, std::vector<long int> &branched_procs);
+
+	void makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int from_node,
+			std::vector<long int> &all_branches);
+
+	void makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pipeline, long int from_process);
+
+	// Open and close a new flowchart picture
+	void openTikZPicture(std::ofstream &fh);
+
+	void closeTikZPicture(std::ofstream &fh);
+
+	void adaptNamesForTikZ(FileName &name);
+
+	// Open and close a new output file
+	void openFlowChartFile(FileName &fn_out, std::ofstream &fh);
+
+	void closeFlowChartFile(std::ofstream &fh);
+
+
+};
 
 
 #endif /* PIPELINER_H_ */

@@ -115,58 +115,6 @@ public:
 
 };
 
-// This class describes which OriginalParticles in the data set belong to the same frame-average micrograph
-class AverageMicrograph
-{
-public:
-	// ID of this average micrograph, i.e. which number in the MDmic am I?
-	long int id;
-
-	// Name of this average micrograph
-	std::string name;
-
-	// All the original particles that were recorded on this average micrograph
-	std::vector<long int> ori_particles_id;
-
-	// Empty Constructor
-	AverageMicrograph()
-	{
-		clear();
-	}
-
-	// Destructor needed for work with vectors
-	~AverageMicrograph()
-	{
-		clear();
-	}
-
-	// Copy constructor needed for work with vectors
-	AverageMicrograph(AverageMicrograph const& copy)
-	{
-		id = copy.id;
-		name = copy.name;
-		ori_particles_id = copy.ori_particles_id;
-	}
-
-	// Define assignment operator in terms of the copy constructor
-	AverageMicrograph& operator=(AverageMicrograph const& copy)
-	{
-		id = copy.id;
-		name = copy.name;
-		ori_particles_id = copy.ori_particles_id;
-		return *this;
-	}
-
-	// Initialise
-	void clear()
-	{
-		id = -1;
-		name="";
-		ori_particles_id.clear();
-		ori_particles_id.reserve(MAX_NR_PARTICLES_PER_MICROGRAPH);
-	}
-};
-
 
 class ExpMicrograph
 {
@@ -179,6 +127,9 @@ public:
 
 	// All the particles that were recorded on this micrograph
 	std::vector<long int> particle_ids;
+
+	// All the original particles that were recorded on this average micrograph
+	std::vector<long int> ori_particle_ids;
 
 	// Empty Constructor
 	ExpMicrograph()
@@ -198,6 +149,7 @@ public:
 		id = copy.id;
 		name = copy.name;
 		particle_ids = copy.particle_ids;
+		ori_particle_ids = copy.ori_particle_ids;
 
 	}
 
@@ -207,6 +159,7 @@ public:
 		id = copy.id;
 		name = copy.name;
 		particle_ids = copy.particle_ids;
+		ori_particle_ids = copy.ori_particle_ids;
 		return *this;
 	}
 
@@ -217,6 +170,7 @@ public:
 		name="";
 		particle_ids.clear();
 		particle_ids.reserve(MAX_NR_PARTICLES_PER_MICROGRAPH);
+		ori_particle_ids.clear();
 	}
 
 };
@@ -276,9 +230,6 @@ public:
 	// All micrographs in the experiment
 	std::vector<ExpMicrograph> micrographs;
 
-	// All average micrographs in this experiment (only used for movie-processing, i.e. by the particle_polisher
-	std::vector<AverageMicrograph> average_micrographs;
-
 	// All particles in the experiment
 	std::vector<ExpParticle> particles;
 
@@ -317,15 +268,18 @@ public:
 	void clear()
 	{
 		groups.clear();
+		groups.reserve(MAX_NR_MICROGRAPHS);
 		micrographs.clear();
 		micrographs.reserve(MAX_NR_MICROGRAPHS);
-		groups.reserve(MAX_NR_MICROGRAPHS);
 		particles.clear(); // reserve upon reading
 		ori_particles.clear(); // TODO: reserve upon reading
+		nr_ori_particles_subset1 = nr_ori_particles_subset2 = 0;
+		nr_bodies = 1;
 		MDexp.clear();
 		MDexp.setIsList(true);
 		MDimg.clear();
 		MDimg.setIsList(false);
+		MDbodies.clear();
 		MDmic.clear();
 		MDmic.setIsList(false);
 		MDimg.setName("images");
@@ -369,23 +323,11 @@ public:
 	// Add a micrograph
 	long int addMicrograph(std::string mic_name);
 
-	// Add an AverageMicrograph
-	long int addAverageMicrograph(std::string avg_mic_name);
-
 	// for separate refinement of random halves of the data
 	void divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
-	// Randomise the order of the original_particles
-	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false);
-
 	// calculate maximum number of images for a particle (possibly within a range of particles)
 	int maxNumberOfImagesPerOriginalParticle(long int first_particle_id = -1, long int last_particle_id = -1);
-
-	// Given the STAR file of a set of movieframes, expand the current Experiment to contain all movie frames
-	// rlnParticleName entries in the movie-frame Experiment should coincide with rlnImageName entries in the current Experiment
-	// the entries rlnAngleRot, rlnAngleTilt, rlnAnglePsi, rlnOriginX and rlnOriginY will be taken from the current Experiment and
-	// copied into the new moevieframe Experiment. In addition, these values will be used to center the corresponding Priors
-	void expandToMovieFrames(FileName fn_data_movie, int verb = 0);
 
 	// Make sure the particles inside each orriginal_particle are in the right order
 	// After they have been ordered, get rid of the particles_order vector inside the ori_particles

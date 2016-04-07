@@ -56,8 +56,9 @@
 #include <algorithm>
 #include <vector>
 #include <typeinfo>
-
+#include <sys/stat.h>
 #include <glob.h>
+#include <errno.h>
 
 #include "src/numerical_recipes.h"
 #include "src/macros.h"
@@ -354,6 +355,11 @@ public:
      */
     FileName removeAllExtensions() const;
 
+    /**
+     *  Replace all substrings
+     */
+    void replaceAllSubstrings(std::string from, std::string to);
+
     /** Remove file format
      * @code
      * fn_proj = "g1ta00001.xmp";
@@ -432,9 +438,10 @@ public:
 
     /** From a wild-card containing filename get a vector with all existing filenames,
      * return number of existing filenames
+     * If do_clear, the output vector will be clear when starting, when false, files will just be added to the vector
      *
      */
-    int globFiles(std::vector<FileName> &files) const;
+    int globFiles(std::vector<FileName> &files, bool do_clear = true) const;
     //@}
 };
 
@@ -456,14 +463,12 @@ public:
     }
 };
 
-
-// Get a unique string based on the current time
-std::string getUniqDateString();
-
 // The following 2 functions are for the pipelining of RELION-2.0
-// Finds the 6-digit UNIQDATE substring from a larger string, as used in relion-2.0 pipeline
-// This function returns the position of the slash right before the UNIQDATE entry, and the entry itself is in
-size_t findUniqueDateSubstring(FileName fnt, FileName &uniqdate);
+// Finds the 160101.093245 or job001 UNIQ-ID substring from a larger string, as used in relion-2.0 pipeline
+// It returns the part before that id (+trailing slash), the id itself (plus trailing slash) and the part after the id
+// The function returns true if the input filename was a pipeline one, and false otherwise
+// If the input filename wasn't a pipeline one, then fn_post is set to the input filename and the fn_pre and fn_jobnr are left empty
+bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post);
 
 // Replaces the UNIQDATE substring and its preceding Directory-structure from fn_input, and adds fn_new_outputdir in front of it
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir);
@@ -476,6 +481,15 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
  * @endcode
  */
 bool exists(const FileName& fn);
+
+/** Touch a file on the file system. */
+void touch(const FileName& fn);
+
+/** Copy a file */
+void copy(const FileName &fn_src, const FileName &fn_dest);
+
+/** Make a directory tree*/
+int mktree(const FileName &fn_dir, mode_t mode = 0777);
 
 /** True if the path is a directory */
 bool isDirectory (const FileName &fn);

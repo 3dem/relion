@@ -82,6 +82,7 @@ enum EMDLabel
     EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
     EMDL_CTF_LENS_STABILITY, ///< Lens stability
     EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination
+    EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
     EMDL_CTF_CONVERGENCE_CONE, ///< Convergence cone
     EMDL_CTF_LONGITUDINAL_DISPLACEMENT, ///< Longitudinal displacement
     EMDL_CTF_TRANSVERSAL_DISPLACEMENT, ///< Transversal displacemente
@@ -231,7 +232,6 @@ enum EMDLabel
     EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
     EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
     EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
-    EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS,
     EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
     EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
@@ -293,8 +293,11 @@ enum EMDLabel
     EMDL_PARTICLE_ORI_NAME,
     EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES,
     EMDL_PARTICLE_NR_FRAMES,
+    EMDL_PARTICLE_NR_FRAMES_AVG,
+    EMDL_PARTICLE_MOVIE_RUNNING_AVG,
     EMDL_PARTICLE_PMAX,
 
+    EMDL_PIPELINE_JOB_COUNTER,
     EMDL_PIPELINE_NODE_NAME,
     EMDL_PIPELINE_NODE_TYPE,
     EMDL_PIPELINE_PROCESS_ALIAS,
@@ -346,6 +349,7 @@ enum EMDLabel
     EMDL_SELECTED,
     EMDL_SELECT_PARTICLES_ZSCORE,
     EMDL_SORTED_IDX,
+    EMDL_STARFILE_MOVIE_PARTICLES,
     EMDL_PERFRAME_CUMULATIVE_WEIGHT,
     EMDL_PERFRAME_RELATIVE_WEIGHT,
 
@@ -452,6 +456,7 @@ private:
         EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
         EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
         EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
+        EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
         EMDL::addLabel(EMDL_CTF_CONVERGENCE_CONE, EMDL_DOUBLE, "rlnConvergenceCone", "Convergence cone (in mrad)");
         EMDL::addLabel(EMDL_CTF_LONGITUDINAL_DISPLACEMENT, EMDL_DOUBLE, "rlnLongitudinalDisplacement", "Longitudinal displacement (in Angstroms)");
         EMDL::addLabel(EMDL_CTF_TRANSVERSAL_DISPLACEMENT, EMDL_DOUBLE, "rlnTransversalDisplacement", "Transversal displacement (in Angstroms)");
@@ -600,7 +605,6 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_BIMODAL_ORIENTS, EMDL_BOOL, "rlnHelicalBimodalOrientations", "Flag to indicate that bimodal orientations are searched for helical segments in the first few iterations");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaSegmentDistance", "Sigma of helical segment distance (in Angstroms)");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
@@ -662,9 +666,12 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_ORI_NAME, EMDL_STRING, "rlnOriginalParticleName", "Original name for a particles");
         EMDL::addLabel(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, EMDL_INT, "rlnNrOfSignificantSamples", "Number of orientational/class assignments (for a particle) with sign.probabilities in the 1st pass of adaptive oversampling"); /**< particle, Number of orientations contributing to weights*/
         EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES, EMDL_INT, "rlnNrOfFrames", "Number of movie frames that were collected for this particle");
+        EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES_AVG, EMDL_INT, "rlnAverageNrOfFrames", "Number of movie frames that one averages over upon extraction of movie-particles");
+        EMDL::addLabel(EMDL_PARTICLE_MOVIE_RUNNING_AVG, EMDL_INT, "rlnMovieFramesRunningAverage", "Number of movie frames inside the running average that will be used for movie-refinement");
         EMDL::addLabel(EMDL_PARTICLE_PMAX, EMDL_DOUBLE, "rlnMaxValueProbDistribution", "Maximum value of the (normalised) probability function for a particle"); /**< particle, Maximum value of probability distribution */
 
 
+        EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
@@ -713,7 +720,8 @@ private:
         EMDL::addLabel(EMDL_SELECTED, EMDL_BOOL, "rlnSelected", "Flag whether an entry in a metadatatable is selected in the viewer or not");
         EMDL::addLabel(EMDL_SELECT_PARTICLES_ZSCORE, EMDL_DOUBLE, "rlnParticleSelectZScore", "Sum of Z-scores from particle_select. High Z-scores are likely to be outliers.");
         EMDL::addLabel(EMDL_SORTED_IDX, EMDL_LONG, "rlnSortedIndex", "Index of a metadata entry after sorting (first sorted index is 0).");
-		EMDL::addLabel(EMDL_PERFRAME_CUMULATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameCumulativeWeight", "Sum of the resolution-dependent relative weights from the first frame until the given frame");
+        EMDL::addLabel(EMDL_STARFILE_MOVIE_PARTICLES, EMDL_STRING, "rlnStarFileMovieParticles", "Filename of a STAR file with movie-particles in it");
+        EMDL::addLabel(EMDL_PERFRAME_CUMULATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameCumulativeWeight", "Sum of the resolution-dependent relative weights from the first frame until the given frame");
 		EMDL::addLabel(EMDL_PERFRAME_RELATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameRelativeWeight", "The resolution-dependent relative weights for a given frame");
 
         EMDL::addLabel(EMDL_RESOLUTION, EMDL_DOUBLE, "rlnResolution", "Resolution (in 1/Angstroms)");

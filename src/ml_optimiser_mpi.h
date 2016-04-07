@@ -36,10 +36,8 @@
 class MlOptimiserMpi: public MlOptimiser
 {
 
-private:
-	MpiNode *node;
-
 public:
+	MpiNode *node;
 
 #ifdef TIMINGMPI
     int MPIR_PACK, MPIR_ALLREDUCE, MPIR_UNPACK, MPIR_EXP, MPIR_MAX, MPIR_BCAST;
@@ -47,6 +45,9 @@ public:
 
     // Name of the directory to write temporary files to
     FileName fn_scratch;
+
+    // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
+    bool only_do_unfinished_movies;
 
 	/** Destructor, calls MPI_Finalize */
     ~MlOptimiserMpi()
@@ -134,6 +135,12 @@ public:
     void iterate();
 
 
+    /**
+     * Process movies one micrograph at a time
+     * This reduces time and RAM for movie expansion and may thus be very useful for large data sets (with millions of particle movie frames)
+     * It does affect the parallelisatione efficiency though, especially when there are few particles per micrograph
+     */
+    void processMoviesPerMicrograph(int argc, char **argv);
 
 
 };

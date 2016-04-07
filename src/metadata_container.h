@@ -129,6 +129,7 @@ public:
     	for (std::map<EMDLabel, std::string *>::iterator it = strings.begin(); it != strings.end(); ++it)
     		delete it->second;
     	strings.clear();
+    	labels.clear();
     }
 
     /** Get a value for a given name.

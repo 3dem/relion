@@ -42,7 +42,10 @@ public:
      */
     void read(int argc, char **argv);
 
-	// Parallelized fit the beam-induced translations for all average micrographs
+    // Parallel version of making the list
+    void generateMicrographList();
+
+    // Parallelized fit the beam-induced translations for all average micrographs
 	void fitMovementsAllMicrographs();
 
 	// Parallelized calculation of B-factors for single-frame reconstructions
@@ -53,9 +56,6 @@ public:
 
 	// Calculate two half-reconstructions from shiny particles and calculate FSC-weighted average map, store that in refvol
 	void reconstructShinyParticlesAndFscWeight(int ipass);
-
-	// Parallelized optimisation of beamtilt for all micrographs
-	void optimiseBeamTilt();
 
 	// Parallelized run function
     void run();

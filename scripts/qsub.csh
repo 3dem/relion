@@ -9,4 +9,4 @@
 # Environment
 source ~/.cshrc
 
-mpiexec -n XXXmpinodesXXX  XXXcommandXXX
+mpiexec -mca orte_forward_job_control 1 -n XXXmpinodesXXX  XXXcommandXXX

@@ -37,7 +37,7 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
-#define DEFAULTMOTIONCORRLOCATION "/public/EM/motioncorr/motioncorr"
+#define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -59,9 +59,14 @@ static Fl_Menu_Item sampling_options[] = {
 static Fl_Menu_Item node_type_options[] = {
 		      {"2D micrograph movies (*.mrcs)"},
 	          {"2D micrographs/tomograms (*.mrc)"},
-		      {"2D/3D particle coordinates (*.box, *_pick.star)"},
+	          {"2D/3D particle coordinates (*.box, *_pick.star)"},
+	          {"Particles STAR file (.star)"},
+	          {"Movie-particles STAR file (.star)"},
+	          {"2D references (.star or .mrcs)"},
+	          {"Micrographs STAR file (.star)"},
 		      {"3D reference (.mrc)"},
 		      {"3D mask (.mrc)"},
+		      {"Unfiltered half-map (unfil.mrc)"},
 		      {0} // this should be the last entry
 };
 
@@ -110,9 +115,6 @@ public:
 	AnyEntry qsub_extra2;
 	AnyEntry other_args;
 
-    // Run buttons
-    Fl_Button *run_button, *print_CL_button, *cite_button;
-
 	// For the run tab
 	bool has_mpi;
 	bool has_thread;
@@ -126,7 +128,7 @@ public:
 public:
 	// Constructor with x, y, w, h and a title
 	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
-			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-70, const char* title = "");
+			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-65, const char* title = "");
 
     // Destructor
     ~RelionJobWindow() {};
@@ -148,7 +150,7 @@ public:
 	void saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands);
 
 	// Initialise pipeiline stuff for each job, return outputname
-	void initialisePipeline(std::string &outputname, std::string defaultname);
+	void initialisePipeline(std::string &outputname, std::string defaultname, int job_counter);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
@@ -212,7 +214,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -227,6 +229,7 @@ public:
 	SliderEntry last_frame_ali;
 	SliderEntry first_frame_sum;
 	SliderEntry last_frame_sum;
+	SliderEntry bfactor;
 	AnyEntry other_motioncorr_args;
 	BooleanEntry do_save_movies;
 
@@ -247,7 +250,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -260,10 +263,15 @@ public:
 	SliderEntry ctf_win;
 	SliderEntry cs, kv, q0, angpix, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
+	BooleanEntry is_ctffind4, do_movie_thon_rings, do_phaseshift;
+	SliderEntry avg_movie_frames;
+	AnyEntry phase_min, phase_max, phase_step;
+	AnyEntry movie_rootname;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
+
 	AnyEntry other_gctf_args;
 
-	Fl_Group *gctf_group;
+	Fl_Group *gctf_group, *ctffind4_group, *movie_group, *phaseshift_group;
 
 public:
 
@@ -281,7 +289,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -297,6 +305,7 @@ public:
 	SliderEntry lowpass;
 	SliderEntry highpass;
 	SliderEntry angpix;
+	SliderEntry particle_diameter;
 	SliderEntry psi_sampling_autopick;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
@@ -325,7 +334,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -368,7 +377,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -396,18 +405,13 @@ public:
 	SliderEntry black_dust;
 	BooleanEntry do_invert;
 
-	// movies
-	BooleanEntry do_movie_extract;
-	AnyEntry movie_rootname;
-	SliderEntry first_movie_frame;
-	SliderEntry last_movie_frame;
-
 	// Helix
 	BooleanEntry do_extract_helix;
 	BooleanEntry do_extract_helical_tubes;
 	SliderEntry helical_nr_asu;
 	SliderEntry helical_rise;
 	SliderEntry helical_tube_outer_diameter;
+	BooleanEntry helical_bimodal_angular_priors;
 
 	Fl_Group *reextract_group, *rescale_group, *set_angpix_group, *norm_group, *movie_extract_group, *helix_group, *helical_tubes_group;
 
@@ -428,7 +432,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -460,10 +464,9 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
-
 
 class Class2DJobWindow : public RelionJobWindow
 {
@@ -472,7 +475,6 @@ public:
 	// I/O
 	FileNameEntry fn_cont;
 	InputNodeEntry fn_img;
-	BooleanEntry do_parallel_discio;
 
 	// CTF
 	BooleanEntry do_ctf_correction;
@@ -494,8 +496,16 @@ public:
 	SliderEntry offset_step;
 
 	// Helix
+	BooleanEntry do_helix;
 	BooleanEntry do_bimodal_psi;
 	SliderEntry range_psi;
+	SliderEntry helical_tube_outer_diameter;
+
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
 
 	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
 
@@ -516,7 +526,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -531,7 +541,6 @@ public:
 	InputNodeEntry fn_ref;
 	InputNodeEntry fn_mask;
 	SliderEntry nr_classes;
-	BooleanEntry do_parallel_discio;
 
 	// Reference
 	BooleanEntry ref_correct_greyscale;
@@ -560,9 +569,7 @@ public:
 	SliderEntry sigma_angles;
 
 	// Helix
-	//textOnlyEntry helix_text;
 	BooleanEntry do_helix;
-	//BooleanEntry do_bimodal;
 	AnyEntry helical_tube_inner_diameter;
 	AnyEntry helical_tube_outer_diameter;
 	SliderEntry helical_nr_asu;
@@ -578,6 +585,12 @@ public:
 	SliderEntry helical_z_percentage;
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
+
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
 
 	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group;
 
@@ -598,7 +611,7 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -612,7 +625,6 @@ public:
 	InputNodeEntry fn_img;
 	InputNodeEntry fn_ref;
 	InputNodeEntry fn_mask;
-	BooleanEntry do_parallel_discio;
 
 	// Reference
 	BooleanEntry ref_correct_greyscale;
@@ -628,6 +640,7 @@ public:
 	// Optimisation
 	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
+	BooleanEntry do_solvent_fsc;
 
 	// Sampling
 	textOnlyEntry autosample_text;
@@ -636,18 +649,8 @@ public:
 	SliderEntry offset_step;
 	RadioEntry auto_local_sampling;
 
-	// Movies
-	BooleanEntry do_movies;
-	InputNodeEntry fn_movie_star;
-	SliderEntry movie_runavg_window;
-	SliderEntry movie_sigma_offset;
-	BooleanEntry do_alsorot_movies;
-	SliderEntry movie_sigma_angles;
-
 	// Helix
-	//textOnlyEntry helix_text;
 	BooleanEntry do_helix;
-	//BooleanEntry do_bimodal;
 	AnyEntry helical_tube_inner_diameter;
 	AnyEntry helical_tube_outer_diameter;
 	SliderEntry helical_nr_asu;
@@ -664,7 +667,13 @@ public:
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
 
-	Fl_Group *ctf_group, *movie_group, *alsorot_movie_group, *helix_group, *helix_symmetry_search_group;
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
+
+	Fl_Group *ctf_group, *helix_group, *helix_symmetry_search_group;
 
 public:
 
@@ -683,7 +692,62 @@ public:
 
 	// Generate the correct commands
 	void getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir);
+			std::string &final_command, bool do_makedir, int job_counter);
+
+};
+
+class MovieRefineJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	FileNameEntry fn_cont;
+	InputNodeEntry fn_movie_star;
+	AnyEntry movie_rootname;
+
+	// Extract movie-particles
+	SliderEntry first_movie_frame;
+	SliderEntry last_movie_frame;
+	SliderEntry avg_movie_frames;
+	SliderEntry max_mpi_nodes;
+	SliderEntry extract_size;
+	BooleanEntry do_set_angpix;
+	SliderEntry angpix;
+	BooleanEntry do_rescale;
+	SliderEntry rescale;
+	BooleanEntry do_norm;
+	SliderEntry bg_diameter;
+	SliderEntry white_dust;
+	SliderEntry black_dust;
+	BooleanEntry do_invert;
+
+	// Movies
+	SliderEntry join_nr_mics;
+	SliderEntry movie_runavg_window;
+	SliderEntry movie_sigma_offset;
+	BooleanEntry do_alsorot_movies;
+	SliderEntry movie_sigma_angles;
+
+	Fl_Group *norm_group, *rescale_group, *alsorot_movie_group;
+
+public:
+
+	// Constructor
+	MovieRefineJobWindow();
+
+	// Destructor
+	~MovieRefineJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -696,7 +760,6 @@ public:
 	InputNodeEntry fn_mask;
 
 	// Movements
-	SliderEntry movie_runavg_window;
 	BooleanEntry do_fit_movement;
 	SliderEntry sigma_nb;
 
@@ -735,7 +798,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -747,6 +810,10 @@ public:
 	InputNodeEntry fn_model;
 	InputNodeEntry fn_data;
 	InputNodeEntry fn_mic;
+	InputNodeEntry fn_coords;
+
+	// Allow clearing of input fields for a new job
+	FileName ori_fn_model, ori_fn_data, ori_fn_mic, ori_fn_coords;
 
 	BooleanEntry do_recenter;
 	BooleanEntry do_regroup;
@@ -770,7 +837,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -806,7 +873,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -827,6 +894,11 @@ public:
 	InputNodeEntry fn_mic3;
 	InputNodeEntry fn_mic4;
 
+
+	// Allow clearing of input fields for a new job
+	FileName ori_fn_part1, ori_fn_part2, ori_fn_part3, ori_fn_part4;
+	FileName ori_fn_mic1, ori_fn_mic2, ori_fn_mic3, ori_fn_mic4;
+
 	Fl_Group *part_group, *mic_group;
 
 public:
@@ -845,7 +917,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -855,15 +927,17 @@ public:
 
 	// I/O
 	InputNodeEntry fn_in;
+	BooleanEntry do_subtract;
 	InputNodeEntry fn_data;
 	InputNodeEntry fn_mask;
+	BooleanEntry do_fliplabel;
 
 	// CTF
 	BooleanEntry do_ctf_correction;
 	BooleanEntry ctf_phase_flipped;
 	BooleanEntry ctf_intact_first_peak;
 
-	Fl_Group *ctf_group;
+	Fl_Group *ctf_group, *subtract_group;
 
 public:
 
@@ -881,7 +955,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -925,7 +999,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -939,6 +1013,7 @@ public:
 
 	// Params
 	FileNameEntry fn_resmap;
+	SliderEntry angpix;
 	SliderEntry pval;
 	SliderEntry minres;
 	SliderEntry maxres;
@@ -961,32 +1036,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir);
-
-};
-
-
-class PublishJobWindow : public RelionJobWindow
-{
-public:
-
-	// I/O
-	textOnlyEntry cite_text;
-	textOnlyEntry cite_external_text;
-
-public:
-
-	// Constructor
-	PublishJobWindow();
-
-	// Destructor
-	~PublishJobWindow(){};
-
-	// what happens if you change continue old run radiobutton
-	void toggle_new_continue(bool is_continue);
-
-	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command);
+	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 

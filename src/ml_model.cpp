@@ -659,85 +659,40 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 	initialise();
 
 	// Now set the group names from the Experiment groups list
-	for (int i=0; i<nr_groups; i++)
+	for (int i=0; i< nr_groups; i++)
 		group_names[i] = _mydata.groups[i].name;
 
 }
-void MlModel::expandToMovieFrames(Experiment &moviedata, int running_avg_side)
+
+void MlModel::reassignGroupsForMovies(Experiment &mydata)
 {
-	MlModel moviemodel;
 
-	// Start from all equal model (nr_classes, references etc)
-	moviemodel = (*this);
-	// Reset the average norm correction to one
-	moviemodel.avg_norm_correction = 1.;
-
-	// Then delete the current groups: their numbers, names, scale_corrections and sigma2noise spectra
-	moviemodel.nr_groups = 0;
-	moviemodel.nr_particles_group.clear();
-	moviemodel.group_names.clear();
-	moviemodel.sigma2_noise.clear();
-	moviemodel.scale_correction.clear();
-	moviemodel.bfactor_correction.clear();
-
-	// Now go and look in the (already expanded) moviedata to find the unique groups
-	for (int i=0; i<moviedata.groups.size(); i++)
+	std::vector<long int> rename_ids(mydata.groups.size());
+	for (long int igr = 0; igr < mydata.groups.size(); igr++)
 	{
-
-		FileName curr_name, movie_name;
-		movie_name = moviedata.groups[i].name;
-
-		// Find the corresponding group_name in the current model
-		int my_curr_group_nr = -1;
-		for (int j=0; j<group_names.size(); j++)
+		FileName data_name = mydata.groups[igr].name;
+		long int rename_id = -1;
+		for (long int id = 0; id < group_names.size(); id++)
 		{
-			curr_name = group_names[j].withoutExtension();
-			// The moviename should be the current name plus something else...
-			if (movie_name.contains(curr_name))
+			if (data_name.contains(group_names[id].withoutExtension()))
 			{
-				my_curr_group_nr = j;
+				rename_id = id;
 				break;
 			}
 		}
-		if (my_curr_group_nr < 0)
-			REPORT_ERROR("MlModel::expandToMovieFrames ERROR: cannot find rlnMicrographName or rlnGroupName for movie frame: " + movie_name);
 
-		moviemodel.sigma2_noise.push_back(sigma2_noise[my_curr_group_nr]);
-		moviemodel.scale_correction.push_back(scale_correction[my_curr_group_nr]);
-		moviemodel.bfactor_correction.push_back(bfactor_correction[my_curr_group_nr]);
-		moviemodel.group_names.push_back(movie_name);
-		moviemodel.nr_groups++;
+		if (rename_id < 0)
+			REPORT_ERROR("MlModel::adjustGroupsForMovies ERROR: cannot find " + data_name + " among the groups of the model!");
+
+		rename_ids[igr] = rename_id;
 	}
 
-	// Also find the number of particles in this group
-	moviemodel.nr_particles_group.resize(moviemodel.nr_groups);
-	std::vector<int> nr_frames_in_group;
-	nr_frames_in_group.resize(moviemodel.nr_groups, -1);
-
-	for (long int ipart = 0; ipart < moviedata.particles.size(); ipart++)
+	// Now change the group_ids of all particles!
+	for (long int ipart = 0; ipart < mydata.particles.size(); ipart++)
 	{
-		long int group_id = (moviedata.particles[ipart]).group_id;
-		long int part_id = (moviedata.particles[ipart]).id;
-		// count the number of particles in this group
-		moviemodel.nr_particles_group[group_id]++;
-		// Get and check the number of frames is constant within one group
-		int nframes = -1;
-		if (!moviedata.MDimg.getValue(EMDL_PARTICLE_NR_FRAMES, nframes, part_id))
-			REPORT_ERROR("MlModel::expandToMovieFrames ERROR: cannot find rlnNrOfFrames in moviedata.");
-		if (nr_frames_in_group[group_id] < 0)
-			nr_frames_in_group[group_id] = nframes;
-		else if (nr_frames_in_group[group_id] != nframes)
-			REPORT_ERROR((std::string)"MlModel::expandToMovieFrames ERROR: unequal number of frames in group" + moviemodel.group_names[group_id]);
+		long int old_id = mydata.particles[ipart].group_id;
+		mydata.particles[ipart].group_id = rename_ids[old_id];
 	}
-
-	// Correct the input sigma2noise spectra by a factor of nframes
-	for (int i=0; i < moviemodel.nr_groups; i++)
-	{
-		moviemodel.sigma2_noise[i] *= (RFLOAT)nr_frames_in_group[i]/((RFLOAT)(2 * running_avg_side + 1));
-	}
-
-	// Now replace the current model with the expanded moviemodel
-	(*this) = moviemodel;
 
 }
 

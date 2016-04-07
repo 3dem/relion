@@ -42,7 +42,8 @@
 #include <FL/Fl_Wizard.H>
 #include <FL/Fl_Text_Display.H>
 #include <FL/Fl_Text_Editor.H>
-#include <FL/Fl_JPEG_Image.H>
+#include <FL/Fl_Image.H>
+#include <FL/Fl_XPM_Image.H>
 #include "src/macros.h"
 #include "src/strings.h"
 #include <string>
@@ -56,6 +57,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+
+ // forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
+extern std::string current_browse_directory;
 
 // Gui layout
 //#define XCOL1 10
@@ -90,8 +94,8 @@
 //version-1.4 #define GUI_BUTTON_COLOR (fl_rgb_color(60, 180, 155))
 //version-1.4 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(45, 135, 120))
 //devel-version
-#define GUI_BUTTON_COLOR (fl_rgb_color(0, 235, 235))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(0, 180, 180))
+#define GUI_BUTTON_COLOR (fl_rgb_color(0, 200, 255))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(0, 160, 200))
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //version-1.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(255,155,0))
 //version-1.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(255,50,50))
@@ -102,8 +106,8 @@
 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))
 #
-#define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
-#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(200,200,200))
+#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
+#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
 
 // Replace a single instance of text in a buffer. Return true if replaced, false otherwise

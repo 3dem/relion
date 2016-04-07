@@ -58,6 +58,7 @@ protected:
     RFLOAT K2;
     RFLOAT K3;
     RFLOAT K4;
+    RFLOAT K5;
 
     // Azimuthal angle in radians
     RFLOAT rad_azimuth;
@@ -118,6 +119,9 @@ public:
     // Overall scale-factor of CTF
     RFLOAT scale;
 
+    // Phase-shift from a phase-plate (in rad)
+    RFLOAT phase_shift;
+
     /** Empty constructor. */
     CTF() { clear(); }
 
@@ -130,7 +134,7 @@ public:
 
     /** Just set all values explicitly */
     void setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
-    		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1.);
+    		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.);
 
     /** Read from a single MetaDataTable */
     void read(MetaDataTable &MD);
@@ -157,7 +161,7 @@ public:
         RFLOAT u4 = u2 * u2;
         // if (u2>=ua2) return 0;
         RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT argument = K1 * deltaf * u2 + K2 * u4;
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5;
         RFLOAT retval;
         if (do_intact_until_first_peak && ABS(argument) < PI/2.)
         {
