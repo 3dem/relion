@@ -789,6 +789,9 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 	PipeLine mini_pipeline;
 	mini_pipeline.setName(oname+"job");
 
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read();
+
 	// Add Process to the processList of the pipeline
 	Process process(oname, itype, as_status);
 	long int myProcess = pipeline.addNewProcess(process, do_overwrite);
@@ -1109,6 +1112,10 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 
 			if (repeat + 1 != nr_repeat)
 			{
+
+				// Read in existing pipeline, in case some other window had changed it
+				pipeline.read();
+
 				// Set the current job back into the job list of the repeating cycle
 				// Do we want to run this as NEW or CONTINUED NEXT TIME?
 				int mytype = pipeline.processList[current_job].type;
@@ -1117,7 +1124,8 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 					pipeline.processList[current_job].status = PROC_SCHEDULED_CONT;
 				else
 					pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
-				// Write the pipeline to an updated STAR file, and read back in again to update the lists
+
+				// Write the pipeline to an updated STAR file
 				pipeline.write();
 			}
 		}
@@ -1139,6 +1147,9 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
 		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
 
+		// Read in existing pipeline, in case some other window had changed it
+		pipeline.read();
+
 		// After breaking out of repeat, set status of the jobs to finished
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		{
@@ -1146,6 +1157,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		}
 		// Write the pipeline to an updated STAR file
 		pipeline.write();
+
 		// Remove the temporary file
 		std::remove(fn_check.c_str());
 		exit(0);
@@ -1730,6 +1742,9 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	if (proceed)
 	{
 
+		// Read in existing pipeline, in case some other window had changed it
+		pipeline.read();
+
 		// Write new pipeline without the deleted processes and nodes to disc and read in again
 		pipeline.write(fn_del, deleteNodes, deleteProcesses);
 
@@ -2158,6 +2173,10 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		}
 		else
 		{
+
+			// Read in existing pipeline, in case some other window had changed it
+			pipeline.read();
+
 			//remove spaces from any potential alias
 			for (int i = 0; i < alias.length(); i++)
 			{
@@ -2244,6 +2263,9 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		fl_message("You can only mark existing jobs as finished!");
 		return;
 	}
+
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read();
 
 	pipeline.processList[current_job].status = PROC_FINISHED;
 
@@ -2338,6 +2360,9 @@ void RelionMainWindow::cb_make_flowchart_i()
 	int res = std::system(command.c_str());
 	command = myviewer + " " + fn_dir + "flowchart.pdf &";
 	res = std::system(command.c_str());
+
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read();
 
 	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
 	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
@@ -2457,6 +2482,9 @@ void RelionMainWindow::cb_import_i(bool is_undelete)
     fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
+
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read();
 
     pipeline.importPipeline(fn_pipe.beforeLastOf("_pipeline.star"));
 

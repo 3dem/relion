@@ -5062,6 +5062,17 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
+
+		// For re-setting of new jobs
+		ori_fn_part1 = fn_part1.getValue();
+		ori_fn_part2 = fn_part2.getValue();
+		ori_fn_part3 = fn_part3.getValue();
+		ori_fn_part4 = fn_part4.getValue();
+		ori_fn_mic1 = fn_mic1.getValue();
+		ori_fn_mic2 = fn_mic2.getValue();
+		ori_fn_mic3 = fn_mic3.getValue();
+		ori_fn_mic4 = fn_mic4.getValue();
+
 	}
 }
 
@@ -5069,6 +5080,30 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
+
+	// For new jobs, always reset the input fields to empty
+	if (!_is_continue)
+	{
+		fn_part1.setValue("");
+		fn_part2.setValue("");
+		fn_part3.setValue("");
+		fn_part4.setValue("");
+		fn_mic1.setValue("");
+		fn_mic2.setValue("");
+		fn_mic3.setValue("");
+		fn_mic4.setValue("");
+	}
+	else
+	{
+		fn_part1.setValue(ori_fn_part1.c_str());
+		fn_part2.setValue(ori_fn_part2.c_str());
+		fn_part3.setValue(ori_fn_part3.c_str());
+		fn_part4.setValue(ori_fn_part4.c_str());
+		fn_mic1.setValue(ori_fn_mic1.c_str());
+		fn_mic2.setValue(ori_fn_mic2.c_str());
+		fn_mic3.setValue(ori_fn_mic3.c_str());
+		fn_mic4.setValue(ori_fn_mic4.c_str());
+	}
 
 	do_part.deactivate(is_continue);
 	fn_part1.deactivate(is_continue);
@@ -5116,6 +5151,8 @@ void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		}
 		command += " \" ";
 
+		// Check for duplicates
+		command += " --check_duplicates rlnImageName ";
 		command += " --o " + outputname + "join_particles.star";
 		Node node5(outputname + "join_particles.star", fn_part1.type);
 		pipelineOutputNodes.push_back(node5);
@@ -5143,6 +5180,8 @@ void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		}
 		command += " \" ";
 
+		// Check for duplicates
+		command += " --check_duplicates rlnMicrographName ";
 		command += " --o " + outputname + "join_mics.star";
 		Node node5(outputname + "join_mics.star", fn_mic1.type);
 		pipelineOutputNodes.push_back(node5);
@@ -5264,6 +5303,7 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
+
 	}
 }
 

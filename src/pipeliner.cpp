@@ -165,6 +165,9 @@ void PipeLine::deleteProcess(int ipos, bool recursive)
 	std::vector<long int> to_delete_processes;
 	to_delete_processes.push_back(ipos);
 
+	// Read in existing pipeline, in case some other window had changed it
+	read(true);
+
 	bool is_done = false;
 	size_t istart = 0;
 	while (!is_done)
@@ -354,6 +357,7 @@ void PipeLine::remakeNodeDirectory()
 
 void PipeLine::checkProcessCompletion()
 {
+
 	bool something_changed = false;
 	for (long int i=0; i < processList.size(); i++)
 	{
@@ -820,8 +824,7 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
     }
     case NODE_MOVIE_DATA:
     {
-    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
-    	mylabel = integerToString(nr_obj) + " particle movie-frames";
+    	mylabel = "particle movie-frames";
         break;
     }
     case NODE_2DREFS:
@@ -998,6 +1001,10 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 	        {
 	        	// For joinstar: there will be no parent process that returns a postive value!
 	        	// Thereby, joinstar will always end in the 2-4 input processes, each of for which a new flowchart will be made on a new tikZpicture
+	        	if (mynodetype == NODE_MOVIES)
+	        		right_label = left_label = "mics";
+	        	else if (mynodetype == NODE_PART_DATA)
+	        		right_label = left_label = "parts";
 	        	is_right = (inode == 0);
 	        	is_left = (inode == 1);
 	        	is_upper_right = (inode == 2);
@@ -1072,7 +1079,7 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 				else if (is_upper_right || is_upper_left)
 				{
 					std::string abovename = (is_upper_right) ? rightname : leftname;
-					fh << "\\node [block2, above of="<< abovename <<"] (" << parent_nodename << ") {" << newprocname << "};" << std::endl;
+					fh << "\\node [block2b, above of="<< abovename <<"] (" << parent_nodename << ") {" << newprocname << "};" << std::endl;
 				}
 
 				// Make an arrow from the box to the process it came from
@@ -1220,6 +1227,7 @@ void PipeLineFlowChart::openTikZPicture(std::ofstream &fh)
     {
     	fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
         fh << "\\tikzstyle{block2} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 4cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
+        fh << "\\tikzstyle{block2b} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
     }
 }
 
@@ -1245,6 +1253,7 @@ void PipeLineFlowChart::openFlowChartFile(FileName &fn_out, std::ofstream &fh)
     // These are the styles for the long names!
     fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
     fh << "\\tikzstyle{block2} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 5cm, text centered, rounded corners]" << std::endl;
+    fh << "\\tikzstyle{block2b} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
 
 
     fh << "\\tikzstyle{line} = [draw, very thick, color=black!50, -latex']" << std::endl << std::endl;

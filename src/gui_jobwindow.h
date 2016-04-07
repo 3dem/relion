@@ -894,6 +894,11 @@ public:
 	InputNodeEntry fn_mic3;
 	InputNodeEntry fn_mic4;
 
+
+	// Allow clearing of input fields for a new job
+	FileName ori_fn_part1, ori_fn_part2, ori_fn_part3, ori_fn_part4;
+	FileName ori_fn_mic1, ori_fn_mic2, ori_fn_mic3, ori_fn_mic4;
+
 	Fl_Group *part_group, *mic_group;
 
 public:
