@@ -25,7 +25,7 @@
 class star_combine_parameters
 {
 	public:
-	FileName fn_in, fn_out;
+	FileName fn_in, fn_out, fn_check;
 	// I/O Parser
 	IOParser parser;
 
@@ -43,6 +43,7 @@ class star_combine_parameters
 		int general_section = parser.addSection("General options");
 	    fn_in = parser.getOption("--i", "Input STAR files (multiple individual filenames, all within double-quotes)");
 	    fn_out = parser.getOption("--o", "Output combined STAR file ");
+	    fn_check = parser.getOption("--check_duplicates", "MetaDataLabel (for a string!) to check for duplicates, e.g. rlnImageName", "");
 
       	// Check for errors in the command-line option
     	if (parser.checkForErrors())
@@ -72,6 +73,37 @@ class star_combine_parameters
 		}
 
 		MDout = combineMetaDataTables(MDsin);
+
+		if (fn_check != "")
+		{
+			EMDLabel label = EMDL::str2Label(fn_check);
+			if (!MDout.containsLabel(label))
+				REPORT_ERROR("ERROR: the output file does not contain the label to check for duplicates. Is it present in all input files?");
+
+			/// Don't want to mess up original order, so make a MDsort with only that label...
+			FileName fn_this, fn_prev = "";
+			MetaDataTable MDsort;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+			{
+				MDout.getValue(label, fn_this);
+				MDsort.addObject();
+				MDsort.setValue(label, fn_this);
+			}
+			// sort on the label
+			MDsort.newSort(label);
+			long int nr_duplicates = 0;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsort)
+			{
+				MDsort.getValue(label, fn_this);
+				if (fn_this == fn_prev)
+				{
+					nr_duplicates++;
+					std::cerr << " WARNING: duplicate entry: " << fn_this << std::endl;
+				}
+				fn_prev = fn_this;
+			}
+			std::cerr << " WARNING: Total number of duplicate "<< fn_check << " entries: " << nr_duplicates << std::endl;
+		}
 
 		MDout.write(fn_out);
 		std::cout << " Done! Written: " << fn_out << std::endl;
