@@ -20,6 +20,8 @@
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/gpu_utils/cuda_ml_optimiser.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 //#define DEBUG
 //#define DEBUG_MPIEXP2
@@ -170,6 +172,9 @@ void MlOptimiserMpi::initialise()
 	}
 
 
+	/************************************************************************/
+	//Setup GPU related resources
+
 	if (do_gpu)
 	{
 
@@ -190,7 +195,7 @@ void MlOptimiserMpi::initialise()
 			{
 				if ((allThreadIDs.size()<node->rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 				{
-					std::cout << "gpu-ids not specified this rank, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
 				}
 				else
 				{
@@ -260,7 +265,109 @@ void MlOptimiserMpi::initialise()
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 		}
+
+		MPI_Status status;
+
+		if (! node->isMaster())
+		{
+			int devCount = cudaMlDeviceBundles.size();
+			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+
+			MlDeviceBundle * bundle(NULL);
+
+			for (int i = 0; i < devCount; i++)
+			{
+				bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
+
+				char buffer[BUFSIZ];
+				int len;
+				MPI_Get_processor_name(buffer, &len);
+				std::string didS(buffer, len);
+				std::stringstream didSs;
+
+				didSs << "Device " << bundle->device_id << " on " << didS;
+				didS = didSs.str();
+
+//				std::cout << "SENDING: " << didS << std::endl;
+
+				strcpy(buffer, didS.c_str());
+				node->relion_MPI_Send(buffer, didS.length()+1, MPI_CHAR, 0, MPITAG_IDENTIFIER, MPI_COMM_WORLD);
+			}
+
+			for (int i = 0; i < devCount; i++)
+			{
+				bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
+	        	node->relion_MPI_Recv(&bundle->rank_shared_count, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
+//	        	std::cout << "Received: " << bundle->rank_shared_count << std::endl;
+			}
+		}
+		else
+		{
+			int devCount;
+			std::vector<std::string> deviceIdentifiers;
+			std::vector<std::string> uniqueDeviceIdentifiers;
+			std::vector<int> uniqueDeviceIdentifierCounts;
+			std::vector<int> deviceCounts(node->size-1,0);
+
+	        for (int slave = 1; slave < node->size; slave++)
+	        {
+	        	node->relion_MPI_Recv(&devCount, 1, MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
+
+	        	deviceCounts[slave-1] = devCount;
+
+				for (int i = 0; i < devCount; i++)
+				{
+					char buffer[BUFSIZ];
+		        	node->relion_MPI_Recv(&buffer, BUFSIZ, MPI_CHAR, slave, MPITAG_IDENTIFIER, MPI_COMM_WORLD, status);
+					std::string deviceIdentifier(buffer);
+
+					deviceIdentifiers.push_back(deviceIdentifier);
+
+					int idi(-1);
+
+					for (int j = 0; j < uniqueDeviceIdentifiers.size(); j++)
+						if (uniqueDeviceIdentifiers[j] == deviceIdentifier)
+							idi = j;
+
+					if (idi >= 0)
+						uniqueDeviceIdentifierCounts[idi] ++;
+					else
+					{
+						uniqueDeviceIdentifiers.push_back(deviceIdentifier);
+						uniqueDeviceIdentifierCounts.push_back(1);
+					}
+
+//					std::cout << "RECEIVING: " << deviceIdentifier << std::endl;
+				}
+	        }
+
+			for (int i = 0; i < uniqueDeviceIdentifiers.size(); i++)
+				if (uniqueDeviceIdentifierCounts[i] > 1)
+					std::cout << uniqueDeviceIdentifiers[i] << " is split between " << uniqueDeviceIdentifierCounts[i] << " slaves" << std::endl;
+
+	        int global_did = 0;
+
+	        for (int slave = 1; slave < node->size; slave++)
+	        {
+	        	devCount = deviceCounts[slave - 1];
+
+				for (int i = 0; i < devCount; i++)
+				{
+					int idi(-1);
+
+					for (int j = 0; j < uniqueDeviceIdentifiers.size(); j++)
+						if (uniqueDeviceIdentifiers[j] == deviceIdentifiers[global_did])
+							idi = j;
+
+					node->relion_MPI_Send(&uniqueDeviceIdentifierCounts[idi], 1, MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD);
+
+					global_did ++;
+				}
+	        }
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
+	/************************************************************************/
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
@@ -568,6 +675,61 @@ void MlOptimiserMpi::expectation()
 #define JOB_LEN_FN_RECIMG  (first_last_nr_images(5))
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
+
+	/************************************************************************/
+	//GPU memory setup
+
+	std::vector<size_t> allocationSizes;
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if (do_gpu && ! node->isMaster())
+	{
+		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
+			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+			((MlDeviceBundle *) cudaMlDeviceBundles[i])->setupFixedSizedObjects();
+
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		{
+			size_t allocationSize;
+
+			if (! node->isMaster())
+			{
+				MlDeviceBundle * bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
+				HANDLE_ERROR(cudaSetDevice(bundle->device_id));
+
+				size_t free, total;
+				HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+				if (free < requested_free_gpu_memory)
+				{
+					printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", requested_free_gpu_memory);
+					allocationSize = (double)free *0.7;
+				}
+				else
+					allocationSize = free - requested_free_gpu_memory;
+
+				allocationSizes.push_back(allocationSize);
+			}
+		}
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if (do_gpu && ! node->isMaster())
+	{
+		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		{
+			MlDeviceBundle * bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
+			size_t allocationSize = (size_t)((float)allocationSizes[i]/(float)bundle->rank_shared_count) - GPU_MEMORY_OVERHEAD_MB*1000*1000;
+			bundle->setupTunableSizedObjects(allocationSize);
+		}
+	}
+
+	/************************************************************************/
+
+
     if (node->isMaster())
     {
         try
@@ -725,14 +887,6 @@ void MlOptimiserMpi::expectation()
     	try
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
-
-    		if (do_gpu)
-    		{
-    			for (int i = 0; i < cudaMlOptimisers.size(); i ++)
-    		    	((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
-    			for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-    				((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
-    		}
     		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!

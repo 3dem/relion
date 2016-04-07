@@ -416,9 +416,12 @@ public:
 
 	int device_id;
 
+	int rank_shared_count;
+
 	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id);
 
-	void resetData();
+	void setupFixedSizedObjects();
+	void setupTunableSizedObjects(size_t allocationSize);
 
 	void resetDevice()
 	{
