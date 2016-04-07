@@ -42,10 +42,14 @@ void MlOptimiserMpi::read(int argc, char **argv)
 
     // First read in non-parallelisation-dependent variables
     MlOptimiser::read(argc, argv, node->rank);
+
+    int mpi_section = parser.addSection("MPI options");
     fn_scratch = parser.getOption("--scratchdir", "Directory (with absolute path, and visible to all nodes) for temporary files", "");
+    only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
 
     // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? 1 : 0;
+    if (verb != 0)
+    	verb = (node->isMaster()) ? 1 : 0;
 
 //#define DEBUG_BODIES
 #ifdef DEBUG_BODIES
@@ -74,8 +78,9 @@ void MlOptimiserMpi::initialise()
     std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
 #endif
 
-    // Print information about MPI nodes:
-    printMpiNodesMachineNames(*node, nr_threads);
+	// Print information about MPI nodes:
+    if (!do_movies_in_batches)
+    	printMpiNodesMachineNames(*node, nr_threads);
 
     MlOptimiser::initialiseGeneral(node->rank);
 
@@ -128,12 +133,13 @@ void MlOptimiserMpi::initialise()
 
 	// Only master writes out initial mymodel (do not gather metadata yet)
 	int nr_subsets = (do_split_random_halves) ? 2 : 1;
-	if (node->isMaster())
+	if (node->isMaster() && !do_movies_in_batches)
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
 	else if (node->rank <= nr_subsets)
 	{
 		//Only the first_slave of each subset writes model to disc
-		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
+		if (!do_movies_in_batches)
+			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
 
 		bool do_warn = false;
 		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
@@ -398,16 +404,12 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		}
 	}
 
-    // First split the data into two random halves and then randomise the particle order
-	if (do_split_random_halves)
-		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
-
-	// Randomise the order of the particles
-    mydata.randomiseOriginalParticlesOrder(random_seed, do_split_random_halves);
-
     // Also randomize random-number-generator for perturbations on the angles
     init_random_generator(random_seed);
 
+    // Split the data into two random halves
+	if (do_split_random_halves)
+		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
 
 	if (node->isMaster())
 	{
@@ -901,7 +903,6 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 				timer.tic(TIMING_MPISLAVEWAIT1);
 #endif
-
 				//Receive a new bunch of particles
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, 0, MPITAG_JOB_REPLY, MPI_COMM_WORLD, status);
 #ifdef TIMING
@@ -2073,7 +2074,12 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 	if ( (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 	{
 		Image<RFLOAT> It;
+//#define DEBUG_RECONSTRUCTION
+#ifdef DEBUG_RECONSTRUCTION
+		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+#else
 		FileName fn_root = fn_out + "_half" + integerToString(node->rank);;
+#endif
 
 		// Write out temporary arrays for all classes
 		for (int iclass = 0; iclass < mymodel.nr_bodies * mymodel.nr_classes; iclass++)
@@ -2105,7 +2111,12 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 {
 	MultidimArray<RFLOAT> dummy;
 	Image<RFLOAT> Iunreg, Itmp;
+
+#ifdef DEBUG_RECONSTRUCTION
+		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+#else
 	FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
+#endif
 	fn_root.compose(fn_root+"_class", iclass+1, "", 3);
 
 	// Read temporary arrays back in
@@ -2169,9 +2180,11 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 
 
 	// remove temporary arrays from the disc
+#ifndef DEBUG_RECONSTRUCTION
 	remove((fn_root+"_data_real.mrc").c_str());
 	remove((fn_root+"_data_imag.mrc").c_str());
 	remove((fn_root+"_weight.mrc").c_str());
+#endif
 
 }
 
@@ -2320,7 +2333,8 @@ void MlOptimiserMpi::iterate()
 				// The master only writes the data file (he's the only one who has and manages these data!)
 				iter = -1; // write output file without iteration number
 				MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-				std::cout << " Auto-refine: Skipping maximization step, so stopping now... " << std::endl;
+				if (verb > 0)
+					std::cout << " Auto-refine: Skipping maximization step, so stopping now... " << std::endl;
 			}
 			break;
 		}
@@ -2358,7 +2372,9 @@ void MlOptimiserMpi::iterate()
 		symmetriseReconstructions();
 
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
+#ifndef DEBUG_RECONSTRUCTION
 		if (do_auto_refine && has_converged)
+#endif
 			writeTemporaryDataAndWeightArrays();
 
 		// Inside iterative refinement: do FSC-calculation BEFORE the solvent flattening, otherwise over-estimation of resolution
@@ -2414,9 +2430,13 @@ void MlOptimiserMpi::iterate()
 		maximization();
 
 		// Make sure all nodes have the same resolution, set the data_vs_prior array from half1 also for half2
+		// Because there is an if-statement on ave_Pmax to set the image size, also make sure this one is the same for both halves
 		if (do_split_random_halves)
+		{
+			node->relion_MPI_Bcast(&mymodel.ave_Pmax, 1, MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+		}
 
 #ifdef TIMING
 		timer.toc(TIMING_MAX);
@@ -2426,9 +2446,25 @@ void MlOptimiserMpi::iterate()
 
 		if (node->isMaster())
 		{
-			if (do_helical_refine)
+			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
 			{
-				updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+				if (helical_sigma_segment_distance < 0.)
+				{
+					updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+				}
+				else
+				{
+					int nr_same_polarity = 0, nr_opposite_polarity = 0;
+					bool do_class3d_with_one_class = ( (mymodel.ref_dim == 3) && (mymodel.nr_classes == 1) );
+					updatePriorsForHelicalReconstruction(
+							mydata.MDimg,
+							helical_sigma_segment_distance / mymodel.pixel_size,
+							nr_opposite_polarity,
+							((do_auto_refine) || (do_class3d_with_one_class)));
+					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+					if (verb > 0)
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << std::endl;
+				}
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
@@ -2490,15 +2526,93 @@ void MlOptimiserMpi::iterate()
 		if (node->rank == 1)
 			timer.printTimes(false);
 #endif
-                for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-                    ((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
+		for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
+			((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
 
-	for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-		((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
     }
+
+	// Hopefully this barrier will prevent some bus errors
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
 	MPI_Barrier(MPI_COMM_WORLD);
+
+}
+
+void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
+{
+
+	if (!(do_movies_in_batches && fn_data_movie != "" && do_skip_maximization))
+		REPORT_ERROR("MlOptimiserMpi::processMoviesPerMicrograp BUG: you should not be here...");
+
+	// Print out the MPI nodes, as this is disabled inside the loop
+	printMpiNodesMachineNames(*node, nr_threads);
+
+	// Read in a list with all micrographs and basically run the entire relion_refine procedure separately for each micropgraph
+	// Only save some time reading in stuff...
+	MetaDataTable MDbatches;
+	MDbatches.read(fn_data_movie);
+	int nr_batches = MDbatches.numberOfObjects();
+
+	// Get original outname
+	FileName fn_out_ori = fn_out;//.beforeLastOf("/");
+	int imic = 0;
+	FileName fn_pre, fn_jobnr, fn_post, fn_olddir="";
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbatches)
+	{
+		FileName fn_star;
+		MDbatches.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
+		fn_data_movie = fn_star;
+		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
+		fn_out = fn_out_ori + fn_post.without(".star");
+
+		// Set new output star file back into MDbatches, to be written out at the end
+		FileName fn_data = fn_out + "_data.star";
+		MDbatches.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_data);
+
+		if (!(only_do_unfinished_movies && exists(fn_data)))
+		{
+
+			if (node->isMaster())
+				std::cout <<std::endl << " + Now processing movie batch " << imic+1 << " out of " << nr_batches <<std::endl <<std::endl;
+
+			// Make output directory structure like the input Micrographs
+			FileName fn_dir = fn_out.beforeLastOf("/");
+			if (fn_dir != fn_olddir)
+			{
+				std::string command = "mkdir -p " + fn_dir;
+				std::system(command.c_str());
+				fn_olddir = fn_dir;
+			}
+
+			// be quiet
+			verb = node->isMaster();
+
+			// Initialise a lot of stuff
+			// (In theory, I could save time omitting part of this. In practice it's complicated...)
+			initialise();
+
+			// Run the final iteration for this batch
+			iterate();
+
+			// Read the start back in
+			// (I tried doing only partial re-starts, but these attempts all lead to (small) differences from processing without batches...)
+			MlOptimiser::read(argc, argv, node->rank);
+
+		}
+
+		imic++;
+	}
+
+	if (node->isMaster())
+	{
+		// At the end, the master also writes out a STAR file with the output STAR files of all micrographs
+		MDbatches.write(fn_out_ori + "_data.star");
+		std::cout << " Done processing all movie batches!" << std::endl;
+	}
+
+
+
 
 }
