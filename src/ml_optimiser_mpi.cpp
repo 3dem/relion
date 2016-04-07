@@ -733,6 +733,7 @@ void MlOptimiserMpi::expectation()
     			for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
     				((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetData();
     		}
+			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
     		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
