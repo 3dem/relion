@@ -702,7 +702,6 @@ public:
 
 	// I/O
 	FileNameEntry fn_cont;
-	InputNodeEntry fn_movie_star;
 	AnyEntry movie_rootname;
 
 	// Extract movie-particles

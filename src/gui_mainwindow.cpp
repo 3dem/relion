@@ -2095,7 +2095,7 @@ void RelionMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 
 		} // end if postprocess
 
-            
+
 		// Now actually move all the files
 		FileName fn_old_dir = "";
 		for (long int idel = 0; idel < fns_del.size(); idel++)
@@ -2136,8 +2136,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 	FileName fn_old_alias="";
 	if (fn_alias != "None")
 	{
-		fn_old_alias = fn_alias;
-		std::remove((fn_alias.beforeLastOf("/")).c_str());
+		fn_old_alias = fn_alias.beforeLastOf("/");
 		default_ask = fn_alias.without(fn_pre);
 		if (default_ask[default_ask.length()-1] == '/')
 			default_ask = default_ask.beforeLastOf("/");
@@ -2222,8 +2221,7 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		// If this was already an alias: remove the old symbolic link
 		if (fn_old_alias != "")
 		{
-			std::string link= fn_pre + fn_old_alias;
-			int res2 = unlink(link.c_str());
+			int res2 = unlink(fn_old_alias.c_str());
 		}
 
 		// Set the alias in the pipeline

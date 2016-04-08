@@ -1221,7 +1221,7 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 void PipeLineFlowChart::openTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
 	if (is_main_flow)
-		fh << "\\resizebox{!}{0.95\\textheight}{%" << std::endl;
+		fh << "\\resizebox{!}{0.95\\textheight}{" << std::endl;
 	fh << "\\begin{tikzpicture}[scale=1, auto]" << std::endl;
     // Override the long-name styles with the shorter ones
     if (do_short_names)

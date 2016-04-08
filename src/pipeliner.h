@@ -20,9 +20,9 @@
 
 #ifndef PIPELINER_H_
 #define PIPELINER_H_
-#include "src/metadata_table.h"
 #include <iostream>
 #include <sstream>
+#include "src/metadata_table.h"
 
 
 //forward declaration
