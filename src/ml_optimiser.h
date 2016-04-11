@@ -395,8 +395,8 @@ public:
 	// Flag whether to do local refinement of helical parameters
 	bool do_helical_symmetry_local_refinement;
 
-	// Sigma of helical segment distance (In Angstroms)
-	RFLOAT helical_sigma_segment_distance;
+	// Sigma of distance along the helical tracks
+	RFLOAT helical_sigma_distance;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -578,7 +578,7 @@ public:
 		helical_tube_inner_diameter(0),
 		helical_tube_outer_diameter(0),
 		do_helical_symmetry_local_refinement(0),
-		helical_sigma_segment_distance(0)
+		helical_sigma_distance(0)
 	{};
 
 	/** ========================== I/O operations  =========================== */

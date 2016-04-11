@@ -454,11 +454,12 @@ void excludeLowCTFCCMicrographs(
 		RFLOAT cc_min,
 		RFLOAT EPA_lowest_res);
 
-void flipPsiTiltForHelicalSegment(
-		RFLOAT old_psi,
-		RFLOAT old_tilt,
-		RFLOAT& new_psi,
-		RFLOAT& new_tilt);
+void cutOutPartOfHelix(
+		const MultidimArray<RFLOAT>& vin,
+		MultidimArray<RFLOAT>& vout,
+		long int new_boxdim,
+		RFLOAT ang_deg,
+		RFLOAT z_percentage);
 
 // TESTING...
 class HelicalSegmentPriorInfoEntry
@@ -466,85 +467,59 @@ class HelicalSegmentPriorInfoEntry
 public:
 	std::string helical_tube_name;
 	long int MDobjectID;
-	RFLOAT psi_deg, psi_prior_deg;
-	RFLOAT tilt_deg, tilt_prior_deg;
-	//RFLOAT dx_pix, dx_prior_pix;
-	//RFLOAT dy_pix, dy_prior_pix;
-	//RFLOAT dz_pix, dz_prior_pix;
+	RFLOAT psi_deg, tilt_deg;
+	RFLOAT dx_pix, dy_pix, dz_pix;
 	RFLOAT track_pos_pix;
 	bool has_wrong_polarity;
+	int subset, classID;
+
+	RFLOAT psi_prior_deg, tilt_prior_deg;
+	RFLOAT dx_prior_pix, dy_prior_pix, dz_prior_pix;
 	RFLOAT psi_flip_ratio;
-	int subset;
 
-	bool operator<(const HelicalSegmentPriorInfoEntry &rhs) const
-	{
-		if ( (helical_tube_name.length() == 0) || (rhs.helical_tube_name.length() == 0) )
-		{
-			std::cerr << "Compare # " << MDobjectID << " with # " << rhs.MDobjectID << std::endl;
-			REPORT_ERROR("helix.h::HelicalSegmentPriorInfoEntry::operator<(): Name string of helical segments are empty!");
-		}
+	void clear();
 
-		if (helical_tube_name != rhs.helical_tube_name)
-			return (helical_tube_name < rhs.helical_tube_name);
+	HelicalSegmentPriorInfoEntry() { clear(); };
 
-		if (fabs(track_pos_pix - rhs.track_pos_pix) < (1e-5))
-		{
-			std::cerr << "Compare # " << MDobjectID << " with # " << rhs.MDobjectID << std::endl;
-			REPORT_ERROR("helix.h::HelicalSegmentPriorInfoEntry::operator<(): A pair of same helical segments is found!");
-		}
+	~HelicalSegmentPriorInfoEntry() { clear(); };
 
-		return (track_pos_pix < rhs.track_pos_pix);
-	};
+	void checkPolarity();
 
-	void clear()
-	{
-		helical_tube_name.clear();
-		MDobjectID = -1;
-		psi_deg = psi_prior_deg = tilt_deg = tilt_prior_deg = 0.;
-		//dx_pix = dx_prior_pix = dy_pix = dy_prior_pix = dz_pix = dz_prior_pix = 0.;
-		track_pos_pix = 0.;
-		has_wrong_polarity = false;
-		psi_flip_ratio = 0.;
-		subset = 0;
-	};
-
-	HelicalSegmentPriorInfoEntry()
-	{
-		clear();
-	};
-
-	~HelicalSegmentPriorInfoEntry()
-	{
-		clear();
-	};
-
-	void checkPolarity()
-	{
-		RFLOAT diff_psi = ABS(psi_deg - psi_prior_deg);
-		if (diff_psi > 180.)
-			diff_psi = ABS(diff_psi - 360.);
-		if (diff_psi > 90.)
-			has_wrong_polarity = true;
-		else
-			has_wrong_polarity = false;
-	};
+	bool operator<(const HelicalSegmentPriorInfoEntry &rhs) const;
 };
+
+void flipPsiTiltForHelicalSegment(
+		RFLOAT old_psi,
+		RFLOAT old_tilt,
+		RFLOAT& new_psi,
+		RFLOAT& new_tilt);
 
 void updatePriorsForOneHelicalTube(
 		std::vector<HelicalSegmentPriorInfoEntry>& list,
 		int sid,
 		int eid,
+		int& nr_wrong_polarity,
 		RFLOAT sigma_segment_dist,
-		RFLOAT sigma_cutoff,
 		bool is_3D,
-		bool do_local_average_tilt,
-		int& nr_wrong_polarity);
+		bool do_auto_refine,
+		bool do_local_angular_searches,
+		bool do_exclude_out_of_range_trans,
+		RFLOAT sigma2_tilt,
+		RFLOAT sigma2_psi,
+		RFLOAT sigma2_offset,
+		RFLOAT sigma_cutoff);
 
 void updatePriorsForHelicalReconstruction(
 		MetaDataTable& MD,
-		RFLOAT sigma_segment_dist,
 		int& total_opposite_polarity,
-		bool do_local_average_tilt,
+		RFLOAT sigma_segment_dist,
+		bool is_3D,
+		bool do_auto_refine,
+		bool do_local_angular_searches,
+		RFLOAT sigma2_rot,
+		RFLOAT sigma2_tilt,
+		RFLOAT sigma2_psi,
+		RFLOAT sigma2_offset,
 		RFLOAT sigma_cutoff = 3.);
 // TESTING...
 

@@ -159,7 +159,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
     else
         recomputePlan=!(fReal->sameShape(input));
 
-    fFourier.resize(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
+    fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
     fReal=&input;
 
     if (recomputePlan)
