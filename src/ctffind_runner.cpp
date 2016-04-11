@@ -260,28 +260,32 @@ void CtffindRunner::joinCtffindResults()
 				HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift);
 
 		if (!has_this_ctf)
-			REPORT_ERROR("CtffindRunner::joinCtffindResults ERROR; cannot get CTF values for " + fn_micrographs_all[imic] );
-
-		FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
-		FileName fn_ctf = fn_root + ".ctf:mrc";
-		MDctf.addObject();
-		MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
-	    MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
-		MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
-	    MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
-	    MDctf.setValue(EMDL_CTF_DEFOCUS_ANGLE, defAng);
-	    MDctf.setValue(EMDL_CTF_VOLTAGE, HT);
-	    MDctf.setValue(EMDL_CTF_CS, CS);
-	    MDctf.setValue(EMDL_CTF_Q0, AmpCnst);
-	    MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
-	    MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
-	    MDctf.setValue(EMDL_CTF_FOM, CC);
-	    if (fabs(maxres + 999.) > 0.)
-	    	MDctf.setValue(EMDL_CTF_MAXRES, maxres);
-	    if (fabs(phaseshift + 999.) > 0.)
-	    	MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
-	    if (fabs(valscore + 999.) > 0.)
-	    	MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+		{
+			std::cerr << " WARNING: skipping, since cannot get CTF values for " + fn_micrographs_all[imic] <<std::endl;
+		}
+		else
+		{
+			FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
+			FileName fn_ctf = fn_root + ".ctf:mrc";
+			MDctf.addObject();
+			MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
+			MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
+			MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
+			MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
+			MDctf.setValue(EMDL_CTF_DEFOCUS_ANGLE, defAng);
+			MDctf.setValue(EMDL_CTF_VOLTAGE, HT);
+			MDctf.setValue(EMDL_CTF_CS, CS);
+			MDctf.setValue(EMDL_CTF_Q0, AmpCnst);
+			MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
+			MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
+			MDctf.setValue(EMDL_CTF_FOM, CC);
+			if (fabs(maxres + 999.) > 0.)
+				MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+			if (fabs(phaseshift + 999.) > 0.)
+				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
+			if (fabs(valscore + 999.) > 0.)
+				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+		}
     }
 	MDctf.write(fn_out+"micrographs_ctf.star");
 	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
@@ -621,12 +625,12 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 
 	if (is_ctffind4)
 	{
-		getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
+		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
 				maxres, phaseshift, die_if_not_found);
 	}
 	else
 	{
-		getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
+		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
 				maxres, valscore, die_if_not_found);
 	}
 
