@@ -291,7 +291,7 @@ public:
 	/* Calculate the inverse FFT of Fin and windows the result to ori_size
 	 * Also pass the transformer, to prevent making and clearing a new one before clearing the one in reconstruct()
 	 */
-	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<Complex > &Fin, MultidimArray<RFLOAT> &Mout, int nr_threads = 1);
+	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, int nr_threads = 1);
 
    /*
 	* Go from the Projector-centered fourier transform back to FFTW-uncentered one

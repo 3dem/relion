@@ -780,10 +780,31 @@ public:
      */
     void alias(const MultidimArray<T> &m)
     {
-        copyShape(m);
+    	coreDeallocate(); // Otherwise there may be a memory leak!
+    	copyShape(m);
         this->data=m.data;
         this->destroyData=false;
     }
+
+    /** Move from a multidimarray.
+     *
+     * Treat the multidimarray as if it were a volume. The data is not copied
+     * into new memory, but a pointer to the multidimarray is copied.
+     *
+     * After the operation, the operand m will become an alias of this array.
+     * Same operation as alias, but reverse the relation between the two arrays
+     */
+    void moveFrom(MultidimArray<T> &m)
+    {
+        coreDeallocate(); // Otherwise there may be a memory leak!
+        copyShape(m);
+        this->data=m.data;
+        this->destroyData=true;
+        this->nzyxdimAlloc = m.nzyxdimAlloc;
+        m.destroyData = false;
+        m.nzyxdimAlloc = 0;
+    }
+
     //@}
 
     /// @name Size
@@ -870,6 +891,101 @@ public:
         yinit=m.yinit;
         xinit=m.xinit;
     }
+
+
+    /** Shrink to fit
+     *
+     * This function resize the memory occupied by the array
+     * As a delayed mechanism for mem release
+     * This is important, because, shrinking requires additional
+     * memory. That will exceed mem limit at peak. This function
+     * thus delayed the peak and helps to keep mem usage within
+     * limits.
+     */
+    void shrinkToFit()
+    {
+        if (!destroyData)
+            REPORT_ERROR("Non-destroyable data!");
+        if (data == NULL || mmapOn || nzyxdim <= 0 || nzyxdimAlloc <= nzyxdim)
+            return;
+        T* old_array = data;
+        data = new T[nzyxdim];
+        memcpy(data, old_array, sizeof(T) * nzyxdim);
+        delete[] old_array;
+        nzyxdimAlloc = nzyxdim;
+    }
+
+    /** Adjust array to a given shape
+     *
+     * This function will resize the actual array to the given size.
+     * No data will be copied/moved to the new space.
+     * If shape is unchanged, then so is the data.
+     * Otherwise, data is almost always destroyed.
+     *
+     * The reshape, moveFrom and shrinkToFit functions were added upon suggestion by Yunxiao Zhang (5 April 2016)
+     *
+     */
+    void reshape(long Ndim, long Zdim, long Ydim, long Xdim)
+    {
+        if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
+        {
+            setDimensions(Xdim, Ydim, Zdim, Ndim);
+            return;
+        }
+        if (Xdim <= 0 || Ydim <= 0 || Zdim <= 0 || Ndim <= 0)
+        {
+            clear();
+            return;
+        }
+
+        coreDeallocate();
+        coreAllocate(Ndim, Zdim, Ydim, Xdim);
+    }
+
+    /** Adjust shape in a 3D array
+     *
+     * No guarantee about the data stored
+     */
+    void reshape(long Zdim, long Ydim, long Xdim)
+    {
+        reshape(1, Zdim, Ydim, Xdim);
+    }
+
+    /** Adjust shape in a 2D array
+     *
+     * No guarantee about the data stored
+     */
+    void reshape(long Ydim, long Xdim)
+    {
+        reshape(1, 1, Ydim, Xdim);
+    }
+
+    /** Adjust shape in a 1D array
+     *
+     * No guarantee about the data stored
+     */
+    void reshape(long Xdim)
+    {
+        reshape(1, 1, 1, Xdim);
+    }
+
+    /** Adjust shape to match the target array
+     *
+     * No guarantee about the data stored
+     */
+    template<typename T1>
+    void reshape(const MultidimArray<T1> &v)
+    {
+        if (NSIZE(*this) != NSIZE(v) || XSIZE(*this) != XSIZE(v) ||
+            YSIZE(*this) != YSIZE(v) || ZSIZE(*this) != ZSIZE(v) || data==NULL)
+            reshape(NSIZE(v), ZSIZE(v), YSIZE(v), XSIZE(v));
+
+        STARTINGX(*this) = STARTINGX(v);
+        STARTINGY(*this) = STARTINGY(v);
+        STARTINGZ(*this) = STARTINGZ(v);
+    }
+
+
 
     /** Resize to a given size
      *
@@ -968,7 +1084,12 @@ public:
     void resize(long int Ndim, long int Zdim, long int Ydim, long int Xdim)
     {
         if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
+        {
+            if (Ndim != this -> ndim || Zdim != this -> zdim ||
+                Ydim != this -> ydim || Xdim != this -> xdim)
+                REPORT_ERROR("Unmatched resize. Maybe bug in window function?");
             return;
+        }
 
         if (Xdim <= 0 || Ydim <= 0 || Zdim <= 0 || Ndim <= 0)
         {
@@ -1278,7 +1399,7 @@ public:
     {
         MultidimArray<T> result;
         window(result, z0, y0, x0, zF, yF, xF, init_value, n);
-        *this = result;
+        moveFrom(result);
     }
 
     /** Put a 2D window to the nth matrix
@@ -3121,7 +3242,7 @@ public:
     void initZeros(const MultidimArray<T1>& op)
     {
         if (data == NULL || !sameShape(op))
-            resize(op);
+            reshape(op);
         memset(data,0,nzyxdim*sizeof(T));
     }
 
@@ -3144,7 +3265,7 @@ public:
     inline void initZeros(long int Ndim, long int Zdim, long int Ydim, long int Xdim)
     {
         if (xdim!=Xdim || ydim!=Ydim || zdim!=Zdim || ndim!=Ndim)
-            resize(Ndim, Zdim,Ydim,Xdim);
+            reshape(Ndim, Zdim,Ydim,Xdim);
         memset(data,0,nzyxdim*sizeof(T));
     }
 
@@ -3214,7 +3335,7 @@ public:
             clear();
         else
         {
-            resize(steps);
+            reshape(steps);
             for (int i = 0; i < steps; i++)
                 A1D_ELEM(*this, i) = (T)((RFLOAT) minF + slope * i);
         }
