@@ -585,6 +585,7 @@ public:
 	SliderEntry helical_z_percentage;
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
+	SliderEntry helical_range_distance;
 
 	// Compute
 	BooleanEntry do_combine_thru_disc;
@@ -666,6 +667,7 @@ public:
 	SliderEntry helical_z_percentage;
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
+	SliderEntry helical_range_distance;
 
 	// Compute
 	BooleanEntry do_combine_thru_disc;

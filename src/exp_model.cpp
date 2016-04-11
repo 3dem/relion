@@ -252,7 +252,9 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 			for (ii_map = map_mics.begin(); ii_map != map_mics.end(); ii_map++)
 				vec_mics.push_back(*ii_map);
 
-			// Perform swaps
+//#define OLD_RANDOMISATION
+#ifdef OLD_RANDOMISATION
+			// Perform swaps (OLD RANDOMISATION - not perfect)
 			nr_swaps = ROUND(rnd_unif(vec_mics.size(), 2. * vec_mics.size()));
 			for (int ii = 0; ii < nr_swaps; ii++)
 			{
@@ -260,7 +262,7 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 				std::pair<std::string, int> tmp;
 				ptr_a = ROUND(rnd_unif(0, vec_mics.size()));
 				ptr_b = ROUND(rnd_unif(0, vec_mics.size()));
-				if ( (ptr_a == ptr_b) || (ptr_a < 0 ) || (ptr_b < 0) || (ptr_a >= vec_mics.size()) || (ptr_b >= vec_mics.size()) )
+				if ( (ptr_a == ptr_b) || (ptr_a < 0) || (ptr_b < 0) || (ptr_a >= vec_mics.size()) || (ptr_b >= vec_mics.size()) )
 					continue;
 				tmp = vec_mics[ptr_a];
 				vec_mics[ptr_a] = vec_mics[ptr_b];
@@ -269,7 +271,24 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 				// DEBUG
 				//std::cout << " Swap mic_id= " << ptr_a << " with mic_id= " << ptr_b << "." << std::endl;
 			}
+#else
+			// NEW RANDOMISATION (better than the old one)
+			nr_swaps = 0;
+			for (int ptr_a = 0; ptr_a < (vec_mics.size() - 1); ptr_a++)
+			{
+				std::pair<std::string, int> tmp;
+				int ptr_b = ROUND(rnd_unif(ptr_a, vec_mics.size() - 1));
+				if ( (ptr_b <= ptr_a) || (ptr_b >= vec_mics.size()) )
+					continue;
+				nr_swaps++;
+				tmp = vec_mics[ptr_a];
+				vec_mics[ptr_a] = vec_mics[ptr_b];
+				vec_mics[ptr_b] = tmp;
 
+				// DEBUG
+				//std::cout << " Swap mic_id= " << ptr_a << " with mic_id= " << ptr_b << "." << std::endl;
+			}
+#endif
 			// DEBUG
 			//if (divide_according_to_helical_tube_id)
 			//	std::cout << " Helical tubes= " << vec_mics.size() << ", nr_swaps= " << nr_swaps << std::endl;

@@ -423,7 +423,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
     helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
     do_helical_symmetry_local_refinement = parser.checkOption("--helical_symmetry_search", "Perform local refinement of helical symmetry?");
-    helical_sigma_segment_distance = textToFloat(parser.getOption("--helical_sigma_segment_distance", "Sigma of helical segment distance (in Angstroms)", "-1."));
+    helical_sigma_distance = textToFloat(parser.getOption("--helical_sigma_distance", "Sigma of distance along the helical tracks", "-1."));
     mymodel.initialiseHelicalParametersLists(helical_twist_initial, helical_rise_initial);
     mymodel.is_helix = do_helical_refine;
 
@@ -629,8 +629,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		helical_tube_outer_diameter = -1.;
     if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement))
     	do_helical_symmetry_local_refinement = false;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, helical_sigma_segment_distance))
-    	helical_sigma_segment_distance = -1.;
+    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, helical_sigma_distance))
+    	helical_sigma_distance = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
 
@@ -779,7 +779,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, helical_sigma_segment_distance);
+	    MD.setValue(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, helical_sigma_distance);
 	    MD.setValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged);
 	    MD.setValue(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, has_high_fsc_at_limit);
 	    MD.setValue(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, has_large_incr_size_iter_ago);
@@ -1808,22 +1808,38 @@ void MlOptimiser::iterate()
 			makeGoodHelixForEachRef();
 			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
-				if (helical_sigma_segment_distance < 0.)
-				{
+				int nr_same_polarity = 0, nr_opposite_polarity = 0;
+				RFLOAT opposite_percentage = 0.;
+				bool do_local_angular_searches = false;
+				if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
+					do_local_angular_searches = true;
+				else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
+					do_local_angular_searches = true;
+
+				if (helical_sigma_distance < 0.)
 					updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
-				}
 				else
 				{
-					int nr_same_polarity = 0, nr_opposite_polarity = 0;
-					bool do_class3d_with_one_class = ( (mymodel.ref_dim == 3) && (mymodel.nr_classes == 1) );
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
-							helical_sigma_segment_distance / mymodel.pixel_size,
 							nr_opposite_polarity,
-							((do_auto_refine) || (do_class3d_with_one_class)));
+							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+							(mymodel.data_dim == 3),
+							do_auto_refine,
+							do_local_angular_searches,
+							mymodel.sigma2_rot,
+							mymodel.sigma2_tilt,
+							mymodel.sigma2_psi,
+							mymodel.sigma2_offset);
+
 					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					if (verb > 0)
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << std::endl;
+					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+					if ( (verb > 0) && (!do_local_angular_searches) )
+					{
+						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
+						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+					}
 				}
 			}
 		}

@@ -233,7 +233,7 @@ enum EMDLabel
     EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
     EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
     EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
-    EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE,
+    EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
@@ -606,7 +606,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
-        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_SEGMENT_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaSegmentDistance", "Sigma of helical segment distance (in Angstroms)");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaDistance", "Sigma of distance along the helical tracks");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");
