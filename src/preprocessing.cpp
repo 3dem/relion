@@ -26,11 +26,11 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	int gen_section = parser.addSection("General options");
 	fn_star_in = parser.getOption("--i", "The STAR file with all (selected) micrographs to extract particles from","");
 	fn_coord_suffix = parser.getOption("--coord_suffix", "The suffix for the coordinate files, e.g. \"_picked.star\" or \".box\"","");
+	fn_data = parser.getOption("--reextract_data_star", "OR: a _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
 	fn_coord_dir = parser.getOption("--coord_dir", "The directory where the coordinate files are (default is same as micrographs)", "ASINPUT");
 	fn_part_dir = parser.getOption("--part_dir", "Output directory for particle stacks", "Particles/");
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "");
 	fn_list_star = parser.getOption("--list_star", "Output STAR file with a list to the output STAR files of individual micrographs", "");
-	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
 	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
 	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input STAR file)", "-1."));
 
@@ -95,31 +95,58 @@ void Preprocessing::initialise()
 	if (!do_extract && fn_operate_in == "")
 		REPORT_ERROR("Provide either --extract or --operate_on");
 
+	// Make sure the output directory name ends with a '/'
+	if (fn_part_dir[fn_part_dir.length()-1] != '/')
+		fn_part_dir+="/";
+
 	// Set up which coordinate files to extract particles from (or to join STAR file for)
 	if (do_extract)
 	{
 		if (verb > 0)
 		{
-			if (fn_star_in=="" || (fn_coord_suffix=="" && fn_data == ""))
-				REPORT_ERROR("Preprocessing::initialise ERROR: please provide --i and either (--coord_suffix or __reextract_data_star) to extract particles");
+			if (fn_star_in=="" && fn_data == "")
+				REPORT_ERROR("Preprocessing::initialise ERROR: please provide --i or --reextract_data_star to extract particles");
 
 			if (extract_size < 0)
 				REPORT_ERROR("Preprocessing::initialise ERROR: please provide the size of the box to extract particle using --extract_size ");
 		}
 
-		// Read in the micrographs STAR file
-		MDmics.read(fn_star_in);
-
-		if ( do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME) )
-			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographMovieName column!");
-		else if ( !do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
-			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
-
-		if (do_movie_extract)
+		// If --reextract_data_star AND --extract_movies is given, then --i will be ignored and a list of micrographs is made from the input _data.star file
+		if (fn_data != "" && do_movie_extract)
 		{
-			if (fn_data == "")
-				REPORT_ERROR("Preprocessing::initialise ERROR: when extracting movies, you have to provide a --reextract_data_star file.");
+			// Generate a MDmics file from the --reextract_data_star option
+			MetaDataTable MDdata;
+			MDdata.read(fn_data);
+			if (!MDdata.containsLabel(EMDL_MICROGRAPH_NAME))
+				REPORT_ERROR("Preprocessing::initialise ERROR: --reextract_data_star does not contain rlnMicrographName.");
+			MDdata.newSort(EMDL_MICROGRAPH_NAME);
+			FileName fn_mic_prev="";
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
+			{
+				FileName fn_mic, fn_mov;
+				MDdata.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				if (fn_mic != fn_mic_prev)
+				{
+					fn_mic_prev = fn_mic;
+					MDmics.addObject();
+					fn_mov = fn_mic.withoutExtension() + "_" + movie_name + ".mrcs";
+					MDmics.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+					MDmics.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				}
+			}
+			// Write out the list of all micrographs in the part_dir
+			MDmics.write(fn_part_dir + "all_micrographs.star");
 		}
+		else
+		{
+			// Read in the micrographs STAR file
+			MDmics.read(fn_star_in);
+			if (!MDmics.containsLabel(EMDL_MICROGRAPH_NAME))
+				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
+		}
+
+		if (do_movie_extract && fn_data == "")
+			REPORT_ERROR("Preprocessing::initialise ERROR: when extracting movies, you have to provide a --reextract_data_star file.");
 
 		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
@@ -174,15 +201,13 @@ void Preprocessing::initialise()
 				fn_coord_dir+="/";
 
 			// Loop over all micrographs in the input STAR file and warn of coordinate file or micrograph file do not exist
-			if (verb > 0 && fn_data == "")
+			if (verb > 0)
 			{
 				FileName fn_mic;
 				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 				{
 					MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 					FileName fn_coord = getCoordinateFileName(fn_mic);
-					if (do_movie_extract)
-						fn_mic = fn_mic.withoutExtension() + "_" + movie_name + ".mrcs";
 					if (!exists(fn_coord))
 						std::cout << "Warning: coordinate file " << fn_coord << " does not exist..." << std::endl;
 					if (!exists(fn_mic))
@@ -191,10 +216,6 @@ void Preprocessing::initialise()
 			}
 		}
 	}
-
-	// Make sure the output directory name ends with a '/'
-	if (fn_part_dir[fn_part_dir.length()-1] != '/')
-		fn_part_dir+="/";
 
 	if (do_extract || fn_operate_in != "")
 	{
