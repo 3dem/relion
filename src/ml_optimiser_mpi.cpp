@@ -1272,7 +1272,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 					}
 					else if (node->rank == other_slave)
 					{
-						MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, &status);
+						node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
 #ifdef DEBUG
 						std::cerr << " AA RECV node->rank= " << node->rank  << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " other_slave= "<<other_slave << std::endl;
