@@ -82,7 +82,7 @@ public:
     int relion_MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm);
 
     /* Better error handling of MPI error messages */
-    void report_MPI_ERROR(int errno);
+    void report_MPI_ERROR(int error_code);
 
 };
 
