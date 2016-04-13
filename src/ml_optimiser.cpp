@@ -443,7 +443,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	int computation_section = parser.addSection("Computation");
 	x_pool = textToInteger(parser.getOption("--pool", "Number of images to pool for each thread task", "1"));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to run in parallel (only useful on multi-core machines)", "1"));
-	available_memory = textToFloat(parser.getOption("--memory_per_thread", "Available RAM (in Gb) for each thread", "2"));
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
@@ -610,8 +609,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		!MD.getValue(EMDL_OPTIMISER_REFS_ARE_CTF_CORRECTED, refs_are_ctf_corrected) ||
 		!MD.getValue(EMDL_OPTIMISER_FIX_SIGMA_NOISE, fix_sigma_noise) ||
 		!MD.getValue(EMDL_OPTIMISER_FIX_SIGMA_OFFSET, fix_sigma_offset) ||
-		!MD.getValue(EMDL_OPTIMISER_MAX_NR_POOL, nr_pool) ||
-		!MD.getValue(EMDL_OPTIMISER_AVAILABLE_MEMORY, available_memory))
+		!MD.getValue(EMDL_OPTIMISER_MAX_NR_POOL, nr_pool)  )
     	REPORT_ERROR("MlOptimiser::readStar: incorrect optimiser_general table");
 
     // Backward compatibility with RELION-1.4
@@ -795,7 +793,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_FIX_SIGMA_NOISE, fix_sigma_noise);
 		MD.setValue(EMDL_OPTIMISER_FIX_SIGMA_OFFSET, fix_sigma_offset);
 		MD.setValue(EMDL_OPTIMISER_MAX_NR_POOL, nr_pool);
-		MD.setValue(EMDL_OPTIMISER_AVAILABLE_MEMORY, available_memory);
 
 		MD.write(fh);
 		fh.close();
@@ -2190,29 +2187,8 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 
 	if (myverb > 0)
 	{
-		std::cout << " Estimated memory for expectation step  > " << total_mem_Gb_exp << " Gb, available memory = "<<available_memory * nr_threads<<" Gb."<<std::endl;
-		std::cout << " Estimated memory for maximization step > " << total_mem_Gb_max << " Gb, available memory = "<<available_memory * nr_threads<<" Gb."<<std::endl;
-
-		if (total_mem_Gb_max > available_memory * nr_threads || total_mem_Gb_exp > available_memory * nr_threads)
-		{
-			std::cout << " WARNING!!! Did you set --memory_per_thread to reflect the true Gb per core on your computer?" << std::endl;
-			if (total_mem_Gb_exp > available_memory * nr_threads)
-			{
-				std::cout << " WARNING!!! Expected to run out of memory during expectation step ...." << std::endl;
-				std::cout << " WARNING!!! Check your processes are not swapping ... " << std::endl;
-				if (!do_shifts_onthefly)
-					std::cout << " WARNING!!! Consider not using --precalculate_shifts !! " << std::endl;
-			}
-			if (total_mem_Gb_max > available_memory * nr_threads)
-			{
-				std::cout << " WARNING!!! Expected to run out of memory during maximization step ...." << std::endl;
-				std::cout << " WARNING!!! Check your processes are not swapping ... " << std::endl;
-				std::cout << " WARNING!!! Consider running fewer MPI processors per node." << std::endl;
-			}
-			std::cout << " + Available memory for each thread, as given by --memory_per_thread      : " << available_memory << " Gb" << std::endl;
-			std::cout << " + Number of threads used per MPI process, as given by --j                : " << nr_threads << std::endl;
-			std::cout << " + Available memory per MPI process 										: " << available_memory * nr_threads << " Gb" << std::endl;
-		}
+		std::cout << " Estimated memory for expectation  step > " << total_mem_Gb_exp << " Gb."<<std::endl;
+		std::cout << " Estimated memory for maximization step > " << total_mem_Gb_max << " Gb."<<std::endl;
 	}
 
 #ifdef DEBUG
@@ -2301,6 +2277,19 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
     // Use global variables for thread visibility (before there were local ones for similar call in MPI version!)
 	exp_my_first_ori_particle = my_first_ori_particle;
     exp_my_last_ori_particle = my_last_ori_particle;
+
+	// Make sure random division is always the same with the same seed
+    if (do_generate_seeds && ((do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1)) )
+	{
+    	// calculate the random class for these SomeParticles
+    	exp_random_class_some_particles.clear();
+    	for (long int ori_part_id = my_first_ori_particle; ori_part_id <= my_last_ori_particle; ori_part_id++)
+    	{
+        	init_random_generator(random_seed + ori_part_id);
+    		int random_class = rand() % mymodel.nr_classes;
+    		exp_random_class_some_particles.push_back(random_class);
+    	}
+	}
 
 	// Only open/close stacks once
     fImageHandler hFile;
@@ -2491,10 +2480,10 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     		// Now select a single random class
     		// exp_part_id is already in randomized order (controlled by -seed)
     		// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-
-    		// Make sure random division is always the same with the same seed
-    		init_random_generator(random_seed + my_ori_particle);
-    		exp_iclass_min = exp_iclass_max = rand() % mymodel.nr_classes;
+    		long int idx = my_ori_particle - exp_my_first_ori_particle;
+    		if (idx >= exp_random_class_some_particles.size())
+    			REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
+    		exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
 		}
     }
 
@@ -7549,36 +7538,3 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 
 }
 
-void MlOptimiser::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
-{
-	// Handle GPU (device) assignments for each rank, if speficied
-	size_t pos = 0;
-	std::string delim = ":";
-	std::vector < std::string > allRankIDs;
-	std::string thisRankIDs, thisThreadID;
-	while ((pos = tangled.find(delim)) != std::string::npos)
-	{
-		thisRankIDs = tangled.substr(0, pos);
-//		    std::cout << "in loop " << thisRankIDs << std::endl;
-		tangled.erase(0, pos + delim.length());
-		allRankIDs.push_back(thisRankIDs);
-	}
-	allRankIDs.push_back(tangled);
-
-	untangled.resize(allRankIDs.size());
-	//Now handle the thread assignements in each rank
-	for (int i = 0; i < allRankIDs.size(); i++)
-	{
-		pos=0;
-		delim = ",";
-//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
-		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
-		{
-			thisThreadID = allRankIDs[i].substr(0, pos);
-//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
-			allRankIDs[i].erase(0, pos + delim.length());
-			untangled[i].push_back(thisThreadID);
-		}
-		untangled[i].push_back(allRankIDs[i]);
-	}
-}

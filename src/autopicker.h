@@ -357,15 +357,6 @@ public:
 	// Only keep those peaks that are at the given distance apart from each other
 	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance, float scale);
 
-	/*
-	 * Takes a string with device-indices which is
-	 *  	: delimited for ranks
-	 *  	, delimited for threads within each rank
-	 * and outputs a rank-major array which supplies
-	 * a mapping as input for distribution of ranks
-	 * and threads over the availiable/specfied GPUs.
-	 */
-	void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled);
 };
 
 
