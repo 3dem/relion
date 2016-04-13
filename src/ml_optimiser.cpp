@@ -2278,6 +2278,19 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	exp_my_first_ori_particle = my_first_ori_particle;
     exp_my_last_ori_particle = my_last_ori_particle;
 
+	// Make sure random division is always the same with the same seed
+    if (do_generate_seeds && ((do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1)) )
+	{
+    	// calculate the random class for these SomeParticles
+    	exp_random_class_some_particles.clear();
+    	for (long int ori_part_id = my_first_ori_particle; ori_part_id <= my_last_ori_particle; ori_part_id++)
+    	{
+        	init_random_generator(random_seed + ori_part_id);
+    		int random_class = rand() % mymodel.nr_classes;
+    		exp_random_class_some_particles.push_back(random_class);
+    	}
+	}
+
 	// Only open/close stacks once
     fImageHandler hFile;
 	long int dump;
@@ -2467,10 +2480,10 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     		// Now select a single random class
     		// exp_part_id is already in randomized order (controlled by -seed)
     		// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-
-    		// Make sure random division is always the same with the same seed
-    		init_random_generator(random_seed + my_ori_particle);
-    		exp_iclass_min = exp_iclass_max = rand() % mymodel.nr_classes;
+    		long int idx = my_ori_particle - exp_my_first_ori_particle;
+    		if (idx >= exp_random_class_some_particles.size())
+    			REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
+    		exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
 		}
     }
 

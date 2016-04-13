@@ -455,6 +455,7 @@ public:
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
+	std::vector<int> exp_random_class_some_particles;
 	int exp_nr_images;
 
 	// Calculate translated images on-the-fly
