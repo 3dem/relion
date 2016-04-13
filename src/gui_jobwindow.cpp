@@ -1537,7 +1537,7 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
     gpu_group->end();
 	use_gpu.place(current_y, "Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.", gpu_group);
 	gpu_group->begin();
-	gpu_ids.place(current_y, "Which GPUs to use: ", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
+	gpu_ids.place(current_y, "Which GPUs to use:", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
     gpu_group->end();
 	use_gpu.cb_menu_i(); // This is to make the default effective
 
@@ -2444,7 +2444,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
     gpu_group->end();
 	use_gpu.place(current_y, "Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.", gpu_group);
 	gpu_group->begin();
-	gpu_ids.place(current_y, "Which GPUs to use: ", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
+	gpu_ids.place(current_y, "Which GPUs to use:", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
     gpu_group->end();
 	use_gpu.cb_menu_i(); // This is to make the default effective
 
@@ -2999,7 +2999,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
     gpu_group->end();
 	use_gpu.place(current_y, "Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.", gpu_group);
 	gpu_group->begin();
-	gpu_ids.place(current_y, "Which GPUs to use: ", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
+	gpu_ids.place(current_y, "Which GPUs to use:", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
     gpu_group->end();
 	use_gpu.cb_menu_i(); // This is to make the default effective
 
@@ -3639,7 +3639,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
     gpu_group->end();
 	use_gpu.place(current_y, "Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.", gpu_group);
 	gpu_group->begin();
-	gpu_ids.place(current_y, "Which GPUs to use: ", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
+	gpu_ids.place(current_y, "Which GPUs to use:", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
     gpu_group->end();
 	use_gpu.cb_menu_i(); // This is to make the default effective
 
