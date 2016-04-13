@@ -132,6 +132,10 @@ public:
 	// Expect large astigmatism for CTFFIND4.1?
 	bool do_large_astigmatism;
 
+	// Which GPU devices to use?
+	std::string gpu_ids;
+	std::vector < std::vector < std::string > > allThreadIDs;
+
 public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
