@@ -649,6 +649,17 @@ void MlOptimiserMpi::expectation()
 	}
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 
+	// Feb15,2016 - Shaoda - copy the following variables to the master
+	if ( (do_helical_refine) && (!(helical_sigma_distance < 0.)) )
+	{
+		node->relion_MPI_Bcast(&sampling.healpix_order, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&mymodel.sigma2_rot, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&mymodel.sigma2_tilt, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&mymodel.sigma2_psi, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&mymodel.sigma2_offset, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(&mymodel.orientational_prior_mode, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
+	}
+
 	// E. All nodes, except the master, check memory and precalculate AB-matrices for on-the-fly shifts
 	if (!node->isMaster())
 	{
@@ -1272,7 +1283,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 					}
 					else if (node->rank == other_slave)
 					{
-						MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, &status);
+						node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, this_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
 #ifdef DEBUG
 						std::cerr << " AA RECV node->rank= " << node->rank  << " MULTIDIM_SIZE(Msum)= "<< MULTIDIM_SIZE(Msum)
 								<< " this_slave= " << this_slave << " other_slave= "<<other_slave << std::endl;
@@ -2448,22 +2459,38 @@ void MlOptimiserMpi::iterate()
 		{
 			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
 			{
-				if (helical_sigma_segment_distance < 0.)
-				{
+				int nr_same_polarity = 0, nr_opposite_polarity = 0;
+				RFLOAT opposite_percentage = 0.;
+				bool do_local_angular_searches = false;
+				if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
+					do_local_angular_searches = true;
+				else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
+					do_local_angular_searches = true;
+
+				if (helical_sigma_distance < 0.)
 					updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
-				}
 				else
 				{
-					int nr_same_polarity = 0, nr_opposite_polarity = 0;
-					bool do_class3d_with_one_class = ( (mymodel.ref_dim == 3) && (mymodel.nr_classes == 1) );
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
-							helical_sigma_segment_distance / mymodel.pixel_size,
 							nr_opposite_polarity,
-							((do_auto_refine) || (do_class3d_with_one_class)));
+							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+							(mymodel.data_dim == 3),
+							do_auto_refine,
+							do_local_angular_searches,
+							mymodel.sigma2_rot,
+							mymodel.sigma2_tilt,
+							mymodel.sigma2_psi,
+							mymodel.sigma2_offset);
+
 					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					if (verb > 0)
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << std::endl;
+					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+					if ( (verb > 0) && (!do_local_angular_searches) )
+					{
+						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
+						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+					}
 				}
 			}
 		}

@@ -1038,39 +1038,46 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 	    	}
 			}
 
-
 			if (is_right || is_left || is_upper_right || is_upper_left)
 			{
 				FileName hyperrefname;
+				FileName parent_nodename, newprocname;
 				long int parent_process = pipeline.nodeList[inputnode].outputFromProcess;
-				// Keep track of all the side-wards branches
-				branched_procs.push_back(parent_process);
-				FileName newprocname;
-				if (pipeline.processList[parent_process].alias != "None")
-					newprocname = pipeline.processList[parent_process].alias;
-				else
-					newprocname = pipeline.processList[parent_process].name;
-				if (do_short_names)
-					newprocname = newprocname.beforeFirstOf("/");
+				if (parent_process < 0)
+				{
+					std::cout << " WARNING: cannot get parent of node: " << pipeline.nodeList[inputnode].name << std::endl;
+					parent_nodename = (is_right || is_upper_right) ? new_nodename + "_rigth" : new_nodename + "_left";
+					newprocname = "unknown";
+				}
 				else
 				{
-					FileName longname2 = (newprocname.afterFirstOf("/")).beforeLastOf("/");
-					adaptNamesForTikZ(longname2);
-					hyperrefname = "sec:" + newprocname.beforeFirstOf("/") + "/" + longname2;
-					if (pipeline.processList[parent_process].type==PROC_IMPORT)
-						newprocname = newprocname.beforeFirstOf("/") + "\\\\" + longname2;
+					// Keep track of all the side-wards branches
+					branched_procs.push_back(parent_process);
+					if (pipeline.processList[parent_process].alias != "None")
+						newprocname = pipeline.processList[parent_process].alias;
 					else
-						newprocname = " \\hyperlink{" + hyperrefname + "}{" + newprocname.beforeFirstOf("/") + "}\\\\" + longname2;
+						newprocname = pipeline.processList[parent_process].name;
+					if (do_short_names)
+						newprocname = newprocname.beforeFirstOf("/");
+					else
+					{
+						FileName longname2 = (newprocname.afterFirstOf("/")).beforeLastOf("/");
+						adaptNamesForTikZ(longname2);
+						hyperrefname = "sec:" + newprocname.beforeFirstOf("/") + "/" + longname2;
+						if (pipeline.processList[parent_process].type==PROC_IMPORT)
+							newprocname = newprocname.beforeFirstOf("/") + "\\\\" + longname2;
+						else
+							newprocname = " \\hyperlink{" + hyperrefname + "}{" + newprocname.beforeFirstOf("/") + "}\\\\" + longname2;
+					}
+
+					parent_nodename = pipeline.processList[parent_process].name;
+					adaptNamesForTikZ(parent_nodename);
+					std::string labelpos;
+					if (is_right)
+						rightname = parent_nodename;
+					if (is_left)
+						leftname = parent_nodename;
 				}
-
-
-				FileName parent_nodename = pipeline.processList[parent_process].name;
-				adaptNamesForTikZ(parent_nodename);
-				std::string labelpos;
-				if (is_right)
-					rightname = parent_nodename;
-				if (is_left)
-					leftname = parent_nodename;
 
 				if (is_right || is_left)
 				{
@@ -1086,7 +1093,6 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 				// Make an arrow from the box to the process it came from
 				std::string arrowlabel = (is_right || is_upper_right) ? right_label : left_label;
 				fh << "\\path [line] ("<< parent_nodename <<") -- node[above] {" << arrowlabel << "} ("<< new_nodename <<");" << std::endl;
-
 			}
 			else
 				result = pipeline.nodeList[inputnode].outputFromProcess;
@@ -1105,10 +1111,10 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 }
 
 void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int from_process,
-		std::vector<long int> &all_branches)
+		std::vector<long int> &all_branches, bool is_main_flow)
 {
 
-	openTikZPicture(fh);
+	openTikZPicture(fh, is_main_flow);
 	long int prev_process = -1;
 	long int current_process = from_process;
 	bool do_stop = false;
@@ -1119,17 +1125,15 @@ void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pip
 		std::vector<long int> branched_procs;
 		long int next_process = addProcessToUpwardsFlowChart(fh, pipeline, prev_process, current_process, branched_procs);
 
-		// Introduce a new page if the flowchart gets to long....
-		if (counter > 9)
+		if (!is_main_flow && counter > 9)
 		{
-			closeTikZPicture(fh);
+			closeTikZPicture(fh, false);
 			counter = 0;
 			next_process = current_process;
 			current_process = prev_process;
 			prev_process = -1;
-			openTikZPicture(fh);
+			openTikZPicture(fh, false);
 		}
-
 
 		if (next_process < 0)
 		{
@@ -1166,7 +1170,7 @@ void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pip
 		counter++;
 
 	}
-	closeTikZPicture(fh);
+	closeTikZPicture(fh, is_main_flow);
 
 }
 void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pipeline, long int from_process)
@@ -1200,11 +1204,7 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 			//fh << "\\newline" << std::endl;
 		}
 
-		makeOneUpwardsFlowChart(fh, pipeline, all_branches[i], all_branches);
-
-		// Always make a new page after the first general workflow
-		if (i==0)
-			fh << "\\newpage" << std::endl;
+		makeOneUpwardsFlowChart(fh, pipeline, all_branches[i], all_branches, (i==0) );
 
 		i++;
 	}
@@ -1212,16 +1212,17 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 	// At the end of the flowchart file, also make one with short names
 	do_short_names = true;
 	do_branches = false;
-	fh << "\\newpage"<<std::endl;
 	fh << "\\section{Overview flowchart for " << myorititle << "}" << std::endl;
-	makeOneUpwardsFlowChart(fh, pipeline,all_branches[0], all_branches);
+	makeOneUpwardsFlowChart(fh, pipeline,all_branches[0], all_branches, true);
 
 	closeFlowChartFile(fh);
 
 }
 
-void PipeLineFlowChart::openTikZPicture(std::ofstream &fh)
+void PipeLineFlowChart::openTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
+	if (is_main_flow)
+		fh << "\\resizebox{!}{0.95\\textheight}{" << std::endl;
 	fh << "\\begin{tikzpicture}[scale=1, auto]" << std::endl;
     // Override the long-name styles with the shorter ones
     if (do_short_names)
@@ -1232,10 +1233,11 @@ void PipeLineFlowChart::openTikZPicture(std::ofstream &fh)
     }
 }
 
-void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh)
+void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
 	fh << "\\end{tikzpicture}" << std::endl;
-	//fh << "\\newpage" << std::endl << std::endl;
+	if (is_main_flow)
+		fh << "}" << std::endl; // closes resizebox
 }
 
 void PipeLineFlowChart::openFlowChartFile(FileName &fn_out, std::ofstream &fh)

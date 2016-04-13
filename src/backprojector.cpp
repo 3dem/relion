@@ -766,10 +766,10 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 
     FourierTransformer transformer;
-	MultidimArray<Complex > Fconv;
 	MultidimArray<RFLOAT> Fweight;
 	// Fnewweight can become too large for a float: always keep this one in double-precision
 	MultidimArray<double> Fnewweight;
+	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
 	int max_r2 = r_max * r_max * padding_factor * padding_factor;
 
 //#define DEBUG_RECONSTRUCT
@@ -781,20 +781,20 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	std::cerr << " pad_size= " << pad_size << " padding_factor= " << padding_factor << " max_r2= " << max_r2 << std::endl;
 #endif
 
-	// Set Fweight, Fnewweight and Fconv to the right size
-	if (ref_dim == 2)
-		vol_out.resize(pad_size, pad_size);
-	else
-		vol_out.resize(pad_size, pad_size, pad_size);
+    // Set Fweight, Fnewweight and Fconv to the right size
+    if (ref_dim == 2)
+        vol_out.setDimensions(pad_size, pad_size, 1, 1);
+    else
+        // Too costly to actually allocate the space
+        // Trick transformer with the right dimensions
+        vol_out.setDimensions(pad_size, pad_size, pad_size, 1);
 
-	transformer.setReal(vol_out);
-	transformer.getFourierAlias(Fconv);
+    transformer.setReal(vol_out); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+    vol_out.clear(); // Reset dimensions to 0
 
-	// clear vol_out to save memory!
-	vol_out.clear();
+    Fweight.reshape(Fconv);
+    Fnewweight.reshape(Fconv);
 
-	Fweight.resize(Fconv);
-	Fnewweight.resize(Fconv);
 	// Go from projector-centered to FFTW-uncentered
 	decenter(weight, Fweight, max_r2);
 
@@ -837,7 +837,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 	if (update_tau2_with_fsc)
 	{
-		tau2.resize(ori_size/2 + 1);
+		tau2.reshape(ori_size/2 + 1);
 		data_vs_prior.initZeros(ori_size/2 + 1);
 		// Then calculate new tau2 values, based on the FSC
 		if (!fsc.sameShape(sigma2) || !fsc.sameShape(tau2))
@@ -1115,7 +1115,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Now do inverse FFT and window to original size in real-space
 	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....
 	// The latter may give memory problems as detected by electric fence....
-	windowToOridimRealSpace(transformer, Fconv, vol_out, nr_threads);
+	windowToOridimRealSpace(transformer, vol_out, nr_threads);
 
 #endif
 
@@ -1140,7 +1140,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		spectrum.initZeros(XSIZE(vol_out));
 	    count.initZeros(XSIZE(vol_out));
 	    // recycle the same transformer for all images
-	    transformer.FourierTransform(vol_out, Fconv, false);
+        transformer.setReal(vol_out);
+        transformer.FourierTransform();
 	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
 	    {
 	    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
@@ -1164,6 +1165,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 	// Completely empty the transformer object
 	transformer.cleanup();
+    // Now can use extra mem to move data into smaller array space
+    vol_out.shrinkToFit();
 
 #ifdef DEBUG_RECONSTRUCT
     std::cerr<<"done with reconstruct"<<std::endl;
@@ -1528,9 +1531,9 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 	// Set up right dimension of real-space array
 	// TODO: resize this according to r_max!!!
 	if (ref_dim==2)
-		Mconv.resize(pad_size, pad_size);
+		Mconv.reshape(pad_size, pad_size);
 	else
-		Mconv.resize(pad_size, pad_size, pad_size);
+		Mconv.reshape(pad_size, pad_size, pad_size);
 
 	// inverse FFT
 	transformer.setReal(Mconv);
@@ -1567,8 +1570,10 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 
 }
 
-void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<Complex > &Fin, MultidimArray<RFLOAT> &Mout, int nr_threads)
+void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, int nr_threads)
 {
+
+	MultidimArray<Complex>& Fin = transformer.getFourierReference();
 
 	MultidimArray<Complex > Ftmp;
 	int padoridim = padding_factor * ori_size;
@@ -1577,7 +1582,7 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 //#define DEBUG_WINDOWORIDIMREALSPACE
 #ifdef DEBUG_WINDOWORIDIMREALSPACE
 	Image<RFLOAT> tt;
-	tt().resize(ZSIZE(Fin), YSIZE(Fin), XSIZE(Fin));
+	tt().reshape(ZSIZE(Fin), YSIZE(Fin), XSIZE(Fin));
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fin)
 	{
 		DIRECT_MULTIDIM_ELEM(tt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fin, n));
@@ -1585,14 +1590,17 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	tt.write("windoworidim_Fin.spi");
 #endif
 
-	if (ref_dim == 2)
+    // Resize incoming complex array to the correct size
+    windowFourierTransform(Fin, padoridim);
+
+ 	if (ref_dim == 2)
 	{
-		Mout.resize(padoridim, padoridim);
+		Mout.reshape(padoridim, padoridim);
 		normfft = (RFLOAT)(padding_factor * padding_factor);
 	}
 	else
 	{
-		Mout.resize(padoridim, padoridim, padoridim);
+		Mout.reshape(padoridim, padoridim, padoridim);
 		if (data_dim == 3)
 			normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
 		else
@@ -1600,20 +1608,21 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	}
 	Mout.setXmippOrigin();
 
-	// Resize incoming complex array to the correct size
-	windowFourierTransform(Fin, Ftmp, padoridim);
-
 #ifdef DEBUG_WINDOWORIDIMREALSPACE
-	tt().resize(ZSIZE(Ftmp), YSIZE(Ftmp), XSIZE(Ftmp));
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ftmp)
+	tt().reshape(ZSIZE(Fin), YSIZE(Fin), XSIZE(Fin));
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fin)
 	{
-		DIRECT_MULTIDIM_ELEM(tt(), n) = abs(DIRECT_MULTIDIM_ELEM(Ftmp, n));
+		DIRECT_MULTIDIM_ELEM(tt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fin, n));
 	}
 	tt.write("windoworidim_Fresized.spi");
 #endif
 
 	// Do the inverse FFT
-	transformer.inverseFourierTransform(Ftmp, Mout);
+    transformer.setReal(Mout);
+    transformer.inverseFourierTransform();
+    //transformer.inverseFourierTransform(Fin, Mout);
+    Fin.clear();
+    transformer.fReal = NULL; // Make sure to re-calculate fftw plan
 	Mout.setXmippOrigin();
 
 	// Shift the map back to its origin
@@ -1653,11 +1662,11 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	tt()=Mout;
 	tt.write("windoworidim_Mwindowed_masked.spi");
 	FourierTransformer ttf;
-	ttf.FourierTransform(Mout, Ftmp);
-	tt().resize(ZSIZE(Ftmp), YSIZE(Ftmp), XSIZE(Ftmp));
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ftmp)
+	ttf.FourierTransform(Mout, Fin);
+	tt().resize(ZSIZE(Fin), YSIZE(Fin), XSIZE(Fin));
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fin)
 	{
-		DIRECT_MULTIDIM_ELEM(tt(), n) = abs(DIRECT_MULTIDIM_ELEM(Ftmp, n));
+		DIRECT_MULTIDIM_ELEM(tt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fin, n));
 	}
 	tt.write("windoworidim_Fnew.spi");
 #endif

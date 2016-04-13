@@ -1736,7 +1736,7 @@ ExtractJobWindow::ExtractJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREA
 	resetHeight();
 
     star_mics.place(current_y,"micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
-	// Add a little spacer
+
 	current_y += STEPY/2;
 	coords_suffix.place(current_y,"Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 
@@ -2910,6 +2910,8 @@ tilt and psi angles in the first few iterations (global searches for orientation
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
+	helical_range_distance.place(current_y, "Range factor of local averaging:", -1., 1., 5., 0.1, "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. Polarities are also set to be the same for segments coming from the same tube during local refinement. \
+Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
 	tab6->end();
@@ -3001,6 +3003,7 @@ void Class3DJobWindow::write(std::string fn)
 	helical_z_percentage.writeValue(fh);
 	range_tilt.writeValue(fh);
 	range_psi.writeValue(fh);
+	helical_range_distance.writeValue(fh);
 
 	// Compute
 	do_combine_thru_disc.writeValue(fh);
@@ -3073,6 +3076,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		helical_z_percentage.readValue(fh);
 		range_tilt.readValue(fh);
 		range_psi.readValue(fh);
+		helical_range_distance.readValue(fh);
 
 		// Compute
 		do_combine_thru_disc.readValue(fh);
@@ -3125,6 +3129,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	helical_z_percentage.deactivate(is_continue);
 	range_tilt.deactivate(is_continue);
 	range_psi.deactivate(is_continue);
+	helical_range_distance.deactivate(is_continue);
 
 	// Sampling
 
@@ -3293,6 +3298,8 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
+			if (helical_range_distance.getValue() > 0.)
+				command += " --helical_sigma_distance " + floatToString(helical_range_distance.getValue() / 3.);
 		}
 	}
 
@@ -3514,6 +3521,8 @@ tilt and psi angles in the first few iterations (global searches for orientation
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
+	helical_range_distance.place(current_y, "Range factor of local averaging:", -1., 1., 5., 0.1, "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. Polarities are also set to be the same for segments coming from the same tube during local refinement. \
+Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
 	helix_group->end();
 	do_helix.cb_menu_i(); // to make default effective
 
@@ -3600,6 +3609,7 @@ void Auto3DJobWindow::write(std::string fn)
 	helical_z_percentage.writeValue(fh);
 	range_tilt.writeValue(fh);
 	range_psi.writeValue(fh);
+	helical_range_distance.writeValue(fh);
 
 	// Compute
 	do_combine_thru_disc.writeValue(fh);
@@ -3667,6 +3677,7 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		helical_z_percentage.readValue(fh);
 		range_tilt.readValue(fh);
 		range_psi.readValue(fh);
+		helical_range_distance.readValue(fh);
 
 		// Compute
 		do_combine_thru_disc.readValue(fh);
@@ -3724,6 +3735,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	helical_z_percentage.deactivate(is_continue);
 	range_tilt.deactivate(is_continue);
 	range_psi.deactivate(is_continue);
+	helical_range_distance.deactivate(is_continue);
 }
 
 void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -3888,6 +3900,8 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
+			if (helical_range_distance.getValue() > 0.)
+				command += " --helical_sigma_distance " + floatToString(helical_range_distance.getValue() / 3.);
 		}
 	}
 
@@ -3914,11 +3928,6 @@ MovieRefineJobWindow::MovieRefineJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_T
 	tab1->label("I/O");
 	resetHeight();
 
-	fn_movie_star.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR Files (*.{star})", "Select the STAR file with the input movie micrographs, either from an Import or a Motion correction job.");
-    movie_rootname.place(current_y, "Rootname of movies files:", "movie", "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs. If you've run the MOTIONCORR wrapper in RELION, then the correct rootname is 'movie'.");
-
-    // Add a little spacer
-	current_y += STEPY/2;
 
 	fn_cont.place(current_y, "Continue 3D auto-refine from: ", "", "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
@@ -3926,11 +3935,12 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run. \n \
 Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
+    movie_rootname.place(current_y, "Rootname of movies files:", "movie", "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs. If you've run the MOTIONCORR wrapper in RELION, then the correct rootname is 'movie'.");
 
     // Add a little spacer
 	current_y += STEPY/2;
 
-	join_nr_mics.place(current_y, "Process micrographs in batches of: ", -1, 10, 200, 10, "All movie-particles will be extracted from each micrograph separately, but the resulting STAR files will be joined together into batches of the size specified here. The movie-refinement will be performed on these batches. \
+	join_nr_mics.place(current_y, "Process micrographs in batches of: ", 50, 10, 200, 10, "All movie-particles will be extracted from each micrograph separately, but the resulting STAR files will be joined together into batches of the size specified here. The movie-refinement will be performed on these batches. \
 Very large batches cost more RAM, but the parallelisation in smaller batches is poorer. If a negative number is given, all micrographs are processed in one batch. Note that movie-refinement that INCLUDE rotational searches cannot be performed in batches!");
 
 	tab1->end();
@@ -4030,7 +4040,6 @@ void MovieRefineJobWindow::write(std::string fn)
 
 	// I/O
 	fn_cont.writeValue(fh);
-	fn_movie_star.writeValue(fh);
 	movie_rootname.writeValue(fh);
 	join_nr_mics.writeValue(fh);
 
@@ -4071,7 +4080,6 @@ void MovieRefineJobWindow::read(std::string fn, bool &_is_continue)
 
 		// I/O
 		fn_cont.readValue(fh);
-		fn_movie_star.readValue(fh);
 		movie_rootname.readValue(fh);
 		join_nr_mics.readValue(fh);
 
@@ -4105,7 +4113,6 @@ void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(is_continue);
-	fn_movie_star.deactivate(is_continue);
 	movie_rootname.deactivate(is_continue);
 	join_nr_mics.deactivate(is_continue);
 
@@ -4149,10 +4156,6 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command="`which relion_preprocess`";
 
 	// Input
-	command += " --i " + fn_movie_star.getValue();
-	Node node(fn_movie_star.getValue(), fn_movie_star.type);
-	pipelineInputNodes.push_back(node);
-
 	// Get the data.star to be used for re-extraction from the optimiser name
 	FileName fn_data = fn_cont.getValue();
 	fn_data = fn_data.without("optimiser.star") + "data.star";
@@ -4212,12 +4215,10 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	commands.push_back(command);
 
 	// Also touch the suffix file. Do this after the first command had completed
-	// TODO: test this!!!
-	command = "echo " + fn_movie_star.getValue() + " > " +  outputname + "coords_suffix_extract.star";
+	command = "echo " + outputname + "all_micrographs.star  > " +  outputname + "coords_suffix_extract.star";
 	commands.push_back(command.c_str());
 	Node node3(outputname + "coords_suffix_extract.star", NODE_MIC_COORDS);
 	pipelineOutputNodes.push_back(node3);
-
 
 	// B. Then get the actual movie-refinement command
 	if (nr_mpi.getValue() > 1)

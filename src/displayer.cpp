@@ -1831,7 +1831,7 @@ void displayerGuiWindow::cb_display_i()
 
 	// send job in the background
 	cl += " &";
-	std::cout << "Executing: " << cl << std::endl;
+	//std::cout << "Executing: " << cl << std::endl;
 	int res = system(cl.c_str());
 
 }

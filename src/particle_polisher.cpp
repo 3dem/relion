@@ -266,7 +266,7 @@ void ParticlePolisher::initialise()
 	// Sep24,2015 - Shaoda, Helical reconstruction
 	if (helical_nr_asu > 1)
 	{
-		if ( (fabs(helical_twist) < 0.01) || (fabs(helical_twist) > 179.99) || (angpix < 0.001) || ((helical_rise / angpix) < 0.001))
+		if ( (fabs(helical_twist) > 360.) || (angpix < 0.001) || ((helical_rise / angpix) < 0.001))
 			REPORT_ERROR("ERROR: Invalid helical twist or rise!");
 	}
 

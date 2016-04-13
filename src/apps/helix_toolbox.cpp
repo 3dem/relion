@@ -63,6 +63,8 @@ public:
 	bool do_merge_star_files;
 	bool do_sort_datastar_tubeID;
 	bool do_simulate_helical_segments_2D;
+	bool do_cut_out;
+	bool do_set_xmipp_origin;
 
 	// Input files
 	FileName fn_in, fn_in1, fn_in2;
@@ -135,6 +137,9 @@ public:
 	// Do bimoidal searches of tilt and psi angles in 3D helical reconstruction?
 	bool do_bimodal_searches;
 
+	// Cut out a small part of the helix within this angle (in degrees)
+	RFLOAT ang;
+
 	helix_bilder_parameters()
 	{
 		clear();
@@ -155,9 +160,10 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (Feb 10, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (Mar 18, 2015)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
+		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
 		do_create_cylinder_3D = parser.checkOption("--cylinder", "Create a cylinder as 3D initial reference");
 		do_impose_helical_symmetry = parser.checkOption("--impose", "Impose helical symmetry");
 		do_PDB_helix = parser.checkOption("--pdb_helix", "Simulate a helix from a single PDB file of protein molecule");
@@ -180,12 +186,13 @@ public:
 		do_extract_coords_ximdisp = parser.checkOption("--extract_xim", "Extract XIMDISP coordinates of helical segments from specified straight tubes");
 		do_set_default_tilt = parser.checkOption("--init_tilt", "Set tilt angles to 90 degrees for all helical segments");
 		do_merge_star_files = parser.checkOption("--merge", "Merge small STAR files into a huge one");
-		do_remove_mics_with_bad_ctf = parser.checkOption("--remove_bad_ctf", "Remove micrographs with bad CTF FOM values");
+		do_set_xmipp_origin = parser.checkOption("--set_xmipp_origin", "Set Xmipp origin");
 
 		int params_section = parser.addSection("Parameters (alphabetically ordered)");
+		ang = textToFloat(parser.getOption("--ang", "Cut out a small part of the helix within this angle (in degrees)", "91."));
 		pixel_size_A = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1."));
 		do_bimodal_searches = parser.checkOption("--bimodal", "Do bimodal searches of tilt and psi angles in 3D helical reconstruction?");
-		boxdim = textToInteger(parser.getOption("--boxdim", "Box size (in pixels)", "512"));
+		boxdim = textToInteger(parser.getOption("--boxdim", "Box size (in pixels)", "-1"));
 		do_center_of_mass_each_PDB_molecule = parser.checkOption("--center_pdb", "Translate all atoms in the original PDB to the center of mass of this molecule?");
 		ctf_fom_min = textToFloat(parser.getOption("--ctf_fom_min", "Minimum figure-of-merit - threshold used in removing micrographs with bad CTF", "-999"));
 		cyl_inner_diameter_A = textToFloat(parser.getOption("--cyl_inner_diameter", "Inner diameter of the cylindrical mask (in Angstroms)", "-1"));
@@ -260,6 +267,8 @@ public:
 		valid_options += (int)(do_merge_star_files);
 		valid_options += (int)(do_sort_datastar_tubeID);
 		valid_options += (int)(do_simulate_helical_segments_2D);
+		valid_options += (int)(do_cut_out);
+		valid_options += (int)(do_set_xmipp_origin);
 
 		if (valid_options <= 0)
 			REPORT_ERROR("Please specify one option!");
@@ -667,6 +676,44 @@ public:
 					sigma_psi,
 					sigma_tilt);
 		}
+		else if (do_cut_out)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Cut out a small part of the helix" << std::endl;
+				std::cout << "  USAGE: --cut_out --i in.mrc --o out.mrc (--boxdim 100 --z_percentage 0.3 --ang 30)" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+
+			Image<RFLOAT> img1, img2;
+			img1.clear();
+			img2.clear();
+			img1.read(fn_in);
+			cutOutPartOfHelix(img1(), img2(), boxdim, ang, z_percentage);
+			img2.write(fn_out);
+		}
+		else if (do_set_xmipp_origin)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Set Xmipp origin" << std::endl;
+				std::cout << "  USAGE: --set_xmipp_origin --i in.mrc --o out.mrc" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			Image<RFLOAT> img;
+			img.clear();
+			img.read(fn_in);
+			img().setXmippOrigin();
+			img.write(fn_out);
+		}
+		else
+		{
+			REPORT_ERROR("Please specify one option!");
+		}
 	};
 };
 #endif
@@ -736,6 +783,7 @@ public:
 
 	void run()
 	{
+		/*
 		FileName fns_in, fa, fb;
 		std::vector<FileName> fn_in_list;
 		MetaDataTable MD_out;
@@ -752,6 +800,7 @@ public:
 			cl = "cp " + fa + " " + fb;
 			int res = system(cl.c_str());
 		}
+		*/
 
 
 
@@ -759,12 +808,23 @@ public:
 		//img.read(fn_in);
 		//amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
 		//img.write(fn_out);
-		//MetaDataTable MD;
-		//MD.read(fn_in);
-		//sortHelicalTubeID(MD);
-		//updateAngularPriorsForHelicalReconstruction(MD, 200., true);
+		MetaDataTable MD;
+		int nr_opposite_polarity;
+		MD.read(fn_in);
+		sortHelicalTubeID(MD);
+		updatePriorsForHelicalReconstruction(
+									MD,
+									nr_opposite_polarity,
+									rot_in,
+									false,
+									true,
+									true,
+									25,
+									25,
+									25,
+									2);
 		//testDataFileTransformXY(MD);
-		//MD.write(fn_out);
+		MD.write(fn_out);
 
 
 

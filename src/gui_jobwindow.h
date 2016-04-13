@@ -585,6 +585,7 @@ public:
 	SliderEntry helical_z_percentage;
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
+	SliderEntry helical_range_distance;
 
 	// Compute
 	BooleanEntry do_combine_thru_disc;
@@ -666,6 +667,7 @@ public:
 	SliderEntry helical_z_percentage;
 	AnyEntry range_tilt;
 	AnyEntry range_psi;
+	SliderEntry helical_range_distance;
 
 	// Compute
 	BooleanEntry do_combine_thru_disc;
@@ -702,7 +704,6 @@ public:
 
 	// I/O
 	FileNameEntry fn_cont;
-	InputNodeEntry fn_movie_star;
 	AnyEntry movie_rootname;
 
 	// Extract movie-particles
