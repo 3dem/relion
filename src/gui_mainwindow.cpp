@@ -777,13 +777,9 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 	}
 	default:
 	{
-		REPORT_ERROR("RelionMainWindow::addToPipeLine ERROR: unrecognised type");
+		REPORT_ERROR("ERROR: unrecognised job-type to add to the pipeline");
 	}
 	}
-
-	// Before changing the pipeline, let's read in the current version
-
-
 
 	// Also write a mini-pipeline in the output directory
 	PipeLine mini_pipeline;
