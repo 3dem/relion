@@ -1738,7 +1738,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	if (use_gpu.getValue())
 	{
 		// for the moment always use --shrink 0 with GPUs ...
-		command += " --shrink 0 --gpu " + gpu_ids.getValue();
+		command += " --gpu " + gpu_ids.getValue();
 	}
 
 	// Other arguments
