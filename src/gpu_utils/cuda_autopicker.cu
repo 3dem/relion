@@ -108,10 +108,22 @@ void AutoPickerCuda::run()
 	}
 
 
+	FileName fn_olddir="";
 	for (long int imic = 0; imic < basePckr->fn_micrographs.size(); imic++)
 	{
 		if (basePckr->verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
+
+
+		// Check new-style outputdirectory exists and make it if not!
+		FileName fn_dir = basePckr->getOutputRootName(basePckr->fn_micrographs[imic]);
+		fn_dir = fn_dir.beforeLastOf("/");
+		if (fn_dir != fn_olddir)
+		{
+			// Make a Particles directory
+			int res = system(("mkdir -p " + fn_dir).c_str());
+			fn_olddir = fn_dir;
+		}
 
 		autoPickOneMicrograph(basePckr->fn_micrographs[imic]);
 	}
@@ -222,6 +234,7 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 				 false,
 				 1);
 	CUDA_CPU_TOC("PRE-CenterFFT_1");
+
 }
 
 void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &Fmic, const MultidimArray<Complex > &Fmic2,
@@ -269,8 +282,13 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex
 	Mstddev.resizeNoCp(1, basePckr->micrograph_size, basePckr->micrograph_size);
 	d_Mstddev.cp_to_host();
 	d_Mstddev.streamSync();
+
+	// Sjors 14Apr2016: Bring back to non-downscaled stddev values:
+	float scale = (float)(basePckr->micrograph_size)/(float)(basePckr->workSize);
+	std::cerr << "scale="<<scale<<std::endl;
 	for(int i =0; i< d_Mstddev.size; i++)
-		Mstddev.data[i] = d_Mstddev[i];
+		Mstddev.data[i] = d_Mstddev[i] * scale;
+
 }
 
 void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
@@ -579,10 +597,14 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		d_Mstddev.streamSync();
 
 		Mstddev.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
+
+		// 16April2014 Sjors
+		float rescale = (float)(basePckr->micrograph_size)/(float)(basePckr->workSize);
+
 		//TODO put this in a kernel
 		for(int i = 0; i < d_Mstddev.size ; i ++)
 		{
-			Mstddev.data[i] = d_Mstddev[i];
+			Mstddev.data[i] = d_Mstddev[i] * rescale;
 			if (d_Mstddev[i] > (XFLOAT)1E-10)
 				d_Mstddev[i] = 1 / d_Mstddev[i];
 			else
@@ -665,9 +687,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 
 
-	CUDA_CPU_TIC("setupProjectors");
-	setupProjectors();
-	CUDA_CPU_TOC("setupProjectors");
+	if (!basePckr->do_read_fom_maps)
+	{
+		CUDA_CPU_TIC("setupProjectors");
+		setupProjectors();
+		CUDA_CPU_TOC("setupProjectors");
+	}
 
 	CudaGlobalPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);
 	for(int i = 0; i< d_ctf.size ; i++)
@@ -682,18 +707,22 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
 		if (basePckr->do_read_fom_maps)
 		{
-			CUDA_CPU_TIC("readFromFomMaps");
-			FileName fn_tmp;
-			Image<RFLOAT> It;
-			fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.spi");
-			It.read(fn_tmp);
-			Mccf_best = It();
-			// Retrieve expected_Pratio from the header of the image..
-			It.MDMainHeader.getValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);
-			fn_tmp.compose(fn_mic.withoutExtension()+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
-			It.read(fn_tmp);
-			Mpsi_best = It();
-			CUDA_CPU_TOC("readFromFomMaps");
+			if (!basePckr->autopick_helical_segments)
+			{
+				CUDA_CPU_TIC("readFromFomMaps");
+				FileName fn_tmp;
+				Image<RFLOAT> It;
+
+				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestCCF.spi");
+				It.read(fn_tmp);
+				Mccf_best = It();
+				It.MDMainHeader.getValue(EMDL_IMAGE_STATS_MAX, expected_Pratio);  // Retrieve expected_Pratio from the header of the image
+
+				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
+				It.read(fn_tmp);
+				Mpsi_best = It();
+				CUDA_CPU_TOC("readFromFomMaps");
+			}
 
 		} //end else if do_read_fom_maps
 		else
