@@ -188,7 +188,7 @@ void MlOptimiserMpi::initialise()
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 		std::vector < std::vector < std::string > > allThreadIDs;
-		MlOptimiser::untangleDeviceIDs(gpu_ids, allThreadIDs);
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 		// Sequential initialisation of GPUs on all ranks
 		bool fullAutomaticMapping(true);

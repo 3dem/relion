@@ -27,11 +27,10 @@
 #define HAS_NOT_THREAD false
 #define HAS_PARALLEL_DISCIO true
 #define HAS_NOT_PARALLEL_DISCIO false
-#define HAS_RUN true
-#define HAS_NOT_RUN false
 
 #include <ctime>
 #include "src/gui_entries.h"
+#include "src/metadata_table.h"
 #include "src/pipeliner.h"
 
 // Our own defaults at LMB are the hard-coded ones
@@ -104,7 +103,6 @@ public:
 	Fl_Group *queue_group;
 	SliderEntry nr_mpi;
 	SliderEntry nr_threads;
-	SliderEntry ram_per_thread;
     BooleanEntry do_queue;
 	AnyEntry queuename;
 	AnyEntry qsub;
@@ -127,7 +125,7 @@ public:
 
 public:
 	// Constructor with x, y, w, h and a title
-	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread, bool _has_run = true,
+	RelionJobWindow(int nr_tabs, bool _has_mpi, bool _has_thread,
 			int x = WCOL0, int y = 2, int w = GUIWIDTH - WCOL0 - 10, int h = GUIHEIGHT_OLD-65, const char* title = "");
 
     // Destructor
@@ -232,6 +230,7 @@ public:
 	SliderEntry bfactor;
 	AnyEntry other_motioncorr_args;
 	BooleanEntry do_save_movies;
+    AnyEntry gpu_ids;
 
 
 public:
@@ -268,6 +267,7 @@ public:
 	AnyEntry phase_min, phase_max, phase_step;
 	AnyEntry movie_rootname;
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
+    AnyEntry gpu_ids;
 
 	AnyEntry other_gctf_args;
 
@@ -315,8 +315,10 @@ public:
 	SliderEntry helical_tube_kappa_max;
 	SliderEntry helical_tube_outer_diameter;
 	SliderEntry helical_tube_length_min;
+    BooleanEntry use_gpu;
+    AnyEntry gpu_ids;
 
-	Fl_Group *autopick_ctf_group, *autopick_helix_group;
+	Fl_Group *autopick_ctf_group, *autopick_helix_group, *gpu_group;
 
 public:
 
@@ -506,8 +508,10 @@ public:
 	BooleanEntry do_parallel_discio;
 	SliderEntry nr_pool;
 	BooleanEntry do_preread_images;
+    BooleanEntry use_gpu;
+    AnyEntry gpu_ids;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group;
+	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group, *gpu_group;
 
 public:
 
@@ -592,8 +596,10 @@ public:
 	BooleanEntry do_parallel_discio;
 	SliderEntry nr_pool;
 	BooleanEntry do_preread_images;
+    BooleanEntry use_gpu;
+    AnyEntry gpu_ids;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group;
+	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 
 public:
 
@@ -674,8 +680,10 @@ public:
 	BooleanEntry do_parallel_discio;
 	SliderEntry nr_pool;
 	BooleanEntry do_preread_images;
+    BooleanEntry use_gpu;
+    AnyEntry gpu_ids;
 
-	Fl_Group *ctf_group, *helix_group, *helix_symmetry_search_group;
+	Fl_Group *ctf_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 
 public:
 

@@ -71,6 +71,10 @@ public:
 	// Output STAR file
 	MetaDataTable MDavg, MDmov;
 
+	// Which GPU devices to use?
+	std::string gpu_ids;
+	std::vector < std::vector < std::string > > allThreadIDs;
+
 public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
