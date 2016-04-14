@@ -789,9 +789,6 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 	PipeLine mini_pipeline;
 	mini_pipeline.setName(oname+"job");
 
-	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(true);
-
 	// Add Process to the processList of the pipeline
 	Process process(oname, itype, as_status);
 	long int myProcess = pipeline.addNewProcess(process, do_overwrite);
