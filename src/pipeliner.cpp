@@ -627,6 +627,8 @@ void PipeLine::write(FileName fn_del, std::vector<bool> deleteNode, std::vector<
     std::ofstream  fh, fh_del;
     FileName fn = name + "_pipeline.star";
     fh.open(fn.c_str(), std::ios::out);
+	if (fh.fail())
+		REPORT_ERROR("ERROR: cannot write to pipeline file: " + fn);
 
     if (fn_del != "")
     {
