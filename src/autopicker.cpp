@@ -1594,7 +1594,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	Mccf_best.resize(workSize, workSize);
 	Mpsi_best.resize(workSize, workSize);
 
-	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_pixels_circular_mask;;
+	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_pixels_circular_mask;
 	if (do_read_fom_maps)
 	{
 		FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_stddevNoise.spi";
@@ -2095,6 +2095,8 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	}
 
 	CenterFFT(_Mstddev, false);
+	// Sjors 14Apr2016: Bring back to non-downscaled stddev values:
+	_Mstddev *= (float)(micrograph_size)/(float)(workSize);
 
 #ifdef DEBUG
 	tt()=_Mstddev;
@@ -2129,15 +2131,30 @@ void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArr
 				if (max_stddev_noise > 0. && A2D_ELEM(Mstddev, i, j) > max_stddev_noise)
 					continue;
 
-				// This is a peak if all four neighbours are also above the threshold, AND have lower values than myval
-				if (A2D_ELEM(Mfom, i-1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i-1, j) > myval )
-					continue;
-				if (A2D_ELEM(Mfom, i+1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i+1, j) > myval )
-					continue;
-				if (A2D_ELEM(Mfom, i, j-1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j-1) > myval )
-					continue;
-				if (A2D_ELEM(Mfom, i, j+1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j+1) > myval )
-					continue;
+				if (scale < 1.)
+				{
+					// When we use shrink, then often peaks aren't 5 pixels big anymore....
+					if (A2D_ELEM(Mfom, i-1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i+1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j-1) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j+1) > myval )
+						continue;
+				}
+				else
+				{
+					// This is a peak if all four neighbours are also above the threshold, AND have lower values than myval
+					if (A2D_ELEM(Mfom, i-1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i-1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i+1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i+1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j-1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j-1) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j+1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j+1) > myval )
+						continue;
+				}
 				peak.x = j - FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale));
 				peak.y = i - FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale));
 				peak.psi = A2D_ELEM(Mpsi, i, j);
@@ -2205,7 +2222,7 @@ void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance, f
 			{
 				int dx = cluster[iclus].x - bestpeak.x;
 				int dy = cluster[iclus].y - bestpeak.y;
-				if (dx*dx + dy*dy < ((float)(mind2)*scale*scale) )
+				if (dx*dx + dy*dy < mind2)
 				{
 					cluster.erase(cluster.begin()+iclus);
 					iclus--;
@@ -2237,7 +2254,7 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 				int dx = peaks[ipeakp].x - my_x;
 				int dy = peaks[ipeakp].y - my_y;
 				int d2 = dx*dx + dy*dy;
-				if ( d2 < (((float)my_mind2)*scale*scale) )
+				if ( d2 < (int)(((float)my_mind2)*scale*scale) )
 					my_mind2 = d2;
 			}
 		}
