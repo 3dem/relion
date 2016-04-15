@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include "src/pipeliner.h"
+#include <unistd.h>
 
 //#define DEBUG
 

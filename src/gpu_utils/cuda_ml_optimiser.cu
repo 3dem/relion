@@ -782,7 +782,7 @@ void getAllSquaredDifferencesCoarse(
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		allWeights_size += projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans * sp.nr_particles;
+		allWeights_size += projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans;
 
 	CudaGlobalPtr<XFLOAT> allWeights(allWeights_size,cudaMLO->devBundle->allocator);
 	allWeights.device_alloc();
@@ -926,6 +926,8 @@ void getAllSquaredDifferencesCoarse(
 		corr_img.cp_to_device();
 
 		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
+
+		allWeights_pos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1417,7 +1419,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
 			CUDA_CPU_TIC("get_offset_priors");
 
-			RFLOAT pdf_offset_mean(0);
+			double pdf_offset_mean(0);
+			std::vector<double> pdf_offset_t(pdf_offset.getSize());
 			unsigned pdf_offset_count(0);
 
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1441,10 +1444,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
-					RFLOAT pdf(0);
+					double pdf(0);
 					RFLOAT offset_x = old_offset_x - myprior_x + baseMLO->sampling.translations_x[itrans];
 					RFLOAT offset_y = old_offset_y - myprior_y + baseMLO->sampling.translations_y[itrans];
-					RFLOAT tdiff2 = offset_x * offset_x + offset_y * offset_y;
+					double tdiff2 = offset_x * offset_x + offset_y * offset_y;
 
 					if (baseMLO->mymodel.data_dim == 3)
 					{
@@ -1459,19 +1462,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					else
 						pdf = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
 
-					pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
+					pdf_offset_t[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
 					pdf_offset_mean += pdf;
 					pdf_offset_count ++;
 				}
 			}
 
-			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
+			pdf_offset_mean /= (double) pdf_offset_count;
 
 			//If mean is non-zero bring all values closer to 1 to improve numerical accuracy
 			//This factor is over all classes and is thus removed in the final normalization
 			if (pdf_offset_mean != 0.)
 				for (int i = 0; i < pdf_offset.getSize(); i ++)
-					pdf_offset[i] /= pdf_offset_mean;
+					pdf_offset[i] = pdf_offset_t[i] /  pdf_offset_mean;
 
 			pdf_offset.cp_to_device();
 			CUDA_CPU_TOC("get_offset_priors");
@@ -2805,10 +2808,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					// exp_part_id is already in randomized order (controlled by -seed)
 					// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
 		    		// Make sure random division is always the same with the same seed
-
-					init_random_generator(baseMLO->random_seed + my_ori_particle);
-		    		sp.iclass_min = sp.iclass_max = rand() % baseMLO->mymodel.nr_classes;
-
+					long int idx = my_ori_particle - baseMLO->exp_my_first_ori_particle;
+					if (idx >= baseMLO->exp_random_class_some_particles.size())
+						REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
+					sp.iclass_min = sp.iclass_max = baseMLO->exp_random_class_some_particles[idx];
 				}
 			}
 			// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?
