@@ -135,9 +135,9 @@ void AutoPickerCuda::run()
 
 }
 
-void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
+void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
 		int nr_nonzero_pixels_mask, CudaGlobalPtr< XFLOAT > &d_Mstddev, CudaGlobalPtr< XFLOAT > &d_Mmean,
-		size_t x, size_t y, size_t workSize)
+		size_t x, size_t y, size_t mic_size, size_t workSize)
 {
 	CudaFFT cudaTransformer(0, d_Fmic.getAllocator());
 	cudaTransformer.setSize(workSize,workSize);
@@ -219,10 +219,12 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 	CUDA_CPU_TOC("PRE-Transform_1");
 
 	CUDA_CPU_TIC("PRE-multi_3");
+	float scale = (float)(mic_size)/(float)(workSize);
 	Bsize = ( (int) ceilf(( float)d_Mstddev.size/(float)BLOCK_SIZE));
 	cuda_kernel_finalizeMstddev<<<Bsize,BLOCK_SIZE>>>( 	  d_Mstddev.d_ptr,
 														  cudaTransformer.reals.d_ptr,
 														  normfft,
+														  scale,
 														  d_Mstddev.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_3");
@@ -234,60 +236,6 @@ void calculateStddevAndMeanUnderMask2(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, Cuda
 				 false,
 				 1);
 	CUDA_CPU_TOC("PRE-CenterFFT_1");
-
-}
-
-void AutoPickerCuda::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &Fmic, const MultidimArray<Complex > &Fmic2,
-		int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &Mstddev, MultidimArray<RFLOAT> &Mmean)
-{
-
-	CudaGlobalPtr< CUDACOMPLEX > d_Fmic(Fmic.nzyxdim, allocator);
-	for(int i = 0; i< d_Fmic.size ; i++)
-	{
-		d_Fmic[i].x=Fmic.data[i].real;
-		d_Fmic[i].y=Fmic.data[i].imag;
-	}
-	d_Fmic.put_on_device();
-
-	CudaGlobalPtr< CUDACOMPLEX > d_Fmic2(Fmic2.nzyxdim, allocator);
-	for(int i = 0; i< d_Fmic2.size ; i++)
-	{
-		d_Fmic2[i].x=Fmic2.data[i].real;
-		d_Fmic2[i].y=Fmic2.data[i].imag;
-	}
-	d_Fmic2.put_on_device();
-
-	CudaGlobalPtr< CUDACOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
-	for(int i = 0; i< d_Fmsk.size ; i++)
-	{
-		d_Fmsk[i].x = basePckr->Finvmsk.data[i].real;
-		d_Fmsk[i].y = basePckr->Finvmsk.data[i].imag;
-	}
-	d_Fmsk.put_on_device();
-
-	CudaGlobalPtr< XFLOAT > d_Mstddev(basePckr->micrograph_size*basePckr->micrograph_size, allocator);
-	CudaGlobalPtr< XFLOAT > d_Mmean(basePckr->micrograph_size*basePckr->micrograph_size, allocator);
-	d_Mstddev.device_alloc();
-	d_Mmean.device_alloc();
-
-
-	calculateStddevAndMeanUnderMask2(d_Fmic, d_Fmic2, d_Fmsk, nr_nonzero_pixels_mask, d_Mstddev, d_Mmean, Fmic.xdim, Fmic.ydim, basePckr->micrograph_size);
-
-	Mmean.resizeNoCp(1, basePckr->micrograph_size, basePckr->micrograph_size);
-	d_Mmean.cp_to_host();
-	d_Mmean.streamSync();
-	for(int i =0; i< Mmean.nzyxdim; i++)
-		Mmean.data[i] = d_Mmean[i];
-
-	Mstddev.resizeNoCp(1, basePckr->micrograph_size, basePckr->micrograph_size);
-	d_Mstddev.cp_to_host();
-	d_Mstddev.streamSync();
-
-	// Sjors 14Apr2016: Bring back to non-downscaled stddev values:
-	float scale = (float)(basePckr->micrograph_size)/(float)(basePckr->workSize);
-	std::cerr << "scale="<<scale<<std::endl;
-	for(int i =0; i< d_Mstddev.size; i++)
-		Mstddev.data[i] = d_Mstddev[i] * scale;
 
 }
 
@@ -518,61 +466,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("FourierTransform_1");
 
-
-
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
-
 		CUDA_CPU_TIC("calculateStddevAndMeanUnderMask");
-
-
-
-//
-//		//TODO REMOVED THIS
-//		MultidimArray<Complex > _Fmic, _Fmic2;
-//		_Fmic.resize(micTransformer.yFSize, micTransformer.xFSize);
-//		_Fmic2.resize(micTransformer.yFSize, micTransformer.xFSize);
-//
-//		Ftmp.host_alloc();
-//		Ftmp.cp_to_host();
-//		micTransformer.fouriers.cp_to_host();
-//		micTransformer.fouriers.streamSync();
-//		for (int i = 0; i < Ftmp.getSize(); i ++)
-//		{
-//			_Fmic.data[i].real = Ftmp[i].x;
-//			_Fmic.data[i].imag = Ftmp[i].y;
-//			_Fmic2.data[i].real = micTransformer.fouriers[i].x;
-//			_Fmic2.data[i].imag = micTransformer.fouriers[i].y;
-//		}
-//
-//
-//
-//
-//
-//		calculateStddevAndMeanUnderMask(_Fmic, _Fmic2, basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
-////		basePckr->calculateStddevAndMeanUnderMask(_Fmic, _Fmic2, basePckr->Finvmsk, basePckr->nr_pixels_circular_invmask, Mstddev, Mmean);
-//
-//
-//
-//
-//
-//
-//		//TODO REMOVED THIS
-//		d_Mmean.setSize(Mmean.nzyxdim);
-//		d_Mstddev.setSize(Mstddev.nzyxdim);
-//		d_Mmean.host_alloc();
-//		d_Mstddev.host_alloc();
-//		for(int i = 0; i < d_Mmean.size; i++)
-//		{
-//			d_Mmean[i] = Mmean.data[i];
-//			d_Mstddev[i] = Mstddev.data[i];
-//		}
-//		d_Mmean.put_on_device();
-//		d_Mstddev.put_on_device();
-
-
-
-
-
 
 		d_Mstddev.device_alloc(basePckr->workSize*basePckr->workSize);
 		d_Mmean.device_alloc(basePckr->workSize*basePckr->workSize);
@@ -588,7 +483,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		d_Fmsk.put_on_device();
 		d_Fmsk.streamSync();
 
-		calculateStddevAndMeanUnderMask2(Ftmp, micTransformer.fouriers, d_Fmsk, basePckr->nr_pixels_circular_invmask, d_Mstddev, d_Mmean, micTransformer.xFSize, micTransformer.yFSize, basePckr->workSize);
+		calculateStddevAndMeanUnderMask(Ftmp, micTransformer.fouriers, d_Fmsk, basePckr->nr_pixels_circular_invmask, d_Mstddev, d_Mmean, micTransformer.xFSize, micTransformer.yFSize, basePckr->micrograph_size, basePckr->workSize);
 
 
 		//TODO remove this
