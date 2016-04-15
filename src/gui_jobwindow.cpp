@@ -4598,6 +4598,9 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
 	pipelineOutputNodes.push_back(node4);
 
+	Node node5(outputname + "shiny_post.mrc", NODE_FINALMAP);
+	pipelineOutputNodes.push_back(node5);
+
 	// If this is not a continue job, then re-start from scratch....
 	if (is_continue)
 		command += " --only_do_unfinished ";
