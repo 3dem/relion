@@ -493,13 +493,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 		Mstddev.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
 
-		// 16April2014 Sjors
-		float rescale = (float)(basePckr->micrograph_size)/(float)(basePckr->workSize);
-
 		//TODO put this in a kernel
 		for(int i = 0; i < d_Mstddev.size ; i ++)
 		{
-			Mstddev.data[i] = d_Mstddev[i] * rescale;
+			Mstddev.data[i] = d_Mstddev[i];
 			if (d_Mstddev[i] > (XFLOAT)1E-10)
 				d_Mstddev[i] = 1 / d_Mstddev[i];
 			else
