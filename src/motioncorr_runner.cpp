@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/motioncorr_runner.h"
+#include "src/gpu_utils/cuda_mem_utils.h"
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
@@ -72,6 +73,12 @@ void MotioncorrRunner::initialise()
 	MDmov.clear();
 
 	untangleDeviceIDs(gpu_ids, allThreadIDs);
+	if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+	{
+		if (verb>0)
+			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	}
 
 	FileName fn_avg, fn_mov;
 
@@ -243,11 +250,15 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 		if (fn_other_args.length() > 0)
 			command += " " + fn_other_args;
 
-		// TODO: think about GPU and MPI interplay!
-		if (rank >= allThreadIDs.size())
-			REPORT_ERROR("ERROR: rank= " + integerToString(rank) + ", while size of GPU-IDs vector= " + integerToString(allThreadIDs.size()) + ". Check --gpu input, and provide a device-ID for each MPI process.");
+		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+		{
+			// Automated mapping
+			command += " -gpu " + integerToString(rank % devCount);
+		}
 		else
+		{
 			command += " -gpu " + allThreadIDs[rank][0];
+		}
 
 		command += " >> " + fn_out + " 2>> " + fn_err;
 

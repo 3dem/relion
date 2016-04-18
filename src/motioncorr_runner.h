@@ -72,6 +72,7 @@ public:
 	MetaDataTable MDavg, MDmov;
 
 	// Which GPU devices to use?
+	int devCount;
 	std::string gpu_ids;
 	std::vector < std::vector < std::string > > allThreadIDs;
 
