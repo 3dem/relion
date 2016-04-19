@@ -176,11 +176,13 @@ if(GUI)
 				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
 		    else()
 		        message(STATUS "FLTK was NOT found")
+		        set(NEW_OWN_FLTK TRUE)
 		    endif() 
         endif(NOT FORCE_OWN_FLTK)
         
 		if(NOT FLTK_FOUND)
         	include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+        	set(NEW_OWN_FLTK TRUE)
         endif(NOT FLTK_FOUND)
     else(X11_FOUND)
         message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
@@ -200,6 +202,7 @@ endif(NOT FORCE_OWN_FFTW)
 	
 if(NOT FFTW_FOUND)
 	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
+	set(NEW_OWN_FFTW TRUE)
 endif(NOT FFTW_FOUND)
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
