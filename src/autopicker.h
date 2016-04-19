@@ -170,8 +170,11 @@ public:
 	// Input & Output rootname
 	FileName fn_in, fn_ref, fns_autopick, fn_odir, fn_out;
 
-	// Pixel size (for low-pass filter and particle diameter)
+	// Pixel size for the micrographs (for low-pass filter and particle diameter)
 	RFLOAT angpix;
+
+	// Pixel size for the references (for low-pass filter and particle diameter)
+	RFLOAT angpix_ref;
 
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
@@ -212,8 +215,9 @@ public:
 	// All micrographs to autopick from
 	std::vector<FileName> fn_micrographs;
 
-	// Original size of the micrographs
-	int micrograph_size, micrograph_xsize, micrograph_ysize, micrograph_minxy_size;
+	// Original and shrunk size of the micrographs
+	int ori_micrograph_size, ori_micrograph_xsize, ori_micrograph_ysize;
+	int micrograph_size, micrograph_xsize, micrograph_ysize;
 
 	// decreased size micrograph
 	int workSize;
@@ -264,11 +268,14 @@ public:
 	// Size of the downsize micrographs for autopicking
 	int downsize_mic;
 
+	// Scale when down-sizing the micrographs (using shrink)
+	float shrink_scale;
+
 	// Number of non-zero pixels in the circular mask, and of its inverse (for background normalisation in do_diff2)
 	int nr_pixels_circular_mask, nr_pixels_circular_invmask;
 
-	// Array with Fourier-transform of the (circular) mask, and of its inverse
-	MultidimArray<Complex > Fmsk, Finvmsk;
+	// Array with Fourier-transform of the inverse of the (circular) mask
+	MultidimArray<Complex > Finvmsk;
 
 public:
 
@@ -301,8 +308,6 @@ public:
 			RFLOAT particle_diameter_pix,
 			std::vector<ccfPeak>& ccf_peak_list,
 			MultidimArray<RFLOAT>& Mccfplot,
-			int micrograph_maxxy_size,
-			int micrograph_minxy_size,
 			int skip_side);
 
 	void extractHelicalTubes(
@@ -326,9 +331,6 @@ public:
 			FileName& fn_star_out,
 			RFLOAT particle_diameter_pix,
 			RFLOAT tube_length_min_pix,
-			int micrograph_maxxy_size,
-			int micrograph_xsize,
-			int micrograph_ysize,
 			int skip_side);
 
 	void autoPickOneMicrograph(FileName &fn_mic);
@@ -347,15 +349,15 @@ public:
 			MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
-	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks, float scale);
+	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks);
 
 	// Now prune the coordinates: within min_particle_distance: all peaks are the same cluster
 	// From each cluster, take the single peaks with the highest ccf
 	// If then, there is another peaks at a distance of at least min_particle_distance: take that one as well, and so forth...
-	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance, float scale);
+	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance);
 
 	// Only keep those peaks that are at the given distance apart from each other
-	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance, float scale);
+	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance);
 
 };
 

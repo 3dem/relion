@@ -259,7 +259,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	int Npsi = 360 / basePckr->psi_sampling;
 
 	int min_distance_pix = ROUND(basePckr->min_particle_distance / basePckr->angpix);
-	float scale = (float)basePckr->workSize / (float)basePckr->micrograph_size;
 
 	// Read in the micrograph
 	CUDA_CPU_TIC("readMicrograph");
@@ -278,26 +277,26 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	my_ysize = YSIZE(Imic());
 	my_size = (my_xsize != my_ysize) ? XMIPP_MAX(my_xsize, my_ysize) : my_xsize;
 
-	if (my_size != basePckr->micrograph_size || my_xsize != basePckr->micrograph_xsize || my_ysize != basePckr->micrograph_ysize)
+	if (my_size != basePckr->ori_micrograph_size || my_xsize != basePckr->ori_micrograph_xsize || my_ysize != basePckr->ori_micrograph_ysize)
 	{
-		Imic().printShape();
-		std::cerr << " micrograph_size= " << basePckr->micrograph_size << " micrograph_xsize= " << basePckr->micrograph_xsize << " micrograph_ysize= " << basePckr->micrograph_ysize << std::endl;
+		std::cerr << "This micrograph: "; Imic().printShape();
+		std::cerr << " ori_micrograph_size= " << basePckr->ori_micrograph_size << " ori_micrograph_xsize= " << basePckr->ori_micrograph_xsize << " ori_micrograph_ysize= " << basePckr->ori_micrograph_ysize << std::endl;
 		REPORT_ERROR("AutoPicker::autoPickOneMicrograph ERROR: No differently sized micrographs are allowed in one run, sorry you will have to run separately for each size...");
 	}
 
 	CudaFFT micTransformer(0, allocator);
-	CudaFFT extraMicTransformer(0,allocator);
+	//CudaFFT extraMicTransformer(0,allocator);
 	CudaFFT FPcudaTransformer(0, allocator);
 	CudaFFT cudaTransformer(0, allocator);
 	CudaFFT extraCudaTransformer(0, allocator);
 	if(!basePckr->do_read_fom_maps)
 	{
 		CUDA_CPU_TIC("setSize_micTr");
-		micTransformer.setSize(Imic().xdim, Imic().ydim,1);
+		micTransformer.setSize(basePckr->ori_micrograph_size, basePckr->ori_micrograph_size, 1);
 		CUDA_CPU_TOC("setSize_micTr");
-		CUDA_CPU_TIC("setSize_micTr");
-		extraMicTransformer.setSize(Imic().xdim, Imic().ydim,2);
-		CUDA_CPU_TOC("setSize_micTr");
+		//CUDA_CPU_TIC("setSize_micTr");
+		//extraMicTransformer.setSize(basePckr->ori_micrograph_size, basePckr->ori_micrograph_size, 2);
+		//CUDA_CPU_TOC("setSize_micTr");
 
 		CUDA_CPU_TIC("setSize_FPudaTr");
 		FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize, 1);
@@ -328,20 +327,20 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	}
     CUDA_CPU_TOC("middlePassFilter");
 
-	if (basePckr->micrograph_xsize !=basePckr->micrograph_ysize)
+	if (basePckr->ori_micrograph_xsize !=basePckr->ori_micrograph_ysize)
 	{
 		CUDA_CPU_TIC("rewindow");
 		// Window non-square micrographs to be a square with the largest side
-		rewindow(Imic, basePckr->micrograph_size);
+		rewindow(Imic, basePckr->ori_micrograph_size);
 		CUDA_CPU_TOC("rewindow");
 		CUDA_CPU_TIC("gaussNoiseOutside");
 		// Fill region outside the original window with white Gaussian noise to prevent all-zeros in Mstddev
 		FOR_ALL_ELEMENTS_IN_ARRAY2D(Imic())
 		{
-			if (i < FIRST_XMIPP_INDEX(basePckr->micrograph_ysize)
-					|| i > LAST_XMIPP_INDEX(basePckr->micrograph_ysize)
-					|| j < FIRST_XMIPP_INDEX(basePckr->micrograph_xsize)
-					|| j > LAST_XMIPP_INDEX(basePckr->micrograph_xsize) )
+			if (i < FIRST_XMIPP_INDEX(basePckr->ori_micrograph_ysize)
+					|| i > LAST_XMIPP_INDEX(basePckr->ori_micrograph_ysize)
+					|| j < FIRST_XMIPP_INDEX(basePckr->ori_micrograph_xsize)
+					|| j > LAST_XMIPP_INDEX(basePckr->ori_micrograph_xsize) )
 				A2D_ELEM(Imic(), i, j) = rnd_gaus(0.,1.);
 		}
 		CUDA_CPU_TOC("gaussNoiseOutside");
@@ -360,7 +359,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			{
 				ctf.read(basePckr->MDmic, basePckr->MDmic);
 				Fctf.resize(downsize_Fmic_y, downsize_Fmic_x);
-				ctf.getFftwImage(Fctf, basePckr->micrograph_size, basePckr->micrograph_size, basePckr->angpix, false, false, basePckr->intact_ctf_first_peak, true);
+				ctf.getFftwImage(Fctf, basePckr->ori_micrograph_size, basePckr->ori_micrograph_size, basePckr->angpix, false, false, basePckr->intact_ctf_first_peak, true);
 				break;
 			}
 		}
@@ -466,6 +465,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("FourierTransform_1");
 
+		// Sjors 19April2016 TODO: windowFourierTransform on both Fmic and Fmic2 to workSize, and then do stddev under msk calculation!
+
+
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
 		CUDA_CPU_TIC("calculateStddevAndMeanUnderMask");
 
@@ -482,7 +484,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		}
 		d_Fmsk.put_on_device();
 		d_Fmsk.streamSync();
-
+		std::cerr << "x="<<micTransformer.xFSize<<" y="<< micTransformer.yFSize<<std::endl;
 		calculateStddevAndMeanUnderMask(Ftmp, micTransformer.fouriers, d_Fmsk, basePckr->nr_pixels_circular_invmask, d_Mstddev, d_Mmean, micTransformer.xFSize, micTransformer.yFSize, basePckr->micrograph_size, basePckr->workSize);
 
 
@@ -915,11 +917,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("setXmippOriginX3");
 
 			CUDA_CPU_TIC("peakSearch");
-			basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks, scale);
+			basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks);
 			CUDA_CPU_TOC("peakSearch");
 
 			CUDA_CPU_TIC("peakPrune");
-			basePckr->prunePeakClusters(my_ref_peaks, min_distance_pix, scale);
+			basePckr->prunePeakClusters(my_ref_peaks, min_distance_pix);
 			CUDA_CPU_TOC("peakPrune");
 
 			CUDA_CPU_TIC("peakInsert");
@@ -985,19 +987,19 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	{
 		//Now that we have done all references, prune the list again...
 		CUDA_CPU_TIC("finalPeakPrune");
-		basePckr->prunePeakClusters(peaks, min_distance_pix, scale);
+		basePckr->prunePeakClusters(peaks, min_distance_pix);
 		CUDA_CPU_TOC("finalPeakPrune");
 
 		// And remove all too close neighbours
-		basePckr->removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix, scale);
+		basePckr->removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix);
 
 		// Write out a STAR file with the coordinates
 		MetaDataTable MDout;
 		for (int ipeak =0; ipeak < peaks.size(); ipeak++)
 		{
 			MDout.addObject();
-			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x)/scale);
-			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y)/scale);
+			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x)/basePckr->shrink_scale);
+			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y)/basePckr->shrink_scale);
 			MDout.setValue(EMDL_PARTICLE_CLASS, peaks[ipeak].ref + 1); // start counting at 1
 			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, peaks[ipeak].fom);
 			MDout.setValue(EMDL_ORIENT_PSI, peaks[ipeak].psi);

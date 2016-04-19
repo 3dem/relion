@@ -305,8 +305,10 @@ public:
 	SliderEntry lowpass;
 	SliderEntry highpass;
 	SliderEntry angpix;
+	SliderEntry angpix_ref;
 	SliderEntry particle_diameter;
 	SliderEntry psi_sampling_autopick;
+	SliderEntry shrink;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
 	SliderEntry mindist_autopick;
