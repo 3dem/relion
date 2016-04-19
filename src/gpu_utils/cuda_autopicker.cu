@@ -158,14 +158,6 @@ void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaG
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_0");
 
-	CUDA_CPU_TIC("PRE-window_0");
-	windowFourierTransform2(
-			d_Fcov,
-			cudaTransformer.fouriers,
-			x, y, 1,
-			workSize/2+1, workSize, 1);
-	CUDA_CPU_TOC("PRE-window_0");
-
 	CUDA_CPU_TIC("PRE-Transform_0");
 	cudaTransformer.backward();
 	CUDA_CPU_TOC("PRE-Transform_0");
@@ -203,15 +195,6 @@ void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaG
 													  d_Fmsk.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_2");
-
-
-	CUDA_CPU_TIC("PRE-window_1");
-	windowFourierTransform2(
-			d_Fcov,
-			cudaTransformer.fouriers,
-			x, y, 1,
-			workSize/2+1, workSize, 1);
-	CUDA_CPU_TOC("PRE-window_1");
 
 
 	CUDA_CPU_TIC("PRE-Transform_1");
@@ -416,13 +399,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		CUDA_CPU_TIC("Imic_insert");
 
 		//TODO ADD HIGH PASS FILTER
-//		if (highpass > 0.)
-//        {
-//			lowPassFilterMap(Fmic, XSIZE(Imic()), highpass, angpix, 2, true); // true means highpass instead of lowpass!
-//        	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
-//        }
-
-
+		//if (basePckr-highpass > 0.)
+        //{
+		//	lowPassFilterMap(Fmic, basePckr->ori_micrograph_size, basePckr->highpass, basePckr->angpix, 2, true); // true means highpass instead of lowpass!
+        //	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
+        //}
 
 		CUDA_CPU_TIC("runCenterFFT_0");
 		runCenterFFT(micTransformer.reals, micTransformer.xSize, micTransformer.ySize, true, 1);
@@ -465,7 +446,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("FourierTransform_1");
 
-		// Sjors 19April2016 TODO: windowFourierTransform on both Fmic and Fmic2 to workSize, and then do stddev under msk calculation!
+		// Sjors 19April2016 TODO: now here equivalent of windowFourierTransform on both Fmic and Fmic2 to workSize, and then do stddev under msk calculation!
 
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
@@ -484,7 +465,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		}
 		d_Fmsk.put_on_device();
 		d_Fmsk.streamSync();
-		std::cerr << "x="<<micTransformer.xFSize<<" y="<< micTransformer.yFSize<<std::endl;
 		calculateStddevAndMeanUnderMask(Ftmp, micTransformer.fouriers, d_Fmsk, basePckr->nr_pixels_circular_invmask, d_Mstddev, d_Mmean, micTransformer.xFSize, micTransformer.yFSize, basePckr->micrograph_size, basePckr->workSize);
 
 
@@ -655,7 +635,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			CUDA_CPU_TIC("PREP_CALCS");
 
-//			FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize);
+			//			FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize);
 			CUDA_CPU_TIC("windowFourierTransform_FP");
 			windowFourierTransform2(d_FauxNpsi,
 									FPcudaTransformer.fouriers,

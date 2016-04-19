@@ -55,6 +55,7 @@
 #include "src/funcs.h"
 #include "src/tabfuncs.h"
 #include "src/complex.h"
+#include "src/CPlot2D.h"
 
 /** @defgroup FourierW FFTW Fourier transforms
   * @ingroup DataLibrary
@@ -848,6 +849,10 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
-bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type);
+void padAndFloat2DMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT> &out, int factor = 2);
+
+void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type);
+
+void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps);
 
 #endif // __RELIONFFTW_H

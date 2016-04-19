@@ -72,8 +72,8 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	do_extract_helical_tubes = parser.checkOption("--helical_tubes", "Extract helical segments from tube coordinates");
 	helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of helical asymmetrical units", "1"));
 	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
-	bimodal_angular_priors = parser.checkOption("--helical_bimodal_angular_priors", "Add bimodal angular priors for helical segments");
-
+	helical_bimodal_angular_priors = parser.checkOption("--helical_bimodal_angular_priors", "Add bimodal angular priors for helical segments");
+	helical_cut_into_segments = parser.checkOption("--helical_cut_into_segments", "Cut helical tubes into segments");
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -542,23 +542,23 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
     if (is_star)
     {
 		if (do_extract_helical_tubes)
-			extractCoordsForAllHelicalSegments(fn_coord, MD, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, bimodal_angular_priors, total_segments, total_tubes);
+			convertHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
-			convertHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, xdim, ydim, extract_size, bimodal_angular_priors, total_segments);
+			convertHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, xdim, ydim, extract_size, helical_bimodal_angular_priors);
     }
     else if (is_box)
     {
 		if (do_extract_helical_tubes)
-			convertEmanHelicalTubeCoordsToMetaDataTable(fn_coord, MD, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, bimodal_angular_priors, total_segments, total_tubes);
+			convertEmanHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
-			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, xdim, ydim, extract_size, bimodal_angular_priors, total_segments, total_tubes);
+			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, xdim, ydim, extract_size, helical_bimodal_angular_priors);
     }
     else if (is_coords)
     {
 		if (do_extract_helical_tubes)
-			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_coord, MD, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, bimodal_angular_priors, total_segments, total_tubes);
+			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
-			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, xdim, ydim, extract_size, bimodal_angular_priors, total_segments, total_tubes);
+			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, xdim, ydim, extract_size, helical_bimodal_angular_priors);
     }
 	else
 		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (*.star, *.box and *.coords are supported).");

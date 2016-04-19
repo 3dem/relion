@@ -1860,21 +1860,26 @@ Pixels values higher than this many times the image stddev will be replaced with
 	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of helical tubes.");
 
+	current_y += STEPY/2;
 	helical_bimodal_angular_priors.place(current_y, "Use bimodal angular priors?", true, "Normally it should be set to Yes and bimodal angular priors will be applied in the following classification and refinement jobs. \
 Set to No if the 3D helix looks the same when rotated upside down.");
 
 	helical_tubes_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helical_tubes_group->end();
 
+	current_y += STEPY/2;
 	do_extract_helical_tubes.place(current_y, "Coordinates are start-end only?", true, "Set to Yes if you want to extract helical segments from manually picked tube coordinates (starting and end points of helical tubes in RELION, EMAN or XIMDISP format). \
 Set to No if segment coordinates (RELION auto-picked results or EMAN / XIMDISP segments) are provided.", helical_tubes_group);
 
 	helical_tubes_group->begin();
 
+	do_cut_into_segments.place(current_y, "Cut helical tubes into segments?", true, "Set to Yes if you want to extract multiple helical segments with a fixed inter-box distance. \
+If it is set to No, only one box at the center of each helical tube will be extracted.");
+
 	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
 The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
 
-	helical_rise.place(current_y, "Helical rise (A):", 0, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+	helical_rise.place(current_y, "Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
 
 	helical_tubes_group->end();
 
@@ -1922,6 +1927,7 @@ void ExtractJobWindow::write(std::string fn)
 	// Helix
 	do_extract_helix.writeValue(fh);
 	do_extract_helical_tubes.writeValue(fh);
+	do_cut_into_segments.writeValue(fh);
 	helical_nr_asu.writeValue(fh);
 	helical_rise.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
@@ -1963,6 +1969,7 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		// Helix
 		do_extract_helix.readValue(fh);
 		do_extract_helical_tubes.readValue(fh);
+		do_cut_into_segments.readValue(fh);
 		helical_nr_asu.readValue(fh);
 		helical_rise.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
@@ -1998,6 +2005,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	// Helix
 	do_extract_helix.deactivate(is_continue);
 	do_extract_helical_tubes.deactivate(is_continue);
+	do_cut_into_segments.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
 	helical_rise.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
@@ -2089,8 +2097,14 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		if (do_extract_helical_tubes.getValue())
 		{
 			command += " --helical_tubes";
-			command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
-			command += " --helical_rise " + floatToString(helical_rise.getValue());
+			if (do_cut_into_segments.getValue())
+			{
+				command += " --helical_cut_into_segments";
+				command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+				command += " --helical_rise " + floatToString(helical_rise.getValue());
+			}
+			else
+				command += " --helical_nr_asu 1 --helical_rise 1";
 		}
 	}
 

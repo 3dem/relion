@@ -161,7 +161,10 @@ public:
 	RFLOAT helical_rise;
 
 	// Add bimodal angular priors for helical segments
-	bool bimodal_angular_priors;
+	bool helical_bimodal_angular_priors;
+
+	// Cut helical tubes into segments?
+	bool helical_cut_into_segments;
 
 	// Use input stack to perform the image modifications
 	FileName fn_operate_in;
