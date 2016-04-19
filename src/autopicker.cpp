@@ -1816,6 +1816,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
+
+					// If we're not doing shrink, then Faux is bigger than Faux2!
 					windowFourierTransform(Faux, Faux2, workSize);
 					transformer.inverseFourierTransform(Faux2, Maux);
 					CenterFFT(Maux, false);
@@ -1865,14 +1867,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
 
+				// If we're not doing shrink, then Faux is bigger than Faux2!
 				windowFourierTransform(Faux, Faux2, workSize);
 				transformer.inverseFourierTransform(Faux2, Maux);
 				CenterFFT(Maux, false);
-//#ifdef DEBUG
+#ifdef DEBUG
 				Image<double> tt;
 				tt()=Maux;
 				tt.write("Mcc.spi");
-//#endif
+#endif
 
 				// Calculate ratio of prabilities P(ref)/P(zero)
 				// Keep track of the best values and their corresponding iref and psi
@@ -2048,7 +2051,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 		MultidimArray<Complex > &_Fmsk, int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &_Mstddev, MultidimArray<RFLOAT> &_Mmean)
 {
 
-	MultidimArray<Complex > Faux, Faux2;
+	MultidimArray<Complex > Faux;
 	MultidimArray<RFLOAT> Maux(workSize, workSize);
 	FourierTransformer transformer;
 
@@ -2065,8 +2068,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	{
 		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
 	}
-	windowFourierTransform(Faux, Faux2, workSize);
-	transformer.inverseFourierTransform(Faux2, Maux);
+	transformer.inverseFourierTransform(Faux, Maux);
 	Maux *= normfft;
 	_Mmean = Maux;
 	CenterFFT(_Mmean, false);
@@ -2088,8 +2090,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	{
 		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic2, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
 	}
-	windowFourierTransform(Faux, Faux2, workSize);
-	transformer.inverseFourierTransform(Faux2, Maux);
+	transformer.inverseFourierTransform(Faux, Maux);
 
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(_Mstddev)
 	{

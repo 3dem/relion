@@ -399,13 +399,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		CUDA_CPU_TIC("Imic_insert");
 
 		//TODO ADD HIGH PASS FILTER
-//		if (highpass > 0.)
-//        {
-//			lowPassFilterMap(Fmic, XSIZE(Imic()), highpass, angpix, 2, true); // true means highpass instead of lowpass!
-//        	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
-//        }
-
-
+		//if (basePckr-highpass > 0.)
+        //{
+		//	lowPassFilterMap(Fmic, basePckr->ori_micrograph_size, basePckr->highpass, basePckr->angpix, 2, true); // true means highpass instead of lowpass!
+        //	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
+        //}
 
 		CUDA_CPU_TIC("runCenterFFT_0");
 		runCenterFFT(micTransformer.reals, micTransformer.xSize, micTransformer.ySize, true, 1);
@@ -639,7 +637,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			//			FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize);
 			CUDA_CPU_TIC("windowFourierTransform_FP");
-			// Sjors 19apr2016: this windowFouriertransform is no longer necessary
 			windowFourierTransform2(d_FauxNpsi,
 									FPcudaTransformer.fouriers,
 									downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
@@ -647,7 +644,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 									);
 			CUDA_CPU_TOC("windowFourierTransform_FP");
 
-			// Sjors 19apr2016: what is this inverse transform doing here?
 			CUDA_CPU_TIC("inverseFourierTransform_FP");
 			FPcudaTransformer.backward();
 			CUDA_CPU_TOC("inverseFourierTransform_FP");
