@@ -544,6 +544,7 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show original image" },
 						{ "Show Fourier amplitudes (2x)" },
 						{ "Show Fourier phase angles (2x)" },
+						{ "Show helical layer line profile" },
 						{ "Show particles from selected classes" },
 						{ "Save selected classes" },
 						{ "Quit" },
@@ -552,7 +553,7 @@ int multiViewerCanvas::handle(int ev)
 
 					if (!do_allow_save)
 				    {
-						rclick_menu[11].deactivate();
+						rclick_menu[12].deactivate();
 				    }
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -578,6 +579,8 @@ int multiViewerCanvas::handle(int ev)
 						showFourierAmplitudes(ipos);
 					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
 						showFourierPhaseAngles(ipos);
+					else if ( strcmp(m->label(), "Show helical layer line profile") == 0 )
+						showHelicalLayerLineProfile(ipos);
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(SELECTED);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
@@ -603,6 +606,7 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show original image" },
 						{ "Show Fourier amplitudes (2x)" },
 						{ "Show Fourier phase angles (2x)" },
+						{ "Show Fourier 1D profile (2x)" },
 						{ "Show metadata" },
 						{ "Save STAR with selected images" },
 						{ "Quit" },
@@ -610,7 +614,7 @@ int multiViewerCanvas::handle(int ev)
 					};
 					if (!do_allow_save)
 				    {
-						rclick_menu[12].deactivate();
+						rclick_menu[13].deactivate();
 				    }
 
 					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -638,6 +642,8 @@ int multiViewerCanvas::handle(int ev)
 						showFourierAmplitudes(ipos);
 					else if ( strcmp(m->label(), "Show Fourier phase angles (2x)") == 0 )
 						showFourierPhaseAngles(ipos);
+					else if ( strcmp(m->label(), "Show helical layer line profile") == 0 )
+						showHelicalLayerLineProfile(ipos);
 					else if ( strcmp(m->label(), "Show metadata") == 0 )
 						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
@@ -924,6 +930,31 @@ void multiViewerCanvas::showFourierPhaseAngles(int ipos)
 	cl += " &";
 
 	int res = system(cl.c_str());
+}
+
+void multiViewerCanvas::showHelicalLayerLineProfile(int ipos)
+{
+	std::string mydefault = std::string(DEFAULTPDFVIEWER);
+	std::string command;
+	FileName fn_img, fn_out;
+	Image<RFLOAT> img;
+
+	boxes[ipos]->MDimg.getValue(display_label, fn_img);
+	img.read(fn_img);
+
+	if (fn_img.contains("@"))
+		fn_img = fn_img.afterFirstOf("@");
+	fn_out = fn_img.beforeLastOf("/") + "/" + "layerlineprofile.eps";
+	if (exists(fn_out))
+	{
+		command = "rm -rf " + fn_out;
+		int res = system(command.c_str());
+	}
+
+	helicalLayerLineProfile(img(), fn_out);
+
+	command = mydefault + " " + fn_out + " &";
+	int res = system(command.c_str());
 }
 
 void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTable &MDpart)

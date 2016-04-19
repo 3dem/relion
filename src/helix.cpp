@@ -1475,6 +1475,7 @@ void applySoftSphericalMask(
 void extractHelicalSegmentsFromTubes_Multiple(
 		FileName& suffix_in,
 		FileName& suffix_out,
+		int format_tag,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
@@ -1482,7 +1483,7 @@ void extractHelicalSegmentsFromTubes_Multiple(
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors,
-		int format_tag)
+		bool cut_into_segments)
 {
 	int total_segments, total_tubes, nr_segments, nr_tubes;
 	FileName fns_in;
@@ -1500,11 +1501,11 @@ void extractHelicalSegmentsFromTubes_Multiple(
 		FileName fn_out;
 		fn_out = fn_in_list[ii].beforeFirstOf(suffix_in) + suffix_out;
 		if (format_tag == RELION_STAR_FORMAT)
-			extractCoordsForAllHelicalSegments(fn_in_list[ii], MD_out, nr_asu, rise_A, pixel_size_A, Xdim, Ydim, box_size_pix, bimodal_angular_priors, nr_segments, nr_tubes);
+			convertHelicalTubeCoordsToMetaDataTable(fn_in_list[ii], MD_out, nr_segments, nr_tubes, nr_asu, rise_A, pixel_size_A, Xdim, Ydim, box_size_pix, bimodal_angular_priors, cut_into_segments);
 		else if (format_tag == XIMDISP_COORDS_FORMAT)
-			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_in_list[ii], MD_out, nr_asu, rise_A, pixel_size_A, Xdim, Ydim, box_size_pix, bimodal_angular_priors, nr_segments, nr_tubes);
+			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_in_list[ii], MD_out, nr_segments, nr_tubes, nr_asu, rise_A, pixel_size_A, Xdim, Ydim, box_size_pix, bimodal_angular_priors, cut_into_segments);
 		else if (format_tag == EMAN2_FORMAT)
-			convertEmanHelicalTubeCoordsToMetaDataTable(fn_in_list[ii], MD_out, nr_asu, rise_A, pixel_size_A, Xdim, Ydim, box_size_pix, bimodal_angular_priors, nr_segments, nr_tubes);
+			convertEmanHelicalTubeCoordsToMetaDataTable(fn_in_list[ii], MD_out, nr_segments, nr_tubes, nr_asu, rise_A, pixel_size_A, Xdim, Ydim, box_size_pix, bimodal_angular_priors, cut_into_segments);
 		else
 			REPORT_ERROR("helix.cpp::extractHelicalSegmentsFromTubes_Multiple(): BUG Invalid format tag!");
 		total_segments += nr_segments;
@@ -1516,9 +1517,11 @@ void extractHelicalSegmentsFromTubes_Multiple(
 	return;
 }
 
-void extractCoordsForAllHelicalSegments(
+void convertHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
@@ -1526,8 +1529,7 @@ void extractCoordsForAllHelicalSegments(
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes)
+		bool cut_into_segments)
 {
 	int nr_segments, MDobj_id;
 	RFLOAT psi_deg, psi_rad, x1, y1, x2, y2, dx, dy, xp, yp, step_pix, half_box_size_pix, len_pix, psi_prior_flip_ratio;
@@ -1536,11 +1538,11 @@ void extractCoordsForAllHelicalSegments(
 
 	// Check parameters and open files
 	if ( (nr_asu < 1) || (rise_A < 0.001) || (pixel_size_A < 0.01) )
-		REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): Wrong parameters!");
+		REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Wrong parameters!");
 	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix))
-		REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): Wrong dimensions or box size!");
+		REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Wrong dimensions or box size!");
     if (fn_in.getExtension() != "star")
-    	REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): MetadataTable should have .star extension.");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): MetadataTable should have .star extension.");
 
     half_box_size_pix = box_size_pix / 2.;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
@@ -1555,9 +1557,9 @@ void extractCoordsForAllHelicalSegments(
 		return;
 
     if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) )
-    	REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): Input STAR file does not contain X and Y coordinates!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates!");
     if (MD_in.numberOfObjects() % 2)
-    	REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): Input coordinates should be in pairs!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs!");
     x1_coord_list.clear();
     y1_coord_list.clear();
     x2_coord_list.clear();
@@ -1583,7 +1585,7 @@ void extractCoordsForAllHelicalSegments(
     		|| (x2_coord_list.size() != y1_coord_list.size())
 			|| (y1_coord_list.size() != y2_coord_list.size())
 			|| (y2_coord_list.size() != x1_coord_list.size()) )
-    	REPORT_ERROR("helix.cpp::extractCoordsForAllHelicalSegments(): BUG in reading input STAR file!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): BUG in reading input STAR file!");
     MD_in.clear();
 
     // Init output STAR file
@@ -1610,6 +1612,20 @@ void extractCoordsForAllHelicalSegments(
     	psi_deg = RAD2DEG(psi_rad);
 		dx = step_pix * cos(psi_rad);
 		dy = step_pix * sin(psi_rad);
+
+    	if (!cut_into_segments)
+    	{
+			MD_out.addObject();
+	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) / 2.));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) / 2.));
+	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, (tube_id + 1));
+	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
+	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
+	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
+	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
+			nr_segments++;
+    		continue;
+    	}
 
     	xp = x1 - (dx * 0.99);
     	yp = y1 - (dy * 0.99);
@@ -2094,11 +2110,11 @@ void removeBadPsiHelicalSegmentsFromDataStar(
 void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
+		int format_tag,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize,
-		bool bimodal_angular_priors,
-		int format_tag)
+		bool bimodal_angular_priors)
 {
 	int total_segments, nr_segments, total_tubes, nr_tubes;
 	FileName fns_coords;
@@ -2116,9 +2132,9 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName fn_out;
 		fn_out = fn_coords_list[ii].beforeFirstOf(suffix_coords) + suffix_out;
 		if (format_tag == XIMDISP_COORDS_FORMAT)
-			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, Xdim, Ydim, boxsize, bimodal_angular_priors, nr_segments, nr_tubes);
+			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, nr_segments, nr_tubes, Xdim, Ydim, boxsize, bimodal_angular_priors);
 		else if (format_tag == EMAN2_FORMAT)
-			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, Xdim, Ydim, boxsize, bimodal_angular_priors, nr_segments, nr_tubes);
+			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, nr_segments, nr_tubes, Xdim, Ydim, boxsize, bimodal_angular_priors);
 		else
 			REPORT_ERROR("helix.cpp::convertHelicalCoordsToStarFile_Multiple(): BUG Invalid format tag!");
 		total_segments += nr_segments;
@@ -2132,11 +2148,11 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 void convertHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments)
+		bool bimodal_angular_priors)
 {
 	MetaDataTable MD_in;
 	RFLOAT psi_prior_flip_ratio;
@@ -2191,12 +2207,12 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes)
+		bool bimodal_angular_priors)
 {
 	int nr_segments_on_edges, nr_segments, nr_tubes;
 	RFLOAT x, y, x_old, y_old, psi_deg_old, psi_deg, half_box_size_pix, len_pix, psi_prior_flip_ratio;
@@ -2287,6 +2303,8 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
@@ -2294,8 +2312,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes)
+		bool cut_into_segments)
 {
 	int nr_segments, nr_tubes;
 	RFLOAT xp, yp, dx, dy, x1, y1, x2, y2, psi_deg, psi_rad, half_box_size_pix, len_pix, psi_prior_flip_ratio;
@@ -2369,6 +2386,19 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		dx = step_pix * cos(psi_rad);
 		dy = step_pix * sin(psi_rad);
 
+		if (!cut_into_segments)
+		{
+			MD_out.addObject();
+	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) / 2.));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) / 2.));
+	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
+	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
+	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
+	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
+	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
+			continue;
+		}
+
 		// Calculate coordinates for all segments
 		xp = x1 - (dx * 0.99);
 		yp = y1 - (dy * 0.99);
@@ -2417,12 +2447,12 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes)
+		bool bimodal_angular_priors)
 {
 	int nr_segments_on_edges, nr_segments, nr_tubes;
 	RFLOAT x, y, x_old, y_old, psi_deg, half_box_size_pix, len_pix, width, psi_prior_flip_ratio;
@@ -2525,6 +2555,8 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 void convertEmanHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
@@ -2532,8 +2564,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes)
+		bool cut_into_segments)
 {
 	int nr_segments, nr_tubes;
 	RFLOAT xp, yp, dx, dy, x1, y1, x2, y2, psi_deg, psi_rad, half_box_size_pix, len_pix, psi_prior_flip_ratio;
@@ -2623,6 +2654,19 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		y1 += ((width1 / 2.) - trans_offset) * sin(psi_rad);
 		x2 -= ((width1 / 2.) - trans_offset) * cos(psi_rad);
 		y2 -= ((width1 / 2.) - trans_offset) * sin(psi_rad);
+
+		if (!cut_into_segments)
+		{
+			MD_out.addObject();
+	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) / 2.));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) / 2.));
+	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
+	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
+	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
+	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
+	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
+			continue;
+		}
 
 		// Calculate coordinates for all segments
 		xp = x1 - (dx * 0.99);
@@ -3376,7 +3420,7 @@ void cutOutPartOfHelix(
         {
         	for (long int xi = 0; xi < XSIZE(vout); xi++)
         	{
-        		RFLOAT deg = (180.) * atan2(yi, xi) / PI;
+        		RFLOAT deg = (180.) * atan2((double)(yi), (double)(xi)) / PI;
 
         		// X or Y subscripts is out of range
         		if ( (ang_deg < 90.) && ( (deg < ((45.) - (ang_deg / 2.))) || (deg > ((45.) + (ang_deg / 2.))) ) )

@@ -255,27 +255,29 @@ void applySoftSphericalMask(
 void extractHelicalSegmentsFromTubes_Multiple(
 		FileName& suffix_in,
 		FileName& suffix_out,
+		int format_tag,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int format_tag);
+		bool bimodal_angular_priors = true,
+		bool cut_into_segments = true);
 
-void extractCoordsForAllHelicalSegments(
+void convertHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes);
+		bool bimodal_angular_priors = true,
+		bool cut_into_segments = true);
 
 void combineParticlePriorsWithKaiLocalCTF(
 		FileName& fn_priors,
@@ -313,66 +315,68 @@ void removeBadPsiHelicalSegmentsFromDataStar(
 void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
+		int format_tag,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize,
-		bool bimodal_angular_priors,
-		int format_tag);
+		bool bimodal_angular_priors = true);
 
 void convertHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments);
+		bool bimodal_angular_priors = true);
 
 void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes);
+		bool bimodal_angular_priors = true);
 
 void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes);
+		bool bimodal_angular_priors = true,
+		bool cut_into_segments = true);
 
 void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes);
+		bool bimodal_angular_priors = true);
 
 void convertEmanHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
 		int nr_asu,
 		RFLOAT rise_A,
 		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
-		bool bimodal_angular_priors,
-		int& total_segments,
-		int& total_tubes);
+		bool bimodal_angular_priors = true,
+		bool cut_into_segments = true);
 
 /*
 void divideHelicalSegmentsFromMultipleMicrographsIntoRandomHalves(

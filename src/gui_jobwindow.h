@@ -412,6 +412,7 @@ public:
 	// Helix
 	BooleanEntry do_extract_helix;
 	BooleanEntry do_extract_helical_tubes;
+	BooleanEntry do_cut_into_segments;
 	SliderEntry helical_nr_asu;
 	SliderEntry helical_rise;
 	SliderEntry helical_tube_outer_diameter;

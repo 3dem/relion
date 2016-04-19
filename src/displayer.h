@@ -58,6 +58,8 @@
 #define BLACK 0
 #define WHITE 1
 
+#define DEFAULTPDFVIEWER "evince"
+
 static bool has_dragged;
 static int predrag_xc;
 static int predrag_yc;
@@ -235,6 +237,7 @@ private:
 	void showOriginalImage(int ipos);
 	void showFourierAmplitudes(int ipos);
 	void showFourierPhaseAngles(int ipos);
+	void showHelicalLayerLineProfile(int ipos);
 	void makeStarFileSelectedParticles(bool save_selected, MetaDataTable &MDpart);
 	void saveSelectedParticles(bool save_selected);
 	void showSelectedParticles(bool save_selected);
