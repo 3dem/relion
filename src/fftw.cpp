@@ -1275,7 +1275,7 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
     amp = out;
 }
 
-void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps)
+void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title, std::string fn_eps)
 {
 	long int XYdim, maxr2;
 	FourierTransformer transformer;
@@ -1319,6 +1319,7 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps
     }
     CDataSet dataSetAmpl, dataSetAmpr;
     RFLOAT linewidth = 1.0;
+    std::string figTitle = "Helical Layer Line Profile - " + title;
     std::string yTitle = "Reciprocal pixels (padded box size = " + integerToString(XYdim) + ")";
     for (int ii = 0; ii < (3 * ampl_list.size() / 4 + 1); ii++)
     {
@@ -1335,7 +1336,7 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps
 	dataSetAmpr.SetLineWidth(linewidth);
 	dataSetAmpr.SetDatasetColor(0., 1., 0.);
 	dataSetAmpr.SetDatasetTitle("ln(amplitudes) (right)");
-	CPlot2D *plot2D = new CPlot2D("Helical Layer Line Profile");
+	CPlot2D *plot2D = new CPlot2D(figTitle);
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(400);
 	plot2D->SetXAxisTitle(yTitle);

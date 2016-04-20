@@ -853,6 +853,6 @@ void padAndFloat2DMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT> &ou
 
 void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type);
 
-void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps);
+void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title, std::string fn_eps);
 
 #endif // __RELIONFFTW_H

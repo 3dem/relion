@@ -606,7 +606,7 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show original image" },
 						{ "Show Fourier amplitudes (2x)" },
 						{ "Show Fourier phase angles (2x)" },
-						{ "Show Fourier 1D profile (2x)" },
+						{ "Show helical layer line profile" },
 						{ "Show metadata" },
 						{ "Save STAR with selected images" },
 						{ "Quit" },
@@ -942,16 +942,14 @@ void multiViewerCanvas::showHelicalLayerLineProfile(int ipos)
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
 	img.read(fn_img);
 
-	if (fn_img.contains("@"))
-		fn_img = fn_img.afterFirstOf("@");
-	fn_out = fn_img.beforeLastOf("/") + "/" + "layerlineprofile.eps";
+	fn_out = "layerlineprofile.eps";
 	if (exists(fn_out))
 	{
 		command = "rm -rf " + fn_out;
 		int res = system(command.c_str());
 	}
 
-	helicalLayerLineProfile(img(), fn_out);
+	helicalLayerLineProfile(img(), fn_img, fn_out);
 
 	command = mydefault + " " + fn_out + " &";
 	int res = system(command.c_str());
