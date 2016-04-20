@@ -57,9 +57,15 @@ int AutoPickerMpi::deviceInitialise()
 	else
 		dev_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
 
-	std::cout << " rank " << node->rank << " mapped to device " << dev_id << std::endl;
+    for (int slave = 1; slave < node->size; slave++)
+    {
+    	if (slave == node->rank)
+    		std::cout << " + Using GPU device: " << dev_id << " on MPI node: " << node->rank << std::endl;
+    	node->barrierWait();
+    }
 
 	return(dev_id);
+
 }
 
 void AutoPickerMpi::run()

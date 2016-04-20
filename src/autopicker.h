@@ -215,9 +215,8 @@ public:
 	// All micrographs to autopick from
 	std::vector<FileName> fn_micrographs;
 
-	// Original and shrunk size of the micrographs
-	int ori_micrograph_size, ori_micrograph_xsize, ori_micrograph_ysize;
-	int micrograph_size, micrograph_xsize, micrograph_ysize;
+	// Original size of the micrographs
+	int micrograph_size, micrograph_xsize, micrograph_ysize, micrograph_minxy_size;
 
 	// decreased size micrograph
 	int workSize;
@@ -268,9 +267,6 @@ public:
 	// Size of the downsize micrographs for autopicking
 	int downsize_mic;
 
-	// Scale when down-sizing the micrographs (using shrink)
-	float shrink_scale;
-
 	// Number of non-zero pixels in the circular mask, and of its inverse (for background normalisation in do_diff2)
 	int nr_pixels_circular_mask, nr_pixels_circular_invmask;
 
@@ -308,7 +304,7 @@ public:
 			RFLOAT particle_diameter_pix,
 			std::vector<ccfPeak>& ccf_peak_list,
 			MultidimArray<RFLOAT>& Mccfplot,
-			int skip_side);
+			int skip_side, float scale);
 
 	void extractHelicalTubes(
 			std::vector<ccfPeak>& ccf_peak_list,
@@ -318,7 +314,7 @@ public:
 			RFLOAT particle_diameter_pix,
 			RFLOAT curvature_factor_max,
 			RFLOAT interbox_distance_pix,
-			RFLOAT tube_diameter_pix);
+			RFLOAT tube_diameter_pix, float scale);
 
 	void exportHelicalTubes(
 			const MultidimArray<RFLOAT>& Mccf,
@@ -331,7 +327,7 @@ public:
 			FileName& fn_star_out,
 			RFLOAT particle_diameter_pix,
 			RFLOAT tube_length_min_pix,
-			int skip_side);
+			int skip_side, float scale);
 
 	void autoPickOneMicrograph(FileName &fn_mic);
 
@@ -349,15 +345,15 @@ public:
 			MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
-	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks);
+	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks, float scale);
 
 	// Now prune the coordinates: within min_particle_distance: all peaks are the same cluster
 	// From each cluster, take the single peaks with the highest ccf
 	// If then, there is another peaks at a distance of at least min_particle_distance: take that one as well, and so forth...
-	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance);
+	void prunePeakClusters(std::vector<Peak> &peaks, int min_distance, float scale);
 
 	// Only keep those peaks that are at the given distance apart from each other
-	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance);
+	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance, float scale);
 
 };
 
