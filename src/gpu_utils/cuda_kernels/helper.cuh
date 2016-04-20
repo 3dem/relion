@@ -213,4 +213,66 @@ __global__ void cuda_kernel_cast(
 		OUT[pixel] = IN[pixel];
 }
 
+template<bool do_highpass>
+__global__ void cuda_kernel_frequencyPass(
+										CUDACOMPLEX *A,
+										long int ori_size,
+										size_t Xdim,
+										size_t Ydim,
+										size_t Zdim,
+										XFLOAT edge_low,
+										XFLOAT edge_width,
+										XFLOAT edge_high,
+										XFLOAT angpix,
+										int image_size)
+{
+	int texel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+
+	int z = texel / (Xdim*Ydim);
+	int xy = (texel - z*Xdim*Ydim);
+	int y = xy / Xdim;
+
+	int xp = xy - y*Xdim;
+
+	int zp = ( z<Xdim ? z : z-Zdim );
+	int yp = ( y<Xdim ? y : y-Ydim );
+
+	int r2 = xp*xp + yp*yp + zp*zp;
+
+	RFLOAT res;
+	if(texel<image_size)
+	{
+		res = sqrt((RFLOAT)r2)/(RFLOAT)ori_size;
+
+		if(do_highpass) //highpass
+		{
+			if (res < edge_low) //highpass => lows are dead
+			{
+				A[texel].x = 0.;
+				A[texel].y = 0.;
+			}
+			else if (res < edge_high) //highpass => medium lows are almost dead
+			{
+				XFLOAT mul = 0.5 - 0.5 * cos( PI * (res-edge_low)/edge_width);
+				A[texel].x *= mul;
+				A[texel].y *= mul;
+			}
+		}
+		else //lowpass
+		{
+			if (res > edge_high) //lowpass => highs are dead
+			{
+				A[texel].x = 0.;
+				A[texel].y = 0.;
+			}
+			else if (res > edge_low) //lowpass => medium highs are almost dead
+			{
+				XFLOAT mul = 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
+				A[texel].x *= mul;
+				A[texel].y *= mul;
+			}
+		}
+	}
+}
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

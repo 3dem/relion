@@ -412,14 +412,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		micTransformer.reals.cp_to_device();
 		CUDA_CPU_TIC("Imic_insert");
 
-		//TODO ADD HIGH PASS FILTER
-//		if (highpass > 0.)
-//        {
-//			lowPassFilterMap(Fmic, XSIZE(Imic()), highpass, angpix, 2, true); // true means highpass instead of lowpass!
-//        	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
-//        }
-
-
 
 		CUDA_CPU_TIC("runCenterFFT_0");
 		runCenterFFT(micTransformer.reals, micTransformer.xSize, micTransformer.ySize, true, 1);
@@ -435,6 +427,26 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				micTransformer.fouriers.getSize()*2);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		CUDA_CPU_TOC("FourierTransform_0");
+
+		if (basePckr->highpass > 0.)
+		{
+			CUDA_CPU_TIC("highpass");
+			micTransformer.fouriers.streamSync();
+			lowPassFilterMapGPU(	micTransformer.fouriers,
+									(size_t)1,
+									micTransformer.yFSize,
+									micTransformer.xFSize,
+									XSIZE(Imic()),
+									basePckr->lowpass,
+									basePckr->highpass,
+									basePckr->angpix,
+									2,
+									true); //false = lowpass, true=highpass
+			micTransformer.fouriers.streamSync();
+			micTransformer.backward();
+			micTransformer.reals.streamSync();
+			CUDA_CPU_TOC("highpass");
+		}
 
 		CUDA_CPU_TIC("F_cp");
 		CudaGlobalPtr< CUDACOMPLEX > Ftmp(allocator);
