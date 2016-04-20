@@ -149,6 +149,13 @@ void AutoPicker::initialise()
 			std::cout << "    * " << fn_micrographs[i] << std::endl;
 	}
 
+	// Make sure that psi-sampling is even around the circle
+	RFLOAT old_sampling = psi_sampling;
+	int n_sampling = ROUND(360. / psi_sampling);
+	psi_sampling = 360. / (RFLOAT) n_sampling;
+	if (verb > 0 && fabs(old_sampling - psi_sampling) > 1e-3)
+		std::cout << " + Changed psi-sampling rate to: " << psi_sampling << std::endl;
+
 	// Read in the references
 	Mrefs.clear();
 	if (fn_ref.isStarFile())
@@ -246,6 +253,13 @@ void AutoPicker::initialise()
 	}
 
 	particle_size = XSIZE(Mrefs[0]);
+
+	if (particle_diameter > particle_size * angpix_ref)
+	{
+		std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
+		REPORT_ERROR("ERROR: the particlae diameter is larger than the size of the box.");
+	}
+
 
 	if ( (verb > 0) && (autopick_helical_segments))
 	{
@@ -422,7 +436,7 @@ int AutoPicker::deviceInitialise()
 
 	if (verb>0)
 	{
-		std::cout << " Using device " << dev_id << std::endl;
+		std::cout << " + Using GPU device " << dev_id << std::endl;
 	}
 
 	return(dev_id);
@@ -1604,7 +1618,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	Mpsi_best.resize(workSize, workSize);
 
 	//Sjors 18apr2016
-	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_pixels_circular_mask;
+	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_pixels_circular_mask;
 	if (do_read_fom_maps)
 	{
 		FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_stddevNoise.spi";
@@ -1662,10 +1676,6 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		transformer.inverseFourierTransform(Faux2, tt());
 		CenterFFT(tt(), false);
 		tt.write("Minvmask.spi");
-		windowFourierTransform(Fmsk, Faux2, micrograph_size);
-		transformer.inverseFourierTransform(Faux2, tt());
-		CenterFFT(tt(), false);
-		tt.write("Mmask.spi");
 #endif
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
@@ -1713,7 +1723,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Mccf_best_combined.resize(workSize, workSize);
 			Mccf_best_combined.initConstant(-99.e99);
 			Mclass_best_combined.clear();
-			Mclass_best_combined.resize(micrograph_size, micrograph_size);
+			Mclass_best_combined.resize(workSize, workSize);
 			Mclass_best_combined.initConstant(-1);
 		}
 	}
@@ -1751,10 +1761,10 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				// Now get the FT of the rotated (non-ctf-corrected) template
 				Faux.initZeros(downsize_mic, downsize_mic/2 + 1);
 				PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
-
 #ifdef DEBUG
 				std::cerr << " psi= " << psi << std::endl;
 				windowFourierTransform(Faux, Faux2, micrograph_size);
+				tt().resize(micrograph_size, micrograph_size);
 				transformer.inverseFourierTransform(Faux2, tt());
 				CenterFFT(tt(), false);
 				tt.write("Mref_rot.spi");
@@ -1774,15 +1784,16 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 						DIRECT_MULTIDIM_ELEM(Faux, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 #ifdef DEBUG
+				MultidimArray<RFLOAT> ttt(micrograph_size, micrograph_size);
 				windowFourierTransform(Faux, Faux2, micrograph_size);
-				transformer.inverseFourierTransform(Faux2, Maux);
-				CenterFFT(Maux, false);
-				Maux.setXmippOrigin();
+				transformer.inverseFourierTransform(Faux2, ttt);
+				CenterFFT(ttt, false);
+				ttt.setXmippOrigin();
 				tt().resize(particle_size, particle_size);
 				tt().setXmippOrigin();
 				FOR_ALL_ELEMENTS_IN_ARRAY2D(tt())
 				{
-					A2D_ELEM(tt(), i, j) = A2D_ELEM(Maux, i, j);
+					A2D_ELEM(tt(), i, j) = A2D_ELEM(ttt, i, j);
 				}
 				tt.write("Mref_rot_ctf.spi");
 #endif
@@ -1793,15 +1804,17 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
-
-					windowFourierTransform(Faux, Faux2, workSize);
+					// This calculation needs to be done on an "non-shrinked" micrograph, in order to get the correct I^2 statistics
+					windowFourierTransform(Faux, Faux2, micrograph_size);
+					Maux.resize(micrograph_size, micrograph_size);
 					transformer.inverseFourierTransform(Faux2, Maux);
 					CenterFFT(Maux, false);
 					Maux.setXmippOrigin();
-#ifdef DEBUG
-					tt()=Maux;
-					tt.write("Maux.spi");
-#endif
+//#ifdef DEBUG
+					Image<RFLOAT> ttt;
+					ttt()=Maux;
+					ttt.write("Maux.spi");
+//#endif
 					sum_ref_under_circ_mask = 0.;
 					sum_ref2_under_circ_mask = 0.;
 					RFLOAT suma2 = 0.;
@@ -1835,6 +1848,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					std::cerr << "sum_ref2_under_circ_mask " << sum_ref2_under_circ_mask << std::endl;
 					std::cerr << "expected_Pratio " << expected_Pratio << std::endl;
 #endif
+
+					// Maux goes back to the workSize
+					Maux.resize(workSize, workSize);
 				}
 
 				// Now multiply template and micrograph to calculate the cross-correlation
@@ -2033,7 +2049,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	FourierTransformer transformer;
 
 	_Mstddev.initZeros(workSize, workSize);
-	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_nonzero_pixels_mask;
+	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_nonzero_pixels_mask;
 
 	// Calculate convolution of micrograph and mask, to get average under mask at all points
 	Faux.resize(_Fmic);
@@ -2075,15 +2091,13 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	{
 		// we already stored minus average-squared in _Mstddev
 		DIRECT_MULTIDIM_ELEM(_Mstddev, n) += normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
-		if (DIRECT_MULTIDIM_ELEM(_Mstddev, n) > 0.)
+		if (DIRECT_MULTIDIM_ELEM(_Mstddev, n) > (RFLOAT)1E-10)
 			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = sqrt(DIRECT_MULTIDIM_ELEM(_Mstddev, n) );
 		else
-			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = 0.;
+			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = 1.;
 	}
 
 	CenterFFT(_Mstddev, false);
-	// Sjors 14Apr2016: Bring back to non-downscaled stddev values:
-	_Mstddev *= (float)(micrograph_size)/(float)(workSize);
 
 #ifdef DEBUG
 	tt()=_Mstddev;
