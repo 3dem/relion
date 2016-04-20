@@ -135,6 +135,7 @@ public:
 	// Which GPU devices to use?
 	std::string gpu_ids;
 	std::vector < std::vector < std::string > > allThreadIDs;
+	int devCount;
 
 public:
 	// Read command line arguments

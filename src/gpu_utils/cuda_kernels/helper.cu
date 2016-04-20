@@ -669,7 +669,6 @@ __global__ void cuda_kernel_batch_multi( XFLOAT *A,
 __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
 											 XFLOAT *aux,
 											 XFLOAT S,
-											 float rescale,
 											 int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -677,7 +676,7 @@ __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
 	{
 		XFLOAT temp = Mstddev[pixel] + S * aux[pixel];
 		if(temp > 0)
-			Mstddev[pixel] = rescale*sqrt(temp);
+			Mstddev[pixel] = sqrt(temp);
 		else
 			Mstddev[pixel] = 0;
 	}

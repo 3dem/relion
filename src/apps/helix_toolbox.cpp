@@ -137,6 +137,9 @@ public:
 	// Do bimoidal searches of tilt and psi angles in 3D helical reconstruction?
 	bool do_bimodal_searches;
 
+	// Cut helical tubes into segments?
+	bool do_cut_into_segments;
+
 	// Cut out a small part of the helix within this angle (in degrees)
 	RFLOAT ang;
 
@@ -160,7 +163,7 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (Mar 18, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (APR 15, 2015)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
@@ -215,6 +218,7 @@ public:
 		rise_inistep_A = textToFloat(parser.getOption("--rise_inistep", "Initial step of helical rise search (in Angstroms)", "-1"));
 		rise_min_A = textToFloat(parser.getOption("--rise_min", "Minimum helical rise (in Angstroms)", "-1"));
 		rise_max_A = textToFloat(parser.getOption("--rise_max", "Maximum helical rise (in Angstroms)", "-1"));
+		do_cut_into_segments = parser.checkOption("--segments", "Cut helical tubes into segments?");
 		sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Sigma of psi angles (in degrees)", "5."));
 		sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Sigma of tilt angles (in degrees)", "5."));
 		sphere_percentage = textToFloat(parser.getOption("--sphere_percentage", "Diameter of spherical mask divided by the box size", "0.9"));
@@ -281,9 +285,9 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Extract coordinates of helical segments from specified straight tubes" << std::endl;
-				std::cout << "  USAGE (EMAN2 format)  : --extract_emn --i_root _boxes.txt  --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
-				std::cout << "  USAGE (RELION format) : --extract_rln --i_root _tubes.star --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
-				std::cout << "  USAGE (XIMDISP format): --extract_xim --i_root .mrc.coords --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (EMAN2 format)  : --extract_emn --i_root _boxes.txt  --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
+				std::cout << "  USAGE (RELION format) : --extract_rln --i_root _tubes.star --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
+				std::cout << "  USAGE (XIMDISP format): --extract_xim --i_root .mrc.coords --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -298,6 +302,7 @@ public:
 			extractHelicalSegmentsFromTubes_Multiple(
 					fn_in_root,
 					fn_out_root,
+					format_tag,
 					nr_asu,
 					rise_A,
 					pixel_size_A,
@@ -305,7 +310,7 @@ public:
 					Ydim,
 					boxdim,
 					do_bimodal_searches,
-					format_tag);
+					do_cut_into_segments);
 		}
 		else if (do_convert_coords_emn2rln || do_convert_coords_xim2rln)
 		{
@@ -327,11 +332,11 @@ public:
 			convertHelicalSegmentCoordsToStarFile_Multiple(
 					fn_in_root,
 					fn_out_root,
+					format_tag,
 					Xdim,
 					Ydim,
 					boxdim,
-					do_bimodal_searches,
-					format_tag);
+					do_bimodal_searches);
 		}
 		else if (do_combine_GCTF_results)
 		{

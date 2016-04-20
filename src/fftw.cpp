@@ -1181,23 +1181,21 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT 
 
 }
 
-bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type)
+void padAndFloat2DMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT> &out, int factor)
 {
-	long int Xdim, Ydim, Zdim, Ndim, XYdim, maxr2;
-	RFLOAT bg_val, bg_pix, bd_val, bd_pix, val;
-	FourierTransformer transformer;
-	MultidimArray<Complex > Faux;
-	MultidimArray<RFLOAT > out;
+	long int Xdim, Ydim, Zdim, Ndim, XYdim;
+	RFLOAT bg_val, bg_pix, bd_val, bd_pix;
 
 	out.clear();
-	Faux.clear();
 
 	// Check dimensions
     v.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	if ( (Zdim > 1) || (Ndim > 1) )
-		return false;
+		REPORT_ERROR("fftw.cpp::padAndFloat2DMap(): ERROR MultidimArray should be 2D.");
 	if (Xdim * Ydim <= 16)
-		REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray is too small.");
+		REPORT_ERROR("fftw.cpp::padAndFloat2DMap(): ERROR MultidimArray is too small.");
+	if (factor <= 1)
+		REPORT_ERROR("fftw.cpp::padAndFloat2DMap(): ERROR Padding factor should be larger than 1.");
 
 	// Calculate background and border values
 	bg_val = bg_pix = bd_val = bd_pix = 0.;
@@ -1212,15 +1210,15 @@ bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 		}
 	}
 	if ( (bg_pix < 1.) || (bd_pix < 1.) )
-		REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray is too small.");
+		REPORT_ERROR("fftw.cpp::padAndFloat2DMap(): ERROR MultidimArray is too small.");
 	bg_val /= bg_pix;
 	bd_val /= bd_pix;
 	// DEBUG
 	//std::cout << "bg_val = " << bg_val << ", bg_pix = " << bg_pix << std::endl;
 	//std::cout << "bd_val = " << bd_val << ", bd_pix = " << bd_pix << std::endl;
 
-	// Pad and float output MultidimArray (2x original size)
-	XYdim = (Xdim > Ydim) ? (Xdim * 2) : (Ydim * 2);
+	// Pad and float output MultidimArray (2x original size by default)
+	XYdim = (Xdim > Ydim) ? (Xdim * factor) : (Ydim * factor);
 	out.resize(XYdim, XYdim);
 	out.initConstant(bd_val - bg_val);
 	out.setXmippOrigin();
@@ -1228,6 +1226,25 @@ bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 	{
 		A2D_ELEM(out, i + FIRST_XMIPP_INDEX(YSIZE(v)), j + FIRST_XMIPP_INDEX(XSIZE(v))) = DIRECT_A2D_ELEM(v, i, j) - bg_val;
 	}
+}
+
+void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type)
+{
+	long int XYdim, maxr2;
+	RFLOAT val;
+	FourierTransformer transformer;
+	MultidimArray<Complex > Faux;
+	MultidimArray<RFLOAT > out;
+
+	transformer.clear();
+	Faux.clear();
+	out.clear();
+
+	// Pad and float
+	padAndFloat2DMap(v, out);
+	if ( (XSIZE(out) != YSIZE(out)) || (ZSIZE(out) > 1) || (NSIZE(out) > 1) )
+		REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray should be 2D square.");
+	XYdim = XSIZE(out);
 
 	// Fourier Transform
 	CenterFFT(out, true);
@@ -1256,5 +1273,74 @@ bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
     A2D_ELEM(out, 0, 0) = 0.;
     amp.clear();
     amp = out;
-    return true;
+}
+
+void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps)
+{
+	long int XYdim, maxr2;
+	FourierTransformer transformer;
+	MultidimArray<Complex > Faux;
+	MultidimArray<RFLOAT > out;
+	std::vector<RFLOAT > ampl_list, ampr_list, nr_pix_list;
+
+	transformer.clear();
+	Faux.clear();
+	out.clear();
+
+	// TODO: DO I NEED TO ROTATE THE ORIGINAL MULTIDINARRAY BY 90 DEGREES ?
+
+	// Pad and float
+	padAndFloat2DMap(v, out);
+	if ( (XSIZE(out) != YSIZE(out)) || (ZSIZE(out) > 1) || (NSIZE(out) > 1) )
+		REPORT_ERROR("fftw.cpp::helicalLayerLineProfile(): ERROR MultidimArray should be 2D square.");
+	XYdim = XSIZE(out);
+
+	// Fourier Transform
+	CenterFFT(out, true);
+    transformer.FourierTransform(out, Faux, false); // TODO: false???
+
+    // Statistics
+    out.setXmippOrigin();
+    maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
+    ampl_list.resize(XSIZE(Faux) + 2);
+    ampr_list.resize(XSIZE(Faux) + 2);
+    nr_pix_list.resize(XSIZE(Faux) + 2);
+    for (int ii = 0; ii < ampl_list.size(); ii++)
+    	ampl_list[ii] = ampr_list[ii] = nr_pix_list[ii] = 0.;
+
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
+    {
+    	if ( ((ip * ip + jp * jp) < maxr2) && (ip > 0) )
+    	{
+    		nr_pix_list[jp] += 1.;
+    		ampl_list[jp] += FFTW2D_ELEM(Faux, ip, jp).abs();
+    		ampr_list[jp] += FFTW2D_ELEM(Faux, -ip, jp).abs();
+    	}
+    }
+    CDataSet dataSetAmpl, dataSetAmpr;
+    RFLOAT linewidth = 1.0;
+    std::string yTitle = "Reciprocal pixels (padded box size = " + integerToString(XYdim) + ")";
+    for (int ii = 0; ii < (3 * ampl_list.size() / 4 + 1); ii++)
+    {
+    	if (nr_pix_list[ii] < 1.)
+    		break; // TODO: IS THIS CORRECT?
+    	dataSetAmpl.AddDataPoint(CDataPoint(ii, log(ampl_list[ii] / nr_pix_list[ii])));
+    	dataSetAmpr.AddDataPoint(CDataPoint(ii, log(ampr_list[ii] / nr_pix_list[ii])));
+    }
+    dataSetAmpl.SetDrawMarker(false);
+    dataSetAmpl.SetLineWidth(linewidth);
+	dataSetAmpl.SetDatasetColor(1., 0., 0.);
+	dataSetAmpl.SetDatasetTitle("ln(amplitudes) (left)");
+	dataSetAmpr.SetDrawMarker(false);
+	dataSetAmpr.SetLineWidth(linewidth);
+	dataSetAmpr.SetDatasetColor(0., 1., 0.);
+	dataSetAmpr.SetDatasetTitle("ln(amplitudes) (right)");
+	CPlot2D *plot2D = new CPlot2D("Helical Layer Line Profile");
+	plot2D->SetXAxisSize(600);
+	plot2D->SetYAxisSize(400);
+	plot2D->SetXAxisTitle(yTitle);
+	plot2D->SetYAxisTitle("ln(amplitudes)");
+	plot2D->AddDataSet(dataSetAmpl);
+	plot2D->AddDataSet(dataSetAmpr);
+	plot2D->OutputPostScriptPlot(fn_eps);
 }

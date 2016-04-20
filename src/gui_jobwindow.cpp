@@ -929,7 +929,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 	resetHeight();
 
 
-	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
+	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
 
 	tab1->end();
 
@@ -1477,6 +1477,8 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	// Add a little spacer
 	current_y += STEPY/2;
 
+	angpix.place(current_y, "Pixel size in micrographs (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+
 	tab1->end();
 	tab2->begin();
 	tab2->label("References");
@@ -1487,9 +1489,9 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	autopick_ctf_group->end();
 
 
-	lowpass.place(current_y, "Lowpass filter refences (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
+	lowpass.place(current_y, "Lowpass filter references (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
 	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter.  Useful values are often in the range of 200-400 Angstroms.");
-	angpix.place(current_y, "Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+	angpix_ref.place(current_y, "Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
 	particle_diameter.place(current_y, "Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
 
 	// Add a little spacer
@@ -1533,7 +1535,8 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	current_y += STEPY/2;
 
 	// Set up queue groups for running tab
-    gpu_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	shrink.place(current_y, "Shrink factor:", 1, 0, 1, 0.1, "This is useful to speed up the calculations, and to make them less memory-intensive. The micrographs will be downscaled (shrunk) to calculate the cross-correlations, and peak searching will be done in the downscaled FOM maps. When set to 0, the micrographs will de downscaled to the lowpass filter of the references, a value between 0 and 1 will downscale the micrographs by that factor. Note that the results will not be exactly the same when you shrink micrographs!");
+	gpu_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     gpu_group->end();
 	use_gpu.place(current_y, "Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.", gpu_group);
 	gpu_group->begin();
@@ -1590,6 +1593,7 @@ void AutopickJobWindow::write(std::string fn)
 	lowpass.writeValue(fh);
 	highpass.writeValue(fh);
 	angpix.writeValue(fh);
+	angpix_ref.writeValue(fh);
 	particle_diameter.writeValue(fh);
 	psi_sampling_autopick.writeValue(fh);
 	do_write_fom_maps.writeValue(fh);
@@ -1603,6 +1607,7 @@ void AutopickJobWindow::write(std::string fn)
 	helical_tube_length_min.writeValue(fh);
 	use_gpu.writeValue(fh);
 	gpu_ids.writeValue(fh);
+	shrink.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -1627,6 +1632,7 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		lowpass.readValue(fh);
 		highpass.readValue(fh);
 		angpix.readValue(fh);
+		angpix_ref.readValue(fh);
 		particle_diameter.readValue(fh);
 		psi_sampling_autopick.readValue(fh);
 		do_write_fom_maps.readValue(fh);
@@ -1640,6 +1646,7 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		helical_tube_length_min.readValue(fh);
 		use_gpu.readValue(fh);
 		gpu_ids.readValue(fh);
+		shrink.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -1658,8 +1665,10 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 	lowpass.deactivate(is_continue);
 	highpass.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+	angpix_ref.deactivate(is_continue);
 	particle_diameter.deactivate(is_continue);
 	psi_sampling_autopick.deactivate(is_continue);
+	shrink.deactivate(is_continue);
 
 }
 
@@ -1703,12 +1712,15 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	}
 	command += " --ang " + floatToString(psi_sampling_autopick.getValue());
 
+	command += " --shrink " + floatToString(shrink.getValue());
 	if (lowpass.getValue() > 0.)
 		command += " --lowpass " + floatToString(lowpass.getValue());
 	if (highpass.getValue() > 0.)
 		command += " --highpass " + floatToString(highpass.getValue());
 	if (angpix.getValue() > 0.)
 		command += " --angpix " + floatToString(angpix.getValue());
+	if (angpix_ref.getValue() > 0.)
+		command += " --angpix_ref " + floatToString(angpix_ref.getValue());
 	if (particle_diameter.getValue() > 0.)
 		command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 
@@ -1738,7 +1750,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	if (use_gpu.getValue())
 	{
 		// for the moment always use --shrink 0 with GPUs ...
-		command += " --shrink 0 --gpu " + gpu_ids.getValue();
+		command += " --gpu " + gpu_ids.getValue();
 	}
 
 	// Other arguments
@@ -1848,21 +1860,26 @@ Pixels values higher than this many times the image stddev will be replaced with
 	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of helical tubes.");
 
+	current_y += STEPY/2;
 	helical_bimodal_angular_priors.place(current_y, "Use bimodal angular priors?", true, "Normally it should be set to Yes and bimodal angular priors will be applied in the following classification and refinement jobs. \
 Set to No if the 3D helix looks the same when rotated upside down.");
 
 	helical_tubes_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	helical_tubes_group->end();
 
+	current_y += STEPY/2;
 	do_extract_helical_tubes.place(current_y, "Coordinates are start-end only?", true, "Set to Yes if you want to extract helical segments from manually picked tube coordinates (starting and end points of helical tubes in RELION, EMAN or XIMDISP format). \
 Set to No if segment coordinates (RELION auto-picked results or EMAN / XIMDISP segments) are provided.", helical_tubes_group);
 
 	helical_tubes_group->begin();
 
+	do_cut_into_segments.place(current_y, "Cut helical tubes into segments?", true, "Set to Yes if you want to extract multiple helical segments with a fixed inter-box distance. \
+If it is set to No, only one box at the center of each helical tube will be extracted.");
+
 	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
 The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
 
-	helical_rise.place(current_y, "Helical rise (A):", 0, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+	helical_rise.place(current_y, "Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
 
 	helical_tubes_group->end();
 
@@ -1910,6 +1927,7 @@ void ExtractJobWindow::write(std::string fn)
 	// Helix
 	do_extract_helix.writeValue(fh);
 	do_extract_helical_tubes.writeValue(fh);
+	do_cut_into_segments.writeValue(fh);
 	helical_nr_asu.writeValue(fh);
 	helical_rise.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
@@ -1951,6 +1969,7 @@ void ExtractJobWindow::read(std::string fn, bool &_is_continue)
 		// Helix
 		do_extract_helix.readValue(fh);
 		do_extract_helical_tubes.readValue(fh);
+		do_cut_into_segments.readValue(fh);
 		helical_nr_asu.readValue(fh);
 		helical_rise.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
@@ -1986,6 +2005,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 	// Helix
 	do_extract_helix.deactivate(is_continue);
 	do_extract_helical_tubes.deactivate(is_continue);
+	do_cut_into_segments.deactivate(is_continue);
 	helical_nr_asu.deactivate(is_continue);
 	helical_rise.deactivate(is_continue);
 	helical_tube_outer_diameter.deactivate(is_continue);
@@ -2077,8 +2097,14 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		if (do_extract_helical_tubes.getValue())
 		{
 			command += " --helical_tubes";
-			command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
-			command += " --helical_rise " + floatToString(helical_rise.getValue());
+			if (do_cut_into_segments.getValue())
+			{
+				command += " --helical_cut_into_segments";
+				command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+				command += " --helical_rise " + floatToString(helical_rise.getValue());
+			}
+			else
+				command += " --helical_nr_asu 1 --helical_rise 1";
 		}
 	}
 
@@ -4597,6 +4623,9 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
 	pipelineOutputNodes.push_back(node4);
+
+	Node node5(outputname + "shiny_post.mrc", NODE_FINALMAP);
+	pipelineOutputNodes.push_back(node5);
 
 	// If this is not a continue job, then re-start from scratch....
 	if (is_continue)

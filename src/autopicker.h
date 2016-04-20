@@ -170,8 +170,11 @@ public:
 	// Input & Output rootname
 	FileName fn_in, fn_ref, fns_autopick, fn_odir, fn_out;
 
-	// Pixel size (for low-pass filter and particle diameter)
+	// Pixel size for the micrographs (for low-pass filter and particle diameter)
 	RFLOAT angpix;
+
+	// Pixel size for the references (for low-pass filter and particle diameter)
+	RFLOAT angpix_ref;
 
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
@@ -267,8 +270,8 @@ public:
 	// Number of non-zero pixels in the circular mask, and of its inverse (for background normalisation in do_diff2)
 	int nr_pixels_circular_mask, nr_pixels_circular_invmask;
 
-	// Array with Fourier-transform of the (circular) mask, and of its inverse
-	MultidimArray<Complex > Fmsk, Finvmsk;
+	// Array with Fourier-transform of the inverse of the (circular) mask
+	MultidimArray<Complex > Finvmsk;
 
 public:
 
@@ -301,9 +304,7 @@ public:
 			RFLOAT particle_diameter_pix,
 			std::vector<ccfPeak>& ccf_peak_list,
 			MultidimArray<RFLOAT>& Mccfplot,
-			int micrograph_maxxy_size,
-			int micrograph_minxy_size,
-			int skip_side);
+			int skip_side, float scale);
 
 	void extractHelicalTubes(
 			std::vector<ccfPeak>& ccf_peak_list,
@@ -313,7 +314,7 @@ public:
 			RFLOAT particle_diameter_pix,
 			RFLOAT curvature_factor_max,
 			RFLOAT interbox_distance_pix,
-			RFLOAT tube_diameter_pix);
+			RFLOAT tube_diameter_pix, float scale);
 
 	void exportHelicalTubes(
 			const MultidimArray<RFLOAT>& Mccf,
@@ -326,10 +327,7 @@ public:
 			FileName& fn_star_out,
 			RFLOAT particle_diameter_pix,
 			RFLOAT tube_length_min_pix,
-			int micrograph_maxxy_size,
-			int micrograph_xsize,
-			int micrograph_ysize,
-			int skip_side);
+			int skip_side, float scale);
 
 	void autoPickOneMicrograph(FileName &fn_mic);
 

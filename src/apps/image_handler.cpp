@@ -314,9 +314,33 @@ class image_handler_parameters
 		// Re-scale
 		if (new_angpix > 0.)
 		{
-			int oldsize = XSIZE(Iout());
+
+			int oldxsize = XSIZE(Iout());
+			int oldysize = YSIZE(Iout());
+			int oldsize = oldxsize;
+			if ( oldxsize != oldysize && Iout().getDim() == 2)
+			{
+				oldsize = XMIPP_MAX( oldxsize, oldysize );
+				Iout().setXmippOrigin();
+				Iout().window(FIRST_XMIPP_INDEX(oldsize), FIRST_XMIPP_INDEX(oldsize),
+						      LAST_XMIPP_INDEX(oldsize),  LAST_XMIPP_INDEX(oldsize));
+			}
+
 			int newsize = ROUND(oldsize * (angpix / new_angpix));
+			newsize -= newsize%2; //make even in case it is not already
 			resizeMap(Iout(), newsize);
+
+			if ( oldxsize != oldysize && Iout().getDim() == 2)
+			{
+				int newxsize = ROUND(oldxsize * (angpix / new_angpix));
+				int newysize = ROUND(oldysize * (angpix / new_angpix));;
+				newxsize -= newxsize%2; //make even in case it is not already
+				newysize -= newysize%2; //make even in case it is not already
+				Iout().setXmippOrigin();
+				Iout().window(FIRST_XMIPP_INDEX(newysize), FIRST_XMIPP_INDEX(newxsize),
+						      LAST_XMIPP_INDEX(newysize),  LAST_XMIPP_INDEX(newxsize));
+			}
+
 			// Also reset the sampling rate in the header
 			Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, new_angpix);
 			Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, new_angpix);

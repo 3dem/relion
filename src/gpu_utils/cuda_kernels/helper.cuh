@@ -188,7 +188,6 @@ __global__ void cuda_kernel_multi( XFLOAT *A,
 __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
 											 XFLOAT *aux,
 											 XFLOAT S,
-											 float rescale,
 											 int image_size);
 
 /*

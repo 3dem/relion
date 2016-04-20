@@ -305,8 +305,10 @@ public:
 	SliderEntry lowpass;
 	SliderEntry highpass;
 	SliderEntry angpix;
+	SliderEntry angpix_ref;
 	SliderEntry particle_diameter;
 	SliderEntry psi_sampling_autopick;
+	SliderEntry shrink;
 	BooleanEntry do_write_fom_maps, do_read_fom_maps;
 	SliderEntry threshold_autopick;
 	SliderEntry mindist_autopick;
@@ -410,6 +412,7 @@ public:
 	// Helix
 	BooleanEntry do_extract_helix;
 	BooleanEntry do_extract_helical_tubes;
+	BooleanEntry do_cut_into_segments;
 	SliderEntry helical_nr_asu;
 	SliderEntry helical_rise;
 	SliderEntry helical_tube_outer_diameter;

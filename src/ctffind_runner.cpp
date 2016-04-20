@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/ctffind_runner.h"
+#include "src/gpu_utils/cuda_mem_utils.h"
 
 void CtffindRunner::read(int argc, char **argv, int rank)
 {
@@ -71,7 +72,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	do_ignore_ctffind_params = parser.checkOption("--ignore_ctffind_params", "Use Gctf default parameters instead of CTFFIND parameters");
 	do_EPA = parser.checkOption("--EPA", "Use equi-phase averaging to calculate Thon rinds in Gctf");
 	do_validation = parser.checkOption("--do_validation", "Use validation inside Gctf to analyse quality of the fit?");
-	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3","0");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3","");
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -176,6 +177,12 @@ void CtffindRunner::initialise()
 	if (do_use_gctf && fn_micrographs.size()>0)
 	{
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
+		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+		{
+			if (verb>0)
+				std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		}
 
 		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
 		Image<double> Itmp;
@@ -413,10 +420,16 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 		for (size_t i = 0; i<allmicnames.size(); i++)
 			command += " " + allmicnames[i];
 
-		if (rank >= allThreadIDs.size())
-			REPORT_ERROR("ERROR: rank= " + integerToString(rank) + ", while size of GPU-IDs vector= " + integerToString(allThreadIDs.size()) + ". Check --gpu input, and provide a device-ID for each MPI process.");
+		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+		{
+			// Automated mapping
+			command += " -gid " + integerToString(rank % devCount);
+		}
 		else
+		{
+			// User-specified mapping
 			command += " -gid " + allThreadIDs[rank][0];
+		}
 
 		// Redirect all gctf output
 		command += " >> " + fn_out + "gctf" + integerToString(rank)+".out  2>> " + fn_out + "gctf" + integerToString(rank)+".err";
