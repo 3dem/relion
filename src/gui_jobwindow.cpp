@@ -449,7 +449,7 @@ void RelionJobWindow::initialisePipeline(std::string &outputname, std::string de
 
 }
 
-void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+bool RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
 	// Create output directory if the outname contains a "/"
@@ -496,6 +496,16 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 		}
 	}
 
+	char * my_warn = getenv ("RELION_WARNING_LOCAL_MPI");
+	int my_nr_warn = (my_warn == NULL) ? DEFAULTWARNINGLOCALMPI : textToInteger(my_warn);
+	if (has_mpi && nr_mpi.getValue() > my_nr_warn && !do_queue.getValue())
+	{
+		std::string ask;
+		ask = "You're submitting a local job with " + integerToString(my_nr_warn) + " parallel MPI processes. Do you really want to run this?\n";
+		return fl_choice(ask.c_str(), "Don't run", "Run", NULL);
+	}
+	else
+		return true;
 }
 
 /*
@@ -532,7 +542,7 @@ void XXXXJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
 }
-void XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
+bool XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
 {
 	commands.clear();
 	std::string command;
@@ -547,7 +557,7 @@ void XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	commands.push_back(command);
 	outputname = "run_ctffind";
-	prepareFinalCommand(outputname, commands, final_command);
+	return prepareFinalCommand(outputname, commands, final_command);
 }
 */
 
@@ -620,7 +630,7 @@ void ImportJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -733,7 +743,7 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option.");
 	}
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -861,7 +871,7 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -913,7 +923,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -1192,7 +1202,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -1237,6 +1247,9 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --ignore_ctffind_params";
 		if (do_EPA.getValue())
 			command += " --EPA";
+
+		// GPU-allocation
+		command += " --gpu " + gpu_ids.getValue();
 	}
 	else
 	{
@@ -1264,14 +1277,11 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (is_continue)
 		command += " --only_do_unfinished ";
 
-	// GPU-stuff
-	command += " --gpu " + gpu_ids.getValue();
-
 	// Other arguments
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -1402,7 +1412,7 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -1458,7 +1468,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command = "echo " + fn_in.getValue() + " > " + fn_suffix;
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -1672,7 +1682,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -1762,7 +1772,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command = "echo " + fn_input_autopick.getValue() + " > " +  outputname + "coords_suffix_autopick.star";
 	commands.push_back(command.c_str());
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2013,7 +2023,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -2127,7 +2137,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	}
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2211,7 +2221,7 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -2270,7 +2280,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -2599,7 +2609,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -2726,7 +2736,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -3233,7 +3243,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -3414,7 +3424,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -3863,7 +3873,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	helical_range_distance.deactivate(is_continue);
 }
 
-void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -4044,7 +4054,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -4269,7 +4279,7 @@ void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -4403,7 +4413,7 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -4596,7 +4606,7 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 	commands.clear();
@@ -4670,7 +4680,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -4798,7 +4808,7 @@ void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -4950,7 +4960,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 	//	commands.push_back(command2);
 	//}
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5063,7 +5073,7 @@ void MaskCreateJobWindow::toggle_new_continue(bool _is_continue)
 	fn_in.deactivate(is_continue);
 }
 
-void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5102,7 +5112,7 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5253,7 +5263,7 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 	fn_mic4.deactivate(is_continue);
 }
 
-void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5328,7 +5338,7 @@ void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5458,7 +5468,7 @@ void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 
-void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5511,7 +5521,7 @@ void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5646,7 +5656,7 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5713,7 +5723,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -5825,7 +5835,7 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5834,7 +5844,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	if (fn_resmap.getValue().length() == 0)
 	{
-		std::cerr << "ResmapJobWindow::getCommands ERROR: please provide an executable for the ResMap program." << std::endl;
+		std::cerr << "ERROR: please provide an executable for the ResMap program." << std::endl;
 		exit(1);
 	}
 
@@ -5848,7 +5858,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else
 	{
-		std::cerr << "ResMapJobWindow::getCommands ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
+		std::cerr << "ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
 		exit(1);
 	}
 
@@ -5878,7 +5888,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 /*

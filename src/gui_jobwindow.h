@@ -40,6 +40,7 @@
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
+#define DEFAULTWARNINGLOCALMPI 32
 #define DEFAULTALLOWCHANGEMINDEDICATED true
 
 static Fl_Menu_Item sampling_options[] = {
@@ -151,7 +152,8 @@ public:
 	void initialisePipeline(std::string &outputname, std::string defaultname, int job_counter);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
-	void prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
+	// Returns true to go ahead, and false to cancel
+	bool prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir = true);
 
 private:
 
@@ -212,7 +214,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -248,7 +250,7 @@ public:
 	// what happens if you change continue old run radiobutton
 	void toggle_new_continue(bool is_continue);
 
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -288,7 +290,7 @@ public:
 	// what happens if you change continue old run radiobutton
 	void toggle_new_continue(bool is_continue);
 
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -337,7 +339,7 @@ public:
 	// what happens if you change continue old run radiobutton
 	void toggle_new_continue(bool is_continue);
 
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -380,7 +382,7 @@ public:
 	// what happens if you change continue old run radiobutton
 	void toggle_new_continue(bool is_continue);
 
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -436,7 +438,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -468,7 +470,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -532,7 +534,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -620,7 +622,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -704,7 +706,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -758,7 +760,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands,
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter);
 
 };
@@ -810,7 +812,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -849,7 +851,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -885,7 +887,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -929,7 +931,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -967,7 +969,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -1011,7 +1013,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
@@ -1048,7 +1050,7 @@ public:
 	void toggle_new_continue(bool is_continue);
 
 	// Generate the correct commands
-	void getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir, int job_counter);
 
 };
 
