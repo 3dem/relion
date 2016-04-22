@@ -89,9 +89,11 @@ class MlOptimiser
 {
 public:
 
-	// For GPU-acceleration
-	std::vector<void*> cudaMlOptimisers;
-	std::vector<void*> cudaMlDeviceBundles;
+	// For GPU-maps
+	std::vector<int> cudaDevices;
+	std::vector<int> cudaDeviceShares;
+	std::vector<int> cudaOptimiserDeviceMap;
+	std::vector<void*> cudaOptimisers;
 
 	// I/O Parser
 	IOParser parser;

@@ -252,20 +252,20 @@ void MlOptimiserMpi::initialise()
 					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
 					//Only make a new bundle of not existing on device
-					MlDeviceBundle * bundle(NULL);
+					int did(-1);
 
-					for (int j = 0; j < cudaMlDeviceBundles.size(); j++)
-						if (((MlDeviceBundle *) cudaMlDeviceBundles[j])->device_id == dev_id)
-							bundle = (MlDeviceBundle *) cudaMlDeviceBundles[j];
+					for (int j = 0; j < cudaDevices.size(); j++)
+						if (cudaDevices[j] == dev_id)
+							did = j;
 
-					if (bundle == NULL)
+					if (did == -1)
 					{
-						bundle = new MlDeviceBundle(this, dev_id);
-						cudaMlDeviceBundles.push_back((void *) bundle);
+						did = dev_id;
+						cudaDevices.push_back(did);
+						cudaDeviceShares.push_back(1);
 					}
 
-					//Make new cuda optimizer and attach to bundle
-					cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, bundle));
+					cudaOptimiserDeviceMap.push_back(did);
 				}
 
 			}
@@ -276,22 +276,18 @@ void MlOptimiserMpi::initialise()
 
 		if (! node->isMaster())
 		{
-			int devCount = cudaMlDeviceBundles.size();
+			int devCount = cudaDevices.size();
 			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-
-			MlDeviceBundle * bundle(NULL);
 
 			for (int i = 0; i < devCount; i++)
 			{
-				bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
-
 				char buffer[BUFSIZ];
 				int len;
 				MPI_Get_processor_name(buffer, &len);
 				std::string didS(buffer, len);
 				std::stringstream didSs;
 
-				didSs << "Device " << bundle->device_id << " on " << didS;
+				didSs << "Device " << cudaDevices[i] << " on " << didS;
 				didS = didSs.str();
 
 //				std::cout << "SENDING: " << didS << std::endl;
@@ -302,8 +298,7 @@ void MlOptimiserMpi::initialise()
 
 			for (int i = 0; i < devCount; i++)
 			{
-				bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
-	        	node->relion_MPI_Recv(&bundle->rank_shared_count, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
+	        	node->relion_MPI_Recv(&cudaDeviceShares[i], 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
 //	        	std::cout << "Received: " << bundle->rank_shared_count << std::endl;
 			}
 		}
@@ -681,27 +676,47 @@ void MlOptimiserMpi::expectation()
 	/************************************************************************/
 	//GPU memory setup
 
+	std::vector<MlDeviceBundle> deviceBundles(cudaDevices.size(), this);
+
 	std::vector<size_t> allocationSizes;
 	MPI_Barrier(MPI_COMM_WORLD);
 
+
 	if (do_gpu && ! node->isMaster())
 	{
-		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
-			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
+		for (int i = 0; i < cudaDevices.size(); i ++)
+		{
+			deviceBundles[i].setDevice(cudaDevices[i]);
+			deviceBundles[i].setupFixedSizedObjects();
+		}
 
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-			((MlDeviceBundle *) cudaMlDeviceBundles[i])->setupFixedSizedObjects();
+		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
+		{
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, &deviceBundles[cudaOptimiserDeviceMap[i]]);
+			b->resetData();
+			cudaOptimisers.push_back((void*)b);
+		}
 
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+//#ifdef PRINT_GPU_MEM_INFO
+//		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+//		{
+//			for (int j = 0; j < cudaMlDeviceBundles[i]->cudaBackprojectors.size(); j ++)
+//			{
+//				size_t BPSize = ((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaBackprojectors[j].mdlXYZ * sizeof(XFLOAT) * 3;
+//				printf("INFO: Size of backprojector nr %d of device bundle nr %d of rank %d: %d MB \n", j, i, node->rank, (int) ( ((float)BPSize)/1000000.0 ) );
+//			}
+//		}
+//#endif
+
+		for (int i = 0; i < deviceBundles.size(); i ++)
 		{
 			size_t allocationSize;
 
 			if (! node->isMaster())
 			{
-				MlDeviceBundle * bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
-				HANDLE_ERROR(cudaSetDevice(bundle->device_id));
+				HANDLE_ERROR(cudaSetDevice(deviceBundles[i].device_id));
 
-				size_t free, total;
+				size_t free, total, allocationSize;
 				HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
 				if (free < requested_free_gpu_memory)
@@ -710,8 +725,11 @@ void MlOptimiserMpi::expectation()
 					allocationSize = (double)free *0.7;
 				}
 				else
-					allocationSize = free - requested_free_gpu_memory;
+					allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000;
 
+#ifdef PRINT_GPU_MEM_INFO
+				printf("INFO: Free memory for Custom Allocator of device bundle %d of rank %d is %d MB\n", i, node->rank, (int) ( ((float)allocationSize)/1000000.0 ) );
+#endif
 				allocationSizes.push_back(allocationSize);
 			}
 		}
@@ -721,11 +739,10 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isMaster())
 	{
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		for (int i = 0; i < deviceBundles.size(); i ++)
 		{
-			MlDeviceBundle * bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
-			size_t allocationSize = (size_t)((float)allocationSizes[i]/(float)bundle->rank_shared_count) - GPU_MEMORY_OVERHEAD_MB*1000*1000;
-			bundle->setupTunableSizedObjects(allocationSize);
+			size_t allocationSize = (size_t)((float)allocationSizes[i]/(float)cudaDeviceShares[i]) - GPU_MEMORY_OVERHEAD_MB*1000*1000;
+			deviceBundles[i].setupTunableSizedObjects(allocationSize);
 		}
 	}
 
@@ -1015,31 +1032,61 @@ void MlOptimiserMpi::expectation()
 
 			if (do_gpu)
 			{
-				for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+				for (int i = 0; i < deviceBundles.size(); i ++)
 				{
-					( (MlDeviceBundle*) cudaMlDeviceBundles[i])->syncAllBackprojects();
+					deviceBundles[i].syncAllBackprojects();
 
-					for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
+					for (int j = 0; j < deviceBundles[i].cudaProjectors.size(); j++)
 					{
-						unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
+						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 						XFLOAT *reals = new XFLOAT[s];
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						( (MlDeviceBundle*) cudaMlDeviceBundles[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+						deviceBundles[i].cudaBackprojectors[j].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{
-							wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) reals[n];
-							wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) imags[n];
-							wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) weights[n];
+							wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+							wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+							wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 						}
 
 						delete [] reals;
 						delete [] imags;
 						delete [] weights;
+
+						deviceBundles[i].cudaProjectors[j].clear();
+						deviceBundles[i].cudaBackprojectors[j].clear();
+						deviceBundles[i].coarseProjectionPlans[j].clear();
 					}
 				}
+
+				for (int i = 0; i < cudaOptimisers.size(); i ++)
+					delete (MlOptimiserCuda*) cudaOptimisers[i];
+
+				cudaOptimisers.clear();
+
+
+				for (int i = 0; i < deviceBundles.size(); i ++)
+				{
+
+					deviceBundles[i].allocator->syncReadyEvents();
+					deviceBundles[i].allocator->freeReadyAllocs();
+
+#ifdef DEBUG_CUDA
+				if (deviceBundles[i].allocator->getNumberOfAllocs() != 0)
+				{
+					printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
+					deviceBundles[i].allocator->printState();
+					fflush(stdout);
+					raise(SIGSEGV);
+				}
+
+#endif
+				}
+
+				deviceBundles.clear();
 			}
 
 
@@ -2526,8 +2573,6 @@ void MlOptimiserMpi::iterate()
 		if (node->rank == 1)
 			timer.printTimes(false);
 #endif
-		for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-			((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
 
     }
 

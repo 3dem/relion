@@ -418,15 +418,22 @@ public:
 
 	int rank_shared_count;
 
-	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id);
+	MlDeviceBundle(MlOptimiser *baseMLOptimiser):
+			baseMLO(baseMLOptimiser),
+			generateProjectionPlanOnTheFly(false),
+			rank_shared_count(1),
+			refIs3D(baseMLO->mymodel.ref_dim == 3),
+			device_id(-1),
+			allocator(NULL)
+	{};
+
+	void setDevice(int did)
+	{
+		device_id = did;
+	}
 
 	void setupFixedSizedObjects();
 	void setupTunableSizedObjects(size_t allocationSize);
-
-	void resetDevice()
-	{
-		HANDLE_ERROR(cudaDeviceReset());
-	}
 
 	void syncAllBackprojects()
 	{
@@ -442,6 +449,7 @@ public:
 		coarseProjectionPlans.clear();
 		//Delete this lastly
 		delete allocator;
+		HANDLE_ERROR(cudaDeviceReset());
 	}
 
 };
@@ -475,7 +483,7 @@ public:
 
 	MlDeviceBundle *devBundle;
 
-	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* Bundle);
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* Bundle);
 
 	void resetData();
 

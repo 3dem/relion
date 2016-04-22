@@ -52,7 +52,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
 	if (MLO->do_gpu)
-		((MlOptimiserCuda*) MLO->cudaMlOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
+		((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
 	else
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
@@ -971,19 +971,19 @@ void MlOptimiser::initialise()
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
 			//Only make a new bundle of not existing on device
-			MlDeviceBundle * bundle(NULL);
+			int did(-1);
 
-			for (int j = 0; j < cudaMlDeviceBundles.size(); j++)
-				if (((MlDeviceBundle *) cudaMlDeviceBundles[j])->device_id == dev_id)
-					bundle = (MlDeviceBundle *) cudaMlDeviceBundles[j];
+			for (int j = 0; j < cudaDevices.size(); j++)
+				if (cudaDevices[j] == dev_id)
+					did = j;
 
-			if (bundle == NULL)
+			if (did == -1)
 			{
-				bundle = new MlDeviceBundle(this, dev_id);
-				cudaMlDeviceBundles.push_back((void *) bundle);
+				did = dev_id;
+				cudaDevices.push_back(did);
 			}
 
-			cudaMlOptimisers.push_back((void *) new MlOptimiserCuda(this, dev_id, bundle));
+			cudaOptimiserDeviceMap.push_back(did);
 		}
 	}
 
@@ -1706,19 +1706,6 @@ void MlOptimiser::iterateWrapUp()
     delete global_barrier;
 	delete global_ThreadManager;
     delete exp_ipart_ThreadTaskDistributor;
-    for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-    	delete (MlOptimiserCuda *) cudaMlOptimisers[i];
-	if(do_gpu)
-		for (unsigned i = 0; i < cudaMlDeviceBundles.size(); i ++)
-		{
-			for (unsigned j = 0; j < ((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaProjectors.size(); j++)
-			{
-				((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaProjectors[j].clear();
-				((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaBackprojectors[j].clear();
-				((MlDeviceBundle *) cudaMlDeviceBundles[i])->coarseProjectionPlans[j].clear();
-			}
-			((MlDeviceBundle *) cudaMlDeviceBundles[i])->resetDevice();
-		}
 }
 
 void MlOptimiser::iterate()
@@ -1870,8 +1857,6 @@ void MlOptimiser::iterate()
     	if (verb > 0)
     		timer.printTimes(false);
 #endif
-    for (unsigned i = 0; i < cudaMlOptimisers.size(); i ++)
-    	((MlOptimiserCuda *)cudaMlOptimisers[i])->transformer.clear();
     }
 
 	// delete threads etc
@@ -1940,17 +1925,25 @@ void MlOptimiser::expectation()
 	/************************************************************************/
 	//GPU memory setup
 
+	std::vector<MlDeviceBundle> deviceBundles(cudaDevices.size(), this);
+
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaMlOptimisers.size(); i ++)
-			((MlOptimiserCuda *) cudaMlOptimisers[i])->resetData();
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-			((MlDeviceBundle *) cudaMlDeviceBundles[i])->setupFixedSizedObjects();
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
-			MlDeviceBundle * bundle = (MlDeviceBundle *) cudaMlDeviceBundles[i];
+			deviceBundles[i].setDevice(cudaDevices[i]);
+			deviceBundles[i].setupFixedSizedObjects();
+		}
 
-			HANDLE_ERROR(cudaSetDevice(bundle->device_id));
+		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
+		{
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, &deviceBundles[cudaOptimiserDeviceMap[i]]);
+			b->resetData();
+			cudaOptimisers.push_back((void*)b);
+		}
+		for (int i = 0; i < deviceBundles.size(); i ++)
+		{
+			HANDLE_ERROR(cudaSetDevice(deviceBundles[i].device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
@@ -1963,7 +1956,7 @@ void MlOptimiser::expectation()
 			else
 				allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000;
 
-			bundle->setupTunableSizedObjects(allocationSize);
+			deviceBundles[i].setupTunableSizedObjects(allocationSize);
 		}
 	}
 
@@ -2026,31 +2019,61 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
+		for (int i = 0; i < deviceBundles.size(); i ++)
 		{
-			( (MlDeviceBundle*) cudaMlDeviceBundles[i])->syncAllBackprojects();
+			deviceBundles[i].syncAllBackprojects();
 
-			for (int iclass = 0; iclass < wsum_model.nr_classes; iclass++)
+			for (int j = 0; j < deviceBundles[i].cudaProjectors.size(); j++)
 			{
-				unsigned long s = wsum_model.BPref[iclass].data.nzyxdim;
+				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 				XFLOAT *reals = new XFLOAT[s];
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				( (MlDeviceBundle*) cudaMlDeviceBundles[i])->cudaBackprojectors[iclass].getMdlData(reals, imags, weights);
+				deviceBundles[i].cudaBackprojectors[j].getMdlData(reals, imags, weights);
 
 				for (unsigned long n = 0; n < s; n++)
 				{
-					wsum_model.BPref[iclass].data.data[n].real += (RFLOAT) reals[n];
-					wsum_model.BPref[iclass].data.data[n].imag += (RFLOAT) imags[n];
-					wsum_model.BPref[iclass].weight.data[n] += (RFLOAT) weights[n];
+					wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+					wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+					wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 				}
 
 				delete [] reals;
 				delete [] imags;
 				delete [] weights;
+
+				deviceBundles[i].cudaProjectors[j].clear();
+				deviceBundles[i].cudaBackprojectors[j].clear();
+				deviceBundles[i].coarseProjectionPlans[j].clear();
 			}
 		}
+
+		for (int i = 0; i < cudaOptimisers.size(); i ++)
+			delete (MlOptimiserCuda*) cudaOptimisers[i];
+
+		cudaOptimisers.clear();
+
+
+		for (int i = 0; i < deviceBundles.size(); i ++)
+		{
+
+			deviceBundles[i].allocator->syncReadyEvents();
+			deviceBundles[i].allocator->freeReadyAllocs();
+
+#ifdef DEBUG_CUDA
+			if (deviceBundles[i].allocator->getNumberOfAllocs() != 0)
+			{
+				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
+				deviceBundles[i].allocator->printState();
+				fflush(stdout);
+				raise(SIGSEGV);
+			}
+
+#endif
+		}
+
+		deviceBundles.clear();
 	}
 
 	// Clean up some memory
