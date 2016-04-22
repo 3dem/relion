@@ -91,9 +91,9 @@ public:
 
 	// For GPU-maps
 	std::vector<int> cudaDevices;
-	std::vector<int> cudaDeviceShares;
 	std::vector<int> cudaOptimiserDeviceMap;
 	std::vector<void*> cudaOptimisers;
+	std::vector<void*> cudaDeviceBundles;
 
 	// I/O Parser
 	IOParser parser;

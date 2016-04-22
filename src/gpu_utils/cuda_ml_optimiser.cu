@@ -125,10 +125,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		CUDA_CPU_TOC("nonZeroProb");
 
+		CUDA_CPU_TIC("setXmippOrigin");
 		// Get the image and recimg data
 		if (baseMLO->do_parallel_disc_io)
 		{
-			CUDA_CPU_TIC("setXmippOrigin");
 
 			// If all slaves had preread images into RAM: get those now
 			if (baseMLO->do_preread_images)
@@ -159,11 +159,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				rec_img.read(fn_recimg);
 				rec_img().setXmippOrigin();
 			}
-			CUDA_CPU_TOC("setXmippOrigin");
 		}
 		else
 		{
-			CUDA_CPU_TIC("setXmippOrigin");
 			// Unpack the image from the imagedata
 			if (baseMLO->mymodel.data_dim == 3)
 			{
@@ -209,8 +207,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					rec_img().setXmippOrigin();
 				}
 			}
-			CUDA_CPU_TOC("setXmippOrigin");
 		}
+		CUDA_CPU_TOC("setXmippOrigin");
 
 		CUDA_CPU_TIC("selfTranslate");
 
@@ -2639,36 +2637,16 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	}
 };
 
-MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle) :
-		baseMLO(baseMLOptimiser), transformer1(0, bundle->allocator), transformer2(0, bundle->allocator)
+void MlOptimiserCuda::resetData()
 {
-	unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
+	HANDLE_ERROR(cudaSetDevice(device_id));
 
-	/*======================================================
-					DEVICE MEM OBJ SETUP
-	======================================================*/
-
-	device_id = bundle->device_id;
-	errorStatus = (cudaError_t)0; // init as cudaSuccess (==0)
-
-	HANDLE_ERROR(cudaSetDevice(bundle->device_id));
-
-	devBundle = bundle;
-
-//	HANDLE_ERROR(cudaStreamCreate(&stream1));
-//	HANDLE_ERROR(cudaStreamCreate(&stream2));
+	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)
 		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
 
-
-	refIs3D = baseMLO->mymodel.ref_dim == 3;
-};
-
-void MlOptimiserCuda::resetData()
-{
-	HANDLE_ERROR(cudaSetDevice(device_id));
 	/*======================================================
 	                  TRANSLATIONS SETUP
 	======================================================*/
