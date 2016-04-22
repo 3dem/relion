@@ -268,7 +268,6 @@ public:
 	int nr_pool;
 
 	// Available memory (in Gigabyte)
-	RFLOAT available_memory;
 	size_t available_gpu_memory;
 	size_t requested_free_gpu_memory;
 
@@ -397,8 +396,8 @@ public:
 	// Flag whether to do local refinement of helical parameters
 	bool do_helical_symmetry_local_refinement;
 
-	// Sigma of helical segment distance (In Angstroms)
-	RFLOAT helical_sigma_segment_distance;
+	// Sigma of distance along the helical tracks
+	RFLOAT helical_sigma_distance;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -458,6 +457,7 @@ public:
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
+	std::vector<int> exp_random_class_some_particles;
 	int exp_nr_images;
 
 	// Calculate translated images on-the-fly
@@ -501,7 +501,6 @@ public:
 		has_high_fsc_at_limit(0),
 		do_acc_currentsize_despite_highres_exp(0),
 		low_resol_join_halves(0),
-		available_memory(0),
 		do_auto_refine(0),
 		has_converged(0),
 		only_flip_phases(0),
@@ -580,7 +579,7 @@ public:
 		helical_tube_inner_diameter(0),
 		helical_tube_outer_diameter(0),
 		do_helical_symmetry_local_refinement(0),
-		helical_sigma_segment_distance(0)
+		helical_sigma_distance(0)
 	{};
 
 	/** ========================== I/O operations  =========================== */
@@ -828,15 +827,6 @@ public:
 	// Get metadata array of a subset of particles from the experimental model
 	void getMetaAndImageDataSubset(int first_ori_particle_id, int last_ori_particle_id, bool do_also_imagedata = true);
 
-	/*
-	 * Takes a string with device-indices which is
-	 *  	: delimited for ranks
-	 *  	, delimited for threads within each rank
-	 * and outputs a rank-major array which supplies
-	 * a mapping as input for distribution of ranks
-	 * and threads over the availiable/specfied GPUs.
-	 */
-	void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled);
 };
 
 // Global call to threaded core of doThreadExpectationSomeParticles

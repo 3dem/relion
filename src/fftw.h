@@ -55,6 +55,7 @@
 #include "src/funcs.h"
 #include "src/tabfuncs.h"
 #include "src/complex.h"
+#include "src/CPlot2D.h"
 
 /** @defgroup FourierW FFTW Fourier transforms
   * @ingroup DataLibrary
@@ -100,7 +101,7 @@
  * @endcode
  */
 #define FFTW_ELEM(V, kp, ip, jp) \
-    DIRECT_A3D_ELEM((V),((kp < 0) ? (kp + ZSIZE(V)) : (kp)), ((ip < 0) ? (ip + YSIZE(V)) : (ip)), (jp))
+    (DIRECT_A3D_ELEM((V),((kp < 0) ? (kp + ZSIZE(V)) : (kp)), ((ip < 0) ? (ip + YSIZE(V)) : (ip)), (jp)))
 
 /** FFTW 2D image element: Logical access.
  *
@@ -111,7 +112,7 @@
  * @endcode
  */
 #define FFTW2D_ELEM(V, ip, jp) \
-    DIRECT_A2D_ELEM((V), ((ip < 0) ? (ip + YSIZE(V)) : (ip)), (jp))
+    (DIRECT_A2D_ELEM((V), ((ip < 0) ? (ip + YSIZE(V)) : (ip)), (jp)))
 
 /** Fourier Transformer class.
  * @ingroup FourierW
@@ -224,9 +225,12 @@ public:
         void getFourierAlias(T& V) {V.alias(fFourier); return;}
 
     /** Get Fourier coefficients. */
+    MultidimArray< Complex>& getFourierReference() {return fFourier;}
+
+    /** Get Fourier coefficients. */
     template <typename T>
         void getFourierCopy(T& V) {
-            V.resize(fFourier);
+            V.reshape(fFourier);
             memcpy(MULTIDIM_ARRAY(V),MULTIDIM_ARRAY(fFourier),
                 MULTIDIM_SIZE(fFourier)*2*sizeof(RFLOAT));
         }
@@ -235,7 +239,7 @@ public:
     */
     template <typename T>
         void getCompleteFourier(T& V) {
-            V.resize(*fReal);
+            V.reshape(*fReal);
             int ndim=3;
             if (ZSIZE(*fReal)==1)
             {
@@ -380,7 +384,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
         int l, shift;
 
         l = XSIZE(v);
-        aux.resize(l);
+        aux.reshape(l);
         shift = (int)(l / 2);
 
         if (!forward)
@@ -411,7 +415,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 
         // Shift in the X direction
         l = XSIZE(v);
-        aux.resize(l);
+        aux.reshape(l);
         shift = (int)(l / 2);
 
         if (!forward)
@@ -439,7 +443,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 
         // Shift in the Y direction
         l = YSIZE(v);
-        aux.resize(l);
+        aux.reshape(l);
         shift = (int)(l / 2);
 
         if (!forward)
@@ -473,7 +477,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 
         // Shift in the X direction
         l = XSIZE(v);
-        aux.resize(l);
+        aux.reshape(l);
         shift = (int)(l / 2);
 
         if (!forward)
@@ -502,7 +506,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 
         // Shift in the Y direction
         l = YSIZE(v);
-        aux.resize(l);
+        aux.reshape(l);
         shift = (int)(l / 2);
 
         if (!forward)
@@ -531,7 +535,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 
         // Shift in the Z direction
         l = ZSIZE(v);
-        aux.resize(l);
+        aux.reshape(l);
         shift = (int)(l / 2);
 
         if (!forward)
@@ -569,54 +573,76 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 // Window an FFTW-centered Fourier-transform to a given size
 template<class T>
 void windowFourierTransform(MultidimArray<T > &in,
-			  			    MultidimArray<T > &out,
-			  			    long int newdim)
+                              MultidimArray<T > &out,
+                              long int newdim)
 {
-	// Check size of the input array
-	if (YSIZE(in) > 1 && YSIZE(in)/2 + 1 != XSIZE(in))
-		REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
-	long int newhdim = newdim/2 + 1;
+    // Check size of the input array
+    if (YSIZE(in) > 1 && YSIZE(in)/2 + 1 != XSIZE(in))
+        REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
+    long int newhdim = newdim/2 + 1;
 
-	// If same size, just return input
-	if (newhdim == XSIZE(in))
-	{
-		out = in;
-		return;
-	}
-
-	// Otherwise apply a windowing operation
-	// Initialise output array
-	switch (in.getDim())
-	{
-	case 1:
-		out.initZeros(newhdim);
-		break;
-	case 2:
-		out.initZeros(newdim, newhdim);
-		break;
-	case 3:
-		out.initZeros(newdim, newdim, newhdim);
-		break;
-	default:
-    	REPORT_ERROR("windowFourierTransform ERROR: dimension should be 1, 2 or 3!");
+    // If same size, just return input
+    if (newhdim == XSIZE(in))
+    {
+        out = in;
+        return;
     }
-	if (newhdim > XSIZE(in))
-	{
-		long int max_r2 = (XSIZE(in) -1) * (XSIZE(in) - 1);
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(in)
-		{
-			// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
-			if (kp*kp + ip*ip + jp*jp <= max_r2)
-				FFTW_ELEM(out, kp, ip, jp) = FFTW_ELEM(in, kp, ip, jp);
-		}
-	}
-	else
-	{
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(out)
-		{
-			FFTW_ELEM(out, kp, ip, jp) = FFTW_ELEM(in, kp, ip, jp);
-		}
-	}
+
+    // Otherwise apply a windowing operation
+    // Initialise output array
+    switch (in.getDim())
+    {
+    case 1:
+        out.initZeros(newhdim);
+        break;
+    case 2:
+        out.initZeros(newdim, newhdim);
+        break;
+    case 3:
+        out.initZeros(newdim, newdim, newhdim);
+        break;
+    default:
+        REPORT_ERROR("windowFourierTransform ERROR: dimension should be 1, 2 or 3!");
+    }
+    if (newhdim > XSIZE(in))
+    {
+        long int max_r2 = (XSIZE(in) -1) * (XSIZE(in) - 1);
+        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(in)
+        {
+            // Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+            if (kp*kp + ip*ip + jp*jp <= max_r2)
+                FFTW_ELEM(out, kp, ip, jp) = FFTW_ELEM(in, kp, ip, jp);
+        }
+    }
+    else
+    {
+        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(out)
+        {
+            FFTW_ELEM(out, kp, ip, jp) = FFTW_ELEM(in, kp, ip, jp);
+        }
+    }
+}
+
+// Same as above, acts on the input array directly
+template<class T>
+void windowFourierTransform(MultidimArray<T > &V,
+                              long int newdim)
+{
+    // Check size of the input array
+    if (YSIZE(V) > 1 && YSIZE(V)/2 + 1 != XSIZE(V))
+        REPORT_ERROR("windowFourierTransform ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
+    long int newhdim = newdim/2 + 1;
+
+    // If same size, just return input
+    if (newhdim == XSIZE(V))
+    {
+        return;
+    }
+
+    MultidimArray<T> tmp;
+    windowFourierTransform<T>(V, tmp, newdim);
+    V.moveFrom(tmp);
+
 }
 
 // A resize operation in Fourier-space (i.e. changing the sampling of the Fourier Transform) by windowing in real-space
@@ -651,22 +677,22 @@ void resizeFourierTransform(MultidimArray<T > &in,
 	switch (in.getDim())
 	{
 	case 1:
-		Min.resize(olddim);
+		Min.reshape(olddim);
 		y0=yF=z0=zF=0;
 		break;
 	case 2:
-		Min.resize(olddim, olddim);
+		Min.reshape(olddim, olddim);
 		z0=zF=0;
 		break;
 	case 3:
-		Min.resize(olddim, olddim, olddim);
+		Min.reshape(olddim, olddim, olddim);
 		break;
 	default:
     	REPORT_ERROR("resizeFourierTransform ERROR: dimension should be 1, 2 or 3!");
     }
 
 	// This is to handle RFLOAT-valued input arrays
-	Fin.resize(ZSIZE(in), YSIZE(in), XSIZE(in));
+	Fin.reshape(ZSIZE(in), YSIZE(in), XSIZE(in));
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(in)
 	{
 		DIRECT_MULTIDIM_ELEM(Fin, n) = DIRECT_MULTIDIM_ELEM(in, n);
@@ -823,6 +849,10 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
-bool amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type);
+void padAndFloat2DMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT> &out, int factor = 2);
+
+void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT > &amp, int output_map_type);
+
+void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string fn_eps);
 
 #endif // __RELIONFFTW_H

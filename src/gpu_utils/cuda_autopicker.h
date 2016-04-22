@@ -45,12 +45,6 @@ public:
 
 	void run();
 
-	// Uses Roseman2003 formulae to calculate stddev under the mask through FFTs
-	// The FFTs of the micrograph (Fmic), micrograph-squared (Fmic2) and the mask (Fmsk) need to be provided at downsize_mic
-	// The putput (Mstddev) will be at (binned) micrograph_size
-	void calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &Fmic, const MultidimArray<Complex > &Fmic2,
-			int nr_nonzero_pixels_mask, MultidimArray<RFLOAT> &Mstddev, MultidimArray<RFLOAT> &Mmean);
-
 	void autoPickOneMicrograph(FileName &fn_mic);
 
 	~AutoPickerCuda()

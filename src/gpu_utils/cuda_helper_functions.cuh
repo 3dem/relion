@@ -586,5 +586,64 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 
 }
 
+template <typename T>
+void lowPassFilterMapGPU(
+		CudaGlobalPtr< T > &img_in,
+		size_t Zdim,
+		size_t Ydim,
+		size_t Xdim,
+		long int ori_size,
+		RFLOAT lowpass,
+		RFLOAT highpass,
+		RFLOAT angpix,
+		int filter_edge_width,
+		bool do_highpass)
+{
+	// High or low?
+	RFLOAT passLimit = (do_highpass ? highpass : lowpass);
+
+	// Which resolution shell is the filter?
+	int ires_filter = ROUND((ori_size * angpix)/passLimit);
+	int filter_edge_halfwidth = filter_edge_width / 2;
+
+	// Soft-edge: from 1 shell less to one shell more:
+	XFLOAT edge_low = XMIPP_MAX(0., (ires_filter - filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
+	XFLOAT edge_high = XMIPP_MIN(Xdim, (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
+	XFLOAT edge_width = edge_high - edge_low;
+
+	dim3 blocks(ceilf( (float)(Xdim*Ydim*Zdim)/ (float)(CFTT_BLOCK_SIZE) ) );
+	if (do_highpass)
+	{
+		cuda_kernel_frequencyPass<true><<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
+
+				~img_in,
+				ori_size,
+				Xdim,
+				Ydim,
+				Zdim,
+				edge_low,
+				edge_width,
+				edge_high,
+				(XFLOAT)angpix,
+				Xdim*Ydim*Zdim);
+	}
+	else
+	{
+		cuda_kernel_frequencyPass<false><<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
+
+						~img_in,
+						ori_size,
+						Xdim,
+						Ydim,
+						Zdim,
+						edge_low,
+						edge_width,
+						edge_high,
+						(XFLOAT)angpix,
+						Xdim*Ydim*Zdim);
+	}
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+}
+
 #endif //CUDA_HELPER_FUNCTIONS_CUH_
 

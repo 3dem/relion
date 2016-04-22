@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/motioncorr_runner.h"
+#include "src/gpu_utils/cuda_mem_utils.h"
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
@@ -29,6 +30,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run MOTIONCORR for those micrographs for which there is not yet an output micrograph.");
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "0");
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	bin_factor =  textToInteger(parser.getOption("--bin_factor", "Binning factor (integer) for scaling inside MOTIONCORR", "1"));
@@ -69,6 +71,14 @@ void MotioncorrRunner::initialise()
 
 	MDavg.clear();
 	MDmov.clear();
+
+	untangleDeviceIDs(gpu_ids, allThreadIDs);
+	if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+	{
+		if (verb>0)
+			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	}
 
 	FileName fn_avg, fn_mov;
 
@@ -240,8 +250,15 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 		if (fn_other_args.length() > 0)
 			command += " " + fn_other_args;
 
-		// TODO: think about GPU and MPI interplay!
-		command += " -gpu " + integerToString(rank);
+		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+		{
+			// Automated mapping
+			command += " -gpu " + integerToString(rank % devCount);
+		}
+		else
+		{
+			command += " -gpu " + allThreadIDs[rank][0];
+		}
 
 		command += " >> " + fn_out + " 2>> " + fn_err;
 

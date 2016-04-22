@@ -121,6 +121,8 @@ void AnyEntry::initialise(int x, int y, int height,
 		// Set the input value
 		inp->value(defaultvalue);
 		inp->color(GUI_INPUT_COLOR);
+		inp->textsize(ENTRY_FONTSIZE);
+		inp->labelsize(ENTRY_FONTSIZE);
 	}
 
 	// Display help button if needed
@@ -133,7 +135,7 @@ void AnyEntry::initialise(int x, int y, int height,
 		help = new Fl_Button( XCOL3, y, wcol3, height, "?");
 		help->callback( cb_help, this );
 		help->color(GUI_BUTTON_COLOR);
-
+		help->labelsize(ENTRY_FONTSIZE);
     }
 }
 
@@ -179,6 +181,8 @@ void AnyEntry::placeOnSameYPosition(int y,
 		// Set the input value
 		inp->value(defaultvalue);
 		inp->color(GUI_INPUT_COLOR);
+		inp->textsize(ENTRY_FONTSIZE);
+		inp->labelsize(ENTRY_FONTSIZE);
 	}
 
 	// Display help button if needed
@@ -191,7 +195,7 @@ void AnyEntry::placeOnSameYPosition(int y,
 		help = new Fl_Button(x + wcol2 + COLUMN_SEPARATION, y, wcol3, h, "?");
 		help->callback( cb_help, this );
 		help->color(GUI_BUTTON_COLOR);
-
+		help->labelsize(ENTRY_FONTSIZE);
     }
 }
 
@@ -321,6 +325,7 @@ void FileNameEntry::initialise(int x, int y, int height,
     browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
     browse->callback( cb_browse, this );
     browse->color(GUI_BUTTON_COLOR);
+    browse->labelsize(ENTRY_FONTSIZE);
 }
 
 
@@ -437,6 +442,7 @@ void InputNodeEntry::initialise(int x, int y, int height,
     browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
     browse->callback( cb_browse_node, this );
     browse->color(GUI_BUTTON_COLOR);
+    browse->labelsize(ENTRY_FONTSIZE);
 }
 
 
@@ -553,10 +559,12 @@ void RadioEntry::initialise(int x, int y, int height,
     choice->menu(options);
     choice->picked(defaultvalue);
     choice->callback(cb_menu, this);
+    choice->textsize(ENTRY_FONTSIZE);
 
     menu = choice;
     //menu->color(GUI_BACKGROUND_COLOR);
     menu->color(GUI_INPUT_COLOR);
+    menu->textsize(ENTRY_FONTSIZE);
 }
 
 

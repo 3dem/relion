@@ -690,5 +690,3 @@ __global__ void cuda_kernel_square(
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*A[pixel];
 }
-
-

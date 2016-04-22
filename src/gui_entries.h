@@ -77,11 +77,12 @@ extern std::string current_browse_directory;
 #define XCOL0 200
 #define WCOL0 200
 #define XCOL1 ( (XCOL0) + 10  )
-#define XCOL2 ( (XCOL0) + 260 )
-#define XCOL3 ( (XCOL0) + 460 )
-#define XCOL4 ( (XCOL0) + 475 )
-#define XCOL5 ( (XCOL0) + 535 )
-#define STEPY 22
+#define XCOL2 ( (XCOL0) + 280 )
+#define XCOL3 ( (XCOL0) + 480 )
+#define XCOL4 ( (XCOL0) + 495 )
+#define XCOL5 ( (XCOL0) + 555 )
+#define ENTRY_FONTSIZE 13
+#define STEPY 20
 #define COLUMN_SEPARATION 3
 #define WCOL1 ( (XCOL2) - (XCOL1) - (COLUMN_SEPARATION) )
 #define WCOL2 ( (XCOL3) - (XCOL2) - (COLUMN_SEPARATION) )

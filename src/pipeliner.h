@@ -20,9 +20,9 @@
 
 #ifndef PIPELINER_H_
 #define PIPELINER_H_
-#include "src/metadata_table.h"
 #include <iostream>
 #include <sstream>
+#include "src/metadata_table.h"
 
 
 //forward declaration
@@ -266,14 +266,14 @@ public:
 			long int new_process, std::vector<long int> &branched_procs);
 
 	void makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int from_node,
-			std::vector<long int> &all_branches);
+			std::vector<long int> &all_branches, bool is_main_flow);
 
 	void makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pipeline, long int from_process);
 
 	// Open and close a new flowchart picture
-	void openTikZPicture(std::ofstream &fh);
+	void openTikZPicture(std::ofstream &fh, bool is_main_flow);
 
-	void closeTikZPicture(std::ofstream &fh);
+	void closeTikZPicture(std::ofstream &fh, bool is_main_flow);
 
 	void adaptNamesForTikZ(FileName &name);
 

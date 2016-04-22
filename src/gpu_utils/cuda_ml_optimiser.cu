@@ -2753,10 +2753,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					// exp_part_id is already in randomized order (controlled by -seed)
 					// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
 		    		// Make sure random division is always the same with the same seed
-
-					init_random_generator(baseMLO->random_seed + my_ori_particle);
-		    		sp.iclass_min = sp.iclass_max = rand() % baseMLO->mymodel.nr_classes;
-
+					long int idx = my_ori_particle - baseMLO->exp_my_first_ori_particle;
+					if (idx >= baseMLO->exp_random_class_some_particles.size())
+						REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
+					sp.iclass_min = sp.iclass_max = baseMLO->exp_random_class_some_particles[idx];
 				}
 			}
 			// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?

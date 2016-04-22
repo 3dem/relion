@@ -32,7 +32,7 @@ void AutoPicker::read(int argc, char **argv)
 	fn_in = parser.getOption("--i", "Micrograph STAR file OR filenames from which to autopick particles, e.g. \"Micrographs/*.mrc\"");
 	fn_out = parser.getOption("--pickname", "Rootname for coordinate STAR files", "autopick");
 	fn_odir = parser.getOption("--odir", "Output directory for coordinate files (default is to store next to micrographs)", "AutoPick/");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size of the micrographs in Angstroms", "1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms, default=automatic)", "-1"));
 	decrease_radius = textToInteger(parser.getOption("--shrink_particle_mask", "Shrink the particle mask by this many pixels (to detect Einstein-from-noise classes)", "2"));
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
@@ -44,6 +44,7 @@ void AutoPicker::read(int argc, char **argv)
 
 	int ref_section = parser.addSection("References options");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
+	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
 	do_invert = parser.checkOption("--invert", "Density in micrograph is inverted w.r.t. density in template");
 	psi_sampling = textToFloat(parser.getOption("--ang", "Angular sampling (in degrees); use 360 for no rotations", "10"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the references (prevent Einstein-from-noise!)","-1"));
@@ -148,6 +149,13 @@ void AutoPicker::initialise()
 			std::cout << "    * " << fn_micrographs[i] << std::endl;
 	}
 
+	// Make sure that psi-sampling is even around the circle
+	RFLOAT old_sampling = psi_sampling;
+	int n_sampling = ROUND(360. / psi_sampling);
+	psi_sampling = 360. / (RFLOAT) n_sampling;
+	if (verb > 0 && fabs(old_sampling - psi_sampling) > 1e-3)
+		std::cout << " + Changed psi-sampling rate to: " << psi_sampling << std::endl;
+
 	// Read in the references
 	Mrefs.clear();
 	if (fn_ref.isStarFile())
@@ -185,7 +193,10 @@ void AutoPicker::initialise()
 		}
 	}
 
-	particle_size = XSIZE(Mrefs[0]);
+
+	// Re-scale references if necessary
+	if (angpix_ref < 0)
+		angpix_ref = angpix;
 
 	// Automated determination of bg_radius (same code as in particle_sorter.cpp!)
 	if (particle_diameter < 0.)
@@ -202,7 +213,7 @@ void AutoPicker::initialise()
 			{
 				if (!has_set_first)
 				{
-					if (A3D_ELEM(Mrefs[iref], 0,0,j) != cornerval)
+					if (fabs(A3D_ELEM(Mrefs[iref], 0,0,j) - cornerval) > 1e-6)
 					{
 						first_corner = j;
 						has_set_first = true;
@@ -210,7 +221,7 @@ void AutoPicker::initialise()
 				}
 				else if (!has_set_last)
 				{
-					if (A3D_ELEM(Mrefs[iref], 0,0,j) == cornerval)
+					if (fabs(A3D_ELEM(Mrefs[iref], 0,0,j) - cornerval) < 1e-6)
 					{
 						last_corner = j - 1;
 						has_set_last = true;
@@ -220,22 +231,35 @@ void AutoPicker::initialise()
 			sumr += (last_corner - first_corner);
 		}
 		particle_diameter = sumr / Mrefs.size();
-		particle_radius2 = particle_diameter*particle_diameter/4.;
-		// diameter was in Angstroms
-		particle_diameter *= angpix;
+		// diameter is in Angstroms
+		particle_diameter *= angpix_ref;
 		if (verb>0)
 		{
-			std::cout << " + Automatically set the background diameter to " << particle_diameter << " Angstroms " << std::endl;
+			std::cout << " + Automatically set the background diameter to " << particle_diameter << " Angstrom" << std::endl;
 			std::cout << " + You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
-
 		}
 	}
-	else
+
+	if (fabs(angpix_ref - angpix) > 1e-3)
 	{
-		// Get the squared particle radius (in integer pixels)
-		particle_radius2 = ROUND(particle_diameter/(2. * angpix));
-		particle_radius2*= particle_radius2;
+		int halfoldsize = XSIZE(Mrefs[0]) / 2;
+		int newsize = (int)(float)halfoldsize * angpix_ref/angpix;
+		newsize *= 2;
+		for (int iref = 0; iref < Mrefs.size(); iref++)
+		{
+			resizeMap(Mrefs[iref], newsize);
+			Mrefs[iref].setXmippOrigin();
+		}
 	}
+
+	particle_size = XSIZE(Mrefs[0]);
+
+	if (particle_diameter > particle_size * angpix_ref)
+	{
+		std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
+		REPORT_ERROR("ERROR: the particlae diameter is larger than the size of the box.");
+	}
+
 
 	if ( (verb > 0) && (autopick_helical_segments))
 	{
@@ -268,7 +292,6 @@ void AutoPicker::initialise()
 	micrograph_xsize = XSIZE(Imic());
 	micrograph_ysize = YSIZE(Imic());
 	micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
-	micrograph_minxy_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MIN(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
 
 	if (lowpass < 0.)
 	{
@@ -337,6 +360,7 @@ void AutoPicker::initialise()
 				nr_pixels_circular_invmask++;
 			}
 		}
+
 		// Now set the mask in the large square and store its FFT
 		Maux.initZeros();
 		FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
@@ -357,28 +381,16 @@ void AutoPicker::initialise()
 				nr_pixels_circular_mask++;
 			}
 		}
+
 #ifdef DEBUG
 		std::cerr << " min_particle_distance= " << min_particle_distance << " micrograph_size= " << micrograph_size << " downsize_mic= " << downsize_mic << std::endl;
 		std::cerr << " nr_pixels_circular_mask= " << nr_pixels_circular_mask << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
 #endif
 
-		// Now set the mask in the large square and store its FFT
-		Maux.initZeros();
-		FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
-		{
-			A2D_ELEM(Maux, i, j ) = A2D_ELEM(Mcirc_mask, i, j);
-		}
-		CenterFFT(Maux, true);
-		transformer.FourierTransform(Maux, Fmsk);
-		transformer.cleanup(); // somehow I get segfaults without this cleanup....
-
 		PPref.clear();
 		Projector PP(micrograph_size);
 		MultidimArray<RFLOAT> dummy;
 
-		// TODO!!! sum_ref etc should be CTF-dependent!!!
-		//sum_ref_under_circ_mask.clear();
-		//sum_ref2_under_circ_mask.clear();
 		for (int iref = 0; iref < Mrefs.size(); iref++)
 		{
 
@@ -390,6 +402,7 @@ void AutoPicker::initialise()
 
 			// Set reference in the large box of the micrograph
 			Maux.initZeros();
+			Maux.setXmippOrigin();
 			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mrefs[iref])
 			{
 				A2D_ELEM(Maux, i, j) = A2D_ELEM(Mrefs[iref], i, j);
@@ -398,7 +411,6 @@ void AutoPicker::initialise()
 			// And compute its Fourier Transform inside the Projector
 			PP.computeFourierTransformMap(Maux, dummy, downsize_mic, 1, false);
 			PPref.push_back(PP);
-
 		}
 	}
 
@@ -422,7 +434,10 @@ int AutoPicker::deviceInitialise()
 	else
 		dev_id = textToInteger((allThreadIDs[0][0]).c_str());
 
-	std::cout << " Using device " << dev_id << std::endl;
+	if (verb>0)
+	{
+		std::cout << " + Using GPU device " << dev_id << std::endl;
+	}
 
 	return(dev_id);
 }
@@ -471,25 +486,26 @@ void AutoPicker::pickCCFPeaks(
 		RFLOAT particle_diameter_pix,
 		std::vector<ccfPeak>& ccf_peak_list,
 		MultidimArray<RFLOAT>& Mccfplot,
-		int micrograph_maxxy_size,
-		int micrograph_minxy_size,
-		int skip_side)
+		int skip_side, float scale)
 {
 	MultidimArray<int> Mrec;
 	std::vector<ccfPixel> ccf_pixel_list;
 	ccfPeak ccf_peak_small, ccf_peak_big;
 	std::vector<ccfPeak> ccf_peak_list_aux;
-	int micrograph_core_size = micrograph_minxy_size - skip_side * 2 - 2;
+	//int micrograph_core_size = XMIPP_MIN(micrograph_xsize, micrograph_ysize) - skip_side * 2 - 2;
 	int nr_pixels;
 	RFLOAT ratio;
 
+	//Rescale skip_side and particle_diameter_pix. Should we rescale peak_r_min as well?
+	skip_side = (int)((float)skip_side*scale);
+	particle_diameter_pix *= scale;
+
 	if ( (NSIZE(Mccf) != 1) || (ZSIZE(Mccf) != 1) || (YSIZE(Mccf) != XSIZE(Mccf)) )
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: The micrograph should be a 2D square!");
-	if ( (XSIZE(Mccf) != micrograph_maxxy_size) || (micrograph_maxxy_size < micrograph_minxy_size)
-			|| (skip_side < 0) )
-		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Invalid parameter(s)!");
-	if (micrograph_core_size < 100)
-		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Size of the micrograph is too small compared to that of the particle box!");
+	if ( (XSIZE(Mccf) < micrograph_xsize) || (YSIZE(Mccf) < micrograph_ysize) )
+		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Invalid dimensions for Mccf!");
+	//if (micrograph_core_size < 100*scale)
+	//	REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Size of the micrograph is too small compared to that of the particle box!");
 	if ( (STARTINGY(Mccf) != FIRST_XMIPP_INDEX(YSIZE(Mccf))) || (STARTINGX(Mccf) != FIRST_XMIPP_INDEX(XSIZE(Mccf))) )
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: The origin of input 3D MultidimArray is not at the center (use v.setXmippOrigin() before calling this function)!");
 	if (Mccf.sameShape(Mclass) == false)
@@ -515,9 +531,9 @@ void AutoPicker::pickCCFPeaks(
 	Mrec.initConstant(0);
 	Mrec.setXmippOrigin();
 	nr_pixels = 0;
-	for (int ii = (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1); ii < (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side); ii++)
+	for (int ii = FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side; ii <= LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side; ii++)
 	{
-		for (int jj = (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1); jj < (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side); jj++)
+		for (int jj = FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side; jj <= LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side; jj++)
 		{
 			RFLOAT fom = A2D_ELEM(Mccf, ii, jj);
 			nr_pixels++;
@@ -600,10 +616,10 @@ void AutoPicker::pickCCFPeaks(
 
 						x_new = x_old + dx;
 						y_new = y_old + dy;
-						if ( (x_new < (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1))
-								|| (x_new > (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side - 1))
-								|| (y_new < (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1))
-								|| (y_new > (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side - 1)) )
+						if ( (x_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side + 1))
+								|| (x_new > (LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side - 1))
+								|| (y_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side + 1))
+								|| (y_new > (LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side - 1)) )
 							continue;
 
 						// Push back all ccf pixels within this rmax
@@ -628,10 +644,10 @@ void AutoPicker::pickCCFPeaks(
 				y_new = ROUND(ccf_peak_big.y);
 
 				// Out of range
-				if ( (x_new < (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1))
-						|| (x_new > (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side - 1))
-						|| (y_new < (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1))
-						|| (y_new > (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side - 1)) )
+				if ( (x_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side + 1))
+						|| (x_new > (LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side - 1))
+						|| (y_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side + 1))
+						|| (y_new > (LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side - 1)) )
 					break;
 
 				// Converge
@@ -705,10 +721,10 @@ void AutoPicker::pickCCFPeaks(
 				y = dy + ROUND(ccf_peak_list[new_id].y);
 
 				// Out of range
-				if ( (x < (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1))
-						|| (x > (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side - 1))
-						|| (y < (FIRST_XMIPP_INDEX(micrograph_minxy_size) + skip_side + 1))
-						|| (y > (LAST_XMIPP_INDEX(micrograph_minxy_size) - skip_side - 1)) )
+				if ( (x < (FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side + 1))
+						|| (x > (LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side - 1))
+						|| (y < (FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side + 1))
+						|| (y > (LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side - 1)) )
 					continue;
 
 				old_id = A2D_ELEM(Mrec, y, x);
@@ -762,7 +778,8 @@ void AutoPicker::extractHelicalTubes(
 		RFLOAT particle_diameter_pix,
 		RFLOAT curvature_factor_max,
 		RFLOAT interbox_distance_pix,
-		RFLOAT tube_diameter_pix)
+		RFLOAT tube_diameter_pix,
+		float scale)
 {
 	std::vector<int> is_peak_on_other_tubes;
 	std::vector<int> is_peak_on_this_tube;
@@ -772,6 +789,11 @@ void AutoPicker::extractHelicalTubes(
 	tube_coord_list.clear();
 	tube_len_list.clear();
 	tube_track_list.clear();
+
+	//Rescaling
+	particle_diameter_pix *= scale;
+	interbox_distance_pix *= scale;
+	tube_diameter_pix *= scale;
 
 	if (particle_diameter_pix < 5.)
 		REPORT_ERROR("autopicker.cpp::extractHelicalTubes: Particle diameter should be larger than 5 pixels!");
@@ -1298,19 +1320,18 @@ void AutoPicker::exportHelicalTubes(
 		FileName& fn_star_out,
 		RFLOAT particle_diameter_pix,
 		RFLOAT tube_length_min_pix,
-		int micrograph_maxxy_size,
-		int micrograph_xsize,
-		int micrograph_ysize,
-		int skip_side)
+		int skip_side, float scale)
 {
+
+	// Rescale particle_diameter_pix, tube_length_min_pix
+	tube_length_min_pix *= scale;
+	particle_diameter_pix *= scale;
+
+
 	if ( (tube_coord_list.size() != tube_track_list.size()) || (tube_track_list.size() != tube_len_list.size()) )
 		REPORT_ERROR("autopicker.cpp::exportHelicalTubes: BUG tube_coord_list.size() != tube_track_list.size() != tube_len_list.size()");
 	if ( (STARTINGY(Mccf) != FIRST_XMIPP_INDEX(YSIZE(Mccf))) || (STARTINGX(Mccf) != FIRST_XMIPP_INDEX(XSIZE(Mccf))) )
 		REPORT_ERROR("autopicker.cpp::exportHelicalTubes: The origin of input 3D MultidimArray is not at the center (use v.setXmippOrigin() before calling this function)!");
-	if ( (XSIZE(Mccf) != micrograph_maxxy_size) || (YSIZE(Mccf) != micrograph_maxxy_size) || (ZSIZE(Mccf) != 1) || (NSIZE(Mccf) != 1)
-			|| (Mccf.sameShape(Mccfplot) == false) || (Mccf.sameShape(Mclass) == false)
-			|| (micrograph_xsize > micrograph_maxxy_size) || (micrograph_ysize > micrograph_maxxy_size) || (skip_side < 0) )
-		REPORT_ERROR("autopicker.cpp::exportHelicalTubes: Wrong dimensions for Mccf, Mclass or Mccfplot!");
 	if (particle_diameter_pix < 5.) // TODO: 5?
 		REPORT_ERROR("autopicker.cpp::exportHelicalTubes: Particle diameter should be larger than 5 pixels!");
 
@@ -1346,10 +1367,10 @@ void AutoPicker::exportHelicalTubes(
 				x_int = ROUND(x1);
 				y_int = ROUND(y1);
 
-				if ( (x_int < (FIRST_XMIPP_INDEX(micrograph_maxxy_size) + 1))
-						|| (x_int > (LAST_XMIPP_INDEX(micrograph_maxxy_size) - 1))
-						|| (y_int < (FIRST_XMIPP_INDEX(micrograph_maxxy_size) + 1))
-						|| (y_int > (LAST_XMIPP_INDEX(micrograph_maxxy_size) - 1)) )
+				if ( (x_int < (FIRST_XMIPP_INDEX(micrograph_xsize) + 1))
+						|| (x_int > (LAST_XMIPP_INDEX(micrograph_xsize) - 1))
+						|| (y_int < (FIRST_XMIPP_INDEX(micrograph_ysize) + 1))
+						|| (y_int > (LAST_XMIPP_INDEX(micrograph_ysize) - 1)) )
 					continue;
 
 				A2D_ELEM(Mccfplot, y_int, x_int) = 1.;
@@ -1483,8 +1504,10 @@ void AutoPicker::exportHelicalTubes(
 			fom = A2D_ELEM(Mccf, y_int, x_int);
 
 			MDout.addObject();
-			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(tube_coord_list[itube][icoord].x - FIRST_XMIPP_INDEX(micrograph_xsize)));
-			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(tube_coord_list[itube][icoord].y - FIRST_XMIPP_INDEX(micrograph_ysize)));
+			RFLOAT xval = (RFLOAT)(tube_coord_list[itube][icoord].x - FIRST_XMIPP_INDEX(micrograph_xsize)) / scale;
+			RFLOAT yval = (RFLOAT)(tube_coord_list[itube][icoord].y - FIRST_XMIPP_INDEX(micrograph_ysize)) / scale;
+			MDout.setValue(EMDL_IMAGE_COORD_X, xval);
+			MDout.setValue(EMDL_IMAGE_COORD_Y, yval);
 			MDout.setValue(EMDL_PARTICLE_CLASS, iref + 1); // start counting at 1
 			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
 			MDout.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
@@ -1594,7 +1617,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	Mccf_best.resize(workSize, workSize);
 	Mpsi_best.resize(workSize, workSize);
 
-	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_pixels_circular_mask;;
+	//Sjors 18apr2016
+	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_pixels_circular_mask;
 	if (do_read_fom_maps)
 	{
 		FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_stddevNoise.spi";
@@ -1630,7 +1654,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 		if (highpass > 0.)
         {
-			lowPassFilterMap(Fmic, XSIZE(Imic()), highpass, angpix, 2, true); // true means highpass instead of lowpass!
+			lowPassFilterMap(Fmic, micrograph_size, highpass, angpix, 2, true); // true means highpass instead of lowpass!
         	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
         }
 
@@ -1652,10 +1676,6 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		transformer.inverseFourierTransform(Faux2, tt());
 		CenterFFT(tt(), false);
 		tt.write("Minvmask.spi");
-		windowFourierTransform(Fmsk, Faux2, micrograph_size);
-		transformer.inverseFourierTransform(Faux2, tt());
-		CenterFFT(tt(), false);
-		tt.write("Mmask.spi");
 #endif
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
@@ -1689,21 +1709,21 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Image<RFLOAT> It_float;
 			Image<int> It_int;
 
-			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCCF.mrc";
+			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCCF.spi";
 			It_float.read(fn_tmp);
 			Mccf_best_combined = It_float();
 
-			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCLASS.mrc";
+			fn_tmp = getOutputRootName(fn_mic)+"_"+fn_out+"_combinedCLASS.spi";
 			It_int.read(fn_tmp);
 			Mclass_best_combined = It_int();
 		}
 		else
 		{
 			Mccf_best_combined.clear();
-			Mccf_best_combined.resize(micrograph_size, micrograph_size);
+			Mccf_best_combined.resize(workSize, workSize);
 			Mccf_best_combined.initConstant(-99.e99);
 			Mclass_best_combined.clear();
-			Mclass_best_combined.resize(micrograph_size, micrograph_size);
+			Mclass_best_combined.resize(workSize, workSize);
 			Mclass_best_combined.initConstant(-1);
 		}
 	}
@@ -1741,10 +1761,10 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				// Now get the FT of the rotated (non-ctf-corrected) template
 				Faux.initZeros(downsize_mic, downsize_mic/2 + 1);
 				PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
-
 #ifdef DEBUG
 				std::cerr << " psi= " << psi << std::endl;
 				windowFourierTransform(Faux, Faux2, micrograph_size);
+				tt().resize(micrograph_size, micrograph_size);
 				transformer.inverseFourierTransform(Faux2, tt());
 				CenterFFT(tt(), false);
 				tt.write("Mref_rot.spi");
@@ -1764,15 +1784,16 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 						DIRECT_MULTIDIM_ELEM(Faux, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 #ifdef DEBUG
+				MultidimArray<RFLOAT> ttt(micrograph_size, micrograph_size);
 				windowFourierTransform(Faux, Faux2, micrograph_size);
-				transformer.inverseFourierTransform(Faux2, Maux);
-				CenterFFT(Maux, false);
-				Maux.setXmippOrigin();
+				transformer.inverseFourierTransform(Faux2, ttt);
+				CenterFFT(ttt, false);
+				ttt.setXmippOrigin();
 				tt().resize(particle_size, particle_size);
 				tt().setXmippOrigin();
 				FOR_ALL_ELEMENTS_IN_ARRAY2D(tt())
 				{
-					A2D_ELEM(tt(), i, j) = A2D_ELEM(Maux, i, j);
+					A2D_ELEM(tt(), i, j) = A2D_ELEM(ttt, i, j);
 				}
 				tt.write("Mref_rot_ctf.spi");
 #endif
@@ -1783,13 +1804,17 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
-
-					windowFourierTransform(Faux, Faux2, workSize);
+					// This calculation needs to be done on an "non-shrinked" micrograph, in order to get the correct I^2 statistics
+					windowFourierTransform(Faux, Faux2, micrograph_size);
+					Maux.resize(micrograph_size, micrograph_size);
 					transformer.inverseFourierTransform(Faux2, Maux);
 					CenterFFT(Maux, false);
 					Maux.setXmippOrigin();
-					// TODO: check whether I need CenterFFT(Maux, false)
-
+//#ifdef DEBUG
+					Image<RFLOAT> ttt;
+					ttt()=Maux;
+					ttt.write("Maux.spi");
+//#endif
 					sum_ref_under_circ_mask = 0.;
 					sum_ref2_under_circ_mask = 0.;
 					RFLOAT suma2 = 0.;
@@ -1817,13 +1842,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					std::cerr << " expected_Pratio["<<iref<<"]= " << expected_Pratio << std::endl;
 					tt()=Mctfref;
 					tt.write("Mctfref.spi");
-
+					std::cerr << "suma2 " << suma2<< " sumn " << sumn << " suma2/2sumn="<< suma2 / (2. * sumn) << std::endl;
+					std::cerr << " nr_pixels_under_mask= " << nr_pixels_circular_mask << " nr_pixels_under_invmask= " << nr_pixels_circular_invmask << std::endl;
+					std::cerr << "sum_ref_under_circ_mask " << sum_ref_under_circ_mask << std::endl;
+					std::cerr << "sum_ref2_under_circ_mask " << sum_ref2_under_circ_mask << std::endl;
+					std::cerr << "expected_Pratio " << expected_Pratio << std::endl;
 #endif
-//					std::cerr << "suma2 " << suma2 << std::endl;
-//					std::cerr << "sum_ref_under_circ_mask " << sum_ref_under_circ_mask << std::endl;
-//					std::cerr << "sum_ref2_under_circ_mask " << sum_ref2_under_circ_mask << std::endl;
-//					std::cerr << "expected_Pratio " << expected_Pratio << std::endl;
 
+					// Maux goes back to the workSize
+					Maux.resize(workSize, workSize);
 				}
 
 				// Now multiply template and micrograph to calculate the cross-correlation
@@ -1832,6 +1859,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					DIRECT_MULTIDIM_ELEM(Faux, n) = conj(DIRECT_MULTIDIM_ELEM(Faux, n)) * DIRECT_MULTIDIM_ELEM(Fmic, n);
 				}
 
+				// If we're not doing shrink, then Faux is bigger than Faux2!
 				windowFourierTransform(Faux, Faux2, workSize);
 				transformer.inverseFourierTransform(Faux2, Maux);
 				CenterFFT(Maux, false);
@@ -1852,19 +1880,6 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					if (DIRECT_MULTIDIM_ELEM(Mstddev, n) > 1E-10)
 						diff2 /= DIRECT_MULTIDIM_ELEM(Mstddev, n);
 					diff2 += sum_ref2_under_circ_mask;
-#ifdef DEBUG
-						/*
-						if (diff2 < 0. || n==28800 || n==0)
-						{
-							std::cerr << " n= "<<n<< "diff2= " << diff2 << " old Mdiff2=" <<DIRECT_MULTIDIM_ELEM(Mdiff2, n)
-									<< " -2AX/sig " << - 2. * normfft * DIRECT_MULTIDIM_ELEM(Maux, n) / DIRECT_MULTIDIM_ELEM(Mstddev, n)
-									<< " 2Amu/sig= " << 2. * DIRECT_MULTIDIM_ELEM(Mmean, n) * sum_ref_under_circ_mask[iref] / DIRECT_MULTIDIM_ELEM(Mstddev, n)
-									<< " A2=" <<  sum_ref2_under_circ_mask[iref]
-									<< " stddev= " <<  DIRECT_MULTIDIM_ELEM(Mstddev, n) << " avg= "<< DIRECT_MULTIDIM_ELEM(Mmean, n)
-									<< std::endl;
-						}
-						*/
-#endif
 					diff2 = exp(- diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
 
 					// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
@@ -1885,22 +1900,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			    std::cerr << " Press any key to continue... "  << std::endl;
 			    char c;
 			    std::cin >> c;
-
 #endif
 			    is_first_psi = false;
 			} // end for psi
 
-//			CenterFFT(Mccf_best, true);
-//			transformer.FourierTransform(Mccf_best, Faux2);
-////			CenterFFT(Faux2, false);
-//			Faux.resize(1,micrograph_size,micrograph_size/2+1);
-//			windowFourierTransform(Faux2, Faux, micrograph_size);
-//			Mccf_best.resize(1,micrograph_size,micrograph_size);
-//			transformer.inverseFourierTransform(Faux, Mccf_best);
-//			CenterFFT(Mccf_best, false);
-
-
-			if (do_write_fom_maps)
+			if (do_write_fom_maps && !autopick_helical_segments)
 			{
 				FileName fn_tmp;
 				Image<RFLOAT> It;
@@ -1952,7 +1956,6 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks, scale);
 			prunePeakClusters(my_ref_peaks, min_distance_pix, scale);
 			peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());  // append the peaks of this reference to all the other peaks
-
 		}
 
 	} // end for iref
@@ -1969,17 +1972,17 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 		Mccf_best_combined.setXmippOrigin();
 		Mclass_best_combined.setXmippOrigin();
-		pickCCFPeaks(Mccf_best_combined, Mclass_best_combined, thres, peak_r_min, (particle_diameter / angpix), ccf_peak_list, Mccfplot, micrograph_size, micrograph_minxy_size, my_skip_side);
-		extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list, (particle_diameter / angpix), helical_tube_curvature_factor_max, (min_particle_distance / angpix), (helical_tube_diameter / angpix));
+		pickCCFPeaks(Mccf_best_combined, Mclass_best_combined, thres, peak_r_min, (particle_diameter / angpix),
+				ccf_peak_list, Mccfplot, my_skip_side, scale);
+		extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list,
+				(particle_diameter / angpix), helical_tube_curvature_factor_max,
+				(min_particle_distance / angpix), (helical_tube_diameter / angpix), scale);
 		exportHelicalTubes(Mccf_best_combined, Mccfplot, Mclass_best_combined,
 					tube_coord_list, tube_track_list, tube_len_list,
 					fn_mic, fn_out,
 					(particle_diameter / angpix),
 					(helical_tube_length_min / angpix),
-					micrograph_size,
-					micrograph_xsize,
-					micrograph_ysize,
-					my_skip_side);
+					my_skip_side, scale);
 
 		if (do_write_fom_maps)
 		{
@@ -1988,11 +1991,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Image<int> It_int;
 
 			It_float() = Mccf_best_combined;
-			fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + "_combinedCCF.mrc";
+			fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + "_combinedCCF.spi";
 			It_float.write(fn_tmp);
 
 			It_int() = Mclass_best_combined;
-			fn_tmp = getOutputRootName(fn_mic) + + "_" + fn_out + "_combinedCLASS.mrc";
+			fn_tmp = getOutputRootName(fn_mic) + + "_" + fn_out + "_combinedCLASS.spi";
 			It_int.write(fn_tmp);
 		} // end if do_write_fom_maps
 
@@ -2002,7 +2005,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			Image<RFLOAT> It;
 
 			It() = Mccfplot;
-			fn_tmp =  getOutputRootName(fn_mic) + "_" + fn_out + "_combinedPLOT.mrc";
+			fn_tmp =  getOutputRootName(fn_mic) + "_" + fn_out + "_combinedPLOT.spi";
 			It.write(fn_tmp);
 		}
 	}
@@ -2017,8 +2020,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		for (int ipeak =0; ipeak < peaks.size(); ipeak++)
 		{
 			MDout.addObject();
-			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x)/scale);
-			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y)/scale);
+			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(peaks[ipeak].x) / scale);
+			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(peaks[ipeak].y) / scale);
 			MDout.setValue(EMDL_PARTICLE_CLASS, peaks[ipeak].ref + 1); // start counting at 1
 			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, peaks[ipeak].fom);
 			MDout.setValue(EMDL_ORIENT_PSI, peaks[ipeak].psi);
@@ -2046,7 +2049,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	FourierTransformer transformer;
 
 	_Mstddev.initZeros(workSize, workSize);
-	RFLOAT normfft = (RFLOAT)(workSize * workSize) / (RFLOAT)nr_nonzero_pixels_mask;
+	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_nonzero_pixels_mask;
 
 	// Calculate convolution of micrograph and mask, to get average under mask at all points
 	Faux.resize(_Fmic);
@@ -2088,10 +2091,10 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 	{
 		// we already stored minus average-squared in _Mstddev
 		DIRECT_MULTIDIM_ELEM(_Mstddev, n) += normfft * DIRECT_MULTIDIM_ELEM(Maux, n);
-		if (DIRECT_MULTIDIM_ELEM(_Mstddev, n) > 0.)
+		if (DIRECT_MULTIDIM_ELEM(_Mstddev, n) > (RFLOAT)1E-10)
 			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = sqrt(DIRECT_MULTIDIM_ELEM(_Mstddev, n) );
 		else
-			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = 0.;
+			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = 1.;
 	}
 
 	CenterFFT(_Mstddev, false);
@@ -2129,15 +2132,30 @@ void AutoPicker::peakSearch(const MultidimArray<RFLOAT> &Mfom, const MultidimArr
 				if (max_stddev_noise > 0. && A2D_ELEM(Mstddev, i, j) > max_stddev_noise)
 					continue;
 
-				// This is a peak if all four neighbours are also above the threshold, AND have lower values than myval
-				if (A2D_ELEM(Mfom, i-1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i-1, j) > myval )
-					continue;
-				if (A2D_ELEM(Mfom, i+1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i+1, j) > myval )
-					continue;
-				if (A2D_ELEM(Mfom, i, j-1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j-1) > myval )
-					continue;
-				if (A2D_ELEM(Mfom, i, j+1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j+1) > myval )
-					continue;
+				if (scale < 1.)
+				{
+					// When we use shrink, then often peaks aren't 5 pixels big anymore....
+					if (A2D_ELEM(Mfom, i-1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i+1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j-1) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j+1) > myval )
+						continue;
+				}
+				else
+				{
+					// This is a peak if all four neighbours are also above the threshold, AND have lower values than myval
+					if (A2D_ELEM(Mfom, i-1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i-1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i+1, j) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i+1, j) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j-1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j-1) > myval )
+						continue;
+					if (A2D_ELEM(Mfom, i, j+1) < min_fraction_expected_Pratio || A2D_ELEM(Mfom, i, j+1) > myval )
+						continue;
+				}
 				peak.x = j - FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale));
 				peak.y = i - FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale));
 				peak.psi = A2D_ELEM(Mpsi, i, j);
@@ -2205,7 +2223,7 @@ void AutoPicker::prunePeakClusters(std::vector<Peak> &peaks, int min_distance, f
 			{
 				int dx = cluster[iclus].x - bestpeak.x;
 				int dy = cluster[iclus].y - bestpeak.y;
-				if (dx*dx + dy*dy < ((float)(mind2)*scale*scale) )
+				if (dx*dx + dy*dy < mind2)
 				{
 					cluster.erase(cluster.begin()+iclus);
 					iclus--;
@@ -2237,7 +2255,7 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 				int dx = peaks[ipeakp].x - my_x;
 				int dy = peaks[ipeakp].y - my_y;
 				int d2 = dx*dx + dy*dy;
-				if ( d2 < (((float)my_mind2)*scale*scale) )
+				if ( d2 < (int)(((float)my_mind2)*scale*scale) )
 					my_mind2 = d2;
 			}
 		}
@@ -2248,39 +2266,5 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 	// Set the pruned peaks back into the input vector
 	peaks = pruned_peaks;
 
-}
-
-void AutoPicker::untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
-{
-	// Handle GPU (device) assignments for each rank, if speficied
-	size_t pos = 0;
-	std::string delim = ":";
-	std::vector < std::string > allRankIDs;
-	std::string thisRankIDs, thisThreadID;
-	while ((pos = tangled.find(delim)) != std::string::npos)
-	{
-		thisRankIDs = tangled.substr(0, pos);
-//		    std::cout << "in loop " << thisRankIDs << std::endl;
-		tangled.erase(0, pos + delim.length());
-		allRankIDs.push_back(thisRankIDs);
-	}
-	allRankIDs.push_back(tangled);
-
-	untangled.resize(allRankIDs.size());
-	//Now handle the thread assignements in each rank
-	for (int i = 0; i < allRankIDs.size(); i++)
-	{
-		pos=0;
-		delim = ",";
-//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
-		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
-		{
-			thisThreadID = allRankIDs[i].substr(0, pos);
-//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
-			allRankIDs[i].erase(0, pos + delim.length());
-			untangled[i].push_back(thisThreadID);
-		}
-		untangled[i].push_back(allRankIDs[i]);
-	}
 }
 
