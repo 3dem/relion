@@ -1140,6 +1140,8 @@ void MlOptimiser::initialiseGeneral(int rank)
     		mymodel.pixel_size = first_angpix;
     	}
 
+    	if (!has_magn && mymodel.pixel_size < 0.)
+    		REPORT_ERROR("ERROR: you did not specify the pixel size. Use the --angpix option to do so.");
 	}
 	// Expand movies if fn_data_movie is given AND we were not doing expanded movies already
 	else if (fn_data_movie != "" && !do_realign_movies)
