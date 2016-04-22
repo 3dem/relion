@@ -412,21 +412,25 @@ public:
 
 	MlOptimiser *baseMLO;
 
-	bool refIs3D;
-
 	int device_id;
 
 	int rank_shared_count;
 
-	MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id);
+	MlDeviceBundle(MlOptimiser *baseMLOptimiser):
+			baseMLO(baseMLOptimiser),
+			generateProjectionPlanOnTheFly(false),
+			rank_shared_count(1),
+			device_id(-1),
+			allocator(NULL)
+	{};
+
+	void setDevice(int did)
+	{
+		device_id = did;
+	}
 
 	void setupFixedSizedObjects();
 	void setupTunableSizedObjects(size_t allocationSize);
-
-	void resetDevice()
-	{
-		HANDLE_ERROR(cudaDeviceReset());
-	}
 
 	void syncAllBackprojects()
 	{
@@ -442,6 +446,7 @@ public:
 		coarseProjectionPlans.clear();
 		//Delete this lastly
 		delete allocator;
+		HANDLE_ERROR(cudaDeviceReset());
 	}
 
 };
@@ -456,8 +461,6 @@ public:
 	std::vector< cudaStream_t > classStreams;
 	cudaError_t errorStatus;
 
-//	cudaStream_t stream1;
-//	cudaStream_t stream2;
 
 	CudaTranslator translator_coarse1;
 	CudaTranslator translator_coarse2;
@@ -475,7 +478,15 @@ public:
 
 	MlDeviceBundle *devBundle;
 
-	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* Bundle);
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle) :
+			baseMLO(baseMLOptimiser),
+			transformer1(0, bundle->allocator),
+			transformer2(0, bundle->allocator),
+			refIs3D(baseMLO->mymodel.ref_dim == 3),
+			devBundle(bundle),
+			device_id(bundle->device_id),
+			errorStatus((cudaError_t)0)
+	{};
 
 	void resetData();
 
@@ -483,11 +494,9 @@ public:
 
 	~MlOptimiserCuda()
 	{
-//		HANDLE_ERROR(cudaStreamDestroy(stream1));
-//		HANDLE_ERROR(cudaStreamDestroy(stream2));
-
 		for (int i = 0; i < classStreams.size(); i++)
-			HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
+			if (classStreams[i] != NULL)
+				HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
 	}
 
 };
