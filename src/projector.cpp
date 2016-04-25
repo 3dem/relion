@@ -168,8 +168,6 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 			DIRECT_A1D_ELEM(power_spectrum, i) /= DIRECT_A1D_ELEM(counter, i);
 	}
 
-	transformer.cleanup();
-
 }
 
 void Projector::griddingCorrect(MultidimArray<RFLOAT> &vol_in)
