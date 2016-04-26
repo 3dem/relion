@@ -361,6 +361,11 @@ public:
 	// Only keep those peaks that are at the given distance apart from each other
 	void removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int min_distance, float scale);
 
+#define LARGEST_ACCEPTABLE_PRIME 43
+
+	int largestPrime(int query);
+
+	int getGoodFourierDims(int requestedSizeRealX, int lim);
 };
 
 

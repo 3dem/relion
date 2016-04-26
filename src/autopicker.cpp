@@ -346,17 +346,29 @@ void AutoPicker::initialise()
 
 	if(workFrac>1) // set size directly
 	{
-		if(workFrac<micrograph_size)
-			workSize = ROUND(workFrac);
+		int tempFrac = (int)ROUND(workFrac);
+		tempFrac -= tempFrac%2;
+		if(tempFrac<micrograph_size)
+		{
+			getGoodFourierDims(tempFrac,micrograph_size);
+			workSize = tempFrac;
+		}
 		else
 			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
 	}
 	else if(workFrac<=1) // set size as fraction of original
 	{
+
 		if(workFrac>0)
+		{
+			getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
 			workSize = ROUND(workFrac*(RFLOAT)micrograph_size);
+		}
 		else if(workFrac==0)
+		{
+			getGoodFourierDims((int)downsize_mic,micrograph_size);
 			workSize = downsize_mic;
+		}
 		else
 			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
 	}
@@ -2386,3 +2398,71 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 
 }
 
+int AutoPicker::largestPrime(int query)
+{
+	int i(2), primeF(query);
+	while (i*i<=primeF)
+	{
+		if(primeF%i!=0)
+			i+=1;
+		else
+			primeF /= i;
+	}
+	return primeF;
+}
+
+int AutoPicker::getGoodFourierDims(int requestedSizeRealX, int lim)
+{
+
+	int inputPrimeF =XMIPP_MAX(largestPrime(requestedSizeRealX),largestPrime(requestedSizeRealX/2+1));
+	if(inputPrimeF<=LARGEST_ACCEPTABLE_PRIME)
+	{
+		std::cout << "for requested x-dim " << requestedSizeRealX << " the smallest prime factor in FFTs is " << inputPrimeF << std::endl;
+		std::cout << " NO NEED TO MODIFY FFT SIZE " << std::endl;
+		return requestedSizeRealX;
+	}
+
+	int S_up = LARGEST_ACCEPTABLE_PRIME;
+	int S_down = LARGEST_ACCEPTABLE_PRIME;
+
+	// Search upwards - can take a long time if unlucky and/or small LARGEST_ACCEPTABLE_PRIME
+	int currentU = requestedSizeRealX;
+	S_up = 			 largestPrime(currentU);
+	S_up = XMIPP_MAX(largestPrime(currentU/2+1),S_up);
+	while(S_up>=LARGEST_ACCEPTABLE_PRIME  && currentU<=(lim+2))
+	{
+		currentU += 2;
+		S_up = 			 largestPrime(currentU);
+		S_up = XMIPP_MAX(largestPrime(currentU/2+1),S_up);
+	}
+
+
+	// Search downwards - guaranteed to find in reasonable time
+	int currentD = requestedSizeRealX;
+	S_down = 		   largestPrime(currentD);
+	S_down = XMIPP_MAX(largestPrime(currentD/2+1),S_down);
+	while(S_down>=LARGEST_ACCEPTABLE_PRIME)
+	{
+		currentD -= 2;
+		S_down = 		   largestPrime(currentD);
+		S_down = XMIPP_MAX(largestPrime(currentD/2+1),S_down);
+	}
+
+
+	std::cout << "*-------------------------------------------------------------------------*"<< std::endl;
+	std::cout << "for requested x-dim " << requestedSizeRealX << " the smallest prime factor in FFTs is " << inputPrimeF << std::endl;
+	std::cout << "the suggested size is instead ";
+	if((currentU-requestedSizeRealX)>(requestedSizeRealX-currentD) || (currentU>lim))
+	{
+		std::cout <<  currentD  << " which has the largest prime factor " <<  S_down << std::endl;
+		std::cout << "*-------------------------------------------------------------------------*"<< std::endl;
+		return currentD;
+	}
+	else
+	{
+		std::cout <<  currentU  << " which has the largest prime factor " <<  S_up << std::endl;
+		std::cout << "*-------------------------------------------------------------------------*"<< std::endl;
+		return currentU;
+	}
+
+}
