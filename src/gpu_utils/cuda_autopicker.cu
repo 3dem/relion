@@ -294,26 +294,16 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	}
 
 	CudaFFT micTransformer(0, allocator);
-	CudaFFT FPcudaTransformer(0, allocator);
 	CudaFFT cudaTransformer(0, allocator);
-	CudaFFT extraCudaTransformer(0, allocator);
 	if(!basePckr->do_read_fom_maps)
 	{
 		CUDA_CPU_TIC("setSize_micTr");
 		micTransformer.setSize(basePckr->micrograph_size, basePckr->micrograph_size, 1);
 		CUDA_CPU_TOC("setSize_micTr");
-		CUDA_CPU_TIC("setSize_micTr");
-		CUDA_CPU_TOC("setSize_micTr");
 
-		CUDA_CPU_TIC("setSize_FPudaTr");
-		FPcudaTransformer.setSize(basePckr->workSize,basePckr->workSize, 1);
-		CUDA_CPU_TOC("setSize_FPcudaTr");
 		CUDA_CPU_TIC("setSize_cudaTr");
 		cudaTransformer.setSize(basePckr->workSize,basePckr->workSize, Npsi);
 		CUDA_CPU_TOC("setSize_cudaTr");
-		CUDA_CPU_TIC("setSize_extraCudaTr");
-		extraCudaTransformer.setSize(basePckr->workSize,basePckr->workSize, 2);
-		CUDA_CPU_TOC("setSize_extraCudaTr");
 	}
 	HANDLE_ERROR(cudaDeviceSynchronize());
 
