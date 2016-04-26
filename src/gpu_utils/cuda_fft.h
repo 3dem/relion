@@ -95,13 +95,10 @@ public:
 		xFSize = x/2 + 1;
 		yFSize = y;
 
-		size_t baseNeed = (xSize*ySize*sizeof(XFLOAT) + xFSize*yFSize*sizeof(CUDACOMPLEX));
-		size_t needed = baseNeed*batchSize[0] + estimate(batchSize[0]);
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
-		size_t avail  = CFallocator->getLargestContinuousFreeSpace();
-#else
-		size_t avail  = needed;
-#endif
+		size_t needed, avail, total;
+		needed = estimate(batchSize[0]);
+		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
+
 		double memFrac = (double)needed / (double)avail;
 
 //		std::cout << std::endl << "needed = ";
@@ -116,13 +113,13 @@ public:
 		{
 			psiIters = CEIL(memFrac);
 			psiSpace = CEIL((double) batch / (double)psiIters);
-			needed = baseNeed*psiSpace + estimate(psiSpace);
+			needed = estimate(psiSpace);
 
 			while(needed>avail && psiSpace>1)
 			{
 				psiIters++;
 				psiSpace = CEIL((double) batch / (double)psiIters);
-				needed = baseNeed*psiSpace + estimate(psiSpace);
+				needed = estimate(psiSpace);
 			}
 
 			batchSize.assign(psiIters,psiSpace); // specify psiIters of batches, each with psiSpace orientations
@@ -153,8 +150,7 @@ public:
 		fouriers.device_alloc();
 		fouriers.host_alloc();
 
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
-		avail  = CFallocator->getLargestContinuousFreeSpace();
+		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
 		needed = estimate(batchSize[0]);
 
 //		std::cout << "after alloc: " << std::endl << std::endl << "needed = ";
@@ -162,7 +158,6 @@ public:
 //		std::cout << "avail  = ";
 //		printf("%15li\n", avail);
 
-#endif
 	    int idist = y*x;
 	    int odist = y*(x/2+1);
 
