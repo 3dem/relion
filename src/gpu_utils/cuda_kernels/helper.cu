@@ -445,7 +445,9 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT sum_ref_under_circ_mask,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
-										int Npsi)
+										int NpsiThisBatch,
+										int startPsi,
+										int totalPsis)
 {
 	/* PLAN TO:
 	 *
@@ -467,8 +469,8 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	if(pixel<image_size)
 	{
 		XFLOAT Kccf = d_Mccf[pixel];
-		XFLOAT Kpsi;
-		for(int psi = 0; psi < Npsi; psi++ )
+		XFLOAT Kpsi = -1.f;
+		for(int psi = 0; psi < NpsiThisBatch; psi++ )
 		{
 			XFLOAT diff2 = normfft * d_Maux[pixel + image_size*psi];
 			diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
@@ -488,11 +490,12 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 			if (diff2 > Kccf)
 			{
 				Kccf = diff2;
-				Kpsi = psi*(360/Npsi);
+				Kpsi = (startPsi + psi)*(360/totalPsis);
 			}
 		}
 		d_Mccf[pixel] = Kccf;
-		d_Mpsi[pixel] = Kpsi;
+		if (Kpsi >= 0.)
+			d_Mpsi[pixel] = Kpsi;
 	}
 }
 

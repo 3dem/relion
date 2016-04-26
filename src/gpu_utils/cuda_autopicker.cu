@@ -65,7 +65,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	if (basePckr->requested_gpu_memory > 0)
 		allocationSize = basePckr->requested_gpu_memory * (1000*1000*1000);
 	else
-		allocationSize = (float)free * .5;
+		allocationSize = (float)free * .8;
 
 	if (allocationSize > free)
 	{
@@ -768,6 +768,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B6);
 #endif
+			int startPsi(0);
 			for (int psiIter = 0; psiIter < cudaTransformer.psiIters; psiIter++) // psi-batches for possible memory-limits
 			{
 
@@ -821,10 +822,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						(XFLOAT) 2*sum_ref_under_circ_mask,
 						(XFLOAT) sum_ref2_under_circ_mask,
 						(XFLOAT) expected_Pratio,
-						cudaTransformer.batchSize[psiIter]
+						cudaTransformer.batchSize[psiIter],
+						startPsi,
+						Npsi
 						);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
-
+				startPsi += cudaTransformer.batchSize[psiIter];
 				CUDA_CPU_TOC("probRatio");
 			    CUDA_CPU_TOC("OneRotation");
 			} // end for psi-batches
