@@ -2,11 +2,13 @@
 #include <signal.h>
 
 
-void CudaProjector::setMdlDim(
+bool CudaProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
 		int maxr, int paddingFactor)
 {
+	if(zdim == 1) zdim = 0;
+
 	if (xdim == mdlX &&
 		ydim == mdlY &&
 		zdim == mdlZ &&
@@ -14,17 +16,17 @@ void CudaProjector::setMdlDim(
 		initz == mdlInitZ &&
 		maxr == mdlMaxR &&
 		paddingFactor == padding_factor)
-		return;
+		return false;
 
 	clear();
 
 	mdlX = xdim;
 	mdlY = ydim;
-	if(zdim==1)
-		mdlZ=0;
+	mdlZ = zdim;
+	if(zdim == 0)
+		mdlXYZ = xdim*ydim;
 	else
-		mdlZ = zdim;
-	mdlXYZ = xdim*ydim*zdim;
+		mdlXYZ = xdim*ydim*zdim;
 	mdlInitY = inity;
 	mdlInitZ = initz;
 	mdlMaxR = maxr;
@@ -163,6 +165,7 @@ void CudaProjector::setMdlDim(
 	HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 #endif
+	return true;
 }
 
 #if(!COMPLEXTEXTURE)
