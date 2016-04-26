@@ -53,31 +53,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	                    CUSTOM ALLOCATOR
 	======================================================*/
 
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-	printf(" DEBUG: Custom allocator is disabled.\n");
 	allocator = new CudaCustomAllocator(0, 1);
-#else
-	size_t allocationSize(0);
-
-	size_t free, total;
-	HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-
-	if (basePckr->requested_gpu_memory > 0)
-		allocationSize = basePckr->requested_gpu_memory * (1000*1000*1000);
-	else
-		allocationSize = (float)free * .5;
-
-	if (allocationSize > free)
-	{
-		printf(" WARNING: Required memory per thread, via \"--gpu_memory_per_thread\", not available on device. (Defaulting to less)\n");
-		allocationSize = (float)free * .5; //Lets leave some for other processes for now
-	}
-
-	int memAlignmentSize;
-	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, dev_id );
-
-	allocator = new CudaCustomAllocator(allocationSize, memAlignmentSize);
-#endif
 };
 
 void AutoPickerCuda::setupProjectors()
