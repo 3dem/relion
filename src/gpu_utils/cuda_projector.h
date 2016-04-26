@@ -62,7 +62,7 @@ public:
 #endif
 	}
 
-	void setMdlDim(
+	bool setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int maxr, int paddingFactor);

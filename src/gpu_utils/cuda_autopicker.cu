@@ -56,23 +56,6 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	allocator = new CudaCustomAllocator(0, 1);
 };
 
-void AutoPickerCuda::setupProjectors()
-{
-	for (int iref = 0; iref < (basePckr->Mrefs.size()); iref++)
-	{
-		cudaProjectors[iref].setMdlDim(
-				basePckr->PPref[iref].data.xdim,
-				basePckr->PPref[iref].data.ydim,
-				basePckr->PPref[iref].data.zdim,
-				basePckr->PPref[iref].data.yinit,
-				basePckr->PPref[iref].data.zinit,
-				basePckr->PPref[iref].r_max,
-				basePckr->PPref[iref].padding_factor);
-
-		cudaProjectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
-	}
-}
-
 void AutoPickerCuda::run()
 {
 
@@ -84,6 +67,24 @@ void AutoPickerCuda::run()
 		barstep = XMIPP_MAX(1,basePckr->fn_micrographs.size() / 60);
 	}
 
+	if (!basePckr->do_read_fom_maps)
+	{
+
+		for (int iref = 0; iref < (basePckr->Mrefs.size()); iref++)
+		{
+			CUDA_CPU_TIC("setupProjectors");
+			cudaProjectors[iref].setMdlDim(
+							basePckr->PPref[iref].data.xdim,
+							basePckr->PPref[iref].data.ydim,
+							basePckr->PPref[iref].data.zdim,
+							basePckr->PPref[iref].data.yinit,
+							basePckr->PPref[iref].data.zinit,
+							basePckr->PPref[iref].r_max,
+							basePckr->PPref[iref].padding_factor);
+			cudaProjectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
+		}
+		CUDA_CPU_TOC("setupProjectors");
+	}
 
 	FileName fn_olddir="";
 	for (long int imic = 0; imic < basePckr->fn_micrographs.size(); imic++)
@@ -573,13 +574,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			Mclass_best_combined.resize(basePckr->workSize, basePckr->workSize);
 			Mclass_best_combined.initConstant(-1);
 		}
-	}
-
-	if (!basePckr->do_read_fom_maps)
-	{
-		CUDA_CPU_TIC("setupProjectors");
-		setupProjectors();
-		CUDA_CPU_TOC("setupProjectors");
 	}
 
 	CudaGlobalPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);

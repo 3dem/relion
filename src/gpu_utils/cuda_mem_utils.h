@@ -588,12 +588,6 @@ public:
 		}
 	}
 
-	CudaCustomAllocator():
-		totalSize(0), alignmentSize(1), first(0), cache(false)
-	{
-		CudaCustomAllocator(0, 1);
-	}
-
 	void resize(size_t size)
 	{
 		pthread_mutex_lock(&mutex);
