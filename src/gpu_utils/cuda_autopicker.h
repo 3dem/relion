@@ -1,18 +1,16 @@
-/*
- * cuda_autopicker.h
- *
- *  Created on: Dec 3, 2015
- *      Author: bjornf
- */
-
 #ifndef CUDA_AUTOPICKER_H_
 #define CUDA_AUTOPICKER_H_
 
 #include "src/mpi.h"
 #include "src/autopicker.h"
-#include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/projector.h"
+#include "src/complex.h"
+#include "src/image.h"
+
+#include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_settings.h"
+#include "src/gpu_utils/cuda_fft.h"
 
 #include <stack>
 
@@ -29,6 +27,9 @@ public:
 	AutoPicker *basePckr;
 
 	CudaCustomAllocator *allocator;
+	CudaFFT micTransformer;
+	CudaFFT cudaTransformer1;
+	CudaFFT cudaTransformer2;
 
 	std::vector< CudaProjector > cudaProjectors;
 
@@ -46,6 +47,10 @@ public:
 	void run();
 
 	void autoPickOneMicrograph(FileName &fn_mic);
+
+	void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
+			int nr_nonzero_pixels_mask, CudaGlobalPtr< XFLOAT > &d_Mstddev, CudaGlobalPtr< XFLOAT > &d_Mmean,
+			size_t x, size_t y, size_t mic_size, size_t workSize);
 
 	~AutoPickerCuda()
 	{

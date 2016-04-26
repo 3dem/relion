@@ -7,18 +7,14 @@
 #include <fstream>
 #include <cuda_runtime.h>
 #include <signal.h>
-#include "src/projector.h"
-#include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_autopicker.h"
+
 #include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_benchmark_utils.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
-#include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_fft.h"
-
-#include "src/complex.h"
-
-#include "src/image.h"
 
 
 #ifdef CUDA_FORCESTL
@@ -29,7 +25,11 @@
 
 
 AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
-	basePckr(basePicker)
+	basePckr(basePicker),
+	allocator(new CudaCustomAllocator(0, 1)),
+	micTransformer(0, allocator),
+	cudaTransformer1(0, allocator),
+	cudaTransformer2(0, allocator)
 {
 
 	cudaProjectors.resize(basePckr->Mrefs.size());
@@ -47,13 +47,6 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(dev_id));
-
-
-	/*======================================================
-	                    CUSTOM ALLOCATOR
-	======================================================*/
-
-	allocator = new CudaCustomAllocator(0, 1);
 };
 
 void AutoPickerCuda::run()
@@ -117,12 +110,11 @@ void AutoPickerCuda::run()
 
 }
 
-void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
+void AutoPickerCuda::calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
 		int nr_nonzero_pixels_mask, CudaGlobalPtr< XFLOAT > &d_Mstddev, CudaGlobalPtr< XFLOAT > &d_Mmean,
 		size_t x, size_t y, size_t mic_size, size_t workSize)
 {
-	CudaFFT cudaTransformer(0, d_Fmic.getAllocator());
-	cudaTransformer.setSize(workSize,workSize);
+	cudaTransformer2.setSize(workSize,workSize);
 
 	deviceInitValue(d_Mstddev, (XFLOAT)0.);
 
@@ -143,39 +135,39 @@ void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaG
 	CUDA_CPU_TIC("PRE-window_0");
 	windowFourierTransform2(
 			d_Fcov,
-			cudaTransformer.fouriers,
+			cudaTransformer2.fouriers,
 			x, y, 1,
 			workSize/2+1, workSize, 1);
 	CUDA_CPU_TOC("PRE-window_0");
 
 	CUDA_CPU_TIC("PRE-Transform_0");
-	cudaTransformer.backward();
+	cudaTransformer2.backward();
 	CUDA_CPU_TOC("PRE-Transform_0");
 
-	Bsize = ( (int) ceilf(( float)cudaTransformer.reals.size/(float)BLOCK_SIZE));
-	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer.reals.d_ptr,
-											 cudaTransformer.reals.d_ptr,
+	Bsize = ( (int) ceilf(( float)cudaTransformer2.reals.size/(float)BLOCK_SIZE));
+	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.d_ptr,
+											 cudaTransformer2.reals.d_ptr,
 										     (XFLOAT) normfft,
-										     cudaTransformer.reals.size);
+										     cudaTransformer2.reals.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TIC("PRE-multi_1");
-	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer.reals.d_ptr,
-											 cudaTransformer.reals.d_ptr,
+	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.d_ptr,
+											 cudaTransformer2.reals.d_ptr,
 											 d_Mstddev.d_ptr,
 											 (XFLOAT) -1,
-										     cudaTransformer.reals.size);
+										     cudaTransformer2.reals.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CUDA_CPU_TOC("PRE-multi_1");
 
 	CUDA_CPU_TIC("PRE-CenterFFT_0");
-	runCenterFFT(cudaTransformer.reals,
-				 (int)cudaTransformer.xSize,
-				 (int)cudaTransformer.ySize,
+	runCenterFFT(cudaTransformer2.reals,
+				 (int)cudaTransformer2.xSize,
+				 (int)cudaTransformer2.ySize,
 				 false,
 				 1);
 	CUDA_CPU_TOC("PRE-CenterFFT_0");
 
-	cudaTransformer.reals.cp_on_device(d_Mmean); //TODO remove the need for this
+	cudaTransformer2.reals.cp_on_device(d_Mmean); //TODO remove the need for this
 
 	CUDA_CPU_TIC("PRE-multi_2");
 	Bsize = ( (int) ceilf(( float)d_Fmsk.size/(float)BLOCK_SIZE));
@@ -190,20 +182,20 @@ void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaG
 	CUDA_CPU_TIC("PRE-window_1");
 	windowFourierTransform2(
 			d_Fcov,
-			cudaTransformer.fouriers,
+			cudaTransformer2.fouriers,
 			x, y, 1,
 			workSize/2+1, workSize, 1);
 	CUDA_CPU_TOC("PRE-window_1");
 
 
 	CUDA_CPU_TIC("PRE-Transform_1");
-	cudaTransformer.backward();
+	cudaTransformer2.backward();
 	CUDA_CPU_TOC("PRE-Transform_1");
 
 	CUDA_CPU_TIC("PRE-multi_3");
 	Bsize = ( (int) ceilf(( float)d_Mstddev.size/(float)BLOCK_SIZE));
 	cuda_kernel_finalizeMstddev<<<Bsize,BLOCK_SIZE>>>( 	  d_Mstddev.d_ptr,
-														  cudaTransformer.reals.d_ptr,
+														  cudaTransformer2.reals.d_ptr,
 														  normfft,
 														  d_Mstddev.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
@@ -270,8 +262,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		REPORT_ERROR("AutoPicker::autoPickOneMicrograph ERROR: No differently sized micrographs are allowed in one run, sorry you will have to run separately for each size...");
 	}
 
-	CudaFFT micTransformer(0, allocator);
-	CudaFFT cudaTransformer(0, allocator);
 	if(!basePckr->do_read_fom_maps)
 	{
 		CUDA_CPU_TIC("setSize_micTr");
@@ -279,7 +269,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		CUDA_CPU_TOC("setSize_micTr");
 
 		CUDA_CPU_TIC("setSize_cudaTr");
-		cudaTransformer.setSize(basePckr->workSize,basePckr->workSize, Npsi);
+		cudaTransformer1.setSize(basePckr->workSize,basePckr->workSize, Npsi);
 		CUDA_CPU_TOC("setSize_cudaTr");
 	}
 	HANDLE_ERROR(cudaDeviceSynchronize());
@@ -739,7 +729,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	basePckr->timer.tic(basePckr->TIMING_B6);
 #endif
 			int startPsi(0);
-			for (int psiIter = 0; psiIter < cudaTransformer.psiIters; psiIter++) // psi-batches for possible memory-limits
+			for (int psiIter = 0; psiIter < cudaTransformer1.psiIters; psiIter++) // psi-batches for possible memory-limits
 			{
 
 				CUDA_CPU_TIC("OneRotation");
@@ -749,25 +739,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				CUDA_CPU_TIC("windowFourierTransform_1");
 				windowFourierTransform2(
 						d_FauxNpsi,
-						cudaTransformer.fouriers,
+						cudaTransformer1.fouriers,
 						downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
 						basePckr->workSize/2+1, basePckr->workSize, 1,  //Output dimensions
-						cudaTransformer.batchSize[psiIter],
-						cudaTransformer.batchSize[0]*psiIter*FauxStride
+						cudaTransformer1.batchSize[psiIter],
+						cudaTransformer1.batchSize[0]*psiIter*FauxStride
 						);
 				CUDA_CPU_TOC("windowFourierTransform_1");
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
 				CUDA_CPU_TIC("CudaInverseFourierTransform_1");
-				cudaTransformer.backward();
+				cudaTransformer1.backward();
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
 				CUDA_CPU_TIC("runCenterFFT_1");
-				runCenterFFT(cudaTransformer.reals,
-							 (int)cudaTransformer.xSize,
-							 (int)cudaTransformer.ySize,
+				runCenterFFT(cudaTransformer1.reals,
+							 (int)cudaTransformer1.xSize,
+							 (int)cudaTransformer1.ySize,
 							 false,
-							 cudaTransformer.batchSize[psiIter]);
+							 cudaTransformer1.batchSize[psiIter]);
 				CUDA_CPU_TOC("runCenterFFT_1");
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
@@ -780,24 +770,24 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
 				CUDA_CPU_TIC("probRatio");
 				HANDLE_ERROR(cudaDeviceSynchronize());
-				dim3 PR_blocks(ceilf((float)(cudaTransformer.reals.size/cudaTransformer.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
+				dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/cudaTransformer1.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
 				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
 						d_Mccf_best.d_ptr,
 						d_Mpsi_best.d_ptr,
-						cudaTransformer.reals.d_ptr,
+						cudaTransformer1.reals.d_ptr,
 						d_Mmean.d_ptr,
 						d_Mstddev.d_ptr,
-						cudaTransformer.reals.size/cudaTransformer.batchSize[0],
+						cudaTransformer1.reals.size/cudaTransformer1.batchSize[0],
 						(XFLOAT) -2*normfft,
 						(XFLOAT) 2*sum_ref_under_circ_mask,
 						(XFLOAT) sum_ref2_under_circ_mask,
 						(XFLOAT) expected_Pratio,
-						cudaTransformer.batchSize[psiIter],
+						cudaTransformer1.batchSize[psiIter],
 						startPsi,
 						Npsi
 						);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
-				startPsi += cudaTransformer.batchSize[psiIter];
+				startPsi += cudaTransformer1.batchSize[psiIter];
 				CUDA_CPU_TOC("probRatio");
 			    CUDA_CPU_TOC("OneRotation");
 			} // end for psi-batches
