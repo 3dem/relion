@@ -2580,8 +2580,9 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	/*======================================================
 	                    CUSTOM ALLOCATOR
 	======================================================*/
-
+#ifndef CUDA_NO_CUSTOM_ALLOCATION
 	allocator->resize(allocationSize);
+#endif
 
 #ifdef DEBUG_CUDA
 	printf("DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
