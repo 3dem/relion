@@ -232,6 +232,8 @@ private:
 	size_t totalSize;
 	size_t alignmentSize;
 
+	bool cache;
+
 	pthread_mutex_t mutex;
 
 
@@ -290,24 +292,26 @@ private:
 	inline
 	size_t _getTotalFreeSpace()
 	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		size_t free, total;
-		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-		return free;
-#else
-
-		size_t total = 0;
-		Alloc *a = first;
-
-		while (a != NULL)
+		if (cache)
 		{
-			if (a->free)
-				total += a->size;
-			a = a->next;
-		}
+			size_t total = 0;
+			Alloc *a = first;
 
-		return total;
-#endif
+			while (a != NULL)
+			{
+				if (a->free)
+					total += a->size;
+				a = a->next;
+			}
+
+			return total;
+		}
+		else
+		{
+			size_t free, total;
+			DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+			return free;
+		}
 	}
 
 	inline
@@ -345,22 +349,22 @@ private:
 	inline
 	size_t _getLargestContinuousFreeSpace()
 	{
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		return _getTotalFreeSpace();
-#else
-
-		size_t largest = 0;
-		Alloc *a = first;
-
-		while (a != NULL)
+		if (cache)
 		{
-			if (a->free && a->size > largest)
-				largest = a->size;
-			a = a->next;
-		}
+			size_t largest = 0;
+			Alloc *a = first;
 
-		return largest;
-#endif
+			while (a != NULL)
+			{
+				if (a->free && a->size > largest)
+					largest = a->size;
+				a = a->next;
+			}
+
+			return largest;
+		}
+		else
+			return _getTotalFreeSpace();
 	}
 
 	inline
@@ -474,71 +478,67 @@ private:
 
 		a->free = true;
 
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
+		if (cache)
+		{
+			//Previous neighbor is free, concatenate
+			if ( a->prev != NULL && a->prev->free)
+			{
+				//Resize and set pointer
+				a->size += a->prev->size;
+				a->ptr = a->prev->ptr;
 
-		DEBUG_HANDLE_ERROR(cudaFree( a->ptr ));
-		a->ptr = NULL;
+				//Fetch secondary neighbor
+				Alloc *ppL = a->prev->prev;
 
-		if ( a->prev != NULL)
-			a->prev->next = a->next;
+				//Remove primary neighbor
+				if (ppL == NULL) //If the previous is first in chain
+					first = a;
+				else
+					ppL->next = a;
+
+				delete a->prev;
+
+				//Attach secondary neighbor
+				a->prev = ppL;
+			}
+
+			//Next neighbor is free, concatenate
+			if ( a->next != NULL && a->next->free)
+			{
+				//Resize and set pointer
+				a->size += a->next->size;
+
+				//Fetch secondary neighbor
+				Alloc *nnL = a->next->next;
+
+				//Remove primary neighbor
+				if (nnL != NULL)
+					nnL->prev = a;
+				delete a->next;
+
+				//Attach secondary neighbor
+				a->next = nnL;
+			}
+		}
 		else
-			first = a->next; //This is the first link
-
-		if ( a->next != NULL)
-			a->next->prev = a->prev;
-
-		delete a;
-#else
-
-		//Previous neighbor is free, concatenate
-		if ( a->prev != NULL && a->prev->free)
 		{
-			//Resize and set pointer
-			a->size += a->prev->size;
-			a->ptr = a->prev->ptr;
+			DEBUG_HANDLE_ERROR(cudaFree( a->ptr ));
+			a->ptr = NULL;
 
-			//Fetch secondary neighbor
-			Alloc *ppL = a->prev->prev;
-
-			//Remove primary neighbor
-			if (ppL == NULL) //If the previous is first in chain
-				first = a;
+			if ( a->prev != NULL)
+				a->prev->next = a->next;
 			else
-				ppL->next = a;
+				first = a->next; //This is the first link
 
-			delete a->prev;
+			if ( a->next != NULL)
+				a->next->prev = a->prev;
 
-			//Attach secondary neighbor
-			a->prev = ppL;
+			delete a;
 		}
-
-		//Next neighbor is free, concatenate
-		if ( a->next != NULL && a->next->free)
-		{
-			//Resize and set pointer
-			a->size += a->next->size;
-
-			//Fetch secondary neighbor
-			Alloc *nnL = a->next->next;
-
-			//Remove primary neighbor
-			if (nnL != NULL)
-				nnL->prev = a;
-			delete a->next;
-
-			//Attach secondary neighbor
-			a->next = nnL;
-		}
-#endif
 	};
 
 	void _setup()
 	{
-
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		totalSize = 0;
-#endif
-
 		first = new Alloc();
 		first->prev = NULL;
 		first->next = NULL;
@@ -546,7 +546,12 @@ private:
 		first->free = true;
 
 		if (totalSize > 0)
+		{
 			HANDLE_ERROR(cudaMalloc( (void**) &(first->ptr), totalSize));
+			cache = true;
+		}
+		else
+			cache = false;
 	}
 
 	void _clear()
@@ -569,7 +574,7 @@ private:
 public:
 
 	CudaCustomAllocator(size_t size, size_t alignmentSize):
-		totalSize(size), alignmentSize(alignmentSize), first(0)
+		totalSize(size), alignmentSize(alignmentSize), first(0), cache(true)
 	{
 		_setup();
 
@@ -581,6 +586,12 @@ public:
 			fflush(stdout);
 			raise(SIGSEGV);
 		}
+	}
+
+	CudaCustomAllocator():
+		totalSize(0), alignmentSize(1), first(0), cache(false)
+	{
+		CudaCustomAllocator(0, 1);
 	}
 
 	void resize(size_t size)
@@ -616,82 +627,83 @@ public:
 		fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
 #endif
 
-#ifdef CUDA_NO_CUSTOM_ALLOCATION
-		Alloc *newAlloc = new Alloc();
-		newAlloc->size = size;
-		newAlloc->free = false;
-		DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(newAlloc->ptr), size));
-
-		//Just add to start by replacing first
-		newAlloc->next = first;
-		first->prev = newAlloc;
-		first = newAlloc;
-#else
-
-		size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
-
-		Alloc *curAlloc = _getFirstSuitedFree(size);
-
-		//If out of memory
-		if (curAlloc == NULL)
-		{
-#ifdef DEBUG_CUDA
-			size_t spaceDiff = _getTotalFreeSpace();
-#endif
-			_syncReadyEvents();
-			_freeReadyAllocs();
-#ifdef DEBUG_CUDA
-			spaceDiff =  _getTotalFreeSpace() - spaceDiff;
-			printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
-#endif
-
-			curAlloc = _getFirstSuitedFree(size); //Is there space now?
-
-			//Did we manage to recover?
-			if (curAlloc == NULL)
-			{
-				printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace:             %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace:             %lu B]\n",
-						(unsigned long) size, (unsigned long) _getLargestContinuousFreeSpace(), (unsigned long) _getTotalFreeSpace());
-
-				_printState();
-				pthread_mutex_unlock(&mutex);
-
-				fflush(stdout);
-				raise(SIGSEGV);
-			}
-		}
-
 		Alloc *newAlloc(NULL);
 
-		if (curAlloc->size == size)
+		if (cache)
 		{
-			curAlloc->free = false;
-			newAlloc = curAlloc;
+			size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
+
+			Alloc *curAlloc = _getFirstSuitedFree(size);
+
+			//If out of memory
+			if (curAlloc == NULL)
+			{
+	#ifdef DEBUG_CUDA
+				size_t spaceDiff = _getTotalFreeSpace();
+	#endif
+				_syncReadyEvents();
+				_freeReadyAllocs();
+	#ifdef DEBUG_CUDA
+				spaceDiff =  _getTotalFreeSpace() - spaceDiff;
+				printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
+	#endif
+
+				curAlloc = _getFirstSuitedFree(size); //Is there space now?
+
+				//Did we manage to recover?
+				if (curAlloc == NULL)
+				{
+					printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace:             %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace:             %lu B]\n",
+							(unsigned long) size, (unsigned long) _getLargestContinuousFreeSpace(), (unsigned long) _getTotalFreeSpace());
+
+					_printState();
+					pthread_mutex_unlock(&mutex);
+
+					fflush(stdout);
+					raise(SIGSEGV);
+				}
+			}
+
+			if (curAlloc->size == size)
+			{
+				curAlloc->free = false;
+				newAlloc = curAlloc;
+			}
+			else //Or curAlloc->size is smaller than size
+			{
+				//Setup new pointer
+				newAlloc = new Alloc();
+				newAlloc->next = curAlloc;
+				newAlloc->ptr = curAlloc->ptr;
+				newAlloc->size = size;
+				newAlloc->free = false;
+
+				//Modify old pointer
+				curAlloc->ptr = &(curAlloc->ptr[size]);
+				curAlloc->size -= size;
+
+				//Insert new allocation region into chain
+				if(curAlloc->prev == NULL) //If the first allocation region
+					first = newAlloc;
+				else
+					curAlloc->prev->next = newAlloc;
+				newAlloc->prev = curAlloc->prev;
+				newAlloc->next = curAlloc;
+				curAlloc->prev = newAlloc;
+			}
 		}
-		else //Or curAlloc->size is smaller than size
+		else
 		{
-			//Setup new pointer
 			newAlloc = new Alloc();
-			newAlloc->next = curAlloc;
-			newAlloc->ptr = curAlloc->ptr;
 			newAlloc->size = size;
 			newAlloc->free = false;
+			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(newAlloc->ptr), size));
 
-			//Modify old pointer
-			curAlloc->ptr = &(curAlloc->ptr[size]);
-			curAlloc->size -= size;
-
-			//Insert new allocation region into chain
-			if(curAlloc->prev == NULL) //If the first allocation region
-				first = newAlloc;
-			else
-				curAlloc->prev->next = newAlloc;
-			newAlloc->prev = curAlloc->prev;
-			newAlloc->next = curAlloc;
-			curAlloc->prev = newAlloc;
+			//Just add to start by replacing first
+			newAlloc->next = first;
+			first->prev = newAlloc;
+			first = newAlloc;
 		}
-
-#endif
 
 		pthread_mutex_unlock(&mutex);
 
@@ -913,7 +925,6 @@ public:
 		size(size), h_ptr(&ptr.h_ptr[start_idx]), d_ptr(&ptr.d_ptr[start_idx]), h_do_free(false),
 		d_do_free(false), allocator(ptr.allocator), alloc(0), stream(ptr.stream)
 	{};
-
 
 
 	/*======================================================
