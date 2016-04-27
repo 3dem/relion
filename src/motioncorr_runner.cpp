@@ -28,20 +28,25 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
-	continue_old = parser.checkOption("--only_do_unfinished", "Only run MOTIONCORR for those micrographs for which there is not yet an output micrograph.");
+	continue_old = parser.checkOption("--only_do_unfinished", "Only run mottion correctiob for those micrographs for which there is not yet an output micrograph.");
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "0");
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
+	int motioncorr_section = parser.addSection("MOTIONCORR options");
 	bin_factor =  textToInteger(parser.getOption("--bin_factor", "Binning factor (integer) for scaling inside MOTIONCORR", "1"));
 	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCORR", "150"));
 	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
 	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
-	fn_other_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR", "");
-
+	fn_other_motioncorr_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR", "");
 	fn_motioncorr_exe = parser.getOption("--motioncorr_exe","Location of MOTIONCORR executable (or through RELION_MOTIONCORR_EXECUTABLE environment variable)","");
+
+	int unblur_section = parser.addSection("UNBLUR/SUMMOVIE options");
+	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCORR.");
+	fn_unblur_exe = parser.getOption("--unblur_exe","Location of UNBLUR (v1.0.2) executable (or through RELION_UNBLUR_EXECUTABLE environment variable)","");
+	nr_threads = textToInteger(parser.getOption("--j","Number of threads in the unblur executable","1"));
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -60,13 +65,27 @@ void MotioncorrRunner::usage()
 void MotioncorrRunner::initialise()
 {
 
-	// Get the CTFFIND executable
-	if (fn_motioncorr_exe == "")
+	if (do_unblur)
 	{
-		char * penv;
-		penv = getenv ("RELION_MOTIONCORR_EXECUTABLE");
-		if (penv!=NULL)
-			fn_motioncorr_exe = (std::string)penv;
+		// Get the CTFFIND executable
+		if (fn_unblur_exe == "")
+		{
+			char * penv;
+			penv = getenv ("RELION_UNBLUR_EXECUTABLE");
+			if (penv!=NULL)
+				fn_unblur_exe = (std::string)penv;
+		}
+	}
+	else
+	{
+		// Get the CTFFIND executable
+		if (fn_motioncorr_exe == "")
+		{
+			char * penv;
+			penv = getenv ("RELION_MOTIONCORR_EXECUTABLE");
+			if (penv!=NULL)
+				fn_motioncorr_exe = (std::string)penv;
+		}
 	}
 
 	MDavg.clear();
@@ -157,7 +176,10 @@ void MotioncorrRunner::initialise()
 
 	if (verb > 0)
 	{
-		std::cout << " Using MOTIONCORR executable in: " << fn_motioncorr_exe << std::endl;
+		if (do_unblur)
+			std::cout << " Using UNBLUR executable in: " << fn_unblur_exe << std::endl;
+		else
+			std::cout << " Using MOTIONCORR executable in: " << fn_motioncorr_exe << std::endl;
 		std::cout << " to correct beam-induced motion for the following micrographs: " << std::endl;
 		if (continue_old)
 			std::cout << " (skipping all micrographs for which a corrected movie already exists) " << std::endl;
@@ -194,43 +216,57 @@ void MotioncorrRunner::run()
 	int barstep;
 	if (verb > 0)
 	{
-		std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
+		if (do_unblur)
+			std::cout << " Correcting beam-induced motions using Niko Grigorieff's UNBLUR ..." << std::endl;
+		else
+			std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
 		init_progress_bar(fn_micrographs.size());
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 	}
 
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
+		std::vector<float> xshifts, yshifts;
+
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
-		executeMotioncorr(fn_micrographs[imic]);
+		if (do_unblur)
+			executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+		else
+			executeMotioncorr(fn_micrographs[imic], xshifts, yshifts);
+
+		plotShifts(fn_micrographs[imic], xshifts, yshifts);
 	}
 
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
+	// Make a logfile with the shifts in pdf format
+	generateLogFilePDF();
+
 	// Write out STAR files at the end
-	MDavg.write(fn_out + "/corrected_micrographs.star");
-	MDmov.write(fn_out + "/corrected_micrograph_movies.star");
+	MDavg.write(fn_out + "corrected_micrographs.star");
+	MDmov.write(fn_out + "corrected_micrograph_movies.star");
 
 }
 
 
-void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
+void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts, int rank)
 {
 
 
+	FileName fn_avg, fn_mov;
+	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+
+
+	FileName fn_out = fn_avg.withoutExtension() + ".out";
+	FileName fn_log = fn_avg.withoutExtension() + ".log";
+	FileName fn_err = fn_avg.withoutExtension() + ".err";
+	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
+
 	for (int ipass = 0; ipass < 3; ipass++)
 	{
-		FileName fn_avg, fn_mov;
-		getOutputFileNames(fn_mic, fn_avg, fn_mov);
-
-
-		FileName fn_out = fn_avg.withoutExtension() + ".out";
-		FileName fn_log = fn_avg.withoutExtension() + ".log";
-		FileName fn_err = fn_avg.withoutExtension() + ".err";
-		FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
 		std::string command = fn_motioncorr_exe + " ";
 
@@ -247,8 +283,8 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 			command += " -bin " + integerToString(bin_factor);
 
 
-		if (fn_other_args.length() > 0)
-			command += " " + fn_other_args;
+		if (fn_other_motioncorr_args.length() > 0)
+			command += " " + fn_other_motioncorr_args;
 
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
@@ -268,7 +304,8 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 		fh << command << std::endl;
 		fh.close();
 
-		int res = system(command.c_str());
+		if (system(command.c_str()))
+			REPORT_ERROR("ERROR executing: " + command);
 
 		// After motion-correction, check for all-zero average micrographs
 		if (exists(fn_avg))
@@ -289,4 +326,243 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, int rank)
 		}
 	}
 
+	// Also analyse the shifts
+	getShiftsMotioncorr(fn_log, xshifts, yshifts);
+
 }
+
+void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, vector<float> &yshifts)
+{
+
+	std::ifstream in(fn_log.data(), std::ios_base::in);
+	if (in.fail())
+		return;
+
+	xshifts.clear();
+	yshifts.clear();
+
+    std::string line;
+
+    // Start reading the ifstream at the top
+    in.seekg(0);
+
+    // Read throught the shifts file
+    int i = 0;
+    bool have_found_final = false;
+    while (getline(in, line, '\n'))
+    {
+    	// ignore all commented lines, just read first two lines with data
+    	if (line.find("Final shift") != std::string::npos)
+    	{
+    		have_found_final = true;
+    	}
+    	else if (have_found_final)
+    	{
+    		if (line.find("Shift") != std::string::npos)
+    		{
+        		std::vector<std::string> words;
+        		tokenize(line, words);
+        		if (words.size() < 7)
+        		{
+        			std::cerr << " fn_log= " << fn_log << std::endl;
+        			REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
+        		}
+        		xshifts.push_back(textToFloat(words[5]));
+    			yshifts.push_back(textToFloat(words[6]));
+    		}
+    		else
+    		{
+    			// Stop now
+    			break;
+    		}
+    	}
+    }
+    in.close();
+
+
+    if (xshifts.size() != yshifts.size())
+    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
+
+}
+
+void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
+{
+
+	FileName fn_avg, fn_mov;
+	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+	FileName fn_root = fn_avg.withoutExtension();
+	FileName fn_log = fn_root + "_unblur.log";
+	FileName fn_com = fn_root + "_unblur.com";
+	FileName fn_shifts = fn_root + "_shifts.txt";
+
+	FileName fn_tmp_mic;
+	// Unblur cannot handle .mrcs extensions
+	if (fn_mic.getExtension() == "mrcs")
+	{
+		fn_tmp_mic = fn_out + fn_mic.withoutExtension() + "_in.mrc";
+
+		// See how many directories deep is the output name
+		size_t ndir = std::count(fn_tmp_mic.begin(), fn_tmp_mic.end(), '/');
+		FileName fn_link = "";
+		for (size_t i =0; i < ndir; i++)
+		{
+			fn_link += "../";
+		}
+		// Make the symbolic link relative to the project dir
+		fn_link += fn_mic;
+		symlink(fn_link.c_str(), fn_tmp_mic.c_str());
+	}
+	else
+	{
+		fn_tmp_mic = fn_mic;
+	}
+	FileName fn_tmp_mov = fn_mov.withoutExtension() + ".mrc";
+
+
+	std::ofstream  fh;
+	fh.open((fn_com).c_str(), std::ios::out);
+	if (!fh)
+	 REPORT_ERROR( (std::string)"executeUnblur cannot create file: " + fn_com);
+
+	// Write script to run ctffind
+	fh << "#!/usr/bin/env csh"<<std::endl;
+	fh << "setenv  OMP_NUM_THREADS " << integerToString(nr_threads)<<std::endl;
+	fh << fn_unblur_exe << " > " << fn_log << "  << EOF"<<std::endl;
+	fh << fn_tmp_mic << std::endl;
+	fh << std::endl;
+	fh << fn_avg << std::endl;
+	fh << fn_shifts << std::endl;
+	fh << "1.0" << std::endl;
+	fh << "NO" << std::endl; // no dose filtering
+	if (do_save_movies)
+	{
+		fh << "YES" << std::endl; // save movie frames
+		fh << fn_tmp_mov << std::endl;
+	}
+	else
+	{
+		fh << "NO" << std::endl; // dont set expert options
+	}
+	fh << "NO" << std::endl; // dont set expert options
+	fh <<"EOF"<<std::endl;
+	fh.close();
+
+	// Execute unblur
+	std::string command = "csh "+ fn_com;
+	if (system(command.c_str()))
+		REPORT_ERROR("ERROR in executing: " + command);
+
+	// Also analyse the shifts
+	getShiftsUnblur(fn_shifts, xshifts, yshifts);
+
+	// Move movie .mrc to new .mrcs filename
+	std::rename(fn_tmp_mov.c_str(), fn_mov.c_str());
+
+}
+
+void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, vector<float> &yshifts)
+{
+
+	std::ifstream in(fn_shifts.data(), std::ios_base::in);
+	if (in.fail())
+		return;
+
+	xshifts.clear();
+	yshifts.clear();
+
+	std::string line, token;
+
+    // Start reading the ifstream at the top
+    in.seekg(0);
+
+    // Read throught the shifts file
+    int i = 0;
+    while (getline(in, line, '\n'))
+    {
+    	// ignore all commented lines, just read first two lines with data
+    	if (line[0] != '#')
+    	{
+    		if (i>1)
+    			REPORT_ERROR("ERROR: reading more than 2 data lines from " + fn_shifts);
+
+    		std::vector<std::string> words;
+    	    tokenize(line, words);
+    		for (int j = 0; j < words.size(); j++)
+    		{
+    			float sh = textToFloat(words[j]);
+    			if (i==0)
+    				xshifts.push_back(sh);
+    			else if (i==1)
+    				yshifts.push_back(sh);
+    		}
+    		i++;
+    	}
+    }
+    in.close();
+
+    if (xshifts.size() != yshifts.size())
+    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_shifts);
+}
+
+// Plot the shifts
+void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
+{
+
+	if (xshifts.size() == 0)
+		return;
+
+	FileName fn_eps = fn_out + fn_mic.withoutExtension() + "_shifts.eps";
+	CPlot2D *plot2D=new CPlot2D(fn_eps);
+ 	plot2D->SetXAxisSize(600);
+ 	plot2D->SetYAxisSize(600);
+
+ 	CDataSet dataSet;
+	dataSet.SetDrawMarker(false);
+	dataSet.SetDatasetColor(0.0,0.0,0.0);
+	for (int j = 0; j < xshifts.size(); j++)
+	{
+		CDataPoint point(xshifts[j], yshifts[j]);
+		dataSet.AddDataPoint(point);
+	}
+	plot2D->AddDataSet(dataSet);
+
+	// Different starting point
+	CDataSet dataSetStart;
+	dataSetStart.SetDrawMarker(true);
+	dataSetStart.SetDatasetColor(1.0,0.0,0.0);
+	CDataPoint point2(xshifts[0], yshifts[0]);
+	dataSetStart.AddDataPoint(point2);
+	plot2D->AddDataSet(dataSetStart);
+
+	plot2D->SetXAxisTitle("X-shift (in pixels)");
+	plot2D->SetYAxisTitle("Y-shift (in pixels)");
+	plot2D->OutputPostScriptPlot(fn_eps);
+
+
+}
+
+
+void MotioncorrRunner::generateLogFilePDF()
+{
+
+	if (fn_micrographs.size() > 0)
+	{
+		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+		command += fn_out + "logfile.pdf ";
+
+		FileName fn_prev="";
+		for (long int i = 0; i < fn_micrographs.size(); i++)
+		{
+			if (fn_prev != fn_micrographs[i].beforeLastOf("/"))
+			{
+				fn_prev = fn_micrographs[i].beforeLastOf("/");
+				command += fn_out + fn_prev+"/*.eps ";
+			}
+		}
+
+		command += " > /dev/null &";
+		if (system(command.c_str()))
+			REPORT_ERROR("ERROR executing: " + command);
+	}
+}
+

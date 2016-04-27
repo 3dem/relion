@@ -57,10 +57,8 @@
 #include <vector>
 #include <typeinfo>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <glob.h>
 #include <errno.h>
-
 #include "src/numerical_recipes.h"
 #include "src/macros.h"
 #include "src/error.h"
@@ -430,11 +428,6 @@ public:
      * Or if keep>0, then keep the lowest keep directories
      */
     FileName removeDirectories(int keep = 0) const;
-    /**copy one file
-     *
-     * s
-     */
-    void copyFile(const FileName & targetcopy, mode_t permission = 0644) const;
 
     /*
      * Gets the filesize (in bytes)
@@ -488,7 +481,7 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
 bool exists(const FileName& fn);
 
 /** Touch a file on the file system. */
-void touch(const FileName& fn, mode_t permission = 0644);
+void touch(const FileName& fn);
 
 /** Copy a file */
 void copy(const FileName &fn_src, const FileName &fn_dest);

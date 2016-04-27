@@ -37,6 +37,7 @@
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
 #define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
+#define DEFAULTUNBLURCORRLOCATION "/public/EM/UNBLUR/unblur.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -232,8 +233,13 @@ public:
 	SliderEntry bfactor;
 	AnyEntry other_motioncorr_args;
 	BooleanEntry do_save_movies;
+
+	BooleanEntry do_unblur;
+	FileNameEntry fn_unblur_exe;
+
     AnyEntry gpu_ids;
 
+    Fl_Group *unblur_group;
 
 public:
 

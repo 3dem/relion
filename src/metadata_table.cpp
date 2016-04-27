@@ -659,7 +659,6 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 {
     std::stringstream ss;
     std::string line, token, value;
-    std::vector<std::string> tokens;
     clear();
     bool also_has_loop;
 

@@ -1399,7 +1399,7 @@ void RelionMainWindow::cb_display_io_node_i()
 	}
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
-		const char * default_pdf_viewer = getenv ("RELION_CTFFIND_EXECUTABLE");
+		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		if (default_pdf_viewer == NULL)
 		{
 			char mydefault[]=DEFAULTPDFVIEWER;
