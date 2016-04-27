@@ -369,6 +369,9 @@ void AutoPicker::initialise()
 		}
 		CenterFFT(Maux, true);
 		transformer.FourierTransform(Maux, Finvmsk);
+		// We have to clear this transformer, which is in the same if-statement as the Projectors below
+		// Somehow, multiple transformers together cause crashes sometimes, which have to do with fftw_cleanup()
+		transformer.clear();
 
 		// Also get the particle-area mask
 		nr_pixels_circular_mask = 0;
