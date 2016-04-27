@@ -74,6 +74,15 @@ int MpiNode::myRandomSubset() const
 		return (rank % 2 == 0) ? 2 : 1;
 }
 
+std::string MpiNode::getHostName() const
+{
+    char nodename[64] = "undefined";
+    gethostname(nodename,sizeof(nodename));
+    std::string result(nodename);
+    return result;
+
+}
+
 void MpiNode::barrierWait()
 {
   MPI_Barrier(MPI_COMM_WORLD);
@@ -268,8 +277,6 @@ void MpiNode::report_MPI_ERROR(int error_code)
 void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 {
 
-    char nodename[64] = "undefined";
-    gethostname(nodename,sizeof(nodename));
 
     if (node.isMaster())
     {
@@ -280,7 +287,7 @@ void printMpiNodesMachineNames(MpiNode &node, int nthreads)
     		std::cout << " + Number of threads per MPI process  = " << nthreads << std::endl;
     		std::cout << " + Total number of threads therefore  = " << nthreads * node.size << std::endl;
 		}
-    	std::cout << " + Master  (0) runs on host            = " << nodename << std::endl;
+    	std::cout << " + Master  (0) runs on host            = " << node.getHostName() << std::endl;
     	std::cout.flush();
     }
     node.barrierWait();
@@ -292,7 +299,7 @@ void printMpiNodesMachineNames(MpiNode &node, int nthreads)
     		std::cout << " + Slave ";
     		std::cout.width(5);
     		std::cout << slave;
-    		std::cout << " runs on host            = " << nodename << std::endl;
+    		std::cout << " runs on host            = " << node.getHostName() << std::endl;
     		std::cout.flush();
 		}
     	node.barrierWait();

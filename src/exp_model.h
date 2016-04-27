@@ -254,6 +254,15 @@ public:
     // One large MetaDataTable for all micrographs
     MetaDataTable MDmic;
 
+    // Directory on scratch disk to copy particles to
+    FileName fn_scratch;
+
+    // Number of particles saved on the scratchdir
+    long int nr_parts_on_scratch;
+
+    // Original filenames for the particles on scratch
+    std::vector<FileName> original_fn_parts_on_scratch;
+
 	// Empty Constructor
 	Experiment()
 	{
@@ -275,6 +284,7 @@ public:
 		ori_particles.clear(); // TODO: reserve upon reading
 		nr_ori_particles_subset1 = nr_ori_particles_subset2 = 0;
 		nr_bodies = 1;
+		fn_scratch = "";
 		MDexp.clear();
 		MDexp.setIsList(true);
 		MDimg.clear();
@@ -337,15 +347,28 @@ public:
 	// by copying the relevant entries from MDimg into MDbodies
 	void initialiseBodies(int _nr_bodies);
 
+	// For parallel executions, lock the scratch directory with a unique code, so we won't copy the same data many times to the same position
+	// Returns true if the lock already existed, false if it didn't and it was just created
+	// If do_remove_lock, then don't check, only remove lock if it exists
+	bool checkScratchLock(FileName _fn_scratch, FileName fn_uniq, bool do_remove_lock=false);
+
+	// Copy particles from their original position to a scratch directory
+	// Monitor when the scratch disk gets full or when max_scratch_Gb is reached
+	// in that case, stop copying, and keep reading particles from where they were...
+	void copyParticlesToScratch(FileName _fn_scratch, int verb, bool only_change_names = false, int max_scratch_Gb = 80);
+
 	// Print help message for possible command-line options
 	void usage();
 
 	// Read from file
-	// May23,2015 - Shaoda, Helical refinement
-	void read(FileName fn_in, bool do_ignore_original_particle_name = false, bool do_ignore_group_name = false, bool do_preread_images = false, bool need_tiltpsipriors_for_helical_refine = false);
+	void read(FileName fn_in, bool do_ignore_original_particle_name = false,
+			bool do_ignore_group_name = false, bool do_preread_images = false,
+			bool need_tiltpsipriors_for_helical_refine = false);
 
 	// Write
 	void write(FileName fn_root);
+
+
 
 };
 
