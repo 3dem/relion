@@ -519,10 +519,9 @@ void CtffindRunner::executeCtffind3(long int imic)
 	fh.close();
 
 	// Execute ctffind
-	if (!system(NULL))
-	 REPORT_ERROR("There is a problem with the system call to run ctffind");
-	FileName fn_cmnd = "csh "+ fn_script;
-	int res = system ( fn_cmnd.c_str() );
+	std::string command = "csh "+ fn_script;
+	if (system(command.c_str()))
+		REPORT_ERROR("ERROR in executing: " + command);
 
 	// Remove windowed file again
 	if (ctf_win > 0)
