@@ -618,11 +618,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			int FauxStride = (basePckr->workSize/2+1)*basePckr->workSize;
 
-//			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(allocator);
-//
-//			d_FauxNpsi.setSize(Npsi*FauxStride);
-//			d_FauxNpsi.device_alloc();
-
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B4);
 #endif
@@ -724,69 +719,41 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B6);
 #endif
-			int startPsi(0);
-			for (int psiIter = 0; psiIter < cudaTransformer1.psiIters; psiIter++) // psi-batches for possible memory-limits
-			{
 
-				CUDA_CPU_TIC("OneRotation");
+			CUDA_CPU_TIC("CudaInverseFourierTransform_1");
+			cudaTransformer1.backward();
+			HANDLE_ERROR(cudaDeviceSynchronize());
+			CUDA_CPU_TIC("runCenterFFT_1");
+			runCenterFFT(cudaTransformer1.reals,
+						 (int)cudaTransformer1.xSize,
+						 (int)cudaTransformer1.ySize,
+						 false,
+						 Npsi);
+			CUDA_CPU_TOC("runCenterFFT_1");
+			HANDLE_ERROR(cudaDeviceSynchronize());
+			CUDA_CPU_TOC("CudaInverseFourierTransform_1");
+			CUDA_CPU_TIC("probRatio");
+			HANDLE_ERROR(cudaDeviceSynchronize());
+			dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/Npsi)/(float)PROBRATIO_BLOCK_SIZE));
+			cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
+					d_Mccf_best.d_ptr,
+					d_Mpsi_best.d_ptr,
+					cudaTransformer1.reals.d_ptr,
+					d_Mmean.d_ptr,
+					d_Mstddev.d_ptr,
+					cudaTransformer1.reals.size/Npsi,
+					(XFLOAT) -2*normfft,
+					(XFLOAT) 2*sum_ref_under_circ_mask,
+					(XFLOAT) sum_ref2_under_circ_mask,
+					(XFLOAT) expected_Pratio,
+					Npsi,
+					0,
+					Npsi
+					);
+			LAUNCH_HANDLE_ERROR(cudaGetLastError());
+			CUDA_CPU_TOC("probRatio");
 
-				HANDLE_ERROR(cudaDeviceSynchronize());
 
-//				CUDA_CPU_TIC("windowFourierTransform_1");
-//				windowFourierTransform2(
-//						d_FauxNpsi,
-//						cudaTransformer1.fouriers,
-//						basePckr->workSize/2+1, basePckr->workSize, 1, //Input dimensions
-//						basePckr->workSize/2+1, basePckr->workSize, 1,  //Output dimensions
-//						cudaTransformer1.batchSize[psiIter],
-//						cudaTransformer1.batchSize[0]*psiIter*FauxStride
-//						);
-//				CUDA_CPU_TOC("windowFourierTransform_1");
-//				HANDLE_ERROR(cudaDeviceSynchronize());
-
-				CUDA_CPU_TIC("CudaInverseFourierTransform_1");
-				cudaTransformer1.backward();
-				HANDLE_ERROR(cudaDeviceSynchronize());
-
-				CUDA_CPU_TIC("runCenterFFT_1");
-				runCenterFFT(cudaTransformer1.reals,
-							 (int)cudaTransformer1.xSize,
-							 (int)cudaTransformer1.ySize,
-							 false,
-							 cudaTransformer1.batchSize[psiIter]);
-				CUDA_CPU_TOC("runCenterFFT_1");
-				HANDLE_ERROR(cudaDeviceSynchronize());
-
-				CUDA_CPU_TOC("CudaInverseFourierTransform_1");
-
-				// Calculate ratio of prabilities P(ref)/P(zero)
-				// Keep track of the best values and their corresponding iref and psi
-				// ------------------------------------------------------------------
-				// So now we already had precalculated: Mdiff2 = 1/sig*Sum(X^2) - 2/sig*Sum(X) + mu^2/sig*Sum(1)
-				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
-				CUDA_CPU_TIC("probRatio");
-				HANDLE_ERROR(cudaDeviceSynchronize());
-				dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/cudaTransformer1.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
-				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
-						d_Mccf_best.d_ptr,
-						d_Mpsi_best.d_ptr,
-						cudaTransformer1.reals.d_ptr,
-						d_Mmean.d_ptr,
-						d_Mstddev.d_ptr,
-						cudaTransformer1.reals.size/cudaTransformer1.batchSize[0],
-						(XFLOAT) -2*normfft,
-						(XFLOAT) 2*sum_ref_under_circ_mask,
-						(XFLOAT) sum_ref2_under_circ_mask,
-						(XFLOAT) expected_Pratio,
-						cudaTransformer1.batchSize[psiIter],
-						startPsi,
-						Npsi
-						);
-				LAUNCH_HANDLE_ERROR(cudaGetLastError());
-				startPsi += cudaTransformer1.batchSize[psiIter];
-				CUDA_CPU_TOC("probRatio");
-			    CUDA_CPU_TOC("OneRotation");
-			} // end for psi-batches
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B6);
 #endif
@@ -821,11 +788,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				It.write(fn_tmp);
 				CUDA_CPU_TOC("writeFomMaps");
 
-//				for (long int n=0; n<((Mccf_best).nzyxdim/10); n+=1)
-//				{
-//					std::cerr << DIRECT_MULTIDIM_ELEM(Mccf_best, n) << std::endl;
-//				}
-//				exit(0);
 			} // end if do_write_fom_maps
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B7);

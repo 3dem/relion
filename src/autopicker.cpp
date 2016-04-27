@@ -2417,8 +2417,8 @@ int AutoPicker::getGoodFourierDims(int requestedSizeRealX, int lim)
 	int inputPrimeF =XMIPP_MAX(largestPrime(requestedSizeRealX),largestPrime(requestedSizeRealX/2+1));
 	if(inputPrimeF<=LARGEST_ACCEPTABLE_PRIME)
 	{
-		std::cout << "for requested x-dim " << requestedSizeRealX << " the smallest prime factor in FFTs is " << inputPrimeF << std::endl;
-		std::cout << " NO NEED TO MODIFY FFT SIZE " << std::endl;
+		std::cout << "Will use micrographs scaled to xdim " << requestedSizeRealX << ". The largest prime factor in FFTs is " << inputPrimeF << std::endl;
+		std::cout << "     ( no need to modify FFT dims ) " << std::endl;
 		return requestedSizeRealX;
 	}
 
@@ -2449,19 +2449,21 @@ int AutoPicker::getGoodFourierDims(int requestedSizeRealX, int lim)
 	}
 
 
-	std::cout << "*-------------------------------------------------------------------------*"<< std::endl;
-	std::cout << "for requested x-dim " << requestedSizeRealX << " the smallest prime factor in FFTs is " << inputPrimeF << std::endl;
-	std::cout << "the suggested size is instead ";
+	std::cout << std::endl << "*-----------------------------WARNING------------------------------------------------*"<< std::endl;
+	std::cout << "Will use micrographs scaled to xdim " << requestedSizeRealX << ". The largest prime factor in FFTs is " << inputPrimeF << std::endl;
+	std::cout << "Comparable results will be obtained faster by using  ";
 	if((currentU-requestedSizeRealX)>(requestedSizeRealX-currentD) || (currentU>lim))
 	{
-		std::cout <<  currentD  << " which has the largest prime factor " <<  S_down << std::endl;
-		std::cout << "*-------------------------------------------------------------------------*"<< std::endl;
+		std::cout <<  currentD  << " where the prime factor is " <<  S_down << std::endl;
+		std::cout <<  "         ( change to / add --shrink " << currentD << " to your autopick-command ) " << std::endl;
+		std::cout << "*------------------------------------------------------------------------------------*"<< std::endl << std::endl;
 		return currentD;
 	}
 	else
 	{
-		std::cout <<  currentU  << " which has the largest prime factor " <<  S_up << std::endl;
-		std::cout << "*-------------------------------------------------------------------------*"<< std::endl;
+		std::cout <<  currentU  << " where the prime factor is " <<  S_up << std::endl;
+		std::cout <<  "         ( change to / add --shrink " << currentU << " to your autopick-command ) "<< std::endl;
+		std::cout << "*------------------------------------------------------------------------------------*"<< std::endl <<std::endl;
 		return currentU;
 	}
 

@@ -55,9 +55,7 @@ bool CudaProjector::setMdlDim(
 		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
 
 		// -- Allocate and copy data using very celver CUDA memcpy-functions
-		//HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMalloc3DArray(texArrayComplex, &desc, volumeSize));
-		//HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.res.array.array = *texArrayComplex;
@@ -65,9 +63,7 @@ bool CudaProjector::setMdlDim(
 	}
 	else // 2D model
 	{
-		//HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMallocPitch(&texArrayComplex2D, &pitch2D, sizeof(CUDACOMPLEX)*mdlX,mdlY));
-		//HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.resType = cudaResourceTypePitch2D;

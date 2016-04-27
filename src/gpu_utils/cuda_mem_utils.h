@@ -1220,14 +1220,14 @@ public:
 	const T& operator[](size_t idx) const { return h_ptr[idx]; };
 
 	/**
-	 * Host data quick access
+	 * Device data quick access
 	 */
 	inline
 	T& operator()(size_t idx) { return d_ptr[idx]; };
 
 
 	/**
-	 * Host data quick access
+	 * Device data quick access
 	 */
 	inline
 	const T& operator()(size_t idx) const { return d_ptr[idx]; };
