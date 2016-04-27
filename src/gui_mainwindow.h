@@ -177,7 +177,7 @@ public:
     //int handle(int ev);
 
     // Communicate with the different jobtype objects
-    void jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
+    bool jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
 
     // Add a process to the PipeLine, return the number of the process
     long int addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);

@@ -399,11 +399,32 @@ FileName FileName::removeDirectories(int keep) const
     else
         return substr(last_slash + 1, length() - last_slash);
 }
-void FileName::copyFile(const FileName & target) const
+void FileName::copyFile(const FileName & target, mode_t permission) const
 {
-    std::ifstream f1 (this->c_str(), std::fstream::binary);
-    std::ofstream f2 (target.c_str(),std::fstream::trunc|std::fstream::binary);
-    f2<<f1.rdbuf();
+	char buf[BUFSIZ];
+	size_t size;
+
+	umask(0);
+	int source = open(this->c_str(), O_RDONLY, 0);
+	int dest = open(target.c_str(), O_WRONLY | O_CREAT , permission);
+
+	while ((size = read(source, buf, BUFSIZ)) > 0)
+		write(dest, buf, size);
+
+	close(source);
+	close(dest);
+
+	//std::ifstream f1 (this->c_str(), std::fstream::binary);
+    //std::ofstream f2 (target.c_str(),std::fstream::trunc|std::fstream::binary);
+    //f2<<f1.rdbuf();
+}
+
+size_t FileName::getFileSize() const
+{
+	struct stat filestatus;
+	stat( this->c_str(), &filestatus );
+	return filestatus.st_size;
+
 }
 
 int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
@@ -425,17 +446,22 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 bool exists(const FileName &fn)
 {
 
-    struct stat buffer;   
-    return (stat (fn.c_str(), &buffer) == 0); 
+    struct stat buffer;
+    return (stat (fn.c_str(), &buffer) == 0);
 }
 
-void touch(const FileName &fn)
+void touch(const FileName &fn, mode_t permission)
 {
-    std::ofstream  fh;
-    fh.open(fn.c_str(), std::ios::out);
+	umask(0);
+	int dest = open(fn.c_str(), O_RDWR | O_CREAT, permission);
+	close(dest);
+	/*
+	std::ofstream  fh;
+    fh.open(fn.c_str(), std::ios::out, permission);
     if (!fh)
         REPORT_ERROR( (std::string)"Filename::touch ERROR: Cannot open file: " + fn);
     fh.close();
+    */
 }
 
 void copy(const FileName &fn_src, const FileName &fn_dest)

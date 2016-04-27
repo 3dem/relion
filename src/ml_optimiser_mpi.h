@@ -44,9 +44,6 @@ public:
     int MPIR_PACK, MPIR_ALLREDUCE, MPIR_UNPACK, MPIR_EXP, MPIR_MAX, MPIR_BCAST;
 #endif
 
-    // Name of the directory to write temporary files to
-    FileName fn_scratch;
-
     // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
     bool only_do_unfinished_movies;
 

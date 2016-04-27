@@ -449,7 +449,7 @@ void RelionJobWindow::initialisePipeline(std::string &outputname, std::string de
 
 }
 
-void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
+bool RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command, bool do_makedir)
 {
 
 	// Create output directory if the outname contains a "/"
@@ -496,6 +496,16 @@ void RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 		}
 	}
 
+	char * my_warn = getenv ("RELION_WARNING_LOCAL_MPI");
+	int my_nr_warn = (my_warn == NULL) ? DEFAULTWARNINGLOCALMPI : textToInteger(my_warn);
+	if (has_mpi && nr_mpi.getValue() > my_nr_warn && !do_queue.getValue())
+	{
+		std::string ask;
+		ask = "You're submitting a local job with " + integerToString(my_nr_warn) + " parallel MPI processes. Do you really want to run this?\n";
+		return fl_choice(ask.c_str(), "Don't run", "Run", NULL);
+	}
+	else
+		return true;
 }
 
 /*
@@ -532,7 +542,7 @@ void XXXXJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
 }
-void XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
+bool XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands, std::string &final_command)
 {
 	commands.clear();
 	std::string command;
@@ -547,7 +557,7 @@ void XXXXJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	commands.push_back(command);
 	outputname = "run_ctffind";
-	prepareFinalCommand(outputname, commands, final_command);
+	return prepareFinalCommand(outputname, commands, final_command);
 }
 */
 
@@ -620,7 +630,7 @@ void ImportJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -733,7 +743,7 @@ void ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option.");
 	}
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -861,7 +871,7 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -913,7 +923,7 @@ void MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -1192,7 +1202,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -1237,6 +1247,9 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --ignore_ctffind_params";
 		if (do_EPA.getValue())
 			command += " --EPA";
+
+		// GPU-allocation
+		command += " --gpu " + gpu_ids.getValue();
 	}
 	else
 	{
@@ -1264,14 +1277,11 @@ void CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (is_continue)
 		command += " --only_do_unfinished ";
 
-	// GPU-stuff
-	command += " --gpu " + gpu_ids.getValue();
-
 	// Other arguments
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -1402,7 +1412,7 @@ void ManualpickJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -1458,7 +1468,7 @@ void ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command = "echo " + fn_in.getValue() + " > " + fn_suffix;
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -1672,7 +1682,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -1762,7 +1772,7 @@ void AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	command = "echo " + fn_input_autopick.getValue() + " > " +  outputname + "coords_suffix_autopick.star";
 	commands.push_back(command.c_str());
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2013,7 +2023,7 @@ void ExtractJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -2127,7 +2137,7 @@ void ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	}
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -2141,6 +2151,21 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	resetHeight();
 
 	input_star.place(current_y, "Input particles to be sorted:", NODE_PART_DATA, "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	autopick_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	autopick_group->end();
+
+	is_autopick.place(current_y, "Are these from an Extract job?", false, "Set the particles are from an Extract job (as opposed to a 2D/3D Classification or 3D auto-refine job), then you can only perform sorting if you used coordinates from Auto-picking in the particle extraction. In that case, provide the 2D references from the auto-pick run below.", autopick_group);
+
+	autopick_group->begin();
+
+	autopick_refs.place(current_y, "Autopicking references:", NODE_2DREFS, "", "References(*.{star})", "This STAR file should contain the 2D references that were used for the auto-picking.");
+
+	autopick_group->end();
+	is_autopick.cb_menu_i();
 
 	tab1->end();
 
@@ -2174,6 +2199,8 @@ void SortJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star.writeValue(fh);
+	is_autopick.writeValue(fh);
+	autopick_refs.writeValue(fh);
 	do_ctf.writeValue(fh);
 	do_ignore_first_ctfpeak.writeValue(fh);
 
@@ -2192,6 +2219,8 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star.readValue(fh);
+		is_autopick.readValue(fh);
+		autopick_refs.readValue(fh);
 		do_ctf.readValue(fh);
 		do_ignore_first_ctfpeak.readValue(fh);
 
@@ -2206,12 +2235,14 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	input_star.deactivate(is_continue);
+	is_autopick.deactivate(is_continue);
+	autopick_refs.deactivate(is_continue);
 	do_ctf.deactivate(is_continue);
 	do_ignore_first_ctfpeak.deactivate(is_continue);
 
 }
 
-void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -2238,7 +2269,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	}
 	else if (fn_in.contains("_data.star") && fn_in.contains("Refine3D/"))
 	{
-		if (fn_in.contains("_it0"))
+		if (fn_in.contains("_it0") || fn_in.contains("_it1"))
 			fn_ref = fn_in.without("_data.star") + "_half1_model.star";
 		else
 			fn_ref = fn_in.without("_data.star") + "_model.star";
@@ -2246,9 +2277,15 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	}
 	else if (fn_in.contains("Extract/"))
 	{
-		// TODO!
-		REPORT_ERROR("ERROR: for the moment you can only use inputs from Class2D, Class3D or Refine3D runs!");
-		node_type= NODE_2DREFS;
+		if (is_autopick.getValue())
+		{
+			fn_ref = autopick_refs.getValue();
+			node_type= NODE_2DREFS;
+		}
+		else
+		{
+			REPORT_ERROR("ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!");
+		}
 	}
 	command += " --ref " + fn_ref;
 	Node node2(fn_ref, node_type);
@@ -2270,7 +2307,7 @@ void SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -2459,7 +2496,7 @@ This may improve performance on systems where disk access, and particularly meta
 
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
 
 	// Add a little spacer
@@ -2599,7 +2636,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -2726,7 +2763,7 @@ void Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -3014,8 +3051,7 @@ This may improve performance on systems where disk access, and particularly meta
 
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
-
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3233,7 +3269,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -3414,7 +3450,7 @@ void Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -3654,8 +3690,7 @@ This may improve performance on systems where disk access, and particularly meta
 
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
-
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3863,7 +3898,7 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	helical_range_distance.deactivate(is_continue);
 }
 
-void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -4044,7 +4079,7 @@ void Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -4269,7 +4304,7 @@ void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -4403,7 +4438,7 @@ void MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -4596,7 +4631,7 @@ void PolishJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool PolishJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 	commands.clear();
@@ -4670,7 +4705,7 @@ void PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -4798,7 +4833,7 @@ void ClassSelectJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -4950,7 +4985,7 @@ void ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 	//	commands.push_back(command2);
 	//}
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5063,7 +5098,7 @@ void MaskCreateJobWindow::toggle_new_continue(bool _is_continue)
 	fn_in.deactivate(is_continue);
 }
 
-void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5102,7 +5137,7 @@ void MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5253,7 +5288,7 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 	fn_mic4.deactivate(is_continue);
 }
 
-void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5328,7 +5363,7 @@ void JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5458,7 +5493,7 @@ void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 }
 
-void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5511,7 +5546,7 @@ void SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::st
 
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 
 }
 
@@ -5646,7 +5681,7 @@ void PostJobWindow::toggle_new_continue(bool _is_continue)
 
 }
 
-void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool PostJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5713,7 +5748,7 @@ void PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command += " " + other_args.getValue();
 
 	commands.push_back(command);
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 
@@ -5825,7 +5860,7 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 	do_queue.deactivate(true);
 }
 
-void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter)
 {
 
@@ -5834,7 +5869,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	if (fn_resmap.getValue().length() == 0)
 	{
-		std::cerr << "ResmapJobWindow::getCommands ERROR: please provide an executable for the ResMap program." << std::endl;
+		std::cerr << "ERROR: please provide an executable for the ResMap program." << std::endl;
 		exit(1);
 	}
 
@@ -5848,7 +5883,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else
 	{
-		std::cerr << "ResMapJobWindow::getCommands ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
+		std::cerr << "ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
 		exit(1);
 	}
 
@@ -5878,7 +5913,7 @@ void ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
-	prepareFinalCommand(outputname, commands, final_command, do_makedir);
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
 
 /*
