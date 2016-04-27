@@ -583,6 +583,22 @@ __global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
 	}
 }
 
+__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
+									 	 	CUDACOMPLEX *d_B,
+									 	 	CUDACOMPLEX *d_C,
+									 	 	int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int A_off = blockIdx.y*image_size;
+	if(pixel<image_size)
+	{
+		XFLOAT tr =   d_A[pixel + A_off].x;
+		XFLOAT ti = - d_A[pixel + A_off].y;
+		d_C[pixel + A_off].x =   tr*d_B[pixel].x - ti*d_B[pixel].y;
+		d_C[pixel + A_off].y =   ti*d_B[pixel].x + tr*d_B[pixel].y;
+	}
+}
+
 __global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
 									 	 CUDACOMPLEX *d_B,
 									 	 int image_size)

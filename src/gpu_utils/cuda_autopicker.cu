@@ -215,9 +215,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 {
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
-	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
+	MultidimArray<RFLOAT> Maux, Mstddev, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
 	MultidimArray<int> Mclass_best_combined;
-	CudaGlobalPtr<XFLOAT > d_Maux;
 
 	CudaGlobalPtr<XFLOAT >  d_Mccf_best(basePckr->workSize*basePckr->workSize, allocator);
 	CudaGlobalPtr<XFLOAT >  d_Mpsi_best(basePckr->workSize*basePckr->workSize, allocator);
@@ -708,9 +707,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			sum_ref_under_circ_mask /= sumn;
 			sum_ref2_under_circ_mask /= sumn;
 			expected_Pratio = exp(suma2 / (2. * sumn));
-
-			// Maux goes back to being small
-			Maux.resizeNoCp(1,basePckr->workSize, basePckr->workSize);
 
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");

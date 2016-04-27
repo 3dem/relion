@@ -208,6 +208,9 @@ public:
 	void backward()
 	{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) ); }
 
+	void backward(CudaGlobalPtr<cufftComplex> &src)
+		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~src, ~reals) ); }
+
 	void backward(CudaGlobalPtr<cufftReal> &dst)
 		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~dst) ); }
 #endif
