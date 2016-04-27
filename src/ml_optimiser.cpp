@@ -266,10 +266,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
+	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
+	max_scratch_Gb = textToInteger(parser.getOption("--max_scratch", "Space available for copying particle stacks (in Gb)", "80"));
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in MB) to leave free after allocation.", "0"));
+	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
 		REPORT_ERROR("Invalid free_gpu_memory value.");
@@ -277,10 +279,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		requested_free_gpu_memory =  temp_reqSize;
 
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
-
-	if (do_gpu)
-		do_shifts_onthefly = true;
-
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
 
 	int expert_section = parser.addSection("Expert options");
@@ -447,21 +445,17 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
+	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
+	max_scratch_Gb = textToInteger(parser.getOption("--max_scratch", "Space available for copying particle stacks (in Gb)", "80"));
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in MB) to leave free after allocation.", "0"));
+	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
 		REPORT_ERROR("Invalid free_gpu_memory value.");
 	else
 		requested_free_gpu_memory =  temp_reqSize;
-
-	if (do_skip_align)
-		do_gpu = false;
-
-	if (do_gpu)
-		do_shifts_onthefly = true;
 
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
@@ -1049,6 +1043,12 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::cout << " Running in double precision. " << std::endl;
 #endif
 
+	if (do_skip_align)
+		do_gpu = false;
+
+	if (do_gpu)
+		do_shifts_onthefly = true;
+
     if (do_print_metadata_labels)
 	{
 		if (verb > 0)
@@ -1292,6 +1292,19 @@ void MlOptimiser::initialiseGeneral(int rank)
 			if (do_helical_refine)
 				mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
 		}
+
+		// If this is a normal (non-movie) auto-refinement run: check whether we had converged already
+		// Jobs often fail in the last iteration, these lines below allow restarting of only the last iteration
+		if (iter > 0 && !do_realign_movies)
+		{
+			RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+			if (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling) )
+			{
+				has_fine_enough_angular_sampling = true;
+				checkConvergence();
+			}
+		}
+
 	}
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
@@ -1418,6 +1431,10 @@ void MlOptimiser::initialiseWorkLoad()
 
     divide_equally(mydata.numberOfOriginalParticles(), 1, 0, my_first_ori_particle_id, my_last_ori_particle_id);
 
+    // Now copy particle stacks to scratch if needed
+    if (fn_scratch != "" && !do_preread_images)
+    	mydata.copyParticlesToScratch(fn_scratch, 1, false, max_scratch_Gb);
+
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
@@ -1467,7 +1484,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			// Get the image filename
 			MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
@@ -7350,7 +7366,6 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
 			mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
-
 			if (mymodel.data_dim == 3 && do_ctf_correction)
 			{
 				// Also read the CTF image from disc

@@ -57,6 +57,7 @@
 #include <vector>
 #include <typeinfo>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <glob.h>
 #include <errno.h>
 
@@ -433,8 +434,12 @@ public:
      *
      * s
      */
-    void copyFile(const FileName & target) const;
+    void copyFile(const FileName & targetcopy, mode_t permission = 0644) const;
 
+    /*
+     * Gets the filesize (in bytes)
+     */
+    size_t getFileSize() const;
 
     /** From a wild-card containing filename get a vector with all existing filenames,
      * return number of existing filenames
@@ -483,7 +488,7 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
 bool exists(const FileName& fn);
 
 /** Touch a file on the file system. */
-void touch(const FileName& fn);
+void touch(const FileName& fn, mode_t permission = 0644);
 
 /** Copy a file */
 void copy(const FileName &fn_src, const FileName &fn_dest);
