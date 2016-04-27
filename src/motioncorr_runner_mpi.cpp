@@ -48,17 +48,28 @@ void MotioncorrRunnerMpi::run()
 	int barstep;
 	if (verb > 0)
 	{
-		std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
+		if (do_unblur)
+			std::cout << " Correcting beam-induced motions using Niko Grigorieff's UNBLUR ..." << std::endl;
+		else
+			std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
+
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 	}
 
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 	{
+		std::vector<float> xshifts, yshifts;
+
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
-		executeMotioncorr(fn_micrographs[imic], node->rank);
+		if (do_unblur)
+			executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+		else
+			executeMotioncorr(fn_micrographs[imic], xshifts, yshifts, node->rank);
+
+		plotShifts(fn_micrographs[imic], xshifts, yshifts);
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
@@ -68,6 +79,9 @@ void MotioncorrRunnerMpi::run()
 	// Only the master writes the joined result file
 	if (node->isMaster())
 	{
+		// Make a logfile with the shifts in pdf format
+		generateLogFilePDF();
+
 		// Write out STAR files at the end
 		MDavg.write(fn_out + "/corrected_micrographs.star");
 		MDmov.write(fn_out + "/corrected_micrograph_movies.star");

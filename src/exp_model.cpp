@@ -493,7 +493,10 @@ bool Experiment::checkScratchLock(FileName _fn_scratch, FileName fn_uniq, bool d
 	}
 	else
 	{
-		touch(fn_lock, 0777);
+		touch(fn_lock);
+		std::string command = "chmod 0777 " + fn_lock;
+		if (system(command.c_str()))
+			REPORT_ERROR("ERROR: cannot execute: " + command);
 		return false;
 	}
 }

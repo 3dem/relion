@@ -313,7 +313,6 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 		return;
 
 
-
 	// Also write out a postscript file with the fits
 	FileName fn_eps = fn_mics[imic].withoutExtension() + "_fit.eps";
 	CPlot2D *plot2D=new CPlot2D(fn_mics[imic]);
