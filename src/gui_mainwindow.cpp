@@ -2276,18 +2276,21 @@ void RelionMainWindow::cb_mark_as_finished_i()
 	{
 		// Get the last iteration optimiser file
 		FileName fn_opt;
-		if (pipeline.processList[current_job].alias != "None")
-			fn_opt = pipeline.processList[current_job].alias + "run*optimiser.star";
-		else
-			fn_opt = pipeline.processList[current_job].name + "run*optimiser.star";
+		FileName fn_root1 = (pipeline.processList[current_job].alias != "None") ? pipeline.processList[current_job].alias : pipeline.processList[current_job].name;
+
 		std::vector<FileName> fn_opts;
+		fn_opt = fn_root1 + "run_it*optimiser.star";
 		fn_opt.globFiles(fn_opts);
+		// It could also be a continuation
+		fn_opt = fn_root1 + "run_ct?_optimiser.star";
+		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
+		// It could also be a continuation
+		fn_opt = fn_root1 + "run_ct??_optimiser.star";
+		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
 		if (fn_opts.size() > 0)
 		{
 
 			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
-			Node node1(fn_opt, NODE_OPTIMISER);
-			pipeline.addNewOutputEdge(current_job, node1);
 
 			// Also get data.star
 			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
