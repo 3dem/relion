@@ -747,7 +747,7 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 }
 
-MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
+MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_MOTIONCORR;
@@ -757,13 +757,15 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	resetHeight();
 
 	input_star_mics.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
+	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions and write out the averages.");
+
 	tab1->end();
 
 	tab2->begin();
 	tab2->label("Motioncorr");
 	resetHeight();
 
-	// Check for environment variable RELION_QSUB_TEMPLATE
+	// Check for environment variable RELION_MOTIONCORR_EXECUTABLE
 	char * default_location = getenv ("RELION_MOTIONCORR_EXECUTABLE");
 	if (default_location == NULL)
 	{
@@ -781,7 +783,6 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	last_frame_ali.place(current_y, "Last frame for alignment:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
 	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
 	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
-	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions in MOTIONCOR");
 	bfactor.place(current_y, "Bfactor:", 150, 0, 1500, 50, "The B-factor (in pixel^2) that MOTIONCORR will apply to the micrographs. The MOTIONCORR Readme.txt says: A bfactor 150 or 200pix^2 is good for most cryoEM image with 2x binned super-resolution image. For unbined image, a larger bfactor is needed.");
 
 	// Add a little spacer
@@ -793,6 +794,33 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT
 	other_motioncorr_args.place(current_y, "Other MOTIONCORR arguments", "", "Additional arguments that need to be passed to MOTIONCORR.");
 
 	tab2->end();
+
+	tab3->begin();
+	tab3->label("Unblur");
+	resetHeight();
+
+	// Check for environment variable RELION_UNBLUR_EXECUTABL
+	char * default_location2 = getenv ("RELION_UNBLUR_EXECUTABLE");
+	if (default_location2 == NULL)
+	{
+		char mydefault[]=DEFAULTUNBLURCORRLOCATION;
+		default_location2=mydefault;
+	}
+
+	unblur_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	unblur_group->end();
+
+	do_unblur.place(current_y, "Use UNBLUR instead of MOTIONCORR?", false ,"If set to Yes, Niko Grigoerieff's UNBLUR will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", unblur_group);
+
+	unblur_group->begin();
+
+	fn_unblur_exe.place(current_y, "UNBLUR executable:", default_location2, "*.*", NULL, "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	unblur_group->end();
+
+
+	tab3->end();
+
 
 	// read settings if hidden file exists
 	read(".gui_motioncorr", is_continue);
@@ -820,6 +848,8 @@ void MotioncorrJobWindow::write(std::string fn)
 	bfactor.writeValue(fh);
 	gpu_ids.writeValue(fh);
 	other_motioncorr_args.writeValue(fh);
+	do_unblur.writeValue(fh);
+	fn_unblur_exe.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -847,6 +877,8 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		bfactor.readValue(fh);
 		gpu_ids.readValue(fh);
 		other_motioncorr_args.readValue(fh);
+		do_unblur.readValue(fh);
+		fn_unblur_exe.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -868,7 +900,8 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	do_save_movies.deactivate(is_continue);
 	bfactor.deactivate(is_continue);
 	other_motioncorr_args.deactivate(is_continue);
-
+	do_unblur.deactivate(is_continue);
+	fn_unblur_exe.deactivate(is_continue);
 }
 
 bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -896,27 +929,40 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	pipelineOutputNodes.push_back(node2);
 	Node node3(outputname + "corrected_micrograph_movies.star", NODE_MOVIES);
 	pipelineOutputNodes.push_back(node3);
-
-	// Motioncorr-specific stuff
-	command += " --bin_factor " + floatToString(bin_factor.getValue());
-	command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
-	command += " --first_frame_ali " + floatToString(first_frame_ali.getValue());
-	command += " --last_frame_ali " + floatToString(last_frame_ali.getValue());
-	command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
-	command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
-	command += " --bfactor " + floatToString(bfactor.getValue());
+	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+	pipelineOutputNodes.push_back(node4);
 
 	if (do_save_movies.getValue())
 		command += " --save_movies ";
 
-	if ((other_motioncorr_args.getValue()).length() > 0)
-		command += " --other_motioncorr_args \"" + other_motioncorr_args.getValue() + "\"";
+	if (do_unblur.getValue())
+	{
+		command += " --use_unblur";
+		command += " --j " + floatToString(nr_threads.getValue());
+		command += " --unblur_exe " + fn_unblur_exe.getValue();
+	}
+	else
+	{
+		// Motioncorr-specific stuff
+		command += " --bin_factor " + floatToString(bin_factor.getValue());
+		command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
+		command += " --first_frame_ali " + floatToString(first_frame_ali.getValue());
+		command += " --last_frame_ali " + floatToString(last_frame_ali.getValue());
+		command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
+		command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
+		command += " --bfactor " + floatToString(bfactor.getValue());
+
+		if ((other_motioncorr_args.getValue()).length() > 0)
+			command += " --other_motioncorr_args \"" + other_motioncorr_args.getValue() + "\"";
+
+		// Which GPUs to use?
+		command += " --gpu " + gpu_ids.getValue();
+
+	}
 
 	if (is_continue)
 		command += " --only_do_unfinished ";
 
-	// Which GPUs to use?
-	command += " --gpu " + gpu_ids.getValue();
 
 	// Other arguments
 	command += " " + other_args.getValue();
