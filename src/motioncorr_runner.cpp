@@ -30,7 +30,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run mottion correctiob for those micrographs for which there is not yet an output micrograph.");
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
-	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "0");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	int motioncorr_section = parser.addSection("MOTIONCORR options");
@@ -91,13 +91,12 @@ void MotioncorrRunner::initialise()
 	MDavg.clear();
 	MDmov.clear();
 
-	untangleDeviceIDs(gpu_ids, allThreadIDs);
-	if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
-	{
-		if (verb>0)
-			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-	}
+	if (gpu_ids.length() > 0)
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
+	else if (!do_unblur && verb>0)
+		std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 	FileName fn_avg, fn_mov;
 
@@ -259,7 +258,6 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
 
-
 	FileName fn_out = fn_avg.withoutExtension() + ".out";
 	FileName fn_log = fn_avg.withoutExtension() + ".log";
 	FileName fn_err = fn_avg.withoutExtension() + ".err";
@@ -286,13 +284,15 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 		if (fn_other_motioncorr_args.length() > 0)
 			command += " " + fn_other_motioncorr_args;
 
-		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+		if ( allThreadIDs.size() == 0)
 		{
 			// Automated mapping
 			command += " -gpu " + integerToString(rank % devCount);
 		}
 		else
 		{
+			if (rank >= allThreadIDs.size())
+				REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
 			command += " -gpu " + allThreadIDs[rank][0];
 		}
 
