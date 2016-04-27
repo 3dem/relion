@@ -44,7 +44,6 @@ void MlOptimiserMpi::read(int argc, char **argv)
     MlOptimiser::read(argc, argv, node->rank);
 
     int mpi_section = parser.addSection("MPI options");
-    fn_scratch = parser.getOption("--scratchdir", "Directory (with absolute path, and visible to all nodes) for temporary files", "");
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
 
     // Don't put any output to screen for mpi slaves
@@ -440,6 +439,49 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		}
 
 	}
+
+	// Now copy particle stacks to scratch if needed
+    if (fn_scratch != "" && !do_preread_images)
+    {
+    	if (do_parallel_disc_io)
+		{
+    		int uniqnr = rand() % 100000;
+    		FileName fn_uniq = fn_out;
+    		fn_uniq.replaceAllSubstrings("/", "_");
+    		fn_uniq += "_lock" + integerToString(uniqnr);
+    		bool lock_exists;
+
+    		// One after the other, all ranks pass through  mydata.checkScratchLock()
+    		// This way, only the first rank on each hostname will actually copy the particle stacks
+    		for (int inode = 0; inode < node->size; inode++)
+    		{
+    			if (inode == node->rank)
+    			{
+    				// The master removes the lock if it existed
+    				lock_exists = mydata.checkScratchLock(fn_scratch, fn_uniq, node->isMaster());
+    			}
+
+    			MPI_Barrier(MPI_COMM_WORLD);
+    		}
+
+    		// All slaves pass through mydata.copyParticlesToScratch()
+    		// if (lock_exists) then only change names in the MDimg, don't actually copy the particle stacks
+    		int myverb = (node->rank == 1) ? 1 : 0; // Only the first slave
+    		//std::cerr << " node->rank= " << node->rank << " lock_exists= " << lock_exists << " myverb= " << myverb << std::endl;
+    		mydata.copyParticlesToScratch(fn_scratch, myverb, lock_exists, max_scratch_Gb);
+		}
+		else
+		{
+			// Only the master needs to copy the data, as only the master will be reading in images
+			if (node->isMaster())
+				mydata.copyParticlesToScratch(fn_scratch, 1, false, max_scratch_Gb);
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+
+
+
 //#define DEBUG_WORKLOAD
 #ifdef DEBUG_WORKLOAD
 	std::cerr << " node->rank= " << node->rank << " my_first_ori_particle_id= " << my_first_ori_particle_id << " my_last_ori_particle_id= " << my_last_ori_particle_id << std::endl;
@@ -1172,9 +1214,6 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 			if (this_slave == node->rank)
 			{
 				fn_pack.compose(fn_out+"_rank", node->rank, "tmp");
-				if (fn_scratch != "")
-					fn_pack = fn_scratch + "/" + fn_pack;
-
 				Mpack.writeBinary(fn_pack);
 				//std::cerr << "Rank "<< node->rank <<" has written: "<<fn_pack << " sum= "<<Mpack.sum()<< std::endl;
 			}
@@ -1192,17 +1231,11 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 				for (int other_slave = first_slave + nr_subsets; other_slave < node->size; other_slave+= nr_subsets )
 				{
 					fn_pack.compose(fn_out+"_rank", other_slave, "tmp");
-					if (fn_scratch != "")
-						fn_pack = fn_scratch + "/" + fn_pack;
-
 					Mpack.readBinaryAndSum(fn_pack);
 					//std::cerr << "Slave "<<node->rank<<" has read "<<fn_pack<< " sum= "<<Mpack.sum() << std::endl;
 				}
 				// After adding all Mpacks together: write the sum to disc
 				fn_pack.compose(fn_out+"_rank", node->rank, "tmp");
-				if (fn_scratch != "")
-					fn_pack = fn_scratch + "/" + fn_pack;
-
 				Mpack.writeBinary(fn_pack);
 				//std::cerr << "Slave "<<node->rank<<" is writing total SUM in "<<fn_pack << std::endl;
 			}
@@ -1227,9 +1260,6 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 
 				// Read the corresponding Mpack (which now contains the sum of all Mpacks)
 				fn_pack.compose(fn_out+"_rank", first_slave, "tmp");
-				if (fn_scratch != "")
-					fn_pack = fn_scratch + "/" + fn_pack;
-
 				Mpack.readBinary(fn_pack);
 				//std::cerr << "Rank "<< node->rank <<" has read: "<<fn_pack << " sum= "<<Mpack.sum()<< std::endl;
 			}
@@ -1245,9 +1275,6 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 			if (this_slave == node->rank)
 			{
 				fn_pack.compose(fn_out+"_rank", node->rank, "tmp");
-				if (fn_scratch != "")
-					fn_pack = fn_scratch + "/" + fn_pack;
-
 				remove((fn_pack).c_str());
 				//std::cerr << "Rank "<< node->rank <<" has deleted: "<<fn_pack << std::endl;
 			}
@@ -1420,8 +1447,6 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalvesViaFile()
 
 	MultidimArray<RFLOAT> Mpack;
 	FileName fn_pack = fn_out + ".tmp";
-        if (fn_scratch != "")
-            fn_pack = fn_scratch + "/" + fn_pack;
 
 	// Everyone packs up his wsum_model (simultaneously)
 	// The slaves from 3 and onwards also need this in order to have the correct Mpack size to be able to read in the summed Mpack

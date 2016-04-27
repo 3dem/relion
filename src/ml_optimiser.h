@@ -289,6 +289,12 @@ public:
 	// Or preread all images into RAM on the master node?
 	bool do_preread_images;
 
+	// Place on scratch disk to copy particle stacks temporarily
+	FileName fn_scratch;
+
+	// Amount of scratch space available (in Gb)
+	int max_scratch_Gb;
+
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
