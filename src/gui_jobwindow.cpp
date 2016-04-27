@@ -2152,6 +2152,21 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 
 	input_star.place(current_y, "Input particles to be sorted:", NODE_PART_DATA, "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	autopick_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	autopick_group->end();
+
+	is_autopick.place(current_y, "Are these from an Extract job?", false, "Set the particles are from an Extract job (as opposed to a 2D/3D Classification or 3D auto-refine job), then you can only perform sorting if you used coordinates from Auto-picking in the particle extraction. In that case, provide the 2D references from the auto-pick run below.", autopick_group);
+
+	autopick_group->begin();
+
+	autopick_refs.place(current_y, "Autopicking references:", NODE_2DREFS, "", "References(*.{star})", "This STAR file should contain the 2D references that were used for the auto-picking.");
+
+	autopick_group->end();
+	is_autopick.cb_menu_i();
+
 	tab1->end();
 
 	tab2->begin();
@@ -2184,6 +2199,8 @@ void SortJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star.writeValue(fh);
+	is_autopick.writeValue(fh);
+	autopick_refs.writeValue(fh);
 	do_ctf.writeValue(fh);
 	do_ignore_first_ctfpeak.writeValue(fh);
 
@@ -2202,6 +2219,8 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star.readValue(fh);
+		is_autopick.readValue(fh);
+		autopick_refs.readValue(fh);
 		do_ctf.readValue(fh);
 		do_ignore_first_ctfpeak.readValue(fh);
 
@@ -2216,6 +2235,8 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	input_star.deactivate(is_continue);
+	is_autopick.deactivate(is_continue);
+	autopick_refs.deactivate(is_continue);
 	do_ctf.deactivate(is_continue);
 	do_ignore_first_ctfpeak.deactivate(is_continue);
 
@@ -2248,7 +2269,7 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	}
 	else if (fn_in.contains("_data.star") && fn_in.contains("Refine3D/"))
 	{
-		if (fn_in.contains("_it0"))
+		if (fn_in.contains("_it0") || fn_in.contains("_it1"))
 			fn_ref = fn_in.without("_data.star") + "_half1_model.star";
 		else
 			fn_ref = fn_in.without("_data.star") + "_model.star";
@@ -2256,9 +2277,15 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	}
 	else if (fn_in.contains("Extract/"))
 	{
-		// TODO!
-		REPORT_ERROR("ERROR: for the moment you can only use inputs from Class2D, Class3D or Refine3D runs!");
-		node_type= NODE_2DREFS;
+		if (is_autopick.getValue())
+		{
+			fn_ref = autopick_refs.getValue();
+			node_type= NODE_2DREFS;
+		}
+		else
+		{
+			REPORT_ERROR("ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!");
+		}
 	}
 	command += " --ref " + fn_ref;
 	Node node2(fn_ref, node_type);
@@ -2469,7 +2496,7 @@ This may improve performance on systems where disk access, and particularly meta
 
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
 
 	// Add a little spacer
@@ -3024,8 +3051,7 @@ This may improve performance on systems where disk access, and particularly meta
 
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
-
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3664,8 +3690,7 @@ This may improve performance on systems where disk access, and particularly meta
 
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in double-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 30Gb, or 120 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM.");
-
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
 	// Add a little spacer
 	current_y += STEPY/2;

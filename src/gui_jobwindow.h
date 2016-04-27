@@ -449,10 +449,12 @@ public:
 
 	// I/O
 	InputNodeEntry input_star;
+	BooleanEntry is_autopick;
+	InputNodeEntry autopick_refs;
 	BooleanEntry do_ctf;
 	BooleanEntry do_ignore_first_ctfpeak;
 
-	Fl_Group *ctf_group;
+	Fl_Group *ctf_group, *autopick_group;
 
 public:
 
