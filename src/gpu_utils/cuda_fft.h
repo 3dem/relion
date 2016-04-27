@@ -50,7 +50,7 @@ public:
 		CFallocator(allocator)
 	{};
 
-	long int estimate(int batch)
+	long int estimate(int batch, float fudge = 1.0)
 	{
 		size_t needed;
 
@@ -77,7 +77,7 @@ public:
 		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
 		needed += biggness;
 #endif
-		return needed;
+		return (long int)((float)needed*fudge);
 	}
 
 	void setSize(size_t x, size_t y, int batch = 1)
@@ -125,17 +125,20 @@ public:
 		//
 		// If there isn't, find how many there ARE space for and loop through them in batches.
 
+		// batch fudge-factor to avoid running out of temp-space for transform plan
+		float fudge = 2.0;
+
 		if(memFrac>1)
 		{
 			psiIters = CEIL(memFrac);
 			psiSpace = CEIL((double) batch / (double)psiIters);
-			needed = estimate(psiSpace);
+			needed = estimate(psiSpace,fudge);
 
 			while(needed>avail && psiSpace>1)
 			{
 				psiIters++;
 				psiSpace = CEIL((double) batch / (double)psiIters);
-				needed = estimate(psiSpace);
+				needed = estimate(psiSpace,fudge);
 			}
 
 			batchSize.assign(psiIters,psiSpace); // specify psiIters of batches, each with psiSpace orientations
