@@ -35,6 +35,7 @@
 
 class MlOptimiserMpi: public MlOptimiser
 {
+	std::vector<int> cudaDeviceShares;
 
 public:
 	MpiNode *node;

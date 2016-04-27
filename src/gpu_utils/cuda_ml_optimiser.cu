@@ -125,10 +125,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		CUDA_CPU_TOC("nonZeroProb");
 
+		CUDA_CPU_TIC("setXmippOrigin");
 		// Get the image and recimg data
 		if (baseMLO->do_parallel_disc_io)
 		{
-			CUDA_CPU_TIC("setXmippOrigin");
 
 			// If all slaves had preread images into RAM: get those now
 			if (baseMLO->do_preread_images)
@@ -159,11 +159,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				rec_img.read(fn_recimg);
 				rec_img().setXmippOrigin();
 			}
-			CUDA_CPU_TOC("setXmippOrigin");
 		}
 		else
 		{
-			CUDA_CPU_TIC("setXmippOrigin");
 			// Unpack the image from the imagedata
 			if (baseMLO->mymodel.data_dim == 3)
 			{
@@ -209,8 +207,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					rec_img().setXmippOrigin();
 				}
 			}
-			CUDA_CPU_TOC("setXmippOrigin");
 		}
+		CUDA_CPU_TOC("setXmippOrigin");
 
 		CUDA_CPU_TIC("selfTranslate");
 
@@ -2519,41 +2517,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 }
 
-MlDeviceBundle::MlDeviceBundle(MlOptimiser *baseMLOptimiser, int dev_id) :
-		baseMLO(baseMLOptimiser),
-		generateProjectionPlanOnTheFly(false),
-		rank_shared_count(1)
-{
-	unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
-
-	/*======================================================
-					DEVICE MEM OBJ SETUP
-	======================================================*/
-
-	device_id = dev_id;
-
-	int devCount;
-	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-
-	if(dev_id >= devCount)
-	{
-		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		REPORT_ERROR("ERROR: Assigning a thread to a non-existent device (index likely too high)");
-	}
-	else
-		HANDLE_ERROR(cudaSetDevice(dev_id));
-
-	refIs3D = baseMLO->mymodel.ref_dim == 3;
-
-	cudaProjectors.resize(nr_classes);
-	cudaBackprojectors.resize(nr_classes);
-
-	int memAlignmentSize;
-	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
-	allocator = new CudaCustomAllocator(0, memAlignmentSize);
-
-};
-
 void MlDeviceBundle::setupFixedSizedObjects()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
@@ -2567,28 +2530,9 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 	// clear() called on std::vector appears to set size=0, even if we have an explicit
 	// destructor for each member, so we need to set the size to what is was before
-	cudaProjectors.clear();
-	cudaBackprojectors.clear();
 	cudaProjectors.resize(nr_classes);
 	cudaBackprojectors.resize(nr_classes);
 
-	coarseProjectionPlans.clear();
-
-	allocator->syncReadyEvents();
-	allocator->freeReadyAllocs();
-
-#ifdef DEBUG_CUDA
-	if (allocator->getNumberOfAllocs() != 0)
-	{
-		printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-		allocator->printState();
-		fflush(stdout);
-		raise(SIGSEGV);
-	}
-
-#endif
-
-	allocator->resize(0);
 	/*======================================================
 	              PROJECTOR AND BACKPROJECTOR
 	======================================================*/
@@ -2618,6 +2562,14 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 		cudaBackprojectors[iclass].initMdl();
 	}
+
+	/*======================================================
+	                    CUSTOM ALLOCATOR
+	======================================================*/
+
+	int memAlignmentSize;
+	cudaDeviceGetAttribute ( &memAlignmentSize, cudaDevAttrTextureAlignment, device_id );
+	allocator = new CudaCustomAllocator(0, memAlignmentSize);
 }
 
 void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
@@ -2632,7 +2584,7 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	allocator->resize(allocationSize);
 
 #ifdef DEBUG_CUDA
-	printf(" DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
+	printf("DEBUG: Total GPU allocation size set to %zu MB on device id %d.\n", allocationSize / (1000*1000), device_id);
 #endif
 
 	/*======================================================
@@ -2685,45 +2637,16 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	}
 };
 
-MlOptimiserCuda::MlOptimiserCuda(MlOptimiser *baseMLOptimiser, int dev_id, MlDeviceBundle* bundle) :
-		baseMLO(baseMLOptimiser), transformer1(0, bundle->allocator), transformer2(0, bundle->allocator)
+void MlOptimiserCuda::resetData()
 {
-	unsigned nr_classes = baseMLOptimiser->mymodel.nr_classes;
+	HANDLE_ERROR(cudaSetDevice(device_id));
 
-	/*======================================================
-					DEVICE MEM OBJ SETUP
-	======================================================*/
-
-	device_id = dev_id;
-	errorStatus = (cudaError_t)0; // init as cudaSuccess (==0)
-
-	int devCount;
-	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-
-	if(dev_id >= devCount)
-	{
-		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		REPORT_ERROR("ERROR: Assigning a thread to a non-existent device (index likely too high)");
-	}
-	else
-		HANDLE_ERROR(cudaSetDevice(dev_id));
-
-	devBundle = bundle;
-
-//	HANDLE_ERROR(cudaStreamCreate(&stream1));
-//	HANDLE_ERROR(cudaStreamCreate(&stream2));
+	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)
 		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
 
-
-	refIs3D = baseMLO->mymodel.ref_dim == 3;
-};
-
-void MlOptimiserCuda::resetData()
-{
-	HANDLE_ERROR(cudaSetDevice(device_id));
 	/*======================================================
 	                  TRANSLATIONS SETUP
 	======================================================*/
