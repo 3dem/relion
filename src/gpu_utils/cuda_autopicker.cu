@@ -329,7 +329,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			if (fn_tmp==fn_mic)
 			{
 				ctf.read(basePckr->MDmic, basePckr->MDmic);
-				Fctf.resize(downsize_Fmic_y, downsize_Fmic_x);
+				Fctf.resize(basePckr->workSize,basePckr->workSize/2+1);
 				ctf.getFftwImage(Fctf, basePckr->micrograph_size, basePckr->micrograph_size, basePckr->angpix, false, false, basePckr->intact_ctf_first_peak, true);
 				break;
 			}
@@ -505,13 +505,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		// From now on use downsized Fmic, as the cross-correlation with the references can be done at lower resolution
 		CUDA_CPU_TIC("windowFourierTransform_0");
 
-		d_Fmic.setSize(downsize_Fmic_x * downsize_Fmic_y);
+		d_Fmic.setSize((basePckr->workSize/2+1)*(basePckr->workSize));
 		d_Fmic.device_alloc();
 		windowFourierTransform2(
 				Ftmp,
 				d_Fmic,
 				basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1, //Input dimensions
-				downsize_Fmic_x, downsize_Fmic_y, 1  //Output dimensions
+				basePckr->workSize/2+1, basePckr->workSize, 1  //Output dimensions
 				);
 		CUDA_CPU_TOC("windowFourierTransform_0");
 
@@ -612,16 +612,16 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TOC("mccfInit");
 			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 									cudaProjectors[iref],
-									(int)downsize_Fmic_x,
-									(int)downsize_Fmic_y,
-									(int)downsize_Fmic_x-1);
+									(int)basePckr->workSize/2+1,
+									(int)basePckr->workSize,
+									(int)basePckr->workSize/2+1 -1 );
 
-			int FauxStride = downsize_Fmic_x*downsize_Fmic_y;
+			int FauxStride = (basePckr->workSize/2+1)*basePckr->workSize;
 
-			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(allocator);
-
-			d_FauxNpsi.setSize(Npsi*FauxStride);
-			d_FauxNpsi.device_alloc();
+//			CudaGlobalPtr<CUDACOMPLEX >  d_FauxNpsi(allocator);
+//
+//			d_FauxNpsi.setSize(Npsi*FauxStride);
+//			d_FauxNpsi.device_alloc();
 
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B4);
@@ -629,7 +629,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			CUDA_CPU_TIC("Projection");
 			dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),Npsi);
 			cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
-															  ~d_FauxNpsi,
+															  ~cudaTransformer1.fouriers,
 															  ~d_ctf,
 															  DEG2RAD(basePckr->psi_sampling),
 															  projKernel
@@ -651,9 +651,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #endif
 			// Sjors 20April2016: The calculation for sum_ref_under_circ_mask, etc below needs to be done on original micrograph_size!
 			CUDA_CPU_TIC("windowFourierTransform_FP");
-			windowFourierTransform2(d_FauxNpsi,
+			windowFourierTransform2(cudaTransformer1.fouriers,
 									micTransformer.fouriers,
-									downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
+									basePckr->workSize/2+1,        basePckr->workSize,        1, //Input dimensions
 									basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
 									);
 			CUDA_CPU_TOC("windowFourierTransform_FP");
@@ -716,7 +716,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			// Now multiply template and micrograph to calculate the cross-correlation
 			CUDA_CPU_TIC("convol");
 			dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),Npsi);
-			cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   d_FauxNpsi.d_ptr,
+			cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   cudaTransformer1.fouriers.d_ptr,
 														  	  	  d_Fmic.d_ptr,
 														  	  	  FauxStride);
 			LAUNCH_HANDLE_ERROR(cudaGetLastError());
@@ -732,17 +732,17 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 				HANDLE_ERROR(cudaDeviceSynchronize());
 
-				CUDA_CPU_TIC("windowFourierTransform_1");
-				windowFourierTransform2(
-						d_FauxNpsi,
-						cudaTransformer1.fouriers,
-						downsize_Fmic_x, downsize_Fmic_y, 1, //Input dimensions
-						basePckr->workSize/2+1, basePckr->workSize, 1,  //Output dimensions
-						cudaTransformer1.batchSize[psiIter],
-						cudaTransformer1.batchSize[0]*psiIter*FauxStride
-						);
-				CUDA_CPU_TOC("windowFourierTransform_1");
-				HANDLE_ERROR(cudaDeviceSynchronize());
+//				CUDA_CPU_TIC("windowFourierTransform_1");
+//				windowFourierTransform2(
+//						d_FauxNpsi,
+//						cudaTransformer1.fouriers,
+//						basePckr->workSize/2+1, basePckr->workSize, 1, //Input dimensions
+//						basePckr->workSize/2+1, basePckr->workSize, 1,  //Output dimensions
+//						cudaTransformer1.batchSize[psiIter],
+//						cudaTransformer1.batchSize[0]*psiIter*FauxStride
+//						);
+//				CUDA_CPU_TOC("windowFourierTransform_1");
+//				HANDLE_ERROR(cudaDeviceSynchronize());
 
 				CUDA_CPU_TIC("CudaInverseFourierTransform_1");
 				cudaTransformer1.backward();
