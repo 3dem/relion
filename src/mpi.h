@@ -70,6 +70,9 @@ public:
     // Prints the random subset for this rank
     int myRandomSubset() const;
 
+    // Returns the name of the host this rank is running on
+    std::string getHostName() const;
+
     /** Wait on a barrier for the other MPI nodes */
     void barrierWait();
 
