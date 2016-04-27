@@ -95,8 +95,10 @@ public:
 		xFSize = x/2 + 1;
 		yFSize = y;
 
+		float fudge = 2.0;
+
 		size_t needed, avail, total;
-		needed = estimate(batchSize[0]);
+		needed = estimate(batchSize[0],fudge);
 		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
 
 		double memFrac = (double)needed / (double)avail;
@@ -126,7 +128,6 @@ public:
 		// If there isn't, find how many there ARE space for and loop through them in batches.
 
 		// batch fudge-factor to avoid running out of temp-space for transform plan
-		float fudge = 2.0;
 
 		if(memFrac>1)
 		{
@@ -162,7 +163,7 @@ public:
 		}
 
 		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
-		needed = estimate(batchSize[0]);
+		needed = estimate(batchSize[0], fudge);
 
 //		std::cout << "after alloc: " << std::endl << std::endl << "needed = ";
 //		printf("%15li\n", needed);
