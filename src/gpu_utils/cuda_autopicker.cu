@@ -268,7 +268,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		CUDA_CPU_TOC("setSize_micTr");
 
 		CUDA_CPU_TIC("setSize_cudaTr");
-		cudaTransformer1.setSize(basePckr->workSize,basePckr->workSize, Npsi);
+		cudaTransformer1.setSize(basePckr->workSize,basePckr->workSize, Npsi, FFTW_BACKWARD);
 		CUDA_CPU_TOC("setSize_cudaTr");
 	}
 	HANDLE_ERROR(cudaDeviceSynchronize());
