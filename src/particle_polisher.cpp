@@ -49,6 +49,7 @@ void ParticlePolisher::read(int argc, char **argv)
 	fit_minres = textToFloat(parser.getOption("--autob_lowres", "Lowest resolution (in A) to include in fitting of the B-factor", "20."));
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 	// Sep24,2015 - Shaoda, Helical reconstruction
+	is_helix = parser.checkOption("--helix", "Polish helical segments?");
 	helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
 	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, positive values for right-handedness)", "0."));
 	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
@@ -264,10 +265,10 @@ void ParticlePolisher::initialise()
 	}
 
 	// Sep24,2015 - Shaoda, Helical reconstruction
-	if (helical_nr_asu > 1)
+	if ( (is_helix) && (helical_nr_asu > 1) )
 	{
 		if ( (fabs(helical_twist) > 360.) || (angpix < 0.001) || ((helical_rise / angpix) < 0.001))
-			REPORT_ERROR("ERROR: Invalid helical twist or rise!");
+			REPORT_ERROR("ParticlePolisher::initialise ERROR: Invalid helical twist or rise!");
 	}
 
 	fn_olddir = "";
@@ -311,6 +312,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	FileName fn_fit = fn_mics[imic].withoutExtension() + "_fit.star";
 	if (only_do_unfinished && exists(fn_fit))
 		return;
+
 
 
 	// Also write out a postscript file with the fits
@@ -1053,8 +1055,11 @@ void ParticlePolisher::writeStarFilePolishedParticles()
 	MDshiny.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
 	MDshiny.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
 	MDshiny.deactivateLabel(EMDL_ORIENT_ROT_PRIOR);
-	MDshiny.deactivateLabel(EMDL_ORIENT_TILT_PRIOR);
-	MDshiny.deactivateLabel(EMDL_ORIENT_PSI_PRIOR);
+	if (!is_helix)
+	{
+		MDshiny.deactivateLabel(EMDL_ORIENT_TILT_PRIOR);
+		MDshiny.deactivateLabel(EMDL_ORIENT_PSI_PRIOR);
+	}
 
 	// Write output metadatatable
 	MDshiny.write(fn_out + "shiny.star");

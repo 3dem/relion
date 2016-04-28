@@ -267,7 +267,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	max_scratch_Gb = textToInteger(parser.getOption("--max_scratch", "Space available for copying particle stacks (in Gb)", "80"));
+	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -446,7 +446,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	max_scratch_Gb = textToInteger(parser.getOption("--max_scratch", "Space available for copying particle stacks (in Gb)", "80"));
+	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -1433,7 +1433,10 @@ void MlOptimiser::initialiseWorkLoad()
 
     // Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
-    	mydata.copyParticlesToScratch(fn_scratch, 1, false, max_scratch_Gb);
+    {
+    	mydata.prepareScratchDirectory(fn_scratch);
+    	mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+    }
 
 }
 
@@ -1483,7 +1486,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			MDimg = mydata.getMetaDataImage(part_id);
 
 			// Get the image filename
-			MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+			if (!mydata.getImageNameOnScratch(ori_part_id, fn_img, false))
+				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
@@ -1721,6 +1726,10 @@ void MlOptimiser::iterateWrapUp()
     delete global_barrier;
 	delete global_ThreadManager;
     delete exp_ipart_ThreadTaskDistributor;
+
+    // Delete volatile space on scratch
+    mydata.deleteDataOnScratch();
+
 }
 
 void MlOptimiser::iterate()
@@ -2407,9 +2416,12 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 
 				// Read from disc
 				// Get the filename
-				std::istringstream split(exp_fn_img);
-				for (int i = 0; i <= istop; i++)
-					getline(split, fn_img);
+				if (!mydata.getImageNameOnScratch(ori_part_id, fn_img))
+				{
+					std::istringstream split(exp_fn_img);
+					for (int i = 0; i <= istop; i++)
+						getline(split, fn_img);
+				}
 
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
@@ -3664,9 +3676,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				{
 					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
 					FileName fn_img;
-					std::istringstream split(exp_fn_img);
-					for (int i = 0; i <= istop; i++)
-						getline(split, fn_img);
+					if (!mydata.getImageNameOnScratch(part_id, fn_img))
+					{
+						std::istringstream split(exp_fn_img);
+						for (int i = 0; i <= istop; i++)
+							getline(split, fn_img);
+					}
 
 					img.read(fn_img);
 					img().setXmippOrigin();
@@ -4015,10 +4030,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				{
 					// Read CTF-image from disc
 					FileName fn_ctf;
-					std::istringstream split(exp_fn_ctf);
-					// Get the right line in the exp_fn_img string
-					for (int i = 0; i <= istop; i++)
-						getline(split, fn_ctf);
+					if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+					{
+						std::istringstream split(exp_fn_ctf);
+						// Get the right line in the exp_fn_img string
+						for (int i = 0; i <= istop; i++)
+							getline(split, fn_ctf);
+					}
 					Ictf.read(fn_ctf);
 				}
 				else
@@ -6606,10 +6624,13 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						Image<RFLOAT> Ictf;
 						// Read CTF-image from disc
 						FileName fn_ctf;
-						std::istringstream split(exp_fn_ctf);
-						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= my_metadata_entry; i++)
-							getline(split, fn_ctf);
+						if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+						{
+							std::istringstream split(exp_fn_ctf);
+							// Get the right line in the exp_fn_img string
+							for (int i = 0; i <= my_metadata_entry; i++)
+								getline(split, fn_ctf);
+						}
 						Ictf.read(fn_ctf);
 
 						// Set the CTF-image in Fctf
@@ -7365,12 +7386,16 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 #endif
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
-			mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
+			if (!mydata.getImageNameOnScratch(part_id, fn_img))
+				mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
 			if (mymodel.data_dim == 3 && do_ctf_correction)
 			{
 				// Also read the CTF image from disc
-				if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
-					REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
+				if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+				{
+					if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
+						REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
+				}
 			}
 			if (has_converged && do_use_reconstruct_images)
 			{

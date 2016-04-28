@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/exp_model.h"
+#include <sys/statvfs.h>
 
 void ExpOriginalParticle::addParticle(long int _particle_id, int _random_subset, int _order)
 {
@@ -471,44 +472,122 @@ void Experiment::initialiseBodies(int _nr_bodies)
 
 }
 
-bool Experiment::checkScratchLock(FileName _fn_scratch, FileName fn_uniq, bool do_remove_lock)
+bool Experiment::getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image)
 {
-	// Make sure fn_scratch ends with a slash
-	if (_fn_scratch[_fn_scratch.length()-1] != '/')
-		_fn_scratch += '/';
-	FileName fn_lock = _fn_scratch + fn_uniq;
-	if (do_remove_lock)
+	if (fn_scratch != "" && part_id < nr_parts_on_scratch)
 	{
-		// This will be used by the master: it will delete any old lock with the same name
-		// Although the lock now doesn't exist, the first slave will generate it.
-		// The function needs to return true, so that later on in the copying of particles,
-		// the master only changes the names in the metadatatable and doesn't actually copy the data
-		if (exists(fn_lock))
-			std::remove(fn_lock.c_str());
-		return true;
-	}
-	else if (exists(fn_lock))
-	{
+		if (is_3D)
+		{
+			if (is_ctf_image)
+				fn_img = fn_scratch + "particle_ctf" + integerToString(part_id+1, 5)+".mrc";
+			else
+				fn_img = fn_scratch + "particle" + integerToString(part_id+1, 5)+".mrc";
+		}
+		else
+		{
+
+			if (ori_particles[part_id].particles_id.size() > 1)
+				REPORT_ERROR("BUG: getImageNameOnScratch cannot work with movies!");
+			fn_img.compose(part_id+1, fn_scratch + "particles.mrcs");
+		}
 		return true;
 	}
 	else
 	{
-		touch(fn_lock);
-		std::string command = "chmod 0777 " + fn_lock;
-		if (system(command.c_str()))
-			REPORT_ERROR("ERROR: cannot execute: " + command);
 		return false;
 	}
+
 }
 
-void Experiment::copyParticlesToScratch(FileName _fn_scratch, int verb, bool only_change_names, int max_scratch_Gb)
+FileName Experiment::initialiseScratchLock(FileName _fn_scratch, FileName _fn_out)
 {
-
-	// Make sure fn_scratch ends with a slash
+    // Make sure fn_scratch ends with a slash
 	if (_fn_scratch[_fn_scratch.length()-1] != '/')
 		_fn_scratch += '/';
-
 	fn_scratch = _fn_scratch + "relion_volatile/";
+
+	// Get a unique lockname for this run
+	int uniqnr = rand() % 100000;
+	FileName fn_uniq = _fn_out;
+    fn_uniq.replaceAllSubstrings("/", "_");
+    fn_uniq += "_lock" + integerToString(uniqnr);
+	FileName fn_lock = fn_scratch + fn_uniq;
+
+	if (exists(fn_lock))
+		remove(fn_lock.c_str());
+
+	return fn_lock;
+}
+
+bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
+{
+
+    // Make sure fn_scratch ends with a slash
+	if (_fn_scratch[_fn_scratch.length()-1] != '/')
+		_fn_scratch += '/';
+	fn_scratch = _fn_scratch + "relion_volatile/";
+
+	if (fn_lock != "" && exists(fn_lock))
+	{
+		// Still measure how much free space there is
+		struct statvfs vfs;
+		statvfs(_fn_scratch.c_str(), &vfs);
+		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+	    char nodename[64] = "undefined";
+	    gethostname(nodename,sizeof(nodename));
+	    std::string myhost(nodename);
+	    free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+
+	    return false;
+	}
+	else
+	{
+		// Wipe the directory clean and make a new one
+		std::string command;
+		deleteDataOnScratch();
+
+		// Make the scratch directory
+		command = "mkdir -m 0777 -p " + fn_scratch;
+		if (system(command.c_str()))
+			REPORT_ERROR("ERROR: cannot execute: " + command);
+
+		// Touch the lock file
+		touch(fn_lock);
+		command = "chmod 0777 " + fn_lock;
+		if (system(command.c_str()))
+			REPORT_ERROR("ERROR: cannot execute: " + command);
+
+		// Measure how much free space there is
+		struct statvfs vfs;
+		statvfs(_fn_scratch.c_str(), &vfs);
+		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+	    char nodename[64] = "undefined";
+	    gethostname(nodename,sizeof(nodename));
+	    std::string myhost(nodename);
+	    free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		std::cout << " + On host " << myhost << ": free scratch space = " << free_space_Gb << " Gb." << std::endl;
+
+		return true;
+	}
+
+
+}
+void Experiment::deleteDataOnScratch()
+{
+	// Wipe the scratch directory
+	if (fn_scratch != "" && exists(fn_scratch))
+	{
+		std::string command = " rm -rf " + fn_scratch;
+		if (system(command.c_str()))
+			REPORT_ERROR("ERROR: cannot execute: " + command);
+	}
+
+}
+
+void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_free_scratch_Gb)
+{
+
+	// This function relies on prepareScratchDirectory() being called before!
 
 	long int nr_part = MDimg.numberOfObjects();
 	int barstep;
@@ -519,37 +598,20 @@ void Experiment::copyParticlesToScratch(FileName _fn_scratch, int verb, bool onl
 		barstep = XMIPP_MAX(1, nr_part / 60);
 	}
 
-	// Start by wiping the scratch directory if it exists and make a new one
-	if (!only_change_names)
-	{
-		std::string command;
-		if (exists(fn_scratch))
-		{
-			command = " rm -rf " + fn_scratch;
-			if (system(command.c_str()))
-				REPORT_ERROR("ERROR: cannot execute: " + command);
-		}
-		// Make the directory
-		command = "mkdir -m 0777 -p " + fn_scratch;
-		if (system(command.c_str()))
-			REPORT_ERROR("ERROR: cannot execute: " + command);
-	}
+	long int one_part_space, used_space = 0.;
+	long int max_space = (free_space_Gb - keep_free_scratch_Gb)*1000*1000*1000; // in bytes
 
-
-	size_t one_part_space, used_space = 0., max_space = max_scratch_Gb*1000*1000*1000;
-	bool is_3D;
 	// Loop over all particles and copy them one-by-one
 	FileName fn_open_stack = "";
 	fImageHandler hFile;
 	nr_parts_on_scratch = 0;
-	original_fn_parts_on_scratch.clear();
+	bool also_do_ctf_image = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
 		long int imgno;
 		FileName fn_img, fn_stack, fn_new;
 		Image<RFLOAT> img;
 		MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-		fn_img.decompose(imgno, fn_stack);
 
 		// Get the size of 1 particle
 		if (nr_parts_on_scratch == 0)
@@ -557,61 +619,72 @@ void Experiment::copyParticlesToScratch(FileName _fn_scratch, int verb, bool onl
 			Image<RFLOAT> tmp;
 			tmp.read(fn_img, false); // false means: only read the header!
 			one_part_space = ZYXSIZE(tmp())*sizeof(RFLOAT);
-			is_3D = (ZSIZE(tmp()) > 1);
+			bool myis3D = (ZSIZE(tmp()) > 1);
+			if (myis3D != is_3D)
+				REPORT_ERROR("BUG: inconsistent is_3D values!");
+			// add MRC header size for subtomograms, which are stored as 1 MRC file each
+			if (is_3D)
+			{
+				one_part_space += 1024;
+				also_do_ctf_image = MDimg.containsLabel(EMDL_CTF_IMAGE);
+				if (also_do_ctf_image)
+					one_part_space *= 2;
+			}
 		}
 
 		// Now we have the particle in memory
 		// See how much space it occupies
 		used_space += one_part_space;
-
 		// If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
 		if (used_space > max_space)
 		{
-			if (verb>0)
-			{
-				progress_bar(nr_part);
-				std::cerr << " Warning: not enough space on scratch disk for all particle stacks!" << std::endl;
-				std::cout << " Warning: stop copying to scratch because reached the limit of " << max_scratch_Gb << " Gb."<< std::endl;
-				std::cout << " Have now copied " << nr_parts_on_scratch << " particles, will read remaining " << nr_part - nr_parts_on_scratch << " from their original location." << std::endl;
-			}
+			char nodename[64] = "undefined";
+			gethostname(nodename,sizeof(nodename));
+			std::string myhost(nodename);
+			std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
 			break;
 		}
 
-		if (is_3D)
-			fn_new = fn_scratch + "particle" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
-		else
-			fn_new.compose(nr_parts_on_scratch+1, fn_scratch + "particles.mrcs");
 
 		// Read in the particle image, and write out on scratch
-		if (!only_change_names)
+		if (do_copy)
 		{
-			// Check if this is a new stack
-			if (fn_stack != fn_open_stack)
-			{
-				if (fn_open_stack != "")
-					hFile.closeFile();
-				hFile.openFile(fn_stack, WRITE_READONLY);
-				fn_open_stack = fn_stack;
-			}
-			img.readFromOpenFile(fn_img, hFile, -1, false);
-
-			// For subtomograms, write individual .mrc files, otherwise write one large stack
 			if (is_3D)
 			{
+				// For subtomograms, write individual .mrc files,possibly also CTF images
+				img.read(fn_img);
+				fn_new = fn_scratch + "particle" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
 				img.write(fn_new);
+
+				if (also_do_ctf_image)
+				{
+					FileName fn_ctf;
+					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
+					img.read(fn_ctf);
+					fn_new = fn_scratch + "particle_ctf" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
+					img.write(fn_new);
+				}
 			}
 			else
 			{
+				// Only open/close new stacks, so check if this is a new stack
+				fn_img.decompose(imgno, fn_stack);
+				if (fn_stack != fn_open_stack)
+				{
+					if (fn_open_stack != "")
+						hFile.closeFile();
+					hFile.openFile(fn_stack, WRITE_READONLY);
+					fn_open_stack = fn_stack;
+				}
+				img.readFromOpenFile(fn_img, hFile, -1, false);
+
+				fn_new.compose(nr_parts_on_scratch+1, fn_scratch + "particles.mrcs");
 				if (nr_parts_on_scratch == 0)
 					img.write(fn_new, -1, false, WRITE_OVERWRITE);
 				else
 					img.write(fn_new, -1, true, WRITE_APPEND);
 			}
 		}
-
-		// Store the original filename, and set the new one
-		original_fn_parts_on_scratch.push_back(fn_img);
-		MDimg.setValue(EMDL_IMAGE_NAME, fn_new);
 
 		// Update the counter and progress bar
 		nr_parts_on_scratch++;
@@ -621,10 +694,10 @@ void Experiment::copyParticlesToScratch(FileName _fn_scratch, int verb, bool onl
 
 	}
 
-	if (verb > 0 && nr_parts_on_scratch < nr_part)
+	if (verb > 0)
 		progress_bar(nr_part);
 
-	if (!only_change_names)
+	if (do_copy)
 	{
 		std::string command = " chmod 777 " + fn_scratch + "particle*";
 		if (system(command.c_str()))
@@ -1051,6 +1124,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 	if (fn_img != "")
 	{
 		img.read(fn_img, false); //false means read only header, skip real data
+		is_3D = (ZSIZE(img()) > 1);
 		int image_size = XSIZE(img());
 		if (image_size != YSIZE(img()))
 			REPORT_ERROR("Experiment::read: xsize != ysize: only squared images allowed");
@@ -1099,54 +1173,8 @@ void Experiment::write(FileName fn_root)
     // The vector is needed because not all fn_img may be on fn_scratch (for example when it is full!)
     std::vector<FileName> fn_imgs;
 
-	// Remove scratch directory from the filenames
-    if (fn_scratch != "")
-    {
-    	long int ipart = 0;
-    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
-		{
-    		if (ipart < nr_parts_on_scratch)
-    		{
-    			FileName fn_img;
-				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-				MDimg.setValue(EMDL_IMAGE_NAME, original_fn_parts_on_scratch[ipart]);
-				// Temporarily store the scratch name i this vector
-				original_fn_parts_on_scratch[ipart] = fn_img;
-    		}
-    		else
-    		{
-    			break;
-    		}
-
-    		ipart++;
-		}
-    }
-
     // Always write MDimg
     MDimg.write(fh);
-
-	// Reset all the the particle names as they were
-    if (fn_scratch != "")
-    {
-    	long int ipart = 0;
-    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
-		{
-    		if (ipart < nr_parts_on_scratch)
-    		{
-    			FileName fn_img;
-				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-				MDimg.setValue(EMDL_IMAGE_NAME, original_fn_parts_on_scratch[ipart]);
-				// Put the original name back in this vector
-				original_fn_parts_on_scratch[ipart] = fn_img;
-    		}
-    		else
-    		{
-    			break;
-    		}
-
-    		ipart++;
-		}
-    }
 
     if (nr_bodies > 1)
     {
