@@ -50,7 +50,7 @@ public:
 		CFallocator(allocator)
 	{};
 
-	long int estimate(int batch)
+	long int estimate(int batch, float fudge = 1.0)
 	{
 		size_t needed;
 
@@ -77,7 +77,7 @@ public:
 		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
 		needed += biggness;
 #endif
-		return needed;
+		return (long int)((float)needed*fudge);
 	}
 
 	void setSize(size_t x, size_t y, int batch = 1)
@@ -95,13 +95,12 @@ public:
 		xFSize = x/2 + 1;
 		yFSize = y;
 
-		size_t baseNeed = (xSize*ySize*sizeof(XFLOAT) + xFSize*yFSize*sizeof(CUDACOMPLEX));
-		size_t needed = baseNeed*batchSize[0] + estimate(batchSize[0]);
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
-		size_t avail  = CFallocator->getLargestContinuousFreeSpace();
-#else
-		size_t avail  = needed;
-#endif
+		float fudge = 2.0;
+
+		size_t needed, avail, total;
+		needed = estimate(batchSize[0],fudge);
+		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
+
 		double memFrac = (double)needed / (double)avail;
 
 //		std::cout << std::endl << "needed = ";
@@ -111,18 +110,36 @@ public:
 //		std::cout << "memFrac  = ";
 //		printf("%15f\n", memFrac);
 
-		// Check if there is enough memory. If there isn't, find how many there ARE space for and loop through them in batches.
+
+		// set the size of the real-array to hold the RESULT of transforms ALL batches.
+		reals.setSize(x*y*batch);
+		reals.device_alloc();
+		reals.host_alloc();
+
+		// set the size of the fouriers-array to hold the RESULT of transforms ALL batches.
+		fouriers.setSize(y*(x/2+1)*batch);
+		fouriers.device_alloc();
+		fouriers.host_alloc();
+
+		// Check if there is enough memory
+		//
+		//    --- TO HOLD TEMPORARY DATA DURING TRANSFORMS ---
+		//
+		// If there isn't, find how many there ARE space for and loop through them in batches.
+
+		// batch fudge-factor to avoid running out of temp-space for transform plan
+
 		if(memFrac>1)
 		{
 			psiIters = CEIL(memFrac);
 			psiSpace = CEIL((double) batch / (double)psiIters);
-			needed = baseNeed*psiSpace + estimate(psiSpace);
+			needed = estimate(psiSpace,fudge);
 
 			while(needed>avail && psiSpace>1)
 			{
 				psiIters++;
 				psiSpace = CEIL((double) batch / (double)psiIters);
-				needed = baseNeed*psiSpace + estimate(psiSpace);
+				needed = estimate(psiSpace,fudge);
 			}
 
 			batchSize.assign(psiIters,psiSpace); // specify psiIters of batches, each with psiSpace orientations
@@ -131,8 +148,8 @@ public:
 			if(needed>avail)
 				REPORT_ERROR("Not enough memory for even a single orientation.");
 
-//			std::cerr << std::endl << "NOTE: Having to use " << psiIters << " batches of orientations ";
-//			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
+			std::cerr << std::endl << "NOTE: Having to use " << psiIters << " batches of orientations ";
+			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
 //			std::cerr << "( this could affect performance, consider using " << std::endl;
 //			std::cerr << "\t higher --ang" << std::endl;
 //			std::cerr << "\t harder --shrink" << std::endl;
@@ -145,24 +162,14 @@ public:
 			psiSpace = batch;
 		}
 
-		reals.setSize(x*y*batchSize[0]);
-		reals.device_alloc();
-		reals.host_alloc();
-
-		fouriers.setSize(y*(x/2+1)*batchSize[0]);
-		fouriers.device_alloc();
-		fouriers.host_alloc();
-
-#ifndef CUDA_NO_CUSTOM_ALLOCATION
-		avail  = CFallocator->getLargestContinuousFreeSpace();
-		needed = estimate(batchSize[0]);
+		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
+		needed = estimate(batchSize[0], fudge);
 
 //		std::cout << "after alloc: " << std::endl << std::endl << "needed = ";
 //		printf("%15li\n", needed);
 //		std::cout << "avail  = ";
 //		printf("%15li\n", avail);
 
-#endif
 	    int idist = y*x;
 	    int odist = y*(x/2+1);
 
@@ -208,10 +215,49 @@ public:
 	}
 
 	void forward()
-	{ HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) ); }
+	{
+		if(psiIters>1)
+		{
+			long int Fstride =xFSize*yFSize;
+			long int Rstride =xSize*ySize;
+			long int Fpos = 0;
+			long int Rpos = 0;
+			for (int psiIter = 0; psiIter < psiIters; psiIter++) // psi-batches for possible memory-limits
+			{
+				HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, &reals(Rpos), &fouriers(Fpos)) );
+				Fpos += Fstride*batchSize[psiIter];
+				Rpos += Rstride*batchSize[psiIter];
+			}
+		}
+		else
+		{
+			HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) );
+		}
+	}
 
 	void backward()
-	{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) ); }
+	{
+		if(psiIters>1)
+		{
+			long int Fstride =xFSize*yFSize;
+			long int Rstride =xSize*ySize;
+			long int Fpos = 0;
+			long int Rpos = 0;
+			for (int psiIter = 0; psiIter < psiIters; psiIter++) // psi-batches for possible memory-limits
+			{
+				HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, &fouriers(Fpos), &reals(Rpos)) );
+				Fpos += Fstride*batchSize[psiIter];
+				Rpos += Rstride*batchSize[psiIter];
+			}
+		}
+		else
+		{
+			HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) );
+		}
+	}
+
+	void backward(CudaGlobalPtr<cufftComplex> &src)
+		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~src, ~reals) ); }
 
 	void backward(CudaGlobalPtr<cufftReal> &dst)
 		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~dst) ); }

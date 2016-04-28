@@ -2,11 +2,13 @@
 #include <signal.h>
 
 
-void CudaProjector::setMdlDim(
+bool CudaProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
 		int maxr, int paddingFactor)
 {
+	if(zdim == 1) zdim = 0;
+
 	if (xdim == mdlX &&
 		ydim == mdlY &&
 		zdim == mdlZ &&
@@ -14,17 +16,17 @@ void CudaProjector::setMdlDim(
 		initz == mdlInitZ &&
 		maxr == mdlMaxR &&
 		paddingFactor == padding_factor)
-		return;
+		return false;
 
 	clear();
 
 	mdlX = xdim;
 	mdlY = ydim;
-	if(zdim==1)
-		mdlZ=0;
+	mdlZ = zdim;
+	if(zdim == 0)
+		mdlXYZ = xdim*ydim;
 	else
-		mdlZ = zdim;
-	mdlXYZ = xdim*ydim*zdim;
+		mdlXYZ = xdim*ydim*zdim;
 	mdlInitY = inity;
 	mdlInitZ = initz;
 	mdlMaxR = maxr;
@@ -53,9 +55,7 @@ void CudaProjector::setMdlDim(
 		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
 
 		// -- Allocate and copy data using very celver CUDA memcpy-functions
-		HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMalloc3DArray(texArrayComplex, &desc, volumeSize));
-		HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.res.array.array = *texArrayComplex;
@@ -63,9 +63,7 @@ void CudaProjector::setMdlDim(
 	}
 	else // 2D model
 	{
-		HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 		HANDLE_ERROR(cudaMallocPitch(&texArrayComplex2D, &pitch2D, sizeof(CUDACOMPLEX)*mdlX,mdlY));
-		HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.resType = cudaResourceTypePitch2D;
@@ -163,6 +161,7 @@ void CudaProjector::setMdlDim(
 	HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
 
 #endif
+	return true;
 }
 
 #if(!COMPLEXTEXTURE)

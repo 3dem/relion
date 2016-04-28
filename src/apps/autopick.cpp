@@ -39,6 +39,11 @@ int main(int argc, char *argv[])
 		}
 		else
 			prm.run();
+
+#ifdef TIMING
+		std::cout << "timings:" << std::endl;
+		prm.timer.printTimes(false);
+#endif
     }
 
     catch (RelionError XE)
