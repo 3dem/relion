@@ -229,7 +229,7 @@ void Timer::printTimes(bool doClear)
 		if (counts[i] > 0)
 		{
 			std::cout.width(35);
-			std::cout << std::left << tags[i] << ": " << times[i]/1000000<< " sec (" << times[i] / counts[i] << " microsec/operation)"<<std::endl;
+			std::cout << std::left << tags[i] << ": " << (times[i]/1000)/1000.0 << " sec (" << times[i] / counts[i] << " microsec/operation)"<<std::endl;
 		}
 	}
 	if (doClear)

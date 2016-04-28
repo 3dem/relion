@@ -105,7 +105,9 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT sum_ref_under_circ_mask,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
-										int Npsi);
+										int NpsiThisBatch,
+										int startPsi,
+										int totalPsis);
 
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
@@ -133,6 +135,14 @@ __global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
 __global__ void cuda_kernel_batch_convol_A(	 CUDACOMPLEX *d_A,
 									 	 	 CUDACOMPLEX *d_B,
 									 	 	 int image_size);
+
+/*
+* Multiplies many complex arrays A (not in-place) by a single B, pixel-by-pixel, after conjugating A
+*/
+__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
+								CUDACOMPLEX *d_B,
+								CUDACOMPLEX *d_C,
+								int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B

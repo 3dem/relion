@@ -19,6 +19,29 @@
  ***************************************************************************/
 #include "src/preprocessing.h"
 
+//#define TIMING
+#ifdef TIMING
+    Timer timer;
+	int TIMING_TOP = timer.setNew("extractParticlesFromFieldOfView");
+	int TIMING_READ_COORD = timer.setNew("readInCoordinateFile");
+	int TIMING_BIAS_CORRECT = timer.setNew("biasCorrect");
+	int TIMING_EXTCT_FROM_FRAME = timer.setNew("extractParticlesFromOneFrame");
+	int TIMING_READ_IMG = timer.setNew("-readImg");
+	int TIMING_WINDOW = timer.setNew("-window");
+	int TIMING_BOUNDARY = timer.setNew("-checkBoundary");
+	int TIMING_PRE_IMG_OPS = timer.setNew("-performPerImageOperations");
+	int TIMING_NORMALIZE = timer.setNew("--normalize");
+	int TIMING_INV_CONT = timer.setNew("--invert_contrast");
+	int TIMING_COMP_STATS = timer.setNew("--computeStats");
+	int TIMING_PER_IMG_OP_WRITE = timer.setNew("--write");
+	int TIMING_REST = timer.setNew("-rest");
+#define TIMING_TIC(id) timer.tic(id)
+#define TIMING_TOC(id) timer.toc(id)
+#else
+#define TIMING_TIC(id)
+#define TIMING_TOC(id)
+#endif
+
 void Preprocessing::read(int argc, char **argv, int rank)
 {
 
@@ -267,7 +290,6 @@ void Preprocessing::run()
 		}
 
 		runExtractParticles();
-
 	}
 	else if (fn_operate_in != "")
 	{
@@ -276,6 +298,10 @@ void Preprocessing::run()
 
 	if (verb > 0)
 		std::cout << " Done preprocessing!" <<std::endl;
+
+#ifdef TIMING
+    	timer.printTimes(false);
+#endif
 }
 
 
@@ -412,7 +438,9 @@ void Preprocessing::runExtractParticles()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
+		TIMING_TIC(TIMING_TOP);
 		extractParticlesFromFieldOfView(fn_mic, imic);
+		TIMING_TOC(TIMING_TOP);
 
 		imic++;
 	}
@@ -582,6 +610,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
     	return;
     }
 
+	TIMING_TIC(TIMING_READ_COORD);
 	// Read in the coordinates file
 	MetaDataTable MDin, MDout;
 	if (fn_data != "")
@@ -599,10 +628,12 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		else
 			readCoordinates(fn_coord, MDin);
 	}
+	TIMING_TOC(TIMING_READ_COORD);
 
 	if (MDin.numberOfObjects() > 0)
 	{
 
+		TIMING_TIC(TIMING_BIAS_CORRECT);
 		// Correct for bias in the picked coordinates
 		if (ABS(extract_bias_x) > 0 || ABS(extract_bias_y) > 0)
 		{
@@ -617,6 +648,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 				MDin.setValue(EMDL_IMAGE_COORD_Y, ycoor);
 			}
 		}
+		TIMING_TOC(TIMING_BIAS_CORRECT);
 
 		// Warn for small groups
 		int npos = MDin.numberOfObjects();
@@ -661,6 +693,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		// The total number of images to be extracted
 		long int my_total_nr_images = npos * n_frames;
 
+		TIMING_TIC(TIMING_EXTCT_FROM_FRAME);
 		for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
 		{
 			extractParticlesFromOneFrame(MDin, fn_mic, imic, iframe, n_frames, fn_output_img_root, fn_oristack,
@@ -671,6 +704,8 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			my_current_nr_images += npos;
 
 		}
+		TIMING_TOC(TIMING_EXTCT_FROM_FRAME);
+
 		MDout.setName("images");
 		MDout.write(fn_star);
 	}
@@ -689,6 +724,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 {
 
 	Image<RFLOAT> Ipart, Imic, Itmp;
+
+	TIMING_TIC(TIMING_READ_IMG);
 
 	FileName fn_frame;
 	// If movies, then average over avg_n_frames
@@ -718,6 +755,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		fn_frame = fn_mic;
 		Imic.read(fn_frame);
 	}
+	TIMING_TOC(TIMING_READ_IMG);
 
 	CTF ctf;
 	if (star_has_ctf || do_phase_flip || do_premultiply_ctf)
@@ -782,11 +820,13 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			zF = zpos + LAST_XMIPP_INDEX(extract_size);
 		}
 
+		TIMING_TIC(TIMING_WINDOW);
 		// extract one particle in Ipart
 		if (dimensionality == 3)
 			Imic().window(Ipart(), z0, y0, x0, zF, yF, xF);
 		else
 			Imic().window(Ipart(), y0, x0, yF, xF);
+		TIMING_TOC(TIMING_WINDOW);
 
 		// Discard particles that are completely outside the micrograph and print a warning
 		if (yF < 0 || y0 >= YSIZE(Imic()) || xF < 0 || x0 >= XSIZE(Imic()) ||
@@ -804,6 +844,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		}
 		else
 		{
+
+			TIMING_TIC(TIMING_BOUNDARY);
 			// Check boundaries: fill pixels outside the boundary with the nearest ones inside
 			// This will create lines at the edges, rather than zeros
 			Ipart().setXmippOrigin();
@@ -859,6 +901,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				}
 				Ipart = Iproj;
 			}
+			TIMING_TOC(TIMING_BOUNDARY);
 
 			// performPerImageOperations will also append the particle to the output stack in fn_stack
 			// Jun24,2015 - Shaoda, extract helical segments
@@ -869,10 +912,15 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				MD.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
 				MD.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
 			}
+
+			TIMING_TIC(TIMING_PRE_IMG_OPS);
 			performPerImageOperations(Ipart, fn_output_img_root, n_frames, my_current_nr_images + ipos, my_total_nr_images,
 					tilt_deg, psi_deg,
 					all_avg, all_stddev, all_minval, all_maxval);
+			TIMING_TOC(TIMING_PRE_IMG_OPS);
 
+
+			TIMING_TIC(TIMING_REST);
 			// Also store all the particles information in the STAR file
 			FileName fn_img;
 			if (Ipart().getDim() == 3)
@@ -922,6 +970,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 					MD.setValue(EMDL_CTF_FOM, fom);
 				}
 			}
+			TIMING_TOC(TIMING_REST);
 
 		}
 		ipos++;
@@ -1030,6 +1079,7 @@ void Preprocessing::performPerImageOperations(
 
 	if (do_rewindow) rewindow(Ipart, window);
 
+	TIMING_TIC(TIMING_NORMALIZE);
 	// Jun24,2015 - Shaoda, helical segments
 	if (do_normalise)
 	{
@@ -1039,8 +1089,11 @@ void Preprocessing::performPerImageOperations(
 		normalise(Ipart, bg_radius, white_dust_stddev, black_dust_stddev, do_ramp,
 				do_extract_helix, bg_helical_radius, tilt_deg, psi_deg);
 	}
+	TIMING_TOC(TIMING_NORMALIZE);
 
+	TIMING_TIC(TIMING_INV_CONT);
 	if (do_invert_contrast) invert_contrast(Ipart);
+	TIMING_TOC(TIMING_INV_CONT);
 
 	// For movies: multiple the image intensities by sqrt(nframes) so the stddev in the average of the normalised frames is again 1
 	if (nframes > 1)
@@ -1048,7 +1101,9 @@ void Preprocessing::performPerImageOperations(
 
 	// Calculate mean, stddev, min and max
 	RFLOAT avg, stddev, minval, maxval;
+	TIMING_TIC(TIMING_COMP_STATS);
 	Ipart().computeStats(avg, stddev, minval, maxval);
+	TIMING_TOC(TIMING_COMP_STATS);
 
 	if (Ipart().getDim() == 3)
 	{
@@ -1057,10 +1112,12 @@ void Preprocessing::performPerImageOperations(
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
 
+		TIMING_TIC(TIMING_PER_IMG_OP_WRITE);
 		// Write one mrc file for every subtomogram
 		FileName fn_img;
 		fn_img.compose(fn_output_img_root, image_nr + 1, "mrc");
 		Ipart.write(fn_img);
+		TIMING_TOC(TIMING_PER_IMG_OP_WRITE);
 
 	}
 	else
@@ -1082,12 +1139,14 @@ void Preprocessing::performPerImageOperations(
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, all_stddev);
 		}
 
+		TIMING_TIC(TIMING_PER_IMG_OP_WRITE);
 		// Write this particle to the stack on disc
 		// First particle: write stack in overwrite mode, from then on just append to it
 		if (image_nr == 0)
 			Ipart.write(fn_output_img_root+".mrcs", -1, (nr_of_images > 1), WRITE_OVERWRITE);
 		else
 			Ipart.write(fn_output_img_root+".mrcs", -1, false, WRITE_APPEND);
+		TIMING_TOC(TIMING_PER_IMG_OP_WRITE);
 	}
 
 }

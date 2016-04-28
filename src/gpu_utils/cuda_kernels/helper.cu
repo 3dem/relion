@@ -445,7 +445,9 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT sum_ref_under_circ_mask,
 										XFLOAT sum_ref2_under_circ_mask,
 										XFLOAT expected_Pratio,
-										int Npsi)
+										int NpsiThisBatch,
+										int startPsi,
+										int totalPsis)
 {
 	/* PLAN TO:
 	 *
@@ -467,8 +469,8 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	if(pixel<image_size)
 	{
 		XFLOAT Kccf = d_Mccf[pixel];
-		XFLOAT Kpsi;
-		for(int psi = 0; psi < Npsi; psi++ )
+		XFLOAT Kpsi = -1.f;
+		for(int psi = 0; psi < NpsiThisBatch; psi++ )
 		{
 			XFLOAT diff2 = normfft * d_Maux[pixel + image_size*psi];
 			diff2 += d_Mmean[pixel] * sum_ref_under_circ_mask;
@@ -488,11 +490,12 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 			if (diff2 > Kccf)
 			{
 				Kccf = diff2;
-				Kpsi = psi*(360/Npsi);
+				Kpsi = (startPsi + psi)*(360/totalPsis);
 			}
 		}
 		d_Mccf[pixel] = Kccf;
-		d_Mpsi[pixel] = Kpsi;
+		if (Kpsi >= 0.)
+			d_Mpsi[pixel] = Kpsi;
 	}
 }
 
@@ -577,6 +580,22 @@ __global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
 		XFLOAT ti = - d_A[pixel + A_off].y;
 		d_A[pixel + A_off].x =   tr*d_B[pixel].x - ti*d_B[pixel].y;
 		d_A[pixel + A_off].y =   ti*d_B[pixel].x + tr*d_B[pixel].y;
+	}
+}
+
+__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
+									 	 	CUDACOMPLEX *d_B,
+									 	 	CUDACOMPLEX *d_C,
+									 	 	int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int A_off = blockIdx.y*image_size;
+	if(pixel<image_size)
+	{
+		XFLOAT tr =   d_A[pixel + A_off].x;
+		XFLOAT ti = - d_A[pixel + A_off].y;
+		d_C[pixel + A_off].x =   tr*d_B[pixel].x - ti*d_B[pixel].y;
+		d_C[pixel + A_off].y =   ti*d_B[pixel].x + tr*d_B[pixel].y;
 	}
 }
 

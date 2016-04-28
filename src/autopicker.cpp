@@ -87,6 +87,32 @@ void AutoPicker::usage()
 void AutoPicker::initialise()
 {
 
+#ifdef TIMING
+	TIMING_A0  =           timer.setNew("Initialise()");
+	TIMING_A1  =           timer.setNew("--Init");
+	TIMING_A2  =           timer.setNew("--Read Reference(s)");
+	TIMING_A3  =           timer.setNew("--Read Micrograph(s)");
+	TIMING_A4  =           timer.setNew("--Prep projectors");
+	TIMING_A5  =           timer.setNew("autoPickOneMicrograph()");
+	TIMING_A6  =           timer.setNew("--Read Micrographs(s)");
+	TIMING_A7  =           timer.setNew("--Micrograph computestats");
+	TIMING_A8  =           timer.setNew("--CTF-correct micrograph");
+	TIMING_A9  =           timer.setNew("--Resize CCF and PSI-maps");
+	TIMING_B1  =           timer.setNew("--FOM prep");
+	TIMING_B2  =           timer.setNew("--Read reference(s) via FOM");
+	TIMING_B3  =           timer.setNew("--Psi-dep correlation calc");
+	TIMING_B4  =           timer.setNew("----ctf-correction");
+	TIMING_B5  =           timer.setNew("----first psi");
+	TIMING_B6  =           timer.setNew("----rest of psis");
+	TIMING_B7  =           timer.setNew("----write fom maps");
+	TIMING_B8  =           timer.setNew("----peak-prune/-search");
+	TIMING_B9  =           timer.setNew("--final peak-prune");
+#endif
+
+#ifdef TIMING
+		timer.tic(TIMING_A0);
+		timer.tic(TIMING_A1);
+#endif
 	if (fn_in.isStarFile())
 	{
 		MDmic.read(fn_in);
@@ -148,7 +174,12 @@ void AutoPicker::initialise()
 		for(unsigned  int  i = 0; i < fn_micrographs.size(); ++i)
 			std::cout << "    * " << fn_micrographs[i] << std::endl;
 	}
-
+#ifdef TIMING
+	timer.toc(TIMING_A1);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_A2);
+#endif
 	// Make sure that psi-sampling is even around the circle
 	RFLOAT old_sampling = psi_sampling;
 	int n_sampling = ROUND(360. / psi_sampling);
@@ -192,7 +223,12 @@ void AutoPicker::initialise()
 			Mrefs.push_back(Iref());
 		}
 	}
-
+#ifdef TIMING
+	timer.toc(TIMING_A2);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_A3);
+#endif
 
 	// Re-scale references if necessary
 	if (angpix_ref < 0)
@@ -310,17 +346,29 @@ void AutoPicker::initialise()
 
 	if(workFrac>1) // set size directly
 	{
-		if(workFrac<micrograph_size)
-			workSize = ROUND(workFrac);
+		int tempFrac = (int)ROUND(workFrac);
+		tempFrac -= tempFrac%2;
+		if(tempFrac<micrograph_size)
+		{
+			getGoodFourierDims(tempFrac,micrograph_size);
+			workSize = tempFrac;
+		}
 		else
 			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
 	}
 	else if(workFrac<=1) // set size as fraction of original
 	{
+
 		if(workFrac>0)
+		{
+			getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
 			workSize = ROUND(workFrac*(RFLOAT)micrograph_size);
+		}
 		else if(workFrac==0)
+		{
+			getGoodFourierDims((int)downsize_mic,micrograph_size);
 			workSize = downsize_mic;
+		}
 		else
 			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
 	}
@@ -338,6 +386,12 @@ void AutoPicker::initialise()
 	{
 		min_particle_distance = particle_size * angpix / 2.;
 	}
+#ifdef TIMING
+	timer.toc(TIMING_A3);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_A4);
+#endif
 
 	// Pre-calculate and store Projectors for all references at the right size
 	if (!do_read_fom_maps)
@@ -413,7 +467,10 @@ void AutoPicker::initialise()
 			PPref.push_back(PP);
 		}
 	}
-
+#ifdef TIMING
+	timer.toc(TIMING_A4);
+	timer.toc(TIMING_A0);
+#endif
 #ifdef DEBUG
 	std::cerr << "Finishing initialise" << std::endl;
 #endif
@@ -469,8 +526,13 @@ void AutoPicker::run()
 			int res = system(("mkdir -p " + fn_dir).c_str());
 			fn_olddir = fn_dir;
 		}
-
+#ifdef TIMING
+		timer.tic(TIMING_A5);
+#endif
 		autoPickOneMicrograph(fn_micrographs[imic]);
+#ifdef TIMING
+		timer.toc(TIMING_A5);
+#endif
 	}
 
 	if (verb > 0)
@@ -1544,11 +1606,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	tt().resize(micrograph_size, micrograph_size);
 	std::cerr << " fn_mic= " << fn_mic << std::endl;
 #endif
-
+#ifdef TIMING
+	timer.tic(TIMING_A6);
+#endif
 	// Read in the micrograph
 	Imic.read(fn_mic);
 	Imic().setXmippOrigin();
-
+#ifdef TIMING
+	timer.toc(TIMING_A6);
+#endif
 	// Let's just check the square size again....
 	RFLOAT my_size, my_xsize, my_ysize;
 	my_xsize = XSIZE(Imic());
@@ -1561,7 +1627,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		std::cerr << " micrograph_size= " << micrograph_size << " micrograph_xsize= " << micrograph_xsize << " micrograph_ysize= " << micrograph_ysize << std::endl;
 		REPORT_ERROR("AutoPicker::autoPickOneMicrograph ERROR: No differently sized micrographs are allowed in one run, sorry you will have to run separately for each size...");
 	}
-
+#ifdef TIMING
+	timer.tic(TIMING_A7);
+#endif
 	// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
     RFLOAT avg0, stddev0, minval0, maxval0;
 	Imic().computeStats(avg0, stddev0, minval0, maxval0);
@@ -1589,7 +1657,12 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				A2D_ELEM(Imic(), i, j) = rnd_gaus(0.,1.);
 		}
 	}
-
+#ifdef TIMING
+	timer.toc(TIMING_A7);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_A8);
+#endif
 	// Read in the CTF information if needed
 	if (do_ctf)
 	{
@@ -1613,10 +1686,20 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		Ictf.write("Mmic_ctf.spi");
 #endif
 	}
-
+#ifdef TIMING
+	timer.toc(TIMING_A8);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_A9);
+#endif
 	Mccf_best.resize(workSize, workSize);
 	Mpsi_best.resize(workSize, workSize);
-
+#ifdef TIMING
+	timer.toc(TIMING_A9);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_B1);
+#endif
 	//Sjors 18apr2016
 	RFLOAT normfft = (RFLOAT)(micrograph_size * micrograph_size) / (RFLOAT)nr_pixels_circular_mask;
 	if (do_read_fom_maps)
@@ -1695,6 +1778,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		Fmic = Faux;
 
 	}// end if do_read_fom_maps
+#ifdef TIMING
+	timer.toc(TIMING_B1);
+#endif
 
 	// Now start looking for the peaks of all references
 	// Clear the output vector with all peaks
@@ -1733,6 +1819,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
 		if (do_read_fom_maps)
 		{
+#ifdef TIMING
+			timer.tic(TIMING_B2);
+#endif
 			if (!autopick_helical_segments)
 			{
 				FileName fn_tmp;
@@ -1747,9 +1836,15 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				It.read(fn_tmp);
 				Mpsi_best = It();
 			}
+#ifdef TIMING
+			timer.toc(TIMING_B2);
+#endif
 		} //end else if do_read_fom_maps
 		else
 		{
+#ifdef TIMING
+			timer.tic(TIMING_B3);
+#endif
 			Mccf_best.initConstant(-LARGE_NUMBER);
 			bool is_first_psi = true;
 			for (RFLOAT psi = 0. ; psi < 360.; psi+=psi_sampling)
@@ -1761,6 +1856,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				// Now get the FT of the rotated (non-ctf-corrected) template
 				Faux.initZeros(downsize_mic, downsize_mic/2 + 1);
 				PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
+
 #ifdef DEBUG
 				std::cerr << " psi= " << psi << std::endl;
 				windowFourierTransform(Faux, Faux2, micrograph_size);
@@ -1775,7 +1871,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 				tt.write("Mmic.spi");
 
 #endif
-
+#ifdef TIMING
+	timer.tic(TIMING_B4);
+#endif
 				// Apply the CTF on-the-fly (so same PPref can be used for many different micrographs)
 				if (do_ctf)
 				{
@@ -1783,6 +1881,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 					{
 						DIRECT_MULTIDIM_ELEM(Faux, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
+#ifdef TIMING
+	timer.toc(TIMING_B4);
+#endif
 #ifdef DEBUG
 				MultidimArray<RFLOAT> ttt(micrograph_size, micrograph_size);
 				windowFourierTransform(Faux, Faux2, micrograph_size);
@@ -1801,6 +1902,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 				if (is_first_psi)
 				{
+#ifdef TIMING
+	timer.tic(TIMING_B5);
+#endif
 					// Calculate the expected ratio of probabilities for this CTF-corrected reference
 					// and the sum_ref_under_circ_mask and sum_ref_under_circ_mask2
 					// Do this also if we're not recalculating the fom maps...
@@ -1851,8 +1955,14 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 					// Maux goes back to the workSize
 					Maux.resize(workSize, workSize);
+#ifdef TIMING
+	timer.toc(TIMING_B5);
+#endif
 				}
 
+#ifdef TIMING
+	timer.tic(TIMING_B6);
+#endif
 				// Now multiply template and micrograph to calculate the cross-correlation
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
 				{
@@ -1902,8 +2012,16 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			    std::cin >> c;
 #endif
 			    is_first_psi = false;
+#ifdef TIMING
+	timer.toc(TIMING_B6);
+#endif
 			} // end for psi
-
+#ifdef TIMING
+	timer.toc(TIMING_B3);
+#endif
+#ifdef TIMING
+	timer.tic(TIMING_B7);
+#endif
 			if (do_write_fom_maps && !autopick_helical_segments)
 			{
 				FileName fn_tmp;
@@ -1924,9 +2042,13 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 //				}
 //				exit(0);
 			} // end if do_write_fom_maps
-
+#ifdef TIMING
+	timer.toc(TIMING_B7);
+#endif
 		} // end if do_read_fom_maps
-
+#ifdef TIMING
+	timer.tic(TIMING_B8);
+#endif
 		if (autopick_helical_segments)
 		{
 			if (!do_read_fom_maps)
@@ -1957,7 +2079,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 			prunePeakClusters(my_ref_peaks, min_distance_pix, scale);
 			peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());  // append the peaks of this reference to all the other peaks
 		}
-
+#ifdef TIMING
+	timer.toc(TIMING_B8);
+#endif
 	} // end for iref
 
 
@@ -2011,6 +2135,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	}
 	else
 	{
+#ifdef TIMING
+	timer.tic(TIMING_B9);
+#endif
 		//Now that we have done all references, prune the list again...
 		prunePeakClusters(peaks, min_distance_pix, scale);
 		// And remove all too close neighbours
@@ -2028,6 +2155,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 		}
 		FileName fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
 		MDout.write(fn_tmp);
+#ifdef TIMING
+	timer.toc(TIMING_B9);
+#endif
 	}
 }
 
@@ -2268,3 +2398,73 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 
 }
 
+int AutoPicker::largestPrime(int query)
+{
+	int i(2), primeF(query);
+	while (i*i<=primeF)
+	{
+		if(primeF%i!=0)
+			i+=1;
+		else
+			primeF /= i;
+	}
+	return primeF;
+}
+
+int AutoPicker::getGoodFourierDims(int requestedSizeRealX, int lim)
+{
+
+	int inputPrimeF =XMIPP_MAX(largestPrime(requestedSizeRealX),largestPrime(requestedSizeRealX/2+1));
+	if(inputPrimeF<=LARGEST_ACCEPTABLE_PRIME)
+	{
+		std::cout << "Will use micrographs scaled to xdim " << requestedSizeRealX << ". The largest prime factor in FFTs is " << inputPrimeF << std::endl;
+		std::cout << "     ( no need to modify FFT dims ) " << std::endl;
+		return requestedSizeRealX;
+	}
+
+	int S_up = LARGEST_ACCEPTABLE_PRIME;
+	int S_down = LARGEST_ACCEPTABLE_PRIME;
+
+	// Search upwards - can take a long time if unlucky and/or small LARGEST_ACCEPTABLE_PRIME
+	int currentU = requestedSizeRealX;
+	S_up = 			 largestPrime(currentU);
+	S_up = XMIPP_MAX(largestPrime(currentU/2+1),S_up);
+	while(S_up>=LARGEST_ACCEPTABLE_PRIME  && currentU<=(lim+2))
+	{
+		currentU += 2;
+		S_up = 			 largestPrime(currentU);
+		S_up = XMIPP_MAX(largestPrime(currentU/2+1),S_up);
+	}
+
+
+	// Search downwards - guaranteed to find in reasonable time
+	int currentD = requestedSizeRealX;
+	S_down = 		   largestPrime(currentD);
+	S_down = XMIPP_MAX(largestPrime(currentD/2+1),S_down);
+	while(S_down>=LARGEST_ACCEPTABLE_PRIME)
+	{
+		currentD -= 2;
+		S_down = 		   largestPrime(currentD);
+		S_down = XMIPP_MAX(largestPrime(currentD/2+1),S_down);
+	}
+
+
+	std::cout << std::endl << "*-----------------------------WARNING------------------------------------------------*"<< std::endl;
+	std::cout << "Will use micrographs scaled to xdim " << requestedSizeRealX << ". The largest prime factor in FFTs is " << inputPrimeF << std::endl;
+	std::cout << "Comparable results will be obtained faster by using  ";
+	if((currentU-requestedSizeRealX)>(requestedSizeRealX-currentD) || (currentU>lim))
+	{
+		std::cout <<  currentD  << " where the prime factor is " <<  S_down << std::endl;
+		std::cout <<  "         ( change to / add --shrink " << currentD << " to your autopick-command ) " << std::endl;
+		std::cout << "*------------------------------------------------------------------------------------*"<< std::endl << std::endl;
+		return currentD;
+	}
+	else
+	{
+		std::cout <<  currentU  << " where the prime factor is " <<  S_up << std::endl;
+		std::cout <<  "         ( change to / add --shrink " << currentU << " to your autopick-command ) "<< std::endl;
+		std::cout << "*------------------------------------------------------------------------------------*"<< std::endl <<std::endl;
+		return currentU;
+	}
+
+}
