@@ -1986,7 +1986,7 @@ void MlOptimiser::expectation()
 				allocationSize = (double)free *0.7;
 			}
 			else
-				allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000;
+				allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
 
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
