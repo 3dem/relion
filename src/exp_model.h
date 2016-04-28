@@ -260,8 +260,11 @@ public:
     // Number of particles saved on the scratchdir
     long int nr_parts_on_scratch;
 
-    // Original filenames for the particles on scratch
-    std::vector<FileName> original_fn_parts_on_scratch;
+    // Number of Gb on scratch disk before copying particles
+    long int free_space_Gb;
+
+    // Is this sub-tomograms?
+    bool is_3D;
 
 	// Empty Constructor
 	Experiment()
@@ -285,6 +288,9 @@ public:
 		nr_ori_particles_subset1 = nr_ori_particles_subset2 = 0;
 		nr_bodies = 1;
 		fn_scratch = "";
+		nr_parts_on_scratch = 0;
+		free_space_Gb = 10;
+		is_3D = false;
 		MDexp.clear();
 		MDexp.setIsList(true);
 		MDimg.clear();
@@ -347,15 +353,26 @@ public:
 	// by copying the relevant entries from MDimg into MDbodies
 	void initialiseBodies(int _nr_bodies);
 
+	// Get the image name for a given particle_id
+	bool getImageNameOnScratch(long int particle_id, FileName &fn_img, bool is_ctf_image = false);
+
 	// For parallel executions, lock the scratch directory with a unique code, so we won't copy the same data many times to the same position
-	// Returns true if the lock already existed, false if it didn't and it was just created
-	// If do_remove_lock, then don't check, only remove lock if it exists
-	bool checkScratchLock(FileName _fn_scratch, FileName fn_uniq, bool do_remove_lock=false);
+	// This determines the lockname and removes the lock if it exists
+	FileName initialiseScratchLock(FileName _fn_scratch, FileName _fn_out);
+
+	// Returns true if particles need to be copied, and creates a lock file.
+	// Returns false if the particles do not need to be copied. In that case, only the number of particles on the scratch disk needs to be counted
+	// Also checks how much free space there is on the scratch dir
+	bool prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock = "");
+
+	// Wipe the generic scratch directory clean
+	void deleteDataOnScratch();
 
 	// Copy particles from their original position to a scratch directory
-	// Monitor when the scratch disk gets full or when max_scratch_Gb is reached
+	// Monitor when the scratch disk gets to have fewer than free_scratch_Gb space,
 	// in that case, stop copying, and keep reading particles from where they were...
-	void copyParticlesToScratch(FileName _fn_scratch, int verb, bool only_change_names = false, int max_scratch_Gb = 80);
+	void copyParticlesToScratch(int verb, bool do_copy = true, long int free_scratch_Gb = 10);
+
 
 	// Print help message for possible command-line options
 	void usage();
