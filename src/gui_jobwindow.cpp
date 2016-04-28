@@ -4741,7 +4741,7 @@ bool PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// Helix
 	if (do_helix.getValue())
 	{
-		command += " --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
+		command += " --helix --helical_nr_asu " + integerToString(helical_nr_asu.getValue());
 		command += " --helical_twist " + floatToString(textToFloat(helical_twist.getValue()));
 		command += " --helical_rise " + floatToString(textToFloat(helical_rise.getValue()));
 	}
