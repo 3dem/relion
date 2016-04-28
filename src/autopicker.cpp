@@ -23,6 +23,72 @@
 //#define DEBUG
 //#define DEBUG_HELIX
 
+void ccfPeak::clear()
+{
+	id = ref = nr_peak_pixel = -1;
+	x = y = r = area_percentage = fom_max = psi = dist = fom_thres = (-1.);
+	ccf_pixel_list.clear();
+}
+
+bool ccfPeak::isValid() const
+{
+	// Invalid parameters
+	if ( (r < 0.) || (area_percentage < 0.) || (ccf_pixel_list.size() < 1) )
+		return false;
+	// TODO: check ccf values in ccf_pixel_list?
+	for (int id = 0; id < ccf_pixel_list.size(); id++)
+	{
+		if (ccf_pixel_list[id].fom > fom_thres)
+			return true;
+	}
+	return false;
+}
+
+bool ccfPeak::operator<(const ccfPeak& b) const
+{
+	if (fabs(r - b.r) < 0.01)
+		return (fom_max < b.fom_max);
+	return (r < b.r);
+}
+
+bool ccfPeak::refresh()
+{
+	RFLOAT x_avg, y_avg;
+	int nr_valid_pixel;
+
+	area_percentage = (-1.);
+
+	if (ccf_pixel_list.size() < 1)
+		return false;
+
+	fom_max = (-99.e99);
+	nr_valid_pixel = 0;
+	x_avg = y_avg = 0.;
+	for (int id = 0; id < ccf_pixel_list.size(); id++)
+	{
+		if (ccf_pixel_list[id].fom > fom_thres)
+		{
+			nr_valid_pixel++;
+
+			if (ccf_pixel_list[id].fom > fom_max)
+				fom_max = ccf_pixel_list[id].fom;
+
+			x_avg += ccf_pixel_list[id].x;
+			y_avg += ccf_pixel_list[id].y;
+		}
+	}
+	nr_peak_pixel = nr_valid_pixel;
+
+	if (nr_valid_pixel < 1)
+		return false;
+
+	x = x_avg / (RFLOAT)(nr_valid_pixel);
+	y = y_avg / (RFLOAT)(nr_valid_pixel);
+	area_percentage = (RFLOAT)(nr_valid_pixel) / ccf_pixel_list.size();
+
+	return true;
+};
+
 void AutoPicker::read(int argc, char **argv)
 {
 
@@ -379,6 +445,10 @@ void AutoPicker::initialise()
 		printf(" WARNING: workFrac<downsize_mic, meaning you have chosen to \n use lower resolution than available in the micrograph. \n"
 			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
 	}
+	if ( (autopick_helical_segments) && ((float(workSize) / float(micrograph_size)) < 0.4999) )
+	{
+		std::cerr << " WARNING: Please consider using a shrink value 0.5~1 for picking helical segments. Very small values might lead to poor results." << std::endl;
+	}
 
 	//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
 
@@ -554,17 +624,19 @@ void AutoPicker::pickCCFPeaks(
 	std::vector<ccfPixel> ccf_pixel_list;
 	ccfPeak ccf_peak_small, ccf_peak_big;
 	std::vector<ccfPeak> ccf_peak_list_aux;
-	//int micrograph_core_size = XMIPP_MIN(micrograph_xsize, micrograph_ysize) - skip_side * 2 - 2;
+	int new_micrograph_xsize = (int)((float)micrograph_xsize*scale);
+	int new_micrograph_ysize = (int)((float)micrograph_ysize*scale);
 	int nr_pixels;
 	RFLOAT ratio;
 
-	//Rescale skip_side and particle_diameter_pix. Should we rescale peak_r_min as well?
+	// Rescale skip_side and particle_diameter_pix
 	skip_side = (int)((float)skip_side*scale);
 	particle_diameter_pix *= scale;
+	//int micrograph_core_size = XMIPP_MIN(micrograph_xsize, micrograph_ysize) - skip_side * 2 - 2;
 
 	if ( (NSIZE(Mccf) != 1) || (ZSIZE(Mccf) != 1) || (YSIZE(Mccf) != XSIZE(Mccf)) )
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: The micrograph should be a 2D square!");
-	if ( (XSIZE(Mccf) < micrograph_xsize) || (YSIZE(Mccf) < micrograph_ysize) )
+	if ( (XSIZE(Mccf) < new_micrograph_xsize) || (YSIZE(Mccf) < new_micrograph_ysize) )
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Invalid dimensions for Mccf!");
 	//if (micrograph_core_size < 100*scale)
 	//	REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Size of the micrograph is too small compared to that of the particle box!");
@@ -572,9 +644,9 @@ void AutoPicker::pickCCFPeaks(
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: The origin of input 3D MultidimArray is not at the center (use v.setXmippOrigin() before calling this function)!");
 	if (Mccf.sameShape(Mclass) == false)
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Mccf and Mclass should have the same shape!");
-	if (peak_r_min <= 1)
-		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Radii of peak should not be smaller than 2!");
-	if (particle_diameter_pix < 5.)
+	if (peak_r_min < 1)
+		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Radii of peak should be positive!");
+	if (particle_diameter_pix < 5. * scale)
 		REPORT_ERROR("autopicker.cpp::pickCCFPeaks: Particle diameter should be larger than 5 pixels!");
 
 	// Init output
@@ -593,9 +665,9 @@ void AutoPicker::pickCCFPeaks(
 	Mrec.initConstant(0);
 	Mrec.setXmippOrigin();
 	nr_pixels = 0;
-	for (int ii = FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side; ii <= LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side; ii++)
+	for (int ii = FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side; ii <= LAST_XMIPP_INDEX(new_micrograph_ysize) - skip_side; ii++)
 	{
-		for (int jj = FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side; jj <= LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side; jj++)
+		for (int jj = FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side; jj <= LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side; jj++)
 		{
 			RFLOAT fom = A2D_ELEM(Mccf, ii, jj);
 			nr_pixels++;
@@ -632,8 +704,14 @@ void AutoPicker::pickCCFPeaks(
 		int rmax_min = peak_r_min;
 		int rmax_max;
 		int iter_max = 3;
-		RFLOAT area_percentage_min = 0.8;
 		RFLOAT fom_max;
+		RFLOAT area_percentage_min = 0.8;
+
+		// Deal with very small shrink values. But it still not performs well if workFrac < 0.2
+		if ( (scale < 0.5) && (scale > 0.2) )
+			area_percentage_min = 0.2 + (2. * (scale - 0.2));
+		else if (scale < 0.2)
+			area_percentage_min = 0.2;
 
 		// Check if this ccf pixel is covered by another peak
 		x_old = x_new = ROUND(ccf_pixel_list[id].x);
@@ -678,10 +756,10 @@ void AutoPicker::pickCCFPeaks(
 
 						x_new = x_old + dx;
 						y_new = y_old + dy;
-						if ( (x_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side + 1))
-								|| (x_new > (LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side - 1))
-								|| (y_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side + 1))
-								|| (y_new > (LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side - 1)) )
+						if ( (x_new < (FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side + 1))
+								|| (x_new > (LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side - 1))
+								|| (y_new < (FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side + 1))
+								|| (y_new > (LAST_XMIPP_INDEX(new_micrograph_ysize) - skip_side - 1)) )
 							continue;
 
 						// Push back all ccf pixels within this rmax
@@ -706,10 +784,10 @@ void AutoPicker::pickCCFPeaks(
 				y_new = ROUND(ccf_peak_big.y);
 
 				// Out of range
-				if ( (x_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side + 1))
-						|| (x_new > (LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side - 1))
-						|| (y_new < (FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side + 1))
-						|| (y_new > (LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side - 1)) )
+				if ( (x_new < (FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side + 1))
+						|| (x_new > (LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side - 1))
+						|| (y_new < (FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side + 1))
+						|| (y_new > (LAST_XMIPP_INDEX(new_micrograph_ysize) - skip_side - 1)) )
 					break;
 
 				// Converge
@@ -783,10 +861,10 @@ void AutoPicker::pickCCFPeaks(
 				y = dy + ROUND(ccf_peak_list[new_id].y);
 
 				// Out of range
-				if ( (x < (FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + skip_side + 1))
-						|| (x > (LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - skip_side - 1))
-						|| (y < (FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + skip_side + 1))
-						|| (y > (LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - skip_side - 1)) )
+				if ( (x < (FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side + 1))
+						|| (x > (LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side - 1))
+						|| (y < (FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side + 1))
+						|| (y > (LAST_XMIPP_INDEX(new_micrograph_ysize) - skip_side - 1)) )
 					continue;
 
 				old_id = A2D_ELEM(Mrec, y, x);
@@ -857,7 +935,7 @@ void AutoPicker::extractHelicalTubes(
 	interbox_distance_pix *= scale;
 	tube_diameter_pix *= scale;
 
-	if (particle_diameter_pix < 5.)
+	if (particle_diameter_pix < 5. * scale)
 		REPORT_ERROR("autopicker.cpp::extractHelicalTubes: Particle diameter should be larger than 5 pixels!");
 	if ( (curvature_factor_max < 0.0001) || (curvature_factor_max > 1.0001) )
 		REPORT_ERROR("autopicker.cpp::extractHelicalTubes: Factor of curvature should be 0~1!");
@@ -870,6 +948,7 @@ void AutoPicker::extractHelicalTubes(
 
 	// Calculate the maximum curvature
 	curvature_max = curvature_factor_max / (particle_diameter_pix / 2.);
+	//curvature_max = (sqrt(1. / scale)) * curvature_factor_max / (particle_diameter_pix / 2.);
 
 	// Sort the peaks from the weakest to the strongest
 	std::sort(peak_list.begin(), peak_list.end());
@@ -1384,11 +1463,10 @@ void AutoPicker::exportHelicalTubes(
 		RFLOAT tube_length_min_pix,
 		int skip_side, float scale)
 {
-
-	// Rescale particle_diameter_pix, tube_length_min_pix
+	// Rescale particle_diameter_pix, tube_length_min_pix, skip_side
 	tube_length_min_pix *= scale;
 	particle_diameter_pix *= scale;
-
+	skip_side = (int)((float)skip_side*scale);
 
 	if ( (tube_coord_list.size() != tube_track_list.size()) || (tube_track_list.size() != tube_len_list.size()) )
 		REPORT_ERROR("autopicker.cpp::exportHelicalTubes: BUG tube_coord_list.size() != tube_track_list.size() != tube_len_list.size()");
@@ -1566,8 +1644,8 @@ void AutoPicker::exportHelicalTubes(
 			fom = A2D_ELEM(Mccf, y_int, x_int);
 
 			MDout.addObject();
-			RFLOAT xval = (RFLOAT)(tube_coord_list[itube][icoord].x - FIRST_XMIPP_INDEX(micrograph_xsize)) / scale;
-			RFLOAT yval = (RFLOAT)(tube_coord_list[itube][icoord].y - FIRST_XMIPP_INDEX(micrograph_ysize)) / scale;
+			RFLOAT xval = (tube_coord_list[itube][icoord].x / scale) - (RFLOAT)(FIRST_XMIPP_INDEX(micrograph_xsize));
+			RFLOAT yval = (tube_coord_list[itube][icoord].y / scale) - (RFLOAT)(FIRST_XMIPP_INDEX(micrograph_ysize));
 			MDout.setValue(EMDL_IMAGE_COORD_X, xval);
 			MDout.setValue(EMDL_IMAGE_COORD_Y, yval);
 			MDout.setValue(EMDL_PARTICLE_CLASS, iref + 1); // start counting at 1
@@ -2088,7 +2166,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 	if (autopick_helical_segments)
 	{
 		RFLOAT thres = min_fraction_expected_Pratio;
-		int peak_r_min = 2;
+		int peak_r_min = 1;
 		std::vector<ccfPeak> ccf_peak_list;
 		std::vector<std::vector<ccfPeak> > tube_coord_list, tube_track_list;
 		std::vector<RFLOAT> tube_len_list;

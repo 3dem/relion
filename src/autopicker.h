@@ -25,129 +25,42 @@
 class ccfPixel
 {
 public:
-	RFLOAT x;
-	RFLOAT y;
-	RFLOAT fom;
-	//RFLOAT psi;
-	ccfPixel()
-	{
-		x = y = fom = (-1.);
-		//psi = -1.;
-	};
-	//ccfPixel(int _x, int _y, RFLOAT _fom, RFLOAT _psi)
-	//{
-	//	x = _x; y = _y; fom = _fom; psi = _psi;
-	//};
-	ccfPixel(RFLOAT _x, RFLOAT _y, RFLOAT _fom)
-	{
-		x = _x; y = _y; fom = _fom;
-	};
-	bool operator<(const ccfPixel& b) const
-	{
-		return (fom < b.fom);
-	};
+	RFLOAT x, y, fom;
+	//RFLOAT x, y, fom, psi;
+
+	ccfPixel() : x(-1.), y(-1.), fom(-1.) {};
+	ccfPixel(RFLOAT _x, RFLOAT _y, RFLOAT _fom) : x(_x), y(_y), fom(_fom) {};
+
+	//ccfPixel() : x(-1.), y(-1.), fom(-1.), psi(-1.) {};
+	//ccfPixel(RFLOAT _x, RFLOAT _y, RFLOAT _fom, RFLOAT _psi) : x(_x), y(_y), fom(_fom), psi(_psi) {};
+
+	bool operator<(const ccfPixel& b) const { return (fom < b.fom); };
 };
 
 class ccfPeak
 {
 public:
-	int id;
-	RFLOAT x;
-	RFLOAT y;
-	RFLOAT r;
-	RFLOAT area_percentage;
-	RFLOAT fom_max;
-	int ref;
-	RFLOAT psi;
-	RFLOAT dist;
-	RFLOAT fom_thres;
-	int nr_peak_pixel;
+	int id, ref, nr_peak_pixel;
+	RFLOAT x, y, r, area_percentage, fom_max, psi, dist, fom_thres;
 	std::vector<ccfPixel> ccf_pixel_list;
 
-	bool isValid() const
-	{
-		// Invalid parameters
-		if ( (r < 0.) || (area_percentage < 0.) || (ccf_pixel_list.size() < 1) )
-			return false;
-		// TODO: check ccf values in ccf_pixel_list?
-		for (int id = 0; id < ccf_pixel_list.size(); id++)
-		{
-			if (ccf_pixel_list[id].fom > fom_thres)
-				return true;
-		}
-		return false;
-	};
-	void clear()
-	{
-		id = ref = nr_peak_pixel = -1;
-		x = y = r = area_percentage = fom_max = psi = dist = fom_thres = (-1.);
-		ccf_pixel_list.clear();
-	};
-	ccfPeak()
-	{
-		clear();
-	};
-	~ccfPeak()
-	{
-		clear();
-	};
-	bool operator<(const ccfPeak& b) const
-	{
-		if (fabs(r - b.r) < 0.01)
-		{
-			return (fom_max < b.fom_max);
-		}
-		return (r < b.r);
-	};
-	bool refresh()
-	{
-		RFLOAT x_avg, y_avg;
-		int nr_valid_pixel;
+	void clear();
 
-		area_percentage = (-1.);
+	ccfPeak() { clear(); };
 
-		if (ccf_pixel_list.size() < 1)
-			return false;
+	~ccfPeak() { clear(); };
 
-		fom_max = (-99.e99);
-		nr_valid_pixel = 0;
-		x_avg = y_avg = 0.;
-		for (int id = 0; id < ccf_pixel_list.size(); id++)
-		{
-			if (ccf_pixel_list[id].fom > fom_thres)
-			{
-				nr_valid_pixel++;
+	bool isValid() const;
 
-				if (ccf_pixel_list[id].fom > fom_max)
-					fom_max = ccf_pixel_list[id].fom;
+	bool operator<(const ccfPeak& b) const;
 
-				x_avg += ccf_pixel_list[id].x;
-				y_avg += ccf_pixel_list[id].y;
-			}
-		}
-		nr_peak_pixel = nr_valid_pixel;
-
-		if (nr_valid_pixel < 1)
-			return false;
-
-		x = x_avg / (RFLOAT)(nr_valid_pixel);
-		y = y_avg / (RFLOAT)(nr_valid_pixel);
-		area_percentage = (RFLOAT)(nr_valid_pixel) / ccf_pixel_list.size();
-
-		return true;
-	};
+	bool refresh();
 };
-
-
 
 struct Peak
 {
-	int x;
-	int y;
-	int ref;
-	RFLOAT psi;
-	RFLOAT fom;
-	RFLOAT relative_fom;
+	int x, y, ref;
+	RFLOAT psi, fom, relative_fom;
 };
 
 class AutoPicker
