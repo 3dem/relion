@@ -48,6 +48,7 @@ void HealpixSampling::initialise(
 		int prior_mode,
 		int ref_dim,
 		bool do_3d_trans,
+		bool do_changepsi,
 		bool do_warnpsi,
 		bool do_local_searches,
 		bool do_helical_refine,
@@ -105,14 +106,15 @@ void HealpixSampling::initialise(
 	else
 	{
 		int t_nr_psi = CEIL(360./psi_step);
-		if(t_nr_psi%32!=0 && do_warnpsi)
+		if(t_nr_psi%32!=0 && do_changepsi)
 		{
-			std::cerr << std::endl << "WARNING:" << std::endl << "the chosen --psi_step (" << psi_step << " degrees) gives " << t_nr_psi << " steps (!=0 mod 32), which is not optimal when you are using GPUs" << std::endl;
-			std::cerr << " May we suggest using --psi_step 11.25 (32 steps), 5.625 (64 steps), 3.75 (96 steps), etc... ? " << std::endl << "(UNLESS YOU ARE DOING LOCAL SEARCHES / AUTO-REFINE)" << std::endl << std::endl;
 
-//			Force-adjust psi_step:
-//			t_nr_psi = CEIL((float)t_nr_psi / 32.0)*32;
-//			float tdiff = psi_step - 360./(RFLOAT)t_nr_psi;
+			if (do_warnpsi)
+				std::cout << " + WARNING: Changing psi sampling rate to " <<  360./(RFLOAT)t_nr_psi << " degrees, for more efficient GPU calculations" << std::endl;
+
+			// Force-adjust psi_step to be multiples of 32 (for efficient GPU calculations)
+			t_nr_psi = CEIL((float)t_nr_psi / 32.0)*32;
+
 		}
 		psi_step = 360./(RFLOAT)t_nr_psi;
 		fn_sym = "C1"; // This may not be set yet if restarting a 2D run....
@@ -1667,7 +1669,7 @@ void HealpixSampling::pushbackOversampledPsiAngles(long int ipsi, int oversampli
 			oversampled_rot.push_back(rot);
 			oversampled_tilt.push_back(tilt);
                         if (!is_3D && overpsi>180.)
-                            overpsi-=360.;			
+                            overpsi-=360.;
                         oversampled_psi.push_back(overpsi);
 		}
 	}
