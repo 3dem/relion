@@ -2,21 +2,86 @@
 #include "src/time.h"
 #include <cuda_runtime.h>
 
-//#define PP_TIMING
+#define PP_TIMING
 #ifdef PP_TIMING
     Timer timer;
 	int TIMING_TOP = timer.setNew("setup");
-	int TIMING_SAMPLING = timer.setNew(" sampling");
-	int TIMING_PRIOR = timer.setNew("  prior");
-	int TIMING_PROC_CALC = timer.setNew("  procCalc");
-	int TIMING_PROC = timer.setNew("  proc");
-	int TIMING_EULERS = timer.setNew(" eulers");
+	int TIMING_SAMPLING = 	timer.setNew(" sampling");
+	int TIMING_PRIOR = 		timer.setNew("  prior");
+	int TIMING_PROC_CALC = 	timer.setNew("  procCalc");
+	int TIMING_PROC = 		timer.setNew("  proc");
+	int TIMING_GEN = 		timer.setNew("   genOri");
+	int TIMING_PERTURB = 	timer.setNew("   perturb");
+	int TIMING_EULERS = 	timer.setNew(" eulers");
 #define TIMING_TIC(id) timer.tic(id)
 #define TIMING_TOC(id) timer.toc(id)
 #else
 #define TIMING_TIC(id)
 #define TIMING_TOC(id)
 #endif
+
+
+void getOrientations(HealpixSampling &sampling, long int idir, long int ipsi, int oversampling_order,
+		std::vector<RFLOAT > &my_rot, std::vector<RFLOAT > &my_tilt, std::vector<RFLOAT > &my_psi,
+		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
+		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior)
+{
+	my_rot.clear();
+	my_tilt.clear();
+	my_psi.clear();
+	long int my_idir, my_ipsi;
+	if (sampling.orientational_prior_mode == NOPRIOR)
+	{
+		my_idir = idir;
+		my_ipsi = ipsi;
+	}
+	else
+	{
+		my_idir = pointer_dir_nonzeroprior[idir];
+		my_ipsi = pointer_psi_nonzeroprior[ipsi];
+	}
+
+	if (oversampling_order == 0)
+	{
+		my_rot.push_back(sampling.rot_angles[my_idir]);
+		my_tilt.push_back(sampling.tilt_angles[my_idir]);
+		my_psi.push_back(sampling.psi_angles[my_ipsi]);
+	}
+	else if (!sampling.is_3D)
+	{
+		// for 2D sampling, only push back oversampled psi rotations
+		sampling.pushbackOversampledPsiAngles(my_ipsi, oversampling_order, 0., 0., my_rot, my_tilt, my_psi);
+	}
+	else
+	{
+		// Set up oversampled grid for 3D sampling
+		Healpix_Base HealPixOver(oversampling_order + sampling.healpix_order, NEST);
+		int fact = HealPixOver.Nside()/sampling.healpix_base.Nside();
+		int x, y, face;
+		RFLOAT rot, tilt;
+		// Get x, y and face for the original, coarse grid
+		long int ipix = sampling.directions_ipix[my_idir];
+		sampling.healpix_base.nest2xyf(ipix, x, y, face);
+		// Loop over the oversampled Healpix pixels on the fine grid
+		for (int j = fact * y; j < fact * (y+1); ++j)
+		{
+			for (int i = fact * x; i < fact * (x+1); ++i)
+			{
+				long int overpix = HealPixOver.xyf2nest(i, j, face);
+								// this one always has to be double (also for SINGLE_PRECISION CALCULATIONS) for call to external library
+				double zz, phi;
+				HealPixOver.pix2ang_z_phi(overpix, zz, phi);
+				rot = RAD2DEG(phi);
+				tilt = ACOSD(zz);
+
+				// The geometrical considerations about the symmetry below require that rot = [-180,180] and tilt [0,180]
+				sampling.checkDirection(rot, tilt);
+
+				sampling.pushbackOversampledPsiAngles(my_ipsi, oversampling_order, rot, tilt, my_rot, my_tilt, my_psi);
+			}
+		}
+	}
+}
 
 void CudaProjectorPlan::setup(
 		HealpixSampling &sampling,
@@ -46,25 +111,37 @@ void CudaProjectorPlan::setup(
 {
 	TIMING_TIC(TIMING_TOP);
 
-	std::vector< RFLOAT > rots, tilts, psis;
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
-	rots.reserve(nr_dir * nr_psi * nr_oversampled_rot);
-	tilts.reserve(nr_dir * nr_psi * nr_oversampled_rot);
-	psis.reserve(nr_dir * nr_psi * nr_oversampled_rot);
+	RFLOAT alpha(.0), beta(.0), gamma(.0);
+	RFLOAT ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
+	RFLOAT cc(.0), cs(.0), sc(.0), ss(.0);
 
-	if (iorientclasses.getSize() < nr_dir * nr_psi * nr_oversampled_rot)
-	{
-		iorientclasses.free_if_set();
-		iorientclasses.setSize(nr_dir * nr_psi * nr_oversampled_rot);
-		iorientclasses.host_alloc();
-		iorientclasses.device_alloc();
-	}
+	eulers.free_if_set();
+	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);
+	eulers.host_alloc();
+
+	iorientclasses.free_if_set();
+	iorientclasses.setSize(nr_dir * nr_psi * nr_oversampled_rot);
+	iorientclasses.host_alloc();
 
 	orientation_num = 0;
 
-
 	TIMING_TIC(TIMING_SAMPLING);
+
+	Matrix2D<RFLOAT> R(3,3);
+	RFLOAT myperturb(0.);
+
+	if (ABS(sampling.random_perturbation) > 0.)
+	{
+		myperturb = sampling.random_perturbation * sampling.getAngularSampling();
+		if (sampling.is_3D)
+			Euler_angles2matrix(myperturb, myperturb, myperturb, R);
+	}
+	else
+	{
+		R.initConstant(1.);
+	}
 
 	for (long int idir = idir_min, iorient = 0; idir <= idir_max; idir++)
 	{
@@ -121,15 +198,59 @@ void CudaProjectorPlan::setup(
 			{
 				// Now get the oversampled (rot, tilt, psi) triplets
 				// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)
-				sampling.getOrientations(idir, ipsi, current_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+				TIMING_TIC(TIMING_GEN);
+				getOrientations(sampling, idir, ipsi, current_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 						pointer_dir_nonzeroprior, directions_prior, pointer_psi_nonzeroprior, psi_prior);
+				TIMING_TOC(TIMING_GEN);
 
 				// Loop over all oversampled orientations (only a single one in the first pass)
 				for (long int iover_rot = 0; iover_rot < nr_oversampled_rot; iover_rot++, ipart++)
 				{
-					rots.push_back(oversampled_rot[iover_rot]);
-					tilts.push_back(oversampled_tilt[iover_rot]);
-					psis.push_back(oversampled_psi[iover_rot]);
+					if (sampling.is_3D)
+						alpha = DEG2RAD(oversampled_rot[iover_rot]);
+					else
+						alpha = DEG2RAD(oversampled_rot[iover_rot] + myperturb);
+
+				    beta  = DEG2RAD(oversampled_tilt[iover_rot]);
+				    gamma = DEG2RAD(oversampled_psi[iover_rot]);
+
+					sincos(alpha, &sa, &ca);
+					sincos(beta,  &sb, &cb);
+					sincos(gamma, &sg, &cg);
+
+					cc = cb * ca;
+					cs = cb * sa;
+					sc = sb * ca;
+					ss = sb * sa;
+
+					Matrix2D<RFLOAT> A(3,3);
+
+					A(0,0) = ( cg * cc - sg * sa);//00
+					A(1,0) = (-sg * cc - cg * sa);//10
+					A(2,0) = ( sc )              ;//20
+					A(0,1) = ( cg * cs + sg * ca);//01
+					A(1,1) = (-sg * cs + cg * ca);//11
+					A(2,1) = ( ss )              ;//21
+					A(0,2) = (-cg * sb )         ;//02
+					A(1,2) = ( sg * sb )         ;//12
+					A(2,2) = ( cb )              ;//22
+
+					if (sampling.is_3D)
+						A = A * R;
+
+					if(!inverseMatrix)
+						A.inv();
+
+					eulers[9 * orientation_num + 0] = A(0,0);//00
+					eulers[9 * orientation_num + 1] = A(1,0);//10
+					eulers[9 * orientation_num + 2] = A(2,0);//20
+					eulers[9 * orientation_num + 3] = A(0,1);//01
+					eulers[9 * orientation_num + 4] = A(1,1);//11
+					eulers[9 * orientation_num + 5] = A(2,1);//21
+					eulers[9 * orientation_num + 6] = A(0,2);//02
+					eulers[9 * orientation_num + 7] = A(1,2);//12
+					eulers[9 * orientation_num + 8] = A(2,2);//22
+
 					iorientclasses[orientation_num] = iorientclass;
 
 					orientation_num ++;
@@ -140,65 +261,11 @@ void CudaProjectorPlan::setup(
 	}
 	TIMING_TOC(TIMING_SAMPLING);
 
-	iorientclasses.cp_to_device();
+	iorientclasses.setSize(orientation_num);
+	iorientclasses.put_on_device();
 
-	RFLOAT alpha(.0), beta(.0), gamma(.0);
-	RFLOAT ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
-	RFLOAT cc(.0), cs(.0), sc(.0), ss(.0);
-
-	if (eulers.getSize() < orientation_num * 9)
-	{
-		eulers.free_if_set();
-		eulers.setSize(orientation_num * 9);
-		eulers.host_alloc();
-		eulers.device_alloc();
-	}
-
-	TIMING_TIC(TIMING_EULERS);
-
-	for (long int i = 0; i < orientation_num; i++)
-	{
-		alpha = DEG2RAD(rots[i]);
-		beta  = DEG2RAD(tilts[i]);
-		gamma = DEG2RAD(psis[i]);
-
-		sincos(alpha, &sa, &ca);
-		sincos(beta,  &sb, &cb);
-		sincos(gamma, &sg, &cg);
-
-		cc = cb * ca;
-		cs = cb * sa;
-		sc = sb * ca;
-		ss = sb * sa;
-
-		if(inverseMatrix)
-		{
-			eulers[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
-			eulers[9 * i + 1] = (-sg * cc - cg * sa) ;// * padding_factor; //10
-			eulers[9 * i + 2] = ( sc )               ;// * padding_factor; //20
-			eulers[9 * i + 3] = ( cg * cs + sg * ca) ;// * padding_factor; //01
-			eulers[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
-			eulers[9 * i + 5] = ( ss )               ;// * padding_factor; //21
-			eulers[9 * i + 6] = (-cg * sb )          ;// * padding_factor; //02
-			eulers[9 * i + 7] = ( sg * sb )          ;// * padding_factor; //12
-			eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
-		}
-		else
-		{
-			eulers[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
-			eulers[9 * i + 1] = ( cg * cs + sg * ca) ;// * padding_factor; //01
-			eulers[9 * i + 2] = (-cg * sb )          ;// * padding_factor; //02
-			eulers[9 * i + 3] = (-sg * cc - cg * sa) ;// * padding_factor; //10
-			eulers[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
-			eulers[9 * i + 5] = ( sg * sb )          ;// * padding_factor; //12
-			eulers[9 * i + 6] = ( sc )               ;// * padding_factor; //20
-			eulers[9 * i + 7] = ( ss )               ;// * padding_factor; //21
-			eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
-		}
-	}
-	TIMING_TOC(TIMING_EULERS);
-
-	eulers.cp_to_device();
+	eulers.setSize(orientation_num * 9);
+	eulers.put_on_device();
 
 	TIMING_TOC(TIMING_TOP);
 }
