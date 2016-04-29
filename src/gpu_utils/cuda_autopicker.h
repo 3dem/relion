@@ -38,6 +38,8 @@ public:
 
 	int device_id;
 
+	bool have_warned_batching;
+
 	//MlDeviceBundle *devBundle;
 
 	AutoPickerCuda(AutoPicker *basePicker, int dev_id);

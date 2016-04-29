@@ -33,6 +33,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id) :
 {
 
 	cudaProjectors.resize(basePckr->Mrefs.size());
+	have_warned_batching=false;
 	/*======================================================
 	                    DEVICE SETTINGS
 	======================================================*/
@@ -245,8 +246,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_A6);
 #endif
-	size_t downsize_Fmic_x = basePckr->downsize_mic / 2 + 1;
-	size_t downsize_Fmic_y = basePckr->downsize_mic;
 
 	// Let's just check the square size again....
 	RFLOAT my_size, my_xsize, my_ysize;
@@ -272,6 +271,19 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		CUDA_CPU_TOC("setSize_cudaTr");
 	}
 	HANDLE_ERROR(cudaDeviceSynchronize());
+
+	if(cudaTransformer1.batchSize.size()>1 && !have_warned_batching)
+	{
+		have_warned_batching = true;
+		std::cerr << std::endl << "*-----------------------------WARNING------------------------------------------------*"<< std::endl;
+		std::cerr 			   << "With the current settings the GPU memory is imposing a soft limit on your performace," << std::endl;
+		std::cerr 			   << "since one or more micrographs has to use (at least " << cudaTransformer1.batchSize.size() << ") batches of orientations to "<< std::endl;
+		std::cerr              << "achieve the total requested " << Npsi << " orientations. Consider using" << std::endl;
+		std::cerr			   << "\t higher --ang" << std::endl;
+		std::cerr 			   << "\t harder --shrink" << std::endl;
+		std::cerr 			   << "\t higher --lowpass with --shrink 0" << std::endl;
+		std::cerr              << "*------------------------------------------------------------------------------------*"<< std::endl;
+	}
 
 	// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
     RFLOAT avg0, stddev0, minval0, maxval0;

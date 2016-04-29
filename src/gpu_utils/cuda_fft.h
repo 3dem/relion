@@ -165,8 +165,8 @@ public:
 			if(needed>avail)
 				REPORT_ERROR("Not enough memory for even a single orientation.");
 
-			std::cerr << std::endl << "NOTE: Having to use " << psiIters << " batches of orientations ";
-			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
+//			std::cerr << std::endl << "NOTE: Having to use " << psiIters << " batches of orientations ";
+//			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
 //			std::cerr << "( this could affect performance, consider using " << std::endl;
 //			std::cerr << "\t higher --ang" << std::endl;
 //			std::cerr << "\t harder --shrink" << std::endl;
