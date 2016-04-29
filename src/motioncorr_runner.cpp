@@ -547,8 +547,9 @@ void MotioncorrRunner::generateLogFilePDF()
 
 	if (fn_micrographs.size() > 0)
 	{
-		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
-		command += fn_out + "logfile.pdf ";
+
+		std::vector<FileName> fn_eps;
+
 
 		FileName fn_prev="";
 		for (long int i = 0; i < fn_micrographs.size(); i++)
@@ -556,13 +557,12 @@ void MotioncorrRunner::generateLogFilePDF()
 			if (fn_prev != fn_micrographs[i].beforeLastOf("/"))
 			{
 				fn_prev = fn_micrographs[i].beforeLastOf("/");
-				command += fn_out + fn_prev+"/*.eps ";
+				fn_eps.push_back(fn_out + fn_prev+"/*.eps");
 			}
 		}
 
-		command += " > /dev/null &";
-		if (system(command.c_str()))
-			REPORT_ERROR("ERROR executing: " + command);
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
+
 	}
 }
 

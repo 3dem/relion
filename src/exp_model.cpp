@@ -599,7 +599,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 	}
 
 	long int one_part_space, used_space = 0.;
-	long int max_space = (free_space_Gb - keep_free_scratch_Gb)*1000*1000*1000; // in bytes
+	long int max_space = (free_space_Gb - keep_free_scratch_Gb)*1024*1024*1024; // in bytes
 
 	// Loop over all particles and copy them one-by-one
 	FileName fn_open_stack = "";
@@ -618,7 +618,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 		{
 			Image<RFLOAT> tmp;
 			tmp.read(fn_img, false); // false means: only read the header!
-			one_part_space = ZYXSIZE(tmp())*sizeof(RFLOAT);
+			one_part_space = ZYXSIZE(tmp())*sizeof(float); // MRC images are stored in floats!
 			bool myis3D = (ZSIZE(tmp()) > 1);
 			if (myis3D != is_3D)
 				REPORT_ERROR("BUG: inconsistent is_3D values!");
@@ -644,7 +644,6 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 			std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
 			break;
 		}
-
 
 		// Read in the particle image, and write out on scratch
 		if (do_copy)
@@ -697,7 +696,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 	if (verb > 0)
 		progress_bar(nr_part);
 
-	if (do_copy)
+	if (do_copy && nr_parts_on_scratch>1)
 	{
 		std::string command = " chmod 777 " + fn_scratch + "particle*";
 		if (system(command.c_str()))
@@ -772,7 +771,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 			MDimg.addObject();
 			if (do_preread_images)
 			{
-				Image<RFLOAT> img;
+				Image<float> img;
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
@@ -951,7 +950,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 			{
 				FileName fn_img;
 				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-				Image<RFLOAT> img;
+				Image<float> img;
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{

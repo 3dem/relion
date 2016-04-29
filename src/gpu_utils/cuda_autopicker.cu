@@ -853,7 +853,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	if (basePckr->autopick_helical_segments)
 	{
 		RFLOAT thres = basePckr->min_fraction_expected_Pratio;
-		int peak_r_min = 2;
+		int peak_r_min = 1;
 		std::vector<ccfPeak> ccf_peak_list;
 		std::vector<std::vector<ccfPeak> > tube_coord_list, tube_track_list;
 		std::vector<RFLOAT> tube_len_list;

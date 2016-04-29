@@ -1310,7 +1310,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
 	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
-	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu,
+	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 	// Default max_coarse_size is original size
@@ -1508,7 +1508,11 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             Image<RFLOAT> img;
 			if (do_preread_images && do_parallel_disc_io)
             {
-                img() = mydata.particles[part_id].img;
+                img().reshape(mydata.particles[part_id].img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+				{
+                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+				}
             }
             else
             {
@@ -3639,7 +3643,11 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			// If all slaves had preread images into RAM: get those now
 			if (do_preread_images)
 			{
-				img() = mydata.particles[part_id].img;
+                img().reshape(mydata.particles[part_id].img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+				{
+                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+				}
 			}
 			else
 			{
@@ -7407,7 +7415,13 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 				// First read the image from disc or get it from the preread images in the mydata structure
 				Image<RFLOAT> img, rec_img;
 				if (do_preread_images)
-					img() = mydata.particles[part_id].img;
+				{
+					img().reshape(mydata.particles[part_id].img);
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+					{
+						DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+					}
+				}
 				else
 				{
 					// only open new stacks

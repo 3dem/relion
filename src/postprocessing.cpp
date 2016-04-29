@@ -756,12 +756,10 @@ void Postprocessing::writeOutput()
 	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
 	if (!exists(fn_log))
 	{
-		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
-		command += fn_log + " ";
-		command += fn_out + "_fsc.eps ";
-		command += fn_out + "_guinier.eps ";
-		command += " > /dev/null &";
-		int res = system(command.c_str());
+		std::vector<FileName> fn_eps;
+		fn_eps.push_back(fn_out + "_fsc.eps");
+		fn_eps.push_back(fn_out + "_guinier.eps");
+		joinMultipleEPSIntoSinglePDF(fn_log, fn_eps);
 	}
 
 	if (verb > 0)

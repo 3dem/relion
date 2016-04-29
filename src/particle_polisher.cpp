@@ -1349,12 +1349,11 @@ void ParticlePolisher::generateLogFilePDF()
 
 	if (!exists(fn_out + "logfile.pdf"))
 	{
-		std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
-		command += fn_out + "logfile.pdf ";
+		std::vector<FileName> fn_eps;
 
-		command += fn_out + "bfactors.eps ";
-		command += fn_out + "scalefactors.eps ";
-		command += fn_out + "frame_???_guinier.eps ";
+		fn_eps.push_back(fn_out + "bfactors.eps");
+		fn_eps.push_back(fn_out + "scalefactors.eps");
+		fn_eps.push_back(fn_out + "frame_???_guinier.eps");
 
 		FileName fn_prev="";
 		for (long int i = 0; i < fn_mics.size(); i++)
@@ -1362,12 +1361,12 @@ void ParticlePolisher::generateLogFilePDF()
 			if (fn_prev != fn_mics[i].beforeLastOf("/"))
 			{
 				fn_prev = fn_mics[i].beforeLastOf("/");
-				command += fn_prev+"/*.eps ";
+				fn_eps.push_back(fn_prev+"/*.eps");
 			}
 		}
 
-		command += " > /dev/null &";
-		int res = system(command.c_str());
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
+
 	}
 }
 

@@ -50,7 +50,7 @@ public:
 	int random_subset;
 
 	// Pre-read array of the image in RAM
-	MultidimArray<RFLOAT> img;
+	MultidimArray<float> img;
 
 	// Empty Constructor
 	ExpParticle()
