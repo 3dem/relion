@@ -17,20 +17,29 @@
  //  Copyright (c) 2014 AMZs. All rights reserved.
  //
 
- #ifndef __CPlot2D__
- #define __CPlot2D__
+#ifndef __CPlot2D__
+#define __CPlot2D__
 
- #pragma once
+#pragma once
 
- #include <iostream>
- #include <fstream>
- #include <sstream>
- #include <iomanip>
- #include <string.h>
- #include <vector>
- #include <float.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <string.h>
+#include <vector>
+#include <float.h>
+#include "src/filename.h"
 
- using namespace std;
+
+/* SHWS: join multiple eps files into a single pdf
+ *
+ */
+
+void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps);
+
+
+using namespace std;
 
  /*!
   A simple container class to hold a data point, comprised of an x and y value
