@@ -621,16 +621,17 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B4);
 #endif
-			CUDA_CPU_TIC("Projection");
-			dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),Npsi);
-			cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
-															  ~cudaTransformer1.fouriers,
-															  ~d_ctf,
-															  DEG2RAD(basePckr->psi_sampling),
-															  projKernel
-														);
-			LAUNCH_HANDLE_ERROR(cudaGetLastError());
-			CUDA_CPU_TOC("Projection");
+	CUDA_CPU_TIC("SingleProjection");
+	dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),1);
+	cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
+													  ~cudaTransformer1.fouriers,
+													  ~d_ctf,
+													  0,
+													  projKernel,
+													  0
+												);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+	CUDA_CPU_TOC("SingleProjection");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B4);
 #endif
@@ -705,54 +706,66 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 			CUDA_CPU_TOC("suma_FP");
 			CUDA_CPU_TOC("PREP_CALCS");
-#ifdef TIMING
-	basePckr->timer.toc(basePckr->TIMING_B5);
-#endif
-			// Now multiply template and micrograph to calculate the cross-correlation
-			CUDA_CPU_TIC("convol");
-			dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),Npsi);
-			cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   cudaTransformer1.fouriers.d_ptr,
-														  	  	  d_Fmic.d_ptr,
-														  	  	  FauxStride);
-			LAUNCH_HANDLE_ERROR(cudaGetLastError());
-			CUDA_CPU_TOC("convol");
-#ifdef TIMING
-	basePckr->timer.tic(basePckr->TIMING_B6);
-#endif
 
-			CUDA_CPU_TIC("CudaInverseFourierTransform_1");
-			cudaTransformer1.backward();
-			HANDLE_ERROR(cudaDeviceSynchronize());
-			CUDA_CPU_TIC("runCenterFFT_1");
-			runCenterFFT(cudaTransformer1.reals,
-						 (int)cudaTransformer1.xSize,
-						 (int)cudaTransformer1.ySize,
-						 false,
-						 Npsi);
-			CUDA_CPU_TOC("runCenterFFT_1");
-			HANDLE_ERROR(cudaDeviceSynchronize());
-			CUDA_CPU_TOC("CudaInverseFourierTransform_1");
-			CUDA_CPU_TIC("probRatio");
-			HANDLE_ERROR(cudaDeviceSynchronize());
-			dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/Npsi)/(float)PROBRATIO_BLOCK_SIZE));
-			cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
-					d_Mccf_best.d_ptr,
-					d_Mpsi_best.d_ptr,
-					cudaTransformer1.reals.d_ptr,
-					d_Mmean.d_ptr,
-					d_Mstddev.d_ptr,
-					cudaTransformer1.reals.size/Npsi,
-					(XFLOAT) -2*normfft,
-					(XFLOAT) 2*sum_ref_under_circ_mask,
-					(XFLOAT) sum_ref2_under_circ_mask,
-					(XFLOAT) expected_Pratio,
-					Npsi,
-					0,
-					Npsi
-					);
-			LAUNCH_HANDLE_ERROR(cudaGetLastError());
-			CUDA_CPU_TOC("probRatio");
+			// for all batches
+			int startPsi(0);
+			for (int psiIter = 0; psiIter < cudaTransformer1.psiIters; psiIter++) // psi-batches for possible memory-limits
+			{
 
+				CUDA_CPU_TIC("Projection");
+				dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),cudaTransformer1.batchSize[psiIter]);
+				cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
+																  ~cudaTransformer1.fouriers,
+																  ~d_ctf,
+																  DEG2RAD(basePckr->psi_sampling),
+																  projKernel,
+																  startPsi
+															);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
+				CUDA_CPU_TOC("Projection");
+
+				// Now multiply template and micrograph to calculate the cross-correlation
+				CUDA_CPU_TIC("convol");
+				dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),cudaTransformer1.batchSize[psiIter]);
+				cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   cudaTransformer1.fouriers.d_ptr,
+																	  d_Fmic.d_ptr,
+																	  FauxStride);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
+				CUDA_CPU_TOC("convol");
+
+				CUDA_CPU_TIC("CudaInverseFourierTransform_1");
+				cudaTransformer1.backward();
+				HANDLE_ERROR(cudaDeviceSynchronize());
+				CUDA_CPU_TOC("CudaInverseFourierTransform_1");
+
+				// Calculate ratio of prabilities P(ref)/P(zero)
+				// Keep track of the best values and their corresponding iref and psi
+				// ------------------------------------------------------------------
+				// So now we already had precalculated: Mdiff2 = 1/sig*Sum(X^2) - 2/sig*Sum(X) + mu^2/sig*Sum(1)
+				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
+				CUDA_CPU_TIC("probRatio");
+				HANDLE_ERROR(cudaDeviceSynchronize());
+				dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/cudaTransformer1.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
+				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
+						d_Mccf_best.d_ptr,
+						d_Mpsi_best.d_ptr,
+						cudaTransformer1.reals.d_ptr,
+						d_Mmean.d_ptr,
+						d_Mstddev.d_ptr,
+						cudaTransformer1.reals.size/cudaTransformer1.batchSize[0],
+						(XFLOAT) -2*normfft,
+						(XFLOAT) 2*sum_ref_under_circ_mask,
+						(XFLOAT) sum_ref2_under_circ_mask,
+						(XFLOAT) expected_Pratio,
+						cudaTransformer1.batchSize[psiIter],
+						startPsi,
+						Npsi
+						);
+				LAUNCH_HANDLE_ERROR(cudaGetLastError());
+				startPsi += cudaTransformer1.batchSize[psiIter];
+				CUDA_CPU_TOC("probRatio");
+			    CUDA_CPU_TOC("OneRotation");
+			} // end for psi-batches
 
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B6);
