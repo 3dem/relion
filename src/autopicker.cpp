@@ -104,6 +104,7 @@ void AutoPicker::read(int argc, char **argv)
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
+	do_optimise_scale = !parser.checkOption("--skip_optimise_scale", "Skip the optimisation of the micrograph scale for better prime factors in the FFTs. This runs slower, but at exactly the requested resolution.");
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -347,9 +348,17 @@ void AutoPicker::initialise()
 		int halfoldsize = XSIZE(Mrefs[0]) / 2;
 		int newsize = (int)(float)halfoldsize * angpix_ref/angpix;
 		newsize *= 2;
+		RFLOAT rescale_greyvalue = 1.;
+		// If the references came from downscaled particles, then those were normalised differently
+		// (the stddev is N times smaller after downscaling N times)
+		// This needs to be corrected again
+		RFLOAT rescale_factor = 1.;
+		if (newsize > XSIZE(Mrefs[0]))
+			rescale_factor *= (RFLOAT)(XSIZE(Mrefs[0]))/(RFLOAT)newsize;
 		for (int iref = 0; iref < Mrefs.size(); iref++)
 		{
 			resizeMap(Mrefs[iref], newsize);
+			Mrefs[iref] *= rescale_factor;
 			Mrefs[iref].setXmippOrigin();
 		}
 	}
@@ -416,8 +425,7 @@ void AutoPicker::initialise()
 		tempFrac -= tempFrac%2;
 		if(tempFrac<micrograph_size)
 		{
-			getGoodFourierDims(tempFrac,micrograph_size);
-			workSize = tempFrac;
+			workSize = getGoodFourierDims(tempFrac,micrograph_size);
 		}
 		else
 			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
@@ -427,27 +435,25 @@ void AutoPicker::initialise()
 
 		if(workFrac>0)
 		{
-			getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
-			workSize = ROUND(workFrac*(RFLOAT)micrograph_size);
+			workSize = getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
 		}
 		else if(workFrac==0)
 		{
-			getGoodFourierDims((int)downsize_mic,micrograph_size);
-			workSize = downsize_mic;
+			workSize = getGoodFourierDims((int)downsize_mic,micrograph_size);
 		}
 		else
 			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
 	}
 	workSize -= workSize%2; //make even in case it is not already
 
-	if(workSize<downsize_mic)
+	if ( verb > 0 && workSize < downsize_mic)
 	{
-		printf(" WARNING: workFrac<downsize_mic, meaning you have chosen to \n use lower resolution than available in the micrograph. \n"
-			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
+		std::cout << " + WARNING: The calculations will be done at a lower resolution than requested." << std::endl;
 	}
-	if ( (autopick_helical_segments) && ((float(workSize) / float(micrograph_size)) < 0.4999) )
+
+	if ( verb > 0 && (autopick_helical_segments) && ((float(workSize) / float(micrograph_size)) < 0.4999) )
 	{
-		std::cerr << " WARNING: Please consider using a shrink value 0.5~1 for picking helical segments. Very small values might lead to poor results." << std::endl;
+		std::cerr << " + WARNING: Please consider using a shrink value 0.5~1 for picking helical segments. Smaller values may lead to poor results." << std::endl;
 	}
 
 	//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
@@ -466,6 +472,12 @@ void AutoPicker::initialise()
 	// Pre-calculate and store Projectors for all references at the right size
 	if (!do_read_fom_maps)
 	{
+		if (verb > 0)
+		{
+			std::cout << " Initialising FFTs for the references ... " << std::endl;
+			init_progress_bar(Mrefs.size());
+		}
+
 		// Calculate a circular mask based on the particle_diameter and then store its FT
 		FourierTransformer transformer;
 		MultidimArray<RFLOAT> Mcirc_mask(particle_size, particle_size);
@@ -535,7 +547,15 @@ void AutoPicker::initialise()
 			// And compute its Fourier Transform inside the Projector
 			PP.computeFourierTransformMap(Maux, dummy, downsize_mic, 1, false);
 			PPref.push_back(PP);
+
+			if (verb > 0)
+				progress_bar(iref+1);
+
 		}
+
+		if (verb > 0)
+			progress_bar(Mrefs.size());
+
 	}
 #ifdef TIMING
 	timer.toc(TIMING_A4);
@@ -2492,11 +2512,14 @@ int AutoPicker::largestPrime(int query)
 int AutoPicker::getGoodFourierDims(int requestedSizeRealX, int lim)
 {
 
+	if (!do_optimise_scale)
+		return requestedSizeRealX;
+
 	int inputPrimeF =XMIPP_MAX(largestPrime(requestedSizeRealX),largestPrime(requestedSizeRealX/2+1));
 	if(inputPrimeF<=LARGEST_ACCEPTABLE_PRIME)
 	{
-		std::cout << "Will use micrographs scaled to xdim " << requestedSizeRealX << ". The largest prime factor in FFTs is " << inputPrimeF << std::endl;
-		std::cout << "     ( no need to modify FFT dims ) " << std::endl;
+		if (verb > 0)
+			std::cout << " + Will use micrographs scaled to " << requestedSizeRealX << " pixels as requested. The largest prime factor in FFTs is " << inputPrimeF << std::endl;
 		return requestedSizeRealX;
 	}
 
@@ -2527,21 +2550,26 @@ int AutoPicker::getGoodFourierDims(int requestedSizeRealX, int lim)
 	}
 
 
-	std::cout << std::endl << "*-----------------------------WARNING------------------------------------------------*"<< std::endl;
-	std::cout << "Will use micrographs scaled to xdim " << requestedSizeRealX << ". The largest prime factor in FFTs is " << inputPrimeF << std::endl;
-	std::cout << "Comparable results will be obtained faster by using  ";
+	if (verb > 0)
+	{
+		std::cout << " + WARNING: Requested rescale of micrographs is " << requestedSizeRealX << " pixels. The largest prime factor in FFTs is " << inputPrimeF << std::endl;
+	}
 	if((currentU-requestedSizeRealX)>(requestedSizeRealX-currentD) || (currentU>lim))
 	{
-		std::cout <<  currentD  << " where the prime factor is " <<  S_down << std::endl;
-		std::cout <<  "         ( change to / add --shrink " << currentD << " to your autopick-command ) " << std::endl;
-		std::cout << "*------------------------------------------------------------------------------------*"<< std::endl << std::endl;
+		if (verb > 0)
+		{
+			std::cout << " + WARNING: Will change rescaling of micrographs to " << currentD << " pixels, because the prime factor then becomes " <<  S_down << std::endl;
+			std::cout << " + WARNING: add --skip_optimise_scale to your autopick command to prevent rescaling " << std::endl;
+		}
 		return currentD;
 	}
 	else
 	{
-		std::cout <<  currentU  << " where the prime factor is " <<  S_up << std::endl;
-		std::cout <<  "         ( change to / add --shrink " << currentU << " to your autopick-command ) "<< std::endl;
-		std::cout << "*------------------------------------------------------------------------------------*"<< std::endl <<std::endl;
+		if (verb > 0)
+		{
+			std::cout << " + WARNING: Will change rescaling of micrographs to " << currentU << " pixels, because the prime factor then becomes " <<  S_up << std::endl;
+			std::cout << " + WARNING: add --skip_optimise_scale to your autopick command to prevent rescaling " << std::endl;
+		}
 		return currentU;
 	}
 

@@ -186,6 +186,9 @@ public:
 	// Array with Fourier-transform of the inverse of the (circular) mask
 	MultidimArray<Complex > Finvmsk;
 
+	// Perform optimisation of the scale factor?
+	bool do_optimise_scale;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_A0, TIMING_A1, TIMING_A2, TIMING_A3, TIMING_A4, TIMING_A5, TIMING_A6, TIMING_A7, TIMING_A8, TIMING_A9;
