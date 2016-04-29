@@ -1,5 +1,22 @@
 #include "src/gpu_utils/cuda_projector_plan.h"
+#include "src/time.h"
 #include <cuda_runtime.h>
+
+//#define PP_TIMING
+#ifdef PP_TIMING
+    Timer timer;
+	int TIMING_TOP = timer.setNew("setup");
+	int TIMING_SAMPLING = timer.setNew(" sampling");
+	int TIMING_PRIOR = timer.setNew("  prior");
+	int TIMING_PROC_CALC = timer.setNew("  procCalc");
+	int TIMING_PROC = timer.setNew("  proc");
+	int TIMING_EULERS = timer.setNew(" eulers");
+#define TIMING_TIC(id) timer.tic(id)
+#define TIMING_TOC(id) timer.toc(id)
+#else
+#define TIMING_TIC(id)
+#define TIMING_TOC(id)
+#endif
 
 void CudaProjectorPlan::setup(
 		HealpixSampling &sampling,
@@ -27,6 +44,8 @@ void CudaProjectorPlan::setup(
 		bool do_skip_rotate,
 		int orientational_prior_mode)
 {
+	TIMING_TIC(TIMING_TOP);
+
 	std::vector< RFLOAT > rots, tilts, psis;
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
@@ -44,12 +63,16 @@ void CudaProjectorPlan::setup(
 
 	orientation_num = 0;
 
+
+	TIMING_TIC(TIMING_SAMPLING);
+
 	for (long int idir = idir_min, iorient = 0; idir <= idir_max; idir++)
 	{
 		for (long int ipsi = ipsi_min, ipart = 0; ipsi <= ipsi_max; ipsi++, iorient++)
 		{
 			long int iorientclass = iclass * nr_dir * nr_psi + iorient;
 
+			TIMING_TIC(TIMING_PRIOR);
 			// Get prior for this direction and skip calculation if prior==0
 			RFLOAT pdf_orientation;
 			if (do_skip_align || do_skip_rotate)
@@ -64,6 +87,7 @@ void CudaProjectorPlan::setup(
 			{
 				pdf_orientation = directions_prior[idir] * psi_prior[ipsi];
 			}
+			TIMING_TOC(TIMING_PRIOR);
 
 			// In the first pass, always proceed
 			// In the second pass, check whether one of the translations for this orientation of any of the particles had a significant weight in the first pass
@@ -71,6 +95,7 @@ void CudaProjectorPlan::setup(
 
 			bool do_proceed(false);
 
+			TIMING_TIC(TIMING_PROC_CALC);
 			if (coarse && pdf_orientation > 0.)
 				do_proceed = true;
 			else if (pdf_orientation > 0.)
@@ -89,7 +114,9 @@ void CudaProjectorPlan::setup(
 					}
 				}
 			}
+			TIMING_TOC(TIMING_PROC_CALC);
 
+			TIMING_TIC(TIMING_PROC);
 			if (do_proceed)
 			{
 				// Now get the oversampled (rot, tilt, psi) triplets
@@ -108,8 +135,10 @@ void CudaProjectorPlan::setup(
 					orientation_num ++;
 				}
 			}
+			TIMING_TOC(TIMING_PROC);
 		}
 	}
+	TIMING_TOC(TIMING_SAMPLING);
 
 	iorientclasses.cp_to_device();
 
@@ -124,6 +153,8 @@ void CudaProjectorPlan::setup(
 		eulers.host_alloc();
 		eulers.device_alloc();
 	}
+
+	TIMING_TIC(TIMING_EULERS);
 
 	for (long int i = 0; i < orientation_num; i++)
 	{
@@ -165,8 +196,11 @@ void CudaProjectorPlan::setup(
 			eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
 		}
 	}
+	TIMING_TOC(TIMING_EULERS);
 
 	eulers.cp_to_device();
+
+	TIMING_TOC(TIMING_TOP);
 }
 
 void CudaProjectorPlan::printTo(std::ostream &os) // print
@@ -191,4 +225,7 @@ void CudaProjectorPlan::clear()
 	iorientclasses.setSize(0);
 	eulers.free_if_set();
 	eulers.setSize(0);
+#ifdef PP_TIMING
+	timer.printTimes(false);
+#endif
 }
