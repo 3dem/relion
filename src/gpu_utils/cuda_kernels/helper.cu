@@ -12,6 +12,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 {
 	// blockid
 	int bid  = blockIdx.x;
+	int cid  = blockIdx.y;
 	//threadid
 	int tid = threadIdx.x;
 
@@ -22,7 +23,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 	{
 		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
 		{
-			pos = iorient * nr_coarse_trans + itrans;
+			pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
 			XFLOAT diff2 = g_Mweight[pos] - min_diff2;
 			if( diff2 < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
 				diff2 = (XFLOAT)0.0;

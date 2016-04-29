@@ -778,7 +778,7 @@ void MlOptimiserMpi::expectation()
 					allocationSize = (double)free *0.7;
 				}
 				else
-					allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000;
+					allocationSize = free - requested_free_gpu_memory;
 
 #ifdef PRINT_GPU_MEM_INFO
 				printf("INFO: Free memory for Custom Allocator of device bundle %d of rank %d is %d MB\n", i, node->rank, (int) ( ((float)allocationSize)/1000000.0 ) );
@@ -794,7 +794,7 @@ void MlOptimiserMpi::expectation()
 	{
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 		{
-			size_t allocationSize = (size_t)((float)allocationSizes[i]/(float)cudaDeviceShares[i]) - GPU_MEMORY_OVERHEAD_MB*1000*1000;
+			size_t allocationSize = (size_t)((float)allocationSizes[i]/(float)cudaDeviceShares[i]) - GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
 	}
