@@ -750,6 +750,14 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				HANDLE_ERROR(cudaDeviceSynchronize());
 				CUDA_CPU_TOC("CudaInverseFourierTransform_1");
 
+
+				CUDA_CPU_TIC("runCenterFFT_1");
+				runCenterFFT(cudaTransformer1.reals,
+							(int)cudaTransformer1.xSize,
+							 (int)cudaTransformer1.ySize,
+							 false,
+							 cudaTransformer1.batchSize[psiIter]);
+				CUDA_CPU_TOC("runCenterFFT_1");
 				// Calculate ratio of prabilities P(ref)/P(zero)
 				// Keep track of the best values and their corresponding iref and psi
 				// ------------------------------------------------------------------
