@@ -503,7 +503,9 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
-						  	  			  CudaProjectorKernel projector)
+						  	  			  CudaProjectorKernel projector,
+						  	  			  int startPsi
+						  	  			  )
 {
 	int proj = blockIdx.y;
 	int image_size=projector.imgX*projector.imgY;

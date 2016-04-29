@@ -350,8 +350,9 @@ void AutoPicker::initialise()
 		tempFrac -= tempFrac%2;
 		if(tempFrac<micrograph_size)
 		{
-			getGoodFourierDims(tempFrac,micrograph_size);
 			workSize = tempFrac;
+			getGoodFourierDims(workSize,micrograph_size);
+
 		}
 		else
 			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
@@ -361,13 +362,16 @@ void AutoPicker::initialise()
 
 		if(workFrac>0)
 		{
-			getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
-			workSize = ROUND(workFrac*(RFLOAT)micrograph_size);
+			workSize = ROUND((int)((float)workFrac*(float)micrograph_size));
+			workSize -= workSize%2;
+			getGoodFourierDims(workSize,micrograph_size);
+
 		}
 		else if(workFrac==0)
 		{
-			getGoodFourierDims((int)downsize_mic,micrograph_size);
 			workSize = downsize_mic;
+			getGoodFourierDims(workSize,micrograph_size);
+
 		}
 		else
 			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
@@ -376,8 +380,10 @@ void AutoPicker::initialise()
 
 	if(workSize<downsize_mic)
 	{
-		printf(" WARNING: workFrac<downsize_mic, meaning you have chosen to \n use lower resolution than available in the micrograph. \n"
-			   "(you are allowed to do this, it might even be a good idea, \n but beware, you are choosing to ignore some level of detail)\n");
+		std::cerr << std::endl 	<< "*-----------------------------WARNING------------------------------------------------*"<< std::endl;
+		std::cerr 			   	<< "By using --shrink you have chosen use lower resolution than --lowpass" << std::endl;
+		std::cerr 			   	<< "you are allowed to do this (it might even be a good idea) but beware" << std::endl;
+		std::cerr				<< "*------------------------------------------------------------------------------------*"<< std::endl;
 	}
 
 	//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
