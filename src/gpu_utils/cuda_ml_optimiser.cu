@@ -1612,9 +1612,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << std::endl;
 				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]  << std::endl;
-				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
-				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
 				pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
 				pdf_offset.dump_device_to_file("error_dump_pdf_offset");
@@ -1650,6 +1648,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
 				unsorted_ipart.dump_device_to_file("error_dump_unsorted");
 				filtered.dump_device_to_file("error_dump_filtered");
