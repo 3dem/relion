@@ -133,21 +133,28 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// If all slaves had preread images into RAM: get those now
 			if (baseMLO->do_preread_images)
 			{
-				img() = baseMLO->mydata.particles[part_id].img;
+                img().reshape(baseMLO->mydata.particles[part_id].img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mydata.particles[part_id].img)
+				{
+                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(baseMLO->mydata.particles[part_id].img, n);
+				}
 			}
 			else
 			{
-				/*
-				// Read from disc
-				FileName fn_img;
-				std::istringstream split(baseMLO->exp_fn_img);
-				for (int i = 0; i <= istop; i++)
-					getline(split, fn_img);
-
-				img.read(fn_img);
-				img().setXmippOrigin();
-				*/
-				img() = baseMLO->exp_imgs[istop];
+				if (baseMLO->mymodel.data_dim == 3)
+				{
+					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
+					FileName fn_img;
+					std::istringstream split(baseMLO->exp_fn_img);
+					for (int i = 0; i <= istop; i++)
+						getline(split, fn_img);
+					img.read(fn_img);
+					img().setXmippOrigin();
+				}
+				else
+				{
+					img() = baseMLO->exp_imgs[istop];
+				}
 			}
 			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 			{
@@ -1263,7 +1270,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-		
+
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CUDA_CPU_TIC("collect_data_1");

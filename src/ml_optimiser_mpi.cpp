@@ -445,36 +445,36 @@ void MlOptimiserMpi::initialiseWorkLoad()
     {
     	if (do_parallel_disc_io)
 		{
-    		int uniqnr = rand() % 100000;
-    		FileName fn_uniq = fn_out;
-    		fn_uniq.replaceAllSubstrings("/", "_");
-    		fn_uniq += "_lock" + integerToString(uniqnr);
-    		bool lock_exists;
 
-    		// One after the other, all ranks pass through  mydata.checkScratchLock()
+    		FileName fn_lock = mydata.initialiseScratchLock(fn_scratch, fn_out);
+    		// One rank after the other, all slaves pass through  mydata.prepareScratchDirectory()
     		// This way, only the first rank on each hostname will actually copy the particle stacks
+    		// The rest will just update the filenames in exp_model
+    		bool need_to_copy = false;
     		for (int inode = 0; inode < node->size; inode++)
     		{
-    			if (inode == node->rank)
+    			if (inode > 0 && inode == node->rank)
     			{
     				// The master removes the lock if it existed
-    				lock_exists = mydata.checkScratchLock(fn_scratch, fn_uniq, node->isMaster());
+    				need_to_copy = mydata.prepareScratchDirectory(fn_scratch, fn_lock);
     			}
-
     			MPI_Barrier(MPI_COMM_WORLD);
     		}
 
-    		// All slaves pass through mydata.copyParticlesToScratch()
-    		// if (lock_exists) then only change names in the MDimg, don't actually copy the particle stacks
     		int myverb = (node->rank == 1) ? 1 : 0; // Only the first slave
-    		//std::cerr << " node->rank= " << node->rank << " lock_exists= " << lock_exists << " myverb= " << myverb << std::endl;
-    		mydata.copyParticlesToScratch(fn_scratch, myverb, lock_exists, max_scratch_Gb);
+    		if (!node->isMaster())
+    		{
+    			mydata.copyParticlesToScratch(myverb, need_to_copy, keep_free_scratch_Gb);
+    		}
 		}
 		else
 		{
 			// Only the master needs to copy the data, as only the master will be reading in images
 			if (node->isMaster())
-				mydata.copyParticlesToScratch(fn_scratch, 1, false, max_scratch_Gb);
+			{
+				mydata.prepareScratchDirectory(fn_scratch);
+				mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
     }

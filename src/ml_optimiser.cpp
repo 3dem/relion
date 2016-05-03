@@ -267,7 +267,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	max_scratch_Gb = textToInteger(parser.getOption("--max_scratch", "Space available for copying particle stacks (in Gb)", "80"));
+	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -446,7 +446,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	max_scratch_Gb = textToInteger(parser.getOption("--max_scratch", "Space available for copying particle stacks (in Gb)", "80"));
+	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -907,6 +907,10 @@ void MlOptimiser::initialise()
 
 	if (do_gpu)
 	{
+
+		if (do_helical_refine)
+			REPORT_ERROR("You cannot use GPU-acceleration with helical refinement yet...");
+
 		do_shifts_onthefly = true;
 
 		int devCount;
@@ -1310,7 +1314,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
 	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
-	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu,
+	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, do_helical_refine, helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 	// Default max_coarse_size is original size
@@ -1433,7 +1437,10 @@ void MlOptimiser::initialiseWorkLoad()
 
     // Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
-    	mydata.copyParticlesToScratch(fn_scratch, 1, false, max_scratch_Gb);
+    {
+    	mydata.prepareScratchDirectory(fn_scratch);
+    	mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+    }
 
 }
 
@@ -1484,6 +1491,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			// Get the image filename
 			MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
@@ -1503,7 +1511,11 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             Image<RFLOAT> img;
 			if (do_preread_images && do_parallel_disc_io)
             {
-                img() = mydata.particles[part_id].img;
+                img().reshape(mydata.particles[part_id].img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+				{
+                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+				}
             }
             else
             {
@@ -1721,6 +1733,10 @@ void MlOptimiser::iterateWrapUp()
     delete global_barrier;
 	delete global_ThreadManager;
     delete exp_ipart_ThreadTaskDistributor;
+
+    // Delete volatile space on scratch
+    mydata.deleteDataOnScratch();
+
 }
 
 void MlOptimiser::iterate()
@@ -2410,7 +2426,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 				std::istringstream split(exp_fn_img);
 				for (int i = 0; i <= istop; i++)
 					getline(split, fn_img);
-
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
@@ -3627,7 +3642,11 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			// If all slaves had preread images into RAM: get those now
 			if (do_preread_images)
 			{
-				img() = mydata.particles[part_id].img;
+                img().reshape(mydata.particles[part_id].img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+				{
+                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+				}
 			}
 			else
 			{
@@ -3667,7 +3686,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					std::istringstream split(exp_fn_img);
 					for (int i = 0; i <= istop; i++)
 						getline(split, fn_img);
-
 					img.read(fn_img);
 					img().setXmippOrigin();
 				}
@@ -7382,7 +7400,13 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 				// First read the image from disc or get it from the preread images in the mydata structure
 				Image<RFLOAT> img, rec_img;
 				if (do_preread_images)
-					img() = mydata.particles[part_id].img;
+				{
+					img().reshape(mydata.particles[part_id].img);
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+					{
+						DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+					}
+				}
 				else
 				{
 					// only open new stacks
