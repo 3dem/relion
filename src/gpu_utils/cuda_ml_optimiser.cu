@@ -1483,73 +1483,67 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			pdf_offset.cp_to_device();
 			CUDA_CPU_TOC("get_offset_priors");
+			CUDA_CPU_TIC("sumweight1");
 
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+			long int block_num;
+			if(exp_ipass==0)
 			{
-				CUDA_CPU_TIC("sumweight1");
-				long int block_num;
+				CudaGlobalPtr<XFLOAT>  ipartMweight(
+						Mweight,
+						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
+						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
-				if(exp_ipass==0)  //use Mweight for now - FIXME use PassWeights.weights (ignore indexArrays)
+				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
+				dim3 block_dim(block_num,sp.iclass_max-sp.iclass_min+1);
+
+				cuda_kernel_exponentiate_weights_coarse<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
+						~pdf_orientation,
+						~pdf_offset,
+						~ipartMweight,
+						(XFLOAT)op.min_diff2[ipart],
+						sp.nr_dir*sp.nr_psi,
+						sp.nr_trans);
+			}
+			else
+			{
+				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
-					CudaGlobalPtr<XFLOAT>  classMweight(
-							Mweight,
-							ipart * op.Mweight.xdim + exp_iclass * sp.nr_dir * sp.nr_psi * sp.nr_trans,
-							sp.nr_dir * sp.nr_psi * sp.nr_trans);
+					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
+					{
+						// Use the constructed mask to build a partial (class-specific) input
+						// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
+						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
+						CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
+						CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
-					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
-					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
+						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
+						dim3 block_dim(block_num);
 
-					block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
-					dim3 block_dim(block_num);
+						cuda_kernel_exponentiate_weights_fine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+								~pdf_orientation_class,
+								~pdf_offset_class,
+								~thisClassPassWeights.weights,
+								(XFLOAT)op.min_diff2[ipart],
+								sp.nr_oversampled_rot,
+								sp.nr_oversampled_trans,
+								~thisClassPassWeights.rot_id,
+								~thisClassPassWeights.trans_idx,
+								~FPCMasks[ipart][exp_iclass].jobOrigin,
+								~FPCMasks[ipart][exp_iclass].jobExtent,
+								FPCMasks[ipart][exp_iclass].jobNum);
+								LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+					}
 
-//					CUDA_GPU_TIC("cuda_kernel_sumweight");
-
-					cuda_kernel_exponentiate_weights_coarse<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
-							~pdf_orientation_class,
-							~pdf_offset_class,
-							~classMweight,
-							(XFLOAT)op.min_diff2[ipart],
-							sp.nr_dir*sp.nr_psi,
-							sp.nr_trans);
-					LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-//					CUDA_GPU_TAC("cuda_kernel_sumweight");
 				}
-				else if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
-				{
-					// Use the constructed mask to build a partial (class-specific) input
-					// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
-					IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
-					CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
-					CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
-					block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
-					dim3 block_dim(block_num);
-
-//					CUDA_GPU_TIC("cuda_kernel_sumweight");
-					cuda_kernel_exponentiate_weights_fine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
-							~pdf_orientation_class,
-							~pdf_offset_class,
-							~thisClassPassWeights.weights,
-							(XFLOAT)op.min_diff2[ipart],
-							sp.nr_oversampled_rot,
-							sp.nr_oversampled_trans,
-							~thisClassPassWeights.rot_id,
-							~thisClassPassWeights.trans_idx,
-							~FPCMasks[ipart][exp_iclass].jobOrigin,
-							~FPCMasks[ipart][exp_iclass].jobExtent,
-							FPCMasks[ipart][exp_iclass].jobNum);
-							LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-//					CUDA_GPU_TAC("cuda_kernel_sumweight");
-				}
 				CUDA_CPU_TOC("sumweight1");
-			} // end loop exp_iclass
 
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
-			if(exp_ipass!=0)
 				PassWeights[ipart].weights.cp_to_host(); // note that the host-pointer is shared: we're copying to Mweight.
+			}
 		}
 	} // end loop ipart
 

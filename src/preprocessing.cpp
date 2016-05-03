@@ -19,8 +19,8 @@
  ***************************************************************************/
 #include "src/preprocessing.h"
 
-//#define TIMING
-#ifdef TIMING
+//#define PREP_TIMING
+#ifdef PREP_TIMING
     Timer timer;
 	int TIMING_TOP = timer.setNew("extractParticlesFromFieldOfView");
 	int TIMING_READ_COORD = timer.setNew("readInCoordinateFile");
@@ -299,7 +299,7 @@ void Preprocessing::run()
 	if (verb > 0)
 		std::cout << " Done preprocessing!" <<std::endl;
 
-#ifdef TIMING
+#ifdef PREP_TIMING
     	timer.printTimes(false);
 #endif
 }
