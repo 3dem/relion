@@ -463,7 +463,9 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     		int myverb = (node->rank == 1) ? 1 : 0; // Only the first slave
     		if (!node->isMaster())
+    		{
     			mydata.copyParticlesToScratch(myverb, need_to_copy, keep_free_scratch_Gb);
+    		}
 		}
 		else
 		{

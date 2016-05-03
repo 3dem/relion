@@ -260,6 +260,9 @@ public:
     // Number of particles saved on the scratchdir
     long int nr_parts_on_scratch;
 
+    // Save the original names
+    std::vector<FileName> original_img_names, original_ctf_names;
+
     // Number of Gb on scratch disk before copying particles
     long int free_space_Gb;
 
