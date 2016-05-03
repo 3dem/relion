@@ -91,7 +91,7 @@ public:
 			needed += biggness;
 		}
 #endif
-		size_t res = needed + odist*2*batch*sizeof(XFLOAT) + idist*batch*sizeof(XFLOAT);
+		size_t res = needed + (size_t)odist*(size_t)batch*sizeof(XFLOAT)*(size_t)2 + (size_t)idist*(size_t)batch*sizeof(XFLOAT);
 
 		return res;
 	}
@@ -155,6 +155,13 @@ public:
 			while(needed>avail && psiSpace>1)
 			{
 				psiIters++;
+				psiSpace = CEIL((double) batch / (double)psiIters);
+				needed = estimate(psiSpace);
+			}
+
+			if(psiIters>1)
+			{
+				psiIters = (int)((float)psiIters*1.1 + 1);
 				psiSpace = CEIL((double) batch / (double)psiIters);
 				needed = estimate(psiSpace);
 			}
