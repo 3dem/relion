@@ -350,9 +350,7 @@ void AutoPicker::initialise()
 		tempFrac -= tempFrac%2;
 		if(tempFrac<micrograph_size)
 		{
-			workSize = tempFrac;
-			getGoodFourierDims(workSize,micrograph_size);
-
+			workSize = getGoodFourierDims(tempFrac,micrograph_size);
 		}
 		else
 			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
@@ -362,28 +360,25 @@ void AutoPicker::initialise()
 
 		if(workFrac>0)
 		{
-			workSize = ROUND((int)((float)workFrac*(float)micrograph_size));
-			workSize -= workSize%2;
-			getGoodFourierDims(workSize,micrograph_size);
-
+			workSize = getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
 		}
 		else if(workFrac==0)
 		{
-			workSize = downsize_mic;
-			getGoodFourierDims(workSize,micrograph_size);
-
+			workSize = getGoodFourierDims((int)downsize_mic,micrograph_size);
 		}
 		else
 			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
 	}
 	workSize -= workSize%2; //make even in case it is not already
 
-	if(workSize<downsize_mic)
+	if ( verb > 0 && workSize < downsize_mic)
 	{
-		std::cerr << std::endl 	<< "*-----------------------------WARNING------------------------------------------------*"<< std::endl;
-		std::cerr 			   	<< "By using --shrink you have chosen use lower resolution than --lowpass" << std::endl;
-		std::cerr 			   	<< "you are allowed to do this (it might even be a good idea) but beware" << std::endl;
-		std::cerr				<< "*------------------------------------------------------------------------------------*"<< std::endl;
+		std::cout << " + WARNING: The calculations will be done at a lower resolution than requested." << std::endl;
+	}
+
+	if ( verb > 0 && (autopick_helical_segments) && ((float(workSize) / float(micrograph_size)) < 0.4999) )
+	{
+		std::cerr << " + WARNING: Please consider using a shrink value 0.5~1 for picking helical segments. Smaller values may lead to poor results." << std::endl;
 	}
 
 	//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
