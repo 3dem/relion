@@ -605,15 +605,24 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 	FileName fn_open_stack = "";
 	fImageHandler hFile;
 	nr_parts_on_scratch = 0;
+	original_img_names.clear();
+	original_ctf_names.clear();
 	bool also_do_ctf_image = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
 		long int imgno;
-		FileName fn_img, fn_stack, fn_new;
+		int ihalf;
+		FileName fn_img, fn_ctf, fn_stack, fn_img_new, fn_ctf_new;
 		Image<RFLOAT> img;
 		MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+		original_img_names.push_back(fn_img);
+		if (also_do_ctf_image)
+		{
+			MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
+			original_ctf_names.clear();
+		}
 
-		// Get the size of 1 particle
+		// Get the size of the first particle
 		if (nr_parts_on_scratch == 0)
 		{
 			Image<RFLOAT> tmp;
@@ -645,6 +654,25 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 			break;
 		}
 
+		// Replace the filenames in the Metadatatable
+		if (is_3D)
+		{
+			fn_img_new = fn_scratch + "particle" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
+			MDimg.setValue(EMDL_IMAGE_NAME, fn_img_new);
+			if (also_do_ctf_image)
+			{
+				fn_ctf_new = fn_scratch + "particle_ctf" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
+				MDimg.setValue(EMDL_CTF_IMAGE, fn_ctf_new);
+			}
+		}
+		else
+		{
+			fn_img.decompose(imgno, fn_stack);
+			fn_img_new.compose(nr_parts_on_scratch+1, fn_scratch + "particles.mrcs");
+			MDimg.setValue(EMDL_IMAGE_NAME, fn_img_new);
+		}
+
+
 		// Read in the particle image, and write out on scratch
 		if (do_copy)
 		{
@@ -652,22 +680,16 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 			{
 				// For subtomograms, write individual .mrc files,possibly also CTF images
 				img.read(fn_img);
-				fn_new = fn_scratch + "particle" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
-				img.write(fn_new);
-
+				img.write(fn_img_new);
 				if (also_do_ctf_image)
 				{
-					FileName fn_ctf;
-					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
 					img.read(fn_ctf);
-					fn_new = fn_scratch + "particle_ctf" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
-					img.write(fn_new);
+					img.write(fn_ctf_new);
 				}
 			}
 			else
 			{
 				// Only open/close new stacks, so check if this is a new stack
-				fn_img.decompose(imgno, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
 					if (fn_open_stack != "")
@@ -677,11 +699,10 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, long int keep_fr
 				}
 				img.readFromOpenFile(fn_img, hFile, -1, false);
 
-				fn_new.compose(nr_parts_on_scratch+1, fn_scratch + "particles.mrcs");
 				if (nr_parts_on_scratch == 0)
-					img.write(fn_new, -1, false, WRITE_OVERWRITE);
+					img.write(fn_img_new, -1, false, WRITE_OVERWRITE);
 				else
-					img.write(fn_new, -1, true, WRITE_APPEND);
+					img.write(fn_img_new, -1, true, WRITE_APPEND);
 			}
 		}
 
@@ -1169,11 +1190,72 @@ void Experiment::write(FileName fn_root)
     if (!fh)
         REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
 
-    // The vector is needed because not all fn_img may be on fn_scratch (for example when it is full!)
-    std::vector<FileName> fn_imgs;
+    bool also_do_ctf = (original_ctf_names.size() > 0);
+
+	// Remove scratch directory from the filenames
+    if (fn_scratch != "")
+    {
+    	long int ipart = 0;
+    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		{
+    		if (ipart < nr_parts_on_scratch)
+    		{
+    			FileName fn_img;
+				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				MDimg.setValue(EMDL_IMAGE_NAME, original_img_names[ipart]);
+				// Temporarily store the scratch name i this vector
+				original_img_names[ipart] = fn_img;
+
+				if (also_do_ctf)
+				{
+		   			FileName fn_ctf;
+					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
+					MDimg.setValue(EMDL_CTF_IMAGE, original_ctf_names[ipart]);
+					// Temporarily store the scratch name i this vector
+					original_ctf_names[ipart] = fn_ctf;
+				}
+    		}
+    		else
+    		{
+    			break;
+    		}
+    		ipart++;
+		}
+    }
 
     // Always write MDimg
     MDimg.write(fh);
+
+	// Reset all the the particle names as they were
+    if (fn_scratch != "")
+    {
+    	long int ipart = 0;
+    	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		{
+    		if (ipart < nr_parts_on_scratch)
+    		{
+    			FileName fn_img;
+				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				MDimg.setValue(EMDL_IMAGE_NAME, original_img_names[ipart]);
+				// Put the original name back in this vector
+				original_img_names[ipart] = fn_img;
+				if (also_do_ctf)
+				{
+					FileName fn_ctf;
+					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
+					MDimg.setValue(EMDL_CTF_IMAGE, original_ctf_names[ipart]);
+					// Put the original name back in this vector
+					original_ctf_names[ipart] = fn_ctf;
+				}
+    		}
+    		else
+    		{
+    			break;
+    		}
+    		ipart++;
+		}
+    }
+
 
     if (nr_bodies > 1)
     {
