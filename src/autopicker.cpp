@@ -419,6 +419,7 @@ void AutoPicker::initialise()
 	 * intermediate calculations.
 	 */
 
+
 	if(workFrac>1) // set size directly
 	{
 		int tempFrac = (int)ROUND(workFrac);
@@ -435,7 +436,9 @@ void AutoPicker::initialise()
 
 		if(workFrac>0)
 		{
-			workSize = getGoodFourierDims((int)workFrac*(RFLOAT)micrograph_size,micrograph_size);
+			int tempFrac = (int)ROUND(workFrac*(RFLOAT)micrograph_size);
+			tempFrac -= tempFrac%2;
+			workSize = getGoodFourierDims(tempFrac,micrograph_size);
 		}
 		else if(workFrac==0)
 		{

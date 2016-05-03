@@ -33,6 +33,7 @@ public:
 	CudaGlobalPtr<cufftComplex> fouriers;
 #endif
 	cufftHandle cufftPlanForward, cufftPlanBackward;
+	int direction;
 	size_t xSize,ySize,xFSize,yFSize;
 	std::vector< int >  batchSize;
 	CudaCustomAllocator *CFallocator;
@@ -43,6 +44,7 @@ public:
 		fouriers(stream, allocator),
 		cufftPlanForward(0),
 		cufftPlanBackward(0),
+		direction(0),
 		planSet(false),
 		xSize(0), ySize(0),
 		xFSize(0), yFSize(0),
@@ -50,9 +52,9 @@ public:
 		CFallocator(allocator)
 	{};
 
-	long int estimate(int batch, float fudge = 1.0)
+	size_t estimate(int batch)
 	{
-		size_t needed;
+		size_t needed(0);
 
 	    int idist = ySize*xSize;
 	    int odist = ySize*(xSize/2+1);
@@ -67,21 +69,55 @@ public:
 	    size_t biggness;
 
 #ifdef CUDA_DOUBLE_PRECISION
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batch, &biggness));
-		needed = biggness;
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batch, &biggness));
-		needed += biggness;
+	    if(direction<=0)
+	    {
+			HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batch, &biggness));
+			needed += biggness;
+	    }
+		if(direction>=0)
+		{
+			HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batch, &biggness));
+			needed += biggness;
+		}
 #else
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batch, &biggness));
-		needed = biggness;
-		HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
-		needed += biggness;
+		if(direction<=0)
+		{
+			HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batch, &biggness));
+			needed += biggness;
+		}
+		if(direction>=0)
+		{
+			HANDLE_CUFFT_ERROR( cufftEstimateMany(2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batch, &biggness));
+			needed += biggness;
+		}
 #endif
-		return (long int)((float)needed*fudge);
+		size_t res = needed + odist*2*batch*sizeof(XFLOAT) + idist*batch*sizeof(XFLOAT);
+
+		return res;
 	}
 
-	void setSize(size_t x, size_t y, int batch = 1)
+	void setSize(size_t x, size_t y, int batch = 1, int setDirection = 0)
 	{
+
+		/* Optional 4th input restricts transformer to
+		 * forwards or backwards tranformation only,
+		 * which reduces memory requirements, especially
+		 * for large batches of simulatanous transforms.
+		 *
+		 * FFTW_FORWARDS  === -1
+		 * FFTW_BACKWARDS === +1
+		 *
+		 * The default direction is 0 === forwards AND backwards
+		 */
+
+		if( !( (setDirection==-1)||(setDirection==0)||(setDirection==1) ) )
+		{
+			std::cerr << "*ERROR : Setting a cuda transformer direction to non-defined value" << std::endl;
+			raise(SIGSEGV);
+		}
+
+		direction = setDirection;
+
 		if (x == xSize && y == ySize && batch == batchSize[0] && planSet)
 			return;
 
@@ -95,31 +131,14 @@ public:
 		xFSize = x/2 + 1;
 		yFSize = y;
 
-		float fudge = 2.0;
-
 		size_t needed, avail, total;
-		needed = estimate(batchSize[0],fudge);
+		needed = estimate(batchSize[0]);
 		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
 
-		double memFrac = (double)needed / (double)avail;
-
 //		std::cout << std::endl << "needed = ";
-//		printf("%15li\n", needed);
+//		printf("%15zu\n", needed);
 //		std::cout << "avail  = ";
-//		printf("%15li\n", avail);
-//		std::cout << "memFrac  = ";
-//		printf("%15f\n", memFrac);
-
-
-		// set the size of the real-array to hold the RESULT of transforms ALL batches.
-		reals.setSize(x*y*batch);
-		reals.device_alloc();
-		reals.host_alloc();
-
-		// set the size of the fouriers-array to hold the RESULT of transforms ALL batches.
-		fouriers.setSize(y*(x/2+1)*batch);
-		fouriers.device_alloc();
-		fouriers.host_alloc();
+//		printf("%15zu\n", avail);
 
 		// Check if there is enough memory
 		//
@@ -127,19 +146,17 @@ public:
 		//
 		// If there isn't, find how many there ARE space for and loop through them in batches.
 
-		// batch fudge-factor to avoid running out of temp-space for transform plan
-
-		if(memFrac>1)
+		if(needed>avail)
 		{
-			psiIters = CEIL(memFrac);
+			psiIters = 2;
 			psiSpace = CEIL((double) batch / (double)psiIters);
-			needed = estimate(psiSpace,fudge);
+			needed = estimate(psiSpace);
 
 			while(needed>avail && psiSpace>1)
 			{
 				psiIters++;
 				psiSpace = CEIL((double) batch / (double)psiIters);
-				needed = estimate(psiSpace,fudge);
+				needed = estimate(psiSpace);
 			}
 
 			batchSize.assign(psiIters,psiSpace); // specify psiIters of batches, each with psiSpace orientations
@@ -148,8 +165,8 @@ public:
 			if(needed>avail)
 				REPORT_ERROR("Not enough memory for even a single orientation.");
 
-			std::cerr << std::endl << "NOTE: Having to use " << psiIters << " batches of orientations ";
-			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
+//			std::cerr << std::endl << "NOTE: Having to use " << psiIters << " batches of orientations ";
+//			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
 //			std::cerr << "( this could affect performance, consider using " << std::endl;
 //			std::cerr << "\t higher --ang" << std::endl;
 //			std::cerr << "\t harder --shrink" << std::endl;
@@ -162,8 +179,16 @@ public:
 			psiSpace = batch;
 		}
 
-		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
-		needed = estimate(batchSize[0], fudge);
+		reals.setSize(x*y*batchSize[0]);
+		reals.device_alloc();
+		reals.host_alloc();
+
+		fouriers.setSize(y*(x/2+1)*batchSize[0]);
+		fouriers.device_alloc();
+		fouriers.host_alloc();
+
+//		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
+//		needed = estimate(batchSize[0], fudge);
 
 //		std::cout << "after alloc: " << std::endl << std::endl << "needed = ";
 //		printf("%15li\n", needed);
@@ -182,10 +207,16 @@ public:
 	    int nR[2] = {y, x};
 //	    int nC[2] = {y, x/2 +1};
 #ifdef CUDA_DOUBLE_PRECISION
-		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batchSize[0]));
-		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batchSize[0]));
-		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanForward, fouriers.getStream()));
-		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanBackward, reals.getStream()));
+	    if(direction<=0)
+	    {
+	    	HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batchSize[0]));
+	   		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanForward, fouriers.getStream()));
+	    }
+	    if(direction>=0)
+	    {
+	    	HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_Z2D, batchSize[0]));
+			HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanBackward, reals.getStream()));
+	    }
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_D2Z) );
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_Z2D) );
 
@@ -204,10 +235,16 @@ public:
 
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanForward,  x, y, CUFFT_R2C) );
 //		HANDLE_CUFFT_ERROR( cufftPlan2d(&cufftPlanBackward, x, y, CUFFT_C2R) );
-	    HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batchSize[0]));
-		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batchSize[0]));
-		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanForward, fouriers.getStream()));
-		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanBackward, reals.getStream()));
+	 	if(direction<=0)
+	 	{
+	 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  2, nR, inembed, istride, idist, onembed, ostride, odist, CUFFT_R2C, batchSize[0]));
+	 		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanForward, fouriers.getStream()));
+	 	}
+	 	if(direction>=0)
+	 	{
+	 		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward, 2, nR, onembed, ostride, odist, inembed, istride, idist, CUFFT_C2R, batchSize[0]));
+	 		HANDLE_CUFFT_ERROR( cufftSetStream(cufftPlanBackward, reals.getStream()));
+	 	}
 //		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,   2, nR, 0,0,0,0,0,0, CUFFT_R2C, batchSize));
 //		HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanBackward,  2, nC, 0,0,0,0,0,0, CUFFT_C2R, batchSize));
 
@@ -216,51 +253,24 @@ public:
 
 	void forward()
 	{
-		if(psiIters>1)
+		if(direction==1)
 		{
-			long int Fstride =xFSize*yFSize;
-			long int Rstride =xSize*ySize;
-			long int Fpos = 0;
-			long int Rpos = 0;
-			for (int psiIter = 0; psiIter < psiIters; psiIter++) // psi-batches for possible memory-limits
-			{
-				HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, &reals(Rpos), &fouriers(Fpos)) );
-				Fpos += Fstride*batchSize[psiIter];
-				Rpos += Rstride*batchSize[psiIter];
-			}
+			std::cout << "trying to execute a forward plan for a cudaFFT transformer which is backwards-only" << std::endl;
+			raise(SIGSEGV);
 		}
-		else
-		{
-			HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) );
-		}
+		HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) );
 	}
 
 	void backward()
 	{
-		if(psiIters>1)
+		if(direction==-1)
 		{
-			long int Fstride =xFSize*yFSize;
-			long int Rstride =xSize*ySize;
-			long int Fpos = 0;
-			long int Rpos = 0;
-			for (int psiIter = 0; psiIter < psiIters; psiIter++) // psi-batches for possible memory-limits
-			{
-				HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, &fouriers(Fpos), &reals(Rpos)) );
-				Fpos += Fstride*batchSize[psiIter];
-				Rpos += Rstride*batchSize[psiIter];
-			}
+			std::cout << "trying to execute a backwards plan for a cudaFFT transformer which is forwards-only" << std::endl;
+			raise(SIGSEGV);
 		}
-		else
-		{
-			HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) );
-		}
+		HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) );
 	}
 
-	void backward(CudaGlobalPtr<cufftComplex> &src)
-		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~src, ~reals) ); }
-
-	void backward(CudaGlobalPtr<cufftReal> &dst)
-		{ HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~dst) ); }
 #endif
 	void clear()
 	{
@@ -268,8 +278,10 @@ public:
 		{
 			reals.free_if_set();
 			fouriers.free_if_set();
-			HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanForward));
-			HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanBackward));
+			if(direction<=0)
+				HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanForward));
+			if(direction>=0)
+				HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanBackward));
 			planSet = false;
 		}
 	}

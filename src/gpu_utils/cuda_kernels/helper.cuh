@@ -112,7 +112,8 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
-						  	  			  CudaProjectorKernel projector);
+						  	  			  CudaProjectorKernel projector,
+						  	  			  int startPsi = 0);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A
