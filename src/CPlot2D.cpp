@@ -26,6 +26,25 @@
 
 #include "CPlot2D.h"
 
+void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
+{
+
+
+	std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+	command += fn_pdf + " ";
+	for (int i = 0; i < fn_eps.size(); i++)
+		command += fn_eps[i] + " ";
+
+	command += " > /dev/null &";
+	if (system(command.c_str()))
+	{
+		std::cerr << " ERROR in executing: " << command << std::endl;
+		std::cerr << " + Will make an empty PDF-file in " << fn_pdf << std::endl;
+		std::cerr << " + Solve your issue with the ps-command to get better PDF logfiles." << std::endl;
+		touch(fn_pdf);
+	}
+}
+
 CPlot2D::CPlot2D(std::string title)
 {
     m_dXAxisSize=809.0; // Golden Ratio
