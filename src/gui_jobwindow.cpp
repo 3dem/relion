@@ -5526,6 +5526,8 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 
 void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 {
+	is_continue = _is_continue;
+
 	fn_data.deactivate(is_continue);
 	fn_in.deactivate(is_continue);
 	fn_mask.deactivate(is_continue);
@@ -5536,7 +5538,6 @@ void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 	ctf_phase_flipped.deactivate(is_continue);
 	ctf_intact_first_peak.deactivate(is_continue);
 
-	is_continue = _is_continue;
 }
 
 bool SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,

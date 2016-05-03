@@ -1340,7 +1340,7 @@ void RelionMainWindow::cb_display_io_node_i()
 			global_manualpickjob.read(fn_job.c_str(), iscont);
 		else
 		{
-			fl_message("ERROR: Save a Manual picking job parameters (using the File menu) before displaying coordinate files. ");
+			fl_message("ERROR: Save a Manual picking job parameter file (using the Save jobs settings option from the Jobs menu) before displaying coordinate files. ");
 			return;
 		}
 
