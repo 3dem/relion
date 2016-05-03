@@ -950,8 +950,8 @@ void getAllSquaredDifferencesCoarse(
 
 				runDiff2KernelCoarse(
 						projKernel,
-						~trans_x,
-						~trans_y,
+						do_CC ? NULL : ~trans_x,
+						do_CC ? NULL : ~trans_y,
 						~corr_img,
 						~Fimgs_real,
 						~Fimgs_imag,
@@ -1561,9 +1561,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
-			Mweight.cp_to_host();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(Mweight.getStream()));
-
 			my_significant_weight = 0.999;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) 1.;
 			if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
@@ -1619,9 +1616,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << std::endl;
 				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]  << std::endl;
-				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
-				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
 				pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
 				pdf_offset.dump_device_to_file("error_dump_pdf_offset");
@@ -1657,6 +1652,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
 				unsorted_ipart.dump_device_to_file("error_dump_unsorted");
 				filtered.dump_device_to_file("error_dump_filtered");
