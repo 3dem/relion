@@ -383,9 +383,9 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	Fl_Text_Buffer *textbuf = new Fl_Text_Buffer;
 
 	// Open the standard job submission file
-	int errno;
-	if (errno = textbuf->loadfile(qsubscript.getValue().c_str()))
-	    fl_alert("Error reading from file \'%s\':\n%s.", qsubscript.getValue().c_str(), strerror(errno));
+	int err_no;
+	if (err_no = textbuf->loadfile(qsubscript.getValue().c_str()))
+	    fl_alert("Error reading from file \'%s\':\n%s.", qsubscript.getValue().c_str(), strerror(err_no));
 
 	// default to a single thread
 	int nmpi = nr_mpi.getValue();
@@ -426,8 +426,8 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	textbuf->append("\n");
 
 	// Save the modified job submission script using a local name
-	if (errno = textbuf->savefile(newfilename.c_str()))
-	    fl_alert("Error writing to file \'%s\':\n%s.", newfilename.c_str(), strerror(errno));
+	if (err_no = textbuf->savefile(newfilename.c_str()))
+	    fl_alert("Error writing to file \'%s\':\n%s.", newfilename.c_str(), strerror(err_no));
 
 }
 
@@ -759,6 +759,12 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	input_star_mics.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions and write out the averages.");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss. ");
+	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all, only for MOTIONCORR). This will be used for MOTIONCORRs -ned and -nes.");
+
 	tab1->end();
 
 	tab2->begin();
@@ -781,8 +787,6 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	bin_factor.place(current_y, "Binning factor (1 or 2):", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
 	first_frame_ali.place(current_y, "First frame for alignment:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
 	last_frame_ali.place(current_y, "Last frame for alignment:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
-	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
-	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
 	bfactor.place(current_y, "Bfactor:", 150, 0, 1500, 50, "The B-factor (in pixel^2) that MOTIONCORR will apply to the micrographs. The MOTIONCORR Readme.txt says: A bfactor 150 or 200pix^2 is good for most cryoEM image with 2x binned super-resolution image. For unbined image, a larger bfactor is needed.");
 
 	// Add a little spacer
@@ -803,8 +807,15 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	char * default_location2 = getenv ("RELION_UNBLUR_EXECUTABLE");
 	if (default_location2 == NULL)
 	{
-		char mydefault[]=DEFAULTUNBLURCORRLOCATION;
+		char mydefault[]=DEFAULTUNBLURLOCATION;
 		default_location2=mydefault;
+	}
+	// Check for environment variable RELION_SUMMOVIE_EXECUTABL
+	char * default_location3 = getenv ("RELION_SUMMOVIE_EXECUTABLE");
+	if (default_location3 == NULL)
+	{
+		char mydefault[]=DEFAULTSUMMOVIELOCATION;
+		default_location3=mydefault;
 	}
 
 	unblur_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -814,8 +825,9 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 
 	unblur_group->begin();
 
-	fn_unblur_exe.place(current_y, "UNBLUR executable:", default_location2, "*.*", NULL, "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-
+	fn_unblur_exe.place(current_y, "UNBLUR executable:", default_location2, "*.*", NULL, "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with unblur version 1.0.2.");
+	fn_summovie_exe.place(current_y, "SUMMOVIE executable:", default_location3, "*.*", NULL, "Location of the SUMMOVIE executable. You can control the default of this field by setting environment variable RELION_SUMMOVIE_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with summovie version 1.0.2.");
+	angpix.place(current_y, "Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the movies. All outputs will be in Angstroms, and internally a default B-factor of 1500A^2 is calculated using this value.");
 	unblur_group->end();
 
 
@@ -850,6 +862,8 @@ void MotioncorrJobWindow::write(std::string fn)
 	other_motioncorr_args.writeValue(fh);
 	do_unblur.writeValue(fh);
 	fn_unblur_exe.writeValue(fh);
+	fn_summovie_exe.writeValue(fh);
+	angpix.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -879,6 +893,8 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		other_motioncorr_args.readValue(fh);
 		do_unblur.readValue(fh);
 		fn_unblur_exe.readValue(fh);
+		fn_summovie_exe.readValue(fh);
+		angpix.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -902,6 +918,9 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	other_motioncorr_args.deactivate(is_continue);
 	do_unblur.deactivate(is_continue);
 	fn_unblur_exe.deactivate(is_continue);
+	fn_summovie_exe.deactivate(is_continue);
+	angpix.deactivate(is_continue);
+
 }
 
 bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -935,11 +954,16 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	if (do_save_movies.getValue())
 		command += " --save_movies ";
 
-	if (do_unblur.getValue())
+	command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
+	command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
+
+		if (do_unblur.getValue())
 	{
 		command += " --use_unblur";
 		command += " --j " + floatToString(nr_threads.getValue());
 		command += " --unblur_exe " + fn_unblur_exe.getValue();
+		command += " --summovie_exe " + fn_summovie_exe.getValue();
+		command += " --angpix " +  floatToString(angpix.getValue());
 	}
 	else
 	{
@@ -948,8 +972,6 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 		command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
 		command += " --first_frame_ali " + floatToString(first_frame_ali.getValue());
 		command += " --last_frame_ali " + floatToString(last_frame_ali.getValue());
-		command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
-		command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
 		command += " --bfactor " + floatToString(bfactor.getValue());
 
 		if ((other_motioncorr_args.getValue()).length() > 0)
@@ -4138,6 +4160,11 @@ MovieRefineJobWindow::MovieRefineJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_T
 	tab1->label("I/O");
 	resetHeight();
 
+	fn_movie_star.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR Files (*.{star})", "Select the STAR file with the input movie micrographs, either from an Import or a Motion correction job.");
+    movie_rootname.place(current_y, "Rootname of movies files:", "movie", "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs. If you've run the MOTIONCORR wrapper in RELION, then the correct rootname is 'movie'.");
+
+    // Add a little spacer
+	current_y += STEPY/2;
 
 	fn_cont.place(current_y, "Continue 3D auto-refine from: ", "", "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
@@ -4145,7 +4172,6 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run. \n \
 Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
-    movie_rootname.place(current_y, "Rootname of movies files:", "movie", "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs. If you've run the MOTIONCORR wrapper in RELION, then the correct rootname is 'movie'.");
 
     // Add a little spacer
 	current_y += STEPY/2;
@@ -4250,6 +4276,7 @@ void MovieRefineJobWindow::write(std::string fn)
 
 	// I/O
 	fn_cont.writeValue(fh);
+	fn_movie_star.writeValue(fh);
 	movie_rootname.writeValue(fh);
 	join_nr_mics.writeValue(fh);
 
@@ -4290,6 +4317,7 @@ void MovieRefineJobWindow::read(std::string fn, bool &_is_continue)
 
 		// I/O
 		fn_cont.readValue(fh);
+		fn_movie_star.readValue(fh);
 		movie_rootname.readValue(fh);
 		join_nr_mics.readValue(fh);
 
@@ -4323,6 +4351,7 @@ void MovieRefineJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(is_continue);
+	fn_movie_star.deactivate(is_continue);
 	movie_rootname.deactivate(is_continue);
 	join_nr_mics.deactivate(is_continue);
 
@@ -4366,6 +4395,10 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command="`which relion_preprocess`";
 
 	// Input
+	command += " --i " + fn_movie_star.getValue();
+	Node node(fn_movie_star.getValue(), fn_movie_star.type);
+	pipelineInputNodes.push_back(node);
+
 	// Get the data.star to be used for re-extraction from the optimiser name
 	MetaDataTable MDopt;
 	MDopt.read(fn_cont.getValue(), "optimiser_general");
@@ -4425,12 +4458,6 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	// Other arguments for extraction
 	command += " " + other_args.getValue();
 	commands.push_back(command);
-
-	// Also touch the suffix file. Do this after the first command had completed
-	command = "echo " + outputname + "all_micrographs.star  > " +  outputname + "coords_suffix_extract.star";
-	commands.push_back(command.c_str());
-	Node node3(outputname + "coords_suffix_extract.star", NODE_MIC_COORDS);
-	pipelineOutputNodes.push_back(node3);
 
 	// B. Then get the actual movie-refinement command
 	if (nr_mpi.getValue() > 1)
@@ -5526,6 +5553,8 @@ void SubtractJobWindow::read(std::string fn, bool &_is_continue)
 
 void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 {
+	is_continue = _is_continue;
+
 	fn_data.deactivate(is_continue);
 	fn_in.deactivate(is_continue);
 	fn_mask.deactivate(is_continue);
@@ -5536,7 +5565,6 @@ void SubtractJobWindow::toggle_new_continue(bool _is_continue)
 	ctf_phase_flipped.deactivate(is_continue);
 	ctf_intact_first_peak.deactivate(is_continue);
 
-	is_continue = _is_continue;
 }
 
 bool SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,

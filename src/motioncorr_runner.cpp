@@ -46,6 +46,8 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	int unblur_section = parser.addSection("UNBLUR/SUMMOVIE options");
 	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCORR.");
 	fn_unblur_exe = parser.getOption("--unblur_exe","Location of UNBLUR (v1.0.2) executable (or through RELION_UNBLUR_EXECUTABLE environment variable)","");
+	fn_summovie_exe = parser.getOption("--summovie_exe","Location of SUMMOVIE(v1.0.2) executable (or through RELION_SUMMOVIE_EXECUTABLE environment variable)","");
+	angpix = textToFloat(parser.getOption("--angpix","Pixel size in Angstroms","1.0"));
 	nr_threads = textToInteger(parser.getOption("--j","Number of threads in the unblur executable","1"));
 
 	// Initialise verb for non-parallel execution
@@ -67,7 +69,7 @@ void MotioncorrRunner::initialise()
 
 	if (do_unblur)
 	{
-		// Get the CTFFIND executable
+		// Get the UNBLUR executable
 		if (fn_unblur_exe == "")
 		{
 			char * penv;
@@ -75,10 +77,18 @@ void MotioncorrRunner::initialise()
 			if (penv!=NULL)
 				fn_unblur_exe = (std::string)penv;
 		}
+		// Get the SUMMOVIE executable
+		if (fn_summovie_exe == "")
+		{
+			char * penv;
+			penv = getenv ("RELION_SUMMOVIE_EXECUTABLE");
+			if (penv!=NULL)
+				fn_summovie_exe = (std::string)penv;
+		}
 	}
 	else
 	{
-		// Get the CTFFIND executable
+		// Get the MOTIONCORR executable
 		if (fn_motioncorr_exe == "")
 		{
 			char * penv;
@@ -91,12 +101,14 @@ void MotioncorrRunner::initialise()
 	MDavg.clear();
 	MDmov.clear();
 
-	if (gpu_ids.length() > 0)
-		untangleDeviceIDs(gpu_ids, allThreadIDs);
-	else if (!do_unblur && verb>0)
-		std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-
-	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	if (!do_unblur)
+	{
+		if (gpu_ids.length() > 0)
+			untangleDeviceIDs(gpu_ids, allThreadIDs);
+		else if (verb>0)
+			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	}
 
 	FileName fn_avg, fn_mov;
 
@@ -115,6 +127,7 @@ void MotioncorrRunner::initialise()
 			// For output STAR file
 			getOutputFileNames(fn_mic, fn_avg, fn_mov);
 			MDmov.addObject();
+			MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
 			MDavg.addObject();
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
@@ -418,6 +431,9 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	}
 	FileName fn_tmp_mov = fn_mov.withoutExtension() + ".mrc";
 
+	Image<RFLOAT> Itest;
+	Itest.read(fn_mic, false);
+	int Nframes = NSIZE(Itest());
 
 	std::ofstream  fh;
 	fh.open((fn_com).c_str(), std::ios::out);
@@ -429,10 +445,10 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	fh << "setenv  OMP_NUM_THREADS " << integerToString(nr_threads)<<std::endl;
 	fh << fn_unblur_exe << " > " << fn_log << "  << EOF"<<std::endl;
 	fh << fn_tmp_mic << std::endl;
-	fh << std::endl;
+	fh << Nframes << std::endl;
 	fh << fn_avg << std::endl;
 	fh << fn_shifts << std::endl;
-	fh << "1.0" << std::endl;
+	fh << angpix << std::endl; // pixel size
 	fh << "NO" << std::endl; // no dose filtering
 	if (do_save_movies)
 	{
@@ -454,6 +470,44 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 
 	// Also analyse the shifts
 	getShiftsUnblur(fn_shifts, xshifts, yshifts);
+
+	// If the requested sum is only a subset, then use summovie to make the average
+	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum + 1;
+	if (first_frame_sum != 0 || mylastsum != Nframes)
+	{
+		FileName fn_com2 = fn_root + "_summovie.com";
+		FileName fn_log2 = fn_root + "_summovie.log";
+		FileName fn_frc = fn_root + "_frc.txt";
+
+		std::ofstream  fh2;
+		fh2.open((fn_com2).c_str(), std::ios::out);
+		if (!fh2)
+		 REPORT_ERROR( (std::string)"executeUnblur cannot create file: " + fn_com2);
+
+		// Write script to run ctffind
+		fh2 << "#!/usr/bin/env csh"<<std::endl;
+		fh2 << "setenv  OMP_NUM_THREADS " << integerToString(nr_threads)<<std::endl;
+		fh2 << fn_summovie_exe << " > " << fn_log2 << "  << EOF"<<std::endl;
+		fh2 << fn_tmp_mic << std::endl;
+		fh2 << Nframes << std::endl;
+		fh2 << fn_avg << std::endl;
+		fh2 << fn_shifts << std::endl;
+		fh2 << fn_frc << std::endl;
+		fh2 << first_frame_sum + 1 << std::endl;
+		fh2 << mylastsum << std::endl;
+		fh2 << angpix << std::endl; // pixel size
+		fh2 << "NO" << std::endl; // dont set expert options
+		fh2 <<"EOF"<<std::endl;
+		fh2.close();
+
+		// Execute summovie
+		std::string command2 = "csh "+ fn_com2;
+		if (system(command2.c_str()))
+			REPORT_ERROR("ERROR in executing: " + command2);
+
+		// Plot ther FRC
+		plotFRC(fn_frc);
+	}
 
 	// Move movie .mrc to new .mrcs filename
 	std::rename(fn_tmp_mov.c_str(), fn_mov.c_str());
@@ -504,6 +558,49 @@ void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &x
     	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_shifts);
 }
 
+// Plot the UNBLUR FRC curve
+void MotioncorrRunner::plotFRC(FileName fn_frc)
+{
+
+	std::ifstream in(fn_frc.data(), std::ios_base::in);
+	if (in.fail())
+		return;
+
+	FileName fn_eps = fn_frc.withoutExtension() + ".eps";
+	CPlot2D *plot2D=new CPlot2D(fn_eps);
+ 	plot2D->SetXAxisSize(600);
+ 	plot2D->SetYAxisSize(600);
+ 	CDataSet dataSet;
+	dataSet.SetDrawMarker(false);
+	dataSet.SetDatasetColor(0.0,0.0,0.0);
+
+ 	std::string line, token;
+	// Read through the frc file
+	while (getline(in, line, '\n'))
+	{
+		// ignore all commented lines, just read first two lines with data
+		if (line[0] != '#')
+		{
+			std::vector<std::string> words;
+			tokenize(line, words);
+			if (words.size() < 2)
+			{
+				break;
+			}
+			else
+			{
+				CDataPoint point(textToFloat(words[0]), textToFloat(words[1]));
+			}
+		}
+	}
+	in.close();
+
+	plot2D->SetXAxisTitle("Resolution (1/Angstrom)");
+	plot2D->SetYAxisTitle("FRC");
+	plot2D->OutputPostScriptPlot(fn_eps);
+
+}
+
 // Plot the shifts
 void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
 {
@@ -534,8 +631,16 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 	dataSetStart.AddDataPoint(point2);
 	plot2D->AddDataSet(dataSetStart);
 
-	plot2D->SetXAxisTitle("X-shift (in pixels)");
-	plot2D->SetYAxisTitle("Y-shift (in pixels)");
+	if (do_unblur)
+	{
+		plot2D->SetXAxisTitle("X-shift (in Angstroms)");
+		plot2D->SetYAxisTitle("Y-shift (in Angstroms)");
+	}
+	else
+	{
+		plot2D->SetXAxisTitle("X-shift (in pixels)");
+		plot2D->SetYAxisTitle("Y-shift (in pixels)");
+	}
 	plot2D->OutputPostScriptPlot(fn_eps);
 
 

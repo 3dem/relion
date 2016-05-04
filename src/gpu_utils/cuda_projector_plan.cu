@@ -2,7 +2,7 @@
 #include "src/time.h"
 #include <cuda_runtime.h>
 
-#define PP_TIMING
+//#define PP_TIMING
 #ifdef PP_TIMING
     Timer timer;
 	int TIMING_TOP = timer.setNew("setup");

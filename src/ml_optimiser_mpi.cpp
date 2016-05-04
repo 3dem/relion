@@ -443,6 +443,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	// Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
     {
+    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
     	if (do_parallel_disc_io)
 		{
 
@@ -464,7 +465,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
     		int myverb = (node->rank == 1) ? 1 : 0; // Only the first slave
     		if (!node->isMaster())
     		{
-    			mydata.copyParticlesToScratch(myverb, need_to_copy, keep_free_scratch_Gb);
+    			mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
     		}
 		}
 		else
@@ -473,7 +474,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 			if (node->isMaster())
 			{
 				mydata.prepareScratchDirectory(fn_scratch);
-				mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+				mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);

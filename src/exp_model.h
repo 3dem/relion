@@ -260,9 +260,6 @@ public:
     // Number of particles saved on the scratchdir
     long int nr_parts_on_scratch;
 
-    // Save the original names
-    std::vector<FileName> original_img_names, original_ctf_names;
-
     // Number of Gb on scratch disk before copying particles
     long int free_space_Gb;
 
@@ -374,7 +371,7 @@ public:
 	// Copy particles from their original position to a scratch directory
 	// Monitor when the scratch disk gets to have fewer than free_scratch_Gb space,
 	// in that case, stop copying, and keep reading particles from where they were...
-	void copyParticlesToScratch(int verb, bool do_copy = true, long int free_scratch_Gb = 10);
+	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, long int free_scratch_Gb = 10);
 
 
 	// Print help message for possible command-line options
