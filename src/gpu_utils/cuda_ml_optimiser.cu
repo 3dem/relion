@@ -145,9 +145,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				{
 					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
 					FileName fn_img;
-					std::istringstream split(baseMLO->exp_fn_img);
-					for (int i = 0; i <= istop; i++)
-						getline(split, fn_img);
+					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
+					{
+						std::istringstream split(baseMLO->exp_fn_img);
+						for (int i = 0; i <= istop; i++)
+							getline(split, fn_img);
+					}
 					img.read(fn_img);
 					img().setXmippOrigin();
 				}
@@ -651,10 +654,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				{
 					// Read CTF-image from disc
 					FileName fn_ctf;
-					std::istringstream split(baseMLO->exp_fn_ctf);
-					// Get the right line in the exp_fn_img string
-					for (int i = 0; i <= istop; i++)
-						getline(split, fn_ctf);
+					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+					{
+						std::istringstream split(baseMLO->exp_fn_ctf);
+						// Get the right line in the exp_fn_img string
+						for (int i = 0; i <= istop; i++)
+							getline(split, fn_ctf);
+					}
 					Ictf.read(fn_ctf);
 				}
 				else
