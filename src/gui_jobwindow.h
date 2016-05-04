@@ -37,7 +37,8 @@
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
 #define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
-#define DEFAULTUNBLURCORRLOCATION "/public/EM/UNBLUR/unblur.exe"
+#define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
+#define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -225,6 +226,7 @@ public:
 
 	InputNodeEntry input_star_mics;
 	FileNameEntry fn_motioncorr_exe;
+	FileNameEntry fn_summovie_exe;
 	SliderEntry bin_factor;
 	SliderEntry first_frame_ali;
 	SliderEntry last_frame_ali;
@@ -236,6 +238,7 @@ public:
 
 	BooleanEntry do_unblur;
 	FileNameEntry fn_unblur_exe;
+	SliderEntry angpix;
 
     AnyEntry gpu_ids;
 
@@ -725,6 +728,7 @@ public:
 
 	// I/O
 	FileNameEntry fn_cont;
+	InputNodeEntry fn_movie_star;
 	AnyEntry movie_rootname;
 
 	// Extract movie-particles
