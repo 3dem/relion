@@ -690,7 +690,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	}
 	else
 	{
-		std::cerr << " Warning: no particles on micrograph: " << fn_mic << std::endl;
+		std::cerr << " WARNING: no particles on micrograph: " << fn_mic << std::endl;
 	}
 
 }
