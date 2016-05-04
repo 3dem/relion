@@ -4459,12 +4459,6 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	command += " " + other_args.getValue();
 	commands.push_back(command);
 
-	// Also touch the suffix file. Do this after the first command had completed
-	command = "echo " + fn_movie_star.getValue() + " > " +  outputname + "coords_suffix_extract.star";
-	commands.push_back(command.c_str());
-	Node node3(outputname + "coords_suffix_extract.star", NODE_MIC_COORDS);
-	pipelineOutputNodes.push_back(node3);
-
 	// B. Then get the actual movie-refinement command
 	if (nr_mpi.getValue() > 1)
 		command="`which relion_refine_mpi`";
