@@ -1391,11 +1391,13 @@ void RelionMainWindow::cb_display_io_node_i()
 			}
 			else
 			{
-				std::cout << " Only coordinates generated in the pipeline are allowed" << std::endl;
+				fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
 			}
 	    }
 	    else
-	    	std::cout << " Only coordinates in .star format (generated in the pipeline) are allowed" << std::endl;
+	    {
+	    	fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
+	    }
 	}
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
