@@ -1439,7 +1439,8 @@ void MlOptimiser::initialiseWorkLoad()
     if (fn_scratch != "" && !do_preread_images)
     {
     	mydata.prepareScratchDirectory(fn_scratch);
-    	mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
+    	mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
     }
 
 }
