@@ -17,7 +17,10 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#ifdef CUDA
 #include <cuda_runtime.h>
+#endif
+
 #include "src/autopicker_mpi.h"
 
 void AutoPickerMpi::read(int argc, char **argv)
@@ -42,6 +45,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 
 }
 
+#ifdef CUDA
 int AutoPickerMpi::deviceInitialise()
 {
 	int devCount;
@@ -67,6 +71,7 @@ int AutoPickerMpi::deviceInitialise()
 	return(dev_id);
 
 }
+#endif
 
 void AutoPickerMpi::run()
 {

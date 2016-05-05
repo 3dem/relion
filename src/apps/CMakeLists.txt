@@ -27,17 +27,17 @@ if(NOT GUI)
 endif(NOT GUI)
 
 if (CUDA_FOUND)
+
     file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu" "${CMAKE_SOURCE_DIR}/src/gpu_utils/cuda_kernels/*.cu")
     cuda_add_library(relion_gpu_util ${REL_CUDA_SRC})
-    
+
     if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
-        find_library(NV_TOOLS_LIBRARIES   NAMES nvToolsExt  PATHS $ENV{CUDA_HOME}/lib64)
+        find_library(NV_TOOLS_LIBRARIES   NAMES nvToolsExt  PATHS ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
         list(APPEND EXTRA_LIBS "${NV_TOOLS_LIBRARIES}")
-        message(STATUS "Adding extra library for NVIDIA profiling: ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnvToolsExt.so")
+        message(STATUS "Adding extra library for NVIDIA profiling: ${NV_TOOLS_LIBRARIES}")
     endif()
-    
-    find_library(CUFFT_LIBRARIES   NAMES cufft  PATHS $ENV{CUDA_HOME}/lib64)
-    list(APPEND EXTRA_LIBS "${CUFFT_LIBRARIES}")
+
+    list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
     if(BUILD_SHARED_LIBS)
         install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
     endif()
@@ -47,7 +47,7 @@ endif(CUDA_FOUND)
 if(BUILD_SHARED_LIBS)
     add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP})
     if(GUI)
-    	target_link_libraries(relion_lib ${FLTK_LIBRARIES})
+        target_link_libraries(relion_lib ${FLTK_LIBRARIES} ${FFTW_LIBRARIES})
     	if(NEW_OWN_FLTK)
  	        add_dependencies(relion_lib FLTK)
  	    endif()

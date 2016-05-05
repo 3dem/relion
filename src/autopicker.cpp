@@ -17,9 +17,13 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#ifdef CUDA
 #include <cuda_runtime.h>
+#endif
 #include "src/autopicker.h"
+#ifdef CUDA
 #include "src/gpu_utils/cuda_autopicker.h"
+#endif
 //#define DEBUG
 //#define DEBUG_HELIX
 
@@ -569,6 +573,8 @@ void AutoPicker::initialise()
 #endif
 
 }
+
+#ifdef CUDA
 int AutoPicker::deviceInitialise()
 {
 	int devCount;
@@ -591,6 +597,7 @@ int AutoPicker::deviceInitialise()
 
 	return(dev_id);
 }
+#endif
 
 void AutoPicker::run()
 {

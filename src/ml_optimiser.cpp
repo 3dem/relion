@@ -35,7 +35,9 @@
 //#include <helper_cuda.h>
 //#include <helper_functions.h>
 #include "src/ml_optimiser.h"
+#ifdef CUDA
 #include "src/gpu_utils/cuda_ml_optimiser.h"
+#endif
 
 #define NR_CLASS_MUTEXES 5
 
@@ -51,9 +53,11 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 {
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
+#ifdef CUDA
 	if (MLO->do_gpu)
 		((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
 	else
+#endif
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
 
@@ -907,7 +911,7 @@ void MlOptimiser::initialise()
 
 	if (do_gpu)
 	{
-
+#ifdef CUDA
 		if (do_helical_refine)
 			REPORT_ERROR("You cannot use GPU-acceleration with helical refinement yet...");
 
@@ -980,6 +984,9 @@ void MlOptimiser::initialise()
 
 			cudaOptimiserDeviceMap.push_back(bundleId);
 		}
+#else
+        REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
+#endif
 	}
 
 
@@ -1969,11 +1976,12 @@ void MlOptimiser::expectation()
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 
+#ifdef CUDA
 	/************************************************************************/
 	//GPU memory setup
 
 	if (do_gpu)
-	{
+    {
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 			MlDeviceBundle *b = new MlDeviceBundle(this);
@@ -2007,6 +2015,7 @@ void MlOptimiser::expectation()
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
 	}
+#endif
 
 	/************************************************************************/
 
@@ -2065,6 +2074,7 @@ void MlOptimiser::expectation()
 	if (verb > 0)
 		progress_bar(mydata.numberOfOriginalParticles());
 
+#ifdef CUDA
 	if (do_gpu)
 	{
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
@@ -2127,6 +2137,7 @@ void MlOptimiser::expectation()
 
 		cudaDeviceBundles.clear();
 	}
+#endif
 
 	// Clean up some memory
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)

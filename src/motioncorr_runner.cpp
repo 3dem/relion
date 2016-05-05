@@ -18,7 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/motioncorr_runner.h"
+#ifdef CUDA
 #include "src/gpu_utils/cuda_mem_utils.h"
+#endif
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
@@ -91,12 +93,14 @@ void MotioncorrRunner::initialise()
 	MDavg.clear();
 	MDmov.clear();
 
+#ifdef CUDA
 	if (gpu_ids.length() > 0)
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 	else if (!do_unblur && verb>0)
 		std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+#endif
 
 	FileName fn_avg, fn_mov;
 

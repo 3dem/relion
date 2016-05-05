@@ -6,6 +6,9 @@ set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 #endif()
 project(Relion)
 
+# Use new policy for OS X @rpath
+cmake_policy(SET CMP0042 NEW)
+
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -65,6 +68,9 @@ else(NOT DEFINED CUDA_ARCH)
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
 endif(NOT DEFINED CUDA_ARCH)
 
+# ---------------- Use CUDA if found
+option(CUDA "Enable CUDA GPU acceleration" ON)
+
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
 if(DoublePrec_CPU)
@@ -81,27 +87,25 @@ if(DoublePrec_GPU)
 	set(CudaTexture FALSE)
 else(DoublePrec_GPU)
     message(STATUS "Setting gpu precision to single")
-    # -- Will warn when double prec is inadvertently used in CUDA-code --
-    #message(STATUS "ENV CUDA_VERSION :  $ENV{CUDA_VERSION}")
-    if(DEFINED ENV{CUDA_VERSION})
-        if(($ENV{CUDA_VERSION} VERSION_GREATER "7.5") OR ($ENV{CUDA_VERSION} VERSION_EQUAL "7.5"))
-             message(STATUS "Cuda version is >= 7.5")
-            set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
-        else()
-            message(STATUS "Cuda version is < 7.5")
-        endif()
-    endif()
 endif(DoublePrec_GPU)
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
  #This *has* to be AFTER project()
 include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
 
-# -----------------------------------------------------------------------------CUDA--
-# DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
-FIND_PACKAGE(CUDA)  
+if(CUDA)
+    # -----------------------------------------------------------------------------CUDA--
+    # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
+    FIND_PACKAGE(CUDA)
+endif()
+
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
+    if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_GPU) )
+        message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
+	set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
+    endif()
+    add_definitions(-DCUDA)
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
@@ -204,6 +208,17 @@ if(NOT FFTW_FOUND)
 	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
 	set(NEW_OWN_FFTW TRUE)
 endif(NOT FFTW_FOUND)
+
+include(CheckCXXSymbolExists)
+check_cxx_symbol_exists(sincos    math.h   HAVE_SINCOS)
+check_cxx_symbol_exists(__sincos  math.h   HAVE___SINCOS)
+
+if(HAVE_SINCOS)
+    add_definitions(-DHAVE_SINCOS)
+endif()
+if(HAVE___SINCOS)
+    add_definitions(-DHAVE___SINCOS)
+endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
