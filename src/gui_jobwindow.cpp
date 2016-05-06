@@ -1598,7 +1598,8 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 
 	threshold_autopick.place(current_y, "Picking threshold:", 0.05, 0, 1., 0.01, "Use lower thresholds to pick more particles (and more junk probably)");
 
-	mindist_autopick.place(current_y, "Minimum inter-particle distance (A):", 100, 0, 1000, 20, "Particles closer together than this distance will be consider to be a single cluster. From each cluster, only one particle will be picked.");
+	mindist_autopick.place(current_y, "Minimum inter-particle distance (A):", 100, 0, 1000, 20, "Particles closer together than this distance will be consider to be a single cluster. From each cluster, only one particle will be picked. \
+\n\nThis option takes no effect for picking helical segments. The inter-box distance is calculated with the number of asymmetrical units and the helical rise on 'Helix' tab.");
 
 	maxstddevnoise_autopick.place(current_y, "Maximum stddev noise:", 1.1, 0.9, 1.5, 0.02, "This is useful to prevent picking in carbon areas, or areas with big contamination features. Peaks in areas where the background standard deviation in the normalized micrographs is higher than this value will be ignored. Useful values are probably in the range 1.0 to 1.2. Set to -1 to switch off the feature to eliminate peaks due to high background standard deviations.");
 
@@ -1634,12 +1635,21 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 
 	autopick_helix_group->begin();
 
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of the tubes.");
+
+	current_y += STEPY/2;
+
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
+The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
+
+	helical_rise.place(current_y, "Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+
+	current_y += STEPY/2;
+
 	helical_tube_kappa_max.place(current_y, "Maximum curvature (kappa): ", 0.1, 0.05, 0.5, 0.01, "Maximum curvature allowed for picking helical tubes. \
 Kappa = 0.3 means that the curvature of the picked helical tubes should not be larger than 30% the curvature of a circle (diameter = particle mask diameter). \
 Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
-
-	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
-This value should be slightly larger than the actual width of the tubes.");
 
 	helical_tube_length_min.place(current_y, "Minimum length (A): ", 200, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
 Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
@@ -1683,6 +1693,8 @@ void AutopickJobWindow::write(std::string fn)
 	helical_tube_kappa_max.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 	helical_tube_length_min.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_rise.writeValue(fh);
 	use_gpu.writeValue(fh);
 	gpu_ids.writeValue(fh);
 	shrink.writeValue(fh);
@@ -1722,6 +1734,8 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		helical_tube_kappa_max.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
 		helical_tube_length_min.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_rise.readValue(fh);
 		use_gpu.readValue(fh);
 		gpu_ids.readValue(fh);
 		shrink.readValue(fh);
@@ -1809,15 +1823,18 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command += " --read_fom_maps ";
 
 	command += " --threshold " + floatToString(threshold_autopick.getValue());
-	command += " --min_distance " + floatToString(mindist_autopick.getValue());
+	if (do_pick_helical_segments.getValue())
+		command += " --min_distance " + floatToString(helical_nr_asu.getValue() * helical_rise.getValue());
+	else
+		command += " --min_distance " + floatToString(mindist_autopick.getValue());
 	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
 
 	// Helix
 	if (do_pick_helical_segments.getValue())
 	{
 		command += " --helix";
-		command += " --helical_tube_kappa_max " + floatToString(helical_tube_kappa_max.getValue());
 		command += " --helical_tube_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		command += " --helical_tube_kappa_max " + floatToString(helical_tube_kappa_max.getValue());
 		command += " --helical_tube_length_min " + floatToString(helical_tube_length_min.getValue());
 	}
 

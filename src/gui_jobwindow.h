@@ -328,6 +328,8 @@ public:
 	SliderEntry helical_tube_kappa_max;
 	SliderEntry helical_tube_outer_diameter;
 	SliderEntry helical_tube_length_min;
+	SliderEntry helical_nr_asu;
+	SliderEntry helical_rise;
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
 
