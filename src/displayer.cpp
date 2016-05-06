@@ -680,7 +680,9 @@ void multiViewerCanvas::saveBackupSelection()
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
 		MDout.addObject();
-		MDout.setValue(EMDL_SELECTED, selected[ipos]);
+        // without the bool() cast, clang will interpret the formal template parameter
+        // as a reference to a bit field, which is not the same as a boolean.
+		MDout.setValue(EMDL_SELECTED, bool(selected[ipos]));
 	}
 
 	FileName fn_dir;

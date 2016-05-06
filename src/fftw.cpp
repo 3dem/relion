@@ -43,9 +43,11 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
+#include "src/macros.h"
 #include "src/fftw.h"
 #include "src/args.h"
 #include <string.h>
+#include <math.h>
 
 static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -631,9 +633,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 			x = j;
 			dotp = 2 * PI * (x * xshift);
 #ifdef RELION_SINGLE_PRECISION
-                        sincosf(dotp, &b, &a);
+                        SINCOSF(dotp, &b, &a);
 #else
-                        sincos(dotp, &b, &a);
+                        SINCOS(dotp, &b, &a);
 #endif
 			DIRECT_A1D_ELEM(out, j) = Complex(a, b);
 		}
@@ -648,9 +650,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                sincosf(dotp, &b, &a);
+                SINCOSF(dotp, &b, &a);
 #else
-                sincos(dotp, &b, &a);
+                SINCOS(dotp, &b, &a);
 #endif
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
@@ -662,9 +664,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                sincosf(dotp, &b, &a);
+                SINCOSF(dotp, &b, &a);
 #else
-                sincos(dotp, &b, &a);
+                SINCOS(dotp, &b, &a);
 #endif
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
@@ -685,9 +687,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
 #ifdef RELION_SINGLE_PRECISION
-                    sincosf(dotp, &b, &a);
+                    SINCOSF(dotp, &b, &a);
 #else
-                    sincos(dotp, &b, &a);
+                    SINCOS(dotp, &b, &a);
 #endif
 					DIRECT_A3D_ELEM(out, k, i, j) = Complex(a, b);
 				}
@@ -720,9 +722,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 			x = j;
 			dotp = 2 * PI * (x * xshift);
 #ifdef RELION_SINGLE_PRECISION
-            sincosf(dotp, &b, &a);
+            SINCOSF(dotp, &b, &a);
 #else
-            sincos(dotp, &b, &a);
+            SINCOS(dotp, &b, &a);
 #endif
   			c = DIRECT_A1D_ELEM(in, j).real;
 			d = DIRECT_A1D_ELEM(in, j).imag;
@@ -747,9 +749,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                sincosf(dotp, &b, &a);
+                SINCOSF(dotp, &b, &a);
 #else
-                sincos(dotp, &b, &a);
+                SINCOS(dotp, &b, &a);
 #endif
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
@@ -766,9 +768,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                sincosf(dotp, &b, &a);
+                SINCOSF(dotp, &b, &a);
 #else
-                sincos(dotp, &b, &a);
+                SINCOS(dotp, &b, &a);
 #endif
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
@@ -799,9 +801,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
 #ifdef RELION_SINGLE_PRECISION
-                    sincosf(dotp, &b, &a);
+                    SINCOSF(dotp, &b, &a);
 #else
-                    sincos(dotp, &b, &a);
+                    SINCOS(dotp, &b, &a);
 #endif
 					c = DIRECT_A3D_ELEM(in, k, i, j).real;
 					d = DIRECT_A3D_ELEM(in, k, i, j).imag;

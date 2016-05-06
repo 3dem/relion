@@ -19,7 +19,9 @@
  ***************************************************************************/
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
+#ifdef CUDA
 #include "src/gpu_utils/cuda_ml_optimiser.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -177,111 +179,112 @@ void MlOptimiserMpi::initialise()
 	}
 
 
-	/************************************************************************/
+#ifdef CUDA
+    /************************************************************************/
 	//Setup GPU related resources
 
 	if (do_gpu)
 	{
 
-		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+        int devCount;
+        HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-		std::vector < std::vector < std::string > > allThreadIDs;
-		untangleDeviceIDs(gpu_ids, allThreadIDs);
+        std::vector < std::vector < std::string > > allThreadIDs;
+        untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 		// Sequential initialisation of GPUs on all ranks
 		bool fullAutomaticMapping(true);
 		bool semiAutomaticMapping(true);
-		for (int rank = 0; rank < node->size; rank++)
-		{
-			fullAutomaticMapping = true;
-			semiAutomaticMapping = true; // possible to set fully manual for specific ranks
-			if (rank == node->rank && !node->isMaster()) //Device not initialized on master rank
-			{
-				if ((allThreadIDs.size()<node->rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
-				{
-					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
-				}
-				else
-				{
-					fullAutomaticMapping=false;
-					if(allThreadIDs[rank-1].size()!=nr_threads)
-					{
-						std::cout << " Slave " << rank << " will distribute threads over devices ";
-						for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
-							std::cout << " "  << allThreadIDs[rank-1][j];
-						std::cout  << std::endl;
+        for (int rank = 0; rank < node->size; rank++)
+        {
+            fullAutomaticMapping = true;
+            semiAutomaticMapping = true; // possible to set fully manual for specific ranks
+            if (rank == node->rank && !node->isMaster()) //Device not initialized on master rank
+            {
+                if ((allThreadIDs.size()<node->rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+                {
+                    std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
+                }
+                else
+                {
+                    fullAutomaticMapping=false;
+                    if(allThreadIDs[rank-1].size()!=nr_threads)
+                    {
+                        std::cout << " Slave " << rank << " will distribute threads over devices ";
+                        for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
+                            std::cout << " "  << allThreadIDs[rank-1][j];
+                        std::cout  << std::endl;
 					}
-					else
-					{
-						semiAutomaticMapping = false;
-						std::cout << " Using explicit indexing on slave " << node->rank << " to assign devices ";
-								for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
-							std::cout << " "  << allThreadIDs[rank-1][j];
-						std::cout  << std::endl;
-					}
-				}
+                    else
+                    {
+                        semiAutomaticMapping = false;
+                        std::cout << " Using explicit indexing on slave " << node->rank << " to assign devices ";
+                        for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
+                            std::cout << " "  << allThreadIDs[rank-1][j];
+                        std::cout  << std::endl;
+                    }
+                }
 
-				for (int i = 0; i < nr_threads; i ++)
-				{
-					int dev_id;
-					if (semiAutomaticMapping)
-					{
-						// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
-						if (fullAutomaticMapping)
-						{
-							if(node->size > 1)
-								dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
-							else
-								dev_id = i%devCount;
-						}
-						else
-						{
-							if(node->size > 1)
-								dev_id = (i*(allThreadIDs[rank-1].size()-1))%allThreadIDs[rank-1].size();
-							else
-								dev_id = i%allThreadIDs[rank-1].size();
-							dev_id =  textToInteger(allThreadIDs[rank-1][dev_id].c_str());
-						}
-					}
-					else // not semiAutomatic => explicit
-					{
-						dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
-					}
-					std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
+                for (int i = 0; i < nr_threads; i ++)
+                {
+                    int dev_id;
+                    if (semiAutomaticMapping)
+                    {
+                        // Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+                        if (fullAutomaticMapping)
+                        {
+                            if(node->size > 1)
+                                dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
+                            else
+                                dev_id = i%devCount;
+                        }
+                        else
+                        {
+                            if(node->size > 1)
+                                dev_id = (i*(allThreadIDs[rank-1].size()-1))%allThreadIDs[rank-1].size();
+                            else
+                                dev_id = i%allThreadIDs[rank-1].size();
+                            dev_id =  textToInteger(allThreadIDs[rank-1][dev_id].c_str());
+                        }
+                    }
+                    else // not semiAutomatic => explicit
+                    {
+                        dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
+                    }
+                    std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
-					//Only make a new bundle of not existing on device
-					int bundleId(-1);
+                    //Only make a new bundle of not existing on device
+                    int bundleId(-1);
 
-					for (int j = 0; j < cudaDevices.size(); j++)
-						if (cudaDevices[j] == dev_id)
-							bundleId = j;
+                    for (int j = 0; j < cudaDevices.size(); j++)
+                        if (cudaDevices[j] == dev_id)
+                            bundleId = j;
 
-					if (bundleId == -1)
-					{
-						bundleId = cudaDevices.size();
-						cudaDevices.push_back(dev_id);
-						cudaDeviceShares.push_back(1);
-					}
+                    if (bundleId == -1)
+                    {
+                        bundleId = cudaDevices.size();
+                        cudaDevices.push_back(dev_id);
+                        cudaDeviceShares.push_back(1);
+                    }
 
-					cudaOptimiserDeviceMap.push_back(bundleId);
-				}
+                    cudaOptimiserDeviceMap.push_back(bundleId);
+                }
 
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
 
-		MPI_Status status;
+        MPI_Status status;
 
-		if (! node->isMaster())
-		{
-			int devCount = cudaDevices.size();
-			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+        if (! node->isMaster())
+        {
+            int devCount = cudaDevices.size();
+            node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 
-			for (int i = 0; i < devCount; i++)
-			{
-				char buffer[BUFSIZ];
-				int len;
+            for (int i = 0; i < devCount; i++)
+            {
+                char buffer[BUFSIZ];
+                int len;
 				MPI_Get_processor_name(buffer, &len);
 				std::string didS(buffer, len);
 				std::stringstream didSs;
@@ -295,13 +298,13 @@ void MlOptimiserMpi::initialise()
 				node->relion_MPI_Send(buffer, didS.length()+1, MPI_CHAR, 0, MPITAG_IDENTIFIER, MPI_COMM_WORLD);
 			}
 
-			for (int i = 0; i < devCount; i++)
+            for (int i = 0; i < devCount; i++)
 			{
 	        	node->relion_MPI_Recv(&cudaDeviceShares[i], 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
 //	        	std::cout << "Received: " << bundle->rank_shared_count << std::endl;
-			}
+            }
 		}
-		else
+        else
 		{
 			int devCount;
 			std::vector<std::string> deviceIdentifiers;
@@ -367,6 +370,8 @@ void MlOptimiserMpi::initialise()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
+#endif // CUDA
+
 	/************************************************************************/
 
 #ifdef DEBUG
@@ -726,6 +731,7 @@ void MlOptimiserMpi::expectation()
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
 
+#ifdef CUDA
 	/************************************************************************/
 	//GPU memory setup
 
@@ -798,6 +804,7 @@ void MlOptimiserMpi::expectation()
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
+#endif // CUDA
 
 	/************************************************************************/
 
@@ -1083,6 +1090,7 @@ void MlOptimiserMpi::expectation()
 
 			}
 
+#ifdef CUDA
 			if (do_gpu)
 			{
 				for (int i = 0; i < cudaDeviceBundles.size(); i ++)
@@ -1144,7 +1152,7 @@ void MlOptimiserMpi::expectation()
 
 				cudaDeviceBundles.clear();
 			}
-
+#endif // CUDA
 
     	}
         catch (RelionError XE)

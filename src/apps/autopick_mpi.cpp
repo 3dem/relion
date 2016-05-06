@@ -18,7 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include <src/autopicker_mpi.h>
+#ifdef CUDA
 #include <src/gpu_utils/cuda_autopicker.h>
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -30,6 +32,7 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 
+#ifdef CUDA
 		if (prm.do_gpu)
 		{
 			int dev_id = prm.deviceInitialise();
@@ -38,6 +41,7 @@ int main(int argc, char *argv[])
 			((AutoPickerCuda*)prm.cudaPicker)->run();
 		}
 		else
+#endif
 			prm.run();
     }
 

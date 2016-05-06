@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+#include "src/macros.h"
 #include "src/helix.h"
 
 //#define DEBUG_SEARCH_HELICAL_SYMMETRY
@@ -149,9 +150,9 @@ bool calcCCofHelicalSymmetry(
 	cos_rec.resize(rec_len);
 	for (int id = 0; id < rec_len; id++)
 #ifdef RELION_SINGLE_PRECISION
-		sincosf(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+		SINCOSF(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
 #else
-		sincos(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+		SINCOS(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
 #endif
 
 	rise_pix = fabs(rise_pix);
@@ -746,9 +747,9 @@ void imposeHelicalSymmetryInRealSpace(
 	cos_rec.resize(rec_len);
 	for (int id = 0; id < rec_len; id++)
 #ifdef RELION_SINGLE_PRECISION
-		sincosf(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+		SINCOSF(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
 #else
-		sincos(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
+		SINCOS(DEG2RAD(((RFLOAT)(id)) * twist_deg), &sin_rec[id], &cos_rec[id]);
 #endif
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
