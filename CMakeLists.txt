@@ -7,7 +7,9 @@ set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
 project(Relion)
 
 # Use new policy for OS X @rpath
-cmake_policy(SET CMP0042 NEW)
+if(POLICY CMP0042)
+    cmake_policy(SET CMP0042 NEW)
+endif()
 
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
