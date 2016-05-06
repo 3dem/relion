@@ -1127,7 +1127,7 @@ void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pip
 		std::vector<long int> branched_procs;
 		long int next_process = addProcessToUpwardsFlowChart(fh, pipeline, prev_process, current_process, branched_procs);
 
-		if (!is_main_flow && counter > 9)
+		if (counter > 9)
 		{
 			closeTikZPicture(fh, false);
 			counter = 0;
