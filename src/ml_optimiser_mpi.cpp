@@ -772,13 +772,16 @@ void MlOptimiserMpi::expectation()
 				size_t free, total, allocationSize;
 				HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-				if (free < requested_free_gpu_memory)
+				free = (float) free / (float)cudaDeviceShares[i];
+				size_t required_free = requested_free_gpu_memory + GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+
+				if (free < required_free)
 				{
-					printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", requested_free_gpu_memory);
+					printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
 					allocationSize = (double)free *0.7;
 				}
 				else
-					allocationSize = free - requested_free_gpu_memory;
+					allocationSize = free - required_free;
 
 #ifdef PRINT_GPU_MEM_INFO
 				printf("INFO: Free memory for Custom Allocator of device bundle %d of rank %d is %d MB\n", i, node->rank, (int) ( ((float)allocationSize)/1000000.0 ) );
@@ -793,10 +796,7 @@ void MlOptimiserMpi::expectation()
 	if (do_gpu && ! node->isMaster())
 	{
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
-		{
-			size_t allocationSize = (size_t)((float)allocationSizes[i]/(float)cudaDeviceShares[i]) - GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
-			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
-		}
+			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
 
 	/************************************************************************/

@@ -1996,13 +1996,15 @@ void MlOptimiser::expectation()
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-			if (free < requested_free_gpu_memory)
+			size_t required_free = requested_free_gpu_memory + GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+
+			if (free < required_free)
 			{
-				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", requested_free_gpu_memory);
+				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
 				allocationSize = (double)free *0.7;
 			}
 			else
-				allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+				allocationSize = free - required_free;
 
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
