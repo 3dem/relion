@@ -109,11 +109,11 @@ void HealpixSampling::initialise(
 		if(t_nr_psi%32!=0 && do_changepsi)
 		{
 
-			if (do_warnpsi)
-				std::cout << " + WARNING: Changing psi sampling rate to " <<  360./(RFLOAT)t_nr_psi << " degrees, for more efficient GPU calculations" << std::endl;
-
 			// Force-adjust psi_step to be multiples of 32 (for efficient GPU calculations)
 			t_nr_psi = CEIL((float)t_nr_psi / 32.0)*32;
+
+			if (do_warnpsi)
+				std::cout << " + WARNING: Changing psi sampling rate (before oversampling) to " <<  360./(RFLOAT)t_nr_psi << " degrees, for more efficient GPU calculations" << std::endl;
 
 		}
 		psi_step = 360./(RFLOAT)t_nr_psi;
