@@ -286,4 +286,27 @@ __global__ void cuda_kernel_frequencyPass(
 	}
 }
 
+
+__device__ __forceinline__ void translatePixel(
+		int x,
+		int y,
+		XFLOAT tx,
+		XFLOAT ty,
+		XFLOAT &real,
+		XFLOAT &imag,
+		XFLOAT &tReal,
+		XFLOAT &tImag)
+{
+	XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+	sincos( x * tx + y * ty , &s, &c );
+#else
+	sincosf( x * tx + y * ty , &s, &c );
+#endif
+
+	tReal = c * real - s * imag;
+	tImag = c * imag + s * real;
+}
+
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

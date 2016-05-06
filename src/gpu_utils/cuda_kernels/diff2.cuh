@@ -124,15 +124,9 @@ __global__ void cuda_kernel_diff2_coarse(
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
-			XFLOAT s, c;
-#ifdef CUDA_DOUBLE_PRECISION
-			sincos( x * tx + y * ty , &s, &c );
-#else
-			sincosf( x * tx + y * ty , &s, &c );
-#endif
+			XFLOAT real, imag;
 
-			XFLOAT real = c * s_real[i + init_pixel % block_sz] - s * s_imag[i + init_pixel % block_sz];
-			XFLOAT imag = c * s_imag[i + init_pixel % block_sz] + s * s_real[i + init_pixel % block_sz];
+			translatePixel(x, y, tx, ty, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
 
 			#pragma unroll
 			for (int j = 0; j < eulers_per_block; j ++)
