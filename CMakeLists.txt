@@ -59,7 +59,6 @@ else()
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
 endif()
 
-
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
 if(NOT DEFINED CUDA_ARCH)
@@ -182,14 +181,13 @@ if(GUI)
 				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
 		    else()
 		        message(STATUS "FLTK was NOT found")
-		        set(NEW_OWN_FLTK TRUE)
 		    endif() 
         endif(NOT FORCE_OWN_FLTK)
         
-		if(NOT FLTK_FOUND)
-        	include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
-        	set(NEW_OWN_FLTK TRUE)
+	if(NOT FLTK_FOUND)
+            include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
         endif(NOT FLTK_FOUND)
+
     else(X11_FOUND)
         message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
         message( STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
@@ -198,7 +196,7 @@ if(GUI)
     endif(X11_FOUND)
     
 endif(GUI)
-    
+
 # ------------------------------------------------------------------------------FFTW--
 option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
 
@@ -208,7 +206,6 @@ endif(NOT FORCE_OWN_FFTW)
 	
 if(NOT FFTW_FOUND)
 	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
-	set(NEW_OWN_FFTW TRUE)
 endif(NOT FFTW_FOUND)
 
 include(CheckCXXSymbolExists)
@@ -250,6 +247,8 @@ if(BUILD_SHARED_LIBS)
 else()
     message(STATUS "Building static libs (larger build size and binaries)")    
 endif()
+
+
 ADD_SUBDIRECTORY(src/apps)
 
 # -----------------------------------------------------------------------------TESTS--
