@@ -1,5 +1,6 @@
-cmake_minimum_required(VERSION 2.8.8)
-set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
+cmake_minimum_required(VERSION 2.8.12)
+set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.12")
+
 #
 #if(POLICY CMP0048)
 #  cmake_policy(SET CMP0048 NEW)

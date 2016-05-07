@@ -34,9 +34,9 @@ if(NOT FLTK_FOUND)
     #set(FLTK_HASH cf3687ed404bd72347466663b90a8b09)
     #set(FLTK_TAR_NAME fltk-1.3.0.tar.gz)
 
-    set(FLTK_TAR_FILE https://drive.google.com/uc?export=download&id=0B1wYtZx--OuxTFJDdEZUYmY0Zms)   # FLTK 1.3.3
-    set(FLTK_HASH 2b9ae115cceb4807f93c056e8e1c64ab)
-    set(FLTK_TAR_NAME fltk-1.3.3-fixed.tar.gz)
+    set(FLTK_TAR_FILE https://drive.google.com/uc?export=download&id=0B942d76zVnSeazZWcExRaXIyVDg)   # FLTK 1.3.3
+    set(FLTK_HASH 9ccdb0d19dc104b87179bd9fd10822e3)
+    set(FLTK_TAR_NAME fltk-1.3.3-source.tar.gz)
     
     set(FLTK_LIB_DIR ${FLTK_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk)
     set(FLTK_BUILD_DIR ${FLTK_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk-build)
@@ -49,6 +49,7 @@ if(NOT FLTK_FOUND)
     DOWNLOAD_DIR ${FLTK_EXTERNAL_LIBS_TAR_DIRECTORY}
     DOWNLOAD_NAME ${FLTK_TAR_NAME}
     SOURCE_DIR ${FLTK_LIB_DIR}
+    PATCH_COMMAND patch -p1 < ${CMAKE_SOURCE_DIR}/cmake/fltk-1.3.3.patch
     CONFIGURE_COMMAND <SOURCE_DIR>/configure ${ext_conf_flags_fltk}
     INSTALL_DIR ${FLTK_EXTERNAL_PATH}/fltk
     BINARY_DIR ${FLTK_EXTERNAL_PATH}/fltk
