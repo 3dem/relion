@@ -255,7 +255,7 @@ void MotioncorrRunner::run()
 }
 
 
-void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts, int rank)
+void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
 {
 
 
@@ -335,7 +335,7 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 
 }
 
-void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
@@ -389,7 +389,7 @@ void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &
 
 }
 
-void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	FileName fn_avg, fn_mov;
@@ -464,7 +464,7 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 
 }
 
-void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	std::ifstream in(fn_shifts.data(), std::ios_base::in);
@@ -509,7 +509,7 @@ void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &x
 }
 
 // Plot the shifts
-void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	if (xshifts.size() == 0)
