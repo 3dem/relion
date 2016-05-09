@@ -112,7 +112,13 @@ void AutoPicker::read(int argc, char **argv)
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-
+#ifndef CUDA
+	if(do_gpu)
+	{
+		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		do_gpu = false;
+	}
+#endif
 	int ref_section = parser.addSection("References options");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
 	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
