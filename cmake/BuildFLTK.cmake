@@ -1,29 +1,28 @@
-message(STATUS "-------------------------------------------------")   
-message(STATUS "-------- WILL USE LOCALY BUILT FLTK LIBS --------")  
-message(STATUS "-------------------------------------------------") 
+message(STATUS "-------------------------------------------------")
+message(STATUS "------- WILL USE LOCALLY BUILT FLTK LIBS --------")
+message(STATUS "-------------------------------------------------")
 
 set(FLTK_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fltk")
 set(ext_conf_flags_fltk --enable-shared --prefix=${FLTK_EXTERNAL_PATH})
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
 
-find_library(FLTK_LIBRARIES NAMES libfltk.so  PATHS  "${FLTK_EXTERNAL_PATH}/lib" NO_DEFAULT_PATH) 
-find_path(FLTK_INCLUDE_DIR  NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH) 
-find_path(FLTK_PATH         NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH) 
-find_path(FLTK_INCLUDES     NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH)  
+find_library(FLTK_LIBRARIES NAMES fltk      PATHS  "${FLTK_EXTERNAL_PATH}/lib" NO_DEFAULT_PATH)
+find_path(FLTK_INCLUDE_DIR  NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH)
+find_path(FLTK_INCLUDES     NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/include" NO_DEFAULT_PATH)
 
 if(FLTK_INCLUDE_DIR AND FLTK_LIBRARIES)
     set(FLTK_FOUND TRUE)
     message( STATUS "Found previously built external (non-system) FLTK library")
+else()
+    set(FLTK_FOUND FALSE)
 endif()
 ## ----------------------------------------------------------------- NEW EXT LIBS? --  
  
 if(NOT FLTK_FOUND)
 
-    set(FLTK_LIBRARIES     "${FLTK_EXTERNAL_PATH}/lib/libfltk.so" ) 
+    set(FLTK_LIBRARIES     "${FLTK_EXTERNAL_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}fltk${CMAKE_SHARED_LIBRARY_SUFFIX}" )
     set(FLTK_INCLUDE_DIR   "${FLTK_EXTERNAL_PATH}/include" )
-    #set(FLTK_PATH          "${FLTK_EXTERNAL_PATH}/includes/FL/Fl.H" )  
-    #set(FLTK_INCLUDES      "${FLTK_EXTERNAL_PATH}/includes/FL/Fl.H" ) 
 
     include(ExternalProject)
     set(FLTK_EXTERNAL_LIBS_TAR_DIRECTORY  ${FLTK_EXTERNAL_PATH})
@@ -50,6 +49,7 @@ if(NOT FLTK_FOUND)
     DOWNLOAD_DIR ${FLTK_EXTERNAL_LIBS_TAR_DIRECTORY}
     DOWNLOAD_NAME ${FLTK_TAR_NAME}
     SOURCE_DIR ${FLTK_LIB_DIR}
+    PATCH_COMMAND patch -p1 < ${CMAKE_SOURCE_DIR}/cmake/fltk-1.3.3.patch
     CONFIGURE_COMMAND <SOURCE_DIR>/configure ${ext_conf_flags_fltk}
     INSTALL_DIR ${FLTK_EXTERNAL_PATH}/fltk
     BINARY_DIR ${FLTK_EXTERNAL_PATH}/fltk
@@ -59,7 +59,10 @@ if(NOT FLTK_FOUND)
     LOG_INSTALL)
     
     set(NEW_OWN_FLTK TRUE)
-    set(FLTK_FOUND TRUE)
+
+else()
+
+    set(NEW_OWN_FLTK FALSE)
 
 endif()
 

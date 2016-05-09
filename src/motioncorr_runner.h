@@ -102,19 +102,19 @@ public:
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
 	// Execute MOTIONCORR for a single micrograph
-	void executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts, int rank = 0);
+    void executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
 
 	// Get the shifts from MOTIONCORR
-	void getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, vector<float> &yshifts);
+    void getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute UNBLUR for a single micrograph
-	void executeUnblur(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts);
+    void executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Get the shifts from UNBLUR
-	void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts);
+    void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Plot the shifts
-	void plotShifts(FileName fn_eps, std::vector<float> &xshifts, vector<float> &yshifts);
+    void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Make a PDF file with all the shifts
 	void generateLogFilePDF();
