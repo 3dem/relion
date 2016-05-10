@@ -26,6 +26,29 @@ if(NOT GUI)
     list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/pipeliner.cpp")
 endif(NOT GUI)
 
+
+# relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
+if(BUILD_SHARED_LIBS)
+    add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+    install(TARGETS relion_lib LIBRARY DESTINATION lib)
+else()
+    add_library(relion_lib STATIC ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+endif()
+
+target_link_libraries(relion_lib ${FFTW_LIBRARIES})
+if(NEW_OWN_FFTW)
+    add_dependencies(relion_lib FFTW3)
+endif()
+
+if(GUI)
+    target_link_libraries(relion_lib ${FLTK_LIBRARIES})
+	if(NEW_OWN_FLTK)
+        add_dependencies(relion_lib FLTK)
+    endif()
+endif(GUI)
+
+
+
 if (CUDA_FOUND)
 
     file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu" "${CMAKE_SOURCE_DIR}/src/gpu_utils/cuda_kernels/*.cu")
@@ -37,9 +60,9 @@ if (CUDA_FOUND)
         message(STATUS "Adding extra library for NVIDIA profiling: ${NV_TOOLS_LIBRARIES}")
     endif()
 
-# Presently we have a number of (bad) circular dependencies between the gpu util
-# and relion libraries, which cause errors at least on OS X with clang. Tell the
-# compiler to ignore them.
+	# Presently we have a number of (bad) circular dependencies between the gpu util
+	# and relion libraries, which cause errors at least on OS X with clang. Tell the
+	# compiler to ignore them.
     if(APPLE)
         set(new_link_flags "-undefined suppress -flat_namespace")
         get_target_property(existing_link_flags relion_gpu_util LINK_FLAGS)
@@ -52,42 +75,25 @@ if (CUDA_FOUND)
     list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
     if(BUILD_SHARED_LIBS)
         install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
+    else()
+	    target_link_libraries(relion_gpu_util relion_lib)
+	    target_link_libraries(relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
     endif()
+    
+    target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
+    
 endif(CUDA_FOUND)
 
-# relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
-if(BUILD_SHARED_LIBS)
-    add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP})
-    if(GUI)
-        target_link_libraries(relion_lib ${FLTK_LIBRARIES} ${FFTW_LIBRARIES})
-    	if(NEW_OWN_FLTK)
- 	        add_dependencies(relion_lib FLTK)
- 	    endif()
- 	    if(NEW_OWN_FFTW)
- 	        add_dependencies(relion_lib FFTW3)
- 	    endif()
-    endif(GUI)
 
-    install (TARGETS relion_lib LIBRARY DESTINATION lib)
-else()
-    add_library(relion_lib OBJECT ${REL_SRC} ${REL_SRC_H} ${REL_HP})
-endif()
-
-if(CUDA_FOUND)
-    target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
-endif()
+	message(STATUS "BLAAAAA ${EXTRA_LIBS}")
 
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
-    if(BUILD_SHARED_LIBS)
-	    add_executable(${_target} ${_target}.cpp )
-	    set(LIB relion_lib)
-	else()
-	    add_executable(${_target} ${_target}.cpp $<TARGET_OBJECTS:relion_lib>)
-	    set(LIB ${relion_lib})
-	endif()
+    add_executable(${_target} ${_target}.cpp )
+    set(LIB relion_lib)
 	
+ 	add_dependencies(${_target} relion_lib)
 	if(NEW_OWN_FFTW)
  	   add_dependencies(${_target} FFTW3)
  	endif()
