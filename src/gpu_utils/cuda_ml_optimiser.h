@@ -8,6 +8,7 @@
 #include "src/gpu_utils/cuda_backprojector.h"
 #include "src/gpu_utils/cuda_translator.h"
 #include "src/gpu_utils/cuda_fft.h"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 #include <stack>
 //#include <cufft.h>
 
@@ -478,12 +479,17 @@ public:
 
 	MlDeviceBundle *devBundle;
 
+#ifdef TIMING
+	relion_timer timer;
+#endif
+
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle) :
 			baseMLO(baseMLOptimiser),
 			transformer1(0, bundle->allocator),
 			transformer2(0, bundle->allocator),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			devBundle(bundle),
+			timer(),
 			device_id(bundle->device_id),
 			errorStatus((cudaError_t)0)
 	{};

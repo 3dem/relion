@@ -12,7 +12,7 @@
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_settings.h"
-#include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
 #include "src/gpu_utils/cuda_fft.h"
 
@@ -66,7 +66,7 @@ void AutoPickerCuda::run()
 
 		for (int iref = 0; iref < (basePckr->Mrefs.size()); iref++)
 		{
-			CUDA_CPU_TIC("setupProjectors");
+			timer.cuda_cpu_tic("setupProjectors");
 			cudaProjectors[iref].setMdlDim(
 							basePckr->PPref[iref].data.xdim,
 							basePckr->PPref[iref].data.ydim,
@@ -77,7 +77,7 @@ void AutoPickerCuda::run()
 							basePckr->PPref[iref].padding_factor);
 			cudaProjectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
 		}
-		CUDA_CPU_TOC("setupProjectors");
+		timer.cuda_cpu_toc("setupProjectors");
 	}
 
 	FileName fn_olddir="";
@@ -124,26 +124,26 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX 
 	CudaGlobalPtr< CUDACOMPLEX > d_Fcov(d_Fmic.getAllocator());
 	d_Fcov.device_alloc(d_Fmic.getSize());
 
-	CUDA_CPU_TIC("PRE-multi_0");
+	timer.cuda_cpu_tic("PRE-multi_0");
 	int Bsize( (int) ceilf(( float)d_Fmic.size/(float)BLOCK_SIZE));
 	cuda_kernel_convol_B<<<Bsize,BLOCK_SIZE>>>(   ~d_Fmic,
 												  ~d_Fmsk,
 												  ~d_Fcov,
 												  d_Fmic.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("PRE-multi_0");
+	timer.cuda_cpu_toc("PRE-multi_0");
 
-	CUDA_CPU_TIC("PRE-window_0");
+	timer.cuda_cpu_tic("PRE-window_0");
 	windowFourierTransform2(
 			d_Fcov,
 			cudaTransformer2.fouriers,
 			x, y, 1,
 			workSize/2+1, workSize, 1);
-	CUDA_CPU_TOC("PRE-window_0");
+	timer.cuda_cpu_toc("PRE-window_0");
 
-	CUDA_CPU_TIC("PRE-Transform_0");
+	timer.cuda_cpu_tic("PRE-Transform_0");
 	cudaTransformer2.backward();
-	CUDA_CPU_TOC("PRE-Transform_0");
+	timer.cuda_cpu_toc("PRE-Transform_0");
 
 	Bsize = ( (int) ceilf(( float)cudaTransformer2.reals.size/(float)BLOCK_SIZE));
 	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.d_ptr,
@@ -151,64 +151,64 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX 
 										     (XFLOAT) normfft,
 										     cudaTransformer2.reals.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TIC("PRE-multi_1");
+	timer.cuda_cpu_tic("PRE-multi_1");
 	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.d_ptr,
 											 cudaTransformer2.reals.d_ptr,
 											 d_Mstddev.d_ptr,
 											 (XFLOAT) -1,
 										     cudaTransformer2.reals.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("PRE-multi_1");
+	timer.cuda_cpu_toc("PRE-multi_1");
 
-	CUDA_CPU_TIC("PRE-CenterFFT_0");
+	timer.cuda_cpu_tic("PRE-CenterFFT_0");
 	runCenterFFT(cudaTransformer2.reals,
 				 (int)cudaTransformer2.xSize,
 				 (int)cudaTransformer2.ySize,
 				 false,
 				 1);
-	CUDA_CPU_TOC("PRE-CenterFFT_0");
+	timer.cuda_cpu_toc("PRE-CenterFFT_0");
 
 	cudaTransformer2.reals.cp_on_device(d_Mmean); //TODO remove the need for this
 
-	CUDA_CPU_TIC("PRE-multi_2");
+	timer.cuda_cpu_tic("PRE-multi_2");
 	Bsize = ( (int) ceilf(( float)d_Fmsk.size/(float)BLOCK_SIZE));
 	cuda_kernel_convol_A<<<Bsize,BLOCK_SIZE>>>( 	  ~d_Fmsk,
 													  ~d_Fmic2,
 													  ~d_Fcov,
 													  d_Fmsk.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("PRE-multi_2");
+	timer.cuda_cpu_toc("PRE-multi_2");
 
 
-	CUDA_CPU_TIC("PRE-window_1");
+	timer.cuda_cpu_tic("PRE-window_1");
 	windowFourierTransform2(
 			d_Fcov,
 			cudaTransformer2.fouriers,
 			x, y, 1,
 			workSize/2+1, workSize, 1);
-	CUDA_CPU_TOC("PRE-window_1");
+	timer.cuda_cpu_toc("PRE-window_1");
 
 
-	CUDA_CPU_TIC("PRE-Transform_1");
+	timer.cuda_cpu_tic("PRE-Transform_1");
 	cudaTransformer2.backward();
-	CUDA_CPU_TOC("PRE-Transform_1");
+	timer.cuda_cpu_toc("PRE-Transform_1");
 
-	CUDA_CPU_TIC("PRE-multi_3");
+	timer.cuda_cpu_tic("PRE-multi_3");
 	Bsize = ( (int) ceilf(( float)d_Mstddev.size/(float)BLOCK_SIZE));
 	cuda_kernel_finalizeMstddev<<<Bsize,BLOCK_SIZE>>>( 	  d_Mstddev.d_ptr,
 														  cudaTransformer2.reals.d_ptr,
 														  normfft,
 														  d_Mstddev.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("PRE-multi_3");
+	timer.cuda_cpu_toc("PRE-multi_3");
 
-	CUDA_CPU_TIC("PRE-CenterFFT_1");
+	timer.cuda_cpu_tic("PRE-CenterFFT_1");
 	runCenterFFT(d_Mstddev,
 				 (int)workSize,
 				 (int)workSize,
 				 false,
 				 1);
-	CUDA_CPU_TOC("PRE-CenterFFT_1");
+	timer.cuda_cpu_toc("PRE-CenterFFT_1");
 
 }
 
@@ -237,12 +237,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_A6);
 #endif
-	CUDA_CPU_TIC("readMicrograph");
+	timer.cuda_cpu_tic("readMicrograph");
 	Imic.read(fn_mic);
-	CUDA_CPU_TOC("readMicrograph");
-	CUDA_CPU_TIC("setXmippOrigin_0");
+	timer.cuda_cpu_toc("readMicrograph");
+	timer.cuda_cpu_tic("setXmippOrigin_0");
 	Imic().setXmippOrigin();
-	CUDA_CPU_TOC("setXmippOrigin_0");
+	timer.cuda_cpu_toc("setXmippOrigin_0");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_A6);
 #endif
@@ -262,13 +262,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 	if(!basePckr->do_read_fom_maps)
 	{
-		CUDA_CPU_TIC("setSize_micTr");
+		timer.cuda_cpu_tic("setSize_micTr");
 		micTransformer.setSize(basePckr->micrograph_size, basePckr->micrograph_size, 1);
-		CUDA_CPU_TOC("setSize_micTr");
+		timer.cuda_cpu_toc("setSize_micTr");
 
-		CUDA_CPU_TIC("setSize_cudaTr");
+		timer.cuda_cpu_tic("setSize_cudaTr");
 		cudaTransformer1.setSize(basePckr->workSize,basePckr->workSize, Npsi, FFTW_BACKWARD);
-		CUDA_CPU_TOC("setSize_cudaTr");
+		timer.cuda_cpu_toc("setSize_cudaTr");
 	}
 	HANDLE_ERROR(cudaDeviceSynchronize());
 
@@ -290,13 +290,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_A7);
 #endif
-    CUDA_CPU_TIC("computeStats");
+    timer.cuda_cpu_tic("computeStats");
 	Imic().computeStats(avg0, stddev0, minval0, maxval0);
-    CUDA_CPU_TOC("computeStats");
+    timer.cuda_cpu_toc("computeStats");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_A7);
 #endif
-    CUDA_CPU_TIC("middlePassFilter");
+    timer.cuda_cpu_tic("middlePassFilter");
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imic())
 	{
 		// Remove pixel values that are too far away from the mean
@@ -305,15 +305,15 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 		DIRECT_MULTIDIM_ELEM(Imic(), n) = (DIRECT_MULTIDIM_ELEM(Imic(), n) - avg0) / stddev0;
 	}
-    CUDA_CPU_TOC("middlePassFilter");
+    timer.cuda_cpu_toc("middlePassFilter");
 
 	if (basePckr->micrograph_xsize !=basePckr->micrograph_ysize)
 	{
-		CUDA_CPU_TIC("rewindow");
+		timer.cuda_cpu_tic("rewindow");
 		// Window non-square micrographs to be a square with the largest side
 		rewindow(Imic, basePckr->micrograph_size);
-		CUDA_CPU_TOC("rewindow");
-		CUDA_CPU_TIC("gaussNoiseOutside");
+		timer.cuda_cpu_toc("rewindow");
+		timer.cuda_cpu_tic("gaussNoiseOutside");
 		// Fill region outside the original window with white Gaussian noise to prevent all-zeros in Mstddev
 		FOR_ALL_ELEMENTS_IN_ARRAY2D(Imic())
 		{
@@ -323,13 +323,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 					|| j > LAST_XMIPP_INDEX(basePckr->micrograph_xsize) )
 				A2D_ELEM(Imic(), i, j) = rnd_gaus(0.,1.);
 		}
-		CUDA_CPU_TOC("gaussNoiseOutside");
+		timer.cuda_cpu_toc("gaussNoiseOutside");
 	}
 
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_A8);
 #endif
-	CUDA_CPU_TIC("CTFread");
+	timer.cuda_cpu_tic("CTFread");
 	// Read in the CTF information if needed
 	if (basePckr->do_ctf)
 	{
@@ -347,19 +347,19 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			}
 		}
 	}
-	CUDA_CPU_TOC("CTFread");
+	timer.cuda_cpu_toc("CTFread");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_A8);
 #endif
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_A9);
 #endif
-	CUDA_CPU_TIC("mccfResize");
+	timer.cuda_cpu_tic("mccfResize");
 	Mccf_best.resize(basePckr->workSize,basePckr->workSize);
-	CUDA_CPU_TOC("mccfResize");
-	CUDA_CPU_TIC("mpsifResize");
+	timer.cuda_cpu_toc("mccfResize");
+	timer.cuda_cpu_tic("mpsifResize");
 	Mpsi_best.resize(basePckr->workSize,basePckr->workSize);
-	CUDA_CPU_TOC("mpsiResize");
+	timer.cuda_cpu_toc("mpsiResize");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_A9);
 #endif
@@ -373,12 +373,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	RFLOAT normfft = (RFLOAT)(basePckr->micrograph_size*basePckr->micrograph_size) / (RFLOAT)basePckr->nr_pixels_circular_mask;;
 	if (basePckr->do_read_fom_maps)
 	{
-		CUDA_CPU_TIC("readFromFomMaps_0");
+		timer.cuda_cpu_tic("readFromFomMaps_0");
 		FileName fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_stddevNoise.spi";
 		Image<RFLOAT> It;
 		It.read(fn_tmp);
 		Mstddev = It();
-		CUDA_CPU_TOC("readFromFomMaps_0");
+		timer.cuda_cpu_toc("readFromFomMaps_0");
 	}
 	else
 	{
@@ -402,19 +402,19 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 		 *
 		 */
 
-		CUDA_CPU_TIC("Imic_insert");
+		timer.cuda_cpu_tic("Imic_insert");
 		for(int i = 0; i< Imic().nzyxdim ; i++)
 			micTransformer.reals[i] = (XFLOAT) Imic().data[i];
 		micTransformer.reals.cp_to_device();
-		CUDA_CPU_TIC("Imic_insert");
+		timer.cuda_cpu_tic("Imic_insert");
 
 
-		CUDA_CPU_TIC("runCenterFFT_0");
+		timer.cuda_cpu_tic("runCenterFFT_0");
 		runCenterFFT(micTransformer.reals, micTransformer.xSize, micTransformer.ySize, true, 1);
-		CUDA_CPU_TOC("runCenterFFT_0");
+		timer.cuda_cpu_toc("runCenterFFT_0");
 
 
-		CUDA_CPU_TIC("FourierTransform_0");
+		timer.cuda_cpu_tic("FourierTransform_0");
 		micTransformer.forward();
 		int FMultiBsize = ( (int) ceilf(( float)micTransformer.fouriers.getSize()*2/(float)BLOCK_SIZE));
 		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
@@ -422,11 +422,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
 				micTransformer.fouriers.getSize()*2);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
-		CUDA_CPU_TOC("FourierTransform_0");
+		timer.cuda_cpu_toc("FourierTransform_0");
 
 		if (basePckr->highpass > 0.)
 		{
-			CUDA_CPU_TIC("highpass");
+			timer.cuda_cpu_tic("highpass");
 			micTransformer.fouriers.streamSync();
 			lowPassFilterMapGPU(	micTransformer.fouriers,
 									(size_t)1,
@@ -441,26 +441,26 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			micTransformer.fouriers.streamSync();
 			micTransformer.backward();
 			micTransformer.reals.streamSync();
-			CUDA_CPU_TOC("highpass");
+			timer.cuda_cpu_toc("highpass");
 		}
 
-		CUDA_CPU_TIC("F_cp");
+		timer.cuda_cpu_tic("F_cp");
 		CudaGlobalPtr< CUDACOMPLEX > Ftmp(allocator);
 		Ftmp.setSize(micTransformer.fouriers.getSize());
 		Ftmp.device_alloc();
 		micTransformer.fouriers.cp_on_device(Ftmp);
-		CUDA_CPU_TOC("F_cp");
+		timer.cuda_cpu_toc("F_cp");
 
 		// Also calculate the FFT of the squared micrograph
-		CUDA_CPU_TIC("SquareImic");
+		timer.cuda_cpu_tic("SquareImic");
 
 		cuda_kernel_square<<<FMultiBsize,BLOCK_SIZE>>>(
 				~micTransformer.reals,
 				micTransformer.reals.getSize());
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
-		CUDA_CPU_TOC("SquareImic");
+		timer.cuda_cpu_toc("SquareImic");
 
-		CUDA_CPU_TIC("FourierTransform_1");
+		timer.cuda_cpu_tic("FourierTransform_1");
 
 		micTransformer.forward();
 		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
@@ -468,10 +468,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
 				micTransformer.fouriers.getSize()*2);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
-		CUDA_CPU_TOC("FourierTransform_1");
+		timer.cuda_cpu_toc("FourierTransform_1");
 
 		// The following calculate mu and sig under the solvent area at every position in the micrograph
-		CUDA_CPU_TIC("calculateStddevAndMeanUnderMask");
+		timer.cuda_cpu_tic("calculateStddevAndMeanUnderMask");
 
 		d_Mstddev.device_alloc(basePckr->workSize*basePckr->workSize);
 		d_Mmean.device_alloc(basePckr->workSize*basePckr->workSize);
@@ -512,10 +512,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 
 
-		CUDA_CPU_TOC("calculateStddevAndMeanUnderMask");
+		timer.cuda_cpu_toc("calculateStddevAndMeanUnderMask");
 
 		// From now on use downsized Fmic, as the cross-correlation with the references can be done at lower resolution
-		CUDA_CPU_TIC("windowFourierTransform_0");
+		timer.cuda_cpu_tic("windowFourierTransform_0");
 
 		d_Fmic.setSize((basePckr->workSize/2+1)*(basePckr->workSize));
 		d_Fmic.device_alloc();
@@ -525,27 +525,27 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1, //Input dimensions
 				basePckr->workSize/2+1, basePckr->workSize, 1  //Output dimensions
 				);
-		CUDA_CPU_TOC("windowFourierTransform_0");
+		timer.cuda_cpu_toc("windowFourierTransform_0");
 
 		if (basePckr->do_write_fom_maps)
 		{
-			CUDA_CPU_TIC("writeToFomMaps");
+			timer.cuda_cpu_tic("writeToFomMaps");
 			// TMP output
 			FileName fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_stddevNoise.spi";
 			Image<RFLOAT> It;
 			It() = Mstddev;
 			It.write(fn_tmp);
-			CUDA_CPU_TOC("writeToFomMaps");
+			timer.cuda_cpu_toc("writeToFomMaps");
 		}
 
 	}// end if do_read_fom_maps
 
 	// Now start looking for the peaks of all references
 	// Clear the output vector with all peaks
-	CUDA_CPU_TIC("initPeaks");
+	timer.cuda_cpu_tic("initPeaks");
 	std::vector<Peak> peaks;
 	peaks.clear();
-	CUDA_CPU_TOC("initPeaks");
+	timer.cuda_cpu_toc("initPeaks");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B1);
 #endif
@@ -586,7 +586,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	for (int iref = 0; iref < basePckr->Mrefs.size(); iref++)
 	{
 
-		CUDA_CPU_TIC("OneReference");
+		timer.cuda_cpu_tic("OneReference");
 		RFLOAT expected_Pratio; // the expectedFOM for this (ctf-corrected) reference
 		if (basePckr->do_read_fom_maps)
 		{
@@ -595,7 +595,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #endif
 			if (!basePckr->autopick_helical_segments)
 			{
-				CUDA_CPU_TIC("readFromFomMaps");
+				timer.cuda_cpu_tic("readFromFomMaps");
 				FileName fn_tmp;
 				Image<RFLOAT> It;
 
@@ -607,7 +607,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.read(fn_tmp);
 				Mpsi_best = It();
-				CUDA_CPU_TOC("readFromFomMaps");
+				timer.cuda_cpu_toc("readFromFomMaps");
 			}
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B2);
@@ -619,9 +619,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B3);
 #endif
-			CUDA_CPU_TIC("mccfInit");
+			timer.cuda_cpu_tic("mccfInit");
 			deviceInitValue(d_Mccf_best, (XFLOAT)-LARGE_NUMBER);
-			CUDA_CPU_TOC("mccfInit");
+			timer.cuda_cpu_toc("mccfInit");
 			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 									cudaProjectors[iref],
 									(int)basePckr->workSize/2+1,
@@ -633,7 +633,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B4);
 #endif
-	CUDA_CPU_TIC("SingleProjection");
+	timer.cuda_cpu_tic("SingleProjection");
 	dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),1);
 	cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
 													  ~cudaTransformer1.fouriers,
@@ -643,7 +643,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 													  0
 												);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("SingleProjection");
+	timer.cuda_cpu_toc("SingleProjection");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B4);
 #endif
@@ -652,31 +652,31 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			 *    -------------------------------------------------------------------
 			 */
 
-			CUDA_CPU_TIC("PREP_CALCS");
+			timer.cuda_cpu_tic("PREP_CALCS");
 
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B5);
 #endif
 			// Sjors 20April2016: The calculation for sum_ref_under_circ_mask, etc below needs to be done on original micrograph_size!
-			CUDA_CPU_TIC("windowFourierTransform_FP");
+			timer.cuda_cpu_tic("windowFourierTransform_FP");
 			windowFourierTransform2(cudaTransformer1.fouriers,
 									micTransformer.fouriers,
 									basePckr->workSize/2+1,        basePckr->workSize,        1, //Input dimensions
 									basePckr->micrograph_size/2+1, basePckr->micrograph_size, 1  //Output dimensions
 									);
-			CUDA_CPU_TOC("windowFourierTransform_FP");
+			timer.cuda_cpu_toc("windowFourierTransform_FP");
 
-			CUDA_CPU_TIC("inverseFourierTransform_FP");
+			timer.cuda_cpu_tic("inverseFourierTransform_FP");
 			micTransformer.backward();
-			CUDA_CPU_TOC("inverseFourierTransform_FP");
+			timer.cuda_cpu_toc("inverseFourierTransform_FP");
 
-			CUDA_CPU_TIC("runCenterFFT_FP");
+			timer.cuda_cpu_tic("runCenterFFT_FP");
 			runCenterFFT(micTransformer.reals,
 						 (int)micTransformer.xSize,
 						 (int)micTransformer.ySize,
 						 false,
 						 1);
-			CUDA_CPU_TOC("runCenterFFT_FP");
+			timer.cuda_cpu_toc("runCenterFFT_FP");
 
 			micTransformer.reals.cp_to_host();
 
@@ -686,9 +686,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			for (int i = 0; i < micTransformer.reals.size ; i ++)
 				Maux.data[i] = micTransformer.reals[i];
 
-			CUDA_CPU_TIC("setXmippOrigin_FP_0");
+			timer.cuda_cpu_tic("setXmippOrigin_FP_0");
 			Maux.setXmippOrigin();
-			CUDA_CPU_TOC("setXmippOrigin_FP_0");
+			timer.cuda_cpu_toc("setXmippOrigin_FP_0");
 			// TODO: check whether I need CenterFFT(Maux, false)
 			// Sjors 20apr2016: checked, somehow not needed.
 
@@ -697,10 +697,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			RFLOAT suma2 = 0.;
 			RFLOAT sumn = 1.;
 			MultidimArray<RFLOAT> Mctfref(basePckr->particle_size, basePckr->particle_size);
-			CUDA_CPU_TIC("setXmippOrigin_FP_1");
+			timer.cuda_cpu_tic("setXmippOrigin_FP_1");
 			Mctfref.setXmippOrigin();
-			CUDA_CPU_TOC("setXmippOrigin_FP_1");
-			CUDA_CPU_TIC("suma_FP");
+			timer.cuda_cpu_toc("setXmippOrigin_FP_1");
+			timer.cuda_cpu_tic("suma_FP");
 			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mctfref) // only loop over smaller Mctfref, but take values from large Maux!
 			{
 				if (i*i + j*j < basePckr->particle_radius2)
@@ -716,15 +716,15 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			sum_ref2_under_circ_mask /= sumn;
 			expected_Pratio = exp(suma2 / (2. * sumn));
 
-			CUDA_CPU_TOC("suma_FP");
-			CUDA_CPU_TOC("PREP_CALCS");
+			timer.cuda_cpu_toc("suma_FP");
+			timer.cuda_cpu_toc("PREP_CALCS");
 
 			// for all batches
 			int startPsi(0);
 			for (int psiIter = 0; psiIter < cudaTransformer1.psiIters; psiIter++) // psi-batches for possible memory-limits
 			{
 
-				CUDA_CPU_TIC("Projection");
+				timer.cuda_cpu_tic("Projection");
 				dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),cudaTransformer1.batchSize[psiIter]);
 				cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
 																  ~cudaTransformer1.fouriers,
@@ -734,36 +734,36 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 																  startPsi
 															);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
-				CUDA_CPU_TOC("Projection");
+				timer.cuda_cpu_toc("Projection");
 
 				// Now multiply template and micrograph to calculate the cross-correlation
-				CUDA_CPU_TIC("convol");
+				timer.cuda_cpu_tic("convol");
 				dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),cudaTransformer1.batchSize[psiIter]);
 				cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   cudaTransformer1.fouriers.d_ptr,
 																	  d_Fmic.d_ptr,
 																	  FauxStride);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
-				CUDA_CPU_TOC("convol");
+				timer.cuda_cpu_toc("convol");
 
-				CUDA_CPU_TIC("CudaInverseFourierTransform_1");
+				timer.cuda_cpu_tic("CudaInverseFourierTransform_1");
 				cudaTransformer1.backward();
 				HANDLE_ERROR(cudaDeviceSynchronize());
-				CUDA_CPU_TOC("CudaInverseFourierTransform_1");
+				timer.cuda_cpu_toc("CudaInverseFourierTransform_1");
 
 
-				CUDA_CPU_TIC("runCenterFFT_1");
+				timer.cuda_cpu_tic("runCenterFFT_1");
 				runCenterFFT(cudaTransformer1.reals,
 							(int)cudaTransformer1.xSize,
 							 (int)cudaTransformer1.ySize,
 							 false,
 							 cudaTransformer1.batchSize[psiIter]);
-				CUDA_CPU_TOC("runCenterFFT_1");
+				timer.cuda_cpu_toc("runCenterFFT_1");
 				// Calculate ratio of prabilities P(ref)/P(zero)
 				// Keep track of the best values and their corresponding iref and psi
 				// ------------------------------------------------------------------
 				// So now we already had precalculated: Mdiff2 = 1/sig*Sum(X^2) - 2/sig*Sum(X) + mu^2/sig*Sum(1)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
-				CUDA_CPU_TIC("probRatio");
+				timer.cuda_cpu_tic("probRatio");
 				HANDLE_ERROR(cudaDeviceSynchronize());
 				dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/cudaTransformer1.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
 				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
@@ -783,8 +783,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 						);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 				startPsi += cudaTransformer1.batchSize[psiIter];
-				CUDA_CPU_TOC("probRatio");
-			    CUDA_CPU_TOC("OneRotation");
+				timer.cuda_cpu_toc("probRatio");
+			    timer.cuda_cpu_toc("OneRotation");
 			} // end for psi-batches
 
 #ifdef TIMING
@@ -793,7 +793,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #ifdef TIMING
 	basePckr->timer.tic(basePckr->TIMING_B7);
 #endif
-			CUDA_CPU_TIC("output");
+			timer.cuda_cpu_tic("output");
 			d_Mccf_best.cp_to_host();
 			d_Mpsi_best.cp_to_host();
 			d_Mccf_best.streamSync();
@@ -802,11 +802,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				Mccf_best.data[i] = d_Mccf_best[i];
 				Mpsi_best.data[i] = d_Mpsi_best[i];
 			}
-			CUDA_CPU_TOC("output");
+			timer.cuda_cpu_toc("output");
 
 			if (basePckr->do_write_fom_maps && !basePckr->autopick_helical_segments)
 			{
-				CUDA_CPU_TIC("writeFomMaps");
+				timer.cuda_cpu_tic("writeFomMaps");
 				// TMP output
 				FileName fn_tmp;
 				Image<RFLOAT> It;
@@ -819,7 +819,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 				It() = Mpsi_best;
 				fn_tmp.compose(basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_ref", iref,"_bestPSI.spi");
 				It.write(fn_tmp);
-				CUDA_CPU_TOC("writeFomMaps");
+				timer.cuda_cpu_toc("writeFomMaps");
 
 			} // end if do_write_fom_maps
 #ifdef TIMING
@@ -856,25 +856,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #endif
 			// Now that we have Mccf_best and Mpsi_best, get the peaks
 			std::vector<Peak> my_ref_peaks;
-			CUDA_CPU_TIC("setXmippOriginX3");
+			timer.cuda_cpu_tic("setXmippOriginX3");
 			Mstddev.setXmippOrigin();
 			Mccf_best.setXmippOrigin();
 			Mpsi_best.setXmippOrigin();
-			CUDA_CPU_TOC("setXmippOriginX3");
+			timer.cuda_cpu_toc("setXmippOriginX3");
 
-			CUDA_CPU_TIC("peakSearch");
+			timer.cuda_cpu_tic("peakSearch");
 			basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks, scale);
-			CUDA_CPU_TOC("peakSearch");
+			timer.cuda_cpu_toc("peakSearch");
 
-			CUDA_CPU_TIC("peakPrune");
+			timer.cuda_cpu_tic("peakPrune");
 			basePckr->prunePeakClusters(my_ref_peaks, min_distance_pix, scale);
-			CUDA_CPU_TOC("peakPrune");
+			timer.cuda_cpu_toc("peakPrune");
 
-			CUDA_CPU_TIC("peakInsert");
+			timer.cuda_cpu_tic("peakInsert");
 			// append the peaks of this reference to all the other peaks
 			peaks.insert(peaks.end(), my_ref_peaks.begin(), my_ref_peaks.end());
-			CUDA_CPU_TOC("peakInsert");
-			CUDA_CPU_TOC("OneReference");
+			timer.cuda_cpu_toc("peakInsert");
+			timer.cuda_cpu_toc("OneReference");
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_B8);
 #endif
@@ -937,9 +937,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	basePckr->timer.tic(basePckr->TIMING_B9);
 #endif
 		//Now that we have done all references, prune the list again...
-		CUDA_CPU_TIC("finalPeakPrune");
+		timer.cuda_cpu_tic("finalPeakPrune");
 		basePckr->prunePeakClusters(peaks, min_distance_pix, scale);
-		CUDA_CPU_TOC("finalPeakPrune");
+		timer.cuda_cpu_toc("finalPeakPrune");
 
 		// And remove all too close neighbours
 		basePckr->removeTooCloselyNeighbouringPeaks(peaks, min_distance_pix, scale);

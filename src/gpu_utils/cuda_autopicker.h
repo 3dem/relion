@@ -11,6 +11,7 @@
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_fft.h"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 
 #include <stack>
 
@@ -41,6 +42,10 @@ public:
 	bool have_warned_batching;
 
 	//MlDeviceBundle *devBundle;
+
+#ifdef TIMING
+	relion_timer timer;
+#endif
 
 	AutoPickerCuda(AutoPicker *basePicker, int dev_id);
 
