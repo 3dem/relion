@@ -751,7 +751,9 @@ void MlOptimiserMpi::expectation()
 
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]]);
+			std::stringstream didSs;
+			didSs << "RRr" << node->rank << "t" << i;
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]],didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
 		}

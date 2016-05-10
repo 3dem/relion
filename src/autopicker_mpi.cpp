@@ -17,9 +17,6 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#ifdef CUDA
-#include <cuda_runtime.h>
-#endif
 
 #include "src/autopicker_mpi.h"
 

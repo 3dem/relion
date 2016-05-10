@@ -7,7 +7,7 @@
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
 #include "src/gpu_utils/cuda_projector_plan.h"
-#include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
@@ -37,6 +37,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		MlOptimiserCuda *cudaMLO
 		)
 {
+		GTIC(cudaMLO->timer,"getFourierTransformsAndCtfs");
+		//cudaMLO->timer.cuda_gpu_tic("getFourierTransformsAndCtfs");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
@@ -46,7 +48,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
-		CUDA_CPU_TIC("init");
+		CTIC(cudaMLO->timer,"init");
 		FileName fn_img;
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg;
@@ -89,9 +91,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
 				ZZ(my_prior) = 0.;
 		}
-		CUDA_CPU_TOC("init");
+		CTOC(cudaMLO->timer,"init");
 
-		CUDA_CPU_TIC("nonZeroProb");
+		CTIC(cudaMLO->timer,"nonZeroProb");
 		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
 			// First try if there are some fixed prior angles
@@ -123,9 +125,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 
 		}
-		CUDA_CPU_TOC("nonZeroProb");
+		CTOC(cudaMLO->timer,"nonZeroProb");
 
-		CUDA_CPU_TIC("setXmippOrigin");
+		CTIC(cudaMLO->timer,"setXmippOrigin");
 		// Get the image and recimg data
 		if (baseMLO->do_parallel_disc_io)
 		{
@@ -215,9 +217,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				}
 			}
 		}
-		CUDA_CPU_TOC("setXmippOrigin");
+		CTOC(cudaMLO->timer,"setXmippOrigin");
 
-		CUDA_CPU_TIC("selfTranslate");
+		CTIC(cudaMLO->timer,"selfTranslate");
 
 		/* FIXME :  For some reason the device-allocation inside "selfTranslate" takes a much longer time than expected.
 		 * 			I tried moving it up and placing the size under a bunch of if()-cases, but this simply transferred the
@@ -244,17 +246,17 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Apply the norm_correction term
 		if (baseMLO->do_norm_correction)
 		{
-			CUDA_CPU_TIC("norm_corr");
+			CTIC(cudaMLO->timer,"norm_corr");
 			cuda_kernel_multi<<<STBsize,BLOCK_SIZE>>>(
 									~temp,
 									(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr),
 									img_size);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 			temp.streamSync();
-			CUDA_CPU_TOC("norm_corr");
+			CTOC(cudaMLO->timer,"norm_corr");
 		}
 
-		CUDA_CPU_TIC("kernel_translate");
+		CTIC(cudaMLO->timer,"kernel_translate");
 		cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
 								~temp,  // translate from temp...
 								~d_img, // ... into d_img
@@ -264,7 +266,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 								XX(my_old_offset),
 								YY(my_old_offset));
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-		CUDA_CPU_TOC("kernel_translate");
+		CTOC(cudaMLO->timer,"kernel_translate");
 //		d_img.cp_to_host();
 //		d_img.streamSync();
 //		for (int i=0; i<img_size; i++)
@@ -299,13 +301,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Also store priors on translations
 		op.prior[ipart] = my_prior;
 
-		CUDA_CPU_TOC("selfTranslate");
+		CTOC(cudaMLO->timer,"selfTranslate");
 
 //		// Always store FT of image without mask (to be used for the reconstruction)
 //		MultidimArray<RFLOAT> img_aux;
 //		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 
-		CUDA_CPU_TIC("calcFimg");
+		CTIC(cudaMLO->timer,"calcFimg");
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		size_t current_size_y = baseMLO->mymodel.current_size;
 
@@ -351,10 +353,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
 				current_size_x, current_size_y, 1  //Output dimensions
 				);
-		CUDA_CPU_TOC("calcFimg");
+		CTOC(cudaMLO->timer,"calcFimg");
 		cudaMLO->transformer1.fouriers.streamSync();
 
-		CUDA_CPU_TIC("cpFimg2Host");
+		CTIC(cudaMLO->timer,"cpFimg2Host");
 		d_Fimg.cp_to_host();
 		d_Fimg.streamSync();
 
@@ -364,9 +366,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
 			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
 		}
-		CUDA_CPU_TOC("cpFimg2Host");
+		CTOC(cudaMLO->timer,"cpFimg2Host");
 
-		CUDA_CPU_TIC("selfApplyBeamTilt");
+		CTIC(cudaMLO->timer,"selfApplyBeamTilt");
 		// Here apply the beamtilt correction if necessary
 		// This will only be used for reconstruction, not for alignment
 		// But beamtilt only affects very high-resolution components anyway...
@@ -381,9 +383,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		op.Fimgs_nomask.at(ipart) = Fimg;
 
-		CUDA_CPU_TOC("selfApplyBeamTilt");
+		CTOC(cudaMLO->timer,"selfApplyBeamTilt");
 
-		CUDA_CPU_TIC("zeroMask");
+		CTIC(cudaMLO->timer,"zeroMask");
 		MultidimArray<RFLOAT> Mnoise;
 		if (!baseMLO->do_zero_mask)
 		{
@@ -424,25 +426,25 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				}
 			}
 			// Back to real space Mnoise
-			CUDA_CPU_TIC("inverseFourierTransform");
+			CTIC(cudaMLO->timer,"inverseFourierTransform");
 			cudaMLO->transformer.inverseFourierTransform();
-			CUDA_CPU_TOC("inverseFourierTransform");
+			CTOC(cudaMLO->timer,"inverseFourierTransform");
 
-			CUDA_CPU_TIC("setXmippOrigin");
+			CTIC(cudaMLO->timer,"setXmippOrigin");
 			Mnoise.setXmippOrigin();
-			CUDA_CPU_TOC("setXmippOrigin");
+			CTOC(cudaMLO->timer,"setXmippOrigin");
 
-			CUDA_CPU_TIC("softMaskOutsideMap");
+			CTIC(cudaMLO->timer,"softMaskOutsideMap");
 			d_img.cp_to_host();
 			d_img.streamSync();
 			for (int i=0; i<img_size; i++)
 				img.data.data[i] = d_img[i];
 			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
-			CUDA_CPU_TOC("softMaskOutsideMap");
+			CTOC(cudaMLO->timer,"softMaskOutsideMap");
 		}
 		else
 		{
-			CUDA_CPU_TIC("softMaskOutsideMap");
+			CTIC(cudaMLO->timer,"softMaskOutsideMap");
 
 			XFLOAT cosine_width = baseMLO->width_mask_edge;
 			XFLOAT radius = (XFLOAT)((RFLOAT)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
@@ -491,19 +493,19 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //				std::cout << img.data.data[n] << std::endl;
 //			}
 //			exit(0);
-			CUDA_CPU_TOC("softMaskOutsideMap");
+			CTOC(cudaMLO->timer,"softMaskOutsideMap");
 		}
-		CUDA_CPU_TOC("zeroMask");
+		CTOC(cudaMLO->timer,"zeroMask");
 
-		CUDA_CPU_TIC("setSize");
+		CTIC(cudaMLO->timer,"setSize");
 		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
 		deviceInitValue(cudaMLO->transformer2.reals, (XFLOAT)0.);
 		deviceInitComplexValue(cudaMLO->transformer2.fouriers, (XFLOAT)0.);
 		cudaMLO->transformer2.reals.streamSync();
 		cudaMLO->transformer2.fouriers.streamSync();
-		CUDA_CPU_TOC("setSize");
+		CTOC(cudaMLO->timer,"setSize");
 
-		CUDA_CPU_TIC("transform");
+		CTIC(cudaMLO->timer,"transform");
 
 		d_img.cp_on_device(cudaMLO->transformer2.reals);
 //		for (int i = 0; i < img().nzyxdim; i ++)
@@ -528,7 +530,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						cudaMLO->transformer2.fouriers.getSize()*2);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
-		CUDA_CPU_TOC("transform");
+		CTOC(cudaMLO->timer,"transform");
 
 		cudaMLO->transformer2.fouriers.streamSync();
 
@@ -536,7 +538,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		if(!powerClassOnGPU)
 		{
-			CUDA_CPU_TIC("cpResults");
+			CTIC(cudaMLO->timer,"cpResults");
 			cudaMLO->transformer2.fouriers.cp_to_host();
 			cudaMLO->transformer2.fouriers.streamSync();
 
@@ -546,10 +548,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
 				Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
 			}
-			CUDA_CPU_TOC("cpResults");
+			CTOC(cudaMLO->timer,"cpResults");
 		}
 
-		CUDA_CPU_TIC("powerClass");
+		CTIC(cudaMLO->timer,"powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
@@ -611,10 +613,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			op.highres_Xi2_imgs.at(ipart) = 0.;
 		}
-		CUDA_CPU_TOC("powerClass");
+		CTOC(cudaMLO->timer,"powerClass");
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
-		CUDA_CPU_TIC("windowFourierTransform2");
+		CTIC(cudaMLO->timer,"windowFourierTransform2");
 		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
 		cudaMLO->transformer2.fouriers.streamSync();
 		windowFourierTransform2(
@@ -626,10 +628,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				0,	//pos
 				cudaMLO->transformer2.fouriers.getStream()
 				);
-		CUDA_CPU_TOC("windowFourierTransform2");
+		CTOC(cudaMLO->timer,"windowFourierTransform2");
 		// Also store its CTF
-		CUDA_CPU_TIC("ctfCorr");
-		CUDA_CPU_TIC("cpFimg2Host_2");
+		CTIC(cudaMLO->timer,"ctfCorr");
+		CTIC(cudaMLO->timer,"cpFimg2Host_2");
 		d_Fimg.streamSync();
 		d_Fimg.cp_to_host();
 		d_Fimg.streamSync();
@@ -638,7 +640,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
 			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
 		}
-		CUDA_CPU_TOC("cpFimg2Host_2");
+		CTOC(cudaMLO->timer,"cpFimg2Host_2");
 
 		Fctf.resize(Fimg);
 		// Now calculate the actual CTF
@@ -693,7 +695,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			Fctf.initConstant(1.);
 		}
-		CUDA_CPU_TOC("ctfCorr");
+		CTOC(cudaMLO->timer,"ctfCorr");
 		// Store Fimg and Fctf
 		op.Fimgs.at(ipart) = Fimg;
 		op.Fctfs.at(ipart) = Fctf;
@@ -704,6 +706,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_FT);
 #endif
+	GTOC(cudaMLO->timer,"getFourierTransformsAndCtfs");
+	GATHERGPUTIMINGS(cudaMLO->timer);
 }
 
 void getAllSquaredDifferencesCoarse(
@@ -722,7 +726,7 @@ void getAllSquaredDifferencesCoarse(
 
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
 
-	CUDA_CPU_TIC("diff_pre_gpu");
+	CTIC(cudaMLO->timer,"diff_pre_gpu");
 
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
@@ -736,14 +740,14 @@ void getAllSquaredDifferencesCoarse(
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	CUDA_CPU_TOC("diff_pre_gpu");
+	CTOC(cudaMLO->timer,"diff_pre_gpu");
 
 	std::vector<CudaProjectorPlan> projectorPlans(0, cudaMLO->devBundle->allocator);
 
 	//If particle specific sampling plan required
 	if (cudaMLO->devBundle->generateProjectionPlanOnTheFly)
 	{
-		CUDA_CPU_TIC("generateProjectionSetupCoarse");
+		CTIC(cudaMLO->timer,"generateProjectionSetupCoarse");
 
 		projectorPlans.resize(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
 
@@ -779,7 +783,7 @@ void getAllSquaredDifferencesCoarse(
 						);
 			}
 		}
-		CUDA_CPU_TOC("generateProjectionSetupCoarse");
+		CTOC(cudaMLO->timer,"generateProjectionSetupCoarse");
 	}
 	else
 		projectorPlans = cudaMLO->devBundle->coarseProjectionPlans;
@@ -803,7 +807,7 @@ void getAllSquaredDifferencesCoarse(
 				Generate Translations
 		======================================*/
 
-		CUDA_CPU_TIC("translation_1");
+		CTIC(cudaMLO->timer,"translation_1");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
@@ -920,7 +924,7 @@ void getAllSquaredDifferencesCoarse(
 		}
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
-		CUDA_CPU_TOC("translation_1");
+		CTOC(cudaMLO->timer,"translation_1");
 
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
@@ -1014,22 +1018,22 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 #endif
 
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
-	CUDA_CPU_TIC("diff_pre_gpu");
+	CTIC(cudaMLO->timer,"diff_pre_gpu");
 
 	op.min_diff2.clear();
 	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
-	CUDA_CPU_TIC("precalculateShiftedImagesCtfsAndInvSigma2s");
+	CTIC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
-	CUDA_CPU_TOC("precalculateShiftedImagesCtfsAndInvSigma2s");
+	CTOC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	MultidimArray<Complex > Fref;
 	Fref.resize(op.local_Minvsigma2s[0]);
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	CUDA_CPU_TOC("diff_pre_gpu");
+	CTOC(cudaMLO->timer,"diff_pre_gpu");
 
 	/*=======================================================================================
 										  Particle Iteration
@@ -1046,7 +1050,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				Generate Translations
 		======================================*/
 
-		CUDA_CPU_TIC("translation_2");
+		CTIC(cudaMLO->timer,"translation_2");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
@@ -1083,9 +1087,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			Fimg_imag[i] = op.Fimgs[ipart].data[i].imag * pixel_correction;
 		}
 
-		CUDA_CPU_TOC("translation_2");
+		CTOC(cudaMLO->timer,"translation_2");
 
-		CUDA_CPU_TIC("kernel_init_1");
+
+		CTIC(cudaMLO->timer,"kernel_init_1");
 
 		CudaGlobalPtr<XFLOAT> corr_img(image_size, cudaMLO->devBundle->allocator);
 		corr_img.device_alloc();
@@ -1097,8 +1102,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		Fimg_imag.put_on_device();
 		corr_img.cp_to_device();
 
-		CUDA_CPU_TOC("kernel_init_1");
-
+		CTOC(cudaMLO->timer,"kernel_init_1");
 		std::vector< CudaGlobalPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), cudaMLO->devBundle->allocator);
 		cudaStager<XFLOAT> AllEulers(cudaMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
@@ -1121,7 +1125,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				if(orientation_num==0)
 					continue;
 
-				CUDA_CPU_TIC("pair_list_1");
+				CTIC(cudaMLO->timer,"pair_list_1");
 				long unsigned significant_num(0);
 				long int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				long int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
@@ -1154,16 +1158,16 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				newDataSize += significant_num;
 				FPCMasks[ipart][exp_iclass].weightNum = significant_num;
 				FPCMasks[ipart][exp_iclass].lastPos = FPCMasks[ipart][exp_iclass].firstPos + significant_num;
-				CUDA_CPU_TOC("pair_list_1");
+				CTOC(cudaMLO->timer,"pair_list_1");
 
-				CUDA_CPU_TIC("IndexedArrayMemCp2");
+				CTIC(cudaMLO->timer,"IndexedArrayMemCp2");
 //				FPCMasks[ipart][exp_iclass].jobOrigin.cp_to_device();
 //				FPCMasks[ipart][exp_iclass].jobExtent.cp_to_device();
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
-				CUDA_CPU_TOC("IndexedArrayMemCp2");
+				CTOC(cudaMLO->timer,"IndexedArrayMemCp2");
 
-				CUDA_CPU_TIC("generateEulerMatrices");
+				CTIC(cudaMLO->timer,"generateEulerMatrices");
 				eulers[exp_iclass-sp.iclass_min].setSize(9*FineProjectionData[ipart].class_entries[exp_iclass]);
 				eulers[exp_iclass-sp.iclass_min].host_alloc();
 				generateEulerMatrices(
@@ -1172,7 +1176,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						&(eulers[exp_iclass-sp.iclass_min])[0],
 						!IS_NOT_INV);
 				AllEulers.stage(eulers[exp_iclass-sp.iclass_min]);
-				CUDA_CPU_TOC("generateEulerMatrices");
+				CTOC(cudaMLO->timer,"generateEulerMatrices");
 			}
 		}
 
@@ -1201,18 +1205,18 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				if(significant_num==0)
 					continue;
 
-				CUDA_CPU_TIC("Diff2MakeKernel");
+				CTIC(cudaMLO->timer,"Diff2MakeKernel");
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
 						cudaMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].xdim-1);
-				CUDA_CPU_TOC("Diff2MakeKernel");
+				CTOC(cudaMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
 				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
 
-				CUDA_CPU_TIC("Diff2CALL");
+				CTIC(cudaMLO->timer,"Diff2CALL");
 
 				runDiff2KernelFine(
 						projKernel,
@@ -1242,7 +1246,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						);
 
 //				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-				CUDA_CPU_TOC("Diff2CALL");
+				CTOC(cudaMLO->timer,"Diff2CALL");
 
 			} // end if class significant
 		} // end loop iclass
@@ -1252,9 +1256,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
-		CUDA_CPU_TIC("collect_data_1");
+		CTIC(cudaMLO->timer,"collect_data_1");
 		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(RFLOAT)getMinOnDevice(FinePassWeights[ipart].weights));
-		CUDA_CPU_TOC("collect_data_1");
+		CTOC(cudaMLO->timer,"collect_data_1");
 //		std::cerr << "  fine pass minweight  =  " << op.min_diff2[ipart] << std::endl;
 
 	}// end loop ipart
@@ -1299,7 +1303,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	pdf_offset.device_alloc();
 
 	// pdf_orientation is ipart-independent, so we keep it above ipart scope
-	CUDA_CPU_TIC("get_orient_priors");
+	CTIC(cudaMLO->timer,"get_orient_priors");
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		for (long int idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
 			for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
@@ -1328,7 +1332,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			pdf_orientation[i] /= pdf_orientation_mean;
 
 	pdf_orientation.cp_to_device();
-	CUDA_CPU_TOC("get_orient_priors");
+	CTOC(cudaMLO->timer,"get_orient_priors");
 
 	// loop over all particles inside this ori_particle
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
@@ -1401,7 +1405,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
-			CUDA_CPU_TIC("get_offset_priors");
+			CTIC(cudaMLO->timer,"get_offset_priors");
 
 			double pdf_offset_mean(0);
 			std::vector<double> pdf_offset_t(pdf_offset.getSize());
@@ -1461,8 +1465,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					pdf_offset[i] = pdf_offset_t[i] /  pdf_offset_mean;
 
 			pdf_offset.cp_to_device();
-			CUDA_CPU_TOC("get_offset_priors");
-			CUDA_CPU_TIC("sumweight1");
+			CTOC(cudaMLO->timer,"get_offset_priors");
+			CTIC(cudaMLO->timer,"sumweight1");
 
 			long int block_num;
 			if(exp_ipass==0)
@@ -1515,21 +1519,20 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				}
 
-				CUDA_CPU_TOC("sumweight1");
-
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 				PassWeights[ipart].weights.cp_to_host(); // note that the host-pointer is shared: we're copying to Mweight.
 			}
+			CTOC(cudaMLO->timer,"sumweight1");
 		}
 	} // end loop ipart
 
 	if (exp_ipass==0)
 		op.Mcoarse_significant.resizeNoCp(1,1,sp.nr_particles, XSIZE(op.Mweight));
 
-	CUDA_CPU_TIC("convertPostKernel");
+	CTIC(cudaMLO->timer,"convertPostKernel");
 	// Now, for each particle,  find the exp_significant_weight that encompasses adaptive_fraction of op.sum_weight
 
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
@@ -1551,6 +1554,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 		else if (exp_ipass!=0)
 		{
+			CTIC(cudaMLO->timer,"sort");
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 			size_t weightSize = PassWeights[ipart].weights.getSize();
 
@@ -1567,14 +1571,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
-			CUDA_CPU_TOC("sort");
+			CTOC(cudaMLO->timer,"sort");
 
 			size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
 		}
 		else
 		{
-			CUDA_CPU_TIC("sort");
+			CTIC(cudaMLO->timer,"sort");
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 			//Wrap the current ipart data in a new pointer
@@ -1617,7 +1621,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
-			CUDA_CPU_TOC("sort");
+			CTOC(cudaMLO->timer,"sort");
 
 			size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
@@ -1668,7 +1672,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	} // end loop ipart
 
-	CUDA_CPU_TOC("convertPostKernel");
+	CTOC(cudaMLO->timer,"convertPostKernel");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 	{
@@ -1690,7 +1694,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_WSUM);
 #endif
-	CUDA_CPU_TIC("store_init");
+	CTIC(cudaMLO->timer,"store_init");
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
@@ -1755,13 +1759,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
 
-	CUDA_CPU_TOC("store_init");
+	CTOC(cudaMLO->timer,"store_init");
 
 	/*=======================================================================================
 	                           COLLECT 2 AND SET METADATA
 	=======================================================================================*/
 
-	CUDA_CPU_TIC("collect_data_2");
+	CTIC(cudaMLO->timer,"collect_data_2");
 	int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
 	int nr_fake_classes = (sp.iclass_max-sp.iclass_min+1);
 	int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
@@ -1780,7 +1784,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int sumBlockNum =0;
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
-		CUDA_CPU_TIC("collect_data_2_pre_kernel");
+		CTIC(cudaMLO->timer,"collect_data_2_pre_kernel");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
@@ -1861,7 +1865,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		p_thr_wsum_prior_offsetx_class.device_alloc();
 		p_thr_wsum_prior_offsety_class.device_alloc();
 		p_thr_wsum_sigma2_offset.device_alloc();
-		CUDA_CPU_TOC("collect_data_2_pre_kernel");
+		CTOC(cudaMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1899,7 +1903,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 			partial_pos+=block_num;
 		}
-		CUDA_CPU_TIC("collect_data_2_post_kernel");
+		CTIC(cudaMLO->timer,"collect_data_2_post_kernel");
 		p_weights.cp_to_host();
 		p_thr_wsum_prior_offsetx_class.cp_to_host();
 		p_thr_wsum_prior_offsety_class.cp_to_host();
@@ -1939,7 +1943,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 			partial_pos+=block_num;
 		} // end loop iclass
-		CUDA_CPU_TOC("collect_data_2_post_kernel");
+		CTOC(cudaMLO->timer,"collect_data_2_post_kernel");
 	} // end loop ipart
 
 	/*======================================================
@@ -1949,11 +1953,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
-		CUDA_CPU_TIC("setMetadata");
+		CTIC(cudaMLO->timer,"setMetadata");
 
-		CUDA_CPU_TIC("getArgMaxOnDevice");
+		CTIC(cudaMLO->timer,"getArgMaxOnDevice");
 		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
-		CUDA_CPU_TOC("getArgMaxOnDevice");
+		CTOC(cudaMLO->timer,"getArgMaxOnDevice");
 
 		Indices max_index;
 		max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
@@ -1988,10 +1992,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
 
-		CUDA_CPU_TOC("setMetadata");
+		CTOC(cudaMLO->timer,"setMetadata");
 	}
 
-	CUDA_CPU_TOC("collect_data_2");
+	CTOC(cudaMLO->timer,"collect_data_2");
 
 
 
@@ -2001,7 +2005,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	                                   MAXIMIZATION
 	=======================================================================================*/
 
-	CUDA_CPU_TIC("maximization");
+	CTIC(cudaMLO->timer,"maximization");
 
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
@@ -2014,7 +2018,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUSTOM_ALLOCATOR_REGION_NAME("TRANS_3");
 
-		CUDA_CPU_TIC("translation_3");
+		CTIC(cudaMLO->timer,"translation_3");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
@@ -2085,7 +2089,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			Fimgs_nomask_imag.cp_to_device();
 		}
 
-		CUDA_CPU_TOC("translation_3");
+		CTOC(cudaMLO->timer,"translation_3");
 
 
 		/*======================================================
@@ -2178,14 +2182,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Use the constructed mask to construct a partial class-specific input
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
 
-			CUDA_CPU_TIC("thisClassProjectionSetupCoarse");
+			CTIC(cudaMLO->timer,"thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 			ProjectionParams thisClassProjectionData(	ProjectionData[ipart],
 														ProjectionData[ipart].class_idx[exp_iclass],
 														ProjectionData[ipart].class_idx[exp_iclass]+ProjectionData[ipart].class_entries[exp_iclass]);
 
 			thisClassProjectionData.orientation_num[0] = ProjectionData[ipart].orientation_num[exp_iclass];
-			CUDA_CPU_TOC("thisClassProjectionSetupCoarse");
+			CTOC(cudaMLO->timer,"thisClassProjectionSetupCoarse");
 
 			long unsigned orientation_num(thisClassProjectionData.orientation_num[0]);
 
@@ -2197,7 +2201,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			eulers[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
 			eulers[exp_iclass].host_alloc();
 
-			CUDA_CPU_TIC("generateEulerMatricesProjector");
+			CTIC(cudaMLO->timer,"generateEulerMatricesProjector");
 
 			generateEulerMatrices(
 					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
@@ -2208,14 +2212,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			eulers[exp_iclass].device_alloc();
 			eulers[exp_iclass].cp_to_device();
 
-			CUDA_CPU_TOC("generateEulerMatricesProjector");
+			CTOC(cudaMLO->timer,"generateEulerMatricesProjector");
 
 
 			/*======================================================
 								 MAP WEIGHTS
 			======================================================*/
 
-			CUDA_CPU_TIC("pre_wavg_map");
+			CTIC(cudaMLO->timer,"pre_wavg_map");
 
 			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
 				sorted_weights[classPos+i] = -999.;
@@ -2225,7 +2229,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 								= thisClassFinePassWeights.weights[i];
 
 			classPos+=orientation_num*translation_num;
-			CUDA_CPU_TOC("pre_wavg_map");
+			CTOC(cudaMLO->timer,"pre_wavg_map");
 		}
 		sorted_weights.put_on_device();
 
@@ -2283,7 +2287,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 
-			CUDA_CPU_TIC("backproject");
+			CTIC(cudaMLO->timer,"backproject");
 
 			cudaMLO->devBundle->cudaBackprojectors[exp_iclass].backproject(
 				~Fimgs_nomask_real,
@@ -2303,7 +2307,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			AAXA_pos += image_size;
 			classPos += orientation_num*translation_num;
 
-			CUDA_CPU_TOC("backproject");
+			CTOC(cudaMLO->timer,"backproject");
 
 #ifdef TIMING
 			if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -2352,10 +2356,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 	} // end loop ipart
-	CUDA_CPU_TOC("maximization");
+	CTOC(cudaMLO->timer,"maximization");
 
 
-	CUDA_CPU_TIC("store_post_gpu");
+	CTIC(cudaMLO->timer,"store_post_gpu");
 
 	// Extend norm_correction and sigma2_noise estimation to higher resolutions for all particles
 	// Also calculate dLL for each particle and store in metadata
@@ -2486,7 +2490,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
 
-	CUDA_CPU_TOC("store_post_gpu");
+	CTOC(cudaMLO->timer,"store_post_gpu");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_WSUM);
@@ -2662,8 +2666,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if (thread_id == 0)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_THR);
 #endif
-//	CUDA_CPU_TOC("interParticle");
-	CUDA_CPU_TIC("oneTask");
+//	CTOC(cudaMLO->timer,"interParticle");
+
 	DEBUG_HANDLE_ERROR(cudaSetDevice(device_id));
 	//std::cerr << " calling on device " << device_id << std::endl;
 	//put mweight allocation here
@@ -2671,9 +2675,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 
 	while (baseMLO->exp_ipart_ThreadTaskDistributor->getTasks(first_ipart, last_ipart))
 	{
+		CTIC(timer,"oneTask");
 		for (long unsigned ipart = first_ipart; ipart <= last_ipart; ipart++)
 		{
-			CUDA_CPU_TIC("oneParticle");
+			CTIC(timer,"oneParticle");
 #ifdef TIMING
 	// Only time one thread
 	if (thread_id == 0)
@@ -2725,9 +2730,9 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if (thread_id == 0)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
-			CUDA_CPU_TIC("getFourierTransformsAndCtfs");
+			CTIC(timer,"getFourierTransformsAndCtfs");
 			getFourierTransformsAndCtfs(my_ori_particle, op, sp, baseMLO, this);
-			CUDA_CPU_TOC("getFourierTransformsAndCtfs");
+			CTOC(timer,"getFourierTransformsAndCtfs");
 
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 			{
@@ -2780,7 +2785,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 
 			for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 			{
-				CUDA_CPU_TIC("weightPass");
+				CTIC(timer,"weightPass");
 #ifdef TIMING
 	// Only time one thread
 	if (thread_id == 0)
@@ -2821,13 +2826,13 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					deviceInitValue<XFLOAT>(Mweight, -999.);
 					Mweight.streamSync();
 
-					CUDA_CPU_TIC("getAllSquaredDifferencesCoarse");
+					CTIC(timer,"getAllSquaredDifferencesCoarse");
 					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
-					CUDA_CPU_TOC("getAllSquaredDifferencesCoarse");
+					CTOC(timer,"getAllSquaredDifferencesCoarse");
 
-					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsCoarse");
+					CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
-					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsCoarse");
+					CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 				}
 				else
 				{
@@ -2848,14 +2853,14 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 								FineProjectionData[iframe].class_idx[exp_iclass] = FineProjectionData[iframe].rots.size();
 							FineProjectionData[iframe].class_entries[exp_iclass] = 0;
 
-							CUDA_CPU_TIC("generateProjectionSetup");
+							CTIC(timer,"generateProjectionSetup");
 							FineProjectionData[iframe].orientationNumAllClasses += generateProjectionSetupFine(
 									op,
 									sp,
 									baseMLO,
 									exp_iclass,
 									FineProjectionData[iframe]);
-							CUDA_CPU_TOC("generateProjectionSetup");
+							CTOC(timer,"generateProjectionSetup");
 
 						}
 						//set a maximum possible size for all weights (to be reduced by significance-checks)
@@ -2871,19 +2876,19 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 #endif
 //					printf("Allocator used space before 'getAllSquaredDifferencesFine': %.2f MiB\n", (float)devBundle->allocator->getTotalUsedSpace()/(1024.*1024.));
 
-					CUDA_CPU_TIC("getAllSquaredDifferencesFine");
+					CTIC(timer,"getAllSquaredDifferencesFine");
 					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
-					CUDA_CPU_TOC("getAllSquaredDifferencesFine");
+					CTOC(timer,"getAllSquaredDifferencesFine");
 
 					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
 
-					CUDA_CPU_TIC("convertAllSquaredDifferencesToWeightsFine");
+					CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
 					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, Mweight);
-					CUDA_CPU_TOC("convertAllSquaredDifferencesToWeightsFine");
+					CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
 
 				}
 
-				CUDA_CPU_TOC("weightPass");
+				CTOC(timer,"weightPass");
 			}
 #ifdef TIMING
 	// Only time one thread
@@ -2903,13 +2908,16 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if (thread_id == 0)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
-			CUDA_CPU_TIC("storeWeightedSums");
+			CTIC(timer,"storeWeightedSums");
 			storeWeightedSums(op, sp, baseMLO, this, FinePassWeights, FineProjectionData, FinePassClassMasks, stagerSWS);
-			CUDA_CPU_TOC("storeWeightedSums");
+			CTOC(timer,"storeWeightedSums");
+
+			CTOC(timer,"oneParticle");
 		}
+		CTOC(timer,"oneTask");
 	}
-	CUDA_CPU_TOC("oneTask");
-//	CUDA_CPU_TIC("interParticle");
+
+//	CTIC(cudaMLO->timer,"interParticle");
 //	exit(0);
 
 #ifdef TIMING

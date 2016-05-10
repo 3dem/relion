@@ -295,8 +295,6 @@ void runWavgKernel(
 	//within the same block (this is done to reduce memory loads in the kernel).
 	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
 
-	CUDA_CPU_TIC("cuda_kernel_wavg");
-
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
 	if(projector.mdlZ!=0)
@@ -342,7 +340,6 @@ void runWavgKernel(
 			part_scale
 			);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
 __global__ void cuda_kernel_allweights_to_mweights(

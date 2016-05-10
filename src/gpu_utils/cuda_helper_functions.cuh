@@ -4,7 +4,7 @@
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
