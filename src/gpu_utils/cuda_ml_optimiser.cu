@@ -891,7 +891,6 @@ void getAllSquaredDifferencesCoarse(
 			Fimgs_imag.streamSync();
 
 			std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-			XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
 			for (long int itrans = 0; itrans < translation_num; itrans++)
 			{
@@ -902,6 +901,7 @@ void getAllSquaredDifferencesCoarse(
 				trans_y[itrans] = -2 * PI * oversampled_translations_y[0] / (double)baseMLO->mymodel.ori_size;
 			}
 
+			XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 			for (unsigned i = 0; i < op.local_Fimgs_shifted[ipart].nzyxdim; i ++)
 			{
 				XFLOAT pixel_correction = 1.0/scale_correction;
@@ -1050,70 +1050,40 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(cudaMLO->devBundle->allocator);
-		Fimgs_real.setSize(image_size * translation_num);
-		Fimgs_imag.setSize(image_size * translation_num);
+		CudaGlobalPtr<XFLOAT> Fimg_real(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimg_imag(image_size, cudaMLO->devBundle->allocator);
 
-		Fimgs_real.device_alloc();
-		deviceInitValue(Fimgs_real, (XFLOAT)0.);
-		Fimgs_imag.device_alloc();
-		deviceInitValue(Fimgs_imag, (XFLOAT)0.);
-		Fimgs_real.streamSync();
-		Fimgs_imag.streamSync();
+		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
 
-		if (baseMLO->do_shifts_onthefly)
+		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+
+		int j = 0;
+		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 		{
-			CudaTranslator::Plan transPlan(
-					op.local_Fimgs_shifted[ipart].data,
-					image_size,
-					sp.itrans_min * sp.nr_oversampled_trans,
-					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-					cudaMLO->devBundle->allocator,
-					Fimgs_real.getStream(), //stream
-					baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
-					baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
+			baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+					oversampled_translations_y, oversampled_translations_z);
 
-			if (sp.current_oversampling == 0)
+			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
-				if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
-					cudaMLO->translator_coarse1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-				else
-					cudaMLO->translator_current1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
+				trans_x[j] = -2 * PI * oversampled_translations_x[iover_trans] / (double)baseMLO->mymodel.ori_size;
+				trans_y[j] = -2 * PI * oversampled_translations_y[iover_trans] / (double)baseMLO->mymodel.ori_size;
+				j ++;
 			}
-			else
-			{
-				if (baseMLO->strict_highres_exp > 0.)
-					cudaMLO->translator_coarse2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-				else
-					cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-			}
-			Fimgs_real.streamSync();
 		}
-		else
+
+		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
+		for (unsigned i = 0; i < image_size; i ++)
 		{
-			Fimgs_real.host_alloc();
-			Fimgs_imag.host_alloc();
+			XFLOAT pixel_correction = 1.0/scale_correction;
+			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+				pixel_correction /= op.local_Fctfs[ipart].data[i];
 
-			unsigned long k = 0;
-			for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
-			{
-				for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
-				{
-					Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
-					Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
-					k++;
-				}
-			}
-
-			Fimgs_real.cp_to_device();
-			Fimgs_imag.cp_to_device();
-			Fimgs_real.streamSync();
-			Fimgs_imag.streamSync();
+			Fimg_real[i] = op.Fimgs[ipart].data[i].real * pixel_correction;
+			Fimg_imag[i] = op.Fimgs[ipart].data[i].imag * pixel_correction;
 		}
 
 		CUDA_CPU_TOC("translation_2");
-
 
 		CUDA_CPU_TIC("kernel_init_1");
 
@@ -1121,9 +1091,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		corr_img.device_alloc();
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 
+		trans_x.put_on_device();
+		trans_y.put_on_device();
+		Fimg_real.put_on_device();
+		Fimg_imag.put_on_device();
 		corr_img.cp_to_device();
 
 		CUDA_CPU_TOC("kernel_init_1");
+
 		std::vector< CudaGlobalPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), cudaMLO->devBundle->allocator);
 		cudaStager<XFLOAT> AllEulers(cudaMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
@@ -1200,9 +1175,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CUDA_CPU_TOC("generateEulerMatrices");
 			}
 		}
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
 		// copy stagers to device
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
@@ -1240,9 +1217,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				runDiff2KernelFine(
 						projKernel,
 						~corr_img,
-						~Fimgs_real,
-						~Fimgs_imag,
-						~(eulers[exp_iclass-sp.iclass_min]),
+						~Fimg_real,
+						~Fimg_imag,
+						~trans_x,
+						~trans_y,
+						~eulers[exp_iclass-sp.iclass_min],
 						~thisClassFinePassWeights.rot_id,
 						~thisClassFinePassWeights.rot_idx,
 						~thisClassFinePassWeights.trans_idx,

@@ -560,6 +560,8 @@ void runDiff2KernelFine(
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
@@ -589,6 +591,8 @@ void runDiff2KernelFine(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 				diff2s,
@@ -607,6 +611,8 @@ void runDiff2KernelFine(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 				diff2s,

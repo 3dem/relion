@@ -244,6 +244,8 @@ void runDiff2KernelFine(
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
