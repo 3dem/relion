@@ -10,8 +10,10 @@
 #include <vector>
 #include <time.h>
 #include <string>
+#include <sstream>
 
-#ifdef TIMING
+
+#ifdef TIMING_FILES
 #define	CTIC(timer,timing) (timer.cuda_cpu_tic(timing))
 #define	CTOC(timer,timing) (timer.cuda_cpu_toc(timing))
 #define	GTIC(timer,timing) (timer.cuda_gpu_tic(timing))
@@ -32,12 +34,21 @@ public:
 
 std::vector<std::string> cuda_cpu_benchmark_identifiers;
 std::vector<clock_t>     cuda_cpu_benchmark_start_times;
-FILE *cuda_cpu_benchmark_fPtr = fopen("benchmark_cpu.dat","w");
+FILE *cuda_cpu_benchmark_fPtr;
 
 std::vector<std::string> cuda_gpu_benchmark_identifiers;
 std::vector<cudaEvent_t> cuda_gpu_benchmark_start_times;
 std::vector<cudaEvent_t> cuda_gpu_benchmark_stop_times;
-FILE *cuda_gpu_benchmark_fPtr = fopen("benchmark_gpu.dat","w");
+FILE *cuda_gpu_benchmark_fPtr;
+
+relion_timer(std::string fnm)
+{
+	std::stringstream fnm_cpu, fnm_gpu;
+	fnm_cpu << "output/" << fnm << "_cpu.dat";
+	cuda_cpu_benchmark_fPtr = fopen(fnm_cpu.str().c_str(),"a");
+	fnm_gpu << "output/" << fnm << "_gpu.dat";
+	cuda_gpu_benchmark_fPtr = fopen(fnm_gpu.str().c_str(),"a");
+}
 
 int cuda_benchmark_find_id(std::string id, std::vector<std::string> v);
 

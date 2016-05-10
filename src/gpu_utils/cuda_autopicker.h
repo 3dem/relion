@@ -43,11 +43,11 @@ public:
 
 	//MlDeviceBundle *devBundle;
 
-#ifdef TIMING
+#ifdef TIMING_FILES
 	relion_timer timer;
 #endif
 
-	AutoPickerCuda(AutoPicker *basePicker, int dev_id);
+	AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * timing_fnm);
 
 	void setupProjectors();
 
