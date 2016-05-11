@@ -41,6 +41,8 @@ public:
 	void backproject(
 			XFLOAT *d_imgs_nomask_real,
 			XFLOAT *d_imgs_nomask_imag,
+			XFLOAT *trans_x,
+			XFLOAT *trans_y,
 			XFLOAT* d_weights,
 			XFLOAT* d_Minvsigma2s,
 			XFLOAT* d_ctfs,

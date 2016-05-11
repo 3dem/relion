@@ -1930,87 +1930,63 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	CTIC(cudaMLO->timer,"maximization");
 
+
+	/*======================================================
+	                     TRANSLATIONS
+	======================================================*/
+
+	long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+
+	CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
+	CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
+
+	int j = 0;
+	for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
+	{
+		baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+				oversampled_translations_y, oversampled_translations_z); //TODO Called multiple time to generate same list, reuse the same list
+
+		for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
+		{
+			trans_x[j] = -2 * PI * oversampled_translations_x[iover_trans] / (double)baseMLO->mymodel.ori_size;
+			trans_y[j] = -2 * PI * oversampled_translations_y[iover_trans] / (double)baseMLO->mymodel.ori_size;
+			j ++;
+		}
+	}
+
+	trans_x.put_on_device();
+	trans_y.put_on_device();
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 
 		/*======================================================
-		                     TRANSLATIONS
+		                     IMAGES
 		======================================================*/
 
 		CUSTOM_ALLOCATOR_REGION_NAME("TRANS_3");
 
 		CTIC(cudaMLO->timer,"translation_3");
 
-		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(image_size, cudaMLO->devBundle->allocator);
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(cudaMLO->devBundle->allocator);
-
-		Fimgs_real.device_alloc(image_size * translation_num);
-		Fimgs_imag.device_alloc(image_size * translation_num);
-		Fimgs_nomask_real.device_alloc(image_size * translation_num);
-		Fimgs_nomask_imag.device_alloc(image_size * translation_num);
-
-		if (baseMLO->do_shifts_onthefly)
+		for (unsigned i = 0; i < image_size; i ++)
 		{
-			CudaTranslator::Plan planMask(
-					op.local_Fimgs_shifted[ipart].data,
-					image_size,
-					sp.itrans_min * sp.nr_oversampled_trans,
-					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-					cudaMLO->devBundle->allocator,
-					0 //stream
-					);
-
-			CudaTranslator::Plan planNomask(
-					op.local_Fimgs_shifted_nomask[ipart].data,
-					image_size,
-					sp.itrans_min * sp.nr_oversampled_trans,
-					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-					cudaMLO->devBundle->allocator,
-					0 //stream
-					);
-
-			if (baseMLO->adaptive_oversampling == 0)
-			{
-				cudaMLO->translator_current1.translate(planMask,   ~Fimgs_real,        ~Fimgs_imag);
-				cudaMLO->translator_current1.translate(planNomask, ~Fimgs_nomask_real, ~Fimgs_nomask_imag);
-			}
-			else
-			{
-				cudaMLO->translator_current2.translate(planMask,   ~Fimgs_real,        ~Fimgs_imag);
-				cudaMLO->translator_current2.translate(planNomask, ~Fimgs_nomask_real, ~Fimgs_nomask_imag);
-			}
+			Fimgs_real[i] = op.local_Fimgs_shifted[0].data[i].real;
+			Fimgs_imag[i] = op.local_Fimgs_shifted[0].data[i].imag;
+			Fimgs_nomask_real[i] = op.local_Fimgs_shifted_nomask[0].data[i].real;
+			Fimgs_nomask_imag[i] = op.local_Fimgs_shifted_nomask[0].data[i].imag;
 		}
-		else
-		{
-			Fimgs_real.host_alloc();
-			Fimgs_imag.host_alloc();
-			Fimgs_nomask_real.host_alloc();
-			Fimgs_nomask_imag.host_alloc();
 
-			unsigned long k = 0;
-			for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
-			{
-				for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
-				{
-					Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
-					Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
-					Fimgs_nomask_real[k] = op.local_Fimgs_shifted_nomask[i].data[j].real;
-					Fimgs_nomask_imag[k] = op.local_Fimgs_shifted_nomask[i].data[j].imag;
-					k++;
-				}
-			}
-
-			Fimgs_real.cp_to_device();
-			Fimgs_imag.cp_to_device();
-			Fimgs_nomask_real.cp_to_device();
-			Fimgs_nomask_imag.cp_to_device();
-		}
+		Fimgs_real.put_on_device();
+		Fimgs_imag.put_on_device();
+		Fimgs_nomask_real.put_on_device();
+		Fimgs_nomask_imag.put_on_device();
 
 		CTOC(cudaMLO->timer,"translation_3");
 
@@ -2183,8 +2159,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~eulers[exp_iclass],
 					~Fimgs_real,
 					~Fimgs_imag,
-					~Fimgs_nomask_real,
-					~Fimgs_nomask_imag,
+					~trans_x,
+					~trans_y,
 					&sorted_weights.d_ptr[classPos],
 					~ctfs,
 					~wdiff2s_sum,
@@ -2215,6 +2191,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			cudaMLO->devBundle->cudaBackprojectors[exp_iclass].backproject(
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
+				~trans_x,
+				~trans_y,
 				&sorted_weights.d_ptr[classPos],
 				~Minvsigma2s,
 				~ctfs,
