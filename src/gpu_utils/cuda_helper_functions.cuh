@@ -589,6 +589,46 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 }
 
 template <typename T>
+void runCenterFFT( CudaGlobalPtr< T > &img_in,
+				  int xSize,
+				  int ySize,
+				  int zSize,
+				  bool forward,
+				  int batchSize = 1)
+{
+//	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	img_aux.device_alloc();
+
+	int xshift = (xSize / 2);
+	int yshift = (ySize / 2);
+	int zshift = (ySize / 2);
+
+	if (!forward)
+	{
+		xshift = -xshift;
+		yshift = -yshift;
+		zshift = -zshift;
+	}
+
+	dim3 blocks(ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
+	cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
+			~img_in,
+			xSize*ySize*zSize,
+			xSize,
+			ySize,
+			zSize,
+			xshift,
+			yshift,
+			zshift);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+
+//	HANDLE_ERROR(cudaStreamSynchronize(0));
+//	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
+
+
+}
+
+template <typename T>
 void lowPassFilterMapGPU(
 		CudaGlobalPtr< T > &img_in,
 		size_t Zdim,

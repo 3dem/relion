@@ -95,6 +95,15 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 int xshift,
 										 int yshift);
 
+__global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
+										 int image_size,
+										 int xdim,
+										 int ydim,
+										 int zdim,
+										 int xshift,
+										 int yshift,
+										 int zshift);
+
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,
