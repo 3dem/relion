@@ -311,7 +311,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		size_t current_size_y = baseMLO->mymodel.current_size;
 
-		cudaMLO->transformer1.setSize(img().xdim,img().ydim);
+		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
 		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
 		cudaMLO->transformer1.reals.streamSync();
@@ -498,7 +498,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTOC(cudaMLO->timer,"zeroMask");
 
 		CTIC(cudaMLO->timer,"setSize");
-		cudaMLO->transformer2.setSize(img().xdim,img().ydim);
+		cudaMLO->transformer2.setSize(img().xdim,img().ydim,img().zdim);
 		deviceInitValue(cudaMLO->transformer2.reals, (XFLOAT)0.);
 		deviceInitComplexValue(cudaMLO->transformer2.fouriers, (XFLOAT)0.);
 		cudaMLO->transformer2.reals.streamSync();

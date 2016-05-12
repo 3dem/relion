@@ -485,8 +485,8 @@ public:
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle, const char * timing_fnm) :
 			baseMLO(baseMLOptimiser),
-			transformer1(0, bundle->allocator),
-			transformer2(0, bundle->allocator),
+			transformer1(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
+			transformer2(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			devBundle(bundle),
 			device_id(bundle->device_id),

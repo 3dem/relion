@@ -118,7 +118,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX 
 		int nr_nonzero_pixels_mask, CudaGlobalPtr< XFLOAT > &d_Mstddev, CudaGlobalPtr< XFLOAT > &d_Mmean,
 		size_t x, size_t y, size_t mic_size, size_t workSize)
 {
-	cudaTransformer2.setSize(workSize,workSize);
+	cudaTransformer2.setSize(workSize,workSize,1);
 
 	deviceInitValue(d_Mstddev, (XFLOAT)0.);
 
@@ -266,11 +266,11 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	if(!basePckr->do_read_fom_maps)
 	{
 		CTIC(timer,"setSize_micTr");
-		micTransformer.setSize(basePckr->micrograph_size, basePckr->micrograph_size, 1);
+		micTransformer.setSize(basePckr->micrograph_size, basePckr->micrograph_size, 1,1);
 		CTOC(timer,"setSize_micTr");
 
 		CTIC(timer,"setSize_cudaTr");
-		cudaTransformer1.setSize(basePckr->workSize,basePckr->workSize, Npsi, FFTW_BACKWARD);
+		cudaTransformer1.setSize(basePckr->workSize,basePckr->workSize, 1, Npsi, FFTW_BACKWARD);
 		CTOC(timer,"setSize_cudaTr");
 	}
 	HANDLE_ERROR(cudaDeviceSynchronize());
@@ -725,7 +725,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 			// for all batches
 			CTIC(timer,"AllPsi");
 			int startPsi(0);
-			for (int psiIter = 0; psiIter < cudaTransformer1.psiIters; psiIter++) // psi-batches for possible memory-limits
+			for (int psiIter = 0; psiIter < cudaTransformer1.batchIters; psiIter++) // psi-batches for possible memory-limits
 			{
 
 				CTIC(timer,"Projection");
