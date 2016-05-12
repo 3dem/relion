@@ -17,8 +17,8 @@ __global__ void cuda_kernel_wavg(
 		unsigned long orientation_num,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
-		XFLOAT *g_imgs_nomask_real,
-		XFLOAT *g_imgs_nomask_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
 		XFLOAT* g_weights,
 		XFLOAT* g_ctfs,
 		XFLOAT *g_wdiff2s_parts,
@@ -30,7 +30,7 @@ __global__ void cuda_kernel_wavg(
 		bool refs_are_ctf_corrected,
 		XFLOAT part_scale)
 {
-	XFLOAT ref_real, ref_imag;
+	XFLOAT ref_real, ref_imag, real, imag;
 
 	int bid = blockIdx.x; //block ID
 	int tid = threadIdx.x;
@@ -102,12 +102,14 @@ __global__ void cuda_kernel_wavg(
 
 					unsigned long img_pixel_idx = itrans * image_size + pixel;
 
-					XFLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-					XFLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
+					translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
+
+					XFLOAT diff_real = ref_real - real;
+					XFLOAT diff_imag = ref_imag - imag;
 
 					s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-					s_sumXA[tid] +=  weight * ( ref_real * g_imgs_real[img_pixel_idx] + ref_imag * g_imgs_imag[img_pixel_idx]);
+					s_sumXA[tid] +=  weight * ( ref_real * real + ref_imag * imag);
 					s_sumA2[tid] +=  weight * ( ref_real*ref_real  +  ref_imag*ref_imag );
 				}
 			}

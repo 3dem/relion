@@ -67,8 +67,10 @@ void CudaBackprojector::initMdl()
 }
 
 __global__ void cuda_kernel_backproject2D(
-		XFLOAT *g_imgs_nomask_real,
-		XFLOAT *g_imgs_nomask_imag,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
 		XFLOAT* g_weights,
 		XFLOAT* g_Minvsigma2s,
 		XFLOAT* g_ctfs,
@@ -113,12 +115,29 @@ __global__ void cuda_kernel_backproject2D(
 		if (pixel >= img_xy)
 			continue;
 
+		int x = pixel % img_x;
+		int y = (int)floorf( (float)pixel / (float)img_x);
+
+		// Don't search beyond square with side max_r
+		if (y > max_r)
+		{
+			if (y >= img_y - max_r)
+				y -= img_y;
+			else
+				continue;
+		}
+
+		if (x * x + y * y > max_r2)
+			continue;
+
 		//WAVG
 		XFLOAT minvsigma2 = g_Minvsigma2s[pixel];
 		XFLOAT ctf = g_ctfs[pixel];
 		XFLOAT Fweight = 0.f;
 		XFLOAT real = 0.f;
 		XFLOAT imag = 0.f;
+		XFLOAT iReal = g_img_real[pixel];
+		XFLOAT iImag = g_img_imag[pixel];
 
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
@@ -128,35 +147,25 @@ __global__ void cuda_kernel_backproject2D(
 			{
 				weight /= weight_norm;
 
-				unsigned long img_pixel_idx = itrans * img_xy + pixel;
+				XFLOAT tx = g_trans_x[itrans];
+				XFLOAT ty = g_trans_y[itrans];
 
 				XFLOAT weightxinvsigma2 = weight * ctf * minvsigma2;
-
-				real += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-				imag += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
-
 				Fweight += weightxinvsigma2 * ctf;
+
+				XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+				sincos( x * tx + y * ty , &s, &c );
+#else
+				sincosf( x * tx + y * ty , &s, &c );
+#endif
+				real += ( c * iReal - s * iImag ) * weightxinvsigma2;
+				imag += ( c * iImag + s * iReal ) * weightxinvsigma2;
 			}
 		}
 
-		//BP
-
 		if (Fweight > 0.f)
 		{
-			int x = pixel % img_x;
-			int y = (int)floorf( (float)pixel / (float)img_x);
-
-			// Don't search beyond square with side max_r
-			if (y > max_r)
-			{
-				if (y >= img_y - max_r)
-					y -= img_y;
-				else
-					continue;
-			}
-
-			if (x * x + y * y > max_r2)
-				continue;
 
 			// Get logical coordinates in the 3D map
 			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
@@ -207,9 +216,11 @@ __global__ void cuda_kernel_backproject2D(
 	}
 }
 
-__global__ void cuda_kernel_backproject3D_scatter(
-		XFLOAT *g_imgs_nomask_real,
-		XFLOAT *g_imgs_nomask_imag,
+__global__ void cuda_kernel_backproject3D(
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
 		XFLOAT* g_weights,
 		XFLOAT* g_Minvsigma2s,
 		XFLOAT* g_ctfs,
@@ -249,12 +260,29 @@ __global__ void cuda_kernel_backproject3D_scatter(
 		if (pixel >= img_xy)
 			continue;
 
+		int x = pixel % img_x;
+		int y = (int)floorf( (float)pixel / (float)img_x);
+
+		// Don't search beyond square with side max_r
+		if (y > max_r)
+		{
+			if (y >= img_y - max_r)
+				y -= img_y;
+			else
+				continue;
+		}
+
+		if (x * x + y * y > max_r2)
+			continue;
+
 		//WAVG
 		XFLOAT minvsigma2 = g_Minvsigma2s[pixel];
 		XFLOAT ctf = g_ctfs[pixel];
 		XFLOAT Fweight = 0.f;
 		XFLOAT real = 0.f;
 		XFLOAT imag = 0.f;
+		XFLOAT iReal = g_img_real[pixel];
+		XFLOAT iImag = g_img_imag[pixel];
 
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
@@ -264,14 +292,20 @@ __global__ void cuda_kernel_backproject3D_scatter(
 			{
 				weight /= weight_norm;
 
-				unsigned long img_pixel_idx = itrans * img_xy + pixel;
+				XFLOAT tx = g_trans_x[itrans];
+				XFLOAT ty = g_trans_y[itrans];
 
 				XFLOAT weightxinvsigma2 = weight * ctf * minvsigma2;
-
-				real += g_imgs_nomask_real[img_pixel_idx] * weightxinvsigma2;    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-				imag += g_imgs_nomask_imag[img_pixel_idx] * weightxinvsigma2;
-
 				Fweight += weightxinvsigma2 * ctf;
+
+				XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+				sincos( x * tx + y * ty , &s, &c );
+#else
+				sincosf( x * tx + y * ty , &s, &c );
+#endif
+				real += ( c * iReal - s * iImag ) * weightxinvsigma2;
+				imag += ( c * iImag + s * iReal ) * weightxinvsigma2;
 			}
 		}
 
@@ -378,8 +412,10 @@ __global__ void cuda_kernel_backproject3D_scatter(
 
 
 void CudaBackprojector::backproject(
-		XFLOAT *d_imgs_nomask_real,
-		XFLOAT *d_imgs_nomask_imag,
+		XFLOAT *d_img_real,
+		XFLOAT *d_img_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT* d_weights,
 		XFLOAT* d_Minvsigma2s,
 		XFLOAT* d_ctfs,
@@ -396,8 +432,10 @@ void CudaBackprojector::backproject(
 	if(mdlZ==1)
 	{
 		cuda_kernel_backproject2D<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
-				d_imgs_nomask_real,
-				d_imgs_nomask_imag,
+				d_img_real,
+				d_img_imag,
+				trans_x,
+				trans_y,
 				d_weights,
 				d_Minvsigma2s,
 				d_ctfs,
@@ -420,9 +458,11 @@ void CudaBackprojector::backproject(
 	}
 	else
 	{
-		cuda_kernel_backproject3D_scatter<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
-				d_imgs_nomask_real,
-				d_imgs_nomask_imag,
+		cuda_kernel_backproject3D<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+				d_img_real,
+				d_img_imag,
+				trans_x,
+				trans_y,
 				d_weights,
 				d_Minvsigma2s,
 				d_ctfs,

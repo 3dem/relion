@@ -811,117 +811,40 @@ void getAllSquaredDifferencesCoarse(
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		CudaGlobalPtr<XFLOAT> trans_x(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_y(cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimg_real(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimg_imag(image_size, cudaMLO->devBundle->allocator);
 
-		if (do_CC)
+		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+
+		for (long int itrans = 0; itrans < translation_num; itrans++)
 		{
-			Fimgs_real.device_alloc(image_size * translation_num);
-			deviceInitValue(Fimgs_real, (XFLOAT)0.);
-			Fimgs_imag.device_alloc(image_size * translation_num);
-			deviceInitValue(Fimgs_imag, (XFLOAT)0.);
-			Fimgs_real.streamSync();
-			Fimgs_imag.streamSync();
+			baseMLO->sampling.getTranslations(itrans, 0, oversampled_translations_x,
+					oversampled_translations_y, oversampled_translations_z);
 
-			if (baseMLO->do_shifts_onthefly)
-			{
-				CudaTranslator::Plan transPlan(
-						op.local_Fimgs_shifted[ipart].data,
-						image_size,
-						sp.itrans_min * sp.nr_oversampled_trans,
-						( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-						cudaMLO->devBundle->allocator,
-						0, //stream
-						baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1,
-						baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected ? op.local_Fctfs[ipart].data : NULL);
-
-				if (sp.current_oversampling == 0)
-				{
-					if (op.local_Minvsigma2s[0].ydim == baseMLO->coarse_size)
-						cudaMLO->translator_coarse1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-					else
-						cudaMLO->translator_current1.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-				}
-				else
-				{
-					if (baseMLO->strict_highres_exp > 0.)
-						cudaMLO->translator_coarse2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-					else
-						cudaMLO->translator_current2.translate(transPlan, ~Fimgs_real, ~Fimgs_imag);
-				}
-			}
-			else
-			{
-				Fimgs_real.host_alloc();
-				Fimgs_imag.host_alloc();
-
-				unsigned long k = 0;
-				for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
-				{
-					for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
-					{
-						Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
-						Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
-						k++;
-					}
-				}
-
-				Fimgs_real.cp_to_device();
-				Fimgs_imag.cp_to_device();
-			}
+			trans_x[itrans] = -2 * PI * oversampled_translations_x[0] / (double)baseMLO->mymodel.ori_size;
+			trans_y[itrans] = -2 * PI * oversampled_translations_y[0] / (double)baseMLO->mymodel.ori_size;
 		}
-		else
+
+		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
+		for (unsigned i = 0; i < image_size; i ++)
 		{
+			XFLOAT pixel_correction = 1.0/scale_correction;
+			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+				pixel_correction /= op.local_Fctfs[ipart].data[i];
 
-			trans_x.setSize(translation_num);
-			trans_y.setSize(translation_num);
-			trans_x.host_alloc();
-			trans_y.host_alloc();
-
-			Fimgs_real.setSize(image_size);
-			Fimgs_imag.setSize(image_size);
-			Fimgs_real.host_alloc();
-			Fimgs_imag.host_alloc();
-
-			Fimgs_real.device_alloc();
-			deviceInitValue(Fimgs_real, (XFLOAT)0.);
-			Fimgs_imag.device_alloc();
-			deviceInitValue(Fimgs_imag, (XFLOAT)0.);
-
-			Fimgs_real.streamSync();
-			Fimgs_imag.streamSync();
-
-			std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-
-			for (long int itrans = 0; itrans < translation_num; itrans++)
-			{
-				baseMLO->sampling.getTranslations(itrans, 0, oversampled_translations_x,
-						oversampled_translations_y, oversampled_translations_z);
-
-				trans_x[itrans] = -2 * PI * oversampled_translations_x[0] / (double)baseMLO->mymodel.ori_size;
-				trans_y[itrans] = -2 * PI * oversampled_translations_y[0] / (double)baseMLO->mymodel.ori_size;
-			}
-
-			XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
-			for (unsigned i = 0; i < op.local_Fimgs_shifted[ipart].nzyxdim; i ++)
-			{
-				XFLOAT pixel_correction = 1.0/scale_correction;
-				if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-					pixel_correction /= op.local_Fctfs[ipart].data[i];
-
-				Fimgs_real[i] = op.local_Fimgs_shifted[ipart].data[i].real * pixel_correction;
-				Fimgs_imag[i] = op.local_Fimgs_shifted[ipart].data[i].imag * pixel_correction;
-			}
-
-
-			trans_x.put_on_device();
-			trans_y.put_on_device();
-			Fimgs_real.cp_to_device();
-			Fimgs_imag.cp_to_device();
+			Fimg_real[i] = op.local_Fimgs_shifted[ipart].data[i].real * pixel_correction;
+			Fimg_imag[i] = op.local_Fimgs_shifted[ipart].data[i].imag * pixel_correction;
 		}
+
+
+		trans_x.put_on_device();
+		trans_y.put_on_device();
+		Fimg_real.put_on_device();
+		Fimg_imag.put_on_device();
+
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		CTOC(cudaMLO->timer,"translation_1");
@@ -954,11 +877,11 @@ void getAllSquaredDifferencesCoarse(
 
 				runDiff2KernelCoarse(
 						projKernel,
-						do_CC ? NULL : ~trans_x,
-						do_CC ? NULL : ~trans_y,
+						~trans_x,
+						~trans_y,
 						~corr_img,
-						~Fimgs_real,
-						~Fimgs_imag,
+						~Fimg_real,
+						~Fimg_imag,
 						~projectorPlans[exp_iclass].eulers,
 						&allWeights(allWeights_pos),
 						op,
@@ -2007,87 +1930,63 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	CTIC(cudaMLO->timer,"maximization");
 
+
+	/*======================================================
+	                     TRANSLATIONS
+	======================================================*/
+
+	long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+
+	CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
+	CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
+
+	int j = 0;
+	for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
+	{
+		baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+				oversampled_translations_y, oversampled_translations_z); //TODO Called multiple time to generate same list, reuse the same list
+
+		for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
+		{
+			trans_x[j] = -2 * PI * oversampled_translations_x[iover_trans] / (double)baseMLO->mymodel.ori_size;
+			trans_y[j] = -2 * PI * oversampled_translations_y[iover_trans] / (double)baseMLO->mymodel.ori_size;
+			j ++;
+		}
+	}
+
+	trans_x.put_on_device();
+	trans_y.put_on_device();
+
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 
 		/*======================================================
-		                     TRANSLATIONS
+		                     IMAGES
 		======================================================*/
 
 		CUSTOM_ALLOCATOR_REGION_NAME("TRANS_3");
 
 		CTIC(cudaMLO->timer,"translation_3");
 
-		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(image_size, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(image_size, cudaMLO->devBundle->allocator);
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(cudaMLO->devBundle->allocator);
-
-		Fimgs_real.device_alloc(image_size * translation_num);
-		Fimgs_imag.device_alloc(image_size * translation_num);
-		Fimgs_nomask_real.device_alloc(image_size * translation_num);
-		Fimgs_nomask_imag.device_alloc(image_size * translation_num);
-
-		if (baseMLO->do_shifts_onthefly)
+		for (unsigned i = 0; i < image_size; i ++)
 		{
-			CudaTranslator::Plan planMask(
-					op.local_Fimgs_shifted[ipart].data,
-					image_size,
-					sp.itrans_min * sp.nr_oversampled_trans,
-					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-					cudaMLO->devBundle->allocator,
-					0 //stream
-					);
-
-			CudaTranslator::Plan planNomask(
-					op.local_Fimgs_shifted_nomask[ipart].data,
-					image_size,
-					sp.itrans_min * sp.nr_oversampled_trans,
-					( sp.itrans_max + 1) * sp.nr_oversampled_trans,
-					cudaMLO->devBundle->allocator,
-					0 //stream
-					);
-
-			if (baseMLO->adaptive_oversampling == 0)
-			{
-				cudaMLO->translator_current1.translate(planMask,   ~Fimgs_real,        ~Fimgs_imag);
-				cudaMLO->translator_current1.translate(planNomask, ~Fimgs_nomask_real, ~Fimgs_nomask_imag);
-			}
-			else
-			{
-				cudaMLO->translator_current2.translate(planMask,   ~Fimgs_real,        ~Fimgs_imag);
-				cudaMLO->translator_current2.translate(planNomask, ~Fimgs_nomask_real, ~Fimgs_nomask_imag);
-			}
+			Fimgs_real[i] = op.local_Fimgs_shifted[0].data[i].real;
+			Fimgs_imag[i] = op.local_Fimgs_shifted[0].data[i].imag;
+			Fimgs_nomask_real[i] = op.local_Fimgs_shifted_nomask[0].data[i].real;
+			Fimgs_nomask_imag[i] = op.local_Fimgs_shifted_nomask[0].data[i].imag;
 		}
-		else
-		{
-			Fimgs_real.host_alloc();
-			Fimgs_imag.host_alloc();
-			Fimgs_nomask_real.host_alloc();
-			Fimgs_nomask_imag.host_alloc();
 
-			unsigned long k = 0;
-			for (unsigned i = 0; i < op.local_Fimgs_shifted.size(); i ++)
-			{
-				for (unsigned j = 0; j < op.local_Fimgs_shifted[i].nzyxdim; j ++)
-				{
-					Fimgs_real[k] = op.local_Fimgs_shifted[i].data[j].real;
-					Fimgs_imag[k] = op.local_Fimgs_shifted[i].data[j].imag;
-					Fimgs_nomask_real[k] = op.local_Fimgs_shifted_nomask[i].data[j].real;
-					Fimgs_nomask_imag[k] = op.local_Fimgs_shifted_nomask[i].data[j].imag;
-					k++;
-				}
-			}
-
-			Fimgs_real.cp_to_device();
-			Fimgs_imag.cp_to_device();
-			Fimgs_nomask_real.cp_to_device();
-			Fimgs_nomask_imag.cp_to_device();
-		}
+		Fimgs_real.put_on_device();
+		Fimgs_imag.put_on_device();
+		Fimgs_nomask_real.put_on_device();
+		Fimgs_nomask_imag.put_on_device();
 
 		CTOC(cudaMLO->timer,"translation_3");
 
@@ -2260,8 +2159,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~eulers[exp_iclass],
 					~Fimgs_real,
 					~Fimgs_imag,
-					~Fimgs_nomask_real,
-					~Fimgs_nomask_imag,
+					~trans_x,
+					~trans_y,
 					&sorted_weights.d_ptr[classPos],
 					~ctfs,
 					~wdiff2s_sum,
@@ -2292,6 +2191,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			cudaMLO->devBundle->cudaBackprojectors[exp_iclass].backproject(
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
+				~trans_x,
+				~trans_y,
 				&sorted_weights.d_ptr[classPos],
 				~Minvsigma2s,
 				~ctfs,
