@@ -12,22 +12,25 @@
 #include <string>
 #include <sstream>
 
-#ifdef CUDA_PROFILING
-#include <nvToolsExt.h>
-#endif
-
 #ifdef TIMING_FILES
 #define	CTIC(timer,timing) (timer.cuda_cpu_tic(timing))
 #define	CTOC(timer,timing) (timer.cuda_cpu_toc(timing))
 #define	GTIC(timer,timing) (timer.cuda_gpu_tic(timing))
 #define	GTOC(timer,timing) (timer.cuda_gpu_toc(timing))
 #define	GATHERGPUTIMINGS(timer) (timer.cuda_gpu_printtictoc())
+#elif defined CUDA_PROFILING
+	#include <nvToolsExt.h>
+	#define	CTIC(timer,timing) (nvtxRangePush(timing))
+	#define	CTOC(timer,timing) (nvtxRangePop())
+	#define	GTIC(timer,timing)
+	#define	GTOC(timer,timing)
+	#define	GATHERGPUTIMINGS(timer)
 #else
-#define	CTIC(timer,timing)
-#define	CTOC(timer,timing)
-#define	GTIC(timer,timing)
-#define	GTOC(timer,timing)
-#define	GATHERGPUTIMINGS(timer)
+	#define	CTIC(timer,timing)
+	#define	CTOC(timer,timing)
+	#define	GTIC(timer,timing)
+	#define	GTOC(timer,timing)
+	#define	GATHERGPUTIMINGS(timer)
 #endif
 
 class relion_timer

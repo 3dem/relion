@@ -113,7 +113,3 @@ void relion_timer::cuda_gpu_printtictoc()
 		cuda_gpu_benchmark_stop_times.clear();
 	}
 }
-
-#ifdef CUDA_PROFILING
-#include <nvToolsExt.h>
-#endif

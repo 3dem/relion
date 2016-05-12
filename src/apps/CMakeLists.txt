@@ -57,6 +57,7 @@ if (CUDA_FOUND)
     if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
         find_library(NV_TOOLS_LIBRARIES   NAMES nvToolsExt  PATHS ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
         list(APPEND EXTRA_LIBS "${NV_TOOLS_LIBRARIES}")
+        target_link_libraries(relion_gpu_util ${NV_TOOLS_LIBRARIES})
         message(STATUS "Adding extra library for NVIDIA profiling: ${NV_TOOLS_LIBRARIES}")
     endif()
 
