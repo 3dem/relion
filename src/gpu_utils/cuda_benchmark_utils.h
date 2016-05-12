@@ -12,6 +12,9 @@
 #include <string>
 #include <sstream>
 
+#ifdef CUDA_PROFILING
+#include <nvToolsExt.h>
+#endif
 
 #ifdef TIMING_FILES
 #define	CTIC(timer,timing) (timer.cuda_cpu_tic(timing))
@@ -61,10 +64,6 @@ void cuda_gpu_tic(std::string id);
 void cuda_gpu_toc(std::string id);
 
 void cuda_gpu_printtictoc();
-
-#ifdef CUDA_PROFILING
-#include <nvToolsExt.h>
-#endif
 
 };
 
