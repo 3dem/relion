@@ -1977,10 +1977,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		for (unsigned i = 0; i < image_size; i ++)
 		{
-			Fimgs_real[i] = op.local_Fimgs_shifted[0].data[i].real;
-			Fimgs_imag[i] = op.local_Fimgs_shifted[0].data[i].imag;
-			Fimgs_nomask_real[i] = op.local_Fimgs_shifted_nomask[0].data[i].real;
-			Fimgs_nomask_imag[i] = op.local_Fimgs_shifted_nomask[0].data[i].imag;
+			Fimgs_real[i] = op.local_Fimgs_shifted[ipart].data[i].real;
+			Fimgs_imag[i] = op.local_Fimgs_shifted[ipart].data[i].imag;
+			Fimgs_nomask_real[i] = op.local_Fimgs_shifted_nomask[ipart].data[i].real;
+			Fimgs_nomask_imag[i] = op.local_Fimgs_shifted_nomask[ipart].data[i].imag;
 		}
 
 		Fimgs_real.put_on_device();
@@ -2017,7 +2017,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
-		CudaGlobalPtr<XFLOAT> ctfs(image_size, cudaMLO->devBundle->allocator); //TODO Same size for all iparts, should be allocated once
+		CudaGlobalPtr<XFLOAT> ctfs(image_size, cudaMLO->devBundle->allocator);
 
 		if (baseMLO->do_ctf_correction)
 		{
@@ -2034,7 +2034,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                       MINVSIGMA
 		======================================================*/
 
-		CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, cudaMLO->devBundle->allocator); //TODO Same size for all iparts, should be allocated once
+		CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, cudaMLO->devBundle->allocator);
 
 		if (baseMLO->do_map)
 			for (unsigned i = 0; i < image_size; i++)
@@ -2167,7 +2167,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					&wdiff2s_AA(AAXA_pos),
 					&wdiff2s_XA(AAXA_pos),
 					op,
-					baseMLO,
 					orientation_num,
 					translation_num,
 					image_size,
@@ -2175,6 +2174,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					group_id,
 					exp_iclass,
 					part_scale,
+					baseMLO->refs_are_ctf_corrected,
 					cudaMLO->classStreams[exp_iclass]);
 
 			/*======================================================
@@ -2205,15 +2205,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				orientation_num,
 				cudaMLO->classStreams[exp_iclass]);
 
-			AAXA_pos += image_size;
-			classPos += orientation_num*translation_num;
-
 			CTOC(cudaMLO->timer,"backproject");
 
 #ifdef TIMING
 			if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 				baseMLO->timer.toc(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
+
+			//Update indices
+			AAXA_pos += image_size;
+			classPos += orientation_num*translation_num;
+
 		} // end loop iclass
 
 		CUSTOM_ALLOCATOR_REGION_NAME("UNSET");

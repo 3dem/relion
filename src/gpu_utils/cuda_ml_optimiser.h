@@ -435,8 +435,7 @@ public:
 
 	void syncAllBackprojects()
 	{
-		for (int i = 0; i < cudaBackprojectors.size(); i ++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 	}
 
 

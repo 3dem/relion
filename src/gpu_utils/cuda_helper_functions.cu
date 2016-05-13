@@ -281,7 +281,6 @@ void runWavgKernel(
 		XFLOAT *wdiff2s_AA,
 		XFLOAT *wdiff2s_XA,
 		OptimisationParamters &op,
-		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		unsigned image_size,
@@ -289,6 +288,7 @@ void runWavgKernel(
 		int group_id,
 		int exp_iclass,
 		XFLOAT part_scale,
+		bool refs_are_ctf_corrected,
 		cudaStream_t stream)
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
@@ -297,48 +297,92 @@ void runWavgKernel(
 
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
-	if(projector.mdlZ!=0)
-		cuda_kernel_wavg<true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
-			eulers,
-			projector,
-			image_size,
-			orientation_num,
-			Fimg_real,
-			Fimg_imag,
-			trans_x,
-			trans_y,
-			sorted_weights,
-			ctfs,
-			wdiff2s_parts,
-			wdiff2s_AA,
-			wdiff2s_XA,
-			translation_num,
-			(XFLOAT) op.sum_weight[ipart],
-			(XFLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected,
-			part_scale
-			);
+	if (refs_are_ctf_corrected)
+	{
+		if(projector.mdlZ!=0)
+			cuda_kernel_wavg<true,true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+		else
+			cuda_kernel_wavg<false,true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+	}
 	else
-		cuda_kernel_wavg<false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
-			eulers,
-			projector,
-			image_size,
-			orientation_num,
-			Fimg_real,
-			Fimg_imag,
-			trans_x,
-			trans_y,
-			sorted_weights,
-			ctfs,
-			wdiff2s_parts,
-			wdiff2s_AA,
-			wdiff2s_XA,
-			translation_num,
-			(XFLOAT) op.sum_weight[ipart],
-			(XFLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected,
-			part_scale
-			);
+	{
+		if(projector.mdlZ!=0)
+			cuda_kernel_wavg<true,false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+		else
+			cuda_kernel_wavg<false,false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
 

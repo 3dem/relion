@@ -89,7 +89,6 @@ void runWavgKernel(
 		XFLOAT *wdiff2s_AA,
 		XFLOAT *wdiff2s_XA,
 		OptimisationParamters &op,
-		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		unsigned image_size,
@@ -97,6 +96,7 @@ void runWavgKernel(
 		int group_id,
 		int exp_iclass,
 		XFLOAT part_scale,
+		bool refs_are_ctf_corrected,
 		cudaStream_t stream);
 
 #define INIT_VALUE_BLOCK_SIZE 512
