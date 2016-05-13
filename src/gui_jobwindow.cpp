@@ -2740,7 +2740,10 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		int pos_it = fn_cont.getValue().rfind("_it");
 		int pos_op = fn_cont.getValue().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+		{
+			fl_message("Warning: invalid optimiser.star filename provided for continuation run!");
+			return false;
+		}
 		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + fn_cont.getValue();
@@ -5231,13 +5234,13 @@ bool MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 }
 
-JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
+JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_JOINSTAR;
 
 	tab1->begin();
-	tab1->label("I/O");
+	tab1->label("particles");
 	resetHeight();
 
 	part_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -5251,8 +5254,11 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	part_group->end();
 	do_part.cb_menu_i(); // make default active
 
-	// Add a little spacer
-    current_y += STEPY/2;
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("micrographs");
+	resetHeight();
 
 	mic_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	mic_group->end();
@@ -5264,7 +5270,26 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	fn_mic4.place(current_y, "Micrograph STAR file 4: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The fourth of the micrograph STAR files to be combined. Leave empty if there are only two or three files to be combined.");
 	mic_group->end();
 	do_mic.cb_menu_i(); // make default active
-	tab1->end();
+
+	tab2->end();
+
+
+	tab3->begin();
+	tab3->label("movies");
+	resetHeight();
+
+	mov_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	mov_group->end();
+	do_mov.place(current_y, "Combine micrograph movie STAR files?", false, "", mov_group);
+	mov_group->begin();
+	fn_mov1.place(current_y, "Micrograph movie STAR file 1: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The first of the micrograph movie STAR files to be combined.");
+	fn_mov2.place(current_y, "Micrograph movie STAR file 2: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The second of the micrograph movie STAR files to be combined.");
+	fn_mov3.place(current_y, "Micrograph movie STAR file 3: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The third of the micrograph movie STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_mov4.place(current_y, "Micrograph movie STAR file 4: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The fourth of the micrograph movie STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	mov_group->end();
+	do_mov.cb_menu_i(); // make default active
+
+	tab3->end();
 
 	// read settings if hidden file exists
 	read(".gui_joinstar", is_continue);
@@ -5293,6 +5318,12 @@ void JoinStarJobWindow::write(std::string fn)
 	fn_mic3.writeValue(fh);
 	fn_mic4.writeValue(fh);
 
+	do_mov.writeValue(fh);
+	fn_mov1.writeValue(fh);
+	fn_mov2.writeValue(fh);
+	fn_mov3.writeValue(fh);
+	fn_mov4.writeValue(fh);
+
 	closeWriteFile(fh, fn);
 }
 
@@ -5320,6 +5351,12 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 		fn_mic3.readValue(fh);
 		fn_mic4.readValue(fh);
 
+		do_mov.readValue(fh);
+		fn_mov1.readValue(fh);
+		fn_mov2.readValue(fh);
+		fn_mov3.readValue(fh);
+		fn_mov4.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
 
@@ -5332,6 +5369,10 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 		ori_fn_mic2 = fn_mic2.getValue();
 		ori_fn_mic3 = fn_mic3.getValue();
 		ori_fn_mic4 = fn_mic4.getValue();
+		ori_fn_mov1 = fn_mov1.getValue();
+		ori_fn_mov2 = fn_mov2.getValue();
+		ori_fn_mov3 = fn_mov3.getValue();
+		ori_fn_mov4 = fn_mov4.getValue();
 
 	}
 }
@@ -5352,6 +5393,10 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 		fn_mic2.setValue("");
 		fn_mic3.setValue("");
 		fn_mic4.setValue("");
+		fn_mov1.setValue("");
+		fn_mov2.setValue("");
+		fn_mov3.setValue("");
+		fn_mov4.setValue("");
 	}
 	else
 	{
@@ -5363,6 +5408,10 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 		fn_mic2.setValue(ori_fn_mic2.c_str());
 		fn_mic3.setValue(ori_fn_mic3.c_str());
 		fn_mic4.setValue(ori_fn_mic4.c_str());
+		fn_mov1.setValue(ori_fn_mov1.c_str());
+		fn_mov2.setValue(ori_fn_mov2.c_str());
+		fn_mov3.setValue(ori_fn_mov3.c_str());
+		fn_mov4.setValue(ori_fn_mov4.c_str());
 	}
 
 	do_part.deactivate(is_continue);
@@ -5376,6 +5425,12 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 	fn_mic2.deactivate(is_continue);
 	fn_mic3.deactivate(is_continue);
 	fn_mic4.deactivate(is_continue);
+
+	do_mov.deactivate(is_continue);
+	fn_mov1.deactivate(is_continue);
+	fn_mov2.deactivate(is_continue);
+	fn_mov3.deactivate(is_continue);
+	fn_mov4.deactivate(is_continue);
 }
 
 bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -5444,6 +5499,35 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command += " --check_duplicates rlnMicrographName ";
 		command += " --o " + outputname + "join_mics.star";
 		Node node5(outputname + "join_mics.star", fn_mic1.type);
+		pipelineOutputNodes.push_back(node5);
+
+	}
+	else if (do_mov.getValue())
+	{
+		command += " --i \" " + fn_mov1.getValue();
+		Node node(fn_mov1.getValue(), fn_mov1.type);
+		pipelineInputNodes.push_back(node);
+		command += " " + fn_mov2.getValue();
+		Node node2(fn_mov2.getValue(), fn_mov2.type);
+		pipelineInputNodes.push_back(node2);
+		if (fn_mov3.getValue() != "")
+		{
+			command += " " + fn_mov3.getValue();
+			Node node3(fn_mov3.getValue(), fn_mov3.type);
+			pipelineInputNodes.push_back(node3);
+		}
+		if (fn_mov4.getValue() != "")
+		{
+			command += " " + fn_mov4.getValue();
+			Node node4(fn_mov4.getValue(), fn_mov4.type);
+			pipelineInputNodes.push_back(node4);
+		}
+		command += " \" ";
+
+		// Check for duplicates
+		command += " --check_duplicates rlnMicrographMovieName ";
+		command += " --o " + outputname + "join_movies.star";
+		Node node5(outputname + "join_movies.star", fn_mov1.type);
 		pipelineOutputNodes.push_back(node5);
 
 	}

@@ -922,12 +922,19 @@ public:
 	InputNodeEntry fn_mic3;
 	InputNodeEntry fn_mic4;
 
+	BooleanEntry do_mov;
+	InputNodeEntry fn_mov1;
+	InputNodeEntry fn_mov2;
+	InputNodeEntry fn_mov3;
+	InputNodeEntry fn_mov4;
+
 
 	// Allow clearing of input fields for a new job
 	FileName ori_fn_part1, ori_fn_part2, ori_fn_part3, ori_fn_part4;
 	FileName ori_fn_mic1, ori_fn_mic2, ori_fn_mic3, ori_fn_mic4;
+	FileName ori_fn_mov1, ori_fn_mov2, ori_fn_mov3, ori_fn_mov4;
 
-	Fl_Group *part_group, *mic_group;
+	Fl_Group *part_group, *mic_group, *mov_group;
 
 public:
 
