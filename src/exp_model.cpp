@@ -403,6 +403,10 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 
 	ori_particles=new_ori_particles;
 
+	if (nr_ori_particles_subset2 == 0 || nr_ori_particles_subset1 == 0)
+		REPORT_ERROR("ERROR: one of your half sets has no segments. Helical half-sets are always per-filament. Provide at least 2 filaments.");
+
+
 }
 
 void Experiment::orderParticlesInOriginalParticles()

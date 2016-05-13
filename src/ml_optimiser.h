@@ -182,6 +182,9 @@ public:
 	// Flag whether to use the auto-refine procedure
 	bool do_auto_refine;
 
+	// Force auto-refinement to converge
+	bool do_force_converge;
+
 	// Number of iterations without a resolution increase
 	int nr_iter_wo_resol_gain;
 
@@ -822,10 +825,8 @@ public:
 	void updateAngularSampling(bool verb = true);
 
 	// Check convergence for auto-refine procedure
-	void checkConvergence();
-
-	// Print convergence information to screen for auto-refine procedure
-	void printConvergenceStats();
+	// Also print convergence information to screen for auto-refine procedure
+	void checkConvergence(bool myverb = true);
 
 	// Set metadata of a subset of particles to the experimental model
 	void setMetaDataSubset(int first_ori_particle_id, int last_ori_particle_id);

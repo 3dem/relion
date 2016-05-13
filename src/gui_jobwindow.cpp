@@ -1598,7 +1598,8 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 
 	threshold_autopick.place(current_y, "Picking threshold:", 0.05, 0, 1., 0.01, "Use lower thresholds to pick more particles (and more junk probably)");
 
-	mindist_autopick.place(current_y, "Minimum inter-particle distance (A):", 100, 0, 1000, 20, "Particles closer together than this distance will be consider to be a single cluster. From each cluster, only one particle will be picked.");
+	mindist_autopick.place(current_y, "Minimum inter-particle distance (A):", 100, 0, 1000, 20, "Particles closer together than this distance will be consider to be a single cluster. From each cluster, only one particle will be picked. \
+\n\nThis option takes no effect for picking helical segments. The inter-box distance is calculated with the number of asymmetrical units and the helical rise on 'Helix' tab.");
 
 	maxstddevnoise_autopick.place(current_y, "Maximum stddev noise:", 1.1, 0.9, 1.5, 0.02, "This is useful to prevent picking in carbon areas, or areas with big contamination features. Peaks in areas where the background standard deviation in the normalized micrographs is higher than this value will be ignored. Useful values are probably in the range 1.0 to 1.2. Set to -1 to switch off the feature to eliminate peaks due to high background standard deviations.");
 
@@ -1634,12 +1635,21 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 
 	autopick_helix_group->begin();
 
+	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
+This value should be slightly larger than the actual width of the tubes.");
+
+	current_y += STEPY/2;
+
+	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
+The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
+
+	helical_rise.place(current_y, "Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+
+	current_y += STEPY/2;
+
 	helical_tube_kappa_max.place(current_y, "Maximum curvature (kappa): ", 0.1, 0.05, 0.5, 0.01, "Maximum curvature allowed for picking helical tubes. \
 Kappa = 0.3 means that the curvature of the picked helical tubes should not be larger than 30% the curvature of a circle (diameter = particle mask diameter). \
 Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
-
-	helical_tube_outer_diameter.place(current_y, "Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
-This value should be slightly larger than the actual width of the tubes.");
 
 	helical_tube_length_min.place(current_y, "Minimum length (A): ", 200, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
 Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
@@ -1683,6 +1693,8 @@ void AutopickJobWindow::write(std::string fn)
 	helical_tube_kappa_max.writeValue(fh);
 	helical_tube_outer_diameter.writeValue(fh);
 	helical_tube_length_min.writeValue(fh);
+	helical_nr_asu.writeValue(fh);
+	helical_rise.writeValue(fh);
 	use_gpu.writeValue(fh);
 	gpu_ids.writeValue(fh);
 	shrink.writeValue(fh);
@@ -1722,6 +1734,8 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 		helical_tube_kappa_max.readValue(fh);
 		helical_tube_outer_diameter.readValue(fh);
 		helical_tube_length_min.readValue(fh);
+		helical_nr_asu.readValue(fh);
+		helical_rise.readValue(fh);
 		use_gpu.readValue(fh);
 		gpu_ids.readValue(fh);
 		shrink.readValue(fh);
@@ -1809,15 +1823,18 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command += " --read_fom_maps ";
 
 	command += " --threshold " + floatToString(threshold_autopick.getValue());
-	command += " --min_distance " + floatToString(mindist_autopick.getValue());
+	if (do_pick_helical_segments.getValue())
+		command += " --min_distance " + floatToString(helical_nr_asu.getValue() * helical_rise.getValue());
+	else
+		command += " --min_distance " + floatToString(mindist_autopick.getValue());
 	command += " --max_stddev_noise " + floatToString(maxstddevnoise_autopick.getValue());
 
 	// Helix
 	if (do_pick_helical_segments.getValue())
 	{
 		command += " --helix";
-		command += " --helical_tube_kappa_max " + floatToString(helical_tube_kappa_max.getValue());
 		command += " --helical_tube_outer_diameter " + floatToString(helical_tube_outer_diameter.getValue());
+		command += " --helical_tube_kappa_max " + floatToString(helical_tube_kappa_max.getValue());
 		command += " --helical_tube_length_min " + floatToString(helical_tube_length_min.getValue());
 	}
 
@@ -2352,7 +2369,8 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		}
 		else
 		{
-			REPORT_ERROR("ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!");
+			fl_message("ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!");
+			return false;
 		}
 	}
 	command += " --ref " + fn_ref;
@@ -2723,7 +2741,10 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		int pos_it = fn_cont.getValue().rfind("_it");
 		int pos_op = fn_cont.getValue().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+		{
+			fl_message("Warning: invalid optimiser.star filename provided for continuation run!");
+			return false;
+		}
 		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + fn_cont.getValue();
@@ -4479,7 +4500,10 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	if (join_nr_mics.getValue() > 0)
 	{
 		if (do_alsorot_movies.getValue())
-			REPORT_ERROR("MovieRefineJobWindow ERROR: you cannot process micrographs in batches and perform rotational searches!");
+		{
+			fl_message("You cannot process micrographs in batches and perform rotational searches!");
+			return false;
+		}
 
 		command += " --process_movies_in_batches --realign_movie_frames " + fn_olist;
 
@@ -4975,7 +4999,10 @@ bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		if (exists(fn_job))
 			global_manualpickjob.read(fn_job.c_str(), iscont);
 		else
-			REPORT_ERROR("RelionMainWindow::cb_display_io_node_i ERROR: Save a Manual picking job parameters (using the File menu) before displaying coordinate files. ");
+		{
+			fl_message("You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.");
+			return false;
+		}
 
 		// Get the name of the micrograph STAR file from reading the suffix file
 	    FileName fn_suffix = fn_coords.getValue();
@@ -5214,18 +5241,18 @@ bool MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 }
 
-JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THREAD)
+JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT_THREAD)
 {
 
 	type = PROC_JOINSTAR;
 
 	tab1->begin();
-	tab1->label("I/O");
+	tab1->label("particles");
 	resetHeight();
 
 	part_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	part_group->end();
-	do_part.place(current_y, "Combine particle STAR files?", true, "", part_group);
+	do_part.place(current_y, "Combine particle STAR files?", false, "", part_group);
 	part_group->begin();
 	fn_part1.place(current_y, "Particle STAR file 1: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The first of the particle STAR files to be combined.");
 	fn_part2.place(current_y, "Particle STAR file 2: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The second of the particle STAR files to be combined.");
@@ -5234,8 +5261,11 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	part_group->end();
 	do_part.cb_menu_i(); // make default active
 
-	// Add a little spacer
-    current_y += STEPY/2;
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("micrographs");
+	resetHeight();
 
 	mic_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	mic_group->end();
@@ -5247,7 +5277,26 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT
 	fn_mic4.place(current_y, "Micrograph STAR file 4: ", NODE_MICS, "", "micrograph STAR file (*.star)", "The fourth of the micrograph STAR files to be combined. Leave empty if there are only two or three files to be combined.");
 	mic_group->end();
 	do_mic.cb_menu_i(); // make default active
-	tab1->end();
+
+	tab2->end();
+
+
+	tab3->begin();
+	tab3->label("movies");
+	resetHeight();
+
+	mov_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	mov_group->end();
+	do_mov.place(current_y, "Combine movie STAR files?", false, "", mov_group);
+	mov_group->begin();
+	fn_mov1.place(current_y, "Movie STAR file 1: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The first of the micrograph movie STAR files to be combined.");
+	fn_mov2.place(current_y, "Movie STAR file 2: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The second of the micrograph movie STAR files to be combined.");
+	fn_mov3.place(current_y, "Movie STAR file 3: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The third of the micrograph movie STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_mov4.place(current_y, "Movie STAR file 4: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The fourth of the micrograph movie STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	mov_group->end();
+	do_mov.cb_menu_i(); // make default active
+
+	tab3->end();
 
 	// read settings if hidden file exists
 	read(".gui_joinstar", is_continue);
@@ -5276,6 +5325,12 @@ void JoinStarJobWindow::write(std::string fn)
 	fn_mic3.writeValue(fh);
 	fn_mic4.writeValue(fh);
 
+	do_mov.writeValue(fh);
+	fn_mov1.writeValue(fh);
+	fn_mov2.writeValue(fh);
+	fn_mov3.writeValue(fh);
+	fn_mov4.writeValue(fh);
+
 	closeWriteFile(fh, fn);
 }
 
@@ -5288,7 +5343,6 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 	if (fn=="")
 		fn=".gui_joinstar";
 
-	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
 		do_part.readValue(fh);
@@ -5303,50 +5357,22 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 		fn_mic3.readValue(fh);
 		fn_mic4.readValue(fh);
 
+		do_mov.readValue(fh);
+		fn_mov1.readValue(fh);
+		fn_mov2.readValue(fh);
+		fn_mov3.readValue(fh);
+		fn_mov4.readValue(fh);
+
 		closeReadFile(fh);
 		_is_continue = is_continue;
-
-		// For re-setting of new jobs
-		ori_fn_part1 = fn_part1.getValue();
-		ori_fn_part2 = fn_part2.getValue();
-		ori_fn_part3 = fn_part3.getValue();
-		ori_fn_part4 = fn_part4.getValue();
-		ori_fn_mic1 = fn_mic1.getValue();
-		ori_fn_mic2 = fn_mic2.getValue();
-		ori_fn_mic3 = fn_mic3.getValue();
-		ori_fn_mic4 = fn_mic4.getValue();
-
 	}
+
 }
 
 
 void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
-
-	// For new jobs, always reset the input fields to empty
-	if (!_is_continue)
-	{
-		fn_part1.setValue("");
-		fn_part2.setValue("");
-		fn_part3.setValue("");
-		fn_part4.setValue("");
-		fn_mic1.setValue("");
-		fn_mic2.setValue("");
-		fn_mic3.setValue("");
-		fn_mic4.setValue("");
-	}
-	else
-	{
-		fn_part1.setValue(ori_fn_part1.c_str());
-		fn_part2.setValue(ori_fn_part2.c_str());
-		fn_part3.setValue(ori_fn_part3.c_str());
-		fn_part4.setValue(ori_fn_part4.c_str());
-		fn_mic1.setValue(ori_fn_mic1.c_str());
-		fn_mic2.setValue(ori_fn_mic2.c_str());
-		fn_mic3.setValue(ori_fn_mic3.c_str());
-		fn_mic4.setValue(ori_fn_mic4.c_str());
-	}
 
 	do_part.deactivate(is_continue);
 	fn_part1.deactivate(is_continue);
@@ -5359,6 +5385,12 @@ void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 	fn_mic2.deactivate(is_continue);
 	fn_mic3.deactivate(is_continue);
 	fn_mic4.deactivate(is_continue);
+
+	do_mov.deactivate(is_continue);
+	fn_mov1.deactivate(is_continue);
+	fn_mov2.deactivate(is_continue);
+	fn_mov3.deactivate(is_continue);
+	fn_mov4.deactivate(is_continue);
 }
 
 bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -5371,7 +5403,21 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	std::string command;
 	command="`which relion_star_combine`";
 
-	// I/O  TODO!!!
+	int ii = 0;
+	if (do_part.getValue())
+		ii++;
+	if (do_mic.getValue())
+		ii++;
+	if (do_mov.getValue())
+		ii++;
+
+	if (ii > 1)
+	{
+		fl_message("You've selected more than one type of files for joining. Only select a single type!");
+		return false;
+	}
+
+	// I/O
 	if (do_part.getValue())
 	{
 		command += " --i \" " + fn_part1.getValue();
@@ -5427,6 +5473,35 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command += " --check_duplicates rlnMicrographName ";
 		command += " --o " + outputname + "join_mics.star";
 		Node node5(outputname + "join_mics.star", fn_mic1.type);
+		pipelineOutputNodes.push_back(node5);
+
+	}
+	else if (do_mov.getValue())
+	{
+		command += " --i \" " + fn_mov1.getValue();
+		Node node(fn_mov1.getValue(), fn_mov1.type);
+		pipelineInputNodes.push_back(node);
+		command += " " + fn_mov2.getValue();
+		Node node2(fn_mov2.getValue(), fn_mov2.type);
+		pipelineInputNodes.push_back(node2);
+		if (fn_mov3.getValue() != "")
+		{
+			command += " " + fn_mov3.getValue();
+			Node node3(fn_mov3.getValue(), fn_mov3.type);
+			pipelineInputNodes.push_back(node3);
+		}
+		if (fn_mov4.getValue() != "")
+		{
+			command += " " + fn_mov4.getValue();
+			Node node4(fn_mov4.getValue(), fn_mov4.type);
+			pipelineInputNodes.push_back(node4);
+		}
+		command += " \" ";
+
+		// Check for duplicates
+		command += " --check_duplicates rlnMicrographMovieName ";
+		command += " --o " + outputname + "join_movies.star";
+		Node node5(outputname + "join_movies.star", fn_mov1.type);
 		pipelineOutputNodes.push_back(node5);
 
 	}
