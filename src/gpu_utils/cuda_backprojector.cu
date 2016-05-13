@@ -95,6 +95,8 @@ __global__ void cuda_kernel_backproject2D(
 
 	__shared__ XFLOAT s_eulers[4];
 
+	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
+
 	if (tid == 0)
 		s_eulers[0] = g_eulers[img*9+0] * padding_factor;
 	else if (tid == 1)
@@ -131,36 +133,31 @@ __global__ void cuda_kernel_backproject2D(
 			continue;
 
 		//WAVG
-		XFLOAT minvsigma2 = g_Minvsigma2s[pixel];
-		XFLOAT ctf = g_ctfs[pixel];
-		XFLOAT Fweight = 0.f;
-		XFLOAT real = 0.f;
-		XFLOAT imag = 0.f;
-		XFLOAT iReal = g_img_real[pixel];
-		XFLOAT iImag = g_img_imag[pixel];
+		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
+		ctf = __ldg(&g_ctfs[pixel]);
+		img_real = __ldg(&g_img_real[pixel]);
+		img_imag = __ldg(&g_img_imag[pixel]);
+		Fweight = 0.f;
+		real = 0.f;
+		imag = 0.f;
 
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
-			XFLOAT weight = g_weights[img * translation_num + itrans];
+			weight = g_weights[img * translation_num + itrans];
 
 			if (weight >= significant_weight)
 			{
-				weight /= weight_norm;
-
-				XFLOAT tx = g_trans_x[itrans];
-				XFLOAT ty = g_trans_y[itrans];
-
-				XFLOAT weightxinvsigma2 = weight * ctf * minvsigma2;
-				Fweight += weightxinvsigma2 * ctf;
+				weight = (weight / weight_norm) * ctf * minvsigma2;
+				Fweight += weight * ctf;
 
 				XFLOAT s, c;
 #ifdef CUDA_DOUBLE_PRECISION
-				sincos( x * tx + y * ty , &s, &c );
+				sincos( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
 #else
-				sincosf( x * tx + y * ty , &s, &c );
+				sincosf( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
 #endif
-				real += ( c * iReal - s * iImag ) * weightxinvsigma2;
-				imag += ( c * iImag + s * iReal ) * weightxinvsigma2;
+				real += ( c * img_real - s * img_imag ) * weight;
+				imag += ( c * img_imag + s * img_real ) * weight;
 			}
 		}
 
@@ -246,6 +243,7 @@ __global__ void cuda_kernel_backproject3D(
 	unsigned img = blockIdx.x;
 
 	__shared__ XFLOAT s_eulers[9];
+	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
 
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[img*9+tid];
@@ -276,36 +274,31 @@ __global__ void cuda_kernel_backproject3D(
 			continue;
 
 		//WAVG
-		XFLOAT minvsigma2 = g_Minvsigma2s[pixel];
-		XFLOAT ctf = g_ctfs[pixel];
-		XFLOAT Fweight = 0.f;
-		XFLOAT real = 0.f;
-		XFLOAT imag = 0.f;
-		XFLOAT iReal = g_img_real[pixel];
-		XFLOAT iImag = g_img_imag[pixel];
+		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
+		ctf = __ldg(&g_ctfs[pixel]);
+		img_real = __ldg(&g_img_real[pixel]);
+		img_imag = __ldg(&g_img_imag[pixel]);
+		Fweight = 0.f;
+		real = 0.f;
+		imag = 0.f;
 
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
-			XFLOAT weight = g_weights[img * translation_num + itrans];
+			weight = g_weights[img * translation_num + itrans];
 
 			if (weight >= significant_weight)
 			{
-				weight /= weight_norm;
-
-				XFLOAT tx = g_trans_x[itrans];
-				XFLOAT ty = g_trans_y[itrans];
-
-				XFLOAT weightxinvsigma2 = weight * ctf * minvsigma2;
-				Fweight += weightxinvsigma2 * ctf;
+				weight = (weight / weight_norm) * ctf * minvsigma2;
+				Fweight += weight * ctf;
 
 				XFLOAT s, c;
 #ifdef CUDA_DOUBLE_PRECISION
-				sincos( x * tx + y * ty , &s, &c );
+				sincos( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
 #else
-				sincosf( x * tx + y * ty , &s, &c );
+				sincosf( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
 #endif
-				real += ( c * iReal - s * iImag ) * weightxinvsigma2;
-				imag += ( c * iImag + s * iReal ) * weightxinvsigma2;
+				real += ( c * img_real - s * img_imag ) * weight;
+				imag += ( c * img_imag + s * img_real ) * weight;
 			}
 		}
 
