@@ -6,7 +6,6 @@
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
-#include "src/gpu_utils/cuda_translator.h"
 #include "src/gpu_utils/cuda_fft.h"
 #include "src/gpu_utils/cuda_benchmark_utils.h"
 #include <stack>
@@ -460,12 +459,6 @@ public:
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;
 	cudaError_t errorStatus;
-
-
-	CudaTranslator translator_coarse1;
-	CudaTranslator translator_coarse2;
-	CudaTranslator translator_current1;
-	CudaTranslator translator_current2;
 
 	CudaFFT transformer1;
 	CudaFFT transformer2;

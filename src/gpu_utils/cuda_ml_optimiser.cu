@@ -829,14 +829,18 @@ void getAllSquaredDifferencesCoarse(
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
+
+		MultidimArray<Complex > Fimg;
+		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
+
 		for (unsigned i = 0; i < image_size; i ++)
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
 				pixel_correction /= op.local_Fctfs[ipart].data[i];
 
-			Fimg_real[i] = op.local_Fimgs_shifted[ipart].data[i].real * pixel_correction;
-			Fimg_imag[i] = op.local_Fimgs_shifted[ipart].data[i].imag * pixel_correction;
+			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
+			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
 
 
@@ -1000,14 +1004,18 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
+
+		MultidimArray<Complex > Fimg, Fimg_nomask;
+		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
+
 		for (unsigned i = 0; i < image_size; i ++)
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
 				pixel_correction /= op.local_Fctfs[ipart].data[i];
 
-			Fimg_real[i] = op.Fimgs[ipart].data[i].real * pixel_correction;
-			Fimg_imag[i] = op.Fimgs[ipart].data[i].imag * pixel_correction;
+			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
+			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
 
 		CTOC(cudaMLO->timer,"translation_2");
@@ -1620,8 +1628,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	CTIC(cudaMLO->timer,"store_init");
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(true, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimgs, op.Fimgs_nomask, op.Fctfs, op.local_Fimgs_shifted, op.local_Fimgs_shifted_nomask,
+	std::vector<MultidimArray<Complex > > dummy;
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
+			sp.itrans_min, sp.itrans_max, op.Fimgs, op.Fimgs_nomask, op.Fctfs, op.local_Fimgs_shifted, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
@@ -1975,12 +1984,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(image_size, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(image_size, cudaMLO->devBundle->allocator);
 
+		MultidimArray<Complex > Fimg, Fimg_nonmask;
+		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
+		windowFourierTransform(op.Fimgs_nomask[ipart], Fimg_nonmask, sp.current_image_size);
+
 		for (unsigned i = 0; i < image_size; i ++)
 		{
-			Fimgs_real[i] = op.local_Fimgs_shifted[ipart].data[i].real;
-			Fimgs_imag[i] = op.local_Fimgs_shifted[ipart].data[i].imag;
-			Fimgs_nomask_real[i] = op.local_Fimgs_shifted_nomask[ipart].data[i].real;
-			Fimgs_nomask_imag[i] = op.local_Fimgs_shifted_nomask[ipart].data[i].imag;
+			Fimgs_real[i] = Fimg.data[i].real;
+			Fimgs_imag[i] = Fimg.data[i].imag;
+			Fimgs_nomask_real[i] = Fimg_nonmask.data[i].real;
+			Fimgs_nomask_imag[i] = Fimg_nonmask.data[i].imag;
 		}
 
 		Fimgs_real.put_on_device();
@@ -2530,33 +2543,6 @@ void MlOptimiserCuda::resetData()
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)
 		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
-
-	/*======================================================
-	                  TRANSLATIONS SETUP
-	======================================================*/
-
-	if (baseMLO->do_shifts_onthefly)
-	{
-		if (baseMLO->global_fftshifts_ab_coarse.size() > 0)
-			translator_coarse1.setShifters(baseMLO->global_fftshifts_ab_coarse);
-		else
-			translator_coarse1.clear();
-
-		if (baseMLO->global_fftshifts_ab2_coarse.size() > 0)
-			translator_coarse2.setShifters(baseMLO->global_fftshifts_ab2_coarse);
-		else
-			translator_coarse2.clear();
-
-		if (baseMLO->global_fftshifts_ab_current.size() > 0)
-			translator_current1.setShifters(baseMLO->global_fftshifts_ab_current);
-		else
-			translator_current1.clear();
-
-		if (baseMLO->global_fftshifts_ab2_current.size() > 0)
-			translator_current2.setShifters(baseMLO->global_fftshifts_ab2_current);
-		else
-			translator_current2.clear();
-	}
 
 	transformer1.clear();
 	transformer2.clear();
