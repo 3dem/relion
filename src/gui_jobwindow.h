@@ -37,7 +37,8 @@
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
 #define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
-#define DEFAULTUNBLURCORRLOCATION "/public/EM/UNBLUR/unblur.exe"
+#define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
+#define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -225,6 +226,7 @@ public:
 
 	InputNodeEntry input_star_mics;
 	FileNameEntry fn_motioncorr_exe;
+	FileNameEntry fn_summovie_exe;
 	SliderEntry bin_factor;
 	SliderEntry first_frame_ali;
 	SliderEntry last_frame_ali;
@@ -236,6 +238,7 @@ public:
 
 	BooleanEntry do_unblur;
 	FileNameEntry fn_unblur_exe;
+	SliderEntry angpix;
 
     AnyEntry gpu_ids;
 
@@ -325,6 +328,8 @@ public:
 	SliderEntry helical_tube_kappa_max;
 	SliderEntry helical_tube_outer_diameter;
 	SliderEntry helical_tube_length_min;
+	SliderEntry helical_nr_asu;
+	SliderEntry helical_rise;
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
 
@@ -725,6 +730,7 @@ public:
 
 	// I/O
 	FileNameEntry fn_cont;
+	InputNodeEntry fn_movie_star;
 	AnyEntry movie_rootname;
 
 	// Extract movie-particles
@@ -916,12 +922,19 @@ public:
 	InputNodeEntry fn_mic3;
 	InputNodeEntry fn_mic4;
 
+	BooleanEntry do_mov;
+	InputNodeEntry fn_mov1;
+	InputNodeEntry fn_mov2;
+	InputNodeEntry fn_mov3;
+	InputNodeEntry fn_mov4;
+
 
 	// Allow clearing of input fields for a new job
 	FileName ori_fn_part1, ori_fn_part2, ori_fn_part3, ori_fn_part4;
 	FileName ori_fn_mic1, ori_fn_mic2, ori_fn_mic3, ori_fn_mic4;
+	FileName ori_fn_mov1, ori_fn_mov2, ori_fn_mov3, ori_fn_mov4;
 
-	Fl_Group *part_group, *mic_group;
+	Fl_Group *part_group, *mic_group, *mov_group;
 
 public:
 

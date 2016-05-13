@@ -68,8 +68,11 @@ public:
 	// Use Unblut/summovie instead of MOTIONCORR?
 	bool do_unblur;
 
-	// UNBLUR executable
-	FileName fn_unblur_exe;
+	// UNBLUR, SUMMOVIE executable
+	FileName fn_unblur_exe, fn_summovie_exe;
+
+	// Pixel size for UNBLUR
+	double angpix;
 
 	// Number of threads for unblur
 	int nr_threads;
@@ -112,6 +115,9 @@ public:
 
 	// Get the shifts from UNBLUR
     void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+
+	// Plot the FRC curve from SUMMOVIE
+	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
     void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);

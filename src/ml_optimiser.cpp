@@ -31,9 +31,6 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-//#include <cuda_runtime.h>
-//#include <helper_cuda.h>
-//#include <helper_functions.h>
 #include "src/ml_optimiser.h"
 #ifdef CUDA
 #include "src/gpu_utils/cuda_ml_optimiser.h"
@@ -111,6 +108,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		fn_out += "_ct" + integerToString(iter);
 	else
 		fn_out = fn_out_new;
+
+	do_force_converge =  parser.checkOption("--force_converge", "Force an auto-refinement run to converge immediately upon continuation.");
 
 	std::string fnt;
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
@@ -435,6 +434,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     helical_sigma_distance = textToFloat(parser.getOption("--helical_sigma_distance", "Sigma of distance along the helical tracks", "-1."));
     mymodel.initialiseHelicalParametersLists(helical_twist_initial, helical_rise_initial);
     mymodel.is_helix = do_helical_refine;
+    RFLOAT tmp_RFLOAT = 0.;
+    if (mymodel.helical_rise_min > mymodel.helical_rise_max)
+    	SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
+    if (mymodel.helical_twist_min > mymodel.helical_twist_max)
+    	SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
 
     // CTF, norm, scale, bfactor correction etc.
 	int corrections_section = parser.addSection("Corrections");
@@ -1226,6 +1230,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
 	{
+		if (do_gpu)
+			REPORT_ERROR("ERROR: GPU-acceleration of helices has not yet been implemented!");
+
 		if (mymodel.ref_dim != 3)
 			REPORT_ERROR("ERROR: cannot do 2D helical refinement!");
 
@@ -1305,6 +1312,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 		nr_iter = 999;
 		has_fine_enough_angular_sampling = false;
+		has_converged = false;
 
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
@@ -1320,13 +1328,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// If this is a normal (non-movie) auto-refinement run: check whether we had converged already
 		// Jobs often fail in the last iteration, these lines below allow restarting of only the last iteration
-		if (iter > 0 && !do_realign_movies)
+		if (do_auto_refine && iter > 0 && !do_realign_movies)
 		{
-			RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
-			if (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling) )
+			if (do_force_converge)
 			{
-				has_fine_enough_angular_sampling = true;
-				checkConvergence();
+				has_converged = true;
+				do_join_random_halves = true;
+				// In the last iteration, include all data until Nyquist
+				do_use_all_data = true;
 			}
 		}
 
@@ -1416,6 +1425,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (mymodel.data_dim == 3)
 	{
+
+		if (do_gpu)
+			REPORT_ERROR("ERROR: GPU-acceleration does not yet work for 3D input images!");
+
 		// TODO: later do norm correction?!
 		// Don't do norm correction for volume averaging at this stage....
 		do_norm_correction = false;
@@ -1460,7 +1473,8 @@ void MlOptimiser::initialiseWorkLoad()
     if (fn_scratch != "" && !do_preread_images)
     {
     	mydata.prepareScratchDirectory(fn_scratch);
-    	mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
+    	mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
     }
 
 }
@@ -1479,7 +1493,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		init_progress_bar(my_nr_ori_particles);
 		barstep = XMIPP_MAX(1, my_nr_ori_particles / 60);
 	}
-
 
     // Only open stacks once and then read multiple images
 	fImageHandler hFile;
@@ -1510,8 +1523,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			// Extract the relevant MetaDataTable row from MDimg
 			MDimg = mydata.getMetaDataImage(part_id);
 
-			// Get the image filename
-			MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+			if (!mydata.getImageNameOnScratch(part_id, fn_img))
+				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
@@ -1795,7 +1808,11 @@ void MlOptimiser::iterate()
 #endif
 
 		if (do_auto_refine)
-			printConvergenceStats();
+		{
+			// Check whether we have converged by now
+			// If we have, set do_join_random_halves and do_use_all_data for the next iteration
+			checkConvergence();
+		}
 
 		expectation();
 
@@ -1915,11 +1932,6 @@ void MlOptimiser::iterate()
 			}
 			break;
 		}
-
-		// Check whether we have converged by now
-		// If we have, set do_join_random_halves and do_use_all_data for the next iteration
-		if (do_auto_refine)
-			checkConvergence();
 
 #ifdef TIMING
     	if (verb > 0)
@@ -2450,11 +2462,18 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 			for (int ipart = 0; ipart < mydata.ori_particles[ori_part_id].particles_id.size(); ipart++, istop++)
 			{
 
+				long int part_id = mydata.ori_particles[ori_part_id].particles_id[ipart];
+
 				// Read from disc
 				// Get the filename
-				std::istringstream split(exp_fn_img);
-				for (int i = 0; i <= istop; i++)
-					getline(split, fn_img);
+				if (!mydata.getImageNameOnScratch(part_id, fn_img))
+				{
+					std::istringstream split(exp_fn_img);
+					for (int i = 0; i <= istop; i++)
+						getline(split, fn_img);
+				}
+
+				// Only open again a new stackname
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
@@ -3712,9 +3731,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				{
 					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
 					FileName fn_img;
-					std::istringstream split(exp_fn_img);
-					for (int i = 0; i <= istop; i++)
-						getline(split, fn_img);
+					if (!mydata.getImageNameOnScratch(part_id, fn_img))
+					{
+						std::istringstream split(exp_fn_img);
+						for (int i = 0; i <= istop; i++)
+							getline(split, fn_img);
+					}
 					img.read(fn_img);
 					img().setXmippOrigin();
 				}
@@ -4062,10 +4084,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				{
 					// Read CTF-image from disc
 					FileName fn_ctf;
-					std::istringstream split(exp_fn_ctf);
-					// Get the right line in the exp_fn_img string
-					for (int i = 0; i <= istop; i++)
-						getline(split, fn_ctf);
+					if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+					{
+						std::istringstream split(exp_fn_ctf);
+						// Get the right line in the exp_fn_img string
+						for (int i = 0; i <= istop; i++)
+							getline(split, fn_ctf);
+					}
 					Ictf.read(fn_ctf);
 				}
 				else
@@ -6551,18 +6576,11 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 	RFLOAT ratio_orient_changes = current_changes_optimal_orientations /  sampling.getAngularSampling(adaptive_oversampling);
 	RFLOAT ratio_trans_changes = current_changes_optimal_offsets /  sampling.getTranslationalSampling(adaptive_oversampling);
 
-	/*
-	std::cout << " sampling orient= " << sampling.getAngularSampling(adaptive_oversampling) << std::endl;
-	std::cout << " ratio_orient_changes" << ratio_orient_changes << std::endl;
-	std::cout << " sampling trans= " << sampling.getTranslationalSampling(adaptive_oversampling) << std::endl;
-	std::cout << " ratio_trans_changes" << ratio_trans_changes << std::endl;
-	*/
-
-	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 3% of the smallest thus far
-	// Or if changes in offsets or orientations are smaller than 5% of the current sampling
-	if (1.03 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
-		(ratio_trans_changes < 0.05 || 1.03 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
-		(ratio_orient_changes < 0.05 || 1.03 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
+	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 5% of the smallest thus far
+	// Or if changes in offsets or orientations are smaller than 60% of the current sampling
+	if (1.05 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
+		(ratio_trans_changes < 0.6 || 1.05 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
+		(ratio_orient_changes < 0.6 || 1.05 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
 		nr_iter_wo_large_hidden_variable_changes++;
 	else
 		nr_iter_wo_large_hidden_variable_changes = 0;
@@ -6653,10 +6671,13 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						Image<RFLOAT> Ictf;
 						// Read CTF-image from disc
 						FileName fn_ctf;
-						std::istringstream split(exp_fn_ctf);
-						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= my_metadata_entry; i++)
-							getline(split, fn_ctf);
+						if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+						{
+							std::istringstream split(exp_fn_ctf);
+							// Get the right line in the exp_fn_img string
+							for (int i = 0; i <= my_metadata_entry; i++)
+								getline(split, fn_ctf);
+						}
 						Ictf.read(fn_ctf);
 
 						// Set the CTF-image in Fctf
@@ -7050,6 +7071,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 		// Only use a finer angular sampling is the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
+		//std::cerr << "iter= " << iter << " nr_iter_wo_resol_gain= " << nr_iter_wo_resol_gain << " nr_iter_wo_large_hidden_variable_changes= " << nr_iter_wo_large_hidden_variable_changes << " acc_rot= " << acc_rot << std::endl;
+		//std::cerr  << "iter= " << iter << " acc_trans= " << acc_trans << " minimum_angular_sampling= " << minimum_angular_sampling << " current_changes_optimal_offsets= " << current_changes_optimal_offsets << std::endl;
 		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
 		{
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
@@ -7191,49 +7214,33 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 }
 
-void MlOptimiser::checkConvergence()
+void MlOptimiser::checkConvergence(bool myverb)
 {
 
 	if (do_realign_movies)
+		return;
+
+	if ( has_fine_enough_angular_sampling && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES )
 	{
-		// only resolution needs to be stuck
-		// Since there does not seem to be any improvement (and sometimes even the opposite)
-		// of performing more than one iteration with the movie frames, just perform a single iteration
-		//if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN)
-		//{
-		//	has_converged = true;
-		//	do_join_random_halves = true;
-		//	// movies were already use all data until Nyquist
-		//}
-	}
-	else
-	{
-		has_converged = false;
-		if ( has_fine_enough_angular_sampling && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES )
-		{
-			has_converged = true;
-			do_join_random_halves = true;
-			// In the last iteration, include all data until Nyquist
-			do_use_all_data = true;
-		}
+		has_converged = true;
+		do_join_random_halves = true;
+		// In the last iteration, include all data until Nyquist
+		do_use_all_data = true;
 	}
 
-}
-
-void MlOptimiser::printConvergenceStats()
-{
-
-	std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-	std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-	std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
+        if (myverb)
+        {
+            std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
+            std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+            std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
 			<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
 
-	if (has_converged)
-	{
+            if (has_converged)
+            {
 		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		if (!do_realign_movies)
-			std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-	}
+		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            }
+        }
 
 }
 
@@ -7412,12 +7419,16 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 #endif
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
-			mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
+			if (!mydata.getImageNameOnScratch(part_id, fn_img))
+				mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
 			if (mymodel.data_dim == 3 && do_ctf_correction)
 			{
 				// Also read the CTF image from disc
-				if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
-					REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
+				if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
+				{
+					if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
+						REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
+				}
 			}
 			if (has_converged && do_use_reconstruct_images)
 			{

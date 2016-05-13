@@ -1127,7 +1127,7 @@ void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pip
 		std::vector<long int> branched_procs;
 		long int next_process = addProcessToUpwardsFlowChart(fh, pipeline, prev_process, current_process, branched_procs);
 
-		if (!is_main_flow && counter > 9)
+		if (counter > 10)
 		{
 			closeTikZPicture(fh, false);
 			counter = 0;
@@ -1224,7 +1224,10 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 void PipeLineFlowChart::openTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
 	if (is_main_flow)
-		fh << "\\resizebox{!}{0.95\\textheight}{" << std::endl;
+	{
+		fh << "% For large flowcharts: try removing percent sign on next line, and on line below." << std::endl;
+		fh << "%\\resizebox{!}{0.95\\textheight}{" << std::endl;
+	}
 	fh << "\\begin{tikzpicture}[scale=1, auto]" << std::endl;
     // Override the long-name styles with the shorter ones
     if (do_short_names)
@@ -1239,7 +1242,10 @@ void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
 	fh << "\\end{tikzpicture}" << std::endl;
 	if (is_main_flow)
-		fh << "}" << std::endl; // closes resizebox
+	{
+		fh << "% For large flowcharts: also remove percent sign on next line." << std::endl;
+		fh << "%}" << std::endl; // closes resizebox
+	}
 }
 
 void PipeLineFlowChart::openFlowChartFile(FileName &fn_out, std::ofstream &fh)

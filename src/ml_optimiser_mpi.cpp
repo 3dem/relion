@@ -124,7 +124,8 @@ void MlOptimiserMpi::initialise()
 		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 	}
 
-   MlOptimiser::initialLowPassFilterReferences();
+
+	MlOptimiser::initialLowPassFilterReferences();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0)
@@ -448,6 +449,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	// Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
     {
+    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
     	if (do_parallel_disc_io)
 		{
 
@@ -469,7 +471,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
     		int myverb = (node->rank == 1) ? 1 : 0; // Only the first slave
     		if (!node->isMaster())
     		{
-    			mydata.copyParticlesToScratch(myverb, need_to_copy, keep_free_scratch_Gb);
+    			mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
     		}
 		}
 		else
@@ -478,14 +480,12 @@ void MlOptimiserMpi::initialiseWorkLoad()
 			if (node->isMaster())
 			{
 				mydata.prepareScratchDirectory(fn_scratch);
-				mydata.copyParticlesToScratch(1, true, keep_free_scratch_Gb);
+				mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
 			}
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
     }
 
-
-
+    MPI_Barrier(MPI_COMM_WORLD);
 
 //#define DEBUG_WORKLOAD
 #ifdef DEBUG_WORKLOAD
@@ -689,7 +689,14 @@ void MlOptimiserMpi::expectation()
 	{
 		updateAngularSampling(node->rank == 1);
 	}
+	// The master needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&nr_iter_wo_resol_gain, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&nr_iter_wo_large_hidden_variable_changes, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&smallest_changes_optimal_classes, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&smallest_changes_optimal_offsets, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&smallest_changes_optimal_orientations, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
+
 
 	// Feb15,2016 - Shaoda - copy the following variables to the master
 	if ( (do_helical_refine) && (!(helical_sigma_distance < 0.)) )
@@ -1882,12 +1889,6 @@ void MlOptimiserMpi::maximization()
 
 	if (node->isMaster())
 	{
-		// If we're realinging movies then the master needs to update the priors
-		// These will then be re-distributed to the slaves in the expectation step (through get/setMetadataSubset)
-		// Switch this off, as we're only doing a single round of movie processing anyway!
-		//if (do_realign_movies)
-		//	updatePriorsForMovieFrames();
-
 		// The master also updates the changes in hidden variables
 		updateOverallChangesInHiddenVariables();
 	}
@@ -2414,8 +2415,9 @@ void MlOptimiserMpi::iterate()
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		if (do_auto_refine && node->rank == 1)
-			printConvergenceStats();
+		// Only first slave checks for convergence and prints stats to the stdout
+		if (do_auto_refine)
+			checkConvergence(node->rank == 1);
 
 		expectation();
 
@@ -2625,13 +2627,6 @@ void MlOptimiserMpi::iterate()
 			}
 			break;
 		}
-
-		// Check whether we have converged by now
-		// Master does not have all info, only slaves do this and then broadcast has_converged so also master has it
-		// If we have, set do_join_random_halves and do_use_all_data for the next iteration
-		if (!node->isMaster() && do_auto_refine)
-			checkConvergence();
-		node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, 1, MPI_COMM_WORLD);
 
 #ifdef TIMING
 		// Only first slave prints it timing information

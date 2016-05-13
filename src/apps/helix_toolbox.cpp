@@ -96,6 +96,7 @@ public:
 	// Helical twist and its local searches
 	RFLOAT twist_deg, twist_min_deg, twist_max_deg, twist_inistep_deg;
 
+	// Pixel size in Angstroms
 	RFLOAT pixel_size_A;
 
 	// Width of soft edge
@@ -163,7 +164,7 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (APR 15, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (MAY 01, 2015)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
@@ -227,12 +228,18 @@ public:
 		tilt_max_dev_deg = textToFloat(parser.getOption("--tilt_max_dev", "Maximum deviation of tilt angles allowed (away from +90 degrees)", "15."));
 		twist_deg = textToFloat(parser.getOption("--twist", "Helical twist (in degrees, + for right-handedness)", "-1"));
 		twist_inistep_deg = textToFloat(parser.getOption("--twist_inistep", "Initial step of helical twist search (in degrees)", "-1"));
-		twist_min_deg= textToFloat(parser.getOption("--twist_min", "Minimum helical twist (in degrees, + for right-handedness)", "-1"));
+		twist_min_deg = textToFloat(parser.getOption("--twist_min", "Minimum helical twist (in degrees, + for right-handedness)", "-1"));
 		twist_max_deg = textToFloat(parser.getOption("--twist_max", "Maximum helical twist (in degrees, + for right-handedness)", "-1"));
 		width_edge_pix = textToFloat(parser.getOption("--width", "Width of cosine soft edge (in pixels)", "5."));
 		Xdim = textToInteger(parser.getOption("--xdim", "Dimension X (in pixels) of the micrographs", "4096"));
 		Ydim = textToInteger(parser.getOption("--ydim", "Dimension Y (in pixels) of the micrographs", "4096"));
 		z_percentage = textToFloat(parser.getOption("--z_percentage", "Percentage of cropped length (along Z axis, 0.1~0.9)", "0.3"));
+
+		RFLOAT tmp_RFLOAT = 0.;
+		if (rise_min_A > rise_max_A)
+			SWAP(rise_min_A, rise_max_A, tmp_RFLOAT);
+		if (twist_min_deg > twist_max_deg)
+			SWAP(twist_min_deg, twist_max_deg, tmp_RFLOAT);
 	};
 
 	void clear()
