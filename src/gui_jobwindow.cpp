@@ -2369,7 +2369,8 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 		}
 		else
 		{
-			REPORT_ERROR("ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!");
+			fl_message("ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!");
+			return false;
 		}
 	}
 	command += " --ref " + fn_ref;
@@ -4499,7 +4500,10 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	if (join_nr_mics.getValue() > 0)
 	{
 		if (do_alsorot_movies.getValue())
-			REPORT_ERROR("MovieRefineJobWindow ERROR: you cannot process micrographs in batches and perform rotational searches!");
+		{
+			fl_message("You cannot process micrographs in batches and perform rotational searches!");
+			return false;
+		}
 
 		command += " --process_movies_in_batches --realign_movie_frames " + fn_olist;
 
@@ -4995,7 +4999,10 @@ bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		if (exists(fn_job))
 			global_manualpickjob.read(fn_job.c_str(), iscont);
 		else
-			REPORT_ERROR("RelionMainWindow::cb_display_io_node_i ERROR: Save a Manual picking job parameters (using the File menu) before displaying coordinate files. ");
+		{
+			fl_message("You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.");
+			return false;
+		}
 
 		// Get the name of the micrograph STAR file from reading the suffix file
 	    FileName fn_suffix = fn_coords.getValue();
@@ -5245,7 +5252,7 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT
 
 	part_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	part_group->end();
-	do_part.place(current_y, "Combine particle STAR files?", true, "", part_group);
+	do_part.place(current_y, "Combine particle STAR files?", false, "", part_group);
 	part_group->begin();
 	fn_part1.place(current_y, "Particle STAR file 1: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The first of the particle STAR files to be combined.");
 	fn_part2.place(current_y, "Particle STAR file 2: ", NODE_PART_DATA, "", "particle STAR file (*.star)", "The second of the particle STAR files to be combined.");
@@ -5280,12 +5287,12 @@ JoinStarJobWindow::JoinStarJobWindow() : RelionJobWindow(3, HAS_NOT_MPI, HAS_NOT
 
 	mov_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	mov_group->end();
-	do_mov.place(current_y, "Combine micrograph movie STAR files?", false, "", mov_group);
+	do_mov.place(current_y, "Combine movie STAR files?", false, "", mov_group);
 	mov_group->begin();
-	fn_mov1.place(current_y, "Micrograph movie STAR file 1: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The first of the micrograph movie STAR files to be combined.");
-	fn_mov2.place(current_y, "Micrograph movie STAR file 2: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The second of the micrograph movie STAR files to be combined.");
-	fn_mov3.place(current_y, "Micrograph movie STAR file 3: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The third of the micrograph movie STAR files to be combined. Leave empty if there are only two files to be combined.");
-	fn_mov4.place(current_y, "Micrograph movie STAR file 4: ", NODE_MOVIES, "", "micrograph movie STAR file (*.star)", "The fourth of the micrograph movie STAR files to be combined. Leave empty if there are only two or three files to be combined.");
+	fn_mov1.place(current_y, "Movie STAR file 1: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The first of the micrograph movie STAR files to be combined.");
+	fn_mov2.place(current_y, "Movie STAR file 2: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The second of the micrograph movie STAR files to be combined.");
+	fn_mov3.place(current_y, "Movie STAR file 3: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The third of the micrograph movie STAR files to be combined. Leave empty if there are only two files to be combined.");
+	fn_mov4.place(current_y, "Movie STAR file 4: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The fourth of the micrograph movie STAR files to be combined. Leave empty if there are only two or three files to be combined.");
 	mov_group->end();
 	do_mov.cb_menu_i(); // make default active
 
@@ -5336,7 +5343,6 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 	if (fn=="")
 		fn=".gui_joinstar";
 
-	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
 		do_part.readValue(fh);
@@ -5359,60 +5365,14 @@ void JoinStarJobWindow::read(std::string fn, bool &_is_continue)
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
-
-		// For re-setting of new jobs
-		ori_fn_part1 = fn_part1.getValue();
-		ori_fn_part2 = fn_part2.getValue();
-		ori_fn_part3 = fn_part3.getValue();
-		ori_fn_part4 = fn_part4.getValue();
-		ori_fn_mic1 = fn_mic1.getValue();
-		ori_fn_mic2 = fn_mic2.getValue();
-		ori_fn_mic3 = fn_mic3.getValue();
-		ori_fn_mic4 = fn_mic4.getValue();
-		ori_fn_mov1 = fn_mov1.getValue();
-		ori_fn_mov2 = fn_mov2.getValue();
-		ori_fn_mov3 = fn_mov3.getValue();
-		ori_fn_mov4 = fn_mov4.getValue();
-
 	}
+
 }
 
 
 void JoinStarJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
-
-	// For new jobs, always reset the input fields to empty
-	if (!_is_continue)
-	{
-		fn_part1.setValue("");
-		fn_part2.setValue("");
-		fn_part3.setValue("");
-		fn_part4.setValue("");
-		fn_mic1.setValue("");
-		fn_mic2.setValue("");
-		fn_mic3.setValue("");
-		fn_mic4.setValue("");
-		fn_mov1.setValue("");
-		fn_mov2.setValue("");
-		fn_mov3.setValue("");
-		fn_mov4.setValue("");
-	}
-	else
-	{
-		fn_part1.setValue(ori_fn_part1.c_str());
-		fn_part2.setValue(ori_fn_part2.c_str());
-		fn_part3.setValue(ori_fn_part3.c_str());
-		fn_part4.setValue(ori_fn_part4.c_str());
-		fn_mic1.setValue(ori_fn_mic1.c_str());
-		fn_mic2.setValue(ori_fn_mic2.c_str());
-		fn_mic3.setValue(ori_fn_mic3.c_str());
-		fn_mic4.setValue(ori_fn_mic4.c_str());
-		fn_mov1.setValue(ori_fn_mov1.c_str());
-		fn_mov2.setValue(ori_fn_mov2.c_str());
-		fn_mov3.setValue(ori_fn_mov3.c_str());
-		fn_mov4.setValue(ori_fn_mov4.c_str());
-	}
 
 	do_part.deactivate(is_continue);
 	fn_part1.deactivate(is_continue);
@@ -5443,7 +5403,21 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	std::string command;
 	command="`which relion_star_combine`";
 
-	// I/O  TODO!!!
+	int ii = 0;
+	if (do_part.getValue())
+		ii++;
+	if (do_mic.getValue())
+		ii++;
+	if (do_mov.getValue())
+		ii++;
+
+	if (ii > 1)
+	{
+		fl_message("You've selected more than one type of files for joining. Only select a single type!");
+		return false;
+	}
+
+	// I/O
 	if (do_part.getValue())
 	{
 		command += " --i \" " + fn_part1.getValue();
