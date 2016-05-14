@@ -17,7 +17,13 @@
 #include "src/mask.h"
 #include "src/macros.h"
 #include "src/helix.h"
-
+#ifdef CUDA
+#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/gpu_utils/cuda_projector.h"
+#include "src/gpu_utils/cuda_settings.h"
+#include "src/gpu_utils/cuda_fft.h"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
+#endif
 //#define OUTPUT_MEAN_MAP_ONLY 1
 //#define OUTPUT_STDDEV_MAP_ONLY 2
 //#define OUTPUT_BOTH_MEAN_AND_STDDEV_MAPS 3

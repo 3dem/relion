@@ -35,6 +35,11 @@ public:
     // Parallelized run function
     void run();
 
+    int getRank()
+    {
+    	return(node->rank);
+    }
+
 };
 
 #endif /* AUTOPICKER_MPI_H_ */

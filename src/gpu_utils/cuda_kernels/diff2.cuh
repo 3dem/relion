@@ -124,15 +124,9 @@ __global__ void cuda_kernel_diff2_coarse(
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
-			XFLOAT s, c;
-#ifdef CUDA_DOUBLE_PRECISION
-			sincos( x * tx + y * ty , &s, &c );
-#else
-			sincosf( x * tx + y * ty , &s, &c );
-#endif
+			XFLOAT real, imag;
 
-			XFLOAT real = c * s_real[i + init_pixel % block_sz] - s * s_imag[i + init_pixel % block_sz];
-			XFLOAT imag = c * s_imag[i + init_pixel % block_sz] + s * s_real[i + init_pixel % block_sz];
+			translatePixel(x, y, tx, ty, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
 
 			#pragma unroll
 			for (int j = 0; j < eulers_per_block; j ++)
@@ -156,6 +150,8 @@ __global__ void cuda_kernel_diff2_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
@@ -179,8 +175,9 @@ __global__ void cuda_kernel_diff2_fine(
 //    __shared__ typename BlockReduce::TempStorage temp_storage;
 
 	unsigned long pixel;
-	XFLOAT ref_real;
-	XFLOAT ref_imag;
+	XFLOAT ref_real, ref_imag,
+		shifted_real, shifted_imag,
+		diff_real, diff_imag;
 
 	__shared__ XFLOAT s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
 	__shared__ XFLOAT s_outs[PROJDIFF_CHUNK_SIZE];
@@ -228,15 +225,14 @@ __global__ void cuda_kernel_diff2_fine(
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						ref_real, ref_imag);
 
-				XFLOAT diff_real;
-				XFLOAT diff_imag;
 				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
-					iy=d_trans_idx[d_job_idx[bid]]+itrans;
-					size_t img_start(iy * (size_t)image_size);
-					size_t img_pixel_idx = img_start + pixel;
-					diff_real =  ref_real - __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
-					diff_imag =  ref_imag - __ldg(&g_imgs_imag[img_pixel_idx]);
+					iy = d_trans_idx[d_job_idx[bid]] + itrans;
+
+					translatePixel(x, y, trans_x[iy], trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+
+					diff_real =  ref_real - shifted_real;
+					diff_imag =  ref_imag - shifted_imag;
 					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_corr_img[pixel]);
 				}
 			}
@@ -277,6 +273,8 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
@@ -289,8 +287,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 	int tid = threadIdx.x;
 	int shared_mid_size = translation_num*BLOCK_SIZE;
 
-	XFLOAT ref_real;
-	XFLOAT ref_imag;
+	XFLOAT real, imag, ref_real, ref_imag;
 
 	XFLOAT e0,e1,e3,e4,e6,e7;
 	e0 = __ldg(&g_eulers[bid*9  ]);
@@ -337,12 +334,9 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 			for (int itrans = 0; itrans < translation_num; itrans ++)
 			{
-				unsigned long img_pixel_idx = itrans * image_size + pixel;
+				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
 
-				XFLOAT diff_real =  ref_real * __ldg(&g_imgs_real[img_pixel_idx]);
-				XFLOAT diff_imag =  ref_imag * __ldg(&g_imgs_imag[img_pixel_idx]);
-
-				s_cuda_kernel_diff2s[translation_num * tid + itrans] += (diff_real + diff_imag) * __ldg(&g_corr_img[pixel]);
+				s_cuda_kernel_diff2s[translation_num * tid + itrans] += (ref_real * real + ref_imag * imag) * __ldg(&g_corr_img[pixel]);
 				s_cuda_kernel_diff2s[translation_num * tid + itrans + shared_mid_size] += (ref_real*ref_real + ref_imag*ref_imag ) * __ldg(&g_corr_img[pixel]);
 			}
 		}
@@ -373,6 +367,8 @@ __global__ void cuda_kernel_diff2_CC_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
@@ -397,8 +393,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 //    __shared__ typename BlockReduce::TempStorage temp_storage;
 
 	int pixel;
-	XFLOAT ref_real;
-	XFLOAT ref_imag;
+	XFLOAT ref_real, ref_imag, shifted_real, shifted_imag;
 
 	__shared__ XFLOAT      s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
 	__shared__ XFLOAT   s_cc[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE];
@@ -448,16 +443,12 @@ __global__ void cuda_kernel_diff2_CC_fine(
 						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						ref_real, ref_imag);
 
-				XFLOAT diff_real;
-				XFLOAT diff_imag;
 				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
-					iy=d_trans_idx[d_job_idx[bid]]+itrans;
-					unsigned long img_start(iy * image_size);
-					unsigned long img_pixel_idx = img_start + pixel;
-					diff_real =  ref_real * __ldg(&g_imgs_real[img_pixel_idx]); // TODO  Put g_img_* in texture (in such a way that fetching of next image might hit in cache)
-					diff_imag =  ref_imag * __ldg(&g_imgs_imag[img_pixel_idx]);
-					s[   itrans*BLOCK_SIZE + tid] += (diff_real + diff_imag) * __ldg(&g_corr_img[pixel]);
+					iy = d_trans_idx[d_job_idx[bid]] + itrans;
+
+					translatePixel(x, y, g_trans_x[iy], g_trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					s[   itrans*BLOCK_SIZE + tid] += (ref_real * shifted_real + ref_imag * shifted_imag) * __ldg(&g_corr_img[pixel]);
 					s_cc[itrans*BLOCK_SIZE + tid] += (ref_real*ref_real + ref_imag*ref_imag) * __ldg(&g_corr_img[pixel]);
 				}
 				__syncthreads();

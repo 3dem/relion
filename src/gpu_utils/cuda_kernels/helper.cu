@@ -436,6 +436,56 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 //	}
 }
 
+__global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
+										 int image_size,
+										 int xdim,
+										 int ydim,
+										 int zdim,
+										 int xshift,
+										 int yshift,
+									 	 int zshift)
+{
+
+	__shared__ XFLOAT buffer[CFTT_BLOCK_SIZE];
+	int tid = threadIdx.x;
+	int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+	long int image_offset = image_size*blockIdx.y;
+
+		int xydim = xdim*ydim;
+		if(pixel<(image_size/2))
+		{
+			int z = floorf((float)pixel/(float)(xydim));
+			int xy = pixel % xydim;
+			int y = floorf((float)xy/(float)xdim);
+			int x = xy % xdim;
+
+			int yp = y + yshift;
+			if (yp < 0)
+				yp += ydim;
+			else if (yp >= ydim)
+				yp -= ydim;
+
+			int xp = x + xshift;
+			if (xp < 0)
+				xp += xdim;
+			else if (xp >= xdim)
+				xp -= xdim;
+
+			int zp = z + zshift;
+			if (zp < 0)
+				zp += zdim;
+			else if (zp >= zdim)
+				zp -= zdim;
+
+			int n_pixel = zp+xydim + yp*xdim + xp;
+
+			buffer[tid]                    = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer[tid];
+		}
+}
+
+
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,

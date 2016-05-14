@@ -6,8 +6,8 @@
 #include "src/gpu_utils/cuda_projector_plan.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_backprojector.h"
-#include "src/gpu_utils/cuda_translator.h"
 #include "src/gpu_utils/cuda_fft.h"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 #include <stack>
 //#include <cufft.h>
 
@@ -434,8 +434,7 @@ public:
 
 	void syncAllBackprojects()
 	{
-		for (int i = 0; i < cudaBackprojectors.size(); i ++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaBackprojectors[i].getStream()));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 	}
 
 
@@ -461,12 +460,6 @@ public:
 	std::vector< cudaStream_t > classStreams;
 	cudaError_t errorStatus;
 
-
-	CudaTranslator translator_coarse1;
-	CudaTranslator translator_coarse2;
-	CudaTranslator translator_current1;
-	CudaTranslator translator_current2;
-
 	CudaFFT transformer1;
 	CudaFFT transformer2;
 
@@ -478,13 +471,20 @@ public:
 
 	MlDeviceBundle *devBundle;
 
-	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle) :
+#ifdef TIMING_FILES
+	relion_timer timer;
+#endif
+
+	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle, const char * timing_fnm) :
 			baseMLO(baseMLOptimiser),
-			transformer1(0, bundle->allocator),
-			transformer2(0, bundle->allocator),
+			transformer1(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
+			transformer2(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			devBundle(bundle),
 			device_id(bundle->device_id),
+#ifdef TIMING_FILES
+			timer(timing_fnm),
+#endif
 			errorStatus((cudaError_t)0)
 	{};
 

@@ -117,7 +117,7 @@ CPlot2D::~CPlot2D()
 
 }
 
-void CPlot2D::OutputPostScriptPlot(string fileName)
+void CPlot2D::OutputPostScriptPlot(std::string fileName)
 {
 
     outputFile.open(fileName.c_str());
@@ -126,10 +126,10 @@ void CPlot2D::OutputPostScriptPlot(string fileName)
     PrecomputeDimensions();
 
     // header
-    outputFile << "%!PS-Adobe-2.0 EPSF-1.2" << endl;
-    outputFile << "%%BoundingBox: 0 0 " << (int)m_dXTotalSize << " " <<  (int)m_dYTotalSize << endl;
-    outputFile << "%%Pages: 1" << endl;
-    outputFile << "%%EndComments" << endl;
+    outputFile << "%!PS-Adobe-2.0 EPSF-1.2" << std::endl;
+    outputFile << "%%BoundingBox: 0 0 " << (int)m_dXTotalSize << " " <<  (int)m_dYTotalSize << std::endl;
+    outputFile << "%%Pages: 1" << std::endl;
+    outputFile << "%%EndComments" << std::endl;
 
     // grid lines
     if (m_bDrawXAxisGridLines) {
@@ -179,30 +179,30 @@ void CPlot2D::OutputPostScriptPlot(string fileName)
 
 void CPlot2D::DrawFramePostScript()
 {
-    outputFile << "newpath" << endl;
-    outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize << " moveto" << endl;
-    outputFile << m_dXAxisSize << " " << 0 << " rlineto" << endl;
-    outputFile << 0 << " " << m_dYAxisSize << " rlineto" << endl;
-    outputFile << -m_dXAxisSize << " " << 0 << " rlineto" << endl;
-    outputFile << "closepath" << endl;
+    outputFile << "newpath" << std::endl;
+    outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize << " moveto" << std::endl;
+    outputFile << m_dXAxisSize << " " << 0 << " rlineto" << std::endl;
+    outputFile << 0 << " " << m_dYAxisSize << " rlineto" << std::endl;
+    outputFile << -m_dXAxisSize << " " << 0 << " rlineto" << std::endl;
+    outputFile << "closepath" << std::endl;
 
-    outputFile << m_dFrameLineWidth << " setlinewidth" << endl;
-    outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << endl;
-    outputFile << "stroke" << endl;
+    outputFile << m_dFrameLineWidth << " setlinewidth" << std::endl;
+    outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << std::endl;
+    outputFile << "stroke" << std::endl;
 
     double labelXCoordinate,labelYCoordinate;
 
     labelXCoordinate=m_dLeftFrameSize+m_dXAxisSize*0.5;
     labelYCoordinate=m_dBottomFrameSize + m_dYAxisSize + 10;
 
-    outputFile << "/" << m_strXAxisTitleFont << " findfont" << endl;
-    outputFile << m_dYAxisTitleFontSize << " scalefont" << endl;
-    outputFile << "setfont" << endl;
-    outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << endl;
-    outputFile << m_dXAxisTitleColor[0] << " " << m_dXAxisTitleColor[1] << " " << m_dXAxisTitleColor[2] << " setrgbcolor" << endl;
+    outputFile << "/" << m_strXAxisTitleFont << " findfont" << std::endl;
+    outputFile << m_dYAxisTitleFontSize << " scalefont" << std::endl;
+    outputFile << "setfont" << std::endl;
+    outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << std::endl;
+    outputFile << m_dXAxisTitleColor[0] << " " << m_dXAxisTitleColor[1] << " " << m_dXAxisTitleColor[2] << " setrgbcolor" << std::endl;
 
     // let PostScript handle the final adjustment based on the width of the string
-    outputFile << "(" << m_strPlotTitle << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << endl;
+    outputFile << "(" << m_strPlotTitle << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << std::endl;
 
 }
 
@@ -281,24 +281,24 @@ void CPlot2D::DrawDataPostScript()
         if (m_dataSets[i].GetDrawLine()) {
 
             if (!m_dataSets[i].GetDashedLine()) {
-                outputFile << "newpath" << endl;
+                outputFile << "newpath" << std::endl;
 
                 point=m_dataSets[i].GetDataPoint(0);
 
                 outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX())*m_dXScale
-                           << " " << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale << " moveto" << endl;
+                           << " " << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale << " moveto" << std::endl;
                 for (int j=1;j<m_dataSets[i].GetNumberOfDataPointsInSet();++j) {
                     point=m_dataSets[i].GetDataPoint(j);
                     outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX())*m_dXScale
-                               << " " << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale << " lineto" << endl;
+                               << " " << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale << " lineto" << std::endl;
                 }
-                outputFile << m_dataSets[i].GetLineWidth() << " setlinewidth" << endl;
+                outputFile << m_dataSets[i].GetLineWidth() << " setlinewidth" << std::endl;
 
                 double r,g,b;
                 m_dataSets[i].GetDatasetColor(&r,&g,&b);
 
-                outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                outputFile << "stroke" << endl;
+                outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                outputFile << "stroke" << std::endl;
             }
             else {
                 if (m_dataSets[i].GetDashedLinePattern()=="dot") {
@@ -324,11 +324,11 @@ void CPlot2D::DrawDataPostScript()
                         for (int k=0;k<numDots+1;++k) {
                             outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX()+k*delX)*m_dXScale << " "
                                        << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY()+k*delY)*m_dYScale << " "
-                                       << m_dataSets[i].GetLineWidth() << " 0 360 arc closepath" << endl;
+                                       << m_dataSets[i].GetLineWidth() << " 0 360 arc closepath" << std::endl;
 
-                            outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                            outputFile << "fill" << endl;
-                            outputFile << "stroke" << endl;
+                            outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                            outputFile << "fill" << std::endl;
+                            outputFile << "stroke" << std::endl;
                         }
                     }
                 }
@@ -359,12 +359,12 @@ void CPlot2D::DrawDataPostScript()
                         for (int k=0;k<numDashes+1;k+=2) {
 
                             outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX())*m_dXScale+(k)*delX*m_dXScale << " "
-                            << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k)*delY*m_dYScale << " moveto" << endl;
+                            << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k)*delY*m_dYScale << " moveto" << std::endl;
 
-                            outputFile << delX*m_dXScale << " " << delY*m_dYScale << " rlineto" << endl;
+                            outputFile << delX*m_dXScale << " " << delY*m_dYScale << " rlineto" << std::endl;
 
-                            outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                            outputFile << "stroke" << endl;
+                            outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                            outputFile << "stroke" << std::endl;
                         }
                     }
                 }
@@ -395,22 +395,22 @@ void CPlot2D::DrawDataPostScript()
                         for (int k=0;k<numDashes+1;k+=2) {
 
                             outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX())*m_dXScale+(k)*delX*m_dXScale << " "
-                            << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k)*delY*m_dYScale << " moveto" << endl;
+                            << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k)*delY*m_dYScale << " moveto" << std::endl;
 
-                            outputFile << delX*m_dXScale << " " << delY*m_dYScale << " rlineto" << endl;
+                            outputFile << delX*m_dXScale << " " << delY*m_dYScale << " rlineto" << std::endl;
 
-                            outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                            outputFile << "stroke" << endl;
+                            outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                            outputFile << "stroke" << std::endl;
 
                             outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX())*m_dXScale+(k+1.5)*delX*m_dXScale << " "
-                            << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k+1.5)*delY*m_dYScale << " moveto" << endl;
+                            << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k+1.5)*delY*m_dYScale << " moveto" << std::endl;
 
                             if (k<numDashes-1) {
-                                outputFile << "newpath" << endl;
+                                outputFile << "newpath" << std::endl;
                                 outputFile << m_dLeftFrameSize+(-m_dMinXStartPoint+point.GetX())*m_dXScale+(k+1.5)*delX*m_dXScale << " "
                                 << m_dBottomFrameSize+(-m_dMinYStartPoint+point.GetY())*m_dYScale+(k+1.5)*delY*m_dYScale << " "
-                                << m_dataSets[i].GetLineWidth()*0.5 << " 0 360 arc closepath" << endl;
-                                outputFile << "fill" << endl;
+                                << m_dataSets[i].GetLineWidth()*0.5 << " 0 360 arc closepath" << std::endl;
+                                outputFile << "fill" << std::endl;
                             }
                         }
                     }
@@ -439,81 +439,81 @@ void CPlot2D::AddDataSet(int numPoints, double *xValues, double *yValues)
     m_dataSets.push_back(dataSet);
 }
 
-void CPlot2D::DrawMarker(string symbol, double size, bool filled, double xLocation, double yLocation, int dataSet)
+void CPlot2D::DrawMarker(std::string symbol, double size, bool filled, double xLocation, double yLocation, int dataSet)
 {
     double r,g,b;
     m_dataSets[dataSet].GetDatasetColor(&r,&g,&b);
 
 
     if (symbol=="o") {
-        outputFile << xLocation << " " << yLocation << " moveto" << endl;
-        outputFile << xLocation << " " << yLocation << " " << size*0.5 << " 0 360 arc closepath" << endl;
-        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
+        outputFile << xLocation << " " << yLocation << " moveto" << std::endl;
+        outputFile << xLocation << " " << yLocation << " " << size*0.5 << " 0 360 arc closepath" << std::endl;
+        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
         if (filled) {
-            outputFile << "fill" << endl;
+            outputFile << "fill" << std::endl;
         }
-        outputFile << "stroke" << endl;
+        outputFile << "stroke" << std::endl;
     }
     if (symbol=="x" || symbol=="*") {
         double halfSize=0.5*size;
-        outputFile << xLocation-halfSize << " " << yLocation-halfSize << " moveto" << endl;
-        outputFile << size << " " << size << " rlineto" << endl;
-        outputFile << -size << " " << 0 << " rmoveto" << endl;
-        outputFile << size << " " << -size << " rlineto" << endl;
-        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-        outputFile << "stroke" << endl;
+        outputFile << xLocation-halfSize << " " << yLocation-halfSize << " moveto" << std::endl;
+        outputFile << size << " " << size << " rlineto" << std::endl;
+        outputFile << -size << " " << 0 << " rmoveto" << std::endl;
+        outputFile << size << " " << -size << " rlineto" << std::endl;
+        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+        outputFile << "stroke" << std::endl;
     }
     if (symbol=="+" || symbol=="*") {
         double halfSize=0.5*size;
-        outputFile << xLocation-halfSize << " " << yLocation << " moveto" << endl;
-        outputFile << size << " " << 0 << " rlineto" << endl;
-        outputFile << -halfSize << " " << halfSize << " rmoveto" << endl;
-        outputFile << 0 << " " << -size << " rlineto" << endl;
-        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-        outputFile << "stroke" << endl;
+        outputFile << xLocation-halfSize << " " << yLocation << " moveto" << std::endl;
+        outputFile << size << " " << 0 << " rlineto" << std::endl;
+        outputFile << -halfSize << " " << halfSize << " rmoveto" << std::endl;
+        outputFile << 0 << " " << -size << " rlineto" << std::endl;
+        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+        outputFile << "stroke" << std::endl;
     }
     if (symbol=="diamond") {
         double halfSize=0.5*size;
-        outputFile << "newpath" << endl;
-        outputFile << xLocation << " " << yLocation-halfSize << " moveto" << endl;
-        outputFile << halfSize << " " << halfSize << " rlineto" << endl;
-        outputFile << -halfSize << " " << halfSize << " rlineto" << endl;
-        outputFile << -halfSize << " " << -halfSize << " rlineto" << endl;
-        outputFile << "closepath" << endl;
-        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
+        outputFile << "newpath" << std::endl;
+        outputFile << xLocation << " " << yLocation-halfSize << " moveto" << std::endl;
+        outputFile << halfSize << " " << halfSize << " rlineto" << std::endl;
+        outputFile << -halfSize << " " << halfSize << " rlineto" << std::endl;
+        outputFile << -halfSize << " " << -halfSize << " rlineto" << std::endl;
+        outputFile << "closepath" << std::endl;
+        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
         if (filled) {
-            outputFile << "fill" << endl;
+            outputFile << "fill" << std::endl;
         }
-        outputFile << "stroke" << endl;
+        outputFile << "stroke" << std::endl;
     }
     if (symbol=="square") {
         double halfSize=0.5*size;
-        outputFile << "newpath" << endl;
-        outputFile << xLocation-halfSize << " " << yLocation-halfSize << " moveto" << endl;
-        outputFile << size << " " << 0 << " rlineto" << endl;
-        outputFile << 0 << " " << size << " rlineto" << endl;
-        outputFile << -size << " " << 0 << " rlineto" << endl;
-        outputFile << "closepath" << endl;
-        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
+        outputFile << "newpath" << std::endl;
+        outputFile << xLocation-halfSize << " " << yLocation-halfSize << " moveto" << std::endl;
+        outputFile << size << " " << 0 << " rlineto" << std::endl;
+        outputFile << 0 << " " << size << " rlineto" << std::endl;
+        outputFile << -size << " " << 0 << " rlineto" << std::endl;
+        outputFile << "closepath" << std::endl;
+        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
         if (filled) {
-            outputFile << "fill" << endl;
+            outputFile << "fill" << std::endl;
         }
-        outputFile << "stroke" << endl;
+        outputFile << "stroke" << std::endl;
     }
     if (symbol=="triangle") {
         double halfSize=0.5*size;
         double halfEdgeLength=1.5/sqrt(3.0)*halfSize;
 
-        outputFile << "newpath" << endl;
-        outputFile << xLocation-halfEdgeLength << " " << yLocation-halfSize*0.5 << " moveto" << endl;
-        outputFile << halfEdgeLength*2.0 << " " << 0 << " rlineto" << endl;
-        outputFile << -halfEdgeLength << " " << 1.5*halfSize << " rlineto" << endl;
-        outputFile << "closepath" << endl;
-        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
+        outputFile << "newpath" << std::endl;
+        outputFile << xLocation-halfEdgeLength << " " << yLocation-halfSize*0.5 << " moveto" << std::endl;
+        outputFile << halfEdgeLength*2.0 << " " << 0 << " rlineto" << std::endl;
+        outputFile << -halfEdgeLength << " " << 1.5*halfSize << " rlineto" << std::endl;
+        outputFile << "closepath" << std::endl;
+        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
         if (filled) {
-            outputFile << "fill" << endl;
+            outputFile << "fill" << std::endl;
         }
-        outputFile << "stroke" << endl;
+        outputFile << "stroke" << std::endl;
     }
 }
 
@@ -521,11 +521,11 @@ void CPlot2D::DrawXAxisTickMarksPostScript()
 {
     for (int i=0;i<m_iXAxisNumberOfLabels;++i) {
         outputFile << m_dLeftFrameSize+(i*m_dXAxisNumbersSpacing)*m_dXScale << " "
-                   << m_dBottomFrameSize << " moveto" << endl;
-        outputFile << 0 << " " << m_dTickMarkLength << " rlineto" << endl;
-        outputFile << m_dFrameLineWidth << " setlinewidth" << endl;
-        outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << endl;
-        outputFile << "stroke" << endl;
+                   << m_dBottomFrameSize << " moveto" << std::endl;
+        outputFile << 0 << " " << m_dTickMarkLength << " rlineto" << std::endl;
+        outputFile << m_dFrameLineWidth << " setlinewidth" << std::endl;
+        outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << std::endl;
+        outputFile << "stroke" << std::endl;
     }
 }
 
@@ -533,11 +533,11 @@ void CPlot2D::DrawYAxisTickMarksPostScript()
 {
     for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
         outputFile << m_dLeftFrameSize << " "
-                   << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << endl;
-        outputFile << m_dTickMarkLength << " " << 0 << " rlineto" << endl;
-        outputFile << m_dFrameLineWidth << " setlinewidth" << endl;
-        outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << endl;
-        outputFile << "stroke" << endl;
+                   << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+        outputFile << m_dTickMarkLength << " " << 0 << " rlineto" << std::endl;
+        outputFile << m_dFrameLineWidth << " setlinewidth" << std::endl;
+        outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << std::endl;
+        outputFile << "stroke" << std::endl;
     }
 }
 
@@ -546,11 +546,11 @@ void CPlot2D::DrawXAxisGridLinesPostScript()
     if (!m_bDrawGridLinesDashed) {
         for (int i=0;i<m_iXAxisNumberOfLabels;++i) {
             outputFile << m_dLeftFrameSize+(i*m_dXAxisNumbersSpacing)*m_dXScale << " "
-                       << m_dBottomFrameSize << " moveto" << endl;
-            outputFile << 0 << " " << m_dYAxisSize << " rlineto" << endl;
-            outputFile << m_dGridLineWidth << " setlinewidth" << endl;
-            outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << endl;
-            outputFile << "stroke" << endl;
+                       << m_dBottomFrameSize << " moveto" << std::endl;
+            outputFile << 0 << " " << m_dYAxisSize << " rlineto" << std::endl;
+            outputFile << m_dGridLineWidth << " setlinewidth" << std::endl;
+            outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << std::endl;
+            outputFile << "stroke" << std::endl;
         }
     }
     else {
@@ -566,17 +566,17 @@ void CPlot2D::DrawXAxisGridLinesPostScript()
         for (int i=0;i<m_iXAxisNumberOfLabels;++i) {
 
             outputFile << m_dLeftFrameSize+(i*m_dXAxisNumbersSpacing)*m_dXScale << " "
-                       << m_dBottomFrameSize << " moveto" << endl;
+                       << m_dBottomFrameSize << " moveto" << std::endl;
 
             for (int k=0;k<numDashes+1;k+=2) {
 
                 outputFile << m_dLeftFrameSize+(i*m_dXAxisNumbersSpacing)*m_dXScale << " "
-                           << m_dBottomFrameSize+k*delY << " moveto" << endl;
-                outputFile << 0 << " " << delY << " rlineto" << endl;
+                           << m_dBottomFrameSize+k*delY << " moveto" << std::endl;
+                outputFile << 0 << " " << delY << " rlineto" << std::endl;
 
-                outputFile << m_dGridLineWidth << " setlinewidth" << endl;
-                outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << endl;
-                outputFile << "stroke" << endl;
+                outputFile << m_dGridLineWidth << " setlinewidth" << std::endl;
+                outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << std::endl;
+                outputFile << "stroke" << std::endl;
             }
         }
     }
@@ -586,11 +586,11 @@ void CPlot2D::DrawYAxisGridLinesPostScript()
 {
     if (!m_bDrawGridLinesDashed) {
         for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
-            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << endl;
-            outputFile << m_dXAxisSize << " " << 0 << " rlineto" << endl;
-            outputFile << m_dGridLineWidth << " setlinewidth" << endl;
-            outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << endl;
-            outputFile << "stroke" << endl;
+            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+            outputFile << m_dXAxisSize << " " << 0 << " rlineto" << std::endl;
+            outputFile << m_dGridLineWidth << " setlinewidth" << std::endl;
+            outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << std::endl;
+            outputFile << "stroke" << std::endl;
         }
     }
     else {
@@ -605,16 +605,16 @@ void CPlot2D::DrawYAxisGridLinesPostScript()
 
         for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
 
-            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << endl;
+            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
 
             for (int k=0;k<numDashes+1;k+=2) {
 
-                outputFile << m_dLeftFrameSize+k*delX  << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << endl;
-                outputFile << delX << " " << 0 << " rlineto" << endl;
+                outputFile << m_dLeftFrameSize+k*delX  << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+                outputFile << delX << " " << 0 << " rlineto" << std::endl;
 
-                outputFile << m_dGridLineWidth << " setlinewidth" << endl;
-                outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << endl;
-                outputFile << "stroke" << endl;
+                outputFile << m_dGridLineWidth << " setlinewidth" << std::endl;
+                outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << std::endl;
+                outputFile << "stroke" << std::endl;
             }
         }
     }
@@ -627,7 +627,7 @@ void CPlot2D::DrawYAxisGridLinesPostScript()
 //  Code available from: http://www.cs.cmu.edu/~ph/
 //
 
-void CPlot2D::ComputeLabelTickSpacing(double dataMin, double dataMax, double *plotMin, double *plotMax, double *tickSpacing, int numTicks, string axis)
+void CPlot2D::ComputeLabelTickSpacing(double dataMin, double dataMax, double *plotMin, double *plotMax, double *tickSpacing, int numTicks, std::string axis)
 {
 
     int nfrac;
@@ -724,14 +724,14 @@ void CPlot2D::DrawXAxisLabelsPostScript()
         labelXCoordinate=m_dLeftFrameSize+(i*m_dXAxisNumbersSpacing)*m_dXScale;
         labelYCoordinate=m_dBottomFrameSize-1.25*m_dXAxisLabelFontSize;
 
-        outputFile << "/" << m_strXAxisLabelFont << " findfont" << endl;
-        outputFile << m_dXAxisLabelFontSize << " scalefont" << endl;
-        outputFile << "setfont" << endl;
-        outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << endl;
-        outputFile << m_dXAxisLabelColor[0] << " " << m_dXAxisLabelColor[1] << " " << m_dXAxisLabelColor[2] << " setrgbcolor" << endl;
+        outputFile << "/" << m_strXAxisLabelFont << " findfont" << std::endl;
+        outputFile << m_dXAxisLabelFontSize << " scalefont" << std::endl;
+        outputFile << "setfont" << std::endl;
+        outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << std::endl;
+        outputFile << m_dXAxisLabelColor[0] << " " << m_dXAxisLabelColor[1] << " " << m_dXAxisLabelColor[2] << " setrgbcolor" << std::endl;
 
         // let PostScript handle the final adjustment based on the width of the string
-        outputFile << "(" << m_strXAxisLabels[i] << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << endl;
+        outputFile << "(" << m_strXAxisLabels[i] << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << std::endl;
     }
 }
 
@@ -748,14 +748,14 @@ void CPlot2D::DrawYAxisLabelsPostScript()
         labelXCoordinate-=m_dYAxisLabelFontSize*0.5;
         labelYCoordinate-=m_dYAxisLabelFontSize*0.25;
 
-        outputFile << "/" << m_strYAxisLabelFont << " findfont" << endl;
-        outputFile << m_dYAxisLabelFontSize << " scalefont" << endl;
-        outputFile << "setfont" << endl;
-        outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << endl;
-        outputFile << m_dYAxisLabelColor[0] << " " << m_dYAxisLabelColor[1] << " " << m_dYAxisLabelColor[2] << " setrgbcolor" << endl;
+        outputFile << "/" << m_strYAxisLabelFont << " findfont" << std::endl;
+        outputFile << m_dYAxisLabelFontSize << " scalefont" << std::endl;
+        outputFile << "setfont" << std::endl;
+        outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << std::endl;
+        outputFile << m_dYAxisLabelColor[0] << " " << m_dYAxisLabelColor[1] << " " << m_dYAxisLabelColor[2] << " setrgbcolor" << std::endl;
 
         // let PostScript handle the final adjustment based on the width of the string
-        outputFile << "(" << m_strYAxisLabels[i] << ")" << " dup stringwidth pop neg 0 rmoveto show"  << endl;
+        outputFile << "(" << m_strYAxisLabels[i] << ")" << " dup stringwidth pop neg 0 rmoveto show"  << std::endl;
     }
 }
 
@@ -766,14 +766,14 @@ void CPlot2D::DrawXAxisTitlePostScript()
     labelXCoordinate=m_dLeftFrameSize+m_dXAxisSize*0.5;
     labelYCoordinate=m_dBottomFrameSize-m_dXAxisTitleFontSize*2.0;
 
-    outputFile << "/" << m_strXAxisTitleFont << " findfont" << endl;
-    outputFile << m_dYAxisTitleFontSize << " scalefont" << endl;
-    outputFile << "setfont" << endl;
-    outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << endl;
-    outputFile << m_dXAxisTitleColor[0] << " " << m_dXAxisTitleColor[1] << " " << m_dXAxisTitleColor[2] << " setrgbcolor" << endl;
+    outputFile << "/" << m_strXAxisTitleFont << " findfont" << std::endl;
+    outputFile << m_dYAxisTitleFontSize << " scalefont" << std::endl;
+    outputFile << "setfont" << std::endl;
+    outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << std::endl;
+    outputFile << m_dXAxisTitleColor[0] << " " << m_dXAxisTitleColor[1] << " " << m_dXAxisTitleColor[2] << " setrgbcolor" << std::endl;
 
     // let PostScript handle the final adjustment based on the width of the string
-    outputFile << "(" << m_strXAxisTitle << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << endl;
+    outputFile << "(" << m_strXAxisTitle << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << std::endl;
 }
 
 void CPlot2D::DrawYAxisTitlePostScript()
@@ -783,16 +783,16 @@ void CPlot2D::DrawYAxisTitlePostScript()
     labelXCoordinate=10.0+m_dYAxisTitleFontSize;
     labelYCoordinate=m_dBottomFrameSize+m_dYAxisSize*0.5;
 
-    outputFile << "/" << m_strYAxisTitleFont << " findfont" << endl;
-    outputFile << m_dYAxisTitleFontSize << " scalefont" << endl;
-    outputFile << "setfont" << endl;
-    outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << endl;
-    outputFile << "90 rotate" << endl;
-    outputFile << m_dYAxisTitleColor[0] << " " << m_dYAxisTitleColor[1] << " " << m_dYAxisTitleColor[2] << " setrgbcolor" << endl;
+    outputFile << "/" << m_strYAxisTitleFont << " findfont" << std::endl;
+    outputFile << m_dYAxisTitleFontSize << " scalefont" << std::endl;
+    outputFile << "setfont" << std::endl;
+    outputFile << labelXCoordinate << " " << labelYCoordinate << " moveto" << std::endl;
+    outputFile << "90 rotate" << std::endl;
+    outputFile << m_dYAxisTitleColor[0] << " " << m_dYAxisTitleColor[1] << " " << m_dYAxisTitleColor[2] << " setrgbcolor" << std::endl;
 
     // let PostScript handle the final adjustment based on the width of the string
-    outputFile << "(" << m_strYAxisTitle << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << endl;
-    outputFile << "-90 rotate" << endl;
+    outputFile << "(" << m_strYAxisTitle << ")" << " dup stringwidth pop 2 div neg 0 rmoveto show"  << std::endl;
+    outputFile << "-90 rotate" << std::endl;
 }
 
 void CPlot2D::DrawLegendPostScript()
@@ -835,11 +835,11 @@ void CPlot2D::DrawLegendPostScript()
             if (!m_dataSets[i].GetDashedLine()) {
                 legendXCoordinate=m_dXTotalSize*0.1+i*widthPerLegend+symbolWidth*0.25;
                 legendYCoordinate=m_dBottomFrameSize*0.25+maxFontHeight*0.3;
-                outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << endl;
-                outputFile << symbolWidth*0.5 << " " << 0 << " rlineto" << endl;
-                outputFile << m_dataSets[i].GetLineWidth() << " setlinewidth" << endl;
-                outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                outputFile << "stroke" << endl;
+                outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << std::endl;
+                outputFile << symbolWidth*0.5 << " " << 0 << " rlineto" << std::endl;
+                outputFile << m_dataSets[i].GetLineWidth() << " setlinewidth" << std::endl;
+                outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                outputFile << "stroke" << std::endl;
             }
             else {
                 if (m_dataSets[i].GetDashedLinePattern()=="dot") {
@@ -850,11 +850,11 @@ void CPlot2D::DrawLegendPostScript()
                         legendYCoordinate=m_dBottomFrameSize*0.25+maxFontHeight*0.3;
 
                         outputFile << legendXCoordinate << " " << legendYCoordinate << " "
-                        << m_dataSets[i].GetLineWidth() << " 0 360 arc closepath" << endl;
+                        << m_dataSets[i].GetLineWidth() << " 0 360 arc closepath" << std::endl;
 
-                        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                        outputFile << "fill" << endl;
-                        outputFile << "stroke" << endl;
+                        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                        outputFile << "fill" << std::endl;
+                        outputFile << "stroke" << std::endl;
                     }
                 }
 
@@ -865,11 +865,11 @@ void CPlot2D::DrawLegendPostScript()
                         legendXCoordinate=m_dXTotalSize*0.1+i*widthPerLegend+symbolWidth*0.25+j*(symbolWidth*0.5/5.0);
                         legendYCoordinate=m_dBottomFrameSize*0.25+maxFontHeight*0.3;
 
-                        outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << endl;
+                        outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << std::endl;
 
-                        outputFile << symbolWidth*0.5/5.0 << " " << 0 << " rlineto" << endl;
-                        outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                        outputFile << "stroke" << endl;
+                        outputFile << symbolWidth*0.5/5.0 << " " << 0 << " rlineto" << std::endl;
+                        outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                        outputFile << "stroke" << std::endl;
                     }
                 }
                 if (m_dataSets[i].GetDashedLinePattern()=="dash_dot") {
@@ -878,17 +878,17 @@ void CPlot2D::DrawLegendPostScript()
                     legendYCoordinate=m_dBottomFrameSize*0.25+maxFontHeight*0.3;
 
 
-                    outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << endl;
-                    outputFile << symbolWidth*0.5/2.0 << " " << 0 << " rlineto" << endl;
-                    outputFile << r << " " << g << " " << b << " setrgbcolor" << endl;
-                    outputFile << "stroke" << endl;
+                    outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << std::endl;
+                    outputFile << symbolWidth*0.5/2.0 << " " << 0 << " rlineto" << std::endl;
+                    outputFile << r << " " << g << " " << b << " setrgbcolor" << std::endl;
+                    outputFile << "stroke" << std::endl;
 
                     legendXCoordinate=m_dXTotalSize*0.1+i*widthPerLegend+symbolWidth*0.75;
                     legendYCoordinate=m_dBottomFrameSize*0.25+maxFontHeight*0.3;
 
                     outputFile << legendXCoordinate << " " << legendYCoordinate << " "
-                    << m_dataSets[i].GetLineWidth()*0.5 << " 0 360 arc closepath" << endl;
-                    outputFile << "fill" << endl;
+                    << m_dataSets[i].GetLineWidth()*0.5 << " 0 360 arc closepath" << std::endl;
+                    outputFile << "fill" << std::endl;
                 }
             }
         }
@@ -905,16 +905,16 @@ void CPlot2D::DrawLegendPostScript()
         legendXCoordinate=m_dXTotalSize*0.1+i*widthPerLegend+symbolWidth;
         legendYCoordinate=m_dBottomFrameSize*0.25;
 
-        outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << endl;
+        outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << std::endl;
 
-        outputFile << "/" << m_dataSets[i].GetDatasetLegendFont() << " findfont" << endl;
-        outputFile << maxFontHeight << " scalefont" << endl;
-        outputFile << "setfont" << endl;
-        outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << endl;
+        outputFile << "/" << m_dataSets[i].GetDatasetLegendFont() << " findfont" << std::endl;
+        outputFile << maxFontHeight << " scalefont" << std::endl;
+        outputFile << "setfont" << std::endl;
+        outputFile << legendXCoordinate << " " << legendYCoordinate << " moveto" << std::endl;
 
-        outputFile << 0.0 << " " << 0.0 << " " << 0.0 << " setrgbcolor" << endl;
+        outputFile << 0.0 << " " << 0.0 << " " << 0.0 << " setrgbcolor" << std::endl;
 
-        outputFile << "(" <<  m_dataSets[i].GetDatasetTitle() << ")" << " show"  << endl;
+        outputFile << "(" <<  m_dataSets[i].GetDatasetTitle() << ")" << " show"  << std::endl;
     }
 
 }

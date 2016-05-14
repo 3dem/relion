@@ -1,8 +1,11 @@
 #ifndef CUDA_DEVICE_MEM_UTILS_H_
 #define CUDA_DEVICE_MEM_UTILS_H_
 
+#ifdef CUDA
 #include "src/gpu_utils/cuda_settings.h"
 #include <cuda_runtime.h>
+#endif
+
 #include <signal.h>
 #include <fstream>
 #include <iostream>
@@ -164,6 +167,7 @@ class CudaCustomAllocator
 
 	const static unsigned GUARD_SIZE = 4;
 	const static BYTE GUARD_VALUE = 145;
+	const static int ALLOC_RETRY = 500;
 
 public:
 
@@ -251,23 +255,30 @@ private:
 
 	//Free allocs with recorded ready events
 	inline
-	void _syncReadyEvents()
+	bool _syncReadyEvents()
 	{
+		bool somethingReady(false);
 		Alloc *a = first;
 
 		while (a != NULL)
 		{
 			if (! a->free && a->freeWhenReady && a->readyEvent != 0)
+			{
 				DEBUG_HANDLE_ERROR(cudaEventSynchronize(a->readyEvent));
+				somethingReady = true;
+			}
 
 			a = a->next;
 		}
+
+		return somethingReady;
 	}
 
 	//Free allocs with recorded ready events
 	inline
-	void _freeReadyAllocs()
+	bool _freeReadyAllocs()
 	{
+		bool somethingFreed(false);
 		Alloc *a = first;
 
 		while (a != NULL)
@@ -277,7 +288,10 @@ private:
 				cudaError_t e = cudaEventQuery(a->readyEvent);
 
 				if (e == cudaSuccess)
+				{
 					_free(a);
+					somethingFreed = true;
+				}
 				else if (e != cudaErrorNotReady)
 				{
 					_printState();
@@ -287,6 +301,7 @@ private:
 
 			a = a->next;
 		}
+		return somethingFreed;
 	}
 
 	inline
@@ -635,14 +650,22 @@ public:
 	#ifdef DEBUG_CUDA
 				size_t spaceDiff = _getTotalFreeSpace();
 	#endif
-				_syncReadyEvents();
-				_freeReadyAllocs();
+				//Try to recover before throwing error
+				for (int i = 0; i <= ALLOC_RETRY; i ++)
+				{
+					if (_syncReadyEvents() && _freeReadyAllocs())
+					{
+						curAlloc = _getFirstSuitedFree(size); //Is there space now?
+						if (curAlloc != NULL)
+							break; //Success
+					}
+					else
+						usleep(10000); // 10 ms, Order of magnitude of largest kernels
+				}
 	#ifdef DEBUG_CUDA
 				spaceDiff =  _getTotalFreeSpace() - spaceDiff;
 				printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
 	#endif
-
-				curAlloc = _getFirstSuitedFree(size); //Is there space now?
 
 				//Did we manage to recover?
 				if (curAlloc == NULL)

@@ -83,6 +83,137 @@ void getOrientations(HealpixSampling &sampling, long int idir, long int ipsi, in
 	}
 }
 
+template<bool invert>
+__global__ void cuda_kernel_make_eulers_2D(
+		XFLOAT *alphas,
+		XFLOAT *eulers,
+		unsigned orientation_num)
+{
+	unsigned oid = blockIdx.x * BLOCK_SIZE + threadIdx.x; //Orientation id
+
+	if (oid >= orientation_num)
+		return;
+
+	XFLOAT ca, sa;
+	XFLOAT a = alphas[oid] * 3.14159f / 180.f;
+
+#ifdef CUDA_DOUBLE_PRECISION
+	sincos(a, &sa, &ca);
+#else
+	sincosf(a, &sa, &ca);
+#endif
+
+	if(!invert)
+	{
+		eulers[9 * oid + 0] = ca;//00
+		eulers[9 * oid + 1] = sa;//01
+		eulers[9 * oid + 2] = 0 ;//02
+		eulers[9 * oid + 3] =-sa;//10
+		eulers[9 * oid + 4] = ca;//11
+		eulers[9 * oid + 5] = 0 ;//12
+		eulers[9 * oid + 6] = 0 ;//20
+		eulers[9 * oid + 7] = 0 ;//21
+		eulers[9 * oid + 8] = 1 ;//22
+	}
+	else
+	{
+		eulers[9 * oid + 0] = ca;//00
+		eulers[9 * oid + 1] =-sa;//10
+		eulers[9 * oid + 2] = 0 ;//20
+		eulers[9 * oid + 3] = sa;//01
+		eulers[9 * oid + 4] = ca;//11
+		eulers[9 * oid + 5] = 0 ;//21
+		eulers[9 * oid + 6] = 0 ;//02
+		eulers[9 * oid + 7] = 0 ;//12
+		eulers[9 * oid + 8] = 1 ;//22
+	}
+}
+
+template<bool invert,bool perturb>
+__global__ void cuda_kernel_make_eulers_3D(
+		XFLOAT *alphas,
+		XFLOAT *betas,
+		XFLOAT *gammas,
+		XFLOAT *eulers,
+		unsigned orientation_num,
+		XFLOAT *R)
+{
+	XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
+	XFLOAT ca, sa, cb, sb, cg, sg, cc, cs, sc, ss;
+
+	unsigned oid = blockIdx.x * BLOCK_SIZE + threadIdx.x; //Orientation id
+
+	if (oid >= orientation_num)
+		return;
+
+	for (int i = 0; i < 8; i ++)
+		B[i] = (XFLOAT) 0.f;
+
+	a = alphas[oid] * 3.14159f / 180.f;
+	b = betas[oid]  * 3.14159f / 180.f;
+	g = gammas[oid] * 3.14159f / 180.f;
+
+#ifdef CUDA_DOUBLE_PRECISION
+	sincos(a, &sa, &ca);
+	sincos(b,  &sb, &cb);
+	sincos(g, &sg, &cg);
+#else
+	sincosf(a, &sa, &ca);
+	sincosf(b,  &sb, &cb);
+	sincosf(g, &sg, &cg);
+#endif
+
+	cc = cb * ca;
+	cs = cb * sa;
+	sc = sb * ca;
+	ss = sb * sa;
+
+	A[0] = ( cg * cc - sg * sa);//00
+	A[1] = ( cg * cs + sg * ca);//01
+	A[2] = (-cg * sb )         ;//02
+	A[3] = (-sg * cc - cg * sa);//10
+	A[4] = (-sg * cs + cg * ca);//11
+	A[5] = ( sg * sb )         ;//12
+	A[6] = ( sc )              ;//20
+	A[7] = ( ss )              ;//21
+	A[8] = ( cb )              ;//22
+
+
+	if (perturb)
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				for (int k = 0; k < 3; k++)
+					B[i * 3 + j] += A[i * 3 + k] * R[k * 3 + j];
+	else
+		for (int i = 0; i < 9; i++)
+			B[i] = A[i];
+
+	if(invert)
+	{
+		eulers[9 * oid + 0] = B[0];//00
+		eulers[9 * oid + 1] = B[3];//01
+		eulers[9 * oid + 2] = B[6];//02
+		eulers[9 * oid + 3] = B[1];//10
+		eulers[9 * oid + 4] = B[4];//11
+		eulers[9 * oid + 5] = B[7];//12
+		eulers[9 * oid + 6] = B[2];//20
+		eulers[9 * oid + 7] = B[5];//21
+		eulers[9 * oid + 8] = B[8];//22
+	}
+	else
+	{
+		eulers[9 * oid + 0] = B[0];//00
+		eulers[9 * oid + 1] = B[1];//10
+		eulers[9 * oid + 2] = B[2];//20
+		eulers[9 * oid + 3] = B[3];//01
+		eulers[9 * oid + 4] = B[4];//11
+		eulers[9 * oid + 5] = B[5];//21
+		eulers[9 * oid + 6] = B[6];//02
+		eulers[9 * oid + 7] = B[7];//12
+		eulers[9 * oid + 8] = B[8];//22
+	}
+}
+
 void CudaProjectorPlan::setup(
 		HealpixSampling &sampling,
 		std::vector<RFLOAT> &directions_prior,
@@ -113,9 +244,11 @@ void CudaProjectorPlan::setup(
 
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
-	RFLOAT alpha(.0), beta(.0), gamma(.0);
-	RFLOAT ca(.0), sa(.0), cb(.0), sb(.0), cg(.0), sg(.0);
-	RFLOAT cc(.0), cs(.0), sc(.0), ss(.0);
+	CudaGlobalPtr<XFLOAT> alphas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	CudaGlobalPtr<XFLOAT> betas (nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	CudaGlobalPtr<XFLOAT> gammas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+
+	CudaGlobalPtr<XFLOAT> perturb(9, eulers.getAllocator());
 
 	eulers.free_if_set();
 	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);
@@ -127,8 +260,6 @@ void CudaProjectorPlan::setup(
 
 	orientation_num = 0;
 
-	TIMING_TIC(TIMING_SAMPLING);
-
 	Matrix2D<RFLOAT> R(3,3);
 	RFLOAT myperturb(0.);
 
@@ -136,12 +267,15 @@ void CudaProjectorPlan::setup(
 	{
 		myperturb = sampling.random_perturbation * sampling.getAngularSampling();
 		if (sampling.is_3D)
+		{
 			Euler_angles2matrix(myperturb, myperturb, myperturb, R);
+			for (int i = 0; i < 9; i ++)
+				perturb[i] = (XFLOAT) R.mdata[i];
+			perturb.put_on_device();
+		}
 	}
-	else
-	{
-		R.initConstant(1.);
-	}
+
+	TIMING_TIC(TIMING_SAMPLING);
 
 	for (long int idir = idir_min, iorient = 0; idir <= idir_max; idir++)
 	{
@@ -207,52 +341,17 @@ void CudaProjectorPlan::setup(
 				for (long int iover_rot = 0; iover_rot < nr_oversampled_rot; iover_rot++, ipart++)
 				{
 					if (sampling.is_3D)
-						alpha = DEG2RAD(oversampled_rot[iover_rot]);
+					{
+						alphas[orientation_num] = oversampled_rot[iover_rot];
+					    betas[orientation_num]  = oversampled_tilt[iover_rot];
+					    gammas[orientation_num] = oversampled_psi[iover_rot];
+					}
 					else
-						alpha = DEG2RAD(oversampled_rot[iover_rot] + myperturb);
-
-				    beta  = DEG2RAD(oversampled_tilt[iover_rot]);
-				    gamma = DEG2RAD(oversampled_psi[iover_rot]);
-
-					sincos(alpha, &sa, &ca);
-					sincos(beta,  &sb, &cb);
-					sincos(gamma, &sg, &cg);
-
-					cc = cb * ca;
-					cs = cb * sa;
-					sc = sb * ca;
-					ss = sb * sa;
-
-					Matrix2D<RFLOAT> A(3,3);
-
-					A(0,0) = ( cg * cc - sg * sa);//00
-					A(1,0) = (-sg * cc - cg * sa);//10
-					A(2,0) = ( sc )              ;//20
-					A(0,1) = ( cg * cs + sg * ca);//01
-					A(1,1) = (-sg * cs + cg * ca);//11
-					A(2,1) = ( ss )              ;//21
-					A(0,2) = (-cg * sb )         ;//02
-					A(1,2) = ( sg * sb )         ;//12
-					A(2,2) = ( cb )              ;//22
-
-					if (sampling.is_3D)
-						A = A * R;
-
-					if(!inverseMatrix)
-						A.inv();
-
-					eulers[9 * orientation_num + 0] = A(0,0);//00
-					eulers[9 * orientation_num + 1] = A(1,0);//10
-					eulers[9 * orientation_num + 2] = A(2,0);//20
-					eulers[9 * orientation_num + 3] = A(0,1);//01
-					eulers[9 * orientation_num + 4] = A(1,1);//11
-					eulers[9 * orientation_num + 5] = A(2,1);//21
-					eulers[9 * orientation_num + 6] = A(0,2);//02
-					eulers[9 * orientation_num + 7] = A(1,2);//12
-					eulers[9 * orientation_num + 8] = A(2,2);//22
+					{
+						alphas[orientation_num] = oversampled_psi[iover_rot] + myperturb;
+					}
 
 					iorientclasses[orientation_num] = iorientclass;
-
 					orientation_num ++;
 				}
 			}
@@ -265,7 +364,67 @@ void CudaProjectorPlan::setup(
 	iorientclasses.put_on_device();
 
 	eulers.setSize(orientation_num * 9);
-	eulers.put_on_device();
+	eulers.device_alloc();
+
+	alphas.setSize(orientation_num);
+	alphas.put_on_device();
+
+	if(sampling.is_3D)
+	{
+		betas.setSize(orientation_num);
+		betas.put_on_device();
+		gammas.setSize(orientation_num);
+		gammas.put_on_device();
+	}
+
+	int grid_size = ceil((float)orientation_num/(float)BLOCK_SIZE);
+
+	if(inverseMatrix)
+		if(sampling.is_3D)
+			if (ABS(sampling.random_perturbation) > 0.)
+				cuda_kernel_make_eulers_3D<true,true><<<grid_size,BLOCK_SIZE,0,eulers.getStream()>>>(
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						~perturb);
+			else
+				cuda_kernel_make_eulers_3D<true,false><<<grid_size,BLOCK_SIZE,0,eulers.getStream()>>>(
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						NULL);
+		else
+			cuda_kernel_make_eulers_2D<true><<<grid_size,BLOCK_SIZE,0,eulers.getStream()>>>(
+					~alphas,
+					~eulers,
+					orientation_num);
+	else
+		if(sampling.is_3D)
+			if (ABS(sampling.random_perturbation) > 0.)
+				cuda_kernel_make_eulers_3D<false,true><<<grid_size,BLOCK_SIZE,0,eulers.getStream()>>>(
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						~perturb);
+			else
+				cuda_kernel_make_eulers_3D<false,false><<<grid_size,BLOCK_SIZE,0,eulers.getStream()>>>(
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						NULL);
+		else
+			cuda_kernel_make_eulers_2D<false><<<grid_size,BLOCK_SIZE,0,eulers.getStream()>>>(
+					~alphas,
+					~eulers,
+					orientation_num);
 
 	TIMING_TOC(TIMING_TOP);
 }

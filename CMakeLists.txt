@@ -1,35 +1,43 @@
-cmake_minimum_required(VERSION 2.8.8)
-set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.8")
+cmake_minimum_required(VERSION 2.8.12)
+set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.12")
+
 #
 #if(POLICY CMP0048)
 #  cmake_policy(SET CMP0048 NEW)
 #endif()
 project(Relion)
 
+# Use new policy for OS X @rpath
+if(POLICY CMP0042)
+    cmake_policy(SET CMP0042 NEW)
+endif()
+
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # ------------------------------------------------------------------RPATH SETTINGS--
-# use, i.e. don't skip the full RPATH for the build tree
-SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
+if(NOT APPLE)
+    # use, i.e. don't skip the full RPATH for the build tree
+    SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
 
-# when building, don't use the install RPATH already
-# (but later on when installing)
-SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
+    # when building, don't use the install RPATH already
+    # (but later on when installing)
+    SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
-# add the automatically determined parts of the RPATH
-# which point to directories outside the build tree to the install RPATH
-SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    # add the automatically determined parts of the RPATH
+    # which point to directories outside the build tree to the install RPATH
+    SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 
-# the RPATH to be used when installing, but only if it's not a system directory
-LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-IF("${isSystemDir}" STREQUAL "-1")
-   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-ENDIF("${isSystemDir}" STREQUAL "-1")
+    # the RPATH to be used when installing, but only if it's not a system directory
+    LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+    IF("${isSystemDir}" STREQUAL "-1")
+        SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+    ENDIF("${isSystemDir}" STREQUAL "-1")
+endif(NOT APPLE)
 
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
 if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
@@ -54,7 +62,6 @@ else()
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
 endif()
 
-
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
 if(NOT DEFINED CUDA_ARCH)
@@ -64,6 +71,9 @@ else(NOT DEFINED CUDA_ARCH)
     message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
 endif(NOT DEFINED CUDA_ARCH)
+
+# ---------------- Use CUDA if found
+option(CUDA "Enable CUDA GPU acceleration" ON)
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
@@ -81,27 +91,31 @@ if(DoublePrec_GPU)
 	set(CudaTexture FALSE)
 else(DoublePrec_GPU)
     message(STATUS "Setting gpu precision to single")
-    # -- Will warn when double prec is inadvertently used in CUDA-code --
-    #message(STATUS "ENV CUDA_VERSION :  $ENV{CUDA_VERSION}")
-    if(DEFINED ENV{CUDA_VERSION})
-        if(($ENV{CUDA_VERSION} VERSION_GREATER "7.5") OR ($ENV{CUDA_VERSION} VERSION_EQUAL "7.5"))
-             message(STATUS "Cuda version is >= 7.5")
-            set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
-        else()
-            message(STATUS "Cuda version is < 7.5")
-        endif()
-    endif()
 endif(DoublePrec_GPU)
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
  #This *has* to be AFTER project()
 include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
 
-# -----------------------------------------------------------------------------CUDA--
-# DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
-FIND_PACKAGE(CUDA)  
+if(CUDA)
+    # -----------------------------------------------------------------------------CUDA--
+    # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
+    FIND_PACKAGE(CUDA)
+endif()
+
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
+    if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_GPU) )
+        message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
+		set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
+	elseif( ${CUDA_VERSION} VERSION_LESS "7.0")
+		message(WARNING "Cuda version is less than 7.0, so relion will be compiled without GPU support.")
+		set(CUDA OFF)
+    endif()
+    
+    if(CUDA)
+    	add_definitions(-DCUDA)
+    endif()
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
@@ -176,14 +190,13 @@ if(GUI)
 				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
 		    else()
 		        message(STATUS "FLTK was NOT found")
-		        set(NEW_OWN_FLTK TRUE)
 		    endif() 
         endif(NOT FORCE_OWN_FLTK)
         
-		if(NOT FLTK_FOUND)
-        	include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
-        	set(NEW_OWN_FLTK TRUE)
+	if(NOT FLTK_FOUND)
+            include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
         endif(NOT FLTK_FOUND)
+
     else(X11_FOUND)
         message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
         message( STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
@@ -192,7 +205,7 @@ if(GUI)
     endif(X11_FOUND)
     
 endif(GUI)
-    
+
 # ------------------------------------------------------------------------------FFTW--
 option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
 
@@ -202,8 +215,18 @@ endif(NOT FORCE_OWN_FFTW)
 	
 if(NOT FFTW_FOUND)
 	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
-	set(NEW_OWN_FFTW TRUE)
 endif(NOT FFTW_FOUND)
+
+include(CheckCXXSymbolExists)
+check_cxx_symbol_exists(sincos    math.h   HAVE_SINCOS)
+check_cxx_symbol_exists(__sincos  math.h   HAVE___SINCOS)
+
+if(HAVE_SINCOS)
+    add_definitions(-DHAVE_SINCOS)
+endif()
+if(HAVE___SINCOS)
+    add_definitions(-DHAVE___SINCOS)
+endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
@@ -233,6 +256,8 @@ if(BUILD_SHARED_LIBS)
 else()
     message(STATUS "Building static libs (larger build size and binaries)")    
 endif()
+
+
 ADD_SUBDIRECTORY(src/apps)
 
 # -----------------------------------------------------------------------------TESTS--

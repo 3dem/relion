@@ -18,7 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include <src/autopicker.h>
+#ifdef CUDA
 #include <src/gpu_utils/cuda_autopicker.h>
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -30,14 +32,18 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 
-		if (prm.do_gpu)
+#ifdef CUDA
+        if (prm.do_gpu)
 		{
+        	std::stringstream didSs;
+        	didSs << "AP";
 			int dev_id = prm.deviceInitialise();
-			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id);
+			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id, didSs.str().c_str() );
 
 			((AutoPickerCuda*)prm.cudaPicker)->run();
 		}
 		else
+#endif
 			prm.run();
 
 #ifdef TIMING
