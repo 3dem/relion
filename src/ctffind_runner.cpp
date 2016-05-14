@@ -18,7 +18,10 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/ctffind_runner.h"
+
+#ifdef CUDA
 #include "src/gpu_utils/cuda_mem_utils.h"
+#endif
 
 void CtffindRunner::read(int argc, char **argv, int rank)
 {
@@ -176,6 +179,7 @@ void CtffindRunner::initialise()
 
 	if (do_use_gctf && fn_micrographs.size()>0)
 	{
+#ifdef CUDA
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
@@ -183,6 +187,7 @@ void CtffindRunner::initialise()
 				std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		}
+#endif
 
 		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
 		Image<double> Itmp;

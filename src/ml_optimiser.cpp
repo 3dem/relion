@@ -32,7 +32,9 @@
 #include <string>
 #include <fstream>
 #include "src/ml_optimiser.h"
+#ifdef CUDA
 #include "src/gpu_utils/cuda_ml_optimiser.h"
+#endif
 
 #define NR_CLASS_MUTEXES 5
 
@@ -48,9 +50,11 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 {
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
+#ifdef CUDA
 	if (MLO->do_gpu)
 		((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
 	else
+#endif
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
 }
 
@@ -270,6 +274,13 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
+#ifndef CUDA
+	if(do_gpu)
+	{
+		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		do_gpu = false;
+	}
+#endif
 	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
@@ -454,6 +465,13 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
+#ifndef CUDA
+	if(do_gpu)
+	{
+		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		do_gpu = false;
+	}
+#endif
 	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
@@ -911,7 +929,7 @@ void MlOptimiser::initialise()
 
 	if (do_gpu)
 	{
-
+#ifdef CUDA
 		if (do_helical_refine)
 			REPORT_ERROR("You cannot use GPU-acceleration with helical refinement yet...");
 
@@ -984,6 +1002,9 @@ void MlOptimiser::initialise()
 
 			cudaOptimiserDeviceMap.push_back(bundleId);
 		}
+#else
+        REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
+#endif
 	}
 
 
@@ -1981,11 +2002,12 @@ void MlOptimiser::expectation()
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 
+#ifdef CUDA
 	/************************************************************************/
 	//GPU memory setup
 
 	if (do_gpu)
-	{
+    {
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 			MlDeviceBundle *b = new MlDeviceBundle(this);
@@ -1996,7 +2018,9 @@ void MlOptimiser::expectation()
 
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]]);
+			std::stringstream didSs;
+			didSs << "RRt" << i;
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
 		}
@@ -2008,17 +2032,20 @@ void MlOptimiser::expectation()
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-			if (free < requested_free_gpu_memory)
+			size_t required_free = requested_free_gpu_memory + GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+
+			if (free < required_free)
 			{
-				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", requested_free_gpu_memory);
+				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
 				allocationSize = (double)free *0.7;
 			}
 			else
-				allocationSize = free - requested_free_gpu_memory - GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+				allocationSize = free - required_free;
 
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
 	}
+#endif
 
 	/************************************************************************/
 
@@ -2077,6 +2104,7 @@ void MlOptimiser::expectation()
 	if (verb > 0)
 		progress_bar(mydata.numberOfOriginalParticles());
 
+#ifdef CUDA
 	if (do_gpu)
 	{
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
@@ -2139,6 +2167,7 @@ void MlOptimiser::expectation()
 
 		cudaDeviceBundles.clear();
 	}
+#endif
 
 	// Clean up some memory
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)

@@ -202,7 +202,7 @@ void MetaDataContainer::addValue(EMDLabel name, const long int &value)
     	REPORT_ERROR("addValue for long: label " + EMDL::label2Str(name) + " is not of type long!");
 }
 
-void MetaDataContainer::addValue(EMDLabel name, const bool &value)
+void MetaDataContainer::addValue(EMDLabel name, const bool value)
 {
 	if (! valueExists(name))
 		labels.push_back(name);

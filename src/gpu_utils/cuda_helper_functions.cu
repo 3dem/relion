@@ -271,17 +271,16 @@ long unsigned generateProjectionSetupFine(
 void runWavgKernel(
 		CudaProjectorKernel &projector,
 		XFLOAT *eulers,
-		XFLOAT *Fimgs_real,
-		XFLOAT *Fimgs_imag,
-		XFLOAT *Fimgs_nomask_real,
-		XFLOAT *Fimgs_nomask_imag,
+		XFLOAT *Fimg_real,
+		XFLOAT *Fimg_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *sorted_weights,
 		XFLOAT *ctfs,
 		XFLOAT *wdiff2s_parts,
 		XFLOAT *wdiff2s_AA,
 		XFLOAT *wdiff2s_XA,
 		OptimisationParamters &op,
-		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		unsigned image_size,
@@ -289,60 +288,102 @@ void runWavgKernel(
 		int group_id,
 		int exp_iclass,
 		XFLOAT part_scale,
+		bool refs_are_ctf_corrected,
 		cudaStream_t stream)
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
 	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
 
-	CUDA_CPU_TIC("cuda_kernel_wavg");
-
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
-	if(projector.mdlZ!=0)
-		cuda_kernel_wavg<true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
-			eulers,
-			projector,
-			image_size,
-			orientation_num,
-			Fimgs_real,
-			Fimgs_imag,
-			Fimgs_nomask_real,
-			Fimgs_nomask_imag,
-			sorted_weights,
-			ctfs,
-			wdiff2s_parts,
-			wdiff2s_AA,
-			wdiff2s_XA,
-			translation_num,
-			(XFLOAT) op.sum_weight[ipart],
-			(XFLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected,
-			part_scale
-			);
+	if (refs_are_ctf_corrected)
+	{
+		if(projector.mdlZ!=0)
+			cuda_kernel_wavg<true,true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+		else
+			cuda_kernel_wavg<false,true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+	}
 	else
-		cuda_kernel_wavg<false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
-			eulers,
-			projector,
-			image_size,
-			orientation_num,
-			Fimgs_real,
-			Fimgs_imag,
-			Fimgs_nomask_real,
-			Fimgs_nomask_imag,
-			sorted_weights,
-			ctfs,
-			wdiff2s_parts,
-			wdiff2s_AA,
-			wdiff2s_XA,
-			translation_num,
-			(XFLOAT) op.sum_weight[ipart],
-			(XFLOAT) op.significant_weight[ipart],
-			baseMLO->refs_are_ctf_corrected,
-			part_scale
-			);
+	{
+		if(projector.mdlZ!=0)
+			cuda_kernel_wavg<true,false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+		else
+			cuda_kernel_wavg<false,false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	CUDA_CPU_TOC("cuda_kernel_wavg");
 }
 
 __global__ void cuda_kernel_allweights_to_mweights(
@@ -411,8 +452,8 @@ void runDiff2KernelCoarse(
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
 		XFLOAT *corr_img,
-		XFLOAT *Fimgs_real,
-		XFLOAT *Fimgs_imag,
+		XFLOAT *Fimg_real,
+		XFLOAT *Fimg_imag,
 		XFLOAT *d_eulers,
 		XFLOAT *diff2s,
 		OptimisationParamters &op,
@@ -447,8 +488,8 @@ void runDiff2KernelCoarse(
 					d_eulers,
 					trans_x,
 					trans_y,
-					Fimgs_real,
-					Fimgs_imag,
+					Fimg_real,
+					Fimg_imag,
 					projector,
 					corr_img,
 					diff2s,
@@ -464,8 +505,8 @@ void runDiff2KernelCoarse(
 					&d_eulers[9*even_orientation_num],
 					trans_x,
 					trans_y,
-					Fimgs_real,
-					Fimgs_imag,
+					Fimg_real,
+					Fimg_imag,
 					projector,
 					corr_img,
 					&diff2s[translation_num*even_orientation_num],
@@ -496,8 +537,8 @@ void runDiff2KernelCoarse(
 					d_eulers,
 					trans_x,
 					trans_y,
-					Fimgs_real,
-					Fimgs_imag,
+					Fimg_real,
+					Fimg_imag,
 					projector,
 					corr_img,
 					diff2s,
@@ -513,8 +554,8 @@ void runDiff2KernelCoarse(
 					&d_eulers[9*even_orientation_num],
 					trans_x,
 					trans_y,
-					Fimgs_real,
-					Fimgs_imag,
+					Fimg_real,
+					Fimg_imag,
 					projector,
 					corr_img,
 					&diff2s[translation_num*even_orientation_num],
@@ -530,8 +571,10 @@ void runDiff2KernelCoarse(
 			cuda_kernel_diff2_CC_coarse<true>
 		<<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),stream>>>(
 				d_eulers,
-				Fimgs_real,
-				Fimgs_imag,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,
 				diff2s,
@@ -542,8 +585,10 @@ void runDiff2KernelCoarse(
 			cuda_kernel_diff2_CC_coarse<false>
 		<<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),stream>>>(
 				d_eulers,
-				Fimgs_real,
-				Fimgs_imag,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,
 				diff2s,
@@ -560,6 +605,8 @@ void runDiff2KernelFine(
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
@@ -589,6 +636,8 @@ void runDiff2KernelFine(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 				diff2s,
@@ -607,6 +656,8 @@ void runDiff2KernelFine(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 				diff2s,
@@ -629,6 +680,8 @@ void runDiff2KernelFine(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,
 				diff2s,
@@ -648,6 +701,8 @@ void runDiff2KernelFine(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
+				trans_x,
+				trans_y,
 				projector,
 				corr_img,
 				diff2s,

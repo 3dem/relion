@@ -103,7 +103,7 @@ public:
     void addValue(EMDLabel name, const RFLOAT &value);
     void addValue(EMDLabel name, const int &value);
     void addValue(EMDLabel name, const long int &value);
-    void addValue(EMDLabel name, const bool &value);
+    void addValue(EMDLabel name, const bool value);
     void addValue(EMDLabel name, const std::string &value);
 
     /** Creates a new label-value pair, with the default value for the corresponding type */

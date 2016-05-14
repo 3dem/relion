@@ -1,19 +1,14 @@
 
-#ifndef CUDA_BENCHMARK_UTILS_CUH_
-#define CUDA_BENCHMARK_UTILS_CUH_
 
-#include <cuda_runtime.h>
-#include <vector>
-#include <iostream>
-#include <fstream>
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 
 //Non-concurrent benchmarking tools (only for Linux)
-#if defined CUDA_BENCHMARK_OLD
 #include <vector>
 #include <time.h>
 #include <string>
+#include <signal.h>
 
-static int cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
+int relion_timer::cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
 {
 	for (unsigned i = 0; i < v.size(); i++)
 		if (v[i] == id)
@@ -21,12 +16,8 @@ static int cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
 	return -1;
 }
 
-std::vector<std::string> cuda_cpu_benchmark_identifiers;
-std::vector<clock_t>     cuda_cpu_benchmark_start_times;
-FILE *cuda_cpu_benchmark_fPtr = fopen("benchmark_cpu.dat","w");
 
-#define CUDA_CPU_TIC(ID) (cuda_cpu_tic(ID))
-static void cuda_cpu_tic(std::string id)
+void relion_timer::cuda_cpu_tic(std::string id)
 {
 	if (cuda_benchmark_find_id(id, cuda_cpu_benchmark_identifiers) == -1)
 	{
@@ -40,8 +31,7 @@ static void cuda_cpu_tic(std::string id)
 	}
 }
 
-#define CUDA_CPU_TOC(ID) (cuda_cpu_toc(ID))
-static void cuda_cpu_toc(std::string id)
+void relion_timer::cuda_cpu_toc(std::string id)
 {
 	int idx = cuda_benchmark_find_id(id, cuda_cpu_benchmark_identifiers);
 	if (idx == -1)
@@ -61,13 +51,8 @@ static void cuda_cpu_toc(std::string id)
 //		printf(,"%s \t %.2f ms\n", id.c_str(), (float)t / CLOCKS_PER_SEC * 1000.);
 	}
 }
-std::vector<std::string> cuda_gpu_benchmark_identifiers;
-std::vector<cudaEvent_t> cuda_gpu_benchmark_start_times;
-std::vector<cudaEvent_t> cuda_gpu_benchmark_stop_times;
-FILE *cuda_gpu_benchmark_fPtr = fopen("benchmark_gpu.dat","w");
 
-#define CUDA_GPU_TIC(ID) (cuda_gpu_tic(ID))
-static void cuda_gpu_tic(std::string id)
+void relion_timer::cuda_gpu_tic(std::string id)
 {
 	if (cuda_benchmark_find_id(id, cuda_gpu_benchmark_identifiers) == -1)
 	{
@@ -87,8 +72,7 @@ static void cuda_gpu_tic(std::string id)
 	}
 }
 
-#define CUDA_GPU_TAC(ID) (cuda_gpu_tac(ID))
-static void cuda_gpu_tac(std::string id)
+void relion_timer::cuda_gpu_toc(std::string id)
 {
 	int idx = cuda_benchmark_find_id(id, cuda_gpu_benchmark_identifiers);
 	if (idx == -1)
@@ -104,8 +88,7 @@ static void cuda_gpu_tac(std::string id)
 	}
 }
 
-#define CUDA_GPU_TOC() (cuda_gpu_toc())
-static void cuda_gpu_toc()
+void relion_timer::cuda_gpu_printtictoc()
 {
 	if (cuda_gpu_benchmark_identifiers.size() == 0)
 	{
@@ -130,20 +113,3 @@ static void cuda_gpu_toc()
 		cuda_gpu_benchmark_stop_times.clear();
 	}
 }
-#elif defined CUDA_PROFILING
-#include <nvToolsExt.h>
-
-#define CUDA_CPU_TIC(ID) (nvtxRangePush(ID))
-#define CUDA_CPU_TOC(ID) (nvtxRangePop())
-#define CUDA_GPU_TIC(ID)
-#define CUDA_GPU_TAC(ID)
-#define CUDA_GPU_TOC(ID)
-#else
-#define CUDA_CPU_TIC(ID)
-#define CUDA_CPU_TOC(ID)
-#define CUDA_GPU_TIC(ID)
-#define CUDA_GPU_TAC(ID)
-#define CUDA_GPU_TOC(ID)
-#endif
-
-#endif /* CUDA_BENCHMARK_UTILS_CUH_ */

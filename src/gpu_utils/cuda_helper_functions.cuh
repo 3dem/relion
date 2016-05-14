@@ -4,7 +4,7 @@
 #include "src/gpu_utils/cuda_ml_optimiser.h"
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_benchmark_utils.cuh"
+#include "src/gpu_utils/cuda_benchmark_utils.h"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_kernels/diff2.cuh"
@@ -89,7 +89,6 @@ void runWavgKernel(
 		XFLOAT *wdiff2s_AA,
 		XFLOAT *wdiff2s_XA,
 		OptimisationParamters &op,
-		MlOptimiser *baseMLO,
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		unsigned image_size,
@@ -97,6 +96,7 @@ void runWavgKernel(
 		int group_id,
 		int exp_iclass,
 		XFLOAT part_scale,
+		bool refs_are_ctf_corrected,
 		cudaStream_t stream);
 
 #define INIT_VALUE_BLOCK_SIZE 512
@@ -244,6 +244,8 @@ void runDiff2KernelFine(
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
@@ -578,6 +580,46 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 			ySize,
 			xshift,
 			yshift);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+
+//	HANDLE_ERROR(cudaStreamSynchronize(0));
+//	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
+
+
+}
+
+template <typename T>
+void runCenterFFT( CudaGlobalPtr< T > &img_in,
+				  int xSize,
+				  int ySize,
+				  int zSize,
+				  bool forward,
+				  int batchSize = 1)
+{
+//	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	img_aux.device_alloc();
+
+	int xshift = (xSize / 2);
+	int yshift = (ySize / 2);
+	int zshift = (ySize / 2);
+
+	if (!forward)
+	{
+		xshift = -xshift;
+		yshift = -yshift;
+		zshift = -zshift;
+	}
+
+	dim3 blocks(ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
+	cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
+			~img_in,
+			xSize*ySize*zSize,
+			xSize,
+			ySize,
+			zSize,
+			xshift,
+			yshift,
+			zshift);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 //	HANDLE_ERROR(cudaStreamSynchronize(0));

@@ -1,6 +1,6 @@
-message(STATUS "-------------------------------------------------")   
-message(STATUS "-------- WILL USE LOCALY BUILT FFTW LIBS --------")  
-message(STATUS "-------------------------------------------------") 
+message(STATUS "-------------------------------------------------")
+message(STATUS "------- WILL USE LOCALLY BUILT FFTW LIBS --------")
+message(STATUS "-------------------------------------------------")
 
 set(FFTW_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fftw")
 
@@ -16,22 +16,23 @@ endif(DoublePrec_CPU)
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
 
-find_path(FFTW_PATH         NAMES fftw3.h         PATHS ${FFTW_EXTERNAL_PATH}/include NO_DEFAULT_PATH)
 find_path(FFTW_INCLUDES     NAMES fftw3.h         PATHS ${FFTW_EXTERNAL_PATH}/include NO_DEFAULT_PATH) 
-find_library(FFTW_LIBRARIES NAMES lib${libfft}.so PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)   
+find_library(FFTW_LIBRARIES NAMES ${libfft}       PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)
 
-if(FFTW_PATH AND FFTW_INCLUDES AND FFTW_LIBRARIES)
+if(FFTW_INCLUDES AND FFTW_LIBRARIES)
     set(FFTW_FOUND TRUE)
     message( STATUS "Found previously built external (non-system) FFTW library")
+else()
+    set(FFTW_FOUND FALSE)
 endif()
-## ----------------------------------------------------------------- NEW EXT LIBS? --  
 
+## ----------------------------------------------------------------- NEW EXT LIBS? --
 
 if(NOT FFTW_FOUND)
 
-    set(FFTW_LIBRARIES ${FFTW_EXTERNAL_PATH}/lib/lib${libfft}.so )  
-    set(FFTW_PATH      "${FFTW_EXTERNAL_PATH}/includes/fftw3.h" )  
-    set(FFTW_INCLUDES  "${FFTW_EXTERNAL_PATH}/includes/fftw3.h" )
+    set(FFTW_LIBRARIES ${FFTW_EXTERNAL_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${libfft}${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set(FFTW_PATH      "${FFTW_EXTERNAL_PATH}" )
+    set(FFTW_INCLUDES  "${FFTW_EXTERNAL_PATH}/include" )
 
     include(ExternalProject)
     set(FFTW_EXTERNAL_LIBS_TAR_DIRECTORY  ${FFTW_EXTERNAL_PATH})
@@ -60,7 +61,10 @@ if(NOT FFTW_FOUND)
     LOG_INSTALL)
 
     set(NEW_OWN_FFTW TRUE)
-    set(FFTW_FOUND TRUE)
+
+else()
+
+    set(NEW_OWN_FFTW FALSE)
     
 endif()
 
