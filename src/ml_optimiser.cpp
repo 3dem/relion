@@ -972,19 +972,18 @@ void MlOptimiser::initialise()
 			if (semiAutomaticMapping)
 			{
 				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+				// Bjorn: Better hack
 				if (fullAutomaticMapping)
-					dev_id = i%devCount;
+					dev_id = devCount*i / nr_threads;
 				else
-				{
-					dev_id = i%allThreadIDs[0].size();
-					if(std::isdigit(*allThreadIDs[0][dev_id].c_str()))
-						dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
-				}
+					dev_id = textToInteger(allThreadIDs[0][(allThreadIDs[0].size()*i)/nr_threads].c_str());
 			}
 			else // not semiAutomatic => explicit
 			{
-				dev_id = textToInteger(allThreadIDs[0][i].c_str());
+					dev_id = textToInteger(allThreadIDs[0][i].c_str());
 			}
+
+
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
 			//Only make a new bundle of not existing on device
