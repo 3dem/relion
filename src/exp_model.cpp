@@ -556,10 +556,13 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 			REPORT_ERROR("ERROR: cannot execute: " + command);
 
 		// Touch the lock file
-		touch(fn_lock);
-		command = "chmod 0777 " + fn_lock;
-		if (system(command.c_str()))
-			REPORT_ERROR("ERROR: cannot execute: " + command);
+		if(fn_lock != "")
+		{
+			touch(fn_lock);
+			command = "chmod 0777 " + fn_lock;
+			if (system(command.c_str()))
+				REPORT_ERROR("ERROR: cannot execute: " + command);
+		}
 
 		// Measure how much free space there is
 		struct statvfs vfs;
