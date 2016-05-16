@@ -38,8 +38,12 @@
 
 void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps);
 
-
-using namespace std;
+/* EL: Including all of the std namespace on the global level both in this and
+ *     every single file that includes this header will lead to ambiguous
+ *     definitions with Cuda. Fixed by adding std:: prefixes to string, vector,
+ *     and ofstream.
+ */
+// using namespace std;
 
  /*!
   A simple container class to hold a data point, comprised of an x and y value
@@ -285,7 +289,7 @@ using namespace std;
       Sets the marker symbol used in drawing the dataset.
       See the declaration of variable for the available types.
       */
-     void SetMarkerSymbol(string symbol)
+     void SetMarkerSymbol(std::string symbol)
      {
          m_strMarker=symbol;
      };
@@ -327,7 +331,7 @@ using namespace std;
      /*!
       Returns a string describing the marker symbol.
       */
-     string GetMarkerSymbol()
+     std::string GetMarkerSymbol()
      {
          return (m_strMarker);
      };
@@ -372,7 +376,7 @@ using namespace std;
       spanning data points. For the availabel styles see the
       declaration of the variable.
       */
-     void SetDashedLinePattern(string pattern)
+     void SetDashedLinePattern(std::string pattern)
      {
          m_iDashedLinePattern=pattern;
      };
@@ -381,7 +385,7 @@ using namespace std;
       Gets the dased line pattern style used in drawing the line
       spanning data points.
       */
-     string GetDashedLinePattern()
+     std::string GetDashedLinePattern()
      {
          return (m_iDashedLinePattern);
      };
@@ -408,7 +412,7 @@ using namespace std;
       Sets the string used in the plot legend denoting this
       dataset.
       */
-     void SetDatasetTitle(string title)
+     void SetDatasetTitle(std::string title)
      {
          m_strDatasetTitle=title;
      };
@@ -417,7 +421,7 @@ using namespace std;
       Gets the string used in the plot legend denoting this
       dataset.
       */
-     string GetDatasetTitle()
+     std::string GetDatasetTitle()
      {
          return (m_strDatasetTitle);
      };
@@ -426,7 +430,7 @@ using namespace std;
       Sets the font used in the plot legend denoting this
       dataset.
       */
-     void SetDatasetLegendFont(string font)
+     void SetDatasetLegendFont(std::string font)
      {
          m_strDatasetLegendFont=font;
      };
@@ -435,21 +439,21 @@ using namespace std;
       Gets the font used in the plot legend denoting this
       dataset.
       */
-     string GetDatasetLegendFont()
+     std::string GetDatasetLegendFont()
      {
          return (m_strDatasetLegendFont);
      }
 
  protected:
 
-     string m_strDatasetTitle; /*!< Storage for the dataset's title. */
-     string m_strDatasetLegendFont; /*!< Size of the font used to show the dataset's title in the legend. */
+     std::string m_strDatasetTitle; /*!< Storage for the dataset's title. */
+     std::string m_strDatasetLegendFont; /*!< Size of the font used to show the dataset's title in the legend. */
 
      double m_dLineWidth; /*!< The width of the line drawn to connect data points. */
      double m_dColor[3]; /*!< The color of the line drawn to connect data points. */
-     string m_iDashedLinePattern; /*!< The dashed line pattern drawn to connect data points, the possibilites are (strings): "dot", "dash" or "dash_dot". */
+     std::string m_iDashedLinePattern; /*!< The dashed line pattern drawn to connect data points, the possibilites are (strings): "dot", "dash" or "dash_dot". */
 
-     string m_strMarker; /*!< The style for the marker drawn at each data point, possibilities are (strings): "x", "o", "*", "diamond", "square", "triangle". */
+     std::string m_strMarker; /*!< The style for the marker drawn at each data point, possibilities are (strings): "x", "o", "*", "diamond", "square", "triangle". */
      double m_dMarkerSize; /*!< The size of the marker drawn at each data point. */
 
      // flags
@@ -459,7 +463,7 @@ using namespace std;
      bool m_bDashedLine; /*!< Boolean flag to enable/disable drawing of a dashed line connecting data points. */
 
      // data storage
-     vector<CDataPoint> m_dDataPoints; /*!< A vector storage for the data points. */
+     std::vector<CDataPoint> m_dDataPoints; /*!< A vector storage for the data points. */
  };
 
  /*!
@@ -704,12 +708,12 @@ using namespace std;
      /*!
       Sets the font (as a string) that is used for the labels on the x axis.
       */
-     void SetXAxisLabelFont(string font);
+     void SetXAxisLabelFont(std::string font);
 
      /*!
       Gets the font (as a string) that is used for the labels on the x axis.
       */
-     string GetXAxisLabelFont();
+     std::string GetXAxisLabelFont();
 
      /*!
       Sets the font size for the x axis labels.
@@ -724,12 +728,12 @@ using namespace std;
      /*!
       Sets the font (as a string) that is used for the labels on the y axis.
       */
-     void SetYAxisLabelFont(string font);
+     void SetYAxisLabelFont(std::string font);
 
      /*!
       Gets the font (as a string) that is used for the labels on the y axis.
       */
-     string GetYAxisLabelFont();
+     std::string GetYAxisLabelFont();
 
      /*!
       Set the font size for the y axis labels.
@@ -744,12 +748,12 @@ using namespace std;
      /*!
       Sets the font (as a string) that is used for the title on the legend for the x axis.
       */
-     void SetXAxisTitleFont(string font);
+     void SetXAxisTitleFont(std::string font);
 
      /*!
       Gets the font (as a string) that is used for the title on the legend for the x axis.
       */
-     string GetXAxisTitleFont();
+     std::string GetXAxisTitleFont();
 
      /*!
       Sets the font size that is used for the title on the legend for the x axis.
@@ -764,12 +768,12 @@ using namespace std;
      /*!
       Sets the font (as a string) that is used for the title on the legend for the y axis.
       */
-     void SetYAxisTitleFont(string font);
+     void SetYAxisTitleFont(std::string font);
 
      /*!
       Gets the font (as a string) that is used for the title on the legend for the x axis.
       */
-     string GetYAxisTitleFont();
+     std::string GetYAxisTitleFont();
 
      /*!
       Sets the font size that is used for the title on the legend for the y axis.
@@ -785,23 +789,23 @@ using namespace std;
       Sets the title for the x axis. Usually this is where the units or quantity represented by
       the data should be displayed goes.
       */
-     void SetXAxisTitle(string title);
+     void SetXAxisTitle(std::string title);
 
      /*!
       Gets the title for the x axis.
       */
-     string GetXAxisTitle();
+     std::string GetXAxisTitle();
 
      /*!
       Sets the title for the y axis. Usually this is where the units or quantity represented by
       the data should be displayed goes.
       */
-     void SetYAxisTitle(string title);
+     void SetYAxisTitle(std::string title);
 
      /*!
       Gets the title for the y axis.
       */
-     string GetYAxisTitle();
+     std::string GetYAxisTitle();
 
      /*!
       Sets the color, as an RGB triplet, for the x axis title.
@@ -858,7 +862,7 @@ using namespace std;
      /*!
       The function, which is responsible for generating the PostScript output of the plot.
       */
-     void OutputPostScriptPlot(string fileName);
+     void OutputPostScriptPlot(std::string fileName);
 
      // data set functions
      /*!
@@ -885,7 +889,7 @@ using namespace std;
       regarding the source of the algorithm.
       */
      void ComputeLabelTickSpacing(double dataMin, double dataMax, double *plotMin,
-                                  double *plotMax, double *tickSpacing, int numTicks, string axis);
+                                  double *plotMax, double *tickSpacing, int numTicks, std::string axis);
      /*!
       A function to aid the computation of label spacing, see the comments at the head of the implementation
       regarding the source of the algorithm.
@@ -907,7 +911,7 @@ using namespace std;
      /*!
       A function to draw a single marker in a PostScript format.
       */
-     void DrawMarker(string symbol, double size, bool filled, double xLocation, double yLocation, int dataSet);
+     void DrawMarker(std::string symbol, double size, bool filled, double xLocation, double yLocation, int dataSet);
 
      /*!
       A function to draw the x axis tick marks in a PostScript format.
@@ -977,12 +981,12 @@ using namespace std;
      double m_dYAxisNumbersSpacing; /*!< Spacing between tick marks along the y axis. */
      char m_cXAxisLabelFormat[10]; /*!< Format of labels along the x axis. */
      char m_cYAxisLabelFormat[10]; /*!< Format of labels along the y axis. */
-     vector<string> m_strXAxisLabels; /*!< Labels along the x axis. */
-     vector<string> m_strYAxisLabels; /*!< Labels along the y axis. */
+     std::vector<std::string> m_strXAxisLabels; /*!< Labels along the x axis. */
+     std::vector<std::string> m_strYAxisLabels; /*!< Labels along the y axis. */
      //Sjors Scheres 22mar2016: insert PlotTitle
-     string m_strPlotTitle; /*!< Title of plot. */
-     string m_strXAxisTitle; /*!< Title of x axis. */
-     string m_strYAxisTitle; /*!< Title of y axis. */
+     std::string m_strPlotTitle; /*!< Title of plot. */
+     std::string m_strXAxisTitle; /*!< Title of x axis. */
+     std::string m_strYAxisTitle; /*!< Title of y axis. */
      int m_iXAxisNumberOfLabels; /*!< Number of labels along the x axis. */
      int m_iYAxisNumberOfLabels; /*!< Number of labels along the y axis. */
 
@@ -1012,13 +1016,13 @@ using namespace std;
      double m_dTickMarkLength; /*!< Length of tick marks. */
 
      // fonts
-     string m_strXAxisLabelFont; /*!< Font for x axis labels. */
+     std::string m_strXAxisLabelFont; /*!< Font for x axis labels. */
      double m_dXAxisLabelFontSize; /*!< Font size for x axis label. */
-     string m_strYAxisLabelFont; /*!< Font for yx axis label. */
+     std::string m_strYAxisLabelFont; /*!< Font for yx axis label. */
      double m_dYAxisLabelFontSize; /*!< Font size for y axis label. */
-     string m_strXAxisTitleFont; /*!< Font for x axis title. */
+     std::string m_strXAxisTitleFont; /*!< Font for x axis title. */
      double m_dXAxisTitleFontSize; /*!< Font size for x axis title. */
-     string m_strYAxisTitleFont; /*!< Font for y axis title. */
+     std::string m_strYAxisTitleFont; /*!< Font for y axis title. */
      double m_dYAxisTitleFontSize; /*!< Font size for y axis title. */
 
      // flags
@@ -1030,10 +1034,10 @@ using namespace std;
      bool m_bDrawLegend; /*!< Flag for enabling/disabling the drawing of the legend. */
 
      // output
-     ofstream outputFile; /*!< The output stream. */
+     std::ofstream outputFile; /*!< The output stream. */
 
      // data storage
-     vector<CDataSet> m_dataSets; /*!< Storage for the datasets, implemented as a vector. */
+     std::vector<CDataSet> m_dataSets; /*!< Storage for the datasets, implemented as a vector. */
  };
 
  inline void CPlot2D::SetXTotalSize(double value)
@@ -1253,12 +1257,12 @@ using namespace std;
      return (m_bDrawGridLinesDashed);
  }
 
- inline void CPlot2D::SetXAxisLabelFont(string font)
+ inline void CPlot2D::SetXAxisLabelFont(std::string font)
  {
      m_strXAxisLabelFont=font;
  }
 
- inline string CPlot2D::GetXAxisLabelFont()
+ inline std::string CPlot2D::GetXAxisLabelFont()
  {
      return (m_strXAxisLabelFont);
  }
@@ -1273,12 +1277,12 @@ using namespace std;
      return (m_dXAxisLabelFontSize);
  }
 
- inline void CPlot2D::SetYAxisLabelFont(string font)
+ inline void CPlot2D::SetYAxisLabelFont(std::string font)
  {
      m_strYAxisLabelFont=font;
  }
 
- inline string CPlot2D::GetYAxisLabelFont()
+ inline std::string CPlot2D::GetYAxisLabelFont()
  {
      return (m_strYAxisLabelFont);
  }
@@ -1293,12 +1297,12 @@ using namespace std;
      return (m_dYAxisLabelFontSize);
  }
 
- inline void CPlot2D::SetXAxisTitleFont(string font)
+ inline void CPlot2D::SetXAxisTitleFont(std::string font)
  {
      m_strXAxisTitleFont=font;
  }
 
- inline string CPlot2D::GetXAxisTitleFont()
+ inline std::string CPlot2D::GetXAxisTitleFont()
  {
      return (m_strXAxisTitleFont);
  }
@@ -1313,12 +1317,12 @@ using namespace std;
      return (m_dXAxisTitleFontSize);
  }
 
- inline void CPlot2D::SetYAxisTitleFont(string font)
+ inline void CPlot2D::SetYAxisTitleFont(std::string font)
  {
      m_strYAxisTitleFont=font;
  }
 
- inline string CPlot2D::GetYAxisTitleFont()
+ inline std::string CPlot2D::GetYAxisTitleFont()
  {
      return (m_strYAxisTitleFont);
  }
@@ -1333,22 +1337,22 @@ using namespace std;
      return (m_dYAxisTitleFontSize);
  }
 
- inline void CPlot2D::SetXAxisTitle(string title)
+ inline void CPlot2D::SetXAxisTitle(std::string title)
  {
      m_strXAxisTitle=title;
  }
 
- inline string CPlot2D::GetXAxisTitle()
+ inline std::string CPlot2D::GetXAxisTitle()
  {
      return (m_strXAxisTitle);
  }
 
- inline void CPlot2D::SetYAxisTitle(string title)
+ inline void CPlot2D::SetYAxisTitle(std::string title)
  {
      m_strYAxisTitle=title;
  }
 
- inline string CPlot2D::GetYAxisTitle()
+ inline std::string CPlot2D::GetYAxisTitle()
  {
      return (m_strYAxisTitle);
  }

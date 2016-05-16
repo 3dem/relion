@@ -9,16 +9,16 @@
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
 
-template<bool do_3DProjection>
+template<bool do_3DProjection, bool refs_are_ctf_corrected>
 __global__ void cuda_kernel_wavg(
 		XFLOAT *g_eulers,
 		CudaProjectorKernel projector,
 		unsigned image_size,
 		unsigned long orientation_num,
-		XFLOAT *g_imgs_real,
-		XFLOAT *g_imgs_imag,
-		XFLOAT *g_imgs_nomask_real,
-		XFLOAT *g_imgs_nomask_imag,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
 		XFLOAT* g_weights,
 		XFLOAT* g_ctfs,
 		XFLOAT *g_wdiff2s_parts,
@@ -27,10 +27,9 @@ __global__ void cuda_kernel_wavg(
 		unsigned long translation_num,
 		XFLOAT weight_norm,
 		XFLOAT significant_weight,
-		bool refs_are_ctf_corrected,
 		XFLOAT part_scale)
 {
-	XFLOAT ref_real, ref_imag;
+	XFLOAT ref_real, ref_imag, img_real, img_imag, trans_real, trans_imag;
 
 	int bid = blockIdx.x; //block ID
 	int tid = threadIdx.x;
@@ -83,14 +82,17 @@ __global__ void cuda_kernel_wavg(
 
 			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
 			{
-				ref_real *= g_ctfs[pixel];
-				ref_imag *= g_ctfs[pixel];
+				ref_real *= __ldg(&g_ctfs[pixel]);
+				ref_imag *= __ldg(&g_ctfs[pixel]);
 			}
 			else
 			{
 				ref_real *= part_scale;
 				ref_imag *= part_scale;
 			}
+
+			img_real = __ldg(&g_img_real[pixel]);
+			img_imag = __ldg(&g_img_imag[pixel]);
 
 			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
@@ -100,14 +102,14 @@ __global__ void cuda_kernel_wavg(
 				{
 					weight /= weight_norm;
 
-					unsigned long img_pixel_idx = itrans * image_size + pixel;
+					translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, trans_real, trans_imag);
 
-					XFLOAT diff_real = ref_real - g_imgs_real[img_pixel_idx];    // TODO  Put in texture (in such a way that fetching of next image might hit in cache)
-					XFLOAT diff_imag = ref_imag - g_imgs_imag[img_pixel_idx];
+					XFLOAT diff_real = ref_real - trans_real;
+					XFLOAT diff_imag = ref_imag - trans_imag;
 
 					s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
-					s_sumXA[tid] +=  weight * ( ref_real * g_imgs_real[img_pixel_idx] + ref_imag * g_imgs_imag[img_pixel_idx]);
+					s_sumXA[tid] +=  weight * ( ref_real * trans_real + ref_imag * trans_imag);
 					s_sumA2[tid] +=  weight * ( ref_real*ref_real  +  ref_imag*ref_imag );
 				}
 			}

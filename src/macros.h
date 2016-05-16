@@ -310,6 +310,34 @@
  */
 #define SINC(x) (((x) < 0.0001 && (x) > -0.0001) ? 1 : sin(PI * (x)) / (PI * (x)))
 
+#if defined HAVE_SINCOS || defined DOXGEN
+
+/** Sincos function
+ *
+ *  Wrappper to make sincos(x,&sinval,&cosval) work for all compilers.
+ */
+#define SINCOS(x,s,c) sincos(x,s,c)
+
+/** Sincosf function
+ *
+ *  Wrappper to make sincosf(x,&sinval,&cosval) work for all compilers.
+ */
+#define SINCOSF(x,s,c) sincosf(x,s,c)
+
+#elif defined HAVE___SINCOS
+// Use __sincos and __sincosf instead (primarily clang)
+
+#define SINCOS(x,s,c) __sincos(x,s,c)
+#define SINCOSF(x,s,c) __sincosf(x,s,c)
+
+#else
+// Neither sincos or __sincos available, use raw functions.
+
+static void SINCOS(double x, double *s, double *c) { *s = sin(x); *c = cos(x); }
+static void SINCOSF(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
+
+#endif
+
 /** Returns next positive power_class of 2
  *
  * It is supposed that the given number is positive although it's not needed to

@@ -18,7 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/motioncorr_runner.h"
+#ifdef CUDA
 #include "src/gpu_utils/cuda_mem_utils.h"
+#endif
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
@@ -101,6 +103,7 @@ void MotioncorrRunner::initialise()
 	MDavg.clear();
 	MDmov.clear();
 
+#ifdef CUDA
 	if (!do_unblur)
 	{
 		if (gpu_ids.length() > 0)
@@ -109,6 +112,7 @@ void MotioncorrRunner::initialise()
 			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	}
+#endif
 
 	FileName fn_avg, fn_mov;
 
@@ -264,7 +268,7 @@ void MotioncorrRunner::run()
 }
 
 
-void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts, int rank)
+void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
 {
 
 
@@ -344,7 +348,7 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 
 }
 
-void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
@@ -398,7 +402,7 @@ void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &
 
 }
 
-void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	FileName fn_avg, fn_mov;
@@ -514,7 +518,7 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 
 }
 
-void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	std::ifstream in(fn_shifts.data(), std::ios_base::in);
@@ -602,7 +606,7 @@ void MotioncorrRunner::plotFRC(FileName fn_frc)
 }
 
 // Plot the shifts
-void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, vector<float> &yshifts)
+void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	if (xshifts.size() == 0)
