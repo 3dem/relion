@@ -803,9 +803,9 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 		mini_pipeline.addNewOutputEdge(0, outputnodes[i]);
 	}
 
-	// Write the pipeline to an updated STAR file
-	pipeline.write();
+	// Write the mini-pipeline to an updated STAR file
 	mini_pipeline.write();
+	// Writing of the overall pipeline is done in the function calling addToPipeLine
 
 	return myProcess;
 }
@@ -1101,7 +1101,15 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 				sleep(10);
 				pipeline.checkProcessCompletion();
 				if (pipeline.processList[current_job].status == PROC_FINISHED)
+				{
+					// Read in existing pipeline, in case some other window had changed something else
+					pipeline.read(true);
+					// Re-set set status of current_job to finished
+					pipeline.processList[current_job].status = PROC_FINISHED;
+					// Write out the modified pipeline with the status of current_job to finished
+					pipeline.write();
 					break;
+				}
 			}
 
 			if (!fn_check_exists)
@@ -1142,7 +1150,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	if (repeat == nr_repeat)
 	{
 		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
+		std::cout << " PIPELINER: you may want to re-start the GUI to update the job lists." << std::endl;
 
 		// Read in existing pipeline, in case some other window had changed it
 		pipeline.read(true);
@@ -1152,6 +1160,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		{
 			pipeline.processList[my_scheduled_processes[i]].status = PROC_FINISHED;
 		}
+
 		// Write the pipeline to an updated STAR file
 		pipeline.write();
 
@@ -1545,6 +1554,9 @@ void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
 
+	// Make sure that whenever we write out a pipeline, we first read in the existing version on disk
+	// This prevents sync errors with multiple windows acting on the same pipeline
+
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
 	pipeline.read(true); // true means: only_read if_file_exists
 
@@ -1610,6 +1622,9 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	// Update all job lists in the main GUI
 	updateJobLists();
+
+	// Write out the new pipeline
+	pipeline.write();
 
 	if (!only_schedule)
 	{
@@ -2372,8 +2387,9 @@ void RelionMainWindow::cb_make_flowchart_i()
 	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
 	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
 	pipeline.addNewOutputEdge(current_job, node);
-	pipeline.write();
 	updateJobLists();
+
+	pipeline.write();
 
 	return;
 }

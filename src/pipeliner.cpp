@@ -155,56 +155,6 @@ long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
 	return i;
 }
 
-void PipeLine::deleteProcess(int ipos, bool recursive)
-{
-
-	FileName fn_del = processList[ipos].name;
-	std::vector<bool> deleteProcesses, deleteNodes;
-	deleteProcesses.resize(processList.size(), false);
-	deleteNodes.resize(nodeList.size(), false);
-
-	std::vector<long int> to_delete_processes;
-	to_delete_processes.push_back(ipos);
-
-	// Read in existing pipeline, in case some other window had changed it
-	read(true);
-
-	bool is_done = false;
-	size_t istart = 0;
-	while (!is_done)
-	{
-		size_t imax = to_delete_processes.size();
-		for (long int i = istart; i < imax; i++)
-		{
-			// re-set istart for next recursive round
-			istart = imax;
-			long int idel = to_delete_processes[i];
-			deleteProcesses[idel] = true;
-			for (size_t inode = 0; inode < (processList[idel]).outputNodeList.size(); inode++)
-			{
-				long int mynode = (processList[ipos]).outputNodeList[inode];
-				deleteNodes[mynode] = true;
-				is_done = true;
-				if (recursive)
-				{
-					// Check whether this node is being used as input for another process, and if so, delete those as well
-					for (size_t ii = 0; ii < (nodeList[inode]).inputForProcessList.size(); ii++)
-					{
-						long int iproc = (nodeList[inode]).inputForProcessList[ii];
-						to_delete_processes.push_back(iproc);
-						is_done = false;
-					}
-				}
-			}
-		}
-	}
-
-	// Write new pipeline to disc and read in again
-	write(fn_del, deleteNodes, deleteProcesses);
-	read();
-
-}
-
 long int PipeLine::findNodeByName(std::string name)
 {
 	for(long int ipos = 0 ; ipos < nodeList.size() ; ipos++)
@@ -359,7 +309,6 @@ void PipeLine::remakeNodeDirectory()
 void PipeLine::checkProcessCompletion()
 {
 
-	bool something_changed = false;
 	for (long int i=0; i < processList.size(); i++)
 	{
 		// Only check running processes for file existence
@@ -380,13 +329,14 @@ void PipeLine::checkProcessCompletion()
 			if (all_exist)
 			{
 				processList[i].status = PROC_FINISHED;
-				something_changed = true;
 			}
 		}
 	}
 
-	if (something_changed)
-		write(); // write updated pipeline to disk
+	// Don't write out the updated pipeline here.
+	// Always make sure to read in the existing pipeline inside gui_mainwindow.cpp before writing a new one to disk
+	// This is to make sure two different windows do not get out-of-sync
+
 }
 
 // Import a job into the pipeline
