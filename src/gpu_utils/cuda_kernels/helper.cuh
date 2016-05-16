@@ -118,6 +118,11 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										int startPsi,
 										int totalPsis);
 
+__global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
+						  	  	  	  	  XFLOAT psi,
+						  	  			  CudaProjectorKernel projector,
+						  	  			  int startPsi);
+
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
