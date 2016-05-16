@@ -227,31 +227,25 @@ void MlOptimiserMpi::initialise()
                 }
 
                 for (int i = 0; i < nr_threads; i ++)
-                {
-                    int dev_id;
-                    if (semiAutomaticMapping)
-                    {
-                        // Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
-                        if (fullAutomaticMapping)
-                        {
-                            if(node->size > 1)
-                                dev_id = ( (i * (node->size - 1)) + (node->rank - 1) )%devCount;
-                            else
-                                dev_id = i%devCount;
-                        }
-                        else
-                        {
-                            if(node->size > 1)
-                                dev_id = (i*(allThreadIDs[rank-1].size()-1))%allThreadIDs[rank-1].size();
-                            else
-                                dev_id = i%allThreadIDs[rank-1].size();
-                            dev_id =  textToInteger(allThreadIDs[rank-1][dev_id].c_str());
-                        }
-                    }
-                    else // not semiAutomatic => explicit
-                    {
-                        dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
-                    }
+				{
+					int dev_id;
+					if (semiAutomaticMapping)
+					{
+						// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+						// Bjorn: Better hack, no idea about the above condition.
+						if (fullAutomaticMapping)
+						{
+							if(node->size > 1)
+								dev_id = (devCount*( (node->rank-1)*nr_threads + i ))  / ((node->size-1)*nr_threads);
+							else
+								dev_id = devCount*i / nr_threads;
+						}
+						else
+						{
+								dev_id = textToInteger(allThreadIDs[rank-1][(allThreadIDs[rank-1].size()*i)/nr_threads].c_str());
+						}
+					}
+
                     std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 
                     //Only make a new bundle of not existing on device
