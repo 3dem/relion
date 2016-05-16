@@ -279,17 +279,21 @@ private:
 	bool _freeReadyAllocs()
 	{
 		bool somethingFreed(false);
-		Alloc *a = first;
+		Alloc *next = first;
+		Alloc *curr;
 
-		while (a != NULL)
+		while (next != NULL)
 		{
-			if (! a->free && a->freeWhenReady && a->readyEvent != 0)
+			curr = next;
+			next = curr->next;
+
+			if (! curr->free && curr->freeWhenReady && curr->readyEvent != 0)
 			{
-				cudaError_t e = cudaEventQuery(a->readyEvent);
+				cudaError_t e = cudaEventQuery(curr->readyEvent);
 
 				if (e == cudaSuccess)
 				{
-					_free(a);
+					_free(curr);
 					somethingFreed = true;
 				}
 				else if (e != cudaErrorNotReady)
@@ -298,8 +302,6 @@ private:
 					HandleError( e, __FILE__, __LINE__ );
 				}
 			}
-
-			a = a->next;
 		}
 		return somethingFreed;
 	}

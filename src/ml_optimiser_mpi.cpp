@@ -737,7 +737,6 @@ void MlOptimiserMpi::expectation()
 #define JOB_LEN_FN_RECIMG  (first_last_nr_images(5))
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
-
 #ifdef CUDA
 	/************************************************************************/
 	//GPU memory setup
@@ -756,6 +755,8 @@ void MlOptimiserMpi::expectation()
 			cudaDeviceBundles.push_back((void*)b);
 		}
 
+		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
@@ -763,46 +764,31 @@ void MlOptimiserMpi::expectation()
 			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]],didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
+			threadcountOnDevice[b->device_id] ++;
 		}
-
-//#ifdef PRINT_GPU_MEM_INFO
-//		for (int i = 0; i < cudaMlDeviceBundles.size(); i ++)
-//		{
-//			for (int j = 0; j < cudaMlDeviceBundles[i]->cudaBackprojectors.size(); j ++)
-//			{
-//				size_t BPSize = ((MlDeviceBundle *) cudaMlDeviceBundles[i])->cudaBackprojectors[j].mdlXYZ * sizeof(XFLOAT) * 3;
-//				printf("INFO: Size of backprojector nr %d of device bundle nr %d of rank %d: %d MB \n", j, i, node->rank, (int) ( ((float)BPSize)/1000000.0 ) );
-//			}
-//		}
-//#endif
 
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 		{
-			size_t allocationSize;
+			HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
 
-			if (! node->isMaster())
+			size_t free, total, allocationSize;
+			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+
+			free = (float) free / (float)cudaDeviceShares[i];
+			size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
+
+			if (free < required_free)
 			{
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
-
-				size_t free, total, allocationSize;
-				HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
-
-				free = (float) free / (float)cudaDeviceShares[i];
-				size_t required_free = requested_free_gpu_memory + GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
-
-				if (free < required_free)
-				{
-					printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
-					allocationSize = (double)free *0.7;
-				}
-				else
-					allocationSize = free - required_free;
+				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
+				allocationSize = (double)free *0.7;
+			}
+			else
+				allocationSize = free - required_free;
 
 #ifdef PRINT_GPU_MEM_INFO
-				printf("INFO: Free memory for Custom Allocator of device bundle %d of rank %d is %d MB\n", i, node->rank, (int) ( ((float)allocationSize)/1000000.0 ) );
+			printf("INFO: Free memory for Custom Allocator of device bundle %d of rank %d is %d MB\n", i, node->rank, (int) ( ((float)allocationSize)/1000000.0 ) );
 #endif
-				allocationSizes.push_back(allocationSize);
-			}
+			allocationSizes.push_back(allocationSize);
 		}
 	}
 

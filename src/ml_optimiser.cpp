@@ -2016,6 +2016,8 @@ void MlOptimiser::expectation()
 			cudaDeviceBundles.push_back((void*)b);
 		}
 
+		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
@@ -2023,6 +2025,7 @@ void MlOptimiser::expectation()
 			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
+			threadcountOnDevice[b->device_id] ++;
 		}
 
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
@@ -2032,7 +2035,7 @@ void MlOptimiser::expectation()
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-			size_t required_free = requested_free_gpu_memory + GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+			size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
 
 			if (free < required_free)
 			{
