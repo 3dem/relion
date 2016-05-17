@@ -2027,9 +2027,18 @@ void MlOptimiser::expectation()
 			threadcountOnDevice[b->device_id] ++;
 		}
 
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 		{
-			HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
+			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount)
+			{
+				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+				raise(SIGSEGV);
+			}
+			else
+				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
