@@ -2422,7 +2422,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 void MlDeviceBundle::setupFixedSizedObjects()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
-	HANDLE_ERROR(cudaSetDevice(device_id));
+
+	int devCount;
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	if(device_id >= devCount)
+	{
+		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		raise(SIGSEGV);
+	}
+	else
+		HANDLE_ERROR(cudaSetDevice(device_id));
 
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
 	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
@@ -2477,7 +2486,15 @@ void MlDeviceBundle::setupFixedSizedObjects()
 void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
-	HANDLE_ERROR(cudaSetDevice(device_id));
+	int devCount;
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	if(device_id >= devCount)
+	{
+		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		raise(SIGSEGV);
+	}
+	else
+		HANDLE_ERROR(cudaSetDevice(device_id));
 
 	/*======================================================
 	                    CUSTOM ALLOCATOR
@@ -2542,7 +2559,15 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 
 void MlOptimiserCuda::resetData()
 {
-	HANDLE_ERROR(cudaSetDevice(device_id));
+	int devCount;
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	if(device_id >= devCount)
+	{
+		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		raise(SIGSEGV);
+	}
+	else
+		HANDLE_ERROR(cudaSetDevice(device_id));
 
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
@@ -2563,7 +2588,15 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 #endif
 //	CTOC(cudaMLO->timer,"interParticle");
 
-	DEBUG_HANDLE_ERROR(cudaSetDevice(device_id));
+	int devCount;
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	if(device_id >= devCount)
+	{
+		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		raise(SIGSEGV);
+	}
+	else
+		DEBUG_HANDLE_ERROR(cudaSetDevice(device_id));
 	//std::cerr << " calling on device " << device_id << std::endl;
 	//put mweight allocation here
 	size_t first_ipart = 0, last_ipart = 0;

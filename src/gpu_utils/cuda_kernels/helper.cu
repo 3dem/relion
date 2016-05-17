@@ -550,6 +550,46 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	}
 }
 
+__global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
+						  	  	  	  	  XFLOAT psi,
+						  	  			  CudaProjectorKernel projector,
+						  	  			  int startPsi
+						  	  			  )
+{
+	int proj = blockIdx.y;
+	int image_size=projector.imgX*projector.imgY;
+	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(pixel<image_size)
+	{
+		int y = floorfracf(pixel,projector.imgX);
+		int x = pixel % projector.imgX;
+
+		if (y > projector.maxR)
+		{
+			if (y >= projector.imgY - projector.maxR)
+				y = y - projector.imgY;
+			else
+				x = projector.maxR;
+		}
+
+		XFLOAT sa, ca;
+		sincos(proj*psi, &sa, &ca);
+		CUDACOMPLEX val;
+
+		projector.project2Dmodel(	 x,y,
+									 ca,
+									-sa,
+									 sa,
+									 ca,
+									 val.x,val.y);
+
+		long int out_pixel = proj*image_size + pixel;
+
+		d_Faux[out_pixel].x =val.x;
+		d_Faux[out_pixel].y =val.y;
+	}
+}
+
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
@@ -591,6 +631,7 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 
 	}
 }
+
 
 __global__ void cuda_kernel_convol_A( CUDACOMPLEX *d_A,
 									 CUDACOMPLEX *d_B,

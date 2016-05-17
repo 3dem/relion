@@ -201,6 +201,10 @@ public:
 
 		~Alloc()
 		{
+			prev = NULL;
+			next = NULL;
+			ptr = NULL;
+
 			if (readyEvent != 0)
 				DEBUG_HANDLE_ERROR(cudaEventDestroy(readyEvent));
 		}
@@ -279,17 +283,22 @@ private:
 	bool _freeReadyAllocs()
 	{
 		bool somethingFreed(false);
-		Alloc *a = first;
+		Alloc *next = first;
+		Alloc *curr;
 
-		while (a != NULL)
+		while (next != NULL)
 		{
-			if (! a->free && a->freeWhenReady && a->readyEvent != 0)
+			curr = next;
+			next = curr->next;
+
+			if (! curr->free && curr->freeWhenReady && curr->readyEvent != 0)
 			{
-				cudaError_t e = cudaEventQuery(a->readyEvent);
+				cudaError_t e = cudaEventQuery(curr->readyEvent);
 
 				if (e == cudaSuccess)
 				{
-					_free(a);
+					_free(curr);
+					next = first; //List modified, restart
 					somethingFreed = true;
 				}
 				else if (e != cudaErrorNotReady)
@@ -298,8 +307,6 @@ private:
 					HandleError( e, __FILE__, __LINE__ );
 				}
 			}
-
-			a = a->next;
 		}
 		return somethingFreed;
 	}
@@ -1013,6 +1020,8 @@ public:
 	void device_alloc()
 	{
 #ifdef DEBUG_CUDA
+		if(size==0)
+			printf("DEBUG_WARNING: device_alloc called with size == 0");
 		if (d_do_free)
 			printf("DEBUG_WARNING: Device double allocation.\n");
 #endif
@@ -1043,6 +1052,8 @@ public:
 	void host_alloc()
 	{
 #ifdef DEBUG_CUDA
+		if(size==0)
+			printf("DEBUG_WARNING: device_alloc called with size == 0");
 		if (h_do_free)
 			printf("DEBUG_WARNING: Host double allocation.\n");
 #endif
