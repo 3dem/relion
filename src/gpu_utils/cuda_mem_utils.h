@@ -1015,6 +1015,8 @@ public:
 	void device_alloc()
 	{
 #ifdef DEBUG_CUDA
+		if(size==0)
+			DEBUG_WARNING("device_alloc called with size == 0")
 		if (d_do_free)
 			printf("DEBUG_WARNING: Device double allocation.\n");
 #endif
@@ -1045,6 +1047,8 @@ public:
 	void host_alloc()
 	{
 #ifdef DEBUG_CUDA
+		if(size==0)
+			DEBUG_WARNING("host_alloc called with size == 0")
 		if (h_do_free)
 			printf("DEBUG_WARNING: Host double allocation.\n");
 #endif
