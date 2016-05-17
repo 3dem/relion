@@ -201,6 +201,10 @@ public:
 
 		~Alloc()
 		{
+			prev = NULL;
+			next = NULL;
+			ptr = NULL;
+
 			if (readyEvent != 0)
 				DEBUG_HANDLE_ERROR(cudaEventDestroy(readyEvent));
 		}
@@ -294,6 +298,7 @@ private:
 				if (e == cudaSuccess)
 				{
 					_free(curr);
+					next = first; //List modified, restart
 					somethingFreed = true;
 				}
 				else if (e != cudaErrorNotReady)
