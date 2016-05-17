@@ -48,7 +48,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * 
 	if(dev_id >= devCount)
 	{
 		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		REPORT_ERROR("ERROR: Assigning a thread to a non-existent device (index likely too high)");
+		raise(SIGSEGV);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(dev_id));
@@ -581,10 +581,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	}
 
 	CudaGlobalPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);
-	for(int i = 0; i< d_ctf.size ; i++)
-		d_ctf[i]=Fctf.data[i];
-
-	d_ctf.put_on_device();
+	if(basePckr->do_ctf)
+	{
+		for(int i = 0; i< d_ctf.size ; i++)
+			d_ctf[i]=Fctf.data[i];
+		d_ctf.put_on_device();
+	}
 
 	for (int iref = 0; iref < basePckr->Mrefs.size(); iref++)
 	{
@@ -638,13 +640,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 #endif
 	CTIC(timer,"SingleProjection");
 	dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),1);
-	cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
+	if(basePckr->do_ctf)
+	{
+		cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
 													  ~cudaTransformer1.fouriers,
 													  ~d_ctf,
 													  0,
 													  projKernel,
 													  0
 												);
+	}
+	else
+	{
+		cuda_kernel_rotateOnly<<<blocks,BLOCK_SIZE>>>(
+													  ~cudaTransformer1.fouriers,
+													  0,
+													  projKernel,
+													  0
+												);
+	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CTOC(timer,"SingleProjection");
 #ifdef TIMING
@@ -730,13 +744,25 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 
 				CTIC(timer,"Projection");
 				dim3 blocks((int)ceilf((float)FauxStride/(float)BLOCK_SIZE),cudaTransformer1.batchSize[psiIter]);
-				cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
-																  ~cudaTransformer1.fouriers,
-																  ~d_ctf,
-																  DEG2RAD(basePckr->psi_sampling),
-																  projKernel,
-																  startPsi
+				if(basePckr->do_ctf)
+				{
+					cuda_kernel_rotateAndCtf<<<blocks,BLOCK_SIZE>>>(
+															  ~cudaTransformer1.fouriers,
+															  ~d_ctf,
+															  DEG2RAD(basePckr->psi_sampling),
+															  projKernel,
+															  startPsi
 															);
+				}
+				else
+				{
+					cuda_kernel_rotateOnly<<<blocks,BLOCK_SIZE>>>(
+															  ~cudaTransformer1.fouriers,
+															  DEG2RAD(basePckr->psi_sampling),
+															  projKernel,
+															  startPsi
+															);
+				}
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 				CTOC(timer,"Projection");
 

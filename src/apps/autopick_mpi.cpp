@@ -53,9 +53,11 @@ int main(int argc, char *argv[])
     		prm.usage();
         std::cerr << XE;
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 
 }
 

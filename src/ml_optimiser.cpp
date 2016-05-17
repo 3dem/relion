@@ -972,19 +972,18 @@ void MlOptimiser::initialise()
 			if (semiAutomaticMapping)
 			{
 				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+				// Bjorn: Better hack
 				if (fullAutomaticMapping)
-					dev_id = i%devCount;
+					dev_id = devCount*i / nr_threads;
 				else
-				{
-					dev_id = i%allThreadIDs[0].size();
-					if(std::isdigit(*allThreadIDs[0][dev_id].c_str()))
-						dev_id =  textToInteger(allThreadIDs[0][dev_id].c_str());
-				}
+					dev_id = textToInteger(allThreadIDs[0][(allThreadIDs[0].size()*i)/nr_threads].c_str());
 			}
 			else // not semiAutomatic => explicit
 			{
-				dev_id = textToInteger(allThreadIDs[0][i].c_str());
+					dev_id = textToInteger(allThreadIDs[0][i].c_str());
 			}
+
+
 			std::cout << " Thread " << i << " mapped to device " << dev_id << std::endl;
 
 			//Only make a new bundle of not existing on device
@@ -2016,6 +2015,8 @@ void MlOptimiser::expectation()
 			cudaDeviceBundles.push_back((void*)b);
 		}
 
+		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
@@ -2023,16 +2024,26 @@ void MlOptimiser::expectation()
 			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
+			threadcountOnDevice[b->device_id] ++;
 		}
+
+		int devCount;
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 		{
-			HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
+			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount)
+			{
+				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+				raise(SIGSEGV);
+			}
+			else
+				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
-			size_t required_free = requested_free_gpu_memory + GPU_MEMORY_OVERHEAD_MB*1000*1000*nr_threads;
+			size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
 
 			if (free < required_free)
 			{

@@ -56,10 +56,11 @@ int main(int argc, char *argv[])
     {
         prm.usage();
         std::cerr << XE;
-        exit(1);
+
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 
 }
 
