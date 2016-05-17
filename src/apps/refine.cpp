@@ -44,8 +44,9 @@ int main(int argc, char **argv)
     {
         optimiser.usage();
         std::cerr << XE;
-        exit(1);
+	
+        return EXIT_FAILURE;
     }
 
-    exit(0);
+    return EXIT_SUCCESS;
 }
