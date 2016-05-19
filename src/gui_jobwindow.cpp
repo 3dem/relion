@@ -1077,7 +1077,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 	movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	movie_group->end();
 
-	do_movie_thon_rings.place(current_y, "Estimate Thon rongs from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access", movie_group);
+	do_movie_thon_rings.place(current_y, "Estimate Thon rings from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access", movie_group);
 
 	movie_group->begin();
 	movie_rootname.place(current_y, "Movie rootname plus extension", "_movie.mrcs", "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");
@@ -2569,10 +2569,6 @@ A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of 
 	tab6->label("Compute");
 	resetHeight();
 
-	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", true, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
-All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
-This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
-
 	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
@@ -2584,6 +2580,12 @@ This may improve performance on systems where disk access, and particularly meta
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
 
+	scratch_dir.place(current_y, "Copy particles to scratch directory:", "", "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
+Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2648,6 +2650,7 @@ void Class2DJobWindow::write(std::string fn)
 	do_parallel_discio.writeValue(fh);
 	nr_pool.writeValue(fh);
 	do_preread_images.writeValue(fh);
+	scratch_dir.writeValue(fh);
 	use_gpu.writeValue(fh);
 	gpu_ids.writeValue(fh);
 
@@ -2700,6 +2703,7 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 		do_parallel_discio.readValue(fh);
 		nr_pool.readValue(fh);
 		do_preread_images.readValue(fh);
+		scratch_dir.readValue(fh);
 		use_gpu.readValue(fh);
 		gpu_ids.readValue(fh);
 
@@ -2766,9 +2770,15 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
 	if (do_preread_images.getValue())
+	{
 		command += " --preread_images --pool 1 " ;
+	}
 	else
+	{
+		if (scratch_dir.getValue() != "")
+			command += " --scratch_dir " +  scratch_dir.getValue();
 		command += " --pool " + floatToString(nr_pool.getValue());
+	}
 
 	// CTF stuff
 	if (!is_continue)
@@ -3127,10 +3137,6 @@ Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filame
 	tab7->label("Compute");
 	resetHeight();
 
-	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", true, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
-All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
-This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
-
 	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
@@ -3141,6 +3147,13 @@ This may improve performance on systems where disk access, and particularly meta
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+
+	scratch_dir.place(current_y, "Copy particles to scratch directory:", "", "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
+Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3228,6 +3241,7 @@ void Class3DJobWindow::write(std::string fn)
 	do_parallel_discio.writeValue(fh);
 	nr_pool.writeValue(fh);
 	do_preread_images.writeValue(fh);
+	scratch_dir.writeValue(fh);
 	use_gpu.writeValue(fh);
 	gpu_ids.writeValue(fh);
 
@@ -3301,6 +3315,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		// Compute
 		do_combine_thru_disc.readValue(fh);
 		do_parallel_discio.readValue(fh);
+		scratch_dir.readValue(fh);
 		nr_pool.readValue(fh);
 		do_preread_images.readValue(fh);
 		use_gpu.readValue(fh);
@@ -3411,9 +3426,15 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
 	if (do_preread_images.getValue())
+	{
 		command += " --preread_images --pool 1 " ;
+	}
 	else
+	{
+		if (scratch_dir.getValue() != "")
+			command += " --scratch_dir " +  scratch_dir.getValue();
 		command += " --pool " + floatToString(nr_pool.getValue());
+	}
 
 	// CTF stuff
 	if (!is_continue)
@@ -3766,10 +3787,6 @@ Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filame
 	tab7->label("Compute");
 	resetHeight();
 
-	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", true, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
-All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
-This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
-
 	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 
@@ -3780,6 +3797,13 @@ This may improve performance on systems where disk access, and particularly meta
 	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+
+	scratch_dir.place(current_y, "Copy particles to scratch directory:", "", "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
+Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3861,6 +3885,7 @@ void Auto3DJobWindow::write(std::string fn)
 	do_parallel_discio.writeValue(fh);
 	nr_pool.writeValue(fh);
 	do_preread_images.writeValue(fh);
+	scratch_dir.writeValue(fh);
 	use_gpu.writeValue(fh);
 	gpu_ids.writeValue(fh);
 
@@ -3931,6 +3956,7 @@ void Auto3DJobWindow::read(std::string fn, bool &_is_continue)
 		do_parallel_discio.readValue(fh);
 		nr_pool.readValue(fh);
 		do_preread_images.readValue(fh);
+		scratch_dir.readValue(fh);
 		use_gpu.readValue(fh);
 		gpu_ids.readValue(fh);
 
@@ -4041,9 +4067,15 @@ bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
 	if (do_preread_images.getValue())
+	{
 		command += " --preread_images --pool 1 " ;
+	}
 	else
+	{
+		if (scratch_dir.getValue() != "")
+			command += " --scratch_dir " +  scratch_dir.getValue();
 		command += " --pool " + floatToString(nr_pool.getValue());
+	}
 
 	// CTF stuff
 	if (!is_continue)
