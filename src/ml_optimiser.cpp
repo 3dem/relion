@@ -976,7 +976,8 @@ void MlOptimiser::initialise()
 				if (fullAutomaticMapping)
 					dev_id = devCount*i / nr_threads;
 				else
-					dev_id = textToInteger(allThreadIDs[0][(allThreadIDs[0].size()*i)/nr_threads].c_str());
+					dev_id = textToInteger(allThreadIDs[0][i % (allThreadIDs[0]).size()].c_str());
+					//dev_id = textToInteger(allThreadIDs[0][(allThreadIDs[0].size()*i)/nr_threads].c_str());
 			}
 			else // not semiAutomatic => explicit
 			{
@@ -2024,17 +2025,17 @@ void MlOptimiser::expectation()
 			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
-			threadcountOnDevice[b->device_id] ++;
+			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
 		}
 
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-
+		HANDLE_ERROR(cudaDeviceSynchronize());
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 		{
-			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount)
+			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
 			{
-				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
 				raise(SIGSEGV);
 			}
 			else
