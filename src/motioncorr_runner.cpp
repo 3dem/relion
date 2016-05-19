@@ -63,7 +63,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 void MotioncorrRunner::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void MotioncorrRunner::initialise()

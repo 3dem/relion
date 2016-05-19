@@ -525,7 +525,7 @@ void ManualPicker::read(int argc, char **argv)
 
 void ManualPicker::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void ManualPicker::initialise()

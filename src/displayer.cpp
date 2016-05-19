@@ -1921,7 +1921,7 @@ void Displayer::read(int argc, char **argv)
 
 void Displayer::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void Displayer::initialise()

@@ -88,7 +88,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 
 void CtffindRunner::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void CtffindRunner::initialise()
@@ -443,8 +443,8 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 		int res = system(command.c_str());
 
 		// Cleanup all the symbolic links again
-		for (size_t i = 0; i < allmicnames.size(); i++)
-			remove(allmicnames[i].c_str());
+		//for (size_t i = 0; i < allmicnames.size(); i++)
+		//	remove(allmicnames[i].c_str());
 
 		// Re-set the allmicnames vector
 		allmicnames.clear();

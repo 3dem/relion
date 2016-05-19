@@ -105,7 +105,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 
 void Preprocessing::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void Preprocessing::initialise()
@@ -291,7 +291,7 @@ void Preprocessing::joinAllStarFiles()
 	if (do_movie_extract && fn_list_star != "" && join_nr_mics > 0)
 		fn_ostar = fn_list_star.beforeLastOf("/") + "/batch_" + integerToString(join_nr_mics) + "mics_nr";
 
-	std::cout << " Joining all metadata in one STAR file..." << std::endl;
+	std::cout << " Joining metadata of all particles from " << MDmics.numberOfObjects() << " micrographs in one STAR file..." << std::endl;
 
 	long int imic = 0, ibatch = 0;
 	MetaDataTable MDout, MDmicnames, MDbatch;
@@ -367,17 +367,18 @@ void Preprocessing::joinAllStarFiles()
 
 	} // end loop over all micrographs
 
+
 	// Write out the joined star files
 	if (fn_part_star != "")
 	{
 		MDout.write(fn_part_star);
-		std::cout << " Written out STAR file with all particles in " << fn_part_star<< std::endl;
+		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 	}
 
     if (do_movie_extract && fn_list_star != "")
     {
     	MDmicnames.write(fn_list_star);
-    	std::cout << " Written out list of movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
+    	std::cout << " Written out list of " << MDmicnames.numberOfObjects() << " movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
     }
 
 }

@@ -64,7 +64,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 
 void MlOptimiser::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void MlOptimiser::read(int argc, char **argv, int rank)
