@@ -1346,7 +1346,9 @@ void RelionMainWindow::cb_display_io_node_i()
 		FileName fn_job = ".gui_manualpickrun.job";
 		bool iscont=false;
 		if (exists(fn_job))
-			global_manualpickjob.read(fn_job.c_str(), iscont);
+		{
+			global_manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont);
+		}
 		else
 		{
 			fl_message("ERROR: Save a Manual picking job parameter file (using the Save jobs settings option from the Jobs menu) before displaying coordinate files. ");
@@ -2299,10 +2301,10 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		fn_opt = fn_root1 + "run_it*optimiser.star";
 		fn_opt.globFiles(fn_opts);
 		// It could also be a continuation
-		fn_opt = fn_root1 + "run_ct?_optimiser.star";
+		fn_opt = fn_root1 + "run_ct?_it???_optimiser.star";
 		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
 		// It could also be a continuation
-		fn_opt = fn_root1 + "run_ct??_optimiser.star";
+		fn_opt = fn_root1 + "run_ct??_it???_optimiser.star";
 		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
 		if (fn_opts.size() > 0)
 		{
@@ -2339,11 +2341,26 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		}
 	}
 
+	// Remove any of the expected output nodes from the pipeline if the corresponding file doesn't already exist
+	std::vector<bool> deleteNodes, deleteProcesses;
+	deleteNodes.resize(pipeline.nodeList.size(), false);
+	deleteProcesses.resize(pipeline.processList.size(), false);
+
+	for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
+	{
+		long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
+		if(!exists(pipeline.nodeList[mynode].name))
+			deleteNodes[mynode] = true;
+	}
+	FileName fn_del = "tmp";
+	pipeline.write(fn_del, deleteNodes, deleteProcesses);
+	std::remove("tmpdeleted_pipeline.star");
+
+	// Read the updated pipeline back in again
+	pipeline.read();
+
 	// Update all job lists in the main GUI
 	updateJobLists();
-
-	// Write updated pipeline to disk
-	pipeline.write();
 
 }
 
@@ -2677,7 +2694,7 @@ void RelionMainWindow::cb_start_pipeliner_i()
 	// Ask how many times to repeat
 	const char * answer;
 	std::string default_answer="1";
-	answer =  fl_input("Repeat how many times? ", default_answer.c_str());
+	answer =  fl_input("Run the scheduled jobs how many times? ", default_answer.c_str());
 	if (answer == NULL)
 		nr_repeat = 1;
 	else
