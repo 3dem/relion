@@ -85,9 +85,6 @@ if (CUDA_FOUND)
     
 endif(CUDA_FOUND)
 
-
-	message(STATUS "BLAAAAA ${EXTRA_LIBS}")
-
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	

@@ -16,6 +16,9 @@ endif()
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+add_definitions(-DINSTALL_LIBRARY_DIR="${CMAKE_INSTALL_PREFIX}/lib/")
+add_definitions(-DSOURCE_DIR="${CMAKE_SOURCE_DIR}/src/")
+
 # ------------------------------------------------------------------RPATH SETTINGS--
 if(NOT APPLE)
     # use, i.e. don't skip the full RPATH for the build tree
@@ -195,6 +198,7 @@ if(GUI)
         
 	if(NOT FLTK_FOUND)
             include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+            set(INSTALL_OWN_FLTK 1)
         endif(NOT FLTK_FOUND)
 
     else(X11_FOUND)
@@ -248,6 +252,12 @@ foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
     install(FILES ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} DESTINATION bin)
 endforeach()
 
+install(FILES ${CMAKE_SOURCE_DIR}/src/gui_background.xpm DESTINATION lib)
+
+# install fltk if we built our own version
+if(INSTALL_OWN_FLTK)
+    install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
+endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
