@@ -197,9 +197,6 @@ class PipeLine
 	// Add a new Process to the list (no checks are performed)
 	long int addNewProcess(Process &_Process, bool do_overwrite = false);
 
-	// Delete a process and its output nodes (and all input edges) from the pipeline
-	void deleteProcess(int ipos, bool recursive = false);
-
 	// Find nodes or process (by name or alias)
 	long int findNodeByName(std::string name);
 	long int findProcessByName(std::string name);

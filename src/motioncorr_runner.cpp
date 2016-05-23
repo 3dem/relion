@@ -63,7 +63,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 void MotioncorrRunner::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void MotioncorrRunner::initialise()
@@ -153,17 +153,17 @@ void MotioncorrRunner::initialise()
 	}
 
 	// If we're continuing an old run, see which micrographs have not been finished yet...
+	fn_ori_micrographs = fn_micrographs;
 	if (continue_old)
 	{
-		std::vector<FileName> fns_todo;
-		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
+		fn_micrographs.clear();
+		for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 		{
 			FileName fn_avg, fn_mov;
-			getOutputFileNames(fn_micrographs[imic], fn_avg, fn_mov);
+			getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
 			if (!exists(fn_avg) || (do_save_movies && !exists(fn_mov)) )
-				fns_todo.push_back(fn_micrographs[imic]);
+				fn_micrographs.push_back(fn_ori_micrographs[imic]);
 		}
-		fn_micrographs = fns_todo;
 	}
 
 	// Make sure fn_out ends with a slash
@@ -236,6 +236,7 @@ void MotioncorrRunner::run()
 			std::cout << " Correcting beam-induced motions using Niko Grigorieff's UNBLUR ..." << std::endl;
 		else
 			std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
+
 		init_progress_bar(fn_micrographs.size());
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 	}
@@ -322,7 +323,7 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 		fh.close();
 
 		if (system(command.c_str()))
-			REPORT_ERROR("ERROR executing: " + command);
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
 
 		// After motion-correction, check for all-zero average micrographs
 		if (exists(fn_avg))
@@ -363,7 +364,7 @@ void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &
     // Start reading the ifstream at the top
     in.seekg(0);
 
-    // Read throught the shifts file
+    // Read through the shifts file
     int i = 0;
     bool have_found_final = false;
     while (getline(in, line, '\n'))
@@ -654,18 +655,17 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 void MotioncorrRunner::generateLogFilePDF()
 {
 
-	if (fn_micrographs.size() > 0)
+	if (fn_ori_micrographs.size() > 0)
 	{
 
 		std::vector<FileName> fn_eps;
 
-
 		FileName fn_prev="";
-		for (long int i = 0; i < fn_micrographs.size(); i++)
+		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
 		{
-			if (fn_prev != fn_micrographs[i].beforeLastOf("/"))
+			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
 			{
-				fn_prev = fn_micrographs[i].beforeLastOf("/");
+				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
 				fn_eps.push_back(fn_out + fn_prev+"/*.eps");
 			}
 		}

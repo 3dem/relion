@@ -84,7 +84,7 @@ void ParticlePolisher::read(int argc, char **argv)
 
 void ParticlePolisher::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void ParticlePolisher::generateMicrographList()

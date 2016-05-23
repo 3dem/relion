@@ -67,6 +67,9 @@ public:
 	// Allow saving selected micrographs?
 	bool do_allow_save;
 
+	// Save default selection immediately? (useful for always generating output files in pipeline)
+	bool do_fast_save;
+
 	// MetaDataTable of input micrographs
 	MetaDataTable MDin;
 
@@ -110,6 +113,9 @@ public:
 
 	// Allow save selected micrographs?
 	bool do_allow_save;
+
+	// Save an output selection file immediately (with all micrographs selected)
+	bool do_fast_save;
 
 
 public:

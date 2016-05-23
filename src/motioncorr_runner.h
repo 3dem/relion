@@ -45,7 +45,7 @@ public:
 	FileName fn_in, fn_out, fn_movie;
 
 	// Filenames of all the micrographs to run Motioncorr on
-	std::vector<FileName> fn_micrographs;
+	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
 	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;

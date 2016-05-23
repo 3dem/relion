@@ -105,7 +105,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 
 void Preprocessing::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void Preprocessing::initialise()
@@ -291,7 +291,7 @@ void Preprocessing::joinAllStarFiles()
 	if (do_movie_extract && fn_list_star != "" && join_nr_mics > 0)
 		fn_ostar = fn_list_star.beforeLastOf("/") + "/batch_" + integerToString(join_nr_mics) + "mics_nr";
 
-	std::cout << " Joining all metadata in one STAR file..." << std::endl;
+	std::cout << " Joining metadata of all particles from " << MDmics.numberOfObjects() << " micrographs in one STAR file..." << std::endl;
 
 	long int imic = 0, ibatch = 0;
 	MetaDataTable MDout, MDmicnames, MDbatch;
@@ -367,17 +367,18 @@ void Preprocessing::joinAllStarFiles()
 
 	} // end loop over all micrographs
 
+
 	// Write out the joined star files
 	if (fn_part_star != "")
 	{
 		MDout.write(fn_part_star);
-		std::cout << " Written out STAR file with all particles in " << fn_part_star<< std::endl;
+		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 	}
 
     if (do_movie_extract && fn_list_star != "")
     {
     	MDmicnames.write(fn_list_star);
-    	std::cout << " Written out list of movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
+    	std::cout << " Written out list of " << MDmicnames.numberOfObjects() << " movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
     }
 
 }
@@ -633,13 +634,13 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		int npos = MDin.numberOfObjects();
 		if (npos < 10)
 		{
-			std:: cerr << "WARNING: there are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
+			std::cout << "warning: There are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
 		}
 
 		// Get movie or normal micrograph name and check it exists
 		if (!exists(fn_mic))
 		{
-			std::cerr << "WARNING: cannot find micrograph file " << fn_mic << " which has " << npos << " particles" << std::endl;
+			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles, because cannot find the file..." << std::endl;
 			return;
 		}
 
@@ -655,8 +656,11 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			do_ramp = false;
 
 		// Just to be sure...
-		if (do_movie_extract && ndim < 2)
-			std::cerr << "WARNING: movie " << fn_mic << " does not have multiple frames..." << std::endl;
+		if (do_movie_extract && ndim < movie_last_frame)
+		{
+			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles,  because it has only " << ndim << " frames..." << std::endl;
+			return;
+		}
 
 		long int my_current_nr_images = 0;
 		RFLOAT all_avg = 0;
@@ -667,6 +671,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		// To deal with default movie_last_frame value
 		if (movie_last_frame < 0)
 			movie_last_frame = ndim - 1;
+
 
 		int n_frames = movie_last_frame - movie_first_frame + 1;
 		// The total number of images to be extracted

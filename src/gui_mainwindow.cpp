@@ -803,9 +803,9 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 		mini_pipeline.addNewOutputEdge(0, outputnodes[i]);
 	}
 
-	// Write the pipeline to an updated STAR file
-	pipeline.write();
+	// Write the mini-pipeline to an updated STAR file
 	mini_pipeline.write();
+	// Writing of the overall pipeline is done in the function calling addToPipeLine
 
 	return myProcess;
 }
@@ -1101,7 +1101,15 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 				sleep(10);
 				pipeline.checkProcessCompletion();
 				if (pipeline.processList[current_job].status == PROC_FINISHED)
+				{
+					// Read in existing pipeline, in case some other window had changed something else
+					pipeline.read(true);
+					// Re-set set status of current_job to finished
+					pipeline.processList[current_job].status = PROC_FINISHED;
+					// Write out the modified pipeline with the status of current_job to finished
+					pipeline.write();
 					break;
+				}
 			}
 
 			if (!fn_check_exists)
@@ -1142,7 +1150,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	if (repeat == nr_repeat)
 	{
 		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
+		std::cout << " PIPELINER: you may want to re-start the GUI to update the job lists." << std::endl;
 
 		// Read in existing pipeline, in case some other window had changed it
 		pipeline.read(true);
@@ -1152,6 +1160,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		{
 			pipeline.processList[my_scheduled_processes[i]].status = PROC_FINISHED;
 		}
+
 		// Write the pipeline to an updated STAR file
 		pipeline.write();
 
@@ -1337,7 +1346,9 @@ void RelionMainWindow::cb_display_io_node_i()
 		FileName fn_job = ".gui_manualpickrun.job";
 		bool iscont=false;
 		if (exists(fn_job))
-			global_manualpickjob.read(fn_job.c_str(), iscont);
+		{
+			global_manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont);
+		}
 		else
 		{
 			fl_message("ERROR: Save a Manual picking job parameter file (using the Save jobs settings option from the Jobs menu) before displaying coordinate files. ");
@@ -1545,6 +1556,9 @@ void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
 
+	// Make sure that whenever we write out a pipeline, we first read in the existing version on disk
+	// This prevents sync errors with multiple windows acting on the same pipeline
+
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
 	pipeline.read(true); // true means: only_read if_file_exists
 
@@ -1610,6 +1624,9 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	// Update all job lists in the main GUI
 	updateJobLists();
+
+	// Write out the new pipeline
+	pipeline.write();
 
 	if (!only_schedule)
 	{
@@ -2284,10 +2301,10 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		fn_opt = fn_root1 + "run_it*optimiser.star";
 		fn_opt.globFiles(fn_opts);
 		// It could also be a continuation
-		fn_opt = fn_root1 + "run_ct?_optimiser.star";
+		fn_opt = fn_root1 + "run_ct?_it???_optimiser.star";
 		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
 		// It could also be a continuation
-		fn_opt = fn_root1 + "run_ct??_optimiser.star";
+		fn_opt = fn_root1 + "run_ct??_it???_optimiser.star";
 		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
 		if (fn_opts.size() > 0)
 		{
@@ -2324,11 +2341,26 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		}
 	}
 
+	// Remove any of the expected output nodes from the pipeline if the corresponding file doesn't already exist
+	std::vector<bool> deleteNodes, deleteProcesses;
+	deleteNodes.resize(pipeline.nodeList.size(), false);
+	deleteProcesses.resize(pipeline.processList.size(), false);
+
+	for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
+	{
+		long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
+		if(!exists(pipeline.nodeList[mynode].name))
+			deleteNodes[mynode] = true;
+	}
+	FileName fn_del = "tmp";
+	pipeline.write(fn_del, deleteNodes, deleteProcesses);
+	std::remove("tmpdeleted_pipeline.star");
+
+	// Read the updated pipeline back in again
+	pipeline.read();
+
 	// Update all job lists in the main GUI
 	updateJobLists();
-
-	// Write updated pipeline to disk
-	pipeline.write();
 
 }
 
@@ -2372,8 +2404,9 @@ void RelionMainWindow::cb_make_flowchart_i()
 	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
 	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
 	pipeline.addNewOutputEdge(current_job, node);
-	pipeline.write();
 	updateJobLists();
+
+	pipeline.write();
 
 	return;
 }
@@ -2661,7 +2694,7 @@ void RelionMainWindow::cb_start_pipeliner_i()
 	// Ask how many times to repeat
 	const char * answer;
 	std::string default_answer="1";
-	answer =  fl_input("Repeat how many times? ", default_answer.c_str());
+	answer =  fl_input("Run the scheduled jobs how many times? ", default_answer.c_str());
 	if (answer == NULL)
 		nr_repeat = 1;
 	else

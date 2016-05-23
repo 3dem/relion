@@ -153,7 +153,7 @@ void AutoPicker::read(int argc, char **argv)
 
 void AutoPicker::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void AutoPicker::initialise()
