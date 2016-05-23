@@ -6588,11 +6588,11 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 	RFLOAT ratio_orient_changes = current_changes_optimal_orientations /  sampling.getAngularSampling(adaptive_oversampling);
 	RFLOAT ratio_trans_changes = current_changes_optimal_offsets /  sampling.getTranslationalSampling(adaptive_oversampling);
 
-	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 5% of the smallest thus far
-	// Or if changes in offsets or orientations are smaller than 60% of the current sampling
-	if (1.05 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
-		(ratio_trans_changes < 0.6 || 1.05 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
-		(ratio_orient_changes < 0.6 || 1.05 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
+	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 3% of the smallest thus far
+	// Or if changes in offsets or orientations are smaller than 40% of the current sampling
+	if (1.03 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
+		(ratio_trans_changes < 0.40 || 1.03 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
+		(ratio_orient_changes < 0.40 || 1.03 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
 		nr_iter_wo_large_hidden_variable_changes++;
 	else
 		nr_iter_wo_large_hidden_variable_changes = 0;
