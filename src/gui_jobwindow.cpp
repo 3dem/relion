@@ -803,20 +803,6 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	tab3->label("Unblur");
 	resetHeight();
 
-	// Check for environment variable RELION_UNBLUR_EXECUTABL
-	char * default_location2 = getenv ("RELION_UNBLUR_EXECUTABLE");
-	if (default_location2 == NULL)
-	{
-		char mydefault[]=DEFAULTUNBLURLOCATION;
-		default_location2=mydefault;
-	}
-	// Check for environment variable RELION_SUMMOVIE_EXECUTABL
-	char * default_location3 = getenv ("RELION_SUMMOVIE_EXECUTABLE");
-	if (default_location3 == NULL)
-	{
-		char mydefault[]=DEFAULTSUMMOVIELOCATION;
-		default_location3=mydefault;
-	}
 
 	unblur_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	unblur_group->end();
@@ -825,8 +811,25 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 
 	unblur_group->begin();
 
+
+	// Check for environment variable RELION_UNBLUR_EXECUTABL
+	char * default_location2 = getenv ("RELION_UNBLUR_EXECUTABLE");
+	if (default_location2 == NULL)
+	{
+		char mydefault2[]=DEFAULTUNBLURLOCATION;
+		default_location2=mydefault2;
+	}
 	fn_unblur_exe.place(current_y, "UNBLUR executable:", default_location2, "*.*", NULL, "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with unblur version 1.0.2.");
+
+	// Check for environment variable RELION_SUMMOVIE_EXECUTABL
+	char * default_location3 = getenv ("RELION_SUMMOVIE_EXECUTABLE");
+	if (default_location3 == NULL)
+	{
+		char mydefault3[]=DEFAULTSUMMOVIELOCATION;
+		default_location3=mydefault3;
+	}
 	fn_summovie_exe.place(current_y, "SUMMOVIE executable:", default_location3, "*.*", NULL, "Location of the SUMMOVIE executable. You can control the default of this field by setting environment variable RELION_SUMMOVIE_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with summovie version 1.0.2.");
+
 	angpix.place(current_y, "Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the movies. All outputs will be in Angstroms, and internally a default B-factor of 1500A^2 is calculated using this value.");
 	unblur_group->end();
 
@@ -1500,6 +1503,12 @@ bool ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 	FileName fn_suffix = outputname + "coords_suffix_manualpick.star";
 	Node node2(fn_suffix, NODE_MIC_COORDS);
 	pipelineOutputNodes.push_back(node2);
+
+	// Allow saving, and always save default selection file upon launching the program
+	FileName fn_outstar = outputname + "micrographs_selected.star";
+	Node node3(fn_outstar, NODE_MICS);
+	pipelineOutputNodes.push_back(node3);
+	command += " --allow_save   --fast_save --selection " + fn_outstar;
 
 	command += " --scale " + floatToString(micscale.getValue());
 	command += " --sigma_contrast " + floatToString(sigma_contrast.getValue());
@@ -5065,7 +5074,6 @@ bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 		FileName fn_outstar = outputname + "micrographs_selected.star";
 		Node node3(fn_outstar, NODE_MICS);
 		pipelineOutputNodes.push_back(node3);
-		command += " --selection " + fn_outstar;
 		command += " --allow_save  --selection " + fn_outstar;
 
 		// All the stuff from the saved global_manualpickjob

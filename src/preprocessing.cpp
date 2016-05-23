@@ -634,13 +634,13 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		int npos = MDin.numberOfObjects();
 		if (npos < 10)
 		{
-			std:: cerr << "WARNING: there are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
+			std::cout << "warning: There are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
 		}
 
 		// Get movie or normal micrograph name and check it exists
 		if (!exists(fn_mic))
 		{
-			std::cerr << "WARNING: cannot find micrograph file " << fn_mic << " which has " << npos << " particles" << std::endl;
+			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles, because cannot find the file..." << std::endl;
 			return;
 		}
 
@@ -656,8 +656,11 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			do_ramp = false;
 
 		// Just to be sure...
-		if (do_movie_extract && ndim < 2)
-			std::cerr << "WARNING: movie " << fn_mic << " does not have multiple frames..." << std::endl;
+		if (do_movie_extract && ndim < movie_last_frame)
+		{
+			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles,  because it has only " << ndim << " frames..." << std::endl;
+			return;
+		}
 
 		long int my_current_nr_images = 0;
 		RFLOAT all_avg = 0;
@@ -668,6 +671,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		// To deal with default movie_last_frame value
 		if (movie_last_frame < 0)
 			movie_last_frame = ndim - 1;
+
 
 		int n_frames = movie_last_frame - movie_first_frame + 1;
 		// The total number of images to be extracted
