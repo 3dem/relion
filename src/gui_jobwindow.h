@@ -528,6 +528,8 @@ public:
 	BooleanEntry do_preread_images;
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
+    AnyEntry scratch_dir;
+
 
 	Fl_Group *ctf_group, *dont_skip_align_group, *helix_group, *gpu_group;
 
@@ -616,6 +618,7 @@ public:
 	BooleanEntry do_preread_images;
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
+    AnyEntry scratch_dir;
 
 	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 
@@ -700,6 +703,7 @@ public:
 	BooleanEntry do_preread_images;
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
+    AnyEntry scratch_dir;
 
 	Fl_Group *ctf_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 

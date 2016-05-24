@@ -62,7 +62,7 @@ void Postprocessing::read(int argc, char **argv)
 
 void Postprocessing::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void Postprocessing::clear()

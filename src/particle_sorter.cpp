@@ -48,7 +48,7 @@ void ParticleSorter::read(int argc, char **argv)
 
 void ParticleSorter::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void ParticleSorter::initialise()
