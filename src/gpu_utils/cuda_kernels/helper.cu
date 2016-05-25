@@ -573,7 +573,7 @@ __global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
 		}
 
 		XFLOAT sa, ca;
-		sincos(proj*psi, &sa, &ca);
+		sincos((proj+startPsi)*psi, &sa, &ca);
 		CUDACOMPLEX val;
 
 		projector.project2Dmodel(	 x,y,
@@ -614,7 +614,7 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 		}
 
 		XFLOAT sa, ca;
-		sincos(proj*psi, &sa, &ca);
+		sincos((proj+startPsi)*psi, &sa, &ca);
 		CUDACOMPLEX val;
 
 		projector.project2Dmodel(	 x,y,
