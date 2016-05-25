@@ -299,6 +299,9 @@ int manualpickerGuiWindow::fill()
 	if (do_allow_save)
 		readOutputStarfile();
 
+	if (do_fast_save)
+		cb_menubar_save_i();
+
 	// Also count the number of particles that were already picked
 	cb_menubar_recount_i();
 
@@ -482,8 +485,6 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	}
 	std::cout << " Total number of picked particles: " << global_total_count << " from " << nr_sel_mic << " selected micrographs." << std::endl;
 
-	// Also save micrograph selection file
-	cb_menubar_save_i();
 }
 
 
@@ -500,6 +501,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1."));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
+	do_fast_save = parser.checkOption("--fast_save", "Save a default selection of all micrographs immediately");
 
 	int mic_section = parser.addSection("Displaying options");
 	global_micscale = textToFloat(parser.getOption("--scale", "Relative scale for the micrograph display", "1"));
@@ -525,7 +527,7 @@ void ManualPicker::read(int argc, char **argv)
 
 void ManualPicker::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void ManualPicker::initialise()
@@ -567,6 +569,7 @@ void ManualPicker::run()
 	win.MDin = MDin;
 	win.fn_sel = fn_sel;
 	win.do_allow_save = do_allow_save;
+	win.do_fast_save = do_fast_save;
 	win.fill();
 
 }

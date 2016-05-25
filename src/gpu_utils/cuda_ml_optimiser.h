@@ -445,6 +445,7 @@ public:
 		coarseProjectionPlans.clear();
 		//Delete this lastly
 		delete allocator;
+		HANDLE_ERROR(cudaSetDevice(device_id));
 		HANDLE_ERROR(cudaDeviceReset());
 	}
 

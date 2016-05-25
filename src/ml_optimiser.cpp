@@ -64,7 +64,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 
 void MlOptimiser::usage()
 {
-	parser.writeUsage(std::cerr);
+	parser.writeUsage(std::cout);
 }
 
 void MlOptimiser::read(int argc, char **argv, int rank)
@@ -976,7 +976,8 @@ void MlOptimiser::initialise()
 				if (fullAutomaticMapping)
 					dev_id = devCount*i / nr_threads;
 				else
-					dev_id = textToInteger(allThreadIDs[0][(allThreadIDs[0].size()*i)/nr_threads].c_str());
+					dev_id = textToInteger(allThreadIDs[0][i % (allThreadIDs[0]).size()].c_str());
+					//dev_id = textToInteger(allThreadIDs[0][(allThreadIDs[0].size()*i)/nr_threads].c_str());
 			}
 			else // not semiAutomatic => explicit
 			{
@@ -2024,17 +2025,17 @@ void MlOptimiser::expectation()
 			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
-			threadcountOnDevice[b->device_id] ++;
+			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
 		}
 
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-
+		HANDLE_ERROR(cudaDeviceSynchronize());
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 		{
-			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount)
+			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
 			{
-				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
 				raise(SIGSEGV);
 			}
 			else
@@ -6587,11 +6588,11 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 	RFLOAT ratio_orient_changes = current_changes_optimal_orientations /  sampling.getAngularSampling(adaptive_oversampling);
 	RFLOAT ratio_trans_changes = current_changes_optimal_offsets /  sampling.getTranslationalSampling(adaptive_oversampling);
 
-	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 5% of the smallest thus far
-	// Or if changes in offsets or orientations are smaller than 60% of the current sampling
-	if (1.05 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
-		(ratio_trans_changes < 0.6 || 1.05 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
-		(ratio_orient_changes < 0.6 || 1.05 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
+	// Update nr_iter_wo_large_hidden_variable_changes if all three assignment types are within 3% of the smallest thus far
+	// Or if changes in offsets or orientations are smaller than 40% of the current sampling
+	if (1.03 * current_changes_optimal_classes >= smallest_changes_optimal_classes &&
+		(ratio_trans_changes < 0.40 || 1.03 * current_changes_optimal_offsets >= smallest_changes_optimal_offsets) &&
+		(ratio_orient_changes < 0.40 || 1.03 * current_changes_optimal_orientations >= smallest_changes_optimal_orientations) )
 		nr_iter_wo_large_hidden_variable_changes++;
 	else
 		nr_iter_wo_large_hidden_variable_changes = 0;
