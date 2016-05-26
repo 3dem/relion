@@ -65,6 +65,7 @@ public:
 	bool do_simulate_helical_segments_2D;
 	bool do_cut_out;
 	bool do_set_xmipp_origin;
+//	bool do_impose_helical_symmetry_fourier_space;
 
 	// Input files
 	FileName fn_in, fn_in1, fn_in2;
@@ -144,6 +145,9 @@ public:
 	// Cut out a small part of the helix within this angle (in degrees)
 	RFLOAT ang;
 
+	// Random seed
+	int random_seed;
+
 	helix_bilder_parameters()
 	{
 		clear();
@@ -164,12 +168,12 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (MAY 01, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (MAY 15, 2015)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
 		do_create_cylinder_3D = parser.checkOption("--cylinder", "Create a cylinder as 3D initial reference");
-		do_impose_helical_symmetry = parser.checkOption("--impose", "Impose helical symmetry");
+		do_impose_helical_symmetry = parser.checkOption("--impose", "Impose helical symmetry (in real space)");
 		do_PDB_helix = parser.checkOption("--pdb_helix", "Simulate a helix from a single PDB file of protein molecule");
 		do_remove_segments_with_bad_tilt = parser.checkOption("--remove_bad_tilt", "Remove helical segments with large tilt angle deviation (away from 90 degrees)");
 		do_remove_segments_with_bad_psi = parser.checkOption("--remove_bad_psi", "Remove helical segments with large psi angle deviation (away from psi prior)");
@@ -188,6 +192,7 @@ public:
 		do_extract_coords_eman = parser.checkOption("--extract_emn", "Extract EMAN2 coordinates of helical segments from specified straight tubes");
 		do_extract_coords_relion = parser.checkOption("--extract_rln", "Extract RELION coordinates of helical segments from specified straight tubes");
 		do_extract_coords_ximdisp = parser.checkOption("--extract_xim", "Extract XIMDISP coordinates of helical segments from specified straight tubes");
+//		do_impose_helical_symmetry_fourier_space = parser.checkOption("--impose_fourier", "Impose helical symmetry (simulate what is done in 3D reconstruction in Fourier space)");
 		do_set_default_tilt = parser.checkOption("--init_tilt", "Set tilt angles to 90 degrees for all helical segments");
 		do_merge_star_files = parser.checkOption("--merge", "Merge small STAR files into a huge one");
 		do_set_xmipp_origin = parser.checkOption("--set_xmipp_origin", "Set Xmipp origin");
@@ -215,6 +220,7 @@ public:
 		fn_out = parser.getOption("--o", "Output file", "file.out");
 		fn_out_root = parser.getOption("--o_root", "Rootname of output files", "_rootnameOut.star");
 		psi_max_dev_deg = textToFloat(parser.getOption("--psi_max_dev", "Maximum deviation of psi angles allowed (away from psi prior)", "15."));
+		random_seed = textToFloat(parser.getOption("--random_seed", "Random seed (set to system time if negative)", "-1"));
 		rise_A = textToFloat(parser.getOption("--rise", "Helical rise (in Angstroms)", "-1"));
 		rise_inistep_A = textToFloat(parser.getOption("--rise_inistep", "Initial step of helical rise search (in Angstroms)", "-1"));
 		rise_min_A = textToFloat(parser.getOption("--rise_min", "Minimum helical rise (in Angstroms)", "-1"));
@@ -280,11 +286,12 @@ public:
 		valid_options += (int)(do_simulate_helical_segments_2D);
 		valid_options += (int)(do_cut_out);
 		valid_options += (int)(do_set_xmipp_origin);
+//		valid_options += (int)(do_impose_helical_symmetry_fourier_space);
 
 		if (valid_options <= 0)
 			REPORT_ERROR("Please specify one option!");
 		if (valid_options > 1)
-			REPORT_ERROR("Only one option can be specified at one time!");
+			REPORT_ERROR("Only one option can be specified at one time! valid_options = " + integerToString(valid_options));
 
 		if (do_extract_coords_relion || do_extract_coords_ximdisp || do_extract_coords_eman)
 		{
@@ -505,10 +512,17 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Create a helical 3D reference of spheres" << std::endl;
-				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1)" << std::endl;
+				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1 --sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
+
+			if (pixel_size_A < 0.01)
+				REPORT_ERROR("Pixel size should be larger than 0!");
+			if (boxdim < 20)
+				REPORT_ERROR("Box size should be larger than 20 pixels!");
+			if ( (sphere_percentage < 0.1) || (sphere_percentage > 0.9) )
+				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.1~0.9!");
 
 			Image<RFLOAT> img;
 			makeHelicalReference3D(
@@ -520,6 +534,10 @@ public:
 					cyl_outer_diameter_A,
 					subunit_diameter_A,
 					sym_Cn);
+			applySoftSphericalMask(
+					img(),
+					(RFLOAT(boxdim) * sphere_percentage),
+					width_edge_pix);
 			img.write(fn_out);
 		}
 		else if (do_impose_helical_symmetry)
@@ -527,7 +545,7 @@ public:
 			if (show_usage_for_an_option)
 			{
 				displayEmptyLine();
-				std::cout << " Impose helical symmetry" << std::endl;
+				std::cout << " Impose helical symmetry (in real space)" << std::endl;
 				std::cout << "  USAGE: --impose --i in.mrc --o out.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 (--z_percentage 0.3 --sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
@@ -669,7 +687,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Simulate helical segments using a STAR file" << std::endl;
-				std::cout << "  USAGE: --simulate_segments --o out.star --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --angpix 1.126 (--bimodal --sigma_tilt 5 --sigma_psi 5)" << std::endl;
+				std::cout << "  USAGE: --simulate_segments --o out.star --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --angpix 1.126 (--bimodal --sigma_tilt 5 --sigma_psi 5 --random_seed 1400014000)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -686,7 +704,8 @@ public:
 					rise_A / pixel_size_A,
 					twist_deg,
 					sigma_psi,
-					sigma_tilt);
+					sigma_tilt,
+					random_seed);
 		}
 		else if (do_cut_out)
 		{
@@ -722,6 +741,58 @@ public:
 			img().setXmippOrigin();
 			img.write(fn_out);
 		}
+		/*
+		else if (do_impose_helical_symmetry_fourier_space)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Impose helical symmetry (only in Fourier space)" << std::endl;
+				std::cout << "  USAGE: --fimpose --i in.mrc --o out.mrc --angpix 1.126 --nr_asu 5 --rise 1.408 --twist 22.03" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+
+			if (nr_asu <= 1)
+			{
+				std::cout << " Number of asymmetrical units is smaller than 1. Nothing is needed to be done..." << std::endl;
+				return;
+			}
+
+			MultidimArray<RFLOAT> Msum, Maux1;
+			Matrix1D<RFLOAT> transZ(3);
+			Image<RFLOAT> img;
+			long int Xdim, Ydim, Zdim, Ndim;
+
+			img.read(fn_in);
+			img().getDimensions(Xdim, Ydim, Zdim, Ndim);
+			img().setXmippOrigin();
+
+			if ( (Xdim != Ydim) || (Ydim != Zdim) )
+				REPORT_ERROR("Error in the input 3D map: DimX != DimY or DimY != DimZ");
+
+			Msum.clear();
+			Msum.initZeros(img());
+			Msum.setXmippOrigin();
+			int h_min = -nr_asu / 2;
+			int h_max = -h_min + nr_asu % 2;
+			XX(transZ) = YY(transZ) = 0.;
+			for (int hh = h_min; hh < h_max; hh++)
+			{
+				if (hh == 0)
+					Msum += img();
+				else
+				{
+					rotate(img(), Maux1, RFLOAT(hh) * twist_deg);
+					ZZ(transZ) = RFLOAT(hh) * rise_A / pixel_size_A;
+					selfTranslate(Maux1, transZ, WRAP);
+					Msum += Maux1;
+				}
+			}
+			img() = Msum / RFLOAT(nr_asu);
+			img.write(fn_out);
+		}
+		*/
 		else
 		{
 			REPORT_ERROR("Please specify one option!");
@@ -795,6 +866,18 @@ public:
 
 	void run()
 	{
+		Image<RFLOAT> img;
+		img.read(fn_in);
+		img().setXmippOrigin();
+		softMaskOutsideMapForHelix(img(),
+				45.,
+				90.,
+				400. * 0.8 * 0.5,
+				180. * 0.5,
+				5.);
+		img.write(fn_out);
+
+
 		/*
 		FileName fns_in, fa, fb;
 		std::vector<FileName> fn_in_list;
@@ -820,6 +903,7 @@ public:
 		//img.read(fn_in);
 		//amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
 		//img.write(fn_out);
+		/*
 		MetaDataTable MD;
 		int nr_opposite_polarity;
 		MD.read(fn_in);
@@ -837,6 +921,7 @@ public:
 									2);
 		//testDataFileTransformXY(MD);
 		MD.write(fn_out);
+		*/
 
 
 
