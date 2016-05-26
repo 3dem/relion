@@ -2604,16 +2604,18 @@ void RelionMainWindow::cb_print_notes(Fl_Widget*, void* v)
 
 void RelionMainWindow::cb_print_notes_i()
 {
-	std::cout << " ################################################################ " << std::endl;
-	std::cout << " # Printing all note files for pipeline: " << pipeline.name << std::endl;
+	std::ofstream  fh;
+	FileName fn_tmp = pipeline.name + "_all_notes.txt";
+	fh.open((fn_tmp).c_str(), std::ios::out);
+
 	for (size_t i = 0; i < pipeline.processList.size(); i++)
 	{
 		FileName fn_note = pipeline.processList[i].name+"note.txt";
-		std::cout << " ################################################################ " << std::endl;
-		std::cout << " # Job= " << pipeline.processList[i].name;
+		fh << " ################################################################ " << std::endl;
+		fh << " # Job= " << pipeline.processList[i].name;
 		if (pipeline.processList[i].alias != "None")
-			std::cout <<" alias: " << pipeline.processList[i].alias;
-		std::cout	<< std::endl;
+			fh <<" alias: " << pipeline.processList[i].alias;
+		fh	<< std::endl;
 		if (exists(fn_note))
 		{
 			std::ifstream in(fn_note.data(), std::ios_base::in);
@@ -2623,11 +2625,15 @@ void RelionMainWindow::cb_print_notes_i()
     	    in.seekg(0);
     	    while (getline(in, line, '\n'))
     	    {
-    	    	std::cout << line << std::endl;
+    	    	fh << line << std::endl;
     	    }
 			in.close();
 		}
 	}
+	fh.close();
+
+	std::string msg = "Done writing all notes into file: " + fn_tmp;
+	fl_message(msg.c_str());
 
 }
 
