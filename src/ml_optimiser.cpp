@@ -2205,7 +2205,7 @@ void MlOptimiser::expectationSetup()
 	sampling.resetRandomlyPerturbedSampling();
 
     // Initialise Projectors and fill vector with power_spectra for all classes
-	mymodel.setFourierTransformMaps(!fix_tau, nr_threads);
+	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
