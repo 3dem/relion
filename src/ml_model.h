@@ -351,7 +351,7 @@ public:
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector
-	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1);
+	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false);
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */

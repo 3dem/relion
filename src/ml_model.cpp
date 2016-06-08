@@ -20,6 +20,10 @@
 
 #include "src/ml_model.h"
 
+#ifdef CUDA
+#include "src/gpu_utils/cuda_skunks.cuh"
+#endif
+
 void MlModel::initialise()
 {
 
@@ -757,9 +761,8 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 
 
 
-void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads)
+void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
 {
-
 	int nr_classes_bodies = nr_classes * nr_bodies; // also set multiple bodies!
 	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     {
@@ -776,12 +779,18 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads)
 
         if (update_tau2_spectra)
         {
-			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads);
+        	if (do_gpu)
+        		computeFourierTransformMap(&PPref[iclass], Irefp, tau2_class[iclass], current_size, nr_threads);
+        	else
+        		PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads);
         }
         else
         {
         	MultidimArray<RFLOAT> dummy;
-        	PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads);
+        	if (do_gpu)
+        		computeFourierTransformMap(&PPref[iclass], Irefp, dummy, current_size, nr_threads);
+        	else
+        		PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads);
         }
     }
 
