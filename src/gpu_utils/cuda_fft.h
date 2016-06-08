@@ -40,7 +40,7 @@ public:
 	size_t xSize,ySize,zSize,xFSize,yFSize,zFSize;
 	std::vector< int >  batchSize;
 	CudaCustomAllocator *CFallocator;
-	int batchSpace, batchIters;
+	int batchSpace, batchIters, reqN;
 
 	CudaFFT(cudaStream_t stream, CudaCustomAllocator *allocator, int transformDimension = 2):
 		reals(stream, allocator),
@@ -57,6 +57,7 @@ public:
 		xSize(0), ySize(0), zSize(0),
 		xFSize(0), yFSize(0), zFSize(0),
 		batchSize(1,1),
+		reqN(1),
 		CFallocator(allocator)
 	{};
 
@@ -126,13 +127,14 @@ public:
 
 		direction = setDirection;
 
-		if (x == xSize && y == ySize && z == zSize && batch == batchSize[0] && planSet)
+		if (x == xSize && y == ySize && z == zSize && batch == reqN && planSet)
 			return;
 
 		clear();
 
 		batchSize.resize(1);
 		batchSize[0] = batch;
+		reqN = batch;
 
 		xSize = x;
 		ySize = y;

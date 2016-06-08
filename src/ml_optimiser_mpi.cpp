@@ -246,6 +246,10 @@ void MlOptimiserMpi::initialise()
 							//dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
 						}
 					}
+					else
+					{
+						dev_id = textToInteger(allThreadIDs[rank-1][i].c_str());
+					}
 
                     std::cout << " Thread " << i << " on slave " << node->rank << " mapped to device " << dev_id << std::endl;
 

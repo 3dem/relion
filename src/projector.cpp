@@ -18,7 +18,29 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/projector.h"
+#include <src/time.h>
 //#define DEBUG
+
+//#define PROJ_TIMING
+#ifdef PROJ_TIMING
+    Timer proj_timer;
+	int TIMING_TOP = 		proj_timer.setNew("PROJECTOR - computeFourierTransformMap");
+	int TIMING_GRID = 		proj_timer.setNew("PROJECTOR - gridCorr");
+	int TIMING_PAD = 		proj_timer.setNew("PROJECTOR - padTransMap");
+	int TIMING_CENTER = 	proj_timer.setNew("PROJECTOR - centerFFT");
+	int TIMING_TRANS = 		proj_timer.setNew("PROJECTOR - transform");
+	int TIMING_FAUX =		proj_timer.setNew("PROJECTOR - Faux");
+	int TIMING_POW =		proj_timer.setNew("PROJECTOR - power_spectrum");
+	int TIMING_INIT1 =		proj_timer.setNew("PROJECTOR - inti1");
+	int TIMING_INIT2 = 		proj_timer.setNew("PROJECTOR - init2");
+#define TIMING_TIC(id) proj_timer.tic(id)
+#define TIMING_TOC(id) proj_timer.toc(id)
+#else
+#define TIMING_TIC(id)
+#define TIMING_TOC(id)
+#endif
+
+
 
 void Projector::initialiseData(int current_size)
 {
@@ -79,7 +101,9 @@ long int Projector::getSize()
 // Fill data array with oversampled Fourier transform, and calculate its power spectrum
 void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding)
 {
+	TIMING_TIC(TIMING_TOP);
 
+	TIMING_TIC(TIMING_INIT1);
 	MultidimArray<RFLOAT> Mpad;
 	MultidimArray<Complex > Faux;
     FourierTransformer transformer;
@@ -108,13 +132,18 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	default:
 	   REPORT_ERROR("Projector::computeFourierTransformMap%%ERROR: Dimension of the data array should be 2 or 3");
 	}
+	TIMING_TOC(TIMING_INIT1);
 
+	TIMING_TIC(TIMING_GRID);
 	// First do a gridding pre-correction on the real-space map:
 	// Divide by the inverse Fourier transform of the interpolator in Fourier-space
 	// 10feb11: at least in 2D case, this seems to be the wrong thing to do!!!
 	// TODO: check what is best for subtomo!
 	if (do_gridding)// && data_dim != 3)
 		griddingCorrect(vol_in);
+	TIMING_TOC(TIMING_GRID);
+
+	TIMING_TIC(TIMING_PAD);
 
 	// Pad translated map with zeros
 	vol_in.setXmippOrigin();
@@ -122,12 +151,19 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_in) // This will also work for 2D
 		A3D_ELEM(Mpad, k, i, j) = A3D_ELEM(vol_in, k, i, j);
 
+	TIMING_TOC(TIMING_PAD);
+
+	TIMING_TIC(TIMING_CENTER);
 	// Translate padded map to put origin of FT in the center
 	CenterFFT(Mpad, true);
+	TIMING_TOC(TIMING_CENTER);
 
+	TIMING_TIC(TIMING_TRANS);
 	// Calculate the oversampled Fourier transform
 	transformer.FourierTransform(Mpad, Faux, false);
+	TIMING_TOC(TIMING_TRANS);
 
+	TIMING_TIC(TIMING_INIT2);
 	// Free memory: Mpad no longer needed
 	Mpad.clear();
 
@@ -140,7 +176,9 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	power_spectrum.initZeros(ori_size / 2 + 1);
 	MultidimArray<RFLOAT> counter(power_spectrum);
 	counter.initZeros();
+	TIMING_TOC(TIMING_INIT2);
 
+	TIMING_TIC(TIMING_FAUX);
 	int max_r2 = r_max * r_max * padding_factor * padding_factor;
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 	{
@@ -158,7 +196,9 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 			DIRECT_A1D_ELEM(counter, ires) += 1.;
 		}
 	}
+	TIMING_TOC(TIMING_FAUX);
 
+	TIMING_TIC(TIMING_POW);
 	// Calculate radial average of power spectrum
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
 	{
@@ -167,6 +207,14 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 		else
 			DIRECT_A1D_ELEM(power_spectrum, i) /= DIRECT_A1D_ELEM(counter, i);
 	}
+	TIMING_TOC(TIMING_POW);
+
+	TIMING_TOC(TIMING_TOP);
+
+#ifdef PROJ_TIMING
+    proj_timer.printTimes(false);
+#endif
+
 
 }
 
@@ -624,7 +672,6 @@ void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A, bool
 		} // endif y-loop
 	} // endif z-loop
 }
-
 
 
 
