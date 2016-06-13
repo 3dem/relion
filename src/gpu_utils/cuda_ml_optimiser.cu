@@ -998,7 +998,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 		{
-			baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z);
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
@@ -1958,7 +1958,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	int j = 0;
 	for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 	{
-		baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+		baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
 				oversampled_translations_y, oversampled_translations_z); //TODO Called multiple time to generate same list, reuse the same list
 
 		for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
