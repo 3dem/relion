@@ -67,7 +67,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		MetaDataTable MDcoord;
 
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineFileName(global_fn_mics[last_pick_viewed], fn_pre, fn_jobnr, fn_post);
+		decomposePipelineSymlinkName(global_fn_mics[last_pick_viewed], fn_pre, fn_jobnr, fn_post);
 		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
 		int my_nr_picked;
 		if (exists(fn_coord))
@@ -87,7 +87,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 
 
 	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineFileName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+	decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
 	FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
 
 	int rad = ROUND(global_particle_diameter/(2. * global_angpix));
@@ -455,7 +455,7 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	{
 		MetaDataTable MDcoord;
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineFileName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+		decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
 		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
 		int my_nr_picked;
 		if (exists(fn_coord))

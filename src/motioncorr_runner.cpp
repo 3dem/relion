@@ -511,10 +511,10 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 		// Execute summovie
 		std::string command2 = "csh "+ fn_com2;
 		if (system(command2.c_str()))
-                {
-                    std::cerr << "ERROR in executing: " << command2 <<std::endl;
-                    return;
-                }
+		{
+			std::cerr << "ERROR in executing: " << command2 <<std::endl;
+			return;
+		}
 
 		// Plot ther FRC
 		plotFRC(fn_frc);
@@ -522,6 +522,9 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 
 	// Move movie .mrc to new .mrcs filename
 	std::rename(fn_tmp_mov.c_str(), fn_mov.c_str());
+
+	// remove symbolic link
+	std::remove(fn_tmp_mic.c_str());
 
 }
 

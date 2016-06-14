@@ -467,6 +467,8 @@ public:
 // The function returns true if the input filename was a pipeline one, and false otherwise
 // If the input filename wasn't a pipeline one, then fn_post is set to the input filename and the fn_pre and fn_jobnr are left empty
 bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post);
+// Also same for possible symlink
+bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post);
 
 // Replaces the UNIQDATE substring and its preceding Directory-structure from fn_input, and adds fn_new_outputdir in front of it
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir);

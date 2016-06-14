@@ -32,24 +32,26 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 
-#ifdef CUDA
-        if (prm.do_gpu)
+		if (prm.todo_anything)
 		{
-        	std::stringstream didSs;
-        	didSs << "AP";
-			int dev_id = prm.deviceInitialise();
-			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id, didSs.str().c_str() );
+#ifdef CUDA
+			if (prm.do_gpu)
+			{
+				std::stringstream didSs;
+				didSs << "AP";
+				int dev_id = prm.deviceInitialise();
+				prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id, didSs.str().c_str() );
 
-			((AutoPickerCuda*)prm.cudaPicker)->run();
-		}
-		else
+				((AutoPickerCuda*)prm.cudaPicker)->run();
+			}
+			else
 #endif
-			prm.run();
-
+				prm.run();
 #ifdef TIMING
 		std::cout << "timings:" << std::endl;
 		prm.timer.printTimes(false);
 #endif
+		}
     }
 
     catch (RelionError XE)

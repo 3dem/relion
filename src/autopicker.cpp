@@ -240,6 +240,16 @@ void AutoPicker::initialise()
 		fn_micrographs = fns_todo;
 	}
 
+	// If there is nothing to do, then go out of initialise
+	todo_anything = true;
+	if (fn_micrographs.size() == 0)
+	{
+		if (verb > 0)
+			std::cout << " + No new micrographs to do, so exiting autopicking ..." << std::endl;
+		todo_anything = false;
+		return;
+	}
+
 	if (verb > 0)
 	{
 		std::cout << " + Run autopicking on the following micrographs: " << std::endl;
