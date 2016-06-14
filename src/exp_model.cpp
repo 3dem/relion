@@ -491,7 +491,10 @@ bool Experiment::getImageNameOnScratch(long int part_id, FileName &fn_img, bool 
 		{
 
 			if (ori_particles[part_id].particles_id.size() > 1)
+			{
+				std::cerr << " part_id= " << part_id << " ori_particles[part_id].particles_id.size()= " << ori_particles[part_id].particles_id.size() << " ori_particles[part_id].name= " << ori_particles[part_id].name << std::endl;
 				REPORT_ERROR("BUG: getImageNameOnScratch cannot work with movies!");
+			}
 			fn_img.compose(part_id+1, fn_scratch + "particles.mrcs");
 		}
 		return true;

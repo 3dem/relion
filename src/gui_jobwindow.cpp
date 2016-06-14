@@ -326,7 +326,11 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 		idx++;
 		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
 		if (!(type >= 0 && type < NR_BROWSE_TABS))
-			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + "run.job");
+		{
+			std::string msg = "ERROR: cannot find job type in " + fn + "run.job";
+			fl_message(msg.c_str());
+			return false;
+		}
     	// Get is_continue from second line
 		getline(fh, line, '\n');
 		if (line.rfind("is_continue == true") == 0)
@@ -662,20 +666,38 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else if (node_type.getValue() == "2D/3D particle coordinates (*.box, *_pick.star)")
 	{
+
 		// Make the same directory structure of the coordinates
 		// Copy all coordinate files into the same subdirectory in the Import directory
-		command = "cp --parents " + fn_in.getValue() + " " + outputname;
+		// But remove directory structure from pipeline if that exists
+		// Dereference symbolic links if needed
+        FileName fn_dir = fn_in.getValue();
+		if (fn_dir.contains("/"))
+			fn_dir = fn_dir.beforeLastOf("/");
+		else
+			fn_dir = ".";
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post);
+
+		// Make the output directory
+		command = "mkdir -p " + outputname + fn_post;
 		commands.push_back(command);
-		// Get the coordinate-file suffix separately
+		// Copy the coordinates there
+		command = "cp " + fn_in.getValue() + " " + outputname + fn_post;
+		commands.push_back(command);
+
+		// Make a suffix file, which contains the actual suffix as a suffix
+		// Get the coordinate-file suffix
 		FileName fn_suffix = fn_in.getValue();
 		FileName fn_suffix2 = fn_suffix.beforeLastOf("*");
 		fn_suffix = fn_suffix.afterLastOf("*");
 		fn_suffix = "coords_suffix" + fn_suffix;
 		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
-		// Make a suffix file, which contains the actual suffix as a suffix
 		command = " echo \\\"" + fn_suffix2 + "*.mrc\\\" > " + outputname + fn_suffix;
+		//command = " echo \\\"" + outputname + fn_post + "/*.mrc\\\" > " + outputname + fn_suffix;
 		commands.push_back(command);
+
 	}
 	else if (node_type.getValue() == "Particles STAR file (.star)" ||
 			 node_type.getValue() == "Movie-particles STAR file (.star)" ||
@@ -5104,7 +5126,12 @@ bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 		// Other arguments for extraction
 		command += " " + global_manualpickjob.other_args.getValue() + " &";
-
+	}
+	else
+	{
+		// Nothing was selected...
+		fl_message("Please select an input file.");
+		return false;
 	}
 
 	// Re-grouping
@@ -5575,7 +5602,7 @@ SubtractJobWindow::SubtractJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT
 	do_subtract.place(current_y, "Subtract partial signal?", true, "If set to Yes, a copy of the entire set of particle images in this STAR file will be made that contains the subtracted particle images.", subtract_group);
 
 	subtract_group->begin();
-	fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same data set, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
+	fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same particles as above, and preferably with those orientations, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
     fn_mask.place(current_y, "Mask to apply to this map:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is white (1) and the rest of the protein and the solvent is black (0).");
     subtract_group->end();
     do_subtract.cb_menu_i(); // make default active

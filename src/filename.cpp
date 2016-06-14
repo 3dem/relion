@@ -521,6 +521,36 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 
 }
 
+bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
+{
+
+	// Symlinks are always in the second directory....
+	size_t slashpos = 0;
+	int i = 0;
+	while (slashpos < fn_in.length())
+	{
+		i++;
+		slashpos = fn_in.find("/", slashpos+1);
+		if (i==2)
+			break;
+	}
+
+	// Check whether this is a symbol link
+	char linkname[100];
+    ssize_t len = ::readlink(fn_in.substr(0, slashpos).c_str(), linkname, sizeof(linkname)-1);
+    if (len != -1)
+    {
+    	// This is a symbolic link!
+    	linkname[len] = '\0';
+    	FileName fn_link = std::string(linkname);
+    	// So dereference the link
+    	FileName fn_my_pre = std::string(linkname);
+    	fn_in = fn_my_pre.afterFirstOf("../") + fn_in.substr(slashpos+1);
+    }
+    decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
+
+}
+
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir)
 {
 	FileName fn_pre, fn_jobnr, fn_post;

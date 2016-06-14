@@ -281,8 +281,11 @@ void checkRangesForLocalSearchHelicalSymmetry(
 		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Invalid helical rise!");
 	if ( (rise_min_A > rise_max_A) || (twist_min_deg > twist_max_deg) )
 		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Minimum values of twist/rise should be smaller than their maximum values!");
+#define WIDE_SEARCHES
+#ifndef WIDE_SEARCHES
 	if ( (fabs(twist_avg_deg - twist_min_deg) > 180.01) || ((fabs(rise_avg_A - rise_min_A) / fabs(rise_avg_A)) > 0.3334) )
 		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Search ranges of helical parameters are too large!");
+#endif
 	if ( (rise_A < rise_min_A) || (rise_A > rise_max_A) || (twist_deg < twist_min_deg) || (twist_deg > twist_max_deg) )
 		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Helical twist and/or rise are out of their specified ranges!");
 };
@@ -314,6 +317,8 @@ bool localSearchHelicalSymmetry(
 	// Check input 3D reference
 	if (v.getDim() != 3)
 		REPORT_ERROR("helix.cpp::localSearchHelicalSymmetry(): Input helical reference is not 3D! (v.getDim() = " + integerToString(v.getDim()) + ")");
+
+	// Set the length of the box
 	box_len = (XSIZE(v) < YSIZE(v)) ? XSIZE(v) : YSIZE(v);
 	box_len = (box_len < ZSIZE(v)) ? box_len : ZSIZE(v);
 
@@ -336,6 +341,8 @@ bool localSearchHelicalSymmetry(
 			sphere_radius_A,
 			cyl_inner_radius_A,
 			cyl_outer_radius_A);
+
+	// Initialise refined helical parameters
 	rise_refined_A = (rise_min_A + rise_max_A) / 2.;
 	rise_refined_pix = rise_refined_A / pixel_size_A;
 	twist_refined_deg = (twist_min_deg + twist_max_deg) / 2.;
@@ -347,6 +354,8 @@ bool localSearchHelicalSymmetry(
 			twist_min_deg,
 			twist_max_deg);
 
+	// Initialise other parameters
+	out_of_range = false;
 	r_min_pix = cyl_inner_radius_A / pixel_size_A;
 	r_max_pix = cyl_outer_radius_A / pixel_size_A;
 	rise_inistep_pix = rise_inistep_A / pixel_size_A;
@@ -372,9 +381,9 @@ bool localSearchHelicalSymmetry(
 	twist_step_deg = fabs(twist_local_min_deg - twist_local_max_deg) / RFLOAT(nr_twist_samplings);
 	if ( fabs(twist_local_min_deg - twist_local_max_deg) < err_max)
 	{
+		search_twist = false;
 		twist_step_deg = 0.;
 		twist_min_deg = twist_max_deg = twist_local_min_deg = twist_local_max_deg = twist_refined_deg;
-		search_twist = false;
 	}
 #ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
 	std::cout << " ### twist_step_deg = " << twist_step_deg << ", nr_twist_samplings = " << nr_twist_samplings << ", search_twist = " << (int)(search_twist) << std::endl;
@@ -389,9 +398,9 @@ bool localSearchHelicalSymmetry(
 	rise_step_pix = fabs(rise_local_min_pix - rise_local_max_pix) / RFLOAT(nr_rise_samplings);
 	if ((fabs(rise_local_min_pix - rise_local_max_pix) / fabs(rise_refined_pix)) < err_max)
 	{
+		search_rise = false;
 		rise_step_pix = 0.;
 		rise_min_pix = rise_max_pix = rise_local_min_pix = rise_local_max_pix = rise_refined_pix;
-		search_rise = false;
 	}
 #ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
 	std::cout << " ### rise_step_A = " << rise_step_pix * pixel_size_A << ", nr_rise_samplings = " << nr_rise_samplings << ", search_rise = " << (int)(search_rise) << std::endl;
@@ -406,7 +415,7 @@ bool localSearchHelicalSymmetry(
 	for (iter = 1; iter <= 100; iter++)
 	{
 		// TODO: please check this!!!
-		// rise_step_pix and twist_step_deg should be strictly > 0 now!
+		// rise_step_pix and twist_step_deg should be strictly > 0 now! (if they are to be searched)
 		makeHelicalSymmetryList(
 				helical_symmetry_list,
 				rise_local_min_pix,
@@ -467,112 +476,119 @@ bool localSearchHelicalSymmetry(
 		std::cout << " ##### Refined Twist = " << twist_refined_deg << ", Rise = " << rise_refined_A << ", Dev = " << helical_symmetry_list[best_id].dev << std::endl;
 		std::cout << " ################################################################################" << std::endl;
 #endif
-		out_of_range = false;
+		// Out of range...
 		if ( (search_rise) && (rise_refined_pix < rise_min_pix) )
 		{
 			out_of_range = true;
-			rise_refined_pix = rise_min_pix;
+			search_rise = false;
+			rise_step_pix = 0.;
+			rise_local_min_pix = rise_local_max_pix = rise_refined_pix = rise_min_pix;
 			rise_refined_A = rise_refined_pix * pixel_size_A;
 		}
 		if ( (search_rise) && (rise_refined_pix > rise_max_pix) )
 		{
 			out_of_range = true;
-			rise_refined_pix = rise_max_pix;
+			search_rise = false;
+			rise_step_pix = 0.;
+			rise_local_min_pix = rise_local_max_pix = rise_refined_pix = rise_max_pix;
 			rise_refined_A = rise_refined_pix * pixel_size_A;
 		}
 		if ( (search_twist) && (twist_refined_deg < twist_min_deg) )
 		{
 			out_of_range = true;
-			twist_refined_deg = twist_min_deg;
+			search_twist = false;
+			twist_step_deg = 0.;
+			twist_local_min_deg = twist_local_max_deg = twist_refined_deg = twist_min_deg;
 		}
 		if ( (search_twist) && (twist_refined_deg > twist_max_deg) )
 		{
 			out_of_range = true;
-			twist_refined_deg = twist_max_deg;
+			search_twist = false;
+			twist_step_deg = 0.;
+			twist_local_min_deg = twist_local_max_deg = twist_refined_deg = twist_max_deg;
 		}
 
-		if (out_of_range)
+		// Not converged in this iteration...
+		if ( (iter > 1) && (!out_of_range) )
 		{
-			std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial guess of helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
-			return false;
-		}
-		else
-		{
-			if (iter > 1)
+			// If the symmetry does not fall into the local search range
+			// Try 7*, 9*, 11* ... samplings
+			bool this_iter_not_converged = false;
+			if (search_rise)
 			{
-				// If the symmetry does not fall into the local search range
-				// Try 7*, 9*, 11* ... samplings
-				bool this_iter_not_converged = false;
-				if (search_rise)
+				if ( (rise_refined_pix < (rise_local_min_pix + rise_step_pix * 0.5))
+						|| (rise_refined_pix > (rise_local_max_pix - rise_step_pix * 0.5)) )
 				{
-					if ( (rise_refined_pix < (rise_local_min_pix + rise_step_pix * 0.5))
-							|| (rise_refined_pix > (rise_local_max_pix - rise_step_pix * 0.5)) )
-					{
-						this_iter_not_converged = true;
-						rise_local_min_pix = rise_refined_pix - ((RFLOAT)(iter_not_converged) + 3.) * rise_step_pix;
-						rise_local_max_pix = rise_refined_pix + ((RFLOAT)(iter_not_converged) + 3.) * rise_step_pix;
-					}
+					this_iter_not_converged = true;
+					rise_local_min_pix = rise_refined_pix - ((RFLOAT)(iter_not_converged) + 3.) * rise_step_pix;
+					rise_local_max_pix = rise_refined_pix + ((RFLOAT)(iter_not_converged) + 3.) * rise_step_pix;
 				}
-				if (search_twist)
+			}
+			if (search_twist)
+			{
+				if ( (twist_refined_deg < (twist_local_min_deg + twist_step_deg * 0.5))
+						|| (twist_refined_deg > (twist_local_max_deg - twist_step_deg * 0.5)) )
 				{
-					if ( (twist_refined_deg < (twist_local_min_deg + twist_step_deg * 0.5))
-							|| (twist_refined_deg > (twist_local_max_deg - twist_step_deg * 0.5)) )
-					{
-						this_iter_not_converged = true;
-						twist_local_min_deg = twist_refined_deg - ((RFLOAT)(iter_not_converged) + 3.) * twist_step_deg;
-						twist_local_max_deg = twist_refined_deg + ((RFLOAT)(iter_not_converged) + 3.) * twist_step_deg;
-					}
+					this_iter_not_converged = true;
+					twist_local_min_deg = twist_refined_deg - ((RFLOAT)(iter_not_converged) + 3.) * twist_step_deg;
+					twist_local_max_deg = twist_refined_deg + ((RFLOAT)(iter_not_converged) + 3.) * twist_step_deg;
 				}
-				if (this_iter_not_converged)
-				{
-					iter_not_converged++;
+			}
+			if (this_iter_not_converged)
+			{
+				iter_not_converged++;
 #ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-					std::cout << " !!! NR_ITERATION_NOT_CONVERGED = " << iter_not_converged << " !!!" << std::endl;
+				std::cout << " !!! NR_ITERATION_NOT_CONVERGED = " << iter_not_converged << " !!!" << std::endl;
 #endif
-					if (iter_not_converged > 10) // Up to 25*25 samplings are allowed (original 5*5 samplings)
-					{
-						std::cout << " WARNING: Local searches of helical symmetry cannot converge. Consider a finer initial sampling of helical parameters." << std::endl;
-						return false;
-					}
-					continue;
+				if (iter_not_converged > 10) // Up to 25*25 samplings are allowed (original 5*5 samplings)
+				{
+					std::cout << " WARNING: Local searches of helical symmetry cannot converge. Consider a finer initial sampling of helical parameters." << std::endl;
+					return false;
 				}
+				continue;
 			}
-			iter_not_converged = 0;
-
-			// Set 5*5 finer samplings for the next iteration
-			if (search_rise)
-			{
-				rise_local_min_pix = rise_refined_pix - rise_step_pix;
-				rise_local_max_pix = rise_refined_pix + rise_step_pix;
-			}
-			if (search_twist)
-			{
-				twist_local_min_deg = twist_refined_deg - twist_step_deg;
-				twist_local_max_deg = twist_refined_deg + twist_step_deg;
-			}
-
-			// When there is no need to search for either twist or rise
-			if ((rise_step_pix / fabs(rise_refined_pix)) < err_max)
-			{
-				rise_local_min_pix = rise_local_max_pix = rise_refined_pix;
-				search_rise = false;
-			}
-			if ((twist_step_deg / fabs(twist_refined_deg)) < err_max)
-			{
-				twist_local_min_deg = twist_local_max_deg = twist_refined_deg;
-				search_twist = false;
-			}
-
-			// Stop searches if step sizes are too small
-			if ( (!search_twist) && (!search_rise) )
-				return true;
-
-			// Decrease step size
-			if (search_rise)
-				rise_step_pix /= 2.;
-			if (search_twist)
-				twist_step_deg /= 2.;
 		}
+		iter_not_converged = 0;
+
+		// Set 5*5 finer samplings for the next iteration
+		if (search_rise)
+		{
+			rise_local_min_pix = rise_refined_pix - rise_step_pix;
+			rise_local_max_pix = rise_refined_pix + rise_step_pix;
+		}
+		if (search_twist)
+		{
+			twist_local_min_deg = twist_refined_deg - twist_step_deg;
+			twist_local_max_deg = twist_refined_deg + twist_step_deg;
+		}
+
+		// When there is no need to search for either twist or rise
+		if ( (search_rise) && ((rise_step_pix / fabs(rise_refined_pix)) < err_max) )
+		{
+			rise_local_min_pix = rise_local_max_pix = rise_refined_pix;
+			search_rise = false;
+		}
+		if ( (search_twist) && ((twist_step_deg / fabs(twist_refined_deg)) < err_max) )
+		{
+			twist_local_min_deg = twist_local_max_deg = twist_refined_deg;
+			search_twist = false;
+		}
+
+		// Stop searches if step sizes are too small
+		if ( (!search_twist) && (!search_rise) )
+			break;
+
+		// Decrease step size
+		if (search_rise)
+			rise_step_pix /= 2.;
+		if (search_twist)
+			twist_step_deg /= 2.;
+	}
+
+	if (out_of_range)
+	{
+		std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial guess of helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
+		return false;
 	}
 	return true;
 };
@@ -3206,24 +3222,32 @@ void simulateHelicalSegments(
 		RFLOAT rise_pix,
 		RFLOAT twist_deg,
 		RFLOAT sigma_psi,
-		RFLOAT sigma_tilt)
+		RFLOAT sigma_tilt,
+		int random_seed)
 {
 	int nr_segments, tube_id;
-	RFLOAT rot, psi, tilt, step_pix, psi_flip_ratio, len_pix;
+	RFLOAT rot, psi, tilt, new_psi, new_tilt, step_pix, psi_flip_ratio, len_pix;
 	MetaDataTable MD;
 	FileName fn_mic;
 
 	// TODO: raise error if nr_asu<0 or too big, n too small!
 	if ( (nr_tubes < 2) || (nr_subunits < 100) || (nr_asu < 1) || (((nr_subunits / nr_asu) / nr_tubes) < 5) || ((nr_subunits / nr_asu) > 999999) )
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Errors in the number of tubes, asymmetrical units or total subunits!");
-	if ( (sigma_psi < 0.) || (sigma_psi > 10.) || (sigma_tilt < 0.) || (sigma_tilt > 10.) )
-		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Errors in sigma_psi or sigma_tilt!");
+	if ( (sigma_psi > 10.) || (sigma_tilt > 10.) )
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: sigma_psi or sigma_tilt should not be larger than 10 degrees.");
 	if ( (fabs(twist_deg) < 0.001) || (fabs(twist_deg) > 180.))
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Error in helical twist!");
+
+	if (random_seed < 0)
+		random_seed = time(NULL);
+    init_random_generator(random_seed);
 
 	nr_segments = nr_subunits / nr_asu;
 
 	MD.clear();
+    MD.addLabel(EMDL_ORIENT_ROT);
+    MD.addLabel(EMDL_ORIENT_TILT);
+    MD.addLabel(EMDL_ORIENT_PSI);
     MD.addLabel(EMDL_ORIENT_ROT_PRIOR);
     MD.addLabel(EMDL_ORIENT_TILT_PRIOR);
     MD.addLabel(EMDL_ORIENT_PSI_PRIOR);
@@ -3251,10 +3275,22 @@ void simulateHelicalSegments(
 		rot += twist_deg * ((RFLOAT)(nr_asu));
 		rot = realWRAP(rot, -180., 180.);
 
+		if (sigma_tilt < 0.0001)
+			new_tilt = realWRAP(tilt, 0., 180.);
+		else
+			new_tilt = realWRAP(tilt + rnd_gaus(0., sigma_tilt), 0., 180.);
+		if (sigma_psi < 0.0001)
+			new_psi = realWRAP(psi, -180., 180.);
+		else
+			new_psi = realWRAP(psi + rnd_gaus(0., sigma_psi), -180., 180.);
+
 		MD.addObject();
+    	MD.setValue(EMDL_ORIENT_ROT, rot);
+    	MD.setValue(EMDL_ORIENT_TILT, new_tilt);
+    	MD.setValue(EMDL_ORIENT_PSI, new_psi);
     	MD.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
-    	MD.setValue(EMDL_ORIENT_TILT_PRIOR, realWRAP(tilt + rnd_gaus(0., sigma_tilt), 0., 180.) );
-    	MD.setValue(EMDL_ORIENT_PSI_PRIOR, realWRAP(psi + rnd_gaus(0., sigma_psi), -180., 180.) );
+    	MD.setValue(EMDL_ORIENT_TILT_PRIOR, new_tilt);
+    	MD.setValue(EMDL_ORIENT_PSI_PRIOR, new_psi);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
     	MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
