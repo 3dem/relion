@@ -148,6 +148,8 @@ void AutoPicker::read(int argc, char **argv)
 	{
 		if ( (helical_tube_curvature_factor_max < 0.0001) || (helical_tube_curvature_factor_max > 1.0001) )
 			REPORT_ERROR("Error: Maximum curvature factor should be 0~1!");
+		if (!(min_particle_distance > 0.))
+			REPORT_ERROR("Error: Helical rise and the number of asymmetrical units between neighbouring helical segments should be positive!");
 	}
 }
 
