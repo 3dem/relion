@@ -31,8 +31,8 @@ class reconstruct_parameters
 	public:
    	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug;
 	MetaDataTable DF;
-	int r_max, r_min_nn, blob_order, padding_factor, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim;
-	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y;
+	int r_max, r_min_nn, blob_order, padding_factor, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
+	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y, helical_rise, helical_twist;
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt;
 	// I/O Parser
 	IOParser parser;
@@ -69,6 +69,11 @@ class reconstruct_parameters
     	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
     	beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
     	do_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+
+    	int helical_section = parser.addSection("Helical options");
+    	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
+    	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
+    	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, + for right-handedness)", "0."));
 
        	int expert_section = parser.addSection("Expert options");
        	fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
@@ -452,7 +457,7 @@ class reconstruct_parameters
    			}
    		}
    		std::cerr << "Starting the reconstruction ..." << std::endl;
-   		backprojector.symmetrise();
+   		backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise);
    		backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
 
    		if (do_reconstruct_ctf)

@@ -1073,6 +1073,13 @@ bool RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 {
 
+
+	FileName fn_log = "pipeline_" + pipeline.name + "_scheduler.log";
+	std::ofstream  fh;
+	fh.open((fn_log).c_str(), std::ios::app);
+
+	std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
+
 	FileName fn_check = "RUNNING_PIPELINER_"+pipeline.name;
 	bool fn_check_exists = exists(fn_check);
 
@@ -1080,13 +1087,24 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		REPORT_ERROR(" relion_pipeliner ERROR: " + fn_check + " file does not exist. Exiting...");
 
 	if (scheduled_processes.size() < 1)
-		REPORT_ERROR(" relion_pipeliner ERROR: there are no scheduled jobs. Exiting...");
+		REPORT_ERROR("relion_pipeliner ERROR: there are no scheduled jobs. Exiting...");
 
+	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+	fh << " Starting a new scheduler execution .." << std::endl;
+	fh << " The scheduled jobs are: " << std::endl;
+	for (long int i = 0; i < scheduled_processes.size(); i++)
+		fh << " - " << pipeline.processList[scheduled_processes[i]].name << std::endl;
+	fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
+	if (nr_repeat > 1)
+		fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
+	fh << " Will be checking for existence of file " << fn_check << "; if it no longer exists, the scheduler will stop." << std::endl;
+	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
 
 	std::vector<long int> my_scheduled_processes = scheduled_processes;
 	int repeat = 0;
 	for (repeat = 0 ; repeat < nr_repeat; repeat++)
 	{
+		fh << " + Starting the " << repeat+1 << "th repeat .." << std::endl;
 
 		// Get starting time of the repeat cycle
 		timeval time_start, time_end;
@@ -1096,6 +1114,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		{
 			current_job = my_scheduled_processes[i];
 			loadJobFromPipeline();
+			fh << " + -- Executing " << pipeline.processList[current_job].name << " .. " << std::endl;
 			cb_run_i(false, false); //dont only schedule and dont open the editor window
 
 			// Now wait until that job is done!
@@ -1152,12 +1171,16 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		long int passed_minutes = (time_end.tv_sec - time_start.tv_sec)/60;
 		long int still_wait = minutes_wait - passed_minutes;
 		if (still_wait > 0 && repeat+1 != nr_repeat)
+		{
+			fh << " + -- Waiting " << still_wait << " minutes until next repeat .."<< std::endl;
 			sleep(still_wait * 60);
+		}
 
 	}
 
 	if (repeat == nr_repeat)
 	{
+		fh << " + performed all requested repeats, stopping now ..." << std::endl;
 		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
 		std::cout << " PIPELINER: you may want to re-start the GUI to update the job lists." << std::endl;
 
@@ -1179,6 +1202,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	}
 	else if (!fn_check_exists)
 	{
+		fh << " + File " << fn_check << " was removed. Stopping now .." << std::endl;
 		std::cout << " PIPELINER: the " << fn_check << " file was removed. Stopping now ..." << std::endl;
 		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
 	}
@@ -1186,6 +1210,9 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	{
 		REPORT_ERROR("PIPELINER BUG: This shouldn't happen, either fn_check should not exist or we should reach end of repeat cycles...");
 	}
+
+	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+	fh.close();
 
 	cb_quit_i();
 }
@@ -1434,6 +1461,7 @@ void RelionMainWindow::cb_display_io_node_i()
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
+	//std::cerr << " command= " << command << std::endl;
 	int res= system(command.c_str());
 
 }
@@ -1478,8 +1506,8 @@ void RelionMainWindow::cb_toggle_continue_i()
 void RelionMainWindow::cb_fill_stdout_i()
 {
 
-	FileName fn_out = (current_job > 0) ? pipeline.processList[current_job].name + "run.out" : "";
-	FileName fn_err = (current_job > 0) ? pipeline.processList[current_job].name + "run.err" : "";
+	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
+	FileName fn_err = (current_job >= 0) ? pipeline.processList[current_job].name + "run.err" : "";
 	if (exists(fn_out))
 	{
 		// Remove annoying carriage returns
@@ -2469,7 +2497,7 @@ void RelionMainWindow::cb_save(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_save_i()
 {
 	// For scheduled jobs, also allow saving the .job file in the output directory
-	if (current_job > 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
+	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
 			                pipeline.processList[current_job].status == PROC_SCHEDULED_CONT))
 	{
 		fn_settings = pipeline.processList[current_job].name;
@@ -2613,30 +2641,36 @@ void RelionMainWindow::cb_print_notes(Fl_Widget*, void* v)
 
 void RelionMainWindow::cb_print_notes_i()
 {
-	std::cout << " ################################################################ " << std::endl;
-	std::cout << " # Printing all note files for pipeline: " << pipeline.name << std::endl;
+	std::ofstream  fh;
+	FileName fn_tmp = pipeline.name + "_all_notes.txt";
+	fh.open((fn_tmp).c_str(), std::ios::out);
+
 	for (size_t i = 0; i < pipeline.processList.size(); i++)
 	{
 		FileName fn_note = pipeline.processList[i].name+"note.txt";
-		std::cout << " ################################################################ " << std::endl;
-		std::cout << " # Job= " << pipeline.processList[i].name;
+		fh << " ################################################################ " << std::endl;
+		fh << " # Job= " << pipeline.processList[i].name;
 		if (pipeline.processList[i].alias != "None")
-			std::cout <<" alias: " << pipeline.processList[i].alias;
-		std::cout	<< std::endl;
+			fh <<" alias: " << pipeline.processList[i].alias;
+		fh	<< std::endl;
 		if (exists(fn_note))
 		{
 			std::ifstream in(fn_note.data(), std::ios_base::in);
 			std::string line;
 			if (in.fail())
-        		REPORT_ERROR( (std::string) "ERROR: cannot read file " + fn_note);
+				REPORT_ERROR( (std::string) "ERROR: cannot read file " + fn_note);
     	    in.seekg(0);
     	    while (getline(in, line, '\n'))
     	    {
-    	    	std::cout << line << std::endl;
+    	    	fh << line << std::endl;
     	    }
 			in.close();
 		}
 	}
+	fh.close();
+
+	std::string msg = "Done writing all notes into file: " + fn_tmp;
+	fl_message(msg.c_str());
 
 }
 

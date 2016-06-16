@@ -83,6 +83,9 @@ public:
 	// When using Gctf, use equi-phase averaging?
 	bool do_EPA;
 
+	// Additional gctf command line options
+	std::string additional_gctf_options;
+
 	// When using Gctf, do validation test?
 	bool do_validation;
 
@@ -169,13 +172,13 @@ public:
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool die_if_not_found = true);
+			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool do_warn = true);
 	bool getCtffind3Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &valscore, bool die_if_not_found = true);
+			RFLOAT &maxres, RFLOAT &valscore, bool do_warn = true);
 	bool getCtffind4Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &phaseshift, bool die_if_not_found = true);
+			RFLOAT &maxres, RFLOAT &phaseshift, bool do_warn = true);
 };
 
 

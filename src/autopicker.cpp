@@ -148,6 +148,8 @@ void AutoPicker::read(int argc, char **argv)
 	{
 		if ( (helical_tube_curvature_factor_max < 0.0001) || (helical_tube_curvature_factor_max > 1.0001) )
 			REPORT_ERROR("Error: Maximum curvature factor should be 0~1!");
+		if (!(min_particle_distance > 0.))
+			REPORT_ERROR("Error: Helical rise and the number of asymmetrical units between neighbouring helical segments should be positive!");
 	}
 }
 
@@ -238,6 +240,16 @@ void AutoPicker::initialise()
 		}
 
 		fn_micrographs = fns_todo;
+	}
+
+	// If there is nothing to do, then go out of initialise
+	todo_anything = true;
+	if (fn_micrographs.size() == 0)
+	{
+		if (verb > 0)
+			std::cout << " + No new micrographs to do, so exiting autopicking ..." << std::endl;
+		todo_anything = false;
+		return;
 	}
 
 	if (verb > 0)

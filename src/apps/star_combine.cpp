@@ -102,7 +102,9 @@ class star_combine_parameters
 				}
 				fn_prev = fn_this;
 			}
-			std::cerr << " WARNING: Total number of duplicate "<< fn_check << " entries: " << nr_duplicates << std::endl;
+
+			if (nr_duplicates > 0)
+				std::cerr << " WARNING: Total number of duplicate "<< fn_check << " entries: " << nr_duplicates << std::endl;
 		}
 
 		MDout.write(fn_out);

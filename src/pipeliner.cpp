@@ -912,8 +912,30 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 	        }
 	        case PROC_EXTRACT:
 	        {
-	        	is_right = (mynodetype == NODE_MIC_COORDS || mynodetype == NODE_PART_DATA);
-	        	right_label = "coords";
+
+	        	// If the coordinates come from NODE_MIC_COORDS, then straight up is the CTF info
+	        	// If the coordinates come from NODE_PART_DATA, then that should be straight up
+	        	// therefore first check whether this node has NODE_PART_DATA input
+	        	bool has_part_data = false;
+	        	for (int inode2 = 0; inode2 < pipeline.processList[new_process].inputNodeList.size(); inode2++)
+	        	{
+	    			long int inputnode2 = pipeline.processList[new_process].inputNodeList[inode2];
+	    			if (pipeline.nodeList[inputnode2].type == NODE_PART_DATA)
+	    			{
+	    				has_part_data = true;
+	    				break;
+	    			}
+	        	}
+	        	if (has_part_data)
+	        	{
+	        		is_right = (mynodetype == NODE_MICS);
+	        		right_label = "mics";
+	        	}
+	        	else
+	        	{
+					is_right = (mynodetype == NODE_MIC_COORDS);
+					right_label = "coords";
+	        	}
 	        	break;
 	        }
 	        case PROC_SORT:
