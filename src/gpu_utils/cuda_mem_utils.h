@@ -1526,7 +1526,7 @@ public:
 
 		// reset the staged object to this new position (TODO: disable for pinned mem)
 		if(input.h_ptr!=NULL && input.h_do_free)
-			input.free_host();
+			input.free_host_if_set();
 		input.h_ptr=&AllData.h_ptr[AllData.size];
 		input.d_ptr=&AllData.d_ptr[AllData.size];
 

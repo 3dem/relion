@@ -155,11 +155,8 @@ bool CudaProjector::setMdlDim(
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
 #endif
 #else
-	HANDLE_ERROR(cudaMemGetInfo( &free1, &total ));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
-	HANDLE_ERROR(cudaMemGetInfo( &free2, &total ));
-
 #endif
 	return true;
 }
