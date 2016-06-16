@@ -1316,31 +1316,12 @@ int pickerViewerCanvas::handle(int ev)
 					return 0;
 			}
 			// Else store new coordinate
-
-			MDcoords.addObject();
+			MDcoords.addObject(MDcoords.getObject()); // copy last line of MDcoords to make sure all fields are filled
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
-			// If a autopicking file was read in, now store -999 in all the corresponding values....
-			if (MDcoords.containsLabel(EMDL_PARTICLE_CLASS))
-			{
-				int iclass = -999;
-				MDcoords.setValue(EMDL_PARTICLE_CLASS, iclass);
-			}
-			if (MDcoords.containsLabel(EMDL_ORIENT_PSI))
-			{
-				RFLOAT psi = -999.;
-				MDcoords.setValue(EMDL_ORIENT_PSI, psi);
-			}
-			if (MDcoords.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
-			{
-				RFLOAT fom = -999.;
-				MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
-			}
+			RFLOAT aux = -999.;
 			if (MDcoords.containsLabel(color_label))
-			{
-				RFLOAT z = -999.;
-				MDcoords.setValue(color_label, z);
-			}
+				MDcoords.setValue(color_label, aux);
 
 			redraw();
 			return 1;
@@ -1443,8 +1424,16 @@ void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 	// Never write out columns that come from the fn_color file....
 	if (fn_color != "" && color_label != EMDL_UNDEFINED)
 	{
-		MetaDataTable MDnew = MDcoords;
-		MDnew.deactivateLabel(color_label);
+		MetaDataTable MDnew;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
+		{
+			MDnew.addObject();
+			RFLOAT aux;
+			MDcoords.getValue(EMDL_IMAGE_COORD_X, aux);
+			MDnew.setValue(EMDL_IMAGE_COORD_X, aux);
+			MDcoords.getValue(EMDL_IMAGE_COORD_Y, aux);
+			MDnew.setValue(EMDL_IMAGE_COORD_Y, aux);
+		}
 		MDnew.write(fn_out); // write out a copy of the MDcoord to maintain the Z-score label active...
 	}
 	else
