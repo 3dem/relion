@@ -359,11 +359,11 @@ public:
 	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
 	inline
 	ProjectionParams(ProjectionParams &parent, size_t start, size_t end):
-		rots(			parent.rots.begin() +start,  				parent.rots.begin() +start+end),
-		tilts(			parent.tilts.begin() 			+start, 	parent.tilts.begin() 			+start+end),
-		psis(			parent.psis.begin() 			+start,  	parent.psis.begin() 			+start+end),
-		iorientclasses( 	parent.iorientclasses.begin() 		+start,  	parent.iorientclasses.begin() 	+start+end),
-		iover_rots(		parent.iover_rots.begin() 		+start,  	parent.iover_rots.begin() 		+start+end),
+		rots(				parent.rots.begin() 			+start,  	parent.rots.begin() 			+end),
+		tilts(				parent.tilts.begin() 			+start, 	parent.tilts.begin() 			+end),
+		psis(				parent.psis.begin() 			+start,  	parent.psis.begin() 			+end),
+		iorientclasses( 	parent.iorientclasses.begin() 	+start,  	parent.iorientclasses.begin() 	+end),
+		iover_rots(			parent.iover_rots.begin() 		+start,  	parent.iover_rots.begin() 		+end),
 		orientation_num(1),
 		orientationNumAllClasses(0),
 		class_entries(1,end-start),
