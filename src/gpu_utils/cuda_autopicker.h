@@ -3,6 +3,7 @@
 
 #include "src/mpi.h"
 #include "src/autopicker.h"
+#include "src/autopicker_mpi.h"
 #include "src/projector.h"
 #include "src/complex.h"
 #include "src/image.h"
@@ -23,6 +24,10 @@
 
 class AutoPickerCuda
 {
+private:
+
+	MpiNode *node;
+
 public:
 
 	AutoPicker *basePckr;
@@ -47,7 +52,8 @@ public:
 	relion_timer timer;
 #endif
 
-	AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * timing_fnm);
+	AutoPickerCuda(AutoPicker    *basePicker, int dev_id, const char * timing_fnm);
+	AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char * timing_fnm);
 
 	void setupProjectors();
 

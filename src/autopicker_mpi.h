@@ -40,6 +40,11 @@ public:
     	return(node->rank);
     }
 
+    MpiNode * getNode()
+    {
+    	return(node);
+    }
+
 };
 
 #endif /* AUTOPICKER_MPI_H_ */
