@@ -22,6 +22,7 @@
 //#define DEBUG_CHECKSIZES
 //#define DEBUG_BODIES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+//#define PRINT_GPU_MEM_INFO
 
 #include <sys/time.h>
 #include <stdio.h>
@@ -2048,11 +2049,19 @@ void MlOptimiser::expectation()
 
 			if (free < required_free)
 			{
-				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
+				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free/1000000);
 				allocationSize = (double)free *0.7;
 			}
 			else
 				allocationSize = free - required_free;
+
+			if (allocationSize < 200000000)
+				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+
+#ifdef PRINT_GPU_MEM_INFO
+			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
+			printf("INFO: Free memory for Custom Allocator of device bundle %d is %d MB\n", i, (int) ( ((float)allocationSize)/1000000.0 ) );
+#endif
 
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
