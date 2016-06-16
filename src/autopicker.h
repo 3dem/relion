@@ -131,6 +131,9 @@ public:
 	/// Only autopick those micrographs for which the coordinate file does not yet exist
 	bool do_only_unfinished;
 
+	// Is there any work to be done?
+	bool todo_anything;
+
 	// All micrographs to autopick from
 	std::vector<FileName> fn_micrographs;
 

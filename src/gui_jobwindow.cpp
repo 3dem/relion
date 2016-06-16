@@ -326,7 +326,11 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 		idx++;
 		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
 		if (!(type >= 0 && type < NR_BROWSE_TABS))
-			REPORT_ERROR("RelionJobWindow::openReadFile ERROR: cannot find job type in " + fn + "run.job");
+		{
+			std::string msg = "ERROR: cannot find job type in " + fn + "run.job";
+			fl_message(msg.c_str());
+			return false;
+		}
     	// Get is_continue from second line
 		getline(fh, line, '\n');
 		if (line.rfind("is_continue == true") == 0)
@@ -662,20 +666,38 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else if (node_type.getValue() == "2D/3D particle coordinates (*.box, *_pick.star)")
 	{
+
 		// Make the same directory structure of the coordinates
 		// Copy all coordinate files into the same subdirectory in the Import directory
-		command = "cp --parents " + fn_in.getValue() + " " + outputname;
+		// But remove directory structure from pipeline if that exists
+		// Dereference symbolic links if needed
+        FileName fn_dir = fn_in.getValue();
+		if (fn_dir.contains("/"))
+			fn_dir = fn_dir.beforeLastOf("/");
+		else
+			fn_dir = ".";
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post);
+
+		// Make the output directory
+		command = "mkdir -p " + outputname + fn_post;
 		commands.push_back(command);
-		// Get the coordinate-file suffix separately
+		// Copy the coordinates there
+		command = "cp " + fn_in.getValue() + " " + outputname + fn_post;
+		commands.push_back(command);
+
+		// Make a suffix file, which contains the actual suffix as a suffix
+		// Get the coordinate-file suffix
 		FileName fn_suffix = fn_in.getValue();
 		FileName fn_suffix2 = fn_suffix.beforeLastOf("*");
 		fn_suffix = fn_suffix.afterLastOf("*");
 		fn_suffix = "coords_suffix" + fn_suffix;
 		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
-		// Make a suffix file, which contains the actual suffix as a suffix
 		command = " echo \\\"" + fn_suffix2 + "*.mrc\\\" > " + outputname + fn_suffix;
+		//command = " echo \\\"" + outputname + fn_post + "/*.mrc\\\" > " + outputname + fn_suffix;
 		commands.push_back(command);
+
 	}
 	else if (node_type.getValue() == "Particles STAR file (.star)" ||
 			 node_type.getValue() == "Movie-particles STAR file (.star)" ||
@@ -1652,7 +1674,7 @@ This value should be slightly larger than the actual width of the tubes.");
 	helical_nr_asu.place(current_y, "Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
 The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
 
-	helical_rise.place(current_y, "Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+	helical_rise.place(current_y, "Helical rise (A):", -1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
 
 	current_y += STEPY/2;
 
@@ -1660,7 +1682,7 @@ The optimal inter-box distance might also depend on the box size, the helical ri
 Kappa = 0.3 means that the curvature of the picked helical tubes should not be larger than 30% the curvature of a circle (diameter = particle mask diameter). \
 Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
 
-	helical_tube_length_min.place(current_y, "Minimum length (A): ", 200, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
+	helical_tube_length_min.place(current_y, "Minimum length (A): ", -1, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
 Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
 
 	autopick_helix_group->end();
@@ -5104,7 +5126,12 @@ bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 
 		// Other arguments for extraction
 		command += " " + global_manualpickjob.other_args.getValue() + " &";
-
+	}
+	else
+	{
+		// Nothing was selected...
+		fl_message("Please select an input file.");
+		return false;
 	}
 
 	// Re-grouping
@@ -5575,7 +5602,7 @@ SubtractJobWindow::SubtractJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT
 	do_subtract.place(current_y, "Subtract partial signal?", true, "If set to Yes, a copy of the entire set of particle images in this STAR file will be made that contains the subtracted particle images.", subtract_group);
 
 	subtract_group->begin();
-	fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same data set, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
+	fn_in.place(current_y, "Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same particles as above, and preferably with those orientations, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
     fn_mask.place(current_y, "Mask to apply to this map:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is white (1) and the rest of the protein and the solvent is black (0).");
     subtract_group->end();
     do_subtract.cb_menu_i(); // make default active

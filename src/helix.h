@@ -432,7 +432,8 @@ void simulateHelicalSegments(
 		RFLOAT rise_pix,
 		RFLOAT twist_deg,
 		RFLOAT sigma_psi,
-		RFLOAT sigma_tilt);
+		RFLOAT sigma_tilt,
+		int random_seed = -1);
 
 void outputHelicalSymmetryStatus(
 		int iter,
