@@ -575,6 +575,7 @@ public:
 		my_last_ori_particle_id(0),
 		ini_high(0),
 		do_realign_movies(0),
+		do_movies_in_batches(0),
 		do_ctf_correction(0),
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
