@@ -1506,8 +1506,8 @@ void RelionMainWindow::cb_toggle_continue_i()
 void RelionMainWindow::cb_fill_stdout_i()
 {
 
-	FileName fn_out = (current_job > 0) ? pipeline.processList[current_job].name + "run.out" : "";
-	FileName fn_err = (current_job > 0) ? pipeline.processList[current_job].name + "run.err" : "";
+	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
+	FileName fn_err = (current_job >= 0) ? pipeline.processList[current_job].name + "run.err" : "";
 	if (exists(fn_out))
 	{
 		// Remove annoying carriage returns
@@ -2497,7 +2497,7 @@ void RelionMainWindow::cb_save(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_save_i()
 {
 	// For scheduled jobs, also allow saving the .job file in the output directory
-	if (current_job > 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
+	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
 			                pipeline.processList[current_job].status == PROC_SCHEDULED_CONT))
 	{
 		fn_settings = pipeline.processList[current_job].name;
