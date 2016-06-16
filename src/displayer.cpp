@@ -1316,7 +1316,7 @@ int pickerViewerCanvas::handle(int ev)
 					return 0;
 			}
 			// Else store new coordinate
-			MDcoords.addObject(MDcoords.getObject()); // copy last line of MDcoords to make sure all fields are filled
+			MDcoords.addObject();
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
 			RFLOAT aux = -999.;
