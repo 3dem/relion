@@ -53,7 +53,7 @@ public:
 
 	void run();
 
-	void autoPickOneMicrograph(FileName &fn_mic);
+	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
 	void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
 			int nr_nonzero_pixels_mask, CudaGlobalPtr< XFLOAT > &d_Mstddev, CudaGlobalPtr< XFLOAT > &d_Mmean,
