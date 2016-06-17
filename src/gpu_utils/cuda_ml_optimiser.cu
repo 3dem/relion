@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <ctime>
+#include <vector>
 #include <iostream>
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_projector.cuh"
@@ -998,7 +999,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 		{
-			baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z);
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
@@ -1222,10 +1223,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
 	}
 #endif
-
-
-	op.sum_weight.clear();
-	op.sum_weight.resize(sp.nr_particles, 0.);
 
 	// Ready the "prior-containers" for all classes (remake every ipart)
 	CudaGlobalPtr<XFLOAT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, cudaMLO->devBundle->allocator);
@@ -1505,13 +1502,21 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			sortOnDevice(PassWeights[ipart].weights, sorted);
 			scanOnDevice(sorted, cumulative_sum);
-
-			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
-
 			CTOC(cudaMLO->timer,"sort");
 
-			size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
-			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+			if(baseMLO->adaptive_oversampling!=0)
+			{
+				op.sum_weight.clear();
+				op.sum_weight.resize(sp.nr_particles, 0.);
+				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
+				size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
+				my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+			}
+			else
+			{
+				my_significant_weight = sorted.getDeviceAt(0);
+			}
+
 		}
 		else
 		{
@@ -1556,6 +1561,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			sortOnDevice(filtered, sorted);
 			scanOnDevice(sorted, cumulative_sum);
 
+			op.sum_weight.clear();
+			op.sum_weight.resize(sp.nr_particles, 0.);
 			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
 			CTOC(cudaMLO->timer,"sort");
@@ -1909,6 +1916,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
 
 		//TODO We already have rot, tilt and psi don't calculated them again
+		if(baseMLO->do_skip_align || baseMLO->do_skip_rotate)
+			   baseMLO->sampling.getOrientations(sp.idir_min, sp.ipsi_min, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+					   op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+		else
+			   baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+
 		baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 				op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
@@ -1958,7 +1972,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	int j = 0;
 	for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 	{
-		baseMLO->sampling.getTranslations(itrans, 1, oversampled_translations_x,
+		baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
 				oversampled_translations_y, oversampled_translations_z); //TODO Called multiple time to generate same list, reuse the same list
 
 		for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)

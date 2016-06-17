@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 				std::stringstream didSs;
 				didSs << "APr" << prm.getRank();
 				int dev_id = prm.deviceInitialise();
-				prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id, didSs.str().c_str() );
+				prm.cudaPicker = (void*) new AutoPickerCuda((AutoPickerMpi*)&prm, dev_id, didSs.str().c_str() );
 
 				((AutoPickerCuda*)prm.cudaPicker)->run();
 			}

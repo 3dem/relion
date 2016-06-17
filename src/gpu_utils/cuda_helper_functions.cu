@@ -430,7 +430,7 @@ size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT thres
 	else
 	{
 		CudaGlobalPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
-		idx[0] = data.getSize()-1;
+		idx[0] = 0;
 		idx.put_on_device();
 
 
