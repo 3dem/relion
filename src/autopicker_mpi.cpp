@@ -105,7 +105,7 @@ void AutoPickerMpi::run()
 			fn_olddir = fn_dir;
 		}
 
-    	autoPickOneMicrograph(fn_micrographs[imic]);
+    	autoPickOneMicrograph(fn_micrographs[imic], imic);
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
