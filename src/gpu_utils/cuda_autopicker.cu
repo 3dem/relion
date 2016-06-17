@@ -151,7 +151,7 @@ void AutoPickerCuda::run()
 #ifdef TIMING
 		basePckr->timer.tic(basePckr->TIMING_A5);
 #endif
-		autoPickOneMicrograph(basePckr->fn_micrographs[imic]);
+		autoPickOneMicrograph(basePckr->fn_micrographs[imic], imic);
 	}
 #ifdef TIMING
 		basePckr->timer.toc(basePckr->TIMING_A5);
@@ -264,7 +264,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX 
 
 }
 
-void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
+void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 {
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
@@ -275,6 +275,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic)
 	CudaGlobalPtr<XFLOAT >  d_Mpsi_best(basePckr->workSize*basePckr->workSize, allocator);
 	d_Mccf_best.device_alloc();
 	d_Mpsi_best.device_alloc();
+
+	// Always use the same random seed
+	init_random_generator(basePckr->random_seed + imic);
 
 	RFLOAT sum_ref_under_circ_mask, sum_ref2_under_circ_mask;
 	int my_skip_side = basePckr->autopick_skip_side + basePckr->particle_size/2;

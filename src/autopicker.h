@@ -86,6 +86,9 @@ public:
 	// Verbosity
 	int verb;
 
+	// Random seed
+	long int random_seed;
+
 	// Input & Output rootname
 	FileName fn_in, fn_ref, fns_autopick, fn_odir, fn_out;
 
@@ -260,7 +263,7 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
-	void autoPickOneMicrograph(FileName &fn_mic);
+	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
 	// Get the output coordinate filename given the micrograph filename
 	FileName getOutputRootName(FileName fn_mic);

@@ -138,6 +138,7 @@ void AutoPicker::read(int argc, char **argv)
 
 	int expert_section = parser.addSection("Expert options");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "-1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves emory and time)", "1.0"));
 
 	// Check for errors in the command-line option
@@ -187,6 +188,9 @@ void AutoPicker::initialise()
 		timer.tic(TIMING_A0);
 		timer.tic(TIMING_A1);
 #endif
+
+	if (random_seed == -1) random_seed = time(NULL);
+
 	if (fn_in.isStarFile())
 	{
 		MDmic.read(fn_in);
@@ -641,7 +645,7 @@ void AutoPicker::run()
 #ifdef TIMING
 		timer.tic(TIMING_A5);
 #endif
-		autoPickOneMicrograph(fn_micrographs[imic]);
+		autoPickOneMicrograph(fn_micrographs[imic], imic);
 #ifdef TIMING
 		timer.toc(TIMING_A5);
 #endif
@@ -1706,7 +1710,7 @@ void AutoPicker::exportHelicalTubes(
 	return;
 }
 
-void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
+void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 {
 
 	Image<RFLOAT> Imic;
@@ -1720,6 +1724,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic)
 
 	int min_distance_pix = ROUND(min_particle_distance / angpix);
 	float scale = (float)workSize / (float)micrograph_size;
+
+	// Always use the same random seed
+	init_random_generator(random_seed + imic);
 
 #ifdef DEBUG
 	Image<RFLOAT> tt;
