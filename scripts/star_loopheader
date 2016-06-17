@@ -1,0 +1,31 @@
+#!/bin/bash -f
+if [ $# != 0 ]; then
+ echo "data_"
+ echo "loop_"
+ for i;
+ do
+  echo "_"${i}
+ done;
+else
+ echo " === Usage: === "
+ echo " ${0} <label1> <label2> ..."
+ echo " "
+ echo " === Purpose: === "
+ echo " This (bash) script generates the header of STAR-file with the given labels"
+ echo " "
+ echo " === Example: ==="
+ echo " ${0} rlnImageName rlnDefocusU rlnDefocusV rlnDefocusAngle rlnVoltage rlnSphericalAberration rlnAmplitudeContrast"
+ echo " yields: "
+ echo " data_"
+ echo " loop_"
+ echo " _rlnImageName"
+ echo " _rlnDefocusU"
+ echo " _rlnDefocusV"
+ echo " _rlnDefocusAngle"
+ echo " _rlnVoltage"
+ echo " _rlnSphericalAberration"
+ echo " _rlnAmplitudeContrast"
+fi
+
+
+
