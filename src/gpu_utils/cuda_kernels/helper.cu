@@ -107,7 +107,7 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 					s_weights[tid] = prior * exp(-diff2);
 	#else
 				if (diff2 > 88.)
-					s_weights[tid] = 0.;
+					s_weights[tid] = 0.f;
 				else
 					s_weights[tid] = prior * expf(-diff2);
 	#endif
@@ -170,7 +170,7 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
 				weight /= op_sum_weight;
 			else
-				weight = 0.0f;
+				weight = (XFLOAT)0.0;
 
 			s_o_weights[tid] += weight;
 			s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy];
@@ -219,13 +219,13 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
 		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
 
-		XFLOAT sum_bg_total = 0.f;
+		XFLOAT sum_bg_total =  (XFLOAT)0.0;
 
 		long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE);
 		int texel = tid;
 
-		partial_sum[tid]=0.f;
-		partial_sum_bg[tid]=0.f;
+		partial_sum[tid]=(XFLOAT)0.0;
+		partial_sum_bg[tid]=(XFLOAT)0.0;
 		if (do_Mnoise)
 		{
 			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
@@ -235,8 +235,8 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 				{
 					img_pixels[tid]=__ldg(&vol[texel]);
 
-					z = 0.f;// floor( (float) texel                  / (float)((xdim)*(ydim)));
-					y = floor( (float)(texel-z*(xdim)*(ydim)) / (float) xdim );
+					z = (XFLOAT)0.0;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+					y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT) xdim );
 					x = texel - z*(xdim)*(ydim) - y*xdim;
 
 	//				z-=zinit;
@@ -249,12 +249,16 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 						continue;
 					else if (r > radius_p)
 					{
-						partial_sum[tid]    += 1.f;
+						partial_sum[tid]    += (XFLOAT)1.0;
 						partial_sum_bg[tid] += img_pixels[tid];
 					}
 					else
 					{
+#if defined(CUDA_DOUBLE_PRECISION)
+						raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
+#else
 						raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+#endif
 						partial_sum[tid] += raisedcos;
 						partial_sum_bg[tid] += raisedcos * img_pixels[tid];
 					}
@@ -284,8 +288,8 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 			{
 				img_pixels[tid]=__ldg(&vol[texel]);
 
-				z = 0.f;// floor( (float) texel                  / (float)((xdim)*(ydim)));
-				y = floor( (float)(texel-z*(xdim)*(ydim)) / (float)  xdim         );
+				z = (XFLOAT)0.0;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+				y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT)  xdim         );
 				x = texel - z*(xdim)*(ydim) - y*xdim;
 
 //				z-=zinit;
@@ -300,8 +304,13 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 					img_pixels[tid]=sum_bg_total;
 				else
 				{
+#if defined(CUDA_DOUBLE_PRECISION)
+					raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
+#else
 					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+#endif
 					img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + sum_bg_total*raisedcos;
+
 				}
 				vol[texel]=img_pixels[tid];
 			}
@@ -412,7 +421,7 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 //	{
 		if(pixel<(image_size/2))
 		{
-			int y = floorf((float)pixel/(float)xdim);
+			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
 			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
 
 			int yp = y + yshift;
@@ -454,9 +463,9 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 		int xydim = xdim*ydim;
 		if(pixel<(image_size/2))
 		{
-			int z = floorf((float)pixel/(float)(xydim));
+			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
 			int xy = pixel % xydim;
-			int y = floorf((float)xy/(float)xdim);
+			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
 			int x = xy % xdim;
 
 			int yp = y + yshift;
@@ -520,7 +529,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	if(pixel<image_size)
 	{
 		XFLOAT Kccf = d_Mccf[pixel];
-		XFLOAT Kpsi = -1.f;
+		XFLOAT Kpsi =(XFLOAT)-1.0;
 		for(int psi = 0; psi < NpsiThisBatch; psi++ )
 		{
 			XFLOAT diff2 = normfft * d_Maux[pixel + image_size*psi];
@@ -537,7 +546,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 #endif
 
 			// Store fraction of (1 - probability-ratio) wrt  (1 - expected Pratio)
-			diff2 = (diff2 - 1.f) / (expected_Pratio - 1.f);
+			diff2 = (diff2 - (XFLOAT)1.0) / (expected_Pratio - (XFLOAT)1.0);
 			if (diff2 > Kccf)
 			{
 				Kccf = diff2;

@@ -108,16 +108,16 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				real =    tex3D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f, zp + 0.5f);
-				imag =  - tex3D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f, zp + 0.5f);
+				real =    tex3D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
+				imag =  - tex3D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 			else
 			{
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				real =   tex3D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f, zp + 0.5f);
-				imag =   tex3D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f, zp + 0.5f);
+				real =   tex3D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
+				imag =   tex3D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 	#else
 			CUDACOMPLEX val;
@@ -131,7 +131,7 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + 0.5f, yp + 0.5f, zp + 0.5f);
+				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 				val.y = -val.y;
 			}
 			else
@@ -139,7 +139,7 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + 0.5f, yp + 0.5f, zp + 0.5f);
+				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 			real=val.x;
 			imag=val.y;
@@ -194,14 +194,14 @@ public:
 				yp = -yp;
 				yp -= mdlInitY;
 
-				real =   tex2D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
-				imag = - tex2D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
+				real =   tex2D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
+				imag = - tex2D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 			}
 			else
 			{
 				yp -= mdlInitY;
-				real =   tex2D<XFLOAT>(mdlReal, xp + 0.5f, yp + 0.5f);
-				imag =   tex2D<XFLOAT>(mdlImag, xp + 0.5f, yp + 0.5f);
+				real =   tex2D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
+				imag =   tex2D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 			}
 #else
 			CUDACOMPLEX val;
@@ -212,13 +212,13 @@ public:
 				yp = -yp;
 				yp -= mdlInitY;
 
-				val = tex2D<CUDACOMPLEX>(mdlComplex, xp + 0.5f, yp + 0.5f);
+				val = tex2D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 				val.y = -val.y;
 			}
 			else
 			{
 				yp -= mdlInitY;
-				val = tex2D<CUDACOMPLEX>(mdlComplex, xp + 0.5f, yp + 0.5f);
+				val = tex2D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 			}
 			real=val.x;
 			imag=val.y;

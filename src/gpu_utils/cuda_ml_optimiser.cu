@@ -1281,6 +1281,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
+			op.sum_weight.clear();
+			op.sum_weight.resize(sp.nr_particles, (RFLOAT)(sp.nr_particles));
 
 			if(exp_ipass==0)
 			{
@@ -1328,8 +1330,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 //					DIRECT_A2D_ELEM(op.Mweight, ipart, i)= 0.;
 //
 //				DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
-
-			op.sum_weight[ipart] += 1.;
 
 		}
 		else

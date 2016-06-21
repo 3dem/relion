@@ -187,7 +187,7 @@ __global__ void cuda_kernel_diff2_fine(
 		unsigned trans_num  = (unsigned)d_job_num[bid]; //how many transes we have for this rot
 		for (int itrans=0; itrans<trans_num; itrans++)
 		{
-			s[itrans*BLOCK_SIZE+tid] = 0.0f;
+			s[itrans*BLOCK_SIZE+tid] = (XFLOAT)0.0;
 		}
 		// index of comparison
 		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
@@ -233,7 +233,7 @@ __global__ void cuda_kernel_diff2_fine(
 
 					diff_real =  ref_real - shifted_real;
 					diff_imag =  ref_imag - shifted_imag;
-					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_corr_img[pixel]);
+					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * (XFLOAT)0.5 * __ldg(&g_corr_img[pixel]);
 				}
 			}
 			__syncthreads();
