@@ -20,10 +20,6 @@
 
 #include "src/ml_model.h"
 
-#ifdef CUDA
-#include "src/gpu_utils/cuda_skunks.cuh"
-#endif
-
 void MlModel::initialise()
 {
 
@@ -779,18 +775,12 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
         if (update_tau2_spectra)
         {
-        	if (do_gpu)
-        		computeFourierTransformMap(&PPref[iclass], Irefp, tau2_class[iclass], current_size, nr_threads);
-        	else
-        		PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads);
+        	PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads);
         }
         else
         {
         	MultidimArray<RFLOAT> dummy;
-        	if (do_gpu)
-        		computeFourierTransformMap(&PPref[iclass], Irefp, dummy, current_size, nr_threads);
-        	else
-        		PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads);
+        	PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads);
         }
     }
 
