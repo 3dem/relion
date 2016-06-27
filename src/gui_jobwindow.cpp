@@ -327,8 +327,7 @@ bool RelionJobWindow::openReadFile(std::string fn, std::ifstream &fh)
 		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
 		if (!(type >= 0 && type < NR_BROWSE_TABS))
 		{
-			std::string msg = "ERROR: cannot find job type in " + fn + "run.job";
-			fl_message(msg.c_str());
+			fl_message("ERROR: cannot find job type in %s run.job",fn.c_str());
 			return false;
 		}
     	// Get is_continue from second line
@@ -503,11 +502,7 @@ bool RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	char * my_warn = getenv ("RELION_WARNING_LOCAL_MPI");
 	int my_nr_warn = (my_warn == NULL) ? DEFAULTWARNINGLOCALMPI : textToInteger(my_warn);
 	if (has_mpi && nr_mpi.getValue() > my_nr_warn && !do_queue.getValue())
-	{
-		std::string ask;
-		ask = "You're submitting a local job with " + integerToString(my_nr_warn) + " parallel MPI processes. Do you really want to run this?\n";
-		return fl_choice(ask.c_str(), "Don't run", "Run", NULL);
-	}
+		return fl_choice( "You're submitting a local job with %i parallel MPI processes. Do you really want to run this?\n", "Don't run", "Run", NULL,  my_nr_warn);
 	else
 		return true;
 }

@@ -1790,7 +1790,7 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 				ask += " - " + name + "\n";
 			}
 		}
-		proceed =  fl_choice(ask.c_str(), "Don't move", "Move", NULL);
+		proceed =  fl_choice("%s", "Don't move", "Move", NULL, ask.c_str());
 	}
 	else
 	{
@@ -1889,7 +1889,7 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		ask = "Are you sure you want to gently clean up intermediate files from the entire pipeline?";
 	}
 
-	proceed = fl_choice(ask.c_str(), "Don't clean up", "Clean up", NULL);
+	proceed = fl_choice("%s", "Don't clean up", "Clean up", NULL, ask.c_str());
 	if (proceed)
 	{
 		std::string how = (do_harsh) ? "Harshly" : "Gently";
@@ -1947,7 +1947,7 @@ void RelionMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 	{
 		std::string ask;
 		ask = "Are you sure you want to clean up intermediate files from " + pipeline.processList[myjob].name + "?";
-		proceed = fl_choice(ask.c_str(), "Don't clean up", "Clean up", NULL);
+		proceed = fl_choice("%s", "Don't clean up", "Clean up", NULL, ask.c_str());
 	}
 
 	if (proceed)
@@ -2624,7 +2624,7 @@ void RelionMainWindow::cb_empty_trash(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_empty_trash_i()
 {
 	std::string ask = "Are you sure you want to remove the entire Trash folder?";
-	int proceed =  fl_choice(ask.c_str(), "Don't empty trash", "Empty Trash", NULL);
+	int proceed =  fl_choice("%s", "Don't empty trash", "Empty Trash", NULL, ask.c_str());
 	if (proceed)
 	{
 		std::string command = "rm -rf Trash";
@@ -2669,8 +2669,7 @@ void RelionMainWindow::cb_print_notes_i()
 	}
 	fh.close();
 
-	std::string msg = "Done writing all notes into file: " + fn_tmp;
-	fl_message(msg.c_str());
+	fl_message("Done writing all notes into file: %s" , fn_tmp.c_str());
 
 }
 

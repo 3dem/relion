@@ -428,7 +428,7 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 		}
 		// Make the symbolic link relative to the project dir
 		fn_link += fn_mic;
-		symlink(fn_link.c_str(), fn_tmp_mic.c_str());
+		int res = symlink(fn_link.c_str(), fn_tmp_mic.c_str());
 	}
 	else
 	{
