@@ -805,7 +805,7 @@ void multiViewerCanvas::printMetaData(int ipos)
 		 str.replace(pos, 1, (std::string)"(at)" );
 		 pos = str.find('@', pos);
 	 }
-	 fl_message( str.c_str());
+	 fl_message("%s",str.c_str());
 
 }
 
@@ -896,8 +896,7 @@ void multiViewerCanvas::showFourierAmplitudes(int ipos)
 	img.read(fn_img, false);
 	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
 	{
-		 std::string str = "Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.";
-		 fl_message(str.c_str());
+		 fl_message("Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.");
 		 return;
 	}
 
@@ -921,9 +920,8 @@ void multiViewerCanvas::showFourierPhaseAngles(int ipos)
 	img.read(fn_img, false);
 	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
 	{
-		 std::string str = "Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.";
-		 fl_message(str.c_str());
-		 return;
+		fl_message("Cannot display Fourier transform of STAR files, 3D images or stacks. Please select a 2D image as input.");
+		return;
 	}
 
 	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);

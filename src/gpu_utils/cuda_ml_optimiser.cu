@@ -844,8 +844,14 @@ void getAllSquaredDifferencesCoarse(
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				pixel_correction /= op.local_Fctfs[ipart].data[i];
-
+			{
+				// if ctf[i]==0, pix_corr[i] becomes NaN.
+				// However, corr_img[i]==0, so pix-diff in kernel==0.
+				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
+				// which is ori-indep, and we subtract min_diff form ALL orients.
+				if (op.local_Fctfs[ipart].data[i]!=0)
+					pixel_correction /= op.local_Fctfs[ipart].data[i];
+			}
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
@@ -1019,7 +1025,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				pixel_correction /= op.local_Fctfs[ipart].data[i];
+			{
+				// if ctf[i]==0, pix_corr[i] becomes NaN.
+				// However, corr_img[i]==0, so pix-diff in kernel==0.
+				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
+				// which is ori-indep, and we subtract min_diff form ALL orients.
+				if (op.local_Fctfs[ipart].data[i]!=0)
+					pixel_correction /= op.local_Fctfs[ipart].data[i];
+			}
 
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
