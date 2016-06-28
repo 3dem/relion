@@ -249,8 +249,11 @@ foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
                      COMMAND ${CMAKE_COMMAND} -E
                      copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} 
                      ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
-    install(FILES ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} DESTINATION bin)
 endforeach()
+install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
+	 DESTINATION ${CMAKE_INSTALL_PREFIX}
+         USE_SOURCE_PERMISSIONS
+         FILES_MATCHING PATTERN "*")
 
 install(FILES ${CMAKE_SOURCE_DIR}/src/gui_background.xpm DESTINATION lib)
 
