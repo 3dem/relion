@@ -350,6 +350,46 @@ __global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
 	}
 }
 
+__global__ void cuda_kernel_translate3D(	XFLOAT * g_image_in,
+											XFLOAT * g_image_out,
+											int image_size,
+											int xdim,
+											int ydim,
+											int zdim,
+											int dx,
+											int dy,
+											int dz)
+{
+	int tid = threadIdx.x;
+	int bid =  blockIdx.x;
+
+	int x,y,z,xp,yp,zp,xy;
+	int voxel=tid + bid*BLOCK_SIZE;
+	int new_voxel;
+
+	int xydim = xdim*ydim;
+
+	if(voxel<image_size)
+	{
+		z =  voxel / xydim;
+		zp = z + dz;
+
+		xy = voxel % xydim;
+		y =  xy / xdim;
+		yp = y + dy;
+
+		x =  xy % xdim;
+		xp = x + dx;
+
+		if( zp>=0 && yp>=0 && xp>=0 && zp<zdim && yp<ydim && xp<xdim)
+		{
+			new_voxel = zp*xydim +  yp*xdim + xp;
+			if(new_voxel>=0 && new_voxel<image_size) // if displacement is negative, new_pixel could be less than 0
+				g_image_out[new_voxel] = g_image_in[voxel];
+		}
+	}
+}
+
 __global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
 											XFLOAT * g_spectrum,
 											int image_size,
@@ -384,6 +424,63 @@ __global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
 		if((ires>0.f) && (ires<spectrum_size) && !(xp==0 && yp<0.f))
 		{
 			normFaux = g_image[pixel].x*g_image[pixel].x + g_image[pixel].y*g_image[pixel].y;
+			cuda_atomic_add(&g_spectrum[ires], normFaux);
+			if(ires>=res_limit)
+				s_highres_Xi2[tid] = normFaux;
+		}
+	}
+
+	// Reduce the higres_Xi2-values for all threads. (I tried a straight atomic-write: for 128 threads it was ~3x slower)
+	__syncthreads();
+	for(int j=(POWERCLASS_BLOCK_SIZE/2); j>0.f; j/=2)
+	{
+		if(tid<j)
+			s_highres_Xi2[tid] += s_highres_Xi2[tid+j];
+		__syncthreads();
+	}
+	if(tid==0)
+		cuda_atomic_add(&g_highres_Xi2[0], s_highres_Xi2[0]);
+
+}
+
+__global__ void cuda_kernel_powerClass3D(	CUDACOMPLEX * g_image,
+											XFLOAT * g_spectrum,
+											int image_size,
+											int spectrum_size,
+											int xdim,
+											int ydim,
+											int zdim,
+											int res_limit,
+											XFLOAT * g_highres_Xi2)
+{
+	int tid = threadIdx.x;
+	int bid =  blockIdx.x;
+
+	XFLOAT normFaux;
+	__shared__ XFLOAT s_highres_Xi2[POWERCLASS_BLOCK_SIZE];
+	s_highres_Xi2[tid] = (XFLOAT)0.;
+
+	int x,y,z,xy;
+	int xydim = xdim*ydim;
+	int voxel=tid + bid*POWERCLASS_BLOCK_SIZE;
+
+	if(voxel<image_size)
+	{
+		z =  voxel / xydim;
+		xy = voxel % xydim;
+		y =  xy / xdim;
+		x =  xy % xdim;
+
+		y = ((y<xdim) ? y : y-ydim);
+		z = ((z<xdim) ? z : z-zdim);
+#if defined(CUDA_DOUBLE_PRECISION)
+		int ires = __double2int_rn(sqrt((XFLOAT)(x*x + y*y + z*z)));
+#else
+		int ires = __float2int_rn(sqrtf((XFLOAT)(x*x + y*y + z*z)));
+#endif
+		if((ires>0.f) && (ires<spectrum_size) && !(x==0 && y<0.f && z<0.f))
+		{
+			normFaux = g_image[voxel].x*g_image[voxel].x + g_image[voxel].y*g_image[voxel].y;
 			cuda_atomic_add(&g_spectrum[ires], normFaux);
 			if(ires>=res_limit)
 				s_highres_Xi2[tid] = normFaux;
