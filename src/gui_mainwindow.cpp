@@ -1743,32 +1743,29 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			istart = imax;
 			long int idel = to_delete_processes[i];
 			deleteProcesses[idel] = true;
-			if ((pipeline.processList[idel]).outputNodeList.size() > 0)
+                        is_done = true;
+                        for (size_t inode = 0; inode < (pipeline.processList[idel]).outputNodeList.size(); inode++)
 			{
-				is_done = true;
-				for (size_t inode = 0; inode < (pipeline.processList[idel]).outputNodeList.size(); inode++)
-				{
-					long int mynode = (pipeline.processList[idel]).outputNodeList[inode];
-					deleteNodes[mynode] = true;
+				long int mynode = (pipeline.processList[idel]).outputNodeList[inode];
+				deleteNodes[mynode] = true;
 
-					if (do_recursive)
+				if (do_recursive)
+				{
+					// Check whether this node is being used as input for another process, and if so, delete those as well
+					for (size_t ii = 0; ii < (pipeline.nodeList[mynode]).inputForProcessList.size(); ii++)
 					{
-						// Check whether this node is being used as input for another process, and if so, delete those as well
-						for (size_t ii = 0; ii < (pipeline.nodeList[mynode]).inputForProcessList.size(); ii++)
+						long int iproc = (pipeline.nodeList[mynode]).inputForProcessList[ii];
+						// See if this process is not already in the list to be deleted
+						bool already_in = false;
+						for (size_t j = 0; j < to_delete_processes.size(); j++)
 						{
-							long int iproc = (pipeline.nodeList[mynode]).inputForProcessList[ii];
-							// See if this process is not already in the list to be deleted
-							bool already_in = false;
-							for (size_t j = 0; j < to_delete_processes.size(); j++)
-							{
-								if (to_delete_processes[j] == iproc)
-									already_in = true;
-							}
-							if (!already_in)
-							{
-								to_delete_processes.push_back(iproc);
-								is_done = false;
-							}
+							if (to_delete_processes[j] == iproc)
+								already_in = true;
+						}
+						if (!already_in)
+						{
+							to_delete_processes.push_back(iproc);
+							is_done = false;
 						}
 					}
 				}
