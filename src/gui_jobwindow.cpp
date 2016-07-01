@@ -958,6 +958,12 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	// I/O
 
+	if (input_star_mics.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
+
 	command += " --i " + input_star_mics.getValue();
 	Node node(input_star_mics.getValue(), input_star_mics.type);
 	pipelineInputNodes.push_back(node);
@@ -1302,6 +1308,12 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	Node node(fn_outstar, NODE_MICS);
 	pipelineOutputNodes.push_back(node);
 
+	if (input_star_mics.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
+
 	Node node2(input_star_mics.getValue(), input_star_mics.type);
 	pipelineInputNodes.push_back(node2);
 
@@ -1509,6 +1521,12 @@ bool ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	std::string command;
 	command="`which relion_manualpick`";
+
+	if (fn_in.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 
 	command += " --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
@@ -1805,9 +1823,20 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command="`which relion_autopick`";
 
 	// Input
+	if (fn_input_autopick.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 	command += " --i " + fn_input_autopick.getValue();
 	Node node(fn_input_autopick.getValue(), fn_input_autopick.type);
 	pipelineInputNodes.push_back(node);
+
+	if (fn_refs_autopick.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input references...");
+		return false;
+	}
 	command += " --ref " + fn_refs_autopick.getValue();
 	Node node2(fn_refs_autopick.getValue(), fn_refs_autopick.type);
 	pipelineInputNodes.push_back(node2);
@@ -2149,6 +2178,11 @@ bool ExtractJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command="`which relion_preprocess`";
 
 	// Input
+	if (star_mics.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 	command += " --i " + star_mics.getValue();
 	Node node(star_mics.getValue(), star_mics.type);
 	pipelineInputNodes.push_back(node);
@@ -2366,6 +2400,11 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	else
 		command="`which relion_particle_sort`";
 
+	if (input_star.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 	command += " --i " + input_star.getValue();
 	Node node(input_star.getValue(), input_star.type);
 	pipelineInputNodes.push_back(node);
@@ -2768,6 +2807,11 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
     FileName fn_run = "run";
 	if (is_continue)
     {
+		if (fn_cont.getValue() == "")
+		{
+			fl_message("ERROR: empty field for continuation STAR file...");
+			return false;
+		}
 		int pos_it = fn_cont.getValue().rfind("_it");
 		int pos_op = fn_cont.getValue().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
@@ -2785,6 +2829,11 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	if (!is_continue)
 	{
+		if (fn_img.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input STAR file...");
+			return false;
+		}
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
@@ -3411,6 +3460,11 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
     FileName fn_run = "run";
 	if (is_continue)
     {
+		if (fn_cont.getValue() == "")
+		{
+			fl_message("ERROR: empty field for continuation STAR file...");
+			return false;
+		}
 		int pos_it = fn_cont.getValue().rfind("_it");
 		int pos_op = fn_cont.getValue().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
@@ -3425,11 +3479,21 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	if (!is_continue)
 	{
+		if (fn_img.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input STAR file...");
+			return false;
+		}
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 		if (fn_ref.getValue() != "None")
 		{
+			if (fn_ref.getValue() == "")
+			{
+				fl_message("ERROR: empty field for reference...");
+				return false;
+			}
 			command += " --ref " + fn_ref.getValue();
 			Node node(fn_ref.getValue(), fn_ref.type);
 			pipelineInputNodes.push_back(node);
@@ -4046,6 +4110,11 @@ bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
     FileName fn_run = "run";
 	if (is_continue)
     {
+		if (fn_cont.getValue() == "")
+		{
+			fl_message("ERROR: empty field for continuation STAR file...");
+			return false;
+		}
 		int pos_it = fn_cont.getValue().rfind("_it");
 		int pos_op = fn_cont.getValue().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
@@ -4062,10 +4131,20 @@ bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	if (!is_continue)
 	{
 		command += " --auto_refine --split_random_halves --i " + fn_img.getValue();
+		if (fn_img.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input STAR file...");
+			return false;
+		}
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 		if (fn_ref.getValue() != "None")
 		{
+			if (fn_ref.getValue() == "")
+			{
+				fl_message("ERROR: empty field for input reference...");
+				return false;
+			}
 			command += " --ref " + fn_ref.getValue();
 			Node node(fn_ref.getValue(), fn_ref.type);
 			pipelineInputNodes.push_back(node);
@@ -4459,11 +4538,21 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 		command="`which relion_preprocess`";
 
 	// Input
+	if (fn_movie_star.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 	command += " --i " + fn_movie_star.getValue();
 	Node node(fn_movie_star.getValue(), fn_movie_star.type);
 	pipelineInputNodes.push_back(node);
 
 	// Get the data.star to be used for re-extraction from the optimiser name
+	if (fn_cont.getValue() == "")
+	{
+		fl_message("ERROR: empty field for continuation STAR file...");
+		return false;
+	}
 	MetaDataTable MDopt;
 	MDopt.read(fn_cont.getValue(), "optimiser_general");
 	FileName fn_data;
@@ -4784,10 +4873,20 @@ bool PolishJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command="`which relion_particle_polish`";
 
 	// General
+	if (fn_in.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 	command += " --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
+	if (fn_mask.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input mask...");
+		return false;
+	}
 	command += " --mask " + fn_mask.getValue();
 	Node node2(fn_mask.getValue(), fn_mask.type);
 	pipelineInputNodes.push_back(node2);
@@ -5256,6 +5355,11 @@ bool MaskCreateJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command="`which relion_mask_create`";
 
 	// I/O
+	if (fn_in.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input STAR file...");
+		return false;
+	}
 	command += " --i " + fn_in.getValue();
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
@@ -5467,6 +5571,11 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	// I/O
 	if (do_part.getValue())
 	{
+		if (fn_part1.getValue() == "" || fn_part2.getValue() == "")
+		{
+			fl_message("ERROR: empty field for first or second input STAR file...");
+			return false;
+		}
 		command += " --i \" " + fn_part1.getValue();
 		Node node(fn_part1.getValue(), fn_part1.type);
 		pipelineInputNodes.push_back(node);
@@ -5496,6 +5605,11 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	}
 	else if (do_mic.getValue())
 	{
+		if (fn_mic1.getValue() == "" || fn_mic2.getValue() == "")
+		{
+			fl_message("ERROR: empty field for first or second input STAR file...");
+			return false;
+		}
 		command += " --i \" " + fn_mic1.getValue();
 		Node node(fn_mic1.getValue(), fn_mic1.type);
 		pipelineInputNodes.push_back(node);
@@ -5525,6 +5639,11 @@ bool JoinStarJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	}
 	else if (do_mov.getValue())
 	{
+		if (fn_mov1.getValue() == "" || fn_mov2.getValue() == "")
+		{
+			fl_message("ERROR: empty field for first or second input STAR file...");
+			return false;
+		}
 		command += " --i \" " + fn_mov1.getValue();
 		Node node(fn_mov1.getValue(), fn_mov1.type);
 		pipelineInputNodes.push_back(node);
@@ -5702,12 +5821,27 @@ bool SubtractJobWindow::getCommands(std::string &outputname, std::vector<std::st
 		command="`which relion_project`";
 
 		// I/O
+		if (fn_in.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input map...");
+			return false;
+		}
 		command += " --subtract_exp --i " + fn_in.getValue();
 		Node node(fn_in.getValue(), fn_in.type);
 		pipelineInputNodes.push_back(node);
+		if (fn_mask.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input mask...");
+			return false;
+		}
 		command += " --mask " + fn_mask.getValue();
 		Node node2(fn_mask.getValue(), fn_mask.type);
 		pipelineInputNodes.push_back(node2);
+		if (fn_data.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input STAR file...");
+			return false;
+		}
 		command += " --ang " + fn_data.getValue();
 		Node node3(fn_data.getValue(), fn_data.type);
 		pipelineInputNodes.push_back(node3);
@@ -5889,12 +6023,22 @@ bool PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command="`which relion_postprocess`";
 
 	// Input mask
+	if (fn_mask.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input mask...");
+		return false;
+	}
 	command += " --mask " + fn_mask.getValue();
 	Node node3(fn_mask.getValue(), fn_mask.type);
 	pipelineInputNodes.push_back(node3);
 
 	// Get the input rootname from the half-map name
 	// run1_half1_class001_unfil.mrc -> run1
+	if (fn_in.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input half-map...");
+		return false;
+	}
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 	int pos_half = fn_in.getValue().rfind("_half");
@@ -6069,6 +6213,12 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		exit(1);
 	}
 
+
+	if (fn_in.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input half-map...");
+		return false;
+	}
 	// Get the two half-reconstruction names from the single one
 	std::string fn_half1, fn_half2;
 	int pos_half = fn_in.getValue().rfind("_half");
@@ -6090,6 +6240,11 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
+	if (fn_mask.getValue() == "")
+	{
+		fl_message("ERROR: empty field for input mask...");
+		return false;
+	}
 	Node node2(fn_mask.getValue(), fn_mask.type);
 	pipelineInputNodes.push_back(node2);
 
@@ -6111,55 +6266,4 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
 }
-
-/*
-PublishJobWindow::PublishJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
-{
-
-	type = -1;
-
-	tab1->begin();
-	tab1->label("cite RELION");
-	resetHeight();
-
-	cite_text.place(current_y, "\
-If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
- * General Bayesian approach (and first mention of RELION): \n \
-     Scheres (2012) J. Mol. Biol. (PMID: 22100448)	 \n \n\
- * RELION implementation details and the 3D auto-refine procedure: \n \
-     Scheres (2012) J. Struct. Biol. (PMID: 23000701)	 \n \n\
- * Gold-standard FSC and the relevance of the 0.143 criterion: \n \
-     Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)	 \n \n\
- * Movie-processing procedure: \n \
-     Bai et al. (2013) eLife (PMID: 23427024 )	 \n \n\
- * Correction of mask effects on the FSC curve by randomised phases: \n \
-     Chen et al. (2013) Ultramicroscopy (PMID: 23872039)	 \n \n\
- * Particle-polishing: \n \
-     Scheres (2014) eLife (PMID: 25122622)	 \n \n\
- * Auto-picking : \n \
-     Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
- * Sub-tomogram averaging : \n \
-     Bharat et al. (2015) Structure (submitted). \n \n "
-, GUIWIDTH - WCOL0 - 50, GUIHEIGHT_OLD - 150);
-
-	//cite_text.mydisp->textsize(12);
-
-	tab1->end();
-	tab2->begin();
-	tab2->label("cite others");
-	resetHeight();
-
-	cite_external_text.place(current_y, "\
-Please also cite the following EXTERNAL programs: \n \n \
-* CTFFIND for CTF-estimation: \n \
-    Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
-* ResMap for local-resolution estimation:  \n\
-    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)"
-, GUIWIDTH - WCOL0 - 50, GUIHEIGHT_OLD - 150);
-
-	tab2->end();
-
-}
-
-*/
 

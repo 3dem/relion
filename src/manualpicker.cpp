@@ -498,7 +498,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_fn_odir = parser.getOption("--odir", "Output directory for coordinate files (default is to store next to micrographs)", "ManualPick/");
 	fn_sel = parser.getOption("--selection", "STAR file with selected micrographs", "micrographs_selected.star");
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
-	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1."));
+	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1."));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
 	do_fast_save = parser.checkOption("--fast_save", "Save a default selection of all micrographs immediately");
@@ -533,8 +533,28 @@ void ManualPicker::usage()
 void ManualPicker::initialise()
 {
 
-	// If we down-scale the micrograph: always low-pass filter to get better displays
+	if (global_angpix < 0.)
+	{
+		MetaDataTable MDt;
+		MDt.read(fn_in);
 
+		if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		{
+			RFLOAT mag, dstep;
+			MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			global_angpix = 10000. * dstep / mag;
+			std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
+ 		}
+		else
+		{
+			std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
+			global_angpix = 1.;
+		}
+	}
+
+
+	// If we down-scale the micrograph: always low-pass filter to get better displays
 	if (global_micscale < 1.)
 	{
 		RFLOAT new_nyquist = global_angpix * 2. / global_micscale;
