@@ -44,6 +44,7 @@
 
 #include "src/filename.h"
 #include "src/funcs.h"
+#include <unistd.h>
 
 // Constructor with root, number and extension .............................
 void FileName::compose(const std::string &str, long int no, const std::string &ext, int numberlength)

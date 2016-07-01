@@ -75,7 +75,6 @@ int AutoPickerMpi::deviceInitialise()
 
 void AutoPickerMpi::run()
 {
-
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
 	divide_equally(fn_micrographs.size(), node->size, node->rank, my_first_micrograph, my_last_micrograph);

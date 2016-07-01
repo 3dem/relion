@@ -618,7 +618,6 @@ int AutoPicker::deviceInitialise()
 
 void AutoPicker::run()
 {
-
 	int barstep;
 	if (verb > 0)
 	{

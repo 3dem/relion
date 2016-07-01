@@ -25,6 +25,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+//#define PRINT_GPU_MEM_INFO
+
 //#define DEBUG
 //#define DEBUG_MPIEXP2
 
@@ -788,13 +791,17 @@ void MlOptimiserMpi::expectation()
 
 			if (free < required_free)
 			{
-				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free);
+				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free/1000000);
 				allocationSize = (double)free *0.7;
 			}
 			else
 				allocationSize = free - required_free;
 
+			if (allocationSize < 200000000)
+				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+
 #ifdef PRINT_GPU_MEM_INFO
+			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
 			printf("INFO: Free memory for Custom Allocator of device bundle %d of rank %d is %d MB\n", i, node->rank, (int) ( ((float)allocationSize)/1000000.0 ) );
 #endif
 			allocationSizes.push_back(allocationSize);

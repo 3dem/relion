@@ -25,6 +25,7 @@
 
 
 AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * timing_fnm) :
+	node(NULL),
 	basePckr(basePicker),
 	allocator(new CudaCustomAllocator(0, 1)),
 	micTransformer(0, allocator),
@@ -35,6 +36,37 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * 
 	cudaTransformer2(0, allocator)
 
 {
+	cudaProjectors.resize(basePckr->Mrefs.size());
+	have_warned_batching=false;
+	/*======================================================
+	                    DEVICE SETTINGS
+	======================================================*/
+	device_id = dev_id;
+	int devCount;
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+
+	if(dev_id >= devCount)
+	{
+		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		raise(SIGSEGV);
+	}
+	else
+		HANDLE_ERROR(cudaSetDevice(dev_id));
+};
+
+AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char * timing_fnm) :
+	basePckr(basePicker),
+	allocator(new CudaCustomAllocator(0, 1)),
+	micTransformer(0, allocator),
+	cudaTransformer1(0, allocator),
+#ifdef TIMING_FILES
+	timer(timing_fnm),
+#endif
+	cudaTransformer2(0, allocator)
+
+{
+	node = basePicker->getNode();
+	basePicker->verb = (node->isMaster()) ? 1 : 0;
 
 	cudaProjectors.resize(basePckr->Mrefs.size());
 	have_warned_batching=false;
@@ -56,13 +88,29 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * 
 
 void AutoPickerCuda::run()
 {
+	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
+	int first(0),last(0);
+	if(node!=NULL)
+	{
+		// Each node does part of the work
+		divide_equally(basePckr->fn_micrographs.size(), node->size, node->rank, my_first_micrograph, my_last_micrograph);
+		my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
+		first = my_first_micrograph;
+		last = my_last_micrograph+1;
+	}
+	else
+	{
+		first = 0;
+		last = basePckr->fn_micrographs.size();
+		my_nr_micrographs = basePckr->fn_micrographs.size();
+	}
 
 	int barstep;
 	if (basePckr->verb > 0)
 	{
 		std::cout << " Autopicking ..." << std::endl;
-		init_progress_bar(basePckr->fn_micrographs.size());
-		barstep = XMIPP_MAX(1,basePckr->fn_micrographs.size() / 60);
+		init_progress_bar(my_nr_micrographs);
+		barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 	}
 
 	if (!basePckr->do_read_fom_maps)
@@ -84,7 +132,8 @@ void AutoPickerCuda::run()
 	}
 
 	FileName fn_olddir="";
-	for (long int imic = 0; imic < basePckr->fn_micrographs.size(); imic++)
+
+	for (long int imic = first; imic < last; imic++)
 	{
 		if (basePckr->verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
