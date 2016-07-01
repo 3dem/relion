@@ -234,6 +234,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	{
 		mymodel.sigma2_offset = textToFloat(fnt) * textToFloat(fnt);
 	}
+	fnt = parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "OLD"));
+	if (fnt != "OLD")
+	{
+            helical_tube_outer_diameter = textToFloat(fnt);
+	}
 
 	if (parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?"))
 		do_skip_align = true;
@@ -249,6 +254,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		do_bimodal_psi = true;
 	else
 		do_bimodal_psi = false;
+
+
 
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 
@@ -4140,7 +4147,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE),
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_CS),
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_Q0),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC));
+                                                          DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC), 
+                                                          1.,
+                                                          DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
 
 				ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
@@ -6719,7 +6728,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_VOLTAGE),
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_CS),
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_Q0),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC));
+                                                                          DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC),
+                                                                          1., 
+                                                                          DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
 
 						Fctf.resize(exp_current_image_size, exp_current_image_size/ 2 + 1);
 						ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
@@ -7568,7 +7579,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			if (do_ctf_correction)
 			{
 				long int mic_id = mydata.getMicrographId(part_id);
-				RFLOAT kV, DeltafU, DeltafV, azimuthal_angle, Cs, Bfac, Q0;
+				RFLOAT kV, DeltafU, DeltafV, azimuthal_angle, Cs, Bfac, Q0, phase_shift;
 				if (!mydata.MDimg.getValue(EMDL_CTF_VOLTAGE, kV, part_id))
 					if (!mydata.MDmic.getValue(EMDL_CTF_VOLTAGE, kV, mic_id))
 						kV=200;
@@ -7597,6 +7608,10 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 					if (!mydata.MDmic.getValue(EMDL_CTF_Q0, Q0, mic_id))
 						Q0=0;
 
+				if (!mydata.MDimg.getValue(EMDL_CTF_PHASESHIFT, phase_shift, part_id))
+					if (!mydata.MDmic.getValue(EMDL_CTF_PHASESHIFT, phase_shift, mic_id))
+						phase_shift=0;
+
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_VOLTAGE) = kV;
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_DEFOCUS_U) = DeltafU;
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_DEFOCUS_V) = DeltafV;
@@ -7604,6 +7619,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_CS) = Cs;
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_BFAC) = Bfac;
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_Q0) = Q0;
+				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_PHASE_SHIFT) = phase_shift;
 
 			}
 
