@@ -2796,15 +2796,10 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
 	if (do_preread_images.getValue())
-	{
-		command += " --preread_images --pool 1 " ;
-	}
-	else
-	{
-		if (scratch_dir.getValue() != "")
-			command += " --scratch_dir " +  scratch_dir.getValue();
-		command += " --pool " + floatToString(nr_pool.getValue());
-	}
+		command += " --preread_images " ;
+	else if (scratch_dir.getValue() != "")
+            command += " --scratch_dir " +  scratch_dir.getValue();
+        command += " --pool " + floatToString(nr_pool.getValue());
 
 	// CTF stuff
 	if (!is_continue)
@@ -3452,15 +3447,10 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
 	if (do_preread_images.getValue())
-	{
-		command += " --preread_images --pool 1 " ;
-	}
-	else
-	{
-		if (scratch_dir.getValue() != "")
-			command += " --scratch_dir " +  scratch_dir.getValue();
-		command += " --pool " + floatToString(nr_pool.getValue());
-	}
+            command += " --preread_images " ;
+	else if (scratch_dir.getValue() != "")
+            command += " --scratch_dir " +  scratch_dir.getValue();
+        command += " --pool " + floatToString(nr_pool.getValue());
 
 	// CTF stuff
 	if (!is_continue)
@@ -4093,15 +4083,10 @@ bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	if (!do_parallel_discio.getValue())
 		command += " --no_parallel_disc_io";
 	if (do_preread_images.getValue())
-	{
-		command += " --preread_images --pool 1 " ;
-	}
-	else
-	{
-		if (scratch_dir.getValue() != "")
-			command += " --scratch_dir " +  scratch_dir.getValue();
-		command += " --pool " + floatToString(nr_pool.getValue());
-	}
+		command += " --preread_images " ;
+	else if (scratch_dir.getValue() != "")
+                command += " --scratch_dir " +  scratch_dir.getValue();
+	command += " --pool " + floatToString(nr_pool.getValue());
 
 	// CTF stuff
 	if (!is_continue)
