@@ -234,7 +234,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	{
 		mymodel.sigma2_offset = textToFloat(fnt) * textToFloat(fnt);
 	}
-	fnt = parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "OLD"));
+	fnt = parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "OLD");
 	if (fnt != "OLD")
 	{
             helical_tube_outer_diameter = textToFloat(fnt);
