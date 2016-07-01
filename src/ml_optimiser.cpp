@@ -931,11 +931,6 @@ void MlOptimiser::initialise()
 	if (do_gpu)
 	{
 #ifdef CUDA
-		if (do_helical_refine)
-			REPORT_ERROR("You cannot use GPU-acceleration with helical refinement yet...");
-
-		do_shifts_onthefly = true;
-
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
@@ -1075,9 +1070,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (do_skip_align)
 		do_gpu = false;
-
-	if (do_gpu)
-		do_shifts_onthefly = true;
 
     if (do_print_metadata_labels)
 	{
@@ -1231,8 +1223,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
 	{
-		if (do_gpu)
-			REPORT_ERROR("ERROR: GPU-acceleration of helices has not yet been implemented!");
 
 		if (mymodel.ref_dim != 3)
 			REPORT_ERROR("ERROR: cannot do 2D helical refinement!");
@@ -3827,6 +3817,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				}
 			}
 		}
+
 //#define DEBUG_SOFTMASK
 #ifdef DEBUG_SOFTMASK
 		Image<RFLOAT> tt;
@@ -4424,6 +4415,10 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2s[ipart], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires));
 			}
 		}
+
+		//Shifts are done on the fly on the gpu
+		if (do_gpu)
+			return;
 
 		if (do_shifts_onthefly)
 		{

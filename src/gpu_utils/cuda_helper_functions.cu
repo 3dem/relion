@@ -140,25 +140,25 @@ void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, CudaGlobalP
 {
 	// CC or not
 	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			corr_img[n] = 1. / (op.local_sqrtXi2[ipart]*op.local_sqrtXi2[ipart]);
+		for(int i = 0; i < corr_img.getSize(); i++)
+			corr_img[i] = 1. / (op.local_sqrtXi2[ipart]*op.local_sqrtXi2[ipart]);
 	else
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			corr_img[n] = *(op.local_Minvsigma2s[ipart].data + n );
+		for(int i = 0; i < corr_img.getSize(); i++)
+			corr_img[i] = *(op.local_Minvsigma2s[ipart].data + i );
 
 	// ctf-correction or not ( NOTE this is not were the difference metric is ctf-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
 	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			corr_img[n] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], n);
+		for(int i = 0; i < corr_img.getSize(); i++)
+			corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], i);
 	// scale-correction or not ( NOTE this is not were the difference metric is scale-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
 	XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
 	if (baseMLO->do_scale_correction)
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(op.local_Fimgs_shifted[ipart])
-			corr_img[n] *= myscale * myscale;
+		for(int i = 0; i < corr_img.getSize(); i++)
+			corr_img[i] *= myscale * myscale;
 }
 
 void generateEulerMatrices(
@@ -456,14 +456,10 @@ void runDiff2KernelCoarse(
 		XFLOAT *Fimg_imag,
 		XFLOAT *d_eulers,
 		XFLOAT *diff2s,
-		OptimisationParamters &op,
-		MlOptimiser *baseMLO,
+		XFLOAT local_sqrtXi2,
 		long unsigned orientation_num,
 		int translation_num,
 		int image_size,
-		int ipart,
-		int group_id,
-		int exp_iclass,
 		cudaStream_t stream,
 		bool do_CC)
 {
@@ -581,7 +577,7 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size,
-				(XFLOAT) op.local_sqrtXi2[ipart]);
+				local_sqrtXi2);
 		else
 			cuda_kernel_diff2_CC_coarse<false>
 		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
@@ -595,7 +591,7 @@ void runDiff2KernelCoarse(
 				diff2s,
 				translation_num,
 				image_size,
-				(XFLOAT) op.local_sqrtXi2[ipart]);
+				local_sqrtXi2);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
