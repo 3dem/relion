@@ -4,14 +4,25 @@ message(STATUS "-------------------------------------------------")
 
 set(FFTW_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fftw")
 
+if (NOT DEFINED TARGET_X86)
+    try_compile(TARGET_X86 ${CMAKE_BINARY_DIR}
+                "${CMAKE_SOURCE_DIR}/cmake/TestX86.c")
+endif()
+
 if(DoublePrec_CPU)
-   # set fftw lib to use double precision
+    # set fftw lib to use double precision
     set(libfft "fftw3")
-	set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
+    set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
+    if(TARGET_X86)
+        set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-sse2 --enable-avx)
+    endif()
 else(DoublePrec_CPU)
-	# set fftw lib to use single precision
-	set(libfft "fftw3f")
-	set(ext_conf_flags_fft --enable-shared --enable-float --prefix=${FFTW_EXTERNAL_PATH})
+    # set fftw lib to use single precision
+    set(libfft "fftw3f")
+    set(ext_conf_flags_fft --enable-shared --enable-float --prefix=${FFTW_EXTERNAL_PATH})
+    if(TARGET_X86)
+        set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-sse --enable-avx)
+    endif()
 endif(DoublePrec_CPU)	
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --

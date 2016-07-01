@@ -137,9 +137,9 @@ __global__ void cuda_kernel_backproject2D(
 		ctf = __ldg(&g_ctfs[pixel]);
 		img_real = __ldg(&g_img_real[pixel]);
 		img_imag = __ldg(&g_img_imag[pixel]);
-		Fweight = 0.f;
-		real = 0.f;
-		imag = 0.f;
+		Fweight = (XFLOAT) 0.0;
+		real = (XFLOAT) 0.0;
+		imag = (XFLOAT) 0.0;
 
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
@@ -161,7 +161,7 @@ __global__ void cuda_kernel_backproject2D(
 			}
 		}
 
-		if (Fweight > 0.f)
+		if (Fweight > (XFLOAT) 0.0)
 		{
 
 			// Get logical coordinates in the 3D map
@@ -186,8 +186,8 @@ __global__ void cuda_kernel_backproject2D(
 			y0 -= mdl_inity;
 			int y1 = y0 + 1;
 
-			XFLOAT mfx = 1.f - fx;
-			XFLOAT mfy = 1.f - fy;
+			XFLOAT mfx = (XFLOAT) 1.0 - fx;
+			XFLOAT mfy = (XFLOAT) 1.0 - fy;
 
 			XFLOAT dd00 = mfy * mfx;
 			XFLOAT dd01 = mfy *  fx;
@@ -278,9 +278,9 @@ __global__ void cuda_kernel_backproject3D(
 		ctf = __ldg(&g_ctfs[pixel]);
 		img_real = __ldg(&g_img_real[pixel]);
 		img_imag = __ldg(&g_img_imag[pixel]);
-		Fweight = 0.f;
-		real = 0.f;
-		imag = 0.f;
+		Fweight = (XFLOAT) 0.0;
+		real = (XFLOAT) 0.0;
+		imag = (XFLOAT) 0.0;
 
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
@@ -303,7 +303,7 @@ __global__ void cuda_kernel_backproject3D(
 		}
 
 		//BP
-		if (Fweight > 0.f)
+		if (Fweight > (XFLOAT) 0.0)
 		{
 			int x = pixel % img_x;
 			int y = (int)floorf( (float)pixel / (float)img_x);
@@ -324,7 +324,7 @@ __global__ void cuda_kernel_backproject3D(
 			XFLOAT zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 
 			// Only asymmetric half is stored
-			if (xp < 0.f)
+			if (xp < (XFLOAT) 0.0)
 			{
 				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;

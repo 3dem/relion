@@ -261,7 +261,19 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 
 		CTIC(cudaMLO->timer,"kernel_translate");
-		cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
+		if(baseMLO->mymodel.data_dim == 3)
+			cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
+								~temp,  // translate from temp...
+								~d_img, // ... into d_img
+								img_size,
+								img.data.xdim,
+								img.data.ydim,
+								img.data.zdim,
+								XX(my_old_offset),
+								YY(my_old_offset),
+								ZZ(my_old_offset));
+		else
+			cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
 								~temp,  // translate from temp...
 								~d_img, // ... into d_img
 								img_size,
@@ -283,14 +295,26 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				temp[i] = rec_img.data.data[i];
 			temp.cp_to_device();
 			temp.streamSync();
-			cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
-											~temp,  // translate from temp...
-											~d_img, // ... into d_img
-											img_size,
-											img.data.xdim,
-											img.data.ydim,
-											XX(my_old_offset),
-											YY(my_old_offset));
+			if(baseMLO->mymodel.data_dim == 3)
+				cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
+									~temp,  // translate from temp...
+									~d_img, // ... into d_img
+									img_size,
+									img.data.xdim,
+									img.data.ydim,
+									img.data.zdim,
+									XX(my_old_offset),
+									YY(my_old_offset),
+									ZZ(my_old_offset));
+			else
+				cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
+									~temp,  // translate from temp...
+									~d_img, // ... into d_img
+									img_size,
+									img.data.xdim,
+									img.data.ydim,
+									XX(my_old_offset),
+									YY(my_old_offset));
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 //			d_img.cp_to_host();
@@ -559,7 +583,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			if(!powerClassOnGPU)
+			if(!powerClassOnGPU || baseMLO->mymodel.data_dim == 3) //TODO 3D-powerClass
 			{
 				MultidimArray<RFLOAT> spectrum;
 				spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
@@ -844,8 +868,14 @@ void getAllSquaredDifferencesCoarse(
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				pixel_correction /= op.local_Fctfs[ipart].data[i];
-
+			{
+				// if ctf[i]==0, pix_corr[i] becomes NaN.
+				// However, corr_img[i]==0, so pix-diff in kernel==0.
+				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
+				// which is ori-indep, and we subtract min_diff form ALL orients.
+				if (op.local_Fctfs[ipart].data[i]!=0)
+					pixel_correction /= op.local_Fctfs[ipart].data[i];
+			}
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
@@ -1019,7 +1049,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-				pixel_correction /= op.local_Fctfs[ipart].data[i];
+			{
+				// if ctf[i]==0, pix_corr[i] becomes NaN.
+				// However, corr_img[i]==0, so pix-diff in kernel==0.
+				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
+				// which is ori-indep, and we subtract min_diff form ALL orients.
+				if (op.local_Fctfs[ipart].data[i]!=0)
+					pixel_correction /= op.local_Fctfs[ipart].data[i];
+			}
 
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
@@ -1281,6 +1318,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
+			op.sum_weight.clear();
+			op.sum_weight.resize(sp.nr_particles, (RFLOAT)(sp.nr_particles));
 
 			if(exp_ipass==0)
 			{
@@ -1328,8 +1367,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 //					DIRECT_A2D_ELEM(op.Mweight, ipart, i)= 0.;
 //
 //				DIRECT_A2D_ELEM(op.Mweight, ipart, myminidx)= 1.;
-
-			op.sum_weight[ipart] += 1.;
 
 		}
 		else
@@ -1471,6 +1508,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
+		if (exp_ipass==0)
+		{
+			op.sum_weight.clear();
+			op.sum_weight.resize(sp.nr_particles, 0.);
+		}
+
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
 		XFLOAT my_significant_weight;
@@ -1561,8 +1604,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			sortOnDevice(filtered, sorted);
 			scanOnDevice(sorted, cumulative_sum);
 
-			op.sum_weight.clear();
-			op.sum_weight.resize(sp.nr_particles, 0.);
 			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
 			CTOC(cudaMLO->timer,"sort");

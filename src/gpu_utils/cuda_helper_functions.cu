@@ -567,9 +567,10 @@ void runDiff2KernelCoarse(
 	}
 	else
 	{
+		dim3 CCblocks(orientation_num,translation_num);
 		if(projector.mdlZ!=0)
 			cuda_kernel_diff2_CC_coarse<true>
-		<<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),stream>>>(
+		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
@@ -583,7 +584,7 @@ void runDiff2KernelCoarse(
 				(XFLOAT) op.local_sqrtXi2[ipart]);
 		else
 			cuda_kernel_diff2_CC_coarse<false>
-		<<<orientation_num,BLOCK_SIZE,2*translation_num*BLOCK_SIZE*sizeof(XFLOAT),stream>>>(
+		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,

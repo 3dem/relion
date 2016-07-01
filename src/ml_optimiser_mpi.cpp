@@ -2689,7 +2689,7 @@ void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
 			if (fn_dir != fn_olddir)
 			{
 				std::string command = "mkdir -p " + fn_dir;
-				std::system(command.c_str());
+				int res = std::system(command.c_str());
 				fn_olddir = fn_dir;
 			}
 

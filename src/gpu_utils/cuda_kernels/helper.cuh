@@ -62,6 +62,7 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT radius,
 												XFLOAT radius_p,
 												XFLOAT cosine_width	);
+//----------------------------------------------------------------------------
 
 __global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
 											XFLOAT * g_image_out,
@@ -71,14 +72,34 @@ __global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
 											int dx,
 											int dy);
 
-__global__ void cuda_kernel_selfTranslate2D(	XFLOAT * g_image_in,
-												XFLOAT * g_image_out,
-												int image_size,
-												int xdim,
-												int ydim, //not used
-												int dx,
-												int dy);
-
+__global__ void cuda_kernel_translate3D(	XFLOAT * g_image_in,
+											XFLOAT * g_image_out,
+											int image_size,
+											int xdim,
+											int ydim,
+											int zdim, //not used
+											int dx,
+											int dy,
+											int dz);
+//----------------------------------------------------------------------------
+//__global__ void cuda_kernel_selfTranslate2D(	XFLOAT * g_image_in,
+//												XFLOAT * g_image_out,
+//												int image_size,
+//												int xdim,
+//												int ydim, //not used
+//												int dx,
+//												int dy);
+//
+//__global__ void cuda_kernel_selfTranslate3D(	XFLOAT * g_image_in,
+//												XFLOAT * g_image_out,
+//												int image_size,
+//												int xdim,
+//												int ydim,
+//												int zdim, //not used
+//												int dx,
+//												int dy,
+//												int dz);
+//----------------------------------------------------------------------------
 __global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
 											XFLOAT * g_spectrum,
 											int image_size,
@@ -88,6 +109,17 @@ __global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
 											int res_limit,
 											XFLOAT * g_highres_Xi2);
 
+__global__ void cuda_kernel_powerClass3D(	CUDACOMPLEX * g_image,
+											XFLOAT * g_spectrum,
+											int image_size,
+											int spectrum_size,
+											int xdim,
+											int ydim,
+											int zdim,
+											int res_limit,
+											XFLOAT * g_highres_Xi2);
+
+//----------------------------------------------------------------------------
 __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 int image_size,
 										 int xdim,
@@ -103,7 +135,7 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 										 int xshift,
 										 int yshift,
 										 int zshift);
-
+//----------------------------------------------------------------------------
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,

@@ -1067,10 +1067,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #ifdef RELION_SINGLE_PRECISION
         if (verb > 0)
-            std::cout << " Running in single precision. Runs might not be exactly reproducible." << std::endl;
+            std::cout << " Running CPU instructions in single precision. Runs might not be exactly reproducible." << std::endl;
 #else
         if (verb > 0)
-            std::cout << " Running in double precision. " << std::endl;
+            std::cout << " Running CPU instructions in double precision. " << std::endl;
 #endif
 
 	if (do_skip_align)
