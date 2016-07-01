@@ -187,7 +187,7 @@ __global__ void cuda_kernel_diff2_fine(
 		unsigned trans_num  = (unsigned)d_job_num[bid]; //how many transes we have for this rot
 		for (int itrans=0; itrans<trans_num; itrans++)
 		{
-			s[itrans*BLOCK_SIZE+tid] = 0.0f;
+			s[itrans*BLOCK_SIZE+tid] = (XFLOAT)0.0;
 		}
 		// index of comparison
 		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
@@ -233,7 +233,7 @@ __global__ void cuda_kernel_diff2_fine(
 
 					diff_real =  ref_real - shifted_real;
 					diff_imag =  ref_imag - shifted_imag;
-					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * 0.5f * __ldg(&g_corr_img[pixel]);
+					s[itrans*BLOCK_SIZE + tid] += (diff_real * diff_real + diff_imag * diff_imag) * (XFLOAT)0.5 * __ldg(&g_corr_img[pixel]);
 				}
 			}
 			__syncthreads();
@@ -283,24 +283,26 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT exp_local_sqrtXi2
 		)
 {
-	int bid = blockIdx.y * gridDim.x + blockIdx.x;
+
+	int iorient = blockIdx.x;
+	int itrans =  blockIdx.y;
 	int tid = threadIdx.x;
-	int shared_mid_size = translation_num*BLOCK_SIZE;
+
+    __shared__ XFLOAT s_weight[BLOCK_SIZE];
+    s_weight[tid] = (XFLOAT)0.0;
+	__shared__ XFLOAT s_norm[BLOCK_SIZE];
+	s_norm[tid] = (XFLOAT)0.0;
 
 	XFLOAT real, imag, ref_real, ref_imag;
 
 	XFLOAT e0,e1,e3,e4,e6,e7;
-	e0 = __ldg(&g_eulers[bid*9  ]);
-	e1 = __ldg(&g_eulers[bid*9+1]);
-	e3 = __ldg(&g_eulers[bid*9+3]);
-	e4 = __ldg(&g_eulers[bid*9+4]);
-	e6 = __ldg(&g_eulers[bid*9+6]);
-	e7 = __ldg(&g_eulers[bid*9+7]);
+	e0 = __ldg(&g_eulers[iorient*9  ]);
+	e1 = __ldg(&g_eulers[iorient*9+1]);
+	e3 = __ldg(&g_eulers[iorient*9+3]);
+	e4 = __ldg(&g_eulers[iorient*9+4]);
+	e6 = __ldg(&g_eulers[iorient*9+6]);
+	e7 = __ldg(&g_eulers[iorient*9+7]);
 
-	extern __shared__ XFLOAT s_cuda_kernel_diff2s[];
-
-	for (unsigned i = 0; i < 2*translation_num; i++)
-		s_cuda_kernel_diff2s[i*BLOCK_SIZE + tid] = 0.0f;
 	__syncthreads();
 
 	unsigned pixel_pass_num( ceilfracf(image_size,BLOCK_SIZE) );
@@ -332,34 +334,26 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 					e0,e1,e3,e4,
 					ref_real, ref_imag);
 
-			for (int itrans = 0; itrans < translation_num; itrans ++)
-			{
-				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
+			translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
 
-				s_cuda_kernel_diff2s[translation_num * tid + itrans] += (ref_real * real + ref_imag * imag) * __ldg(&g_corr_img[pixel]);
-				s_cuda_kernel_diff2s[translation_num * tid + itrans + shared_mid_size] += (ref_real*ref_real + ref_imag*ref_imag ) * __ldg(&g_corr_img[pixel]);
-			}
+			s_weight[tid] += (ref_real * real     + ref_imag * imag)      * __ldg(&g_corr_img[pixel]);
+			s_norm[tid]   += (ref_real * ref_real + ref_imag * ref_imag ) * __ldg(&g_corr_img[pixel]);
 		}
+		__syncthreads();
 	}
 
-	__syncthreads();
 
-	unsigned trans_pass_num( ceilfracf(translation_num,BLOCK_SIZE) );
-	for (unsigned pass = 0; pass < trans_pass_num; pass++)
+	for(int j=(BLOCK_SIZE/2); j>0; j/=2)
 	{
-		unsigned itrans = (pass * BLOCK_SIZE) + tid;
-		if (itrans < translation_num)
+		if(tid<j)
 		{
-			XFLOAT sum(0);
-			XFLOAT cc_norm(0);
-			for (unsigned i = 0; i < BLOCK_SIZE; i++)
-			{
-				sum     += s_cuda_kernel_diff2s[i * translation_num + itrans];
-				cc_norm += s_cuda_kernel_diff2s[i * translation_num + itrans + shared_mid_size];
-			}
-			g_diff2s[bid * translation_num + itrans] = - sum /  (sqrt(cc_norm) );// * exp_local_sqrtXi2 );
+			s_weight[tid] += s_weight[tid+j];
+			s_norm[tid]   += s_norm[tid+j];
 		}
+		__syncthreads();
 	}
+	g_diff2s[iorient * translation_num + itrans] = - ( s_weight[0] / sqrt(s_norm[0]));
+
 }
 
 template<bool do_3DProjection>

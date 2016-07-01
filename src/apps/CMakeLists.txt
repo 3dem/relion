@@ -100,15 +100,21 @@ foreach (_target ${RELION_TARGETS})
  	endif()
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	
+	if(CUDA_FOUND)
+	    target_link_libraries(${_target} relion_gpu_util)
+	endif(CUDA_FOUND)
+	
 	if(GUI)
         include_directories("${FLTK_INCLUDE_DIR}")
-  	    target_link_libraries(${_target} ${LIB} ${FLTK_LIBRARIES} ${FFTW_LIBRARIES} ${X11} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
-	else(GUI)
-	    target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES})
+		target_link_libraries(${_target} ${FLTK_LIBRARIES} ${X11})
 	endif(GUI)
+	
 	message(STATUS "added ${_target}...")
 	
-	install (TARGETS ${_target} RUNTIME DESTINATION bin)
+	#install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 if(GUI)
