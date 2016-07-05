@@ -347,9 +347,9 @@ __global__ void cuda_kernel_backproject3D(
 			z0 -= mdl_initz;
 			int z1 = z0 + 1;
 
-			XFLOAT mfx = 1.f - fx;
-			XFLOAT mfy = 1.f - fy;
-			XFLOAT mfz = 1.f - fz;
+			XFLOAT mfx = (XFLOAT)1.0 - fx;
+			XFLOAT mfy = (XFLOAT)1.0 - fy;
+			XFLOAT mfz = (XFLOAT)1.0 - fz;
 
 			XFLOAT dd000 = mfz * mfy * mfx;
 

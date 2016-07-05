@@ -16,6 +16,7 @@
 #include "src/gpu_utils/cuda_helper_functions.cuh"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
+#include "src/helix.h"
 #include <fstream>
 #include <cuda_runtime.h>
 #include "src/parallel.h"
@@ -101,6 +102,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			RFLOAT prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT_PRIOR);
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
+			RFLOAT prior_psi_flip_ratio =  (baseMLO->mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
@@ -109,13 +111,26 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op. metadata_offset + ipart, METADATA_PSI);
+			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
+				prior_psi_flip_ratio = 0.5;
 
-			////////// TODO TODO TODO
 			////////// How does this work now: each particle has a different sampling object?!!!
 			// Select only those orientations that have non-zero prior probability
-			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
-					sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
-					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+
+			if (baseMLO->do_helical_refine)
+			{
+				bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
+				baseMLO->sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
+										sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
+										op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior,
+										do_auto_refine_local_searches, prior_psi_flip_ratio);
+			}
+			else
+			{
+				baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
+						sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
+						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+			}
 
 			long int nr_orients = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) * baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior);
 			if (nr_orients == 0)
@@ -260,6 +275,31 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CTOC(cudaMLO->timer,"norm_corr");
 		}
 
+
+		// Helical TODO: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
+		// Helical TODO: For helices do NOT apply old_offset along the direction of the helix!!
+		// iF DO HELICAL REFINE ???!!!
+		Matrix1D<RFLOAT> my_old_offset_helix_coords;
+		RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
+		RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+		if (baseMLO->do_helical_refine)
+		{
+			// TODO: calculate my_old_offset_helix_coords from my_old_offset and psi angle
+			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
+			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
+			// However, when doing helical local searches, we accumulate offsets
+			// Do NOT accumulate offsets in 3D classification of helices
+			if ( (baseMLO->mymodel.ref_dim == 3) && (!baseMLO->do_skip_align) && (!baseMLO->do_skip_rotate) )
+			{
+				if ( (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order < baseMLO->autosampling_hporder_local_searches) )
+					XX(my_old_offset_helix_coords) = 0.;
+			}
+			// TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
+			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, psi_deg, tilt_deg, HELICAL_TO_CART_COORDS);
+		}
+
+
+		my_old_offset.selfROUND();
 		CTIC(cudaMLO->timer,"kernel_translate");
 		if(baseMLO->mymodel.data_dim == 3)
 			cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
@@ -325,7 +365,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
 		}
 
-		op.old_offset[ipart] = my_old_offset;
+		if (baseMLO->do_helical_refine)
+		{
+			// Transform rounded Cartesian offsets to corresponding helical ones
+			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
+			op.old_offset[ipart] = my_old_offset_helix_coords;
+		}
+		else
+		{
+			op.old_offset[ipart] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
+		}
 		// Also store priors on translations
 		op.prior[ipart] = my_prior;
 
@@ -415,6 +464,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CTIC(cudaMLO->timer,"zeroMask");
 		MultidimArray<RFLOAT> Mnoise;
+		bool is_helical_segment = (baseMLO->do_helical_refine) || ((baseMLO->mymodel.ref_dim == 2) && (baseMLO->helical_tube_outer_diameter > 0.));
+
 		if (!baseMLO->do_zero_mask)
 		{
 			// Make a noisy background image with the same spectrum as the sigma2_noise
@@ -467,8 +518,34 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			d_img.streamSync();
 			for (int i=0; i<img_size; i++)
 				img.data.data[i] = d_img[i];
-			softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
+
+			if (is_helical_segment)
+			{
+				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size)),
+						(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)), baseMLO->width_mask_edge, &Mnoise);
+			}
+			else
+				softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
+
+			for (int i=0; i<img_size; i++)
+				d_img[i] = img.data.data[i];
+			d_img.cp_to_device();
+
 			CTOC(cudaMLO->timer,"softMaskOutsideMap");
+		}
+		else if (is_helical_segment)
+		{
+			d_img.cp_to_host();
+			d_img.streamSync();
+			for (int i=0; i<img_size; i++)
+				img.data.data[i] = d_img[i];
+
+			softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size)),
+					(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)), baseMLO->width_mask_edge);
+
+			for (int i=0; i<img_size; i++)
+				d_img[i] = img.data.data[i];
+			d_img.cp_to_device();
 		}
 		else
 		{
@@ -480,47 +557,29 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				radius = ((RFLOAT)img.data.xdim)/2.;
 			XFLOAT radius_p = radius + cosine_width;
 
+			dim3 block_dim = 1; //TODO
+			cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
+																				img().nzyxdim,
+																				img.data.xdim,
+																				img.data.ydim,
+																				img.data.zdim,
+																				img.data.xdim/2,
+																				img.data.ydim/2,
+																				img.data.zdim/2,
+																				true,
+																				radius,
+																				radius_p,
+																				cosine_width);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
-			bool do_softmaskOnGpu = true;
-			if(do_softmaskOnGpu)
+			d_img.cp_to_host();
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 			{
-//				CudaGlobalPtr<XFLOAT,false> dev_img(img().nzyxdim);
-//				dev_img.device_alloc();
-//				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-//					dev_img[n]=(XFLOAT)img.data.data[n];
-//
-//				dev_img.cp_to_device();
-				dim3 block_dim = 1; //TODO
-				cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
-																					img().nzyxdim,
-																					img.data.xdim,
-																					img.data.ydim,
-																					img.data.zdim,
-																					img.data.xdim/2,
-																					img.data.ydim/2,
-																					img.data.zdim/2,
-																					true,
-																					radius,
-																					radius_p,
-																					cosine_width);
-				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-
-				d_img.cp_to_host();
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-				{
-					img.data.data[n]=(RFLOAT)d_img[n];
-				}
+				img.data.data[n]=(RFLOAT)d_img[n];
 			}
-			else
-				softMaskOutsideMap(img(), radius, (RFLOAT)cosine_width);
 
-//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-//			{
-//				std::cout << img.data.data[n] << std::endl;
-//			}
-//			exit(0);
 			CTOC(cudaMLO->timer,"softMaskOutsideMap");
 		}
 		CTOC(cudaMLO->timer,"zeroMask");
@@ -768,7 +827,7 @@ void getAllSquaredDifferencesCoarse(
 
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
+			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, dummy, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
@@ -855,10 +914,26 @@ void getAllSquaredDifferencesCoarse(
 		for (long int itrans = 0; itrans < translation_num; itrans++)
 		{
 			baseMLO->sampling.getTranslations(itrans, 0, oversampled_translations_x,
-					oversampled_translations_y, oversampled_translations_z);
+					oversampled_translations_y, oversampled_translations_z,
+					baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
-			trans_x[itrans] = -2 * PI * oversampled_translations_x[0] / (double)baseMLO->mymodel.ori_size;
-			trans_y[itrans] = -2 * PI * oversampled_translations_y[0] / (double)baseMLO->mymodel.ori_size;
+			RFLOAT xshift, yshift, zshift;
+			zshift = 0.;
+
+			xshift = oversampled_translations_x[0];
+			yshift = oversampled_translations_y[0];
+			if (baseMLO->mymodel.data_dim == 3)
+				zshift = oversampled_translations_z[0];
+
+			if (baseMLO->do_helical_refine)
+			{
+				RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op.metadata_offset + ipart, METADATA_PSI);
+				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, psi_deg, tilt_deg, baseMLO->mymodel.data_dim, HELICAL_TO_CART_COORDS);
+			}
+
+			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
+			trans_y[itrans] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
@@ -881,7 +956,6 @@ void getAllSquaredDifferencesCoarse(
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
-
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
@@ -927,14 +1001,10 @@ void getAllSquaredDifferencesCoarse(
 						~Fimg_imag,
 						~projectorPlans[exp_iclass].eulers,
 						&allWeights(allWeights_pos),
-						op,
-						baseMLO,
+						(XFLOAT) op.local_sqrtXi2[ipart],
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
 						image_size,
-						ipart,
-						group_id,
-						exp_iclass,
 						cudaMLO->classStreams[exp_iclass],
 						do_CC);
 
@@ -991,7 +1061,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	CTIC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, op.local_Fimgs_shifted, dummy,
+			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, dummy, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 	CTOC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	MultidimArray<Complex > Fref;
@@ -1032,12 +1102,29 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 		{
 			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
-					oversampled_translations_y, oversampled_translations_z);
+					oversampled_translations_y, oversampled_translations_z,
+					baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
-				trans_x[j] = -2 * PI * oversampled_translations_x[iover_trans] / (double)baseMLO->mymodel.ori_size;
-				trans_y[j] = -2 * PI * oversampled_translations_y[iover_trans] / (double)baseMLO->mymodel.ori_size;
+				RFLOAT xshift, yshift, zshift;
+				zshift = 0.;
+
+				xshift = oversampled_translations_x[iover_trans];
+				yshift = oversampled_translations_y[iover_trans];
+				if (baseMLO->mymodel.data_dim == 3)
+					zshift = oversampled_translations_z[iover_trans];
+
+				if (baseMLO->do_helical_refine)
+				{
+					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
+					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, psi_deg, tilt_deg, baseMLO->mymodel.data_dim, HELICAL_TO_CART_COORDS);
+				}
+
+				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
+				trans_y[j] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
+
 				j ++;
 			}
 		}
@@ -1405,15 +1492,33 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
-					double pdf(0);
-					RFLOAT offset_x = old_offset_x - myprior_x + baseMLO->sampling.translations_x[itrans];
-					RFLOAT offset_y = old_offset_y - myprior_y + baseMLO->sampling.translations_y[itrans];
-					double tdiff2 = offset_x * offset_x + offset_y * offset_y;
+					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
+					if (baseMLO->mymodel.data_dim == 3)
+						mypriors_len2 += myprior_z * myprior_z;
 
+					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
+					if ( (baseMLO->do_helical_refine) && (mypriors_len2 > 0.00001) )
+					{
+						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
+						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, baseMLO->mymodel.data_dim, CART_TO_HELICAL_COORDS);
+					}
+					// (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
+
+					// To speed things up, only calculate pdf_offset at the coarse sampling.
+					// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
+					double pdf(0);
+					RFLOAT offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
+					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
+					double tdiff2 = 0.;
+
+					if (! baseMLO->do_helical_refine)
+						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
+					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
 					if (baseMLO->mymodel.data_dim == 3)
 					{
-						RFLOAT offset_z = old_offset_z - myprior_z + baseMLO->sampling.translations_z[itrans];
-						tdiff2 += offset_z * offset_z;
+						RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
+						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 					}
 
 					// P(offset|sigma2_offset)
@@ -1683,10 +1788,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 	CTIC(cudaMLO->timer,"store_init");
 
+	int ibody(0); //Not supported yet
+
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimgs, op.Fimgs_nomask, op.Fctfs, op.local_Fimgs_shifted, dummy,
+			sp.itrans_min, sp.itrans_max, op.Fimgs, op.Fimgs_nomask, op.Fctfs, dummy, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
@@ -1819,11 +1926,30 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
 			{
 				baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
-						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+						baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 				for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
 					oo_otrans_y[fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
+
+					// Calculate the vector length of myprior
+					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
+					if (baseMLO->mymodel.data_dim == 3)
+						mypriors_len2 += myprior_z * myprior_z;
+
+					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
+					if ( (baseMLO->do_helical_refine) && (mypriors_len2 > 0.00001) )
+					{
+						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
+						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, baseMLO->mymodel.data_dim, CART_TO_HELICAL_COORDS);
+					}
+
+					if (! baseMLO->do_helical_refine)
+						RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
+
+
 					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 					RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
 					if (baseMLO->mymodel.data_dim == 3)
@@ -1956,7 +2082,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 
 		baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
-				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z);
+				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+				baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
 		//TODO We already have rot, tilt and psi don't calculated them again
 		if(baseMLO->do_skip_align || baseMLO->do_skip_rotate)
@@ -1972,20 +2099,57 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		RFLOAT rot = oversampled_rot[max_index.ioverrot];
 		RFLOAT tilt = oversampled_tilt[max_index.ioverrot];
 		RFLOAT psi = oversampled_psi[max_index.ioverrot];
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT) = rot;
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT) = tilt;
-		if (psi>180.)
-			psi-=360.;
-		else if ( psi<-180.)
-			psi+=360.;
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI) = psi;
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
 
+		int icol_rot  = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_ROT  : 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+		int icol_tilt = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_TILT : 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+		int icol_psi  = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_PSI  : 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+		int icol_xoff = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_XOFF : 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+		int icol_yoff = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_YOFF : 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+		int icol_zoff = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_ZOFF : 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_rot) = rot;
+		RFLOAT old_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_tilt);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_tilt) = tilt;
+		RFLOAT old_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi) = psi;
+
+		Matrix1D<RFLOAT> shifts(2);
+		//21may2015
+		if (baseMLO->mymodel.nr_bodies == 1)
+		{
+			// include old_offsets for normal refinement (i.e. non multi-body)
+			XX(shifts) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
+			YY(shifts) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+		}
+		else
+		{
+			// For multi-body refinements, only store 'residual' translations
+			XX(shifts) = oversampled_translations_x[max_index.iovertrans];
+			YY(shifts) = oversampled_translations_y[max_index.iovertrans];
+		}
 		if (baseMLO->mymodel.data_dim == 3)
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)max_index.iclass + 1;
+		{
+			shifts.resize(3);
+			if (baseMLO->mymodel.nr_bodies == 1)
+				ZZ(shifts) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+			else
+				ZZ(shifts) = oversampled_translations_z[max_index.iovertrans];
+		}
+
+		// HELICAL TODO! Use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
+		if (baseMLO->do_helical_refine)
+			transformCartesianAndHelicalCoords(shifts, shifts, old_psi, old_tilt, HELICAL_TO_CART_COORDS);
+
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_xoff) = XX(shifts);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_yoff) = YY(shifts);
+		if (baseMLO->mymodel.data_dim == 3)
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_zoff) = ZZ(shifts);
+
+		if (ibody == 0)
+		{
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)max_index.iclass + 1;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+		}
 
 		CTOC(cudaMLO->timer,"setMetadata");
 	}
@@ -2002,37 +2166,52 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	CTIC(cudaMLO->timer,"maximization");
 
-
-	/*======================================================
-	                     TRANSLATIONS
-	======================================================*/
-
-	long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
-
-	CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
-	CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
-
-	int j = 0;
-	for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
-	{
-		baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
-				oversampled_translations_y, oversampled_translations_z); //TODO Called multiple time to generate same list, reuse the same list
-
-		for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
-		{
-			trans_x[j] = -2 * PI * oversampled_translations_x[iover_trans] / (double)baseMLO->mymodel.ori_size;
-			trans_y[j] = -2 * PI * oversampled_translations_y[iover_trans] / (double)baseMLO->mymodel.ori_size;
-			j ++;
-		}
-	}
-
-	trans_x.put_on_device();
-	trans_y.put_on_device();
-
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
+
+		/*======================================================
+		                     TRANSLATIONS
+		======================================================*/
+
+		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+
+		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
+
+		int j = 0;
+		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
+		{
+			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
+					oversampled_translations_y, oversampled_translations_z,
+					baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial); //TODO Called multiple time to generate same list, reuse the same list
+
+			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
+			{
+				RFLOAT xshift, yshift, zshift;
+				zshift = 0.;
+
+				xshift = oversampled_translations_x[iover_trans];
+				yshift = oversampled_translations_y[iover_trans];
+				if (baseMLO->mymodel.data_dim == 3)
+					zshift = oversampled_translations_z[iover_trans];
+
+				if (baseMLO->do_helical_refine)
+				{
+					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
+					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, psi_deg, tilt_deg, baseMLO->mymodel.data_dim, HELICAL_TO_CART_COORDS);
+				}
+
+				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
+				trans_y[j] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
+				j ++;
+			}
+		}
+
+		trans_x.put_on_device();
+		trans_y.put_on_device();
 
 		/*======================================================
 		                     IMAGES

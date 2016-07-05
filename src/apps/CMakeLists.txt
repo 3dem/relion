@@ -36,15 +36,11 @@ else()
 endif()
 
 target_link_libraries(relion_lib ${FFTW_LIBRARIES})
-if(NEW_OWN_FFTW)
-    add_dependencies(relion_lib FFTW3)
-endif()
+add_dependencies(relion_lib FFTW3)
 
 if(GUI)
     target_link_libraries(relion_lib ${FLTK_LIBRARIES})
-	if(NEW_OWN_FLTK)
-        add_dependencies(relion_lib FLTK)
-    endif()
+    add_dependencies(relion_lib FLTK)
 endif(GUI)
 
 
@@ -92,12 +88,6 @@ foreach (_target ${RELION_TARGETS})
     set(LIB relion_lib)
 	
  	add_dependencies(${_target} relion_lib)
-	if(NEW_OWN_FFTW)
- 	   add_dependencies(${_target} FFTW3)
- 	endif()
-	if(NEW_OWN_FLTK)
- 	   add_dependencies(${_target} FLTK)
- 	endif()
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 	
