@@ -58,7 +58,7 @@ if(NOT FFTW_FOUND)
     set(FFTW_FFTW3_BUILD_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
    
     set(CMAKE_INSTALL_PREFIX  ${FFTW_EXTERNAL_PATH})
-    externalproject_add(FFTW3
+    externalproject_add(OWN_FFTW
     URL ${FFTW_FFTW3_TAR_FILE}
     URL_MD5 2edab8c06b24feeb3b82bbb3ebf3e7b3
     DOWNLOAD_DIR ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY}
@@ -71,11 +71,11 @@ if(NOT FFTW_FOUND)
 #	LOG_BUILD
     LOG_INSTALL)
 
-    set(NEW_OWN_FFTW TRUE)
+    set(BUILD_OWN_FFTW TRUE)
 
 else()
 
-    set(NEW_OWN_FFTW FALSE)
+    set(BUILD_OWN_FFTW FALSE)
     
 endif()
 

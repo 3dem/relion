@@ -36,11 +36,15 @@ else()
 endif()
 
 target_link_libraries(relion_lib ${FFTW_LIBRARIES})
-add_dependencies(relion_lib FFTW3)
+if(BUILD_OWN_FFTW)
+    add_dependencies(relion_lib OWN_FFTW)
+endif()
 
 if(GUI)
     target_link_libraries(relion_lib ${FLTK_LIBRARIES})
-    add_dependencies(relion_lib FLTK)
+    if(BUILD_OWN_FLTK)
+        add_dependencies(relion_lib OWN_FLTK)
+    endif()
 endif(GUI)
 
 
