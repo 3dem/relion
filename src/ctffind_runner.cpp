@@ -545,11 +545,16 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh << min_defocus << std::endl;
 	fh << max_defocus << std::endl;
 	fh << step_defocus << std::endl;
-	// Expect large astigmatism?
+	// Do you know what astigmatism is present?
+	fh << "no" << std::endl;
+	// Do you expect very large astigmatism?
 	if (do_large_astigmatism)
 		fh << "yes" << std::endl;
 	else
 		fh << "no" << std::endl;
+	// Use a restraint on astigmatism?
+	fh << "yes" << std::endl;
+	// Expected (tolerated) astigmatism
 	fh << amount_astigmatism << std::endl;
 	if (do_phaseshift)
 	{
