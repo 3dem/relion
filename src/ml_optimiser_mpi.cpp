@@ -323,7 +323,7 @@ void MlOptimiserMpi::initialise()
 					}
 
 					std::cout << " Thread " << i << " on slave " << rank << " mapped to device " << dev_id << std::endl;
-					node->relion_MPI_Send(&dev_id, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+					node->relion_MPI_Send(&dev_id, 1, MPI_INT, rank, MPITAG_INT, MPI_COMM_WORLD);
 				}
 
 			}
