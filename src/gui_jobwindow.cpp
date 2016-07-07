@@ -1001,7 +1001,7 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 		command += " --bfactor " + floatToString(bfactor.getValue());
 
 		if ((other_motioncorr_args.getValue()).length() > 0)
-			command += " --other_motioncorr_args \"" + other_motioncorr_args.getValue() + "\"";
+			command += " --other_motioncorr_args \" " + other_motioncorr_args.getValue() + " \"";
 
 		// Which GPUs to use?
 		command += " --gpu " + gpu_ids.getValue();

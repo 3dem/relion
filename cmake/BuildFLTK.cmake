@@ -42,7 +42,7 @@ if(NOT FLTK_FOUND)
     set(FLTK_BUILD_DIR ${FLTK_EXTERNAL_LIBS_EXTRACT_TARGET}/fltk-build)
    
     set(CMAKE_INSTALL_PREFIX  ${FLTK_EXTERNAL_PATH})
-    externalproject_add(FLTK
+    externalproject_add(OWN_FLTK
     URL ${FLTK_TAR_FILE}
 #   TIMEOUT 15
     URL_MD5 ${FLTK_HASH}
@@ -58,11 +58,11 @@ if(NOT FLTK_FOUND)
 #	LOG_BUILD
     LOG_INSTALL)
     
-    set(NEW_OWN_FLTK TRUE)
+    set(BUILD_OWN_FLTK TRUE)
 
 else()
 
-    set(NEW_OWN_FLTK FALSE)
+    set(BUILD_OWN_FLTK FALSE)
 
 endif()
 
