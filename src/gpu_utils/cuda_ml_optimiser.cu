@@ -1394,6 +1394,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	pdf_orientation.cp_to_device();
 	CTOC(cudaMLO->timer,"get_orient_priors");
 
+	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
+	{
+		op.sum_weight.clear();
+		op.sum_weight.resize(sp.nr_particles, (RFLOAT)(sp.nr_particles));
+	}
+
 	// loop over all particles inside this ori_particle
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
@@ -1407,9 +1413,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		{
-			op.sum_weight.clear();
-			op.sum_weight.resize(sp.nr_particles, (RFLOAT)(sp.nr_particles));
-
 			if(exp_ipass==0)
 			{
 				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans;
@@ -1615,12 +1618,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
-		if (exp_ipass==0)
-		{
-			op.sum_weight.clear();
-			op.sum_weight.resize(sp.nr_particles, 0.);
-		}
-
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
 		XFLOAT my_significant_weight;
@@ -1656,8 +1653,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if(baseMLO->adaptive_oversampling!=0)
 			{
-				op.sum_weight.clear();
-				op.sum_weight.resize(sp.nr_particles, 0.);
 				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 				size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 				my_significant_weight = sorted.getDeviceAt(thresholdIdx);
