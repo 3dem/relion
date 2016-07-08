@@ -672,7 +672,8 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		else
 			fn_dir = ".";
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post);
+		if (!decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post))
+			fn_post = fn_dir;
 
 		// Make the output directory
 		command = "mkdir -p " + outputname + fn_post;
