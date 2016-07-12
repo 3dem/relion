@@ -1271,8 +1271,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		checkHelicalParametersFor3DHelicalReference(
 				mymodel.ori_size,
 				mymodel.pixel_size,
-				mymodel.helical_twist_min,
-				mymodel.helical_rise_min,
+				mymodel.helical_twist_max,
+				mymodel.helical_rise_max,
 				helical_z_percentage,
 				(particle_diameter / 2.),
 				(helical_tube_inner_diameter / 2.),
@@ -1280,8 +1280,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		checkHelicalParametersFor3DHelicalReference(
 				mymodel.ori_size,
 				mymodel.pixel_size,
-				mymodel.helical_twist_max,
-				mymodel.helical_rise_max,
+				mymodel.helical_twist_min,
+				mymodel.helical_rise_min,
 				helical_z_percentage,
 				(particle_diameter / 2.),
 				(helical_tube_inner_diameter / 2.),

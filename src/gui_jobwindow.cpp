@@ -672,14 +672,20 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		else
 			fn_dir = ".";
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post);
-
-		// Make the output directory
-		command = "mkdir -p " + outputname + fn_post;
-		commands.push_back(command);
-		// Copy the coordinates there
-		command = "cp " + fn_in.getValue() + " " + outputname + fn_post;
-		commands.push_back(command);
+		if (decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post))
+		{
+			// Make the output directory
+			command = "mkdir -p " + outputname + fn_post;
+			commands.push_back(command);
+			// Copy the coordinates there
+			command = "cp " + fn_in.getValue() + " " + outputname + fn_post;
+			commands.push_back(command);
+		}
+		else
+		{
+			command = "cp --parents " + fn_in.getValue() + " " + outputname;
+			commands.push_back(command);
+		}
 
 		// Make a suffix file, which contains the actual suffix as a suffix
 		// Get the coordinate-file suffix
@@ -690,7 +696,6 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
 		pipelineOutputNodes.push_back(node);
 		command = " echo \\\"" + fn_suffix2 + "*.mrc\\\" > " + outputname + fn_suffix;
-		//command = " echo \\\"" + outputname + fn_post + "/*.mrc\\\" > " + outputname + fn_suffix;
 		commands.push_back(command);
 
 	}
