@@ -6,6 +6,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 		XFLOAT *g_pdf_orientation,
 		XFLOAT *g_pdf_offset,
 		XFLOAT *g_Mweight,
+		XFLOAT mean_diff2,
 		XFLOAT min_diff2,
 		int nr_coarse_orient,
 		int nr_coarse_trans)
@@ -24,11 +25,12 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
 		{
 			pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
-			XFLOAT diff2 = g_Mweight[pos] - min_diff2;
-			if( diff2 < (XFLOAT)0.0 ) //TODO Might be slow (divergent threads)
+			XFLOAT diff2 = g_Mweight[pos];
+			if( diff2 < min_diff2 ) //TODO Might be slow (divergent threads)
 				diff2 = (XFLOAT)0.0;
 			else
 			{
+				diff2 -= mean_diff2;
 				weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
 
 				// next line because of numerical precision of exp-function
