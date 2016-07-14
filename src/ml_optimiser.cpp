@@ -4426,10 +4426,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		}
 
 		//Shifts are done on the fly on the gpu
-		if (do_gpu)
-			return;
-
-		if (do_shifts_onthefly)
+		if (do_shifts_onthefly && !do_gpu)
 		{
 			// Store a single, down-sized version of exp_Fimgs[ipart] in exp_local_Fimgs_shifted
 #ifdef DEBUG_CHECKSIZES
@@ -4444,7 +4441,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			if (do_also_unmasked)
 				exp_local_Fimgs_shifted_nomask[ipart] = Fimg_nomask;
 		}
-		else
+		else if(!do_gpu)
 		{
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			Image<RFLOAT> img_save_ori, img_save_mask, img_save_nomask;

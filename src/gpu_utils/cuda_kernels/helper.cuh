@@ -13,7 +13,8 @@
 __global__ void cuda_kernel_exponentiate_weights_coarse(  XFLOAT *g_pdf_orientation,
 									    	  XFLOAT *g_pdf_offset,
 									    	  XFLOAT *g_Mweight,
-									    	  XFLOAT min_diff2,
+									  		  XFLOAT mean_diff2,
+									  		  XFLOAT min_diff2,
 									     	  int nr_coarse_orient,
 									     	  int nr_coarse_trans);
 
