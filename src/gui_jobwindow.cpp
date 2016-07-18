@@ -6099,7 +6099,7 @@ bool PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 
 
-ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
+ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_RESMAP;
