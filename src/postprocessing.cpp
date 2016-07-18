@@ -48,6 +48,14 @@ void Postprocessing::read(int argc, char **argv)
 	// include low-pass filter option in the program? This could be useful for structurally heterogeneous reconstructions (instead of FSC-weighting)
 	low_pass_freq = textToFloat(parser.getOption("--low_pass", "Resolution (in Angstroms) at which to low-pass filter the final map (by default at final resolution)", "0."));
 
+	int locres_section = parser.addSection("Local-resolution options");
+	do_locres = parser.checkOption("--locres", "Perform local resolution estimation");
+	locres_sampling = textToFloat(parser.getOption("--locres_sampling", "Sampling rate (in Angstroms) with which to sample the local-resolution map", "10."));
+	locres_maskrad = textToFloat(parser.getOption("--locres_maskrad", "Radius (in A) of spherical mask for local-resolution map (default = 0.5*sampling)", "-1"));
+	locres_edgwidth = textToFloat(parser.getOption("--locres_edgwidth", "Width of soft edge (in A) on masks for local-resolution map (default = 0.5*sampling)", "-1"));
+	locres_randomize_fsc = textToFloat(parser.getOption("--locres_randomize_at", "Randomize phases from this resolution (in A)", "10."));
+	locres_minres = textToFloat(parser.getOption("--locres_minres", "Lowest local resolution allowed (in A)", "50."));
+
 	int expert_section = parser.addSection("Expert options");
 	do_ampl_corr = parser.checkOption("--ampl_corr", "Perform amplitude correlation and DPR, also re-normalize amplitudes for non-uniform angular distributions");
 	randomize_fsc_at = textToFloat(parser.getOption("--randomize_at_fsc", "Randomize phases from the resolution where FSC drops below this value", "0.8"));
@@ -110,6 +118,19 @@ void Postprocessing::initialise()
 		std::cerr << " Size of half1 map: "; I1().printShape(std::cerr); std::cerr << std::endl;
 		std::cerr << " Size of half2 map: "; I2().printShape(std::cerr); std::cerr << std::endl;
 		REPORT_ERROR("Postprocessing::initialise ERROR: The two half reconstructions are not of the same size!");
+	}
+
+	if (do_locres)
+	{
+		if (locres_maskrad < 0.0)
+			locres_maskrad = 0.5*locres_sampling;
+		if (locres_edgwidth < 0.0)
+			locres_edgwidth = 0.5*locres_sampling;
+
+		if (fn_mask != "")
+			std::cerr << " WARNING: --mask will be ignored for --locres calculation!" << std::endl;
+		if (do_auto_bfac)
+			REPORT_ERROR("Postprocessing::initialise ERROR: for --locres, you cannot do --auto_bfac, use --adhoc_bfac instead!");
 	}
 
 	if (do_auto_mask && fn_mask != "")
@@ -477,6 +498,39 @@ void Postprocessing::sharpenMap()
 
 }
 
+void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimArray<RFLOAT> &fsc_unmasked,
+		MultidimArray<RFLOAT> &fsc_masked, MultidimArray<RFLOAT> &fsc_random_masked, int randomize_at)
+{
+	// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
+	// FSC_true = FSC_t - FSC_n / ( )
+
+	// Sometimes FSc at origin becomes -1!
+	if (DIRECT_A1D_ELEM(fsc_masked, 0) <= 0.)
+		DIRECT_A1D_ELEM(fsc_masked, 0) = 1.;
+	if (DIRECT_A1D_ELEM(fsc_random_masked, 0) <= 0.)
+		DIRECT_A1D_ELEM(fsc_random_masked, 0) = 1.;
+
+
+	fsc_true.resize(fsc_masked);
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+	{
+		// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
+		if (i < randomize_at + 2)
+		{
+			DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
+		}
+		else
+		{
+			RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
+			RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
+			if (fscn > fsct)
+				DIRECT_A1D_ELEM(fsc_true, i) = 0.;
+			else
+				DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+		}
+	}
+}
+
 void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc)
 {
 	// Find resolution where fsc_true drops below zero for the first time
@@ -484,7 +538,7 @@ void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArra
 	int ires_max = 0 ;
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(my_fsc)
 	{
-		if (DIRECT_A1D_ELEM(my_fsc, i) < 1e-10)
+		if (DIRECT_A1D_ELEM(my_fsc, i) < 0.0001)
 			break;
 		ires_max = i;
 	}
@@ -494,7 +548,7 @@ void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArra
 		if (ires <= ires_max)
 		{
 	        RFLOAT fsc = DIRECT_A1D_ELEM(my_fsc, ires);
-	        if (fsc < 1e-10)
+	        if (fsc < 0.0001)
 	        	REPORT_ERROR("Postprocessing::applyFscWeighting BUG: fsc <= 0");
 	        DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
 		}
@@ -795,10 +849,231 @@ void Postprocessing::writeFscXml(MetaDataTable &MDfsc)
 
 }
 
+void Postprocessing::run_locres(int rank, int size)
+{
+	// Read input maps and perform some checks
+	initialise();
+
+	// Also read the user-provided mask
+	//getMask();
+
+	MultidimArray<RFLOAT> I1m, I2m, I1p, I2p, Isum, locmask, Ilocres, Ifil, Isumw;
+
+	// Get sum of two half-maps and sharpen according to estimated or ad-hoc B-factor
+	Isum.resize(I1());
+	I1m.resize(I1());
+	I2m.resize(I1());
+	I1p.resize(I1());
+	I2p.resize(I1());
+	locmask.resize(I1());
+	// Initialise local-resolution maps, weights etc
+	Ifil.initZeros(I1());
+	Ilocres.initZeros(I1());
+	Isumw.initZeros(I1());
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I1())
+	{
+		DIRECT_MULTIDIM_ELEM(Isum, n) = DIRECT_MULTIDIM_ELEM(I1(), n) + DIRECT_MULTIDIM_ELEM(I2(), n);
+		DIRECT_MULTIDIM_ELEM(I1p, n) = DIRECT_MULTIDIM_ELEM(I1(), n);
+		DIRECT_MULTIDIM_ELEM(I2p, n) = DIRECT_MULTIDIM_ELEM(I2(), n);
+	}
+
+	// Pre-sharpen the sum of the two half-maps with the provided MTF curve and adhoc B-factor
+	do_fsc_weighting = false;
+	MultidimArray<Complex > FTsum;
+	FourierTransformer transformer;
+	transformer.FourierTransform(Isum, FTsum, true);
+	divideByMtf(FTsum);
+	applyBFactorToMap(FTsum, XSIZE(Isum), adhoc_bfac, angpix);
+
+
+	// Step size of locres-sampling in pixels
+	int step_size = ROUND(locres_sampling / angpix);
+	int maskrad_pix = ROUND(locres_maskrad / angpix);
+	int edgewidth_pix = ROUND(locres_edgwidth / angpix);
+
+	// Get the unmasked FSC curve
+	getFSC(I1(), I2(), fsc_unmasked);
+
+	// Randomize phases of unmasked maps from user-provided resolution
+	int randomize_at = XSIZE(I1())* angpix / locres_randomize_fsc;
+	if (verb > 0)
+	{
+		std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(I1())* angpix / randomize_at << " Angstroms" << std::endl;
+	}
+	// Randomize phases
+	randomizePhasesBeyond(I1p, randomize_at);
+	randomizePhasesBeyond(I2p, randomize_at);
+
+	// Write an output STAR file with FSC curves, Guinier plots etc
+	FileName fn_tmp = fn_out + "_locres_fscs.star";
+	std::ofstream  fh;
+	if (rank == 0)
+	{
+		if (verb > 0)
+		{
+			std::cout.width(35); std::cout << std::left <<"  + Metadata output file: "; std::cout << fn_tmp<< std::endl;
+		}
+
+		fh.open((fn_tmp).c_str(), std::ios::out);
+		if (!fh)
+			REPORT_ERROR( (std::string)"MlOptimiser::write: Cannot write file: " + fn_tmp);
+	}
+
+	// Sample the entire volume (within the provided mask)
+
+	int myrad = XSIZE(I1())/2 - maskrad_pix;
+	float myradf = (float)myrad/(float)step_size;
+	long int nr_samplings = ROUND((4.* PI / 3.) * (myradf*myradf*myradf));
+	if (verb > 0)
+	{
+		std::cout << " Calculating local resolution in " << nr_samplings << " sampling points ..." << std::endl;
+		init_progress_bar(nr_samplings);
+	}
+
+	long int nn = 0;
+	for (long int kk=((I1()).zinit); kk<=((I1()).zinit + (I1()).zdim - 1); kk+= step_size)
+		for (long int ii=((I1()).yinit); ii<=((I1()).yinit + (I1()).ydim - 1); ii+= step_size)
+			for (long int jj=((I1()).xinit); jj<=((I1()).xinit + (I1()).xdim - 1); jj+= step_size)
+			{
+				// Only calculate local-resolution inside a spherical mask with radius less than half-box-size minus maskrad_pix
+				float rad = sqrt(kk*kk + ii*ii + jj*jj);
+				if (rad < myrad)
+				{
+
+					if (nn%size == rank)
+					{
+						// Make a spherical mask around (k,i,j), diameter is step_size pixels, soft-edge width is edgewidth_pix
+						raisedCosineMask(locmask, maskrad_pix, maskrad_pix + edgewidth_pix, kk, ii, jj);
+
+						// FSC of masked maps
+						I1m = I1() * locmask;
+						I2m = I2() * locmask;
+						getFSC(I1m, I2m, fsc_masked);
+
+						// FSC of masked randomized-phase map
+						I1m = I1p * locmask;
+						I2m = I2p * locmask;
+						getFSC(I1m, I2m, fsc_random_masked);
+
+						// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
+						// FSC_true = FSC_t - FSC_n / ( )
+						calculateFSCtrue(fsc_true, fsc_unmasked, fsc_masked, fsc_random_masked, randomize_at);
+
+						if (rank == 0)
+						{
+							MetaDataTable MDfsc;
+							FileName fn_name = "fsc_"+integerToString(kk, 5)+"_"+integerToString(ii, 5)+"_"+integerToString(jj, 5);
+							MDfsc.setName(fn_name);
+							FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+							{
+								MDfsc.addObject();
+								RFLOAT res = (i > 0) ? (XSIZE(I1()) * angpix / (RFLOAT)i) : 999.;
+								MDfsc.setValue(EMDL_SPECTRAL_IDX, (int)i);
+								MDfsc.setValue(EMDL_RESOLUTION, 1./res);
+								MDfsc.setValue(EMDL_RESOLUTION_ANGSTROM, res);
+								MDfsc.setValue(EMDL_POSTPROCESS_FSC_TRUE, DIRECT_A1D_ELEM(fsc_true, i) );
+								MDfsc.setValue(EMDL_POSTPROCESS_FSC_UNMASKED, DIRECT_A1D_ELEM(fsc_unmasked, i) );
+								MDfsc.setValue(EMDL_POSTPROCESS_FSC_MASKED, DIRECT_A1D_ELEM(fsc_masked, i) );
+								MDfsc.setValue(EMDL_POSTPROCESS_FSC_RANDOM_MASKED, DIRECT_A1D_ELEM(fsc_random_masked, i) );
+							}
+							MDfsc.write(fh);
+						}
+
+						float local_resol = 999.;
+						// See where corrected FSC drops below 0.143
+						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+						{
+							if ( DIRECT_A1D_ELEM(fsc_true, i) < 0.143)
+								break;
+							local_resol = (i > 0) ? XSIZE(I1())*angpix/(RFLOAT)i : 999.;
+						}
+						local_resol = XMIPP_MIN(locres_minres, local_resol);
+						if (rank == 0)
+							fh << " kk= " << kk << " ii= " << ii << " jj= " << jj << " local resolution= " << local_resol << std::endl;
+
+						// Now low-pass filter Isum to the estimated resolution
+						MultidimArray<Complex > FT = FTsum;
+						applyFscWeighting(FT, fsc_true);
+						lowPassFilterMap(FT, XSIZE(I1()), local_resol, angpix, filter_edge_width);
+
+						// Re-use I1m to save some memory
+						transformer.inverseFourierTransform(FT, I1m);
+
+						// Store weighted sum of local resolution and filtered map
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I1m)
+						{
+							DIRECT_MULTIDIM_ELEM(Ifil, n) +=  DIRECT_MULTIDIM_ELEM(locmask, n) * DIRECT_MULTIDIM_ELEM(I1m, n);
+							DIRECT_MULTIDIM_ELEM(Ilocres, n) +=  DIRECT_MULTIDIM_ELEM(locmask, n) / local_resol;
+							DIRECT_MULTIDIM_ELEM(Isumw, n) +=  DIRECT_MULTIDIM_ELEM(locmask, n);
+						}
+					}
+
+					nn++;
+					if (verb > 0 && nn <= nr_samplings)
+						progress_bar(nn);
+
+				}
+			}
+
+	fh.close();
+	if (verb > 0)
+		init_progress_bar(nr_samplings);
+
+
+	if (size > 1)
+	{
+		I1m.initZeros();
+		MPI_Allreduce(MULTIDIM_ARRAY(Ifil), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Ifil), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Ifil = I1m;
+		I1m.initZeros();
+		MPI_Allreduce(MULTIDIM_ARRAY(Ilocres), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Ilocres), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Ilocres = I1m;
+		I1m.initZeros();
+		MPI_Allreduce(MULTIDIM_ARRAY(Isumw), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Isumw), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Isumw = I1m;
+	}
+
+	if (rank == 0)
+	{
+		// Now write out the local-resolution map and
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I1m)
+		{
+			if (DIRECT_MULTIDIM_ELEM(Isumw, n ) > 0.)
+			{
+				DIRECT_MULTIDIM_ELEM(I1(), n) = 1. / (DIRECT_MULTIDIM_ELEM(Ilocres, n) / DIRECT_MULTIDIM_ELEM(Isumw, n));
+				DIRECT_MULTIDIM_ELEM(I2(), n) = DIRECT_MULTIDIM_ELEM(Ifil, n) / DIRECT_MULTIDIM_ELEM(Isumw, n);
+			}
+			else
+			{
+				DIRECT_MULTIDIM_ELEM(I1(), n) = 0.;
+				DIRECT_MULTIDIM_ELEM(I2(), n) = 0.;
+			}
+		}
+
+		fn_tmp = fn_out + "_locres.mrc";
+		I1.write(fn_tmp);
+		fn_tmp = fn_out + "_locres_filtered.mrc";
+		I2.write(fn_tmp);
+
+		// for debugging
+		//I1() = Isumw;
+		//fn_tmp = fn_out + "_locres_sumw.mrc";
+		//I1.write(fn_tmp);
+	}
+
+	if (verb > 0)
+		std::cout << " done! " << std::endl;
+
+	if (size > 1)
+		MPI_Barrier(MPI_COMM_WORLD);
+
+}
+
+
 void Postprocessing::run()
 {
 
-	// Read inout maps and perform some checks
+	// Read input maps and perform some checks
 	initialise();
 
 
@@ -863,24 +1138,7 @@ void Postprocessing::run()
 
 		// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
 		// FSC_true = FSC_t - FSC_n / ( )
-		fsc_true.resize(fsc_masked);
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
-		{
-                    // 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
-			if (i < randomize_at + 2)
-			{
-				DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
-			}
-			else
-			{
-				RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
-				RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
-				if (fscn > fsct)
-					DIRECT_A1D_ELEM(fsc_true, i) = 0.;
-				else
-					DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
-			}
-		}
+		calculateFSCtrue(fsc_true, fsc_unmasked, fsc_masked, fsc_random_masked, randomize_at);
 
 		// Now re-read the original maps yet again into memory
 		I1.read(fn_I1);
