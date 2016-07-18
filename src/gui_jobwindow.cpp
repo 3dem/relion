@@ -6128,7 +6128,7 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
 		default_location = mydefault;
 	}
 
-	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", NULL, "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", NULL, "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
 
 	current_y += STEPY /2 ;
 
@@ -6151,12 +6151,13 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_NOT_THREAD)
 	do_relion_group->end();
 
 	do_relion_locres.place(current_y,"Use Relion for local-resolution estimation?", False, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
-This is a developmental feature in need of further testing, but initial results indicate it may be useful. Note that only this program can use MPI, the ResMap wrapper cannot use MPI.", do_relion_group);
+\n \n The output relion_locres.mrc map can be used to color the surface of a map in UCSF Chimera according to its local resolution. The output relion_locres_filtered.mrc is a composite map that is locally filtered to the estimated resolution. \
+This is a developmental feature in need of further testing, but initial results indicate it may be useful. \n \n Note that only this program can use MPI, the ResMap wrapper cannot use MPI.", do_relion_group);
 
 	do_relion_group->begin();
 
-	locres_sampling.place(current_y, "Sampling rate (A):", 25, 5, 50, 5, "The local-resolution map will be calculated every so many Angstroms. Very fine samplings (e.g. < 15A?) may take a long time to compute and give spurious estimates!");
-	randomize_at.place(current_y, "Frequency for phase-randomisation (A): ", 10., 5, 20., 1, "From the frequency onwards, randomize the phases for the local FSC-calculation. Make sure this is a lower resolution (i.e. a higher number) than the local resolutions you are after in your map.");
+	locres_sampling.place(current_y, "Sampling rate (A):", 25, 5, 50, 5, "The local-resolution map will be calculated every so many Angstroms, by placing soft spherical masks on a cubic grid with this spacing. Very fine samplings (e.g. < 15A?) may take a long time to compute and give spurious estimates!");
+	randomize_at.place(current_y, "Frequency for phase-randomisation (A): ", 10., 5, 20., 1, "From this frequency onwards, the phases for the mask-corrected FSC-calculation will be randomized. Make sure this is a lower resolution (i.e. a higher number) than the local resolutions you are after in your map.");
 
 	current_y += STEPY /2 ;
 
@@ -6176,7 +6177,7 @@ void ResmapJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmap";
+		fn=".gui_localres";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
@@ -6202,7 +6203,7 @@ void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 
 	// Read hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmap";
+		fn=".gui_localres";
 
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
@@ -6252,7 +6253,7 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Resmap", job_counter);
+	initialisePipeline(outputname, "LocalRes", job_counter);
 
 	if (fn_resmap.getValue().length() == 0)
 	{
