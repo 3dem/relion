@@ -6348,7 +6348,7 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command += " --angpix " + floatToString(angpix.getValue());
 		command += " --locres_sampling " + floatToString(locres_sampling.getValue());
 		command += " --adhoc_bfac " + floatToString(adhoc_bfac.getValue());
-		if (fn_mtf.getValue().length() > 0)
+		if (fn_mtf.getValue() != "")
 			command += " --mtf " + fn_mtf.getValue();
 
 		Node node1(outputname+"relion_locres_filtered.mrc", NODE_FINALMAP);
