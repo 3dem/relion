@@ -1398,6 +1398,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	{
 		op.sum_weight.clear();
 		op.sum_weight.resize(sp.nr_particles, (RFLOAT)(sp.nr_particles));
+		op.max_weight.clear();
+		op.max_weight.resize(sp.nr_particles, (RFLOAT)-1);
 	}
 
 	// loop over all particles inside this ori_particle
@@ -1656,6 +1658,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 				size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 				my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+
+				CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+				std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
+				CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+				op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
+				op.max_weight[ipart] = max_pair.second;
 			}
 			else
 			{
@@ -1734,6 +1742,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				REPORT_ERROR("my_nr_significant_coarse_samples == 0");
 			}
 
+			CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+			std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(unsorted_ipart);
+			CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+			op.max_index[ipart].coarseIdx = max_pair.first;
+			op.max_weight[ipart] = max_pair.second;
+
 			// Store nr_significant_coarse_samples for this particle
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
@@ -1799,10 +1813,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 		DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2s[ipart], 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], 0));
 	}
-
-	// Initialise the maximum of all weights to a negative value
-	op.max_weight.clear();
-	op.max_weight.resize(sp.nr_particles, -1.);
 
 	// For norm_correction and scale_correction of all particles of this ori_particle
 	std::vector<RFLOAT> exp_wsum_norm_correction;
@@ -2064,19 +2074,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	{
 		CTIC(cudaMLO->timer,"setMetadata");
 
-		CTIC(cudaMLO->timer,"getArgMaxOnDevice");
-		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
-		CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+//		CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+//		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
+//		CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+//		op.max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
+//		op.max_weight[ipart] = max_pair.second;
 
-		Indices max_index;
-		max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
-		op.max_weight[ipart] = max_pair.second;
 
 		//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
 		//std::cerr << "max index = " << max_index.fineIdx << std::endl;
-		max_index.fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
 
-		baseMLO->sampling.getTranslations(max_index.itrans, baseMLO->adaptive_oversampling,
+		if(baseMLO->adaptive_oversampling!=0)
+			op.max_index[ipart].fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
+		else
+			op.max_index[ipart].coarseIndexToCoarseIndices(sp);
+
+		baseMLO->sampling.getTranslations(op.max_index[ipart].itrans, baseMLO->adaptive_oversampling,
 				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 				baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
@@ -2085,15 +2098,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			   baseMLO->sampling.getOrientations(sp.idir_min, sp.ipsi_min, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 					   op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 		else
-			   baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+			   baseMLO->sampling.getOrientations(op.max_index[ipart].idir, op.max_index[ipart].ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 					op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
-		baseMLO->sampling.getOrientations(max_index.idir, max_index.ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
+		baseMLO->sampling.getOrientations(op.max_index[ipart].idir, op.max_index[ipart].ipsi, baseMLO->adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 				op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
-		RFLOAT rot = oversampled_rot[max_index.ioverrot];
-		RFLOAT tilt = oversampled_tilt[max_index.ioverrot];
-		RFLOAT psi = oversampled_psi[max_index.ioverrot];
+		RFLOAT rot = oversampled_rot[op.max_index[ipart].ioverrot];
+		RFLOAT tilt = oversampled_tilt[op.max_index[ipart].ioverrot];
+		RFLOAT psi = oversampled_psi[op.max_index[ipart].ioverrot];
 
 		int icol_rot  = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_ROT  : 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 		int icol_tilt = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_TILT : 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
@@ -2113,22 +2126,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if (baseMLO->mymodel.nr_bodies == 1)
 		{
 			// include old_offsets for normal refinement (i.e. non multi-body)
-			XX(shifts) = XX(op.old_offset[ipart]) + oversampled_translations_x[max_index.iovertrans];
-			YY(shifts) = YY(op.old_offset[ipart]) + oversampled_translations_y[max_index.iovertrans];
+			XX(shifts) = XX(op.old_offset[ipart]) + oversampled_translations_x[op.max_index[ipart].iovertrans];
+			YY(shifts) = YY(op.old_offset[ipart]) + oversampled_translations_y[op.max_index[ipart].iovertrans];
 		}
 		else
 		{
 			// For multi-body refinements, only store 'residual' translations
-			XX(shifts) = oversampled_translations_x[max_index.iovertrans];
-			YY(shifts) = oversampled_translations_y[max_index.iovertrans];
+			XX(shifts) = oversampled_translations_x[op.max_index[ipart].iovertrans];
+			YY(shifts) = oversampled_translations_y[op.max_index[ipart].iovertrans];
 		}
 		if (baseMLO->mymodel.data_dim == 3)
 		{
 			shifts.resize(3);
 			if (baseMLO->mymodel.nr_bodies == 1)
-				ZZ(shifts) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[max_index.iovertrans];
+				ZZ(shifts) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[op.max_index[ipart].iovertrans];
 			else
-				ZZ(shifts) = oversampled_translations_z[max_index.iovertrans];
+				ZZ(shifts) = oversampled_translations_z[op.max_index[ipart].iovertrans];
 		}
 
 		// HELICAL TODO! Use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
@@ -2142,16 +2155,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		if (ibody == 0)
 		{
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)max_index.iclass + 1;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = op.max_weight[ipart]/op.sum_weight[ipart];
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)op.max_index[ipart].iclass + 1;
+			RFLOAT pmax = op.max_weight[ipart]/op.sum_weight[ipart];
+			if(pmax>1) //maximum normalised probability weight is (unreasonably) larger than unity
+				raise(SIGSEGV);
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = pmax;
 		}
-
 		CTOC(cudaMLO->timer,"setMetadata");
 	}
-
 	CTOC(cudaMLO->timer,"collect_data_2");
-
-
 
 
 
