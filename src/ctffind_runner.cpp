@@ -225,7 +225,12 @@ void CtffindRunner::run()
 			if (do_use_gctf)
 				std::cout << " Estimating CTF parameters using Kai Zhang's Gctf ..." << std::endl;
 			else
-				std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
+			{
+				if (is_ctffind4)
+					std::cout << " Estimating CTF parameters using Alexis Rohou's CTFFIND4.1 ..." << std::endl;
+				else
+					std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
+			}
 			init_progress_bar(fn_micrographs.size());
 			barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 		}
@@ -545,11 +550,16 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh << min_defocus << std::endl;
 	fh << max_defocus << std::endl;
 	fh << step_defocus << std::endl;
-	// Expect large astigmatism?
+	// Do you know what astigmatism is present?
+	fh << "no" << std::endl;
+	// Do you expect very large astigmatism?
 	if (do_large_astigmatism)
 		fh << "yes" << std::endl;
 	else
 		fh << "no" << std::endl;
+	// Use a restraint on astigmatism?
+	fh << "yes" << std::endl;
+	// Expected (tolerated) astigmatism
 	fh << amount_astigmatism << std::endl;
 	if (do_phaseshift)
 	{
@@ -560,8 +570,11 @@ void CtffindRunner::executeCtffind4(long int imic)
 	}
 	else
 		fh << "no" << std::endl;
+	// Set expert options?
+	fh << "no" << std::endl;
 
 	fh <<"EOF"<<std::endl;
+	fh << "exit 0" << std::endl;
 	fh.close();
 
 	// Execute ctffind
@@ -751,9 +764,12 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 			defV = textToFloat(words[2]);
 			defAng = textToFloat(words[3]);
 			if (do_phaseshift)
-			 phaseshift = textToFloat(words[4]);
+			 phaseshift = RAD2DEG(textToFloat(words[4]));
 			CC = textToFloat(words[5]);
-			maxres = textToFloat(words[6]);
+			if (words[6] == "inf")
+				maxres= 999.;
+			else
+				maxres = textToFloat(words[6]);
 		}
     }
 

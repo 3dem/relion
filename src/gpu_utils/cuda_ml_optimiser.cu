@@ -824,6 +824,8 @@ void getAllSquaredDifferencesCoarse(
 
 	op.min_diff2.clear();
 	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
+	op.mean_diff2.clear();
+	op.mean_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
@@ -1029,6 +1031,7 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
+		op.mean_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
 
 	} // end loop ipart
 
@@ -1562,10 +1565,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
 				dim3 block_dim(block_num,sp.iclass_max-sp.iclass_min+1);
 
+				//Make sure most significant value is at least within single precision limit and some slack to distinguish peaks after prior multiplication
+				XFLOAT local_norm = (XFLOAT)op.mean_diff2[ipart];
+				if (local_norm - op.min_diff2[ipart] > 50)
+					local_norm = op.min_diff2[ipart] + 50;
+
 				cuda_kernel_exponentiate_weights_coarse<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
 						~pdf_orientation,
 						~pdf_offset,
 						~ipartMweight,
+						local_norm,
 						(XFLOAT)op.min_diff2[ipart],
 						sp.nr_dir*sp.nr_psi,
 						sp.nr_trans);

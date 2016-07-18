@@ -538,8 +538,8 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 
 	// Check whether this is a symbol link
 	char linkname[100];
-    ssize_t len = ::readlink(fn_in.substr(0, slashpos).c_str(), linkname, sizeof(linkname)-1);
-    if (len != -1)
+	ssize_t len = ::readlink(fn_in.substr(0, slashpos).c_str(), linkname, sizeof(linkname)-1);
+	if (len != -1)
     {
     	// This is a symbolic link!
     	linkname[len] = '\0';
@@ -548,7 +548,7 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
     	FileName fn_my_pre = std::string(linkname);
     	fn_in = fn_my_pre.afterFirstOf("../") + fn_in.substr(slashpos+1);
     }
-    decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
+    return decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
 
 }
 
