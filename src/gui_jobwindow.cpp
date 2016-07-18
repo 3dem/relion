@@ -6347,6 +6347,7 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 		command += " --o " + outputname + "relion";
 		command += " --angpix " + floatToString(angpix.getValue());
 		command += " --locres_sampling " + floatToString(locres_sampling.getValue());
+		command += " --locres_randomize_at " + floatToString(randomize_at.getValue());
 		command += " --adhoc_bfac " + floatToString(adhoc_bfac.getValue());
 		if (fn_mtf.getValue() != "")
 			command += " --mtf " + fn_mtf.getValue();
