@@ -824,8 +824,8 @@ void getAllSquaredDifferencesCoarse(
 
 	op.min_diff2.clear();
 	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
-	op.mean_diff2.clear();
-	op.mean_diff2.resize(sp.nr_particles, LARGE_NUMBER);
+	op.avg_diff2.clear();
+	op.avg_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
@@ -1031,7 +1031,7 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
 
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
-		op.mean_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
+		op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
 
 	} // end loop ipart
 
@@ -1059,8 +1059,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
 	CTIC(cudaMLO->timer,"diff_pre_gpu");
 
-	op.min_diff2.clear();
-	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
 	CTIC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
@@ -1324,7 +1322,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
 		CTIC(cudaMLO->timer,"collect_data_1");
-		op.min_diff2[ipart] = std::min(op.min_diff2[ipart],(RFLOAT)getMinOnDevice(FinePassWeights[ipart].weights));
+		if(baseMLO->adaptive_oversampling!=0)
+			op.min_diff2[ipart] = (RFLOAT)getMinOnDevice(FinePassWeights[ipart].weights);
 		CTOC(cudaMLO->timer,"collect_data_1");
 //		std::cerr << "  fine pass minweight  =  " << op.min_diff2[ipart] << std::endl;
 
@@ -1555,6 +1554,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			CTIC(cudaMLO->timer,"sumweight1");
 
 			long int block_num;
+
+			//Make sure most significant value is at least within single precision limit and some slack to distinguish peaks after prior multiplication
+			XFLOAT local_norm = (XFLOAT)op.avg_diff2[ipart];
+			if (local_norm - op.min_diff2[ipart] > 50)
+				local_norm = op.min_diff2[ipart] + 50;
+
 			if(exp_ipass==0)
 			{
 				CudaGlobalPtr<XFLOAT>  ipartMweight(
@@ -1564,11 +1569,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
 				dim3 block_dim(block_num,sp.iclass_max-sp.iclass_min+1);
-
-				//Make sure most significant value is at least within single precision limit and some slack to distinguish peaks after prior multiplication
-				XFLOAT local_norm = (XFLOAT)op.mean_diff2[ipart];
-				if (local_norm - op.min_diff2[ipart] > 50)
-					local_norm = op.min_diff2[ipart] + 50;
 
 				cuda_kernel_exponentiate_weights_coarse<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
 						~pdf_orientation,
@@ -1598,7 +1598,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								~pdf_orientation_class,
 								~pdf_offset_class,
 								~thisClassPassWeights.weights,
-								(XFLOAT)op.min_diff2[ipart],
+								(XFLOAT)local_norm,
 								sp.nr_oversampled_rot,
 								sp.nr_oversampled_trans,
 								~thisClassPassWeights.rot_id,
@@ -2616,10 +2616,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			REPORT_ERROR("ERROR: op.sum_weight[ipart]==0");
 		}
 		RFLOAT dLL;
+
+		XFLOAT local_norm = (XFLOAT)op.avg_diff2[ipart];
+		if (local_norm - op.min_diff2[ipart] > 50)
+			local_norm = op.min_diff2[ipart] + 50;
+
 		if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 			dLL = -op.min_diff2[ipart];
 		else
-			dLL = log(op.sum_weight[ipart]) - op.min_diff2[ipart] - logsigma2;
+			dLL = log(op.sum_weight[ipart]) - local_norm - logsigma2;
 
 		// Store dLL of each image in the output array, and keep track of total sum
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_DLL) = dLL;

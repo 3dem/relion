@@ -155,7 +155,7 @@ public:
 	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2;
+	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2, avg_diff2;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
 	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
