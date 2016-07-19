@@ -166,13 +166,12 @@ endif()
 
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
-set(MPICXX_INCLUDE_PATH "${MPI_INCLUDE_PATH}/openmpi/ompi/mpi/cxx")
+
 include_directories("${MPI_INCLUDE_PATH}")
-include_directories("${MPICXX_INCLUDE_PATH}")
 message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
 message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
-message(STATUS "MPICXX_INCLUDE_PATH : ${MPICXX_INCLUDE_PATH}")
-#message(STATUS "MPICXX_LIBRARIES : ${MPICXX_LIBRARIES}")
+message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
+message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
 
 SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
