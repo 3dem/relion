@@ -6,7 +6,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 		XFLOAT *g_pdf_orientation,
 		XFLOAT *g_pdf_offset,
 		XFLOAT *g_Mweight,
-		XFLOAT mean_diff2,
+		XFLOAT avg_diff2,
 		XFLOAT min_diff2,
 		int nr_coarse_orient,
 		int nr_coarse_trans)
@@ -30,7 +30,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 				diff2 = (XFLOAT)0.0;
 			else
 			{
-				diff2 -= mean_diff2;
+				diff2 -= avg_diff2;
 				weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
 
 				// next line because of numerical precision of exp-function
@@ -64,7 +64,7 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 		XFLOAT *g_pdf_orientation,
 		XFLOAT *g_pdf_offset,
 		XFLOAT *g_weights,
-		XFLOAT min_diff2,
+		XFLOAT avg_diff2,
 		int oversamples_orient,
 		int oversamples_trans,
 		unsigned long *d_rot_id,
@@ -100,7 +100,7 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 //			f_itrans = iy % oversamples_trans;
 
 			XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-			XFLOAT diff2 = g_weights[pos+itrans] - min_diff2;								// Different for all threads
+			XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2;								// Different for all threads
 			// next line because of numerical precision of exp-function
 	#if defined(CUDA_DOUBLE_PRECISION)
 				if (diff2 > 700.)
