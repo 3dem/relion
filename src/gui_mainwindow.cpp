@@ -183,8 +183,9 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
     menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
     menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
-    menubar->add("Jobs/Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
-    menubar->add("Jobs/_Import job(s)",  FL_ALT+'i', cb_import, this);
+    menubar->add("Jobs/_Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+    menubar->add("Jobs/Export scheduled job(s)",  FL_ALT+'x', cb_export_jobs, this);
+    menubar->add("Jobs/_Import scheduled job(s)",  FL_ALT+'i', cb_import_jobs, this);
     menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
     menubar->add("Jobs/Harshly clean all jobs",  FL_ALT+'h', cb_harshly_clean_all_jobs, this);
 
@@ -2522,24 +2523,17 @@ void RelionMainWindow::cb_load_i()
 }
 
 // Load button call-back function
-void RelionMainWindow::cb_import(Fl_Widget* o, void* v)
-{
-    RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_import_i(false);
-}
-
-// Load button call-back function
 void RelionMainWindow::cb_undelete_job(Fl_Widget* o, void* v)
 {
     RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_import_i(true);
+    T->cb_undelete_job_i();
 }
 
-void RelionMainWindow::cb_import_i(bool is_undelete)
+void RelionMainWindow::cb_undelete_job_i()
 {
 
-	std::string fn_dir = (is_undelete) ? "./Trash/." : ".";
-	std::string fn_filter = (is_undelete) ? "Pipeline STAR files (job_pipeline.star)" : "Pipeline STAR files (*_pipeline.star)";
+	std::string fn_dir = "./Trash/.";
+	std::string fn_filter = "Pipeline STAR files (job_pipeline.star)";
 	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
 	chooser.show();
 	// Block until user picks something.
@@ -2560,38 +2554,182 @@ void RelionMainWindow::cb_import_i(bool is_undelete)
 
     pipeline.importPipeline(fn_pipe.beforeLastOf("_pipeline.star"));
 
-	if (is_undelete)
+	// Copy all processes in the STAR file back into the ProjectDirectory
+	MetaDataTable MDproc;
+	MDproc.read(fn_pipe, "pipeline_processes");
+	std::cout <<"  Undeleting from Trash ... " << std::endl;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
-		// Copy all processes in the STAR file back into the ProjectDirectory
-		MetaDataTable MDproc;
-		MDproc.read(fn_pipe, "pipeline_processes");
-		std::cout <<"  Undeleting from Trash ... " << std::endl;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
+		FileName fn_proc;
+		MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, fn_proc);
+
+		// Copy the job back from the Trash folder
+		FileName fn_dest = fn_proc.beforeLastOf("/"); //gets rid of ending "/"
+		FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
+		if (!exists(fn_dir_dest))
 		{
-			FileName fn_proc;
-			MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, fn_proc);
-
-			// Copy the job back from the Trash folder
-			FileName fn_dest = fn_proc.beforeLastOf("/"); //gets rid of ending "/"
-			FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
-			if (!exists(fn_dir_dest))
-			{
-				mktree(fn_dir_dest);
-			}
-			std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
-			std::cout << command << std::endl;
-			int res = system(command.c_str());
-
-			// Also re-make all entries in the .Nodes directory
-			long int myproc = pipeline.findProcessByName(fn_proc);
-			pipeline.touchTemporaryNodeFiles(pipeline.processList[myproc]);
+			mktree(fn_dir_dest);
 		}
-		std::cout << " Done undeleting! " << std::endl;
+		std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
+		std::cout << command << std::endl;
+		int res = system(command.c_str());
+
+		// Also re-make all entries in the .Nodes directory
+		long int myproc = pipeline.findProcessByName(fn_proc);
+		pipeline.touchTemporaryNodeFiles(pipeline.processList[myproc]);
+	}
+	std::cout << " Done undeleting! " << std::endl;
+
+	// Write the new pipeline to disk and reread it back in again
+	pipeline.write();
+	pipeline.read();
+
+}
+
+
+void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir, std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern)
+{
+	int res;
+	std::string command;
+	std::vector<std::string> myfiles;
+	myfiles.push_back("run.job");
+	myfiles.push_back("note.txt");
+	myfiles.push_back("job_pipeline.star");
+
+	// Copy the run.job, the note.txt and the job_pipeline.star
+	// Replace all instances of all find_pattern's with the replace_pattern's
+	for (int ifile = 0; ifile < myfiles.size(); ifile++)
+	{
+		for (int ipatt = 0; ipatt < find_pattern.size(); ipatt++)
+		{
+			FileName outfile = fn_out_dir + myfiles[ifile];
+			FileName tmpfile = fn_out_dir + "tmp";
+			FileName infile = (ipatt == 0) ? fn_in_dir + myfiles[ifile] : tmpfile;
+			// Create directory first time round
+			if (ipatt == 0)
+			{
+				FileName dirs = outfile.beforeLastOf("/");
+				command =  "mkdir -p " + dirs;
+				res = system(command.c_str());
+			}
+			command =  "sed 's|" + find_pattern[ipatt] + "|" + replace_pattern[ipatt] + "|g' < " + infile + " > " + outfile;
+			//std::cerr << " Executing: " << command<<std::endl;
+			res = system(command.c_str());
+			if (ipatt+1 < find_pattern.size())
+			{
+				std::rename(outfile.c_str(), tmpfile.c_str());
+				//std::cerr << " Excuting: mv " << outfile<<" "<<tmpfile<<std::endl;
+			}
+		}
+	}
+
+}
+
+void RelionMainWindow::cb_export_jobs(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_export_jobs_i();
+}
+
+void RelionMainWindow::cb_export_jobs_i()
+{
+	// Get the name of this block of exported jobs and make the corresponding directory
+	const char * answer;
+	std::string default_answer="export1";
+	answer =  fl_input("Name of the exported block of jobs? ", default_answer.c_str());
+	std::string mydir(answer);
+	mydir += "/";
+	std::string command = "mkdir -p ExportJobs/" + mydir;
+	int res = system(command.c_str());
+
+	MetaDataTable MDexported;
+
+	// Loop through all the Scheduled jobs and export them one-by-one
+	int iexp =0;
+	std::vector<std::string> find_pattern, replace_pattern;
+	for (long int i = 0; i < pipeline.processList.size(); i++)
+	{
+		if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
+				pipeline.processList[i].status == PROC_SCHEDULED_CONT)
+		{
+			iexp++;
+			if (pipeline.processList[i].alias != "None")
+			{
+				fl_message("ERROR: aliases are not allowed on Scheduled jobs that are to be exported! Make sure all scheduled jobs are made with unaliases names.");
+				return;
+			}
+
+			// A general name for the exported job:
+			FileName expname = pipeline.processList[i].name;
+			expname = expname.beforeFirstOf("/") + "/exp"+integerToString(iexp, 3)+"/";
+			//std::cerr << " pipeline.processList[i].name= " << pipeline.processList[i].name << " expname= " << expname << std::endl;
+			find_pattern.push_back(pipeline.processList[i].name);
+			replace_pattern.push_back(expname);
+
+			MDexported.addObject();
+			MDexported.setValue(EMDL_PIPELINE_PROCESS_NAME, expname);
+
+			// Copy the run.job, the note.txt and the job_pipeline.star and replace patterns
+			replaceFilesForImportExportOfScheduledJobs(pipeline.processList[i].name, "ExportJobs/" + mydir + expname, find_pattern, replace_pattern);
+		}
+	}
+
+	MDexported.write("ExportJobs/" + mydir + "exported.star");
+
+}
+
+void RelionMainWindow::cb_import_jobs(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_import_jobs_i();
+}
+
+
+void RelionMainWindow::cb_import_jobs_i()
+{
+
+	// Get the directory with the Exported jobs
+	std::string fn_dir = ".";
+	std::string fn_filter = "Export STAR file (exported.star)";
+	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
+	chooser.show();
+	// Block until user picks something.
+	while(chooser.shown())
+		{ Fl::wait(); }
+
+	// User hit cancel?
+	if ( chooser.value() == NULL )
+		return;
+
+	FileName fn_export(chooser.value());
+	FileName fn_export_dir = fn_export.beforeLastOf("/")+"/";
+
+	//FileName fn_dir_export = fn_export.beforeLastOf("/")+"/";
+	MetaDataTable MDexported;
+	MDexported.read(fn_export);
+
+	// Loop backwards, as
+
+	std::vector<std::string> find_pattern, replace_pattern;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDexported)
+	{
+		FileName expname;
+		MDexported.getValue(EMDL_PIPELINE_PROCESS_NAME, expname);
+		find_pattern.push_back(expname);
+		// Make a new name for this job
+		FileName newname = expname.beforeFirstOf("/")+"/job"+integerToString(pipeline.job_counter, 3)+"/";
+		//std::cerr << " expname= " << expname << " newname= " << newname << std::endl;
+		replace_pattern.push_back(newname);
+		replaceFilesForImportExportOfScheduledJobs(fn_export_dir + expname, newname, find_pattern, replace_pattern);
+		// Import the job into the pipeline
+	    pipeline.importPipeline(newname+"job");
+	    pipeline.job_counter++;
 	}
 
 	// Write the new pipeline to disk and reread it back in again
 	pipeline.write();
 	pipeline.read();
+	fillRunningJobLists();
 
 }
 
