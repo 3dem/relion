@@ -275,7 +275,7 @@ void MlOptimiserMpi::initialise()
 				fullAutomaticMapping = true;
 				semiAutomaticMapping = true; // possible to set fully manual for specific ranks
 
-				if ((allThreadIDs.size()<node->rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+				if ((allThreadIDs.size()<rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 				{
 					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
 				}
