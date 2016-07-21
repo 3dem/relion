@@ -75,11 +75,13 @@ else(NOT DEFINED CUDA_ARCH)
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
 endif(NOT DEFINED CUDA_ARCH)
 
-# ---------------- Use CUDA if found
+# -------------------------------------------------------------------FURTHER OPTIONS--
 option(CUDA "Enable CUDA GPU acceleration" ON)
+option(DoublePrec_CPU "DoublePrec_CPU" ON)
+option(DoublePrec_GPU "DoublePrec_GPU" OFF)
+option(CudaTexture "CudaTexture" ON)
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
-option(DoublePrec_CPU "DoublePrec_CPU" ON)
 if(DoublePrec_CPU)
     message(STATUS "Setting cpu precision to double")    
 else(DoublePrec_CPU)
@@ -87,7 +89,6 @@ else(DoublePrec_CPU)
     add_definitions(-DRELION_SINGLE_PRECISION)
 endif(DoublePrec_CPU)
 
-option(DoublePrec_GPU "DoublePrec_GPU" OFF)
 if(DoublePrec_GPU)
     message(STATUS "Setting gpu precision to double")
     add_definitions(-DCUDA_DOUBLE_PRECISION)
@@ -123,9 +124,7 @@ else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
 
-# ------------------------------------FURTHER OPTIONS PERTAINING TO CUDA-COMPILATION--
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
-option(CudaTexture "CudaTexture" ON)
 if(NOT CudaTexture)
     add_definitions(-DCUDA_NO_TEXTURES)
     message(STATUS "Texture interpolation is omitted.")
