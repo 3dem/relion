@@ -822,11 +822,6 @@ void getAllSquaredDifferencesCoarse(
 
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
-	op.min_diff2.clear();
-	op.min_diff2.resize(sp.nr_particles, LARGE_NUMBER);
-	op.avg_diff2.clear();
-	op.avg_diff2.resize(sp.nr_particles, LARGE_NUMBER);
-
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, dummy, dummy,
@@ -1323,7 +1318,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CTIC(cudaMLO->timer,"collect_data_1");
 		if(baseMLO->adaptive_oversampling!=0)
-			op.min_diff2[ipart] = (RFLOAT)getMinOnDevice(FinePassWeights[ipart].weights);
+		{
+			op.min_diff2[ipart] = (RFLOAT) getMinOnDevice(FinePassWeights[ipart].weights);
+			op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(FinePassWeights[ipart].weights) /
+					(RFLOAT) FinePassWeights[ipart].weights.size;
+		}
 		CTOC(cudaMLO->timer,"collect_data_1");
 //		std::cerr << "  fine pass minweight  =  " << op.min_diff2[ipart] << std::endl;
 
@@ -2998,6 +2997,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if (thread_id == 0)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 #endif
+
+				op.min_diff2.resize(sp.nr_particles, 0);
+				op.avg_diff2.resize(sp.nr_particles, 0);
+
 				if (ipass == 0)
 				{
 					unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
