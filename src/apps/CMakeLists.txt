@@ -108,7 +108,7 @@ foreach (_target ${RELION_TARGETS})
 	
 	message(STATUS "added ${_target}...")
 	
-	#install (TARGETS ${_target} RUNTIME DESTINATION bin)
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 if(GUI)
