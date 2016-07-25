@@ -873,7 +873,7 @@ void MlOptimiserMpi::expectation()
 				allocationSize = free - required_free;
 
 			if (allocationSize < 200000000)
-				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
 
 #ifdef PRINT_GPU_MEM_INFO
 			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
