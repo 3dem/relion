@@ -1158,10 +1158,12 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 
 	// Add a little spacer
 	current_y += STEPY/2;
+	other_gctf_args.place(current_y, "Other Gctf options:", "", "Provide additional gctf options here.");
 
+	// Add a little spacer
+	current_y += STEPY/2;
 	gpu_ids.place(current_y, "Which GPUs to use: ", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. ");
 
-	//	other_gctf_args.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
 	gctf_group->end();
 	use_gctf.cb_menu_i(); // make default active
@@ -1211,6 +1213,7 @@ void CtffindJobWindow::write(std::string fn)
 	fn_gctf_exe.writeValue(fh);
 	do_ignore_ctffind_params.writeValue(fh);
 	do_EPA.writeValue(fh);
+	other_gctf_args.writeValue(fh);
 	gpu_ids.writeValue(fh);
 
 	closeWriteFile(fh, fn);
@@ -1258,6 +1261,7 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 		fn_gctf_exe.readValue(fh);
 		do_ignore_ctffind_params.readValue(fh);
 		do_EPA.readValue(fh);
+		other_gctf_args.readValue(fh);
 		gpu_ids.readValue(fh);
 
 		closeReadFile(fh);
@@ -1298,6 +1302,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	fn_gctf_exe.deactivate(is_continue);
 	do_ignore_ctffind_params.deactivate(is_continue);
 	do_EPA.deactivate(is_continue);
+	other_gctf_args.deactivate(is_continue);
 
 }
 
@@ -1355,6 +1360,10 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 		// GPU-allocation
 		command += " --gpu " + gpu_ids.getValue();
+
+		if ((other_gctf_args.getValue()).length() > 0)
+			command += " --extra_gctf_options \" " + other_gctf_args.getValue() + " \"";
+
 	}
 	else
 	{
@@ -6131,7 +6140,7 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 	do_resmap_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	do_resmap_group->end();
 
-	do_resmap_locres.place(current_y,"Use ResMap for local-resolution estimation?", True, "If set to Yes, then ResMap will be used for local resolution estimation.", do_resmap_group);
+	do_resmap_locres.place(current_y,"Use ResMap for local-resolution estimation?", true, "If set to Yes, then ResMap will be used for local resolution estimation.", do_resmap_group);
 
 	do_resmap_group->begin();
 
@@ -6160,7 +6169,7 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 	do_relion_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	do_relion_group->end();
 
-	do_relion_locres.place(current_y,"Use Relion for local-resolution estimation?", False, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
+	do_relion_locres.place(current_y,"Use Relion for local-resolution estimation?", false, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
 \n \n The output relion_locres.mrc map can be used to color the surface of a map in UCSF Chimera according to its local resolution. The output relion_locres_filtered.mrc is a composite map that is locally filtered to the estimated resolution. \
 This is a developmental feature in need of further testing, but initial results indicate it may be useful. \n \n Note that only this program can use MPI, the ResMap wrapper cannot use MPI.", do_relion_group);
 
