@@ -30,6 +30,7 @@
 #include "src/mask.h"
 #include "src/funcs.h"
 #include "src/CPlot2D.h"
+#include "src/mpi.h"
 
 
 class Postprocessing
@@ -46,7 +47,7 @@ public:
 	FileName fn_in, fn_out, fn_I1, fn_I2;
 
 	// Images for the two half-reconstructions and the mask
-	Image<RFLOAT> I1, I2, I1phi, I2phi, Im;
+	Image<RFLOAT> I1, I2, Im;
 
 	// Pixel size in Angstroms
 	RFLOAT angpix;
@@ -70,6 +71,26 @@ public:
 
 	// Filename for a user-provided mask
 	FileName fn_mask;
+
+	/////// Local-resolution
+
+	// Perform automated masking (based on a density threshold)
+	bool do_locres;
+
+	// Sampling rate for local resolution estimates (in A)
+	RFLOAT locres_sampling;
+
+	// Radius of mask for local resolution estimates (in A)
+	RFLOAT locres_maskrad;
+
+	// Width of soft edge on local resolution masks (in A)
+	RFLOAT locres_edgwidth;
+
+	// Randomize phases from this resolution for local resolution calculation
+	RFLOAT locres_randomize_fsc;
+
+	// Lowest resolution allowed in the locres map
+	RFLOAT locres_minres;
 
 	//////// Sharpening
 
@@ -146,6 +167,10 @@ public:
 	// Make a Guinier plot from the Fourier transform of an image
 	void makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fit_point2D> &guinier);
 
+	// Use Richard's formula to calculate FSC_true
+	void calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimArray<RFLOAT> &fsc_unmasked,
+			MultidimArray<RFLOAT> &fsc_masked, MultidimArray<RFLOAT> &fsc_random_masked, int randomize_at );
+
 	// Apply sqrt(2FSC/(FSC=1)) weighting prior to B-factor sharpening
 	void applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc);
 
@@ -154,6 +179,9 @@ public:
 
 	// Write XML file for EMDB submission
 	void writeFscXml(MetaDataTable &MDfsc);
+
+	// Local-resolution running
+	void run_locres(int rank = 0, int size = 1);
 
 	// General Running
 	void run();

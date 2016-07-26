@@ -4138,9 +4138,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE),
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_CS),
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_Q0),
-                                                          DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC), 
-                                                          1.,
-                                                          DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
+							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC),
+							  1.,
+							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
 
 				ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
@@ -6720,9 +6720,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_VOLTAGE),
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_CS),
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_Q0),
-                                                                          DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC),
-                                                                          1., 
-                                                                          DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
+									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC),
+									  1.,
+									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
 
 						Fctf.resize(exp_current_image_size, exp_current_image_size/ 2 + 1);
 						ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);

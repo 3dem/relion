@@ -535,17 +535,25 @@ void ManualPicker::initialise()
 
 	if (global_angpix < 0.)
 	{
-		MetaDataTable MDt;
-		MDt.read(fn_in);
-
-		if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		if (fn_in.isStarFile())
 		{
-			RFLOAT mag, dstep;
-			MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			global_angpix = 10000. * dstep / mag;
-			std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
- 		}
+			MetaDataTable MDt;
+			MDt.read(fn_in);
+
+			if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				RFLOAT mag, dstep;
+				MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				global_angpix = 10000. * dstep / mag;
+				std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
+			}
+			else
+			{
+				std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
+				global_angpix = 1.;
+			}
+		}
 		else
 		{
 			std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;

@@ -1560,9 +1560,11 @@ void convertHelicalTubeCoordsToMetaDataTable(
 		bool cut_into_segments)
 {
 	int nr_segments, MDobj_id;
-	RFLOAT psi_deg, psi_rad, x1, y1, x2, y2, dx, dy, xp, yp, step_pix, half_box_size_pix, len_pix, psi_prior_flip_ratio;
+	RFLOAT psi_deg, psi_rad, x1, y1, x2, y2, dx, dy, xp, yp, step_pix, half_box_size_pix, len_pix, psi_prior_flip_ratio, pitch;
+	int id;
 	MetaDataTable MD_in;
-	std::vector<RFLOAT> x1_coord_list, y1_coord_list, x2_coord_list, y2_coord_list;
+	std::vector<RFLOAT> x1_coord_list, y1_coord_list, x2_coord_list, y2_coord_list, pitch_list;
+	std::vector<int> tube_id_list;
 
 	// Check parameters and open files
 	if ( (nr_asu < 1) || (rise_A < 0.001) || (pixel_size_A < 0.01) )
@@ -1588,10 +1590,16 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates!");
     if (MD_in.numberOfObjects() % 2)
     	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs!");
+
+    // Sjors added MDin_has_id and MDin_has_pitch to allow manual calculation of different cross-over distances to be carried onto the extracted segments...
+    bool MDin_has_id = MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+    bool MDin_has_pitch =  MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH);
     x1_coord_list.clear();
     y1_coord_list.clear();
     x2_coord_list.clear();
     y2_coord_list.clear();
+    tube_id_list.clear();
+    pitch_list.clear();
     MDobj_id = 0;
     FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
     {
@@ -1602,6 +1610,16 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	{
     		x1_coord_list.push_back(xp);
     		y1_coord_list.push_back(yp);
+    		if (MDin_has_id)
+    		{
+    			MD_in.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
+    			tube_id_list.push_back(id);
+    		}
+    		if (MDin_has_pitch)
+    		{
+    			MD_in.getValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+    			pitch_list.push_back(pitch);
+    		}
     	}
     	else
     	{
@@ -1625,6 +1643,10 @@ void convertHelicalTubeCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+    if (MDin_has_id)
+    	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+    if (MDin_has_pitch)
+    	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH);
 
 	// Calculate all coordinates for helical segments
 	nr_segments = 0;
@@ -1635,6 +1657,10 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	y1 = y1_coord_list[tube_id];
     	x2 = x2_coord_list[tube_id];
     	y2 = y2_coord_list[tube_id];
+    	if (MDin_has_id)
+    		id = tube_id_list[tube_id];
+    	if (MDin_has_pitch)
+    		pitch = pitch_list[tube_id];
 
     	psi_rad = atan2(y2 - y1, x2 - x1);
     	psi_deg = RAD2DEG(psi_rad);
@@ -1651,7 +1677,12 @@ void convertHelicalTubeCoordsToMetaDataTable(
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
 	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
 	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
-			nr_segments++;
+			if (MDin_has_id)
+				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
+			if (MDin_has_pitch)
+				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+
+	        nr_segments++;
     		continue;
     	}
 
@@ -1685,7 +1716,11 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
     	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
     	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
-    			nr_segments++;
+    			if (MDin_has_id)
+    				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
+    			if (MDin_has_pitch)
+    				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+   			nr_segments++;
     		}
     	}
     }

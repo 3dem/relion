@@ -282,6 +282,7 @@ enum EMDLabel
 
     EMDL_PARTICLE_AUTOPICK_FOM,
     EMDL_PARTICLE_HELICAL_TUBE_ID,
+    EMDL_PARTICLE_HELICAL_TUBE_PITCH,
     EMDL_PARTICLE_HELICAL_TRACK_LENGTH,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
@@ -655,6 +656,7 @@ private:
 
         EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Helical tube ID for a helical segment");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH, EMDL_DOUBLE, "rlnHelicalTubePitch", "Corss-over distance for a helical segment (A)");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance from the position of this helical segment to the starting point of the tube");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
