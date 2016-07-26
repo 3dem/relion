@@ -323,6 +323,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 
+	// Trial feature subset
+	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
+	subset_frac = 		textToFloat(getParameter(argc, argv, "--subset_frac",  "1"));
+	if(subset_frac<=0 || subset_frac>1)
+		subset_frac=1;
+
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
 #ifdef DEBUG
@@ -556,6 +562,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_use_all_data = checkParameter(argc, argv, "--use_all_data");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+
+	// Trial feature subset
+	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
+	subset_frac = 		textToFloat(getParameter(argc, argv, "--subset_frac",  "1"));
+	if(subset_frac<=0 || subset_frac>1)
+		subset_frac=1;
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -1983,6 +1995,12 @@ void MlOptimiser::expectation()
 	if (do_shifts_onthefly)
 		precalculateABMatrices();
 
+	long int my_first_ori_particle, my_last_ori_particle;
+	long int nr_particles_todo;
+	if(iter>subset_iter)
+		nr_particles_todo = mydata.numberOfOriginalParticles();
+	else
+		nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
@@ -1993,10 +2011,10 @@ void MlOptimiser::expectation()
 		if (!do_auto_refine)
 			std::cout << " of " << nr_iter;
 		std::cout << std::endl;
-		init_progress_bar(mydata.numberOfOriginalParticles());
+		init_progress_bar(nr_particles_todo);
 	}
 
-	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
+	int barstep = XMIPP_MAX(1, nr_particles_todo / 60);
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 
@@ -2070,8 +2088,8 @@ void MlOptimiser::expectation()
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
-	long int my_first_ori_particle, my_last_ori_particle;
-	while (nr_ori_particles_done < mydata.numberOfOriginalParticles())
+
+	while (nr_ori_particles_done < nr_particles_todo)
 	{
 
 #ifdef TIMING
@@ -3184,16 +3202,25 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			// Factor 2 because of the 2-dimensionality of the complex-plane
+			float tsum = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
-			{
-				DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
-						DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
-							(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
-				// Watch out for all-zero sigma2 in case of CTF-premultiplication!
-				if (ctf_premultiplied)
-					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
+				tsum += wsum_model.sigma2_noise[igroup].data[n];
 
+//			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
+//				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
+			if(tsum!=0)
+			{
+				// Factor 2 because of the 2-dimensionality of the complex-plane
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
+				{
+					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
+							DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
+								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
+					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
+					if (ctf_premultiplied)
+						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
+
+				}
 			}
 		}
 	}
