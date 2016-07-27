@@ -1,6 +1,10 @@
 #ifndef CUDA_SETTINGS_H_
 #define CUDA_SETTINGS_H_
 
+// Required compute capability
+#define CUDA_CC_MAJOR 3
+#define CUDA_CC_MINOR 5
+
 #define COMPLEXTEXTURE false
 #define LAUNCH_CHECK
 #define CUDA_BENCHMARK_OLD true
