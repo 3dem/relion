@@ -1722,13 +1722,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			sortOnDevice(filtered, sorted);
 			scanOnDevice(sorted, cumulative_sum);
 
-			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
-
 			CTOC(cudaMLO->timer,"sort");
 
+			op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
+
+			long int my_nr_significant_coarse_samples;
 			size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
-			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
-			long int my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
+			my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
 
 			if (my_nr_significant_coarse_samples == 0)
 			{
@@ -1736,7 +1736,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
 				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
-				std::cerr << " my_significant_weight= " << my_significant_weight << std::endl;
 				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
@@ -1749,6 +1748,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				REPORT_ERROR("my_nr_significant_coarse_samples == 0");
 			}
+
+			if (baseMLO->maximum_significants != 0 &&
+					my_nr_significant_coarse_samples > baseMLO->maximum_significants)
+			{
+				my_nr_significant_coarse_samples = baseMLO->maximum_significants;
+				thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
+			}
+
+			my_significant_weight = sorted.getDeviceAt(thresholdIdx);
 
 			CTIC(cudaMLO->timer,"getArgMaxOnDevice");
 			std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(unsorted_ipart);
