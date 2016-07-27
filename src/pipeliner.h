@@ -145,6 +145,9 @@ class Process
 
 };
 
+#define DO_LOCK true
+#define DONT_LOCK false
+
 class PipeLine
 {
 
@@ -222,10 +225,10 @@ class PipeLine
 	bool importPipeline(std::string _name);
 
 	// Write out the pipeline to a STAR file
-	void write(FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
+	void write(bool do_lock = false, FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
 
 	// Read in the pipeline from a STAR file
-	void read(bool only_read_if_file_exists=false);
+	void read(bool do_lock=false);
 
 	// Make LaTeX and TikZ-based flowcharts
 	void makeUpwardsFlowChart(long int from_process);
