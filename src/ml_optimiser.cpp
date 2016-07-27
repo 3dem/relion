@@ -2167,7 +2167,7 @@ void MlOptimiser::expectation()
 	}
 
 	if (verb > 0)
-		progress_bar(mydata.numberOfOriginalParticles());
+		progress_bar(nr_particles_todo);
 
 #ifdef CUDA
 	if (do_gpu)
