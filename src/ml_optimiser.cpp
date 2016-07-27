@@ -1131,8 +1131,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 		exit(0);
 	}
 
+	std::vector<std::string> hiddens;
+	hiddens.push_back("--maximum_significants");
+	hiddens.push_back("--asymmetric_padding");
+	hiddens.push_back("--subset_iter");
+	hiddens.push_back("--subset_frac");
+
 	// Check for errors in the command-line option
-	if (parser.checkForErrors(verb))
+	if (parser.checkForErrors(verb,hiddens))
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
 	// If we are not continuing an old run, now read in the data and the reference images

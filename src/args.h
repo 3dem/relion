@@ -189,10 +189,18 @@ public:
     void writeCommandLine(std::ostream &outstream);
 
     /** Returns true is there were any error messages (and prints them if verb>0 */
-    bool checkForErrors(int verb = 1);
+    bool checkForErrors(int verb = 1) {
+    	std::vector<std::string> dummy;
+    	return checkForErrors(verb, dummy);
+    }
+    bool checkForErrors(int verb, std::vector<std::string> &hiddens);
 
     /** Check the whole command line for invalid arguments, if found add to the error messages */
-    void checkForUnknownArguments();
+    void checkForUnknownArguments() {
+    	std::vector<std::string> dummy;
+    	checkForUnknownArguments(dummy);
+    }
+    void checkForUnknownArguments(std::vector<std::string> &hiddens);
 
     /** Write one line of the usage to outstream */
     void writeUsageOneLine(int i, std::ostream &out);
