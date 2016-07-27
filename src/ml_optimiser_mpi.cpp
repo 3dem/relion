@@ -205,8 +205,26 @@ void MlOptimiserMpi::initialise()
 		// ------------------------------ FIGURE OUT GLOBAL DEVICE MAP------------------------------------------
 		if (!node->isMaster())
 		{
+			cudaDeviceProp deviceProp;
+			int compatibleDevices(0);
 			// Send device count seen by this slave
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+			for(int i=0; i<devCount; i++ )
+			{
+				HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+				if(deviceProp.major>CUDA_CC_MAJOR)
+					compatibleDevices+=1;
+				else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
+					compatibleDevices+=1;
+				//else
+				std::cerr << "Found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
+			}
+			if(compatibleDevices==0)
+				REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+			else if(compatibleDevices!=devCount)
+				std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+
+
 			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 
 			// Send host-name seen by this slave
@@ -899,20 +917,26 @@ void MlOptimiserMpi::expectation()
     {
         try
         {
+			long int nr_particles_todo;
+			if(iter>subset_iter)
+				nr_particles_todo = mydata.numberOfOriginalParticles();
+			else
+				nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
+
     		if (verb > 0)
     		{
 				std::cout << " Expectation iteration " << iter;
 				if (!do_auto_refine)
 					std::cout << " of " << nr_iter;
 				std::cout << std::endl;
-				init_progress_bar(mydata.numberOfOriginalParticles());
+				init_progress_bar(nr_particles_todo);
     		}
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
 			int random_subset = 0;
 			long int nr_ori_particles_done = 0;
 			long int prev_step_done = nr_ori_particles_done;
-			long int progress_bar_step_size = ROUND(mydata.numberOfOriginalParticles() / 80);
+			long int progress_bar_step_size = ROUND(nr_particles_todo / 80);
 			long int nr_ori_particles_done_subset1 = 0;
 			long int nr_ori_particles_done_subset2 = 0;
 			long int my_nr_ori_particles_done = 0;
@@ -966,6 +990,10 @@ void MlOptimiserMpi::expectation()
 						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_subset2;
 						JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, JOB_FIRST + nr_pool - 1);
 					}
+					if(iter>subset_iter)
+						nr_particles_todo = mydata.numberOfOriginalParticles(random_subset);
+					else
+						nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset))*subset_frac;
 				}
 				else
 				{
@@ -976,7 +1004,8 @@ void MlOptimiserMpi::expectation()
 				}
 
 				// Now send out a new job
-				if (my_nr_ori_particles_done < mydata.numberOfOriginalParticles(random_subset))
+
+				if(nr_ori_particles_done < nr_particles_todo)
 				{
 
 					MlOptimiser::getMetaAndImageDataSubset(JOB_FIRST, JOB_LAST, !do_parallel_disc_io);
