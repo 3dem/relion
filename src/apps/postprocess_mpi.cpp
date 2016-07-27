@@ -26,12 +26,26 @@ int main(int argc, char *argv[])
 
 	try
     {
-		prm.read(argc, argv);
+		int rank, size;
 
-		if (prm.do_locres)
-			prm.run_locres();
+		MPI_Init(&argc, &argv);
+	    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	    MPI_Comm_size(MPI_COMM_WORLD, &size);
+	    // Handle errors
+	    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+	    prm.read(argc, argv);
+
+	    // Don't put any output to screen for mpi slaves
+	    prm.verb = (rank == 0) ? 1 : 0;
+
+	    if (prm.do_locres)
+			prm.run_locres(rank, size);
 		else
 			prm.run();
+
+	    MPI_Finalize();
+
     }
 
     catch (RelionError XE)

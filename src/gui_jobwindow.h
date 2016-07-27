@@ -1048,16 +1048,26 @@ public:
 
 	// I/O
 	InputNodeEntry fn_in;
-	InputNodeEntry fn_mask;
-
-	// Params
-	FileNameEntry fn_resmap;
 	SliderEntry angpix;
+
+
+	// ResMap params
+	BooleanEntry do_resmap_locres;
+	FileNameEntry fn_resmap;
+	InputNodeEntry fn_mask;
 	SliderEntry pval;
 	SliderEntry minres;
 	SliderEntry maxres;
 	SliderEntry stepres;
 
+	// RELION params
+	BooleanEntry do_relion_locres;
+	//SliderEntry locres_sampling;
+	//SliderEntry randomize_at;
+	SliderEntry adhoc_bfac;
+	FileNameEntry fn_mtf;
+
+	Fl_Group *do_relion_group, *do_resmap_group;
 
 public:
 

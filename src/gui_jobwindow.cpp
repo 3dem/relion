@@ -1158,10 +1158,12 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 
 	// Add a little spacer
 	current_y += STEPY/2;
+	other_gctf_args.place(current_y, "Other Gctf options:", "", "Provide additional gctf options here.");
 
+	// Add a little spacer
+	current_y += STEPY/2;
 	gpu_ids.place(current_y, "Which GPUs to use: ", "", "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. ");
 
-	//	other_gctf_args.place(current_y, "Perform equi-phase averaging?", true, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 
 	gctf_group->end();
 	use_gctf.cb_menu_i(); // make default active
@@ -1211,6 +1213,7 @@ void CtffindJobWindow::write(std::string fn)
 	fn_gctf_exe.writeValue(fh);
 	do_ignore_ctffind_params.writeValue(fh);
 	do_EPA.writeValue(fh);
+	other_gctf_args.writeValue(fh);
 	gpu_ids.writeValue(fh);
 
 	closeWriteFile(fh, fn);
@@ -1258,6 +1261,7 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 		fn_gctf_exe.readValue(fh);
 		do_ignore_ctffind_params.readValue(fh);
 		do_EPA.readValue(fh);
+		other_gctf_args.readValue(fh);
 		gpu_ids.readValue(fh);
 
 		closeReadFile(fh);
@@ -1298,6 +1302,7 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	fn_gctf_exe.deactivate(is_continue);
 	do_ignore_ctffind_params.deactivate(is_continue);
 	do_EPA.deactivate(is_continue);
+	other_gctf_args.deactivate(is_continue);
 
 }
 
@@ -1355,6 +1360,10 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 		// GPU-allocation
 		command += " --gpu " + gpu_ids.getValue();
+
+		if ((other_gctf_args.getValue()).length() > 0)
+			command += " --extra_gctf_options \" " + other_gctf_args.getValue() + " \"";
+
 	}
 	else
 	{
@@ -6048,11 +6057,13 @@ bool PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	pipelineInputNodes.push_back(node);
 	int pos_half = fn_in.getValue().rfind("_half");
 	if (pos_half < fn_in.getValue().size())
+	{
 		command += " --i " + fn_in.getValue().substr(0, pos_half);
+	}
 	else
 	{
-		std::cerr << "PostJobWindow::getCommands ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
-		exit(1);
+		fl_message("PostJobWindow::getCommands ERROR: cannot find _half substring in input filename!");
+		return false;
 	}
 
 	// The output name contains a directory: use it for output
@@ -6097,7 +6108,7 @@ bool PostJobWindow::getCommands(std::string &outputname, std::vector<std::string
 }
 
 
-ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THREAD)
+ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_RESMAP;
@@ -6107,10 +6118,6 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THR
 	resetHeight();
 
 	fn_in.place(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
-
-	current_y += STEPY /2 ;
-
-	fn_mask.place(current_y, "User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 
 	current_y += STEPY/2;
 
@@ -6130,7 +6137,18 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THR
 		default_location = mydefault;
 	}
 
-	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", NULL, "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	do_resmap_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	do_resmap_group->end();
+
+	do_resmap_locres.place(current_y,"Use ResMap for local-resolution estimation?", true, "If set to Yes, then ResMap will be used for local resolution estimation.", do_resmap_group);
+
+	do_resmap_group->begin();
+
+	fn_resmap.place(current_y, "ResMap executable:", default_location, "ResMap*", NULL, "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
+
+	current_y += STEPY /2 ;
+
+	fn_mask.place(current_y, "User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 
 	current_y += STEPY /2 ;
 
@@ -6139,7 +6157,35 @@ ResmapJobWindow::ResmapJobWindow() : RelionJobWindow(2, HAS_NOT_MPI, HAS_NOT_THR
 	maxres.place(current_y, "Lowest resolution (A): ", 0., 0., 10., 0.1, "ResMaps maxRes parameter. By default (0), the program will stop at 4x the pixel size");
 	stepres.place(current_y, "Resolution step size (A)", 1., 0.1, 3, 0.1, "ResMaps stepSize parameter." );
 
+	do_resmap_group->end();
+	do_resmap_locres.cb_menu_i();
+
 	tab2->end();
+
+	tab3->begin();
+	tab3->label("Relion");
+	resetHeight();
+
+	do_relion_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	do_relion_group->end();
+
+	do_relion_locres.place(current_y,"Use Relion for local-resolution estimation?", false, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
+\n \n The output relion_locres.mrc map can be used to color the surface of a map in UCSF Chimera according to its local resolution. The output relion_locres_filtered.mrc is a composite map that is locally filtered to the estimated resolution. \
+This is a developmental feature in need of further testing, but initial results indicate it may be useful. \n \n Note that only this program can use MPI, the ResMap wrapper cannot use MPI.", do_relion_group);
+
+	do_relion_group->begin();
+
+	//locres_sampling.place(current_y, "Sampling rate (A):", 25, 5, 50, 5, "The local-resolution map will be calculated every so many Angstroms, by placing soft spherical masks on a cubic grid with this spacing. Very fine samplings (e.g. < 15A?) may take a long time to compute and give spurious estimates!");
+	//randomize_at.place(current_y, "Frequency for phase-randomisation (A): ", 10., 5, 20., 1, "From this frequency onwards, the phases for the mask-corrected FSC-calculation will be randomized. Make sure this is a lower resolution (i.e. a higher number) than the local resolutions you are after in your map.");
+	//current_y += STEPY /2 ;
+
+	adhoc_bfac.place(current_y,"User-provided B-factor:", -100, -500, 0, -25, "Probably, the overall B-factor as was estimated in the postprocess is a useful value for here. Use negative values for sharpening. Be careful: if you over-sharpen your map, you may end up interpreting noise for signal!");
+	fn_mtf.place(current_y, "MTF of the detector (STAR file)", "", "STAR Files (*.star)", NULL, "The MTF of the detector is used to complement the user-provided B-factor in the sharpening. If you don't have this curve, you can leave this field empty.");
+
+	do_relion_group->end();
+	do_relion_locres.cb_menu_i();
+
+	tab3->end();
 
 	// read settings if hidden file exists
 	read(".gui_resmap", is_continue);
@@ -6149,10 +6195,11 @@ void ResmapJobWindow::write(std::string fn)
 {
 	// Write hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmap";
+		fn=".gui_localres";
 
 	std::ofstream fh;
 	openWriteFile(fn, fh);
+	do_resmap_locres.writeValue(fh);
 	fn_resmap.writeValue(fh);
 	fn_in.writeValue(fh);
 	angpix.writeValue(fh);
@@ -6161,6 +6208,11 @@ void ResmapJobWindow::write(std::string fn)
 	maxres.writeValue(fh);
 	stepres.writeValue(fh);
 	fn_mask.writeValue(fh);
+	do_relion_locres.writeValue(fh);
+	//locres_sampling.writeValue(fh);
+	//randomize_at.writeValue(fh);
+	adhoc_bfac.writeValue(fh);
+	fn_mtf.writeValue(fh);
 	closeWriteFile(fh, fn);
 }
 
@@ -6170,11 +6222,12 @@ void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 
 	// Read hidden file if no name is given
 	if (fn=="")
-		fn=".gui_resmap";
+		fn=".gui_localres";
 
 	// Only read things if the file exists
 	if (openReadFile(fn, fh))
 	{
+		do_resmap_locres.readValue(fh);
 		fn_resmap.readValue(fh);
 		fn_in.readValue(fh);
 		angpix.readValue(fh);
@@ -6183,6 +6236,11 @@ void ResmapJobWindow::read(std::string fn, bool &_is_continue)
 		maxres.readValue(fh);
 		stepres.readValue(fh);
 		fn_mask.readValue(fh);
+		do_relion_locres.readValue(fh);
+		//locres_sampling.readValue(fh);
+		//randomize_at.readValue(fh);
+		adhoc_bfac.readValue(fh);
+		fn_mtf.readValue(fh);
 		closeReadFile(fh);
 		_is_continue = is_continue;
 	}
@@ -6192,6 +6250,7 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 {
 	is_continue = _is_continue;
 
+	do_resmap_locres.deactivate(is_continue);
 	fn_resmap.deactivate(is_continue);
 	fn_in.deactivate(is_continue);
 	angpix.deactivate(is_continue);
@@ -6200,9 +6259,14 @@ void ResmapJobWindow::toggle_new_continue(bool _is_continue)
 	maxres.deactivate(is_continue);
 	stepres.deactivate(is_continue);
 	fn_mask.deactivate(is_continue);
+	do_relion_locres.deactivate(is_continue);
+	//locres_sampling.deactivate(is_continue);
+	//randomize_at.deactivate(is_continue);
+	adhoc_bfac.deactivate(is_continue);
+	fn_mtf.deactivate(is_continue);
 
 	// never submit this to queue, as ResMap needs user interaction
-	do_queue.deactivate(true);
+	//do_queue.deactivate(true);
 }
 
 bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
@@ -6210,14 +6274,13 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Resmap", job_counter);
+	initialisePipeline(outputname, "LocalRes", job_counter);
 
-	if (fn_resmap.getValue().length() == 0)
+	if (do_resmap_locres.getValue() == do_relion_locres.getValue())
 	{
-		std::cerr << "ERROR: please provide an executable for the ResMap program." << std::endl;
-		exit(1);
+		fl_message("ERROR: choose either ResMap or Relion for local resolution estimation");
+		return false;
 	}
-
 
 	if (fn_in.getValue() == "")
 	{
@@ -6234,36 +6297,83 @@ bool ResmapJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	}
 	else
 	{
-		std::cerr << "ERROR: cannot find _half substring in input filename: " << fn_in.getValue() << std::endl;
-		exit(1);
+		fl_message("ERROR: cannot find _half substring in input filenames...");
+		return false;
 	}
-
-	// Make symbolic links to the half-maps in the output directory
-	commands.push_back("ln -s ../../" + fn_half1 + " " + outputname + "half1.mrc");
-	commands.push_back("ln -s ../../" + fn_half2 + " " + outputname + "half2.mrc");
 
 	Node node(fn_in.getValue(), fn_in.type);
 	pipelineInputNodes.push_back(node);
 
-	if (fn_mask.getValue() == "")
+	std::string command;
+	if (do_resmap_locres.getValue())
 	{
-		fl_message("ERROR: empty field for input mask...");
-		return false;
+
+		// ResMap wrapper
+		if (fn_resmap.getValue().length() == 0)
+		{
+			fl_message("ERROR: please provide an executable for the ResMap program.");
+			return false;
+		}
+
+		if (fn_mask.getValue() == "")
+		{
+			fl_message("ERROR: Please provide an input mask for ResMap local-resolution estimation.");
+			return false;
+		}
+
+		if (do_queue.getValue())
+		{
+			fl_message("ERROR: You cannot submit a ResMap job to the queue, as it needs user interaction.");
+			return false;
+		}
+
+		if (nr_mpi.getValue() > 1)
+			fl_message("Ignoring multiple MPI processors for ResMap wrapper...");
+
+		// Make symbolic links to the half-maps in the output directory
+		commands.push_back("ln -s ../../" + fn_half1 + " " + outputname + "half1.mrc");
+		commands.push_back("ln -s ../../" + fn_half2 + " " + outputname + "half2.mrc");
+
+		Node node2(fn_mask.getValue(), fn_mask.type);
+		pipelineInputNodes.push_back(node2);
+
+		Node node3(outputname + "half1_resmap.mrc", NODE_RESMAP);
+		pipelineOutputNodes.push_back(node3);
+
+		command = fn_resmap.getValue();
+		command += " --maskVol=" + fn_mask.getValue();
+		command += " --noguiSplit " + outputname + "half1.mrc " +  outputname + "half2.mrc";
+		command += " --vxSize=" + floatToString(angpix.getValue());
+		command += " --pVal=" + floatToString(pval.getValue());
+		command += " --minRes=" + floatToString(minres.getValue());
+		command += " --maxRes=" + floatToString(maxres.getValue());
+		command += " --stepRes=" + floatToString(stepres.getValue());
+
 	}
-	Node node2(fn_mask.getValue(), fn_mask.type);
-	pipelineInputNodes.push_back(node2);
+	else if (do_relion_locres.getValue())
+	{
+		// Relion postprocessing
 
-	Node node3(outputname + "half1_resmap.mrc", NODE_RESMAP);
-	pipelineOutputNodes.push_back(node3);
+		if (nr_mpi.getValue() > 1)
+			command="`which relion_postprocess_mpi`";
+		else
+			command="`which relion_postprocess`";
 
-	std::string command = fn_resmap.getValue();
-	command += " --maskVol=" + fn_mask.getValue();
-	command += " --noguiSplit " + outputname + "half1.mrc " +  outputname + "half2.mrc";
-	command += " --vxSize=" + floatToString(angpix.getValue());
-	command += " --pVal=" + floatToString(pval.getValue());
-	command += " --minRes=" + floatToString(minres.getValue());
-	command += " --maxRes=" + floatToString(maxres.getValue());
-	command += " --stepRes=" + floatToString(stepres.getValue());
+		command += " --locres --i " + fn_in.getValue().substr(0, pos_half);
+		command += " --o " + outputname + "relion";
+		command += " --angpix " + floatToString(angpix.getValue());
+		//command += " --locres_sampling " + floatToString(locres_sampling.getValue());
+		//command += " --locres_randomize_at " + floatToString(randomize_at.getValue());
+		command += " --adhoc_bfac " + floatToString(adhoc_bfac.getValue());
+		if (fn_mtf.getValue() != "")
+			command += " --mtf " + fn_mtf.getValue();
+
+		Node node1(outputname+"relion_locres_filtered.mrc", NODE_FINALMAP);
+		pipelineOutputNodes.push_back(node1);
+		Node node2(outputname+"relion_locres.mrc", NODE_RESMAP);
+		pipelineOutputNodes.push_back(node2);
+
+	}
 
 	// Other arguments for extraction
 	command += " " + other_args.getValue();

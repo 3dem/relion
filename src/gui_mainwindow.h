@@ -149,6 +149,9 @@ private:
 
 };
 
+// Helper function for import/export of scheduled jobs
+void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir,
+		std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern);
 
 class RelionMainWindow : public Fl_Window
 {
@@ -281,9 +284,14 @@ private:
     static void cb_load(Fl_Widget*, void*);
     inline void cb_load_i();
 
-    static void cb_import(Fl_Widget*, void*);
     static void cb_undelete_job(Fl_Widget*, void*);
-    inline void cb_import_i(bool is_undelete);
+    inline void cb_undelete_job_i();
+
+    static void cb_export_jobs(Fl_Widget*, void*);
+    inline void cb_export_jobs_i();
+
+    static void cb_import_jobs(Fl_Widget*, void*);
+    inline void cb_import_jobs_i();
 
     static void cb_order_jobs_alphabetically(Fl_Widget*, void*);
     static void cb_order_jobs_chronologically(Fl_Widget*, void*);
