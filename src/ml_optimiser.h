@@ -480,6 +480,9 @@ public:
 	//Use different padding factors for the projector (PF+0) and backprojector (PF+1)
 	bool asymmetric_padding;
 
+	//Maximum number of significant weights in coarse pass of expectation
+	unsigned maximum_significants;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -594,7 +597,8 @@ public:
 		helical_tube_outer_diameter(0),
 		do_helical_symmetry_local_refinement(0),
 		helical_sigma_distance(0),
-		asymmetric_padding(false)
+		asymmetric_padding(false),
+		maximum_significants(0)
 	{};
 
 	/** ========================== I/O operations  =========================== */

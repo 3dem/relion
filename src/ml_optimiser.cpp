@@ -323,6 +323,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
+	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -558,6 +559,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
+	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
