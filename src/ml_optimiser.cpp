@@ -322,6 +322,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_always_cc  = checkParameter(argc, argv, "--always_cc");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
+	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
+
+	// Trial feature subset
+	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
+	subset_frac = 		textToFloat(getParameter(argc, argv, "--subset_frac",  "1"));
+	if(subset_frac<=0 || subset_frac>1)
+		subset_frac=1;
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -556,6 +564,14 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_use_all_data = checkParameter(argc, argv, "--use_all_data");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
+	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
+
+	// Trial feature subset
+	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
+	subset_frac = 		textToFloat(getParameter(argc, argv, "--subset_frac",  "1"));
+	if(subset_frac<=0 || subset_frac>1)
+		subset_frac=1;
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -941,6 +957,25 @@ void MlOptimiser::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
+		cudaDeviceProp deviceProp;
+		int compatibleDevices(0);
+		// Send device count seen by this slave
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		for(int i=0; i<devCount; i++ )
+                {
+                	HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+                        if(deviceProp.major>CUDA_CC_MAJOR)
+                        	compatibleDevices+=1;
+                       	else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
+                        	compatibleDevices+=1;
+                        //else
+                        	std::cerr << "Found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
+                }
+		if(compatibleDevices==0)
+			REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+		else if(compatibleDevices!=devCount)
+			std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+
 		std::vector < std::vector < std::string > > allThreadIDs;
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 
@@ -1096,8 +1131,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 		exit(0);
 	}
 
+	std::vector<std::string> hiddens;
+	hiddens.push_back("--maximum_significants");
+	hiddens.push_back("--asymmetric_padding");
+	hiddens.push_back("--subset_iter");
+	hiddens.push_back("--subset_frac");
+
 	// Check for errors in the command-line option
-	if (parser.checkForErrors(verb))
+	if (parser.checkForErrors(verb,hiddens))
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
 	// If we are not continuing an old run, now read in the data and the reference images
@@ -1412,7 +1453,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
-	wsum_model.initialise(mymodel, sampling.symmetryGroup());
+	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding);
 
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
@@ -1983,6 +2024,12 @@ void MlOptimiser::expectation()
 	if (do_shifts_onthefly)
 		precalculateABMatrices();
 
+	long int my_first_ori_particle, my_last_ori_particle;
+	long int nr_particles_todo;
+	if(iter>subset_iter)
+		nr_particles_todo = mydata.numberOfOriginalParticles();
+	else
+		nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
@@ -1993,10 +2040,10 @@ void MlOptimiser::expectation()
 		if (!do_auto_refine)
 			std::cout << " of " << nr_iter;
 		std::cout << std::endl;
-		init_progress_bar(mydata.numberOfOriginalParticles());
+		init_progress_bar(nr_particles_todo);
 	}
 
-	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
+	int barstep = XMIPP_MAX(1, nr_particles_todo / 60);
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 
@@ -2053,7 +2100,7 @@ void MlOptimiser::expectation()
 				allocationSize = free - required_free;
 
 			if (allocationSize < 200000000)
-				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
 
 #ifdef PRINT_GPU_MEM_INFO
 			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
@@ -2070,8 +2117,8 @@ void MlOptimiser::expectation()
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
-	long int my_first_ori_particle, my_last_ori_particle;
-	while (nr_ori_particles_done < mydata.numberOfOriginalParticles())
+
+	while (nr_ori_particles_done < nr_particles_todo)
 	{
 
 #ifdef TIMING
@@ -3184,16 +3231,25 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			// Factor 2 because of the 2-dimensionality of the complex-plane
+			float tsum = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
-			{
-				DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
-						DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
-							(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
-				// Watch out for all-zero sigma2 in case of CTF-premultiplication!
-				if (ctf_premultiplied)
-					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
+				tsum += wsum_model.sigma2_noise[igroup].data[n];
 
+//			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
+//				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
+			if(tsum!=0)
+			{
+				// Factor 2 because of the 2-dimensionality of the complex-plane
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
+				{
+					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
+							DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
+								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
+					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
+					if (ctf_premultiplied)
+						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
+
+				}
 			}
 		}
 	}

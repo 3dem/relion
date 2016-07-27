@@ -864,7 +864,7 @@ void MlModel::initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _he
 }
 
 /////////// MlWsumModel
-void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
+void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding)
 {
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
@@ -882,7 +882,6 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
     sigma2_rot = _model.sigma2_rot;
     sigma2_tilt = _model.sigma2_tilt;
     sigma2_psi = _model.sigma2_psi;
-    padding_factor = _model.padding_factor;
     interpolator = _model.interpolator;
     r_min_nn = _model.r_min_nn;
 	is_helix = _model.is_helix;
@@ -893,6 +892,10 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
 	helical_rise_min = _model.helical_rise_min;
 	helical_rise_max = _model.helical_rise_max;
 	helical_rise_inistep = _model.helical_rise_inistep;
+
+    padding_factor = _model.padding_factor;
+    if (asymmetric_padding)
+    	padding_factor ++;
 
     // Don't need forward projectors in MlWsumModel!
     PPref.clear();

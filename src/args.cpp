@@ -45,6 +45,7 @@
 #include "src/args.h"
 #include "src/gcc_version.h"
 #include "src/matrix1d.h"
+#include <algorithm>
 
 // Get parameters from the command line ====================================
 std::string getParameter(int argc, char **argv, const std::string param, const std::string option)
@@ -237,11 +238,11 @@ void IOParser::writeCommandLine(std::ostream &out)
 
 }
 
-bool IOParser::checkForErrors(int verb)
+bool IOParser::checkForErrors(int verb, std::vector<std::string> &hiddens)
 {
 
 	// First check the command line for unknown arguments
-	checkForUnknownArguments();
+	checkForUnknownArguments(hiddens);
 
 	// First print warning messages
 	if (warning_messages.size() > 0)
@@ -270,7 +271,7 @@ bool IOParser::checkForErrors(int verb)
 
 }
 
-void IOParser::checkForUnknownArguments()
+void IOParser::checkForUnknownArguments(std::vector<std::string> &hiddens)
 {
 	for (int i = 1; i < argc; i++)
 	{
@@ -303,7 +304,13 @@ void IOParser::checkForUnknownArguments()
 		if (!is_ok)
 		{
 			std::string auxstr;
-			auxstr = (std::string)"WARNING: Option " + argv[i] + " is not a valid RELION argument";
+			auxstr = (std::string)"WARNING: Option " + argv[i] + "\tis not a valid RELION argument";
+
+			std::vector<std::string>::iterator it;
+			it = find (hiddens.begin(), hiddens.end(), argv[i]);
+			if (it != hiddens.end())
+				auxstr += "... or is it?";
+
 			warning_messages.push_back(auxstr);
 		}
 
