@@ -864,7 +864,7 @@ void MlModel::initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _he
 }
 
 /////////// MlWsumModel
-void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding)
+void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
@@ -922,7 +922,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 
     // Resize MlWsumModel-specific vectors
     BackProjector BP(ori_size, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn,
-    		         ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim);
+    		         ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim, _skip_gridding);
     BPref.clear();
     BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
     sumw_group.resize(nr_groups);
