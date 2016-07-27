@@ -20,6 +20,7 @@
 
 #ifndef GUI_MAINWINDOW_H_
 #define GUI_MAINWINDOW_H_
+#include <FL/Fl_Scroll.H>
 #include "src/gui_jobwindow.h"
 #include "src/gui_entries.h"
 #include "src/pipeliner.h"
@@ -149,6 +150,32 @@ private:
 
 };
 
+class SchedulerWindow : public Fl_Window
+{
+public:
+
+	FileName pipeline_name; // Name of this pipeline (e.g. default)
+	std::vector<Fl_Check_Button*> check_buttons;
+	Fl_Input *repeat, *wait, *schedule_name;
+	std::vector<long int> my_jobs; // Which jobs to execute
+
+	SchedulerWindow(int w, int h, const char* title): Fl_Window(w, h, title){}
+
+	~SchedulerWindow() {};
+
+	int fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs, std::vector<long int> _scheduled_job_ids);
+
+private:
+
+	static void cb_execute(Fl_Widget*, void*);
+	inline void cb_execute_i();
+
+	static void cb_cancel(Fl_Widget*, void*);
+	inline void cb_cancel_i();
+
+
+};
+
 // Helper function for import/export of scheduled jobs
 void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir,
 		std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern);
@@ -199,7 +226,7 @@ public:
     void loadJobFromPipeline();
 
     // Run scheduled jobs from the pipeliner
-    void runScheduledJobs(int nr_repeat, long int minutes_wait);
+    void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
 
 private:
 
