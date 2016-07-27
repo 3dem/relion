@@ -917,20 +917,26 @@ void MlOptimiserMpi::expectation()
     {
         try
         {
+			long int nr_particles_todo;
+			if(iter>subset_iter)
+				nr_particles_todo = mydata.numberOfOriginalParticles();
+			else
+				nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
+
     		if (verb > 0)
     		{
 				std::cout << " Expectation iteration " << iter;
 				if (!do_auto_refine)
 					std::cout << " of " << nr_iter;
 				std::cout << std::endl;
-				init_progress_bar(mydata.numberOfOriginalParticles());
+				init_progress_bar(nr_particles_todo);
     		}
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
 			int random_subset = 0;
 			long int nr_ori_particles_done = 0;
 			long int prev_step_done = nr_ori_particles_done;
-			long int progress_bar_step_size = ROUND(mydata.numberOfOriginalParticles() / 80);
+			long int progress_bar_step_size = ROUND(nr_particles_todo / 80);
 			long int nr_ori_particles_done_subset1 = 0;
 			long int nr_ori_particles_done_subset2 = 0;
 			long int my_nr_ori_particles_done = 0;
@@ -994,7 +1000,8 @@ void MlOptimiserMpi::expectation()
 				}
 
 				// Now send out a new job
-				if (my_nr_ori_particles_done < mydata.numberOfOriginalParticles(random_subset))
+
+				if(nr_ori_particles_done < nr_particles_todo)
 				{
 
 					MlOptimiser::getMetaAndImageDataSubset(JOB_FIRST, JOB_LAST, !do_parallel_disc_io);

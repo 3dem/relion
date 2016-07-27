@@ -411,6 +411,11 @@ public:
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
+	// Number of iterations for data subset and subset fraction of data
+	int   subset_iter;
+	float subset_frac;
+
+
 	// Number of iterations for gridding preweighting reconstruction
 	int gridding_nr_iter;
 
@@ -518,6 +523,8 @@ public:
 		has_converged(0),
 		only_flip_phases(0),
 		gridding_nr_iter(0),
+		subset_iter(0),
+		subset_frac(1),
 		do_use_reconstruct_images(0),
 		fix_sigma_noise(0),
 		current_changes_optimal_offsets(0),
