@@ -322,6 +322,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_always_cc  = checkParameter(argc, argv, "--always_cc");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -556,6 +557,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_use_all_data = checkParameter(argc, argv, "--use_all_data");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -1431,7 +1433,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
-	wsum_model.initialise(mymodel, sampling.symmetryGroup());
+	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding);
 
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
@@ -2072,7 +2074,7 @@ void MlOptimiser::expectation()
 				allocationSize = free - required_free;
 
 			if (allocationSize < 200000000)
-				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
 
 #ifdef PRINT_GPU_MEM_INFO
 			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
