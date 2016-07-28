@@ -238,7 +238,7 @@ private:
     int current_y;
 
 
-    /** Call-back functions for the Run button
+    /** Call-back functions
      *  The method of using two functions of static void and inline void was copied from:
      *  http://www3.telus.net/public/robark/
      */

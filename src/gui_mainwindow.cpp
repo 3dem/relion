@@ -121,21 +121,9 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	resizable(*this);
 	show();
 
-	// Live updates of running jobs
-	Fl::add_timeout(10, cb_update);
-
 	return Fl::run();
 
 }
-
-void SchedulerWindow::cb_update(void*) {
-    static int x = 0;
-    grp->image(jpgs[x++ % TOTAL]);
-    win->redraw();
-    // Fl::repeat_timeout(RATE, ShowNextImage_CB);                      // steady rate
-    Fl::repeat_timeout(((x%TOTAL)==0)?2.0:RATE, ShowNextImage_CB);      // eye blink: hold 0003.jpg for 2 secs
-}
-
 
 void SchedulerWindow::cb_cancel(Fl_Widget*, void* v)
 {
