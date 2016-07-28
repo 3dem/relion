@@ -576,6 +576,11 @@ static void Timer_CB(void *userdata) {
 // Update the content of the finished, running and scheduled job lists
 void RelionMainWindow::fillRunningJobLists()
 {
+	// Go back to the same positions in the vertical scroll bars of the job lists after updating...
+	int mypos_running = running_job_browser->position();
+	int mypos_scheduled = scheduled_job_browser->position();
+	int mypos_finished = finished_job_browser->position();
+
     // Clear whatever was in there
 	finished_job_browser->clear();
 	finished_processes.clear();
@@ -647,6 +652,9 @@ void RelionMainWindow::fillRunningJobLists()
 		}
 	}
 
+	running_job_browser->position(mypos_running);
+	scheduled_job_browser->position(mypos_scheduled);
+	finished_job_browser->position(mypos_finished);
 }
 
 void RelionMainWindow::fillToAndFromJobLists()
