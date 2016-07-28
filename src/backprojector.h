@@ -136,7 +136,8 @@ public:
         	padding_factor = op.padding_factor;
         	ref_dim = op.ref_dim;
         	data_dim = op.data_dim;
-         	// BackProjector stuff
+        	skip_gridding = op.skip_gridding;
+        	// BackProjector stuff
         	weight = op.weight;
         	tab_ftblob = op.tab_ftblob;
         	SL = op.SL;
@@ -159,6 +160,7 @@ public:
 
 	void clear()
 	{
+		skip_gridding = false;
 		weight.clear();
 		Projector::clear();
 	}
