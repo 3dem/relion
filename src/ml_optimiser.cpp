@@ -311,6 +311,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0."));
 	debug2 = textToFloat(getParameter(argc, argv, "--debug2", "0."));
+	debug3 = textToFloat(getParameter(argc, argv, "--debug3", "0."));
     do_bfactor = checkParameter(argc, argv, "--bfactor");
 	// Read in initial sigmaNoise spectrum
 	fn_sigma = getParameter(argc, argv, "--sigma","");
@@ -324,6 +325,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
 	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
+	skip_gridding = checkParameter(argc, argv, "--skip_gridding");
 
 	// Trial feature subset
 	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
@@ -514,6 +516,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	dont_raise_norm_error = parser.checkOption("--dont_check_norm", "Skip the check whether the images are normalised correctly");
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
+	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1
@@ -554,6 +557,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0"));
 	debug2 = textToFloat(getParameter(argc, argv, "--debug2", "0"));
+	debug3 = textToFloat(getParameter(argc, argv, "--debug3", "0"));
 	// Read in initial sigmaNoise spectrum
 	fn_sigma = getParameter(argc, argv, "--sigma","");
 	do_calculate_initial_sigma_noise = (fn_sigma == "") ? true : false;
@@ -566,6 +570,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
 	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
+	skip_gridding = checkParameter(argc, argv, "--skip_gridding");
 
 	// Trial feature subset
 	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
@@ -687,7 +692,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
     minres_map = 5;
     do_bfactor = false;
     gridding_nr_iter = 10;
-    debug1 = debug2 = 0.;
+    debug1 = debug2 = debug3 = 0.;
 
     // Then read in sampling, mydata and mymodel stuff
     // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
@@ -1113,6 +1118,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_skip_align)
 		do_gpu = false;
 
+	if (do_always_cc)
+		do_calculate_initial_sigma_noise = false;
+
     if (do_print_metadata_labels)
 	{
 		if (verb > 0)
@@ -1453,7 +1461,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
-	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding);
+	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
 
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
@@ -2167,7 +2175,7 @@ void MlOptimiser::expectation()
 	}
 
 	if (verb > 0)
-		progress_bar(mydata.numberOfOriginalParticles());
+		progress_bar(nr_particles_todo);
 
 #ifdef CUDA
 	if (do_gpu)
@@ -2259,6 +2267,13 @@ void MlOptimiser::expectationSetup()
 
     // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
+
+	// TMP for helices of Anthiony 12 july 2016
+	if (debug1 > 0.)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes*mymodel.nr_bodies; iclass++)
+			mymodel.PPref[iclass].applyFourierMask((int)debug1, (int)debug2, debug3);
+	}
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
@@ -5062,11 +5077,11 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 																											iover_rot, iover_trans);
 //#define DEBUG_DIFF2_ISNAN
 #ifdef DEBUG_DIFF2_ISNAN
-											if (std::isnan(diff2))
+											//if (std::isnan(diff2))
 											{
 												pthread_mutex_lock(&global_mutex);
 												std::cerr << " ipart= " << ipart << std::endl;
-												std::cerr << " diff2= " << diff2 << " thisthread_min_diff2[ipart]= " << thisthread_min_diff2[ipart] << " ipart= " << ipart << std::endl;
+												std::cerr << " diff2= " << diff2 << " ipart= " << ipart << std::endl;
 												std::cerr << " exp_highres_Xi2_imgs[ipart]= " << exp_highres_Xi2_imgs[ipart] << std::endl;
 												std::cerr<< " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
 												std::cerr<< " exp_nr_oversampled_rot="<<exp_nr_oversampled_rot<<std::endl;
@@ -5083,14 +5098,20 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												std::cerr << " group_id= " << group_id << std::endl;
 												Image<RFLOAT> It;
 												std::cerr << "Frefctf shape= "; Frefctf.printShape(std::cerr);
-												std::cerr << "Fimg_shift shape= "; Fimg_shift.printShape(std::cerr);
+												MultidimArray<Complex> Fish;
+												Fish.resize(exp_local_Minvsigma2s[0]);
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fish)
+												{
+													DIRECT_MULTIDIM_ELEM(Fish, n) = *(Fimg_shift + n);
+												}
+												std::cerr << "Fimg_shift shape= "; (Fish).printShape(std::cerr);
 												It()=exp_local_Fctfs[ipart];
 												It.write("exp_local_Fctf.spi");
 												std::cerr << "written exp_local_Fctf.spi" << std::endl;
 												FourierTransformer transformer;
 												Image<RFLOAT> tt;
 												tt().resize(exp_current_image_size, exp_current_image_size);
-												transformer.inverseFourierTransform(Fimg_shift, tt());
+												transformer.inverseFourierTransform(Fish, tt());
 												CenterFFT(tt(),false);
 												tt.write("Fimg_shift.spi");
 												std::cerr << "written Fimg_shift.spi" << std::endl;
@@ -5107,9 +5128,11 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												tt.write("Fref.spi");
 												std::cerr << "written Fref.spi" << std::endl;
 												std::cerr << " A= " << A << std::endl;
-												std::cerr << " exp_R_mic= " << exp_R_mic << std::endl;
 												std::cerr << "written Frefctf.spi" << std::endl;
-												REPORT_ERROR("diff2 is not a number");
+												std::cerr << " press any ket to continue.. " << std::endl;
+												char c;
+												std::cin >> c;
+												//REPORT_ERROR("diff2 is not a number");
 												pthread_mutex_unlock(&global_mutex);
 											}
 #endif

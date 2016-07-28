@@ -130,7 +130,7 @@ public:
 	bool fix_tau;
 
     // some parameters for debugging
-	RFLOAT debug1, debug2;
+	RFLOAT debug1, debug2, debug3;
 
 	// Starting and finishing particles (for parallelisation)
     long int my_first_ori_particle_id, my_last_ori_particle_id;
@@ -415,6 +415,8 @@ public:
 	int   subset_iter;
 	float subset_frac;
 
+	// Skip gridding in reconstruction
+	bool skip_gridding;
 
 	// Number of iterations for gridding preweighting reconstruction
 	int gridding_nr_iter;
