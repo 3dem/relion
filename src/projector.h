@@ -191,6 +191,12 @@ public:
     */
    void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size = -1, int nr_threads = 1, bool do_gridding = true);
 
+   /* This is experimental: apply a mask in Fourier-space to focus refinements on certain Fourier components
+    * mask_r_min and mask_r_max are the radii of the lowest and highest frequencies (only keep crown inside)
+    * mask_ang is the opening angle along z (only really useful for helices, I guess)
+    */
+   void applyFourierMask(int mask_r_min = 0, int mask_r_max = -1, RFLOAT mask_ang = 0.);
+
    /* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
     * the real-space maps by dividing them by the Fourier Transform of the interpolator
     * Note these corrections are made on the not-oversampled, i.e. originally sized real-space map

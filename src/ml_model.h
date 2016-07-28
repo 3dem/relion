@@ -399,7 +399,7 @@ public:
 	}
 
 	// Initialise all weighted sums (according to size of corresponding model
-	void initialise(MlModel &_model, FileName fn_sym = "c1", bool asymmetric_padding = false);
+	void initialise(MlModel &_model, FileName fn_sym = "c1", bool asymmetric_padding = false, bool _skip_gridding = false);
 
 	// Initialize all weighted sums to zero (with resizing the BPrefs to current_size)
 	void initZeros();
