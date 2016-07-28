@@ -429,6 +429,11 @@ public:
      */
     FileName removeDirectories(int keep = 0) const;
 
+    /**
+     * Return all directories
+     */
+    FileName getDirectories() const;
+
     /*
      * Gets the filesize (in bytes)
      */
