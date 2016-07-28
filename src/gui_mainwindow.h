@@ -180,6 +180,8 @@ private:
 void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir,
 		std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern);
 
+static void Timer_CB(void *userdata);
+
 class RelionMainWindow : public Fl_Window
 {
 
@@ -227,6 +229,9 @@ public:
 
     // Run scheduled jobs from the pipeliner
     void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
+
+    // Need public access for auto-updating the GUI
+    void fillStdOutAndErr();
 
 private:
 
@@ -293,11 +298,9 @@ private:
     static void cb_make_flowchart(Fl_Widget*, void*);
     inline void cb_make_flowchart_i();
 
-   static void cb_edit_project_note(Fl_Widget*, void*);
+    static void cb_edit_project_note(Fl_Widget*, void*);
     static void cb_edit_note(Fl_Widget*, void*);
     inline void cb_edit_note_i(bool is_project_note = false);
-
-    inline void cb_fill_stdout_i();
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();

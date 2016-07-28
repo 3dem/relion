@@ -558,6 +558,19 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     cb_select_browsegroup_i(); // make default active
     is_main_continue = false; // default is a new run
 
+    Fl::add_timeout(2, Timer_CB, (void*)this);
+
+}
+
+static void Timer_CB(void *userdata) {
+	RelionMainWindow *o = (RelionMainWindow*)userdata;
+    // Update the stdout and stderr windows if we're currently pointing at a running job
+    if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
+    	o->fillStdOutAndErr();
+    // Always check for job completion
+    o->updateJobLists();
+    // Refresh every 2 seconds
+    Fl::repeat_timeout(2, Timer_CB, userdata);
 }
 
 // Update the content of the finished, running and scheduled job lists
@@ -773,7 +786,7 @@ void RelionMainWindow::loadJobFromPipeline()
     else
     	alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
-	cb_fill_stdout_i();
+	fillStdOutAndErr();
 }
 
 long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
@@ -1640,7 +1653,7 @@ void RelionMainWindow::cb_toggle_continue_i()
 
 }
 
-void RelionMainWindow::cb_fill_stdout_i()
+void RelionMainWindow::fillStdOutAndErr()
 {
 
 	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
