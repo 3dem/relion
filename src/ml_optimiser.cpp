@@ -323,13 +323,13 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_always_cc  = checkParameter(argc, argv, "--always_cc");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
-	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
-	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
-	skip_gridding = checkParameter(argc, argv, "--skip_gridding");
+	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maximum_significants", "", "0", true));
+	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
 
 	// Trial feature subset
-	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
-	subset_frac = 		textToFloat(getParameter(argc, argv, "--subset_frac",  "1"));
+	subset_iter = 		textToInteger(parser.getOption("--subset_iter", "", "0", true));
+	subset_frac = 		textToFloat(parser.getOption("--subset_frac", "", "1", true));
 	if(subset_frac<=0 || subset_frac>1)
 		subset_frac=1;
 
@@ -568,13 +568,13 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_use_all_data = checkParameter(argc, argv, "--use_all_data");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
-	asymmetric_padding = checkParameter(argc, argv, "--asymmetric_padding");
-	maximum_significants = textToInteger(getParameter(argc, argv, "--maximum_significants", "0"));
-	skip_gridding = checkParameter(argc, argv, "--skip_gridding");
+	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maximum_significants", "", "0", true));
+	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
 
 	// Trial feature subset
-	subset_iter = 		textToInteger(getParameter(argc, argv, "--subset_iter", "0"));
-	subset_frac = 		textToFloat(getParameter(argc, argv, "--subset_frac",  "1"));
+	subset_iter = 		textToInteger(parser.getOption("--subset_iter", "", "0", true));
+	subset_frac = 		textToFloat(parser.getOption("--subset_frac", "", "1", true));
 	if(subset_frac<=0 || subset_frac>1)
 		subset_frac=1;
 
@@ -1139,14 +1139,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		exit(0);
 	}
 
-	std::vector<std::string> hiddens;
-	hiddens.push_back("--maximum_significants");
-	hiddens.push_back("--asymmetric_padding");
-	hiddens.push_back("--subset_iter");
-	hiddens.push_back("--subset_frac");
-
 	// Check for errors in the command-line option
-	if (parser.checkForErrors(verb,hiddens))
+	if (parser.checkForErrors(verb))
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
 	// If we are not continuing an old run, now read in the data and the reference images
