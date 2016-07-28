@@ -120,10 +120,10 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 
 	resizable(*this);
 	show();
+
 	return Fl::run();
 
 }
-
 
 void SchedulerWindow::cb_cancel(Fl_Widget*, void* v)
 {
@@ -1782,6 +1782,33 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 				}
 			}
 		}
+
+		// For continuation of relion_refine jobs, remove the original output nodes from the list
+		if (pipeline.processList[current_job].type == PROC_2DCLASS ||
+				pipeline.processList[current_job].type == PROC_3DCLASS ||
+				pipeline.processList[current_job].type == PROC_3DAUTO)
+		{
+
+			std::vector<bool> deleteNodes, deleteProcesses;
+			deleteNodes.resize(pipeline.nodeList.size(), false);
+			deleteProcesses.resize(pipeline.processList.size(), false);
+
+			for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
+			{
+				long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
+				if(!exists(pipeline.nodeList[mynode].name))
+					deleteNodes[mynode] = true;
+			}
+
+			FileName fn_del = "tmp";
+			pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
+			std::remove("tmpdeleted_pipeline.star");
+
+			// Read the updated pipeline back in again
+			pipeline.read(DO_LOCK);
+
+		}
+
 	}
 
 	// Now save the job (and its status) to the PipeLine
