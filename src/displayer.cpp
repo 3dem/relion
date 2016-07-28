@@ -1574,14 +1574,19 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	// display image name at the top
 	fn_in = _fn_in;
 	FileName fn_short = _fn_in.removeDirectories();
+	base_dir = _fn_in.getDirectories();
 
 	color(GUI_BACKGROUND_COLOR);
 
 	int width = 485;
-	Fl_Text_Display *mydisp = new Fl_Text_Display(15, 15, width-15, 25,"");
+//	Fl_Text_Display *mydisp = new Fl_Text_Display(15, 15, width-15, 25,"");
 	Fl_Text_Buffer *textbuff = new Fl_Text_Buffer();
 	textbuff->text(fn_short.c_str());
-	mydisp->buffer(textbuff);
+	//mydisp->buffer(textbuff);
+	editable_fn             = new Fl_Input(15, 15, width-15, 25, "");
+	editable_fn->value(fn_short.c_str());
+
+
 	int x=170, y=15, ystep = 27, height = 25,  inputwidth = 50, inputwidth2=30;
 	int x2 = width - inputwidth - 50;
 	y += ROUND(1.5*ystep);
@@ -1626,6 +1631,7 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		y += ystep;
 
 		sort_button = new Fl_Check_Button(35,y,height,height, "Sort images ");
+		sort_button->set(); // on by default
 		sort_choice = new Fl_Choice(x, y, width-x, height, "on:");
 		for (int i = 0; i < sort_labels.size(); i++)
 			sort_choice->add(sort_labels[i].c_str(), 0, 0,0, FL_MENU_VALUE);
@@ -1634,6 +1640,7 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		y += ystep;
 
 		reverse_sort_button  = new Fl_Check_Button(35, y, inputwidth, height, "Reverse sort?");
+		reverse_sort_button->set(); // on by default
 		reverse_sort_button->color(GUI_INPUT_COLOR);
 		apply_orient_button  = new Fl_Check_Button(x, y, inputwidth, height, "Apply orientations?");
 		apply_orient_button->color(GUI_INPUT_COLOR);
@@ -1784,6 +1791,7 @@ void displayerGuiWindow::cb_display_i()
 	// This is a rather ugly system call to the relion_display program again,
 	// but I do not know how to get back to the original Displayer class from here...
 	std::string cl = "relion_display ";
+	fn_in = base_dir + "/" + (std::string)editable_fn->value();
 	cl += " --i " + fn_in;
 
 	// Always

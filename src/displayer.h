@@ -360,7 +360,7 @@ class displayerGuiWindow : public Fl_Window
 {
 public:
 
-	FileName fn_in, fn_data;
+	FileName fn_in, fn_data, base_dir;
 
 	// Some general settings for different types
 	bool is_class;
@@ -389,7 +389,7 @@ public:
 	std::vector<std::string> sort_labels;
 
 	// Input for the display parameters
-	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
+	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input, *editable_fn;
 	Fl_Input *col_input, *ori_scale_input;
 	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
 	Fl_Choice *display_choice, *sort_choice;
