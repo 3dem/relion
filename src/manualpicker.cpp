@@ -29,6 +29,7 @@ std::vector<Fl_Button*> viewmic_buttons;
 std::vector<Fl_Button*> viewctf_buttons;
 std::vector<Fl_Text_Display*> text_displays;
 std::vector<Fl_Text_Display*> count_displays;
+std::vector<Fl_Text_Display*> defocus_displays;
 std::vector<Fl_Check_Button*> check_buttons;
 int last_pick_viewed;
 int last_ctf_viewed;
@@ -288,6 +289,21 @@ int manualpickerGuiWindow::fill()
 			myviewctf->color(GUI_BUTTON_COLOR);
 			myviewctf->callback(cb_viewctf, &(imics[imic]));
 			viewctf_buttons.push_back(myviewctf);
+
+			Fl_Text_Buffer *textbuffDF = new Fl_Text_Buffer();
+			RFLOAT defocus;
+			MDin.getValue(EMDL_CTF_DEFOCUSU, defocus);
+
+			std::cout << defocus << std::endl;
+			std::ostringstream os;
+			os << defocus;
+			std::string str = os.str();
+			textbuffDF->text(str.c_str());
+
+			Fl_Text_Display* myDF = new Fl_Text_Display(MXCOL4, current_y, MWCOL4, ystep-5);
+			myDF->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+			myDF->buffer(textbuffDF);
+			defocus_displays.push_back(myDF);
 		}
 
 		imic++;
