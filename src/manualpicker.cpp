@@ -181,7 +181,11 @@ void cb_selectmic(Fl_Widget* w, void* data)
 		count_displays[imic]->buffer(textbuff2);
 		count_displays[imic]->activate();
 		if (global_has_ctf)
+		{
 			viewctf_buttons[imic]->activate();
+			defocus_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+			defocus_displays[imic]->activate();
+		}
 	}
 	else
 	{
@@ -193,7 +197,11 @@ void cb_selectmic(Fl_Widget* w, void* data)
 		count_displays[imic]->buffer(textbuff2);
 		count_displays[imic]->deactivate();
 		if (global_has_ctf)
+		{
 			viewctf_buttons[imic]->deactivate();
+			defocus_displays[imic]->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
+			defocus_displays[imic]->deactivate();
+		}
 	}
 
 }
@@ -294,7 +302,6 @@ int manualpickerGuiWindow::fill()
 			RFLOAT defocus;
 			MDin.getValue(EMDL_CTF_DEFOCUSU, defocus);
 
-			std::cout << defocus << std::endl;
 			std::ostringstream os;
 			os << defocus;
 			std::string str = os.str();
