@@ -24,6 +24,7 @@
 #include "src/gui_jobwindow.h"
 #include "src/gui_entries.h"
 #include "src/pipeliner.h"
+#include <time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -114,6 +115,9 @@ static FileName global_outputname;
 // Order jobs in finished window alphabetically?
 static bool do_order_alphabetically;
 
+// The last time something changed
+static time_t time_last_change;
+
 // Stdout and stderr display
 class StdOutDisplay : public Fl_Text_Display
 {
@@ -195,12 +199,18 @@ public:
 	// For clicking in stdout/err windows
 	StdOutDisplay *stdoutbox, *stderrbox;
 
+	// Update GUI every how many seconds
+	int update_every_sec;
+
+	// Exit GUI after how many seconds idle?
+	float exit_after_sec;
+
 	// For job submission
     std::string final_command;
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe);
+	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec);
 
     // Destructor
     ~RelionMainWindow(){};
@@ -232,6 +242,9 @@ public:
 
     // Need public access for auto-updating the GUI
     void fillStdOutAndErr();
+
+    // Touch the TimeStamp of the last change
+    void tickTimeLastChanged();
 
 private:
 
