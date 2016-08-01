@@ -232,8 +232,11 @@ void NoteEditorWindow::cb_save_i()
 
 
 
-RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
+RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec):Fl_Window(w,h,title)
 {
+
+	// Set initial Timer
+	tickTimeLastChanged();
 
 	show_initial_screen = true;
 	do_order_alphabetically = false;
@@ -558,11 +561,50 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     cb_select_browsegroup_i(); // make default active
     is_main_continue = false; // default is a new run
 
+    // Mechanism to update stdout and stderr continuously and also update the JobLists
+    // Also exit the GUI if it has been idle for too long
+    update_every_sec = _update_every_sec;
+    exit_after_sec = (float)_exit_after_sec;
+    if (update_every_sec > 0)
+    	Fl::add_timeout(update_every_sec, Timer_CB, (void*)this);
+
+}
+
+static void Timer_CB(void *userdata)
+{
+	RelionMainWindow *o = (RelionMainWindow*)userdata;
+
+	time_t now;
+	time (&now);
+
+
+	double dif = difftime (now, time_last_change);
+    // If the GUI has been idle for too long, then exit
+	if (dif > o->exit_after_sec)
+    {
+		std::cout << " The GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
+		exit(0);
+    }
+
+	// Update the stdout and stderr windows if we're currently pointing at a running job
+    if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
+    	o->fillStdOutAndErr();
+
+    // Always check for job completion
+    o->updateJobLists();
+
+    // Refresh every so many seconds
+    Fl::repeat_timeout(o->update_every_sec, Timer_CB, userdata);
 }
 
 // Update the content of the finished, running and scheduled job lists
 void RelionMainWindow::fillRunningJobLists()
 {
+	// Go back to the same positions in the vertical scroll bars of the job lists after updating...
+	int mypos_running = running_job_browser->position();
+	int mypos_scheduled = scheduled_job_browser->position();
+	int mypos_finished = finished_job_browser->position();
+
     // Clear whatever was in there
 	finished_job_browser->clear();
 	finished_processes.clear();
@@ -634,6 +676,9 @@ void RelionMainWindow::fillRunningJobLists()
 		}
 	}
 
+	running_job_browser->position(mypos_running);
+	scheduled_job_browser->position(mypos_scheduled);
+	finished_job_browser->position(mypos_finished);
 }
 
 void RelionMainWindow::fillToAndFromJobLists()
@@ -773,7 +818,7 @@ void RelionMainWindow::loadJobFromPipeline()
     else
     	alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
-	cb_fill_stdout_i();
+	fillStdOutAndErr();
 }
 
 long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
@@ -1264,6 +1309,7 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 				}
 
 				sleep(10);
+				tickTimeLastChanged(); // This will make sure the pipeline never gets timed-out
 				pipeline.checkProcessCompletion();
 				if (pipeline.processList[current_job].status == PROC_FINISHED)
 				{
@@ -1354,9 +1400,16 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 	cb_quit_i();
 }
 
+void RelionMainWindow::tickTimeLastChanged()
+{
+	time(&time_last_change);
+}
+
 void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 {
+
 	RelionMainWindow* T=(RelionMainWindow*)v;
+
 	// When clicking the job browser on the left: reset current_job to -1 (i.e. a new job, not yet in the pipeline)
 	current_job = -1;
 	T->cb_select_browsegroup_i();
@@ -1366,6 +1419,9 @@ void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_browsegroup_i()
 {
+
+	// Update timer
+	tickTimeLastChanged();
 
 	// Hide the initial screen
 	if (show_initial_screen)
@@ -1414,6 +1470,9 @@ void RelionMainWindow::cb_select_finished_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_finished_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
+
 	// Show the 'selected' group, hide the others
     int idx = finished_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
@@ -1432,6 +1491,9 @@ void RelionMainWindow::cb_select_running_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_running_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
+
 	// Show the 'selected' group, hide the others
     int idx = running_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
@@ -1450,6 +1512,9 @@ void RelionMainWindow::cb_select_scheduled_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_scheduled_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
+
 	// Show the 'selected' group, hide the others
     int idx = scheduled_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
@@ -1468,6 +1533,8 @@ void RelionMainWindow::cb_select_input_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_input_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
     int idx = input_job_browser->value() - 1;
@@ -1488,6 +1555,8 @@ void RelionMainWindow::cb_select_output_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_output_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
     int idx = output_job_browser->value() - 1;
@@ -1640,7 +1709,7 @@ void RelionMainWindow::cb_toggle_continue_i()
 
 }
 
-void RelionMainWindow::cb_fill_stdout_i()
+void RelionMainWindow::fillStdOutAndErr()
 {
 
 	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
@@ -1729,6 +1798,9 @@ void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 
 void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
+
+	// Update timer
+	tickTimeLastChanged();
 
 	// Make sure that whenever we write out a pipeline, we first read in the existing version on disk
 	// This prevents sync errors with multiple windows acting on the same pipeline
