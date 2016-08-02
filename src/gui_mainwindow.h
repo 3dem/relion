@@ -24,6 +24,7 @@
 #include "src/gui_jobwindow.h"
 #include "src/gui_entries.h"
 #include "src/pipeliner.h"
+#include <time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -114,6 +115,9 @@ static FileName global_outputname;
 // Order jobs in finished window alphabetically?
 static bool do_order_alphabetically;
 
+// The last time something changed
+static time_t time_last_change;
+
 // Stdout and stderr display
 class StdOutDisplay : public Fl_Text_Display
 {
@@ -180,6 +184,8 @@ private:
 void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir,
 		std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern);
 
+static void Timer_CB(void *userdata);
+
 class RelionMainWindow : public Fl_Window
 {
 
@@ -193,12 +199,18 @@ public:
 	// For clicking in stdout/err windows
 	StdOutDisplay *stdoutbox, *stderrbox;
 
+	// Update GUI every how many seconds
+	int update_every_sec;
+
+	// Exit GUI after how many seconds idle?
+	float exit_after_sec;
+
 	// For job submission
     std::string final_command;
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe);
+	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec);
 
     // Destructor
     ~RelionMainWindow(){};
@@ -227,6 +239,12 @@ public:
 
     // Run scheduled jobs from the pipeliner
     void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
+
+    // Need public access for auto-updating the GUI
+    void fillStdOutAndErr();
+
+    // Touch the TimeStamp of the last change
+    void tickTimeLastChanged();
 
 private:
 
@@ -293,11 +311,9 @@ private:
     static void cb_make_flowchart(Fl_Widget*, void*);
     inline void cb_make_flowchart_i();
 
-   static void cb_edit_project_note(Fl_Widget*, void*);
+    static void cb_edit_project_note(Fl_Widget*, void*);
     static void cb_edit_note(Fl_Widget*, void*);
     inline void cb_edit_note_i(bool is_project_note = false);
-
-    inline void cb_fill_stdout_i();
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();

@@ -27,7 +27,7 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif 
+#endif
 
 
 int main(int argc, char *argv[])
@@ -72,7 +72,9 @@ int main(int argc, char *argv[])
 	{
 		// Fill the window
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
-		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe);
+		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
+		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
+		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, _update_every_sec, _exit_after_sec);
 
 		// Show and run the window
 		window.show(argc, argv);
