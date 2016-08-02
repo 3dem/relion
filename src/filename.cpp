@@ -401,14 +401,6 @@ FileName FileName::removeDirectories(int keep) const
         return substr(last_slash + 1, length() - last_slash);
 }
 
-// Return directories ......................................................
-FileName FileName::getDirectories() const
-{
-	// no error checking here
-	std::string prefix = this->substr(0, this->find_last_of('/'));
-
-    return prefix;
-}
 size_t FileName::getFileSize() const
 {
 	struct stat filestatus;
