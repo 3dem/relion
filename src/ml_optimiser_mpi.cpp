@@ -989,21 +989,21 @@ void MlOptimiserMpi::expectation()
 					if (random_subset == 1)
 					{
 						my_nr_ori_particles_done = nr_ori_particles_done_subset1;
-						long int particles_todo_set1 = ( (double) mydata.numberOfOriginalParticles(1) ) * ss_frac;
+						long int particles_todo_set1 = ( (double) mydata.numberOfOriginalParticles(1) );
 						// random_subset1 is stored in second half of OriginalParticles
 						JOB_FIRST = nr_ori_particles_done_subset1;
 						JOB_LAST  = XMIPP_MIN( particles_todo_set1 - 1, JOB_FIRST + nr_pool - 1);
 					}
 					else
 					{
-						long int particles_todo_set1 = ( (double) mydata.numberOfOriginalParticles(1) ) * ss_frac;
-						long int particles_todo      = ( (double) mydata.numberOfOriginalParticles( ) ) * ss_frac;
+						long int particles_todo_set1 = ( (double) mydata.numberOfOriginalParticles(1) );
+						long int particles_todo      = ( (double) mydata.numberOfOriginalParticles( ) );
 						my_nr_ori_particles_done = nr_ori_particles_done_subset2;
 						// random_subset2 is stored in second half of OriginalParticles
 						JOB_FIRST = particles_todo_set1 + nr_ori_particles_done_subset2;
 						JOB_LAST  = XMIPP_MIN( particles_todo - 1, JOB_FIRST + nr_pool - 1);
 					}
-					nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset))*ss_frac;
+					nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset));
 				}
 				else
 				{
@@ -1296,7 +1296,7 @@ void MlOptimiserMpi::expectation()
 	exp_metadata.clear();
 
 	if (verb > 0)
-		progress_bar(nr_particles_todo);
+		progress_bar((double)(mydata.numberOfOriginalParticles())*ss_frac);
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest
