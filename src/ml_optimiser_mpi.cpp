@@ -918,17 +918,20 @@ void MlOptimiserMpi::expectation()
 #endif // CUDA
 
 	/************************************************************************/
-
-
+	double ss_frac(1.0);
+	long int nr_particles_todo;
     if (node->isMaster())
     {
         try
         {
-			long int nr_particles_todo;
-			if(iter>subset_iter)
-				nr_particles_todo = mydata.numberOfOriginalParticles();
-			else
-				nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
+			if( iter<=subset_iter && !do_split_random_halves)
+			{
+				ss_frac = subset_frac;
+				if(random_seed!=0)
+					mydata.randomiseOriginalParticlesOrder(random_seed);
+			}
+
+			nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*ss_frac;
 
     		if (verb > 0)
     		{
@@ -986,33 +989,35 @@ void MlOptimiserMpi::expectation()
 					if (random_subset == 1)
 					{
 						my_nr_ori_particles_done = nr_ori_particles_done_subset1;
+						long int particles_todo_set1 = ( (double) mydata.numberOfOriginalParticles(1) ) * ss_frac;
 						// random_subset1 is stored in second half of OriginalParticles
 						JOB_FIRST = nr_ori_particles_done_subset1;
-						JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles(1) - 1, JOB_FIRST + nr_pool - 1);
+						JOB_LAST  = XMIPP_MIN( particles_todo_set1 - 1, JOB_FIRST + nr_pool - 1);
 					}
 					else
 					{
+						long int particles_todo_set1 = ( (double) mydata.numberOfOriginalParticles(1) ) * ss_frac;
+						long int particles_todo      = ( (double) mydata.numberOfOriginalParticles( ) ) * ss_frac;
 						my_nr_ori_particles_done = nr_ori_particles_done_subset2;
 						// random_subset2 is stored in second half of OriginalParticles
-						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_subset2;
-						JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, JOB_FIRST + nr_pool - 1);
+						JOB_FIRST = particles_todo_set1 + nr_ori_particles_done_subset2;
+						JOB_LAST  = XMIPP_MIN( particles_todo - 1, JOB_FIRST + nr_pool - 1);
 					}
-					if(iter>subset_iter)
-						nr_particles_todo = mydata.numberOfOriginalParticles(random_subset);
-					else
-						nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset))*subset_frac;
+					nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset))*ss_frac;
 				}
 				else
 				{
+					long int particles_todo  = ( (double) mydata.numberOfOriginalParticles( ) ) * ss_frac;
 					random_subset = 0;
 					my_nr_ori_particles_done = nr_ori_particles_done;
 					JOB_FIRST = nr_ori_particles_done;
-					JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, JOB_FIRST + nr_pool - 1);
+					JOB_LAST  = XMIPP_MIN(particles_todo - 1, JOB_FIRST + nr_pool - 1);
+					nr_particles_todo = particles_todo;
 				}
 
 				// Now send out a new job
 
-				if(nr_ori_particles_done < nr_particles_todo)
+				if(my_nr_ori_particles_done < nr_particles_todo)
 				{
 
 					MlOptimiser::getMetaAndImageDataSubset(JOB_FIRST, JOB_LAST, !do_parallel_disc_io);
@@ -1291,7 +1296,7 @@ void MlOptimiserMpi::expectation()
 	exp_metadata.clear();
 
 	if (verb > 0)
-		progress_bar(mydata.numberOfOriginalParticles());
+		progress_bar(nr_particles_todo);
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest

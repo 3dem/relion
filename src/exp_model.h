@@ -342,6 +342,9 @@ public:
 	// for separate refinement of random halves of the data
 	void divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
+	// Randomise the order of the original_particles
+	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false);
+
 	// calculate maximum number of images for a particle (possibly within a range of particles)
 	int maxNumberOfImagesPerOriginalParticle(long int first_particle_id = -1, long int last_particle_id = -1);
 
