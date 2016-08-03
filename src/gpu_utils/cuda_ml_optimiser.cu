@@ -356,13 +356,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 									XX(my_old_offset),
 									YY(my_old_offset));
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-
-//			d_img.cp_to_host();
-//			d_img.streamSync();
-//
-//			for (int i=0; i<img_size; i++)
-//				rec_img.data.data[i] = d_img[i];
-//			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
 		}
 
 		if (baseMLO->do_helical_refine)
@@ -389,16 +382,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		size_t current_size_y = baseMLO->mymodel.current_size;
 
 		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
-		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
-		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
-		cudaMLO->transformer1.reals.streamSync();
-		cudaMLO->transformer1.fouriers.streamSync();
+
+		//FIXME What is this?
+//		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
+//		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
+//		cudaMLO->transformer1.reals.streamSync();
+//		cudaMLO->transformer1.fouriers.streamSync();
 
 		d_img.cp_on_device(cudaMLO->transformer1.reals);
-//		for (int i = 0; i < img_aux.nzyxdim; i ++)
-//			cudaMLO->transformer1.reals[i] = (XFLOAT) img_aux.data[i];
-//
-//		cudaMLO->transformer1.reals.cp_to_device();
 
 		runCenterFFT(
 				cudaMLO->transformer1.reals,
@@ -585,55 +576,55 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTOC(cudaMLO->timer,"zeroMask");
 
 		CTIC(cudaMLO->timer,"setSize");
-		cudaMLO->transformer2.setSize(img().xdim,img().ydim,img().zdim);
-		deviceInitValue(cudaMLO->transformer2.reals, (XFLOAT)0.);
-		deviceInitComplexValue(cudaMLO->transformer2.fouriers, (XFLOAT)0.);
-		cudaMLO->transformer2.reals.streamSync();
-		cudaMLO->transformer2.fouriers.streamSync();
+		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
+//		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
+//		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
+//		cudaMLO->transformer1.reals.streamSync();
+//		cudaMLO->transformer1.fouriers.streamSync();
 		CTOC(cudaMLO->timer,"setSize");
 
 		CTIC(cudaMLO->timer,"transform");
 
-		d_img.cp_on_device(cudaMLO->transformer2.reals);
+		d_img.cp_on_device(cudaMLO->transformer1.reals);
 //		for (int i = 0; i < img().nzyxdim; i ++)
-//			cudaMLO->transformer2.reals[i] = (XFLOAT) img().data[i];
-//		cudaMLO->transformer2.reals.cp_to_device();
+//			cudaMLO->transformer1.reals[i] = (XFLOAT) img().data[i];
+//		cudaMLO->transformer1.reals.cp_to_device();
 
 		runCenterFFT(								// runs on input GlobalPtr.stream
-				cudaMLO->transformer2.reals,
-				(int)cudaMLO->transformer2.xSize,
-				(int)cudaMLO->transformer2.ySize,
+				cudaMLO->transformer1.reals,
+				(int)cudaMLO->transformer1.xSize,
+				(int)cudaMLO->transformer1.ySize,
 				false
 				);
 
-		cudaMLO->transformer2.reals.streamSync();
-		cudaMLO->transformer2.forward();
-		cudaMLO->transformer2.fouriers.streamSync();
+		cudaMLO->transformer1.reals.streamSync();
+		cudaMLO->transformer1.forward();
+		cudaMLO->transformer1.fouriers.streamSync();
 
-		int FMultiBsize2 = ( (int) ceilf(( float)cudaMLO->transformer2.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE,0,cudaMLO->transformer2.fouriers.getStream()>>>(
-						(XFLOAT*)~cudaMLO->transformer2.fouriers,
-						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer2.reals.getSize())),
-						cudaMLO->transformer2.fouriers.getSize()*2);
+		int FMultiBsize2 = ( (int) ceilf(( float)cudaMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
+		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
+						(XFLOAT*)~cudaMLO->transformer1.fouriers,
+						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
+						cudaMLO->transformer1.fouriers.getSize()*2);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 		CTOC(cudaMLO->timer,"transform");
 
-		cudaMLO->transformer2.fouriers.streamSync();
+		cudaMLO->transformer1.fouriers.streamSync();
 
 		bool powerClassOnGPU(true); //keep it like this until stable
 
 		if(!powerClassOnGPU)
 		{
 			CTIC(cudaMLO->timer,"cpResults");
-			cudaMLO->transformer2.fouriers.cp_to_host();
-			cudaMLO->transformer2.fouriers.streamSync();
+			cudaMLO->transformer1.fouriers.cp_to_host();
+			cudaMLO->transformer1.fouriers.streamSync();
 
 			Faux.initZeros(img().ydim, img().xdim/2+1);
 			for (int i = 0; i < Faux.nzyxdim; i ++)
 			{
-				Faux.data[i].real = (RFLOAT) cudaMLO->transformer2.fouriers[i].x;
-				Faux.data[i].imag = (RFLOAT) cudaMLO->transformer2.fouriers[i].y;
+				Faux.data[i].real = (RFLOAT) cudaMLO->transformer1.fouriers[i].x;
+				Faux.data[i].imag = (RFLOAT) cudaMLO->transformer1.fouriers[i].y;
 			}
 			CTOC(cudaMLO->timer,"cpResults");
 		}
@@ -673,14 +664,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				spectrumAndXi2.device_init(0);
 				spectrumAndXi2.streamSync();
 
-				dim3 gridSize = CEIL((float)(cudaMLO->transformer2.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
+				dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
 				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
-						~cudaMLO->transformer2.fouriers,
+						~cudaMLO->transformer1.fouriers,
 						~spectrumAndXi2,
-						cudaMLO->transformer2.fouriers.getSize(),
+						cudaMLO->transformer1.fouriers.getSize(),
 						spectrumAndXi2.getSize()-1,
-						cudaMLO->transformer2.xFSize,
-						cudaMLO->transformer2.yFSize,
+						cudaMLO->transformer1.xFSize,
+						cudaMLO->transformer1.yFSize,
 						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
 						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
@@ -705,15 +696,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// So resize the Fourier transforms
 		CTIC(cudaMLO->timer,"windowFourierTransform2");
 		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
-		cudaMLO->transformer2.fouriers.streamSync();
+		cudaMLO->transformer1.fouriers.streamSync();
 		windowFourierTransform2(
-				cudaMLO->transformer2.fouriers,
+				cudaMLO->transformer1.fouriers,
 				d_Fimg,
-				cudaMLO->transformer2.xFSize,cudaMLO->transformer2.yFSize, 1, //Input dimensions
+				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
 				current_size_x, current_size_y, 1,  //Output dimensions
 				1, 	//Npsi
 				0,	//pos
-				cudaMLO->transformer2.fouriers.getStream()
+				cudaMLO->transformer1.fouriers.getStream()
 				);
 		CTOC(cudaMLO->timer,"windowFourierTransform2");
 		// Also store its CTF
