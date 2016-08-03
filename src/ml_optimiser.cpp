@@ -324,7 +324,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maximum_significants", "", "0", true));
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
 
 	// Trial feature subset
@@ -569,7 +569,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maximum_significants", "", "0", true));
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
 
 	// Trial feature subset
