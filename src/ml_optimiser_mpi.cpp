@@ -927,8 +927,8 @@ void MlOptimiserMpi::expectation()
 			if( iter<=subset_iter && !do_split_random_halves)
 			{
 				ss_frac = subset_frac;
-				if(random_seed!=0)
-					mydata.randomiseOriginalParticlesOrder(random_seed);
+				//if(random_seed!=0)
+				//	mydata.randomiseOriginalParticlesOrder(random_seed);
 			}
 
 			nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*ss_frac;

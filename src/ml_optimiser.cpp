@@ -2029,15 +2029,15 @@ void MlOptimiser::expectation()
 	long int my_first_ori_particle, my_last_ori_particle;
 	long int nr_particles_todo;
 
-	if( iter>subset_iter)
+	if( iter<=subset_iter)
 	{
-		if(random_seed!=0)
-			mydata.randomiseOriginalParticlesOrder(random_seed);
-		nr_particles_todo = mydata.numberOfOriginalParticles();
+		//if(random_seed!=0)
+		//	mydata.randomiseOriginalParticlesOrder(random_seed);
+		nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
 	}
 	else
 	{
-		nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
+		nr_particles_todo = mydata.numberOfOriginalParticles();
 	}
 
 #ifdef DEBUG_EXP
