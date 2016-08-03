@@ -41,12 +41,13 @@
 #define MWCOL1 300
 #define MWCOL2 60
 #define MWCOL3 60
-#define MWCOL4 60
+#define MWCOL4 80
 #define MXCOL0 30
 #define MXCOL1 (MXCOL0 + MWCOL1 + 10)
 #define MXCOL2 (MXCOL1 + MWCOL2 + 10)
 #define MXCOL3 (MXCOL2 + MWCOL3 + 10)
-#define TOTALWIDTH (MWCOL1 + MWCOL2 + MWCOL3 + MWCOL4 + 100)
+#define MXCOL4 (MXCOL3 + MWCOL4 + 10)
+#define TOTALWIDTH (MWCOL1 + MWCOL2 + MWCOL3 + MWCOL4 + MWCOL4 + 100)
 #define TOTALHEIGHT 500
 
 // The button for picking particles
