@@ -30,7 +30,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_shiftCOM, do_stats, do_avg_ampl, do_average, do_remove_nan;
+    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_average, do_remove_nan;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan;
    	int verb;
 	// I/O Parser
@@ -85,6 +85,8 @@ class image_handler_parameters
 	    new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
 	    new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
 	    filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
+	    do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
+	    do_flipY = parser.checkOption("--flipY", "Flip (mirror) a 2D image or 3D map in the Y-direction?");
 	    do_flipZ = parser.checkOption("--flipZ", "Flip (mirror) a 3D map in the Z-direction?");
 	    do_shiftCOM = parser.checkOption("--shift_com", "Shift image(s) to their center-of-mass (only on positive pixel values)");
 	    shift_x = textToFloat(parser.getOption("--shift_x", "Shift images this many pixels in the X-direction", "0."));
@@ -296,7 +298,21 @@ class image_handler_parameters
 		if (highpass > 0.)
 			highPassFilterMap(Iout(), highpass, angpix, filter_edge_width);
 
-		if (do_flipZ)
+		if (do_flipX)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			{
+				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, i, XSIZE(Iin()) - 1 - j);
+			}
+		}
+		else if (do_flipY)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			{
+				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, YSIZE(Iin()) - 1 - i, j);
+			}
+		}
+		else if (do_flipZ)
 		{
 			if (ZSIZE(Iout()) < 2)
 				REPORT_ERROR("ERROR: this is not a 3D map, so cannot be flipped in Z");
