@@ -31,9 +31,10 @@ class reconstruct_parameters
 	public:
    	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug;
 	MetaDataTable DF;
-	int r_max, r_min_nn, blob_order, padding_factor, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
+	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y, helical_rise, helical_twist;
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, skip_gridding;
+	float padding_factor;
 	// I/O Parser
 	IOParser parser;
 
@@ -58,7 +59,7 @@ class reconstruct_parameters
 	    fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
        	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
        	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
-       	padding_factor = textToInteger(parser.getOption("--pad", "Padding factor", "2"));
+       	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
     	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to use for FFTs", "1"));
 
 	    int ctf_section = parser.addSection("CTF options");
