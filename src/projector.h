@@ -56,7 +56,7 @@ public:
     int interpolator;
 
     // Oversample FT by padding in real space
-    int padding_factor;
+    float padding_factor;
 
     // Dimension of the reference (currently allowed 2 or 3)
     int ref_dim;
@@ -87,7 +87,7 @@ public:
      * Projector PPref(ori_size, NEAREST_NEIGHBOUR);
      * @endcode
      */
-    Projector(int _ori_size, int _interpolator = TRILINEAR, int _padding_factor_3d = 2, int _r_min_nn = 10, int _data_dim = 2)
+    Projector(int _ori_size, int _interpolator = TRILINEAR, float _padding_factor_3d = 2., int _r_min_nn = 10, int _data_dim = 2)
     {
 
     	// Store original dimension
@@ -162,7 +162,8 @@ public:
     void clear()
     {
     	data.clear();
-    	r_max = r_min_nn = interpolator = padding_factor = ref_dim = data_dim = pad_size = 0;
+    	r_max = r_min_nn = interpolator = ref_dim = data_dim = pad_size = 0;
+    	padding_factor = 0.;
     }
 
     /*

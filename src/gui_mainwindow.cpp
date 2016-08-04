@@ -577,7 +577,6 @@ static void Timer_CB(void *userdata)
 	time_t now;
 	time (&now);
 
-
 	double dif = difftime (now, time_last_change);
     // If the GUI has been idle for too long, then exit
 	if (dif > o->exit_after_sec)
@@ -587,7 +586,7 @@ static void Timer_CB(void *userdata)
     }
 
 	// Update the stdout and stderr windows if we're currently pointing at a running job
-    if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
+	if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
     	o->fillStdOutAndErr();
 
     // Always check for job completion
@@ -2065,6 +2064,10 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			}
 		}
 
+		// Reset current_job
+		current_job = -1;
+		fillStdOutAndErr();
+
 		// Read new pipeline back in again
 		pipeline.read(DO_LOCK);
 
@@ -2466,9 +2469,6 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		else
 		{
 
-			// Read in existing pipeline, in case some other window had changed it
-			pipeline.read(DO_LOCK);
-
 			//remove spaces from any potential alias
 			for (int i = 0; i < alias.length(); i++)
 			{
@@ -2499,6 +2499,9 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 				is_done = true;
 		}
 	}
+
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read(DO_LOCK);
 
 	// Remove the original .Nodes entry
 	pipeline.deleteTemporaryNodeFiles(pipeline.processList[current_job]);
