@@ -2,60 +2,6 @@
 #include "src/gpu_utils/cuda_kernels/helper.cuh"
 #include "src/gpu_utils/cuda_settings.h"
 
-__global__ void cuda_kernel_exponentiate_weights_coarse(
-		XFLOAT *g_pdf_orientation,
-		XFLOAT *g_pdf_offset,
-		XFLOAT *g_Mweight,
-		XFLOAT avg_diff2,
-		XFLOAT min_diff2,
-		int nr_coarse_orient,
-		int nr_coarse_trans)
-{
-	// blockid
-	int bid  = blockIdx.x;
-	int cid  = blockIdx.y;
-	//threadid
-	int tid = threadIdx.x;
-
-	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
-
-	XFLOAT weight;
-	if(iorient<nr_coarse_orient)
-	{
-		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
-		{
-			pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
-			XFLOAT diff2 = g_Mweight[pos];
-			if( diff2 < min_diff2 ) //TODO Might be slow (divergent threads)
-				diff2 = (XFLOAT)0.0;
-			else
-			{
-				diff2 -= avg_diff2;
-				weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
-
-				// next line because of numerical precision of exp-function
-#if defined(CUDA_DOUBLE_PRECISION)
-				if (diff2 > 700.)
-					weight = 0.;
-				else
-					weight *= exp(-diff2);
-#else
-				if (diff2 > 88.)
-					weight = 0.;
-				else
-					weight *= expf(-diff2);
-#endif
-				diff2=weight;
-				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-			}
-
-			// Store the weight
-			g_Mweight[pos] = diff2; // TODO put in shared mem
-		}
-	}
-}
-
-
 /*
  * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.
  *

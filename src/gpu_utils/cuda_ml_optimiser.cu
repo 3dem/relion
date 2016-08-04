@@ -1332,7 +1332,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											MlOptimiserCuda *cudaMLO,
 											std::vector< IndexedDataArray> &PassWeights,
 											std::vector< std::vector< IndexedDataArrayMask > > &FPCMasks,
-											CudaGlobalPtr<XFLOAT> &Mweight) // FPCMasks = Fine-Pass Class-Masks
+											CudaGlobalPtr<XFLOAT> &Mweight, // FPCMasks = Fine-Pass Class-Masks
+											bool failsafeMode = false)
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1560,14 +1561,31 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
 				dim3 block_dim(block_num,sp.iclass_max-sp.iclass_min+1);
 
-				cuda_kernel_exponentiate_weights_coarse<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
-						~pdf_orientation,
-						~pdf_offset,
-						~ipartMweight,
-						local_norm,
-						(XFLOAT)op.min_diff2[ipart],
-						sp.nr_dir*sp.nr_psi,
-						sp.nr_trans);
+				if (failsafeMode) //Prevent zero prior products in fail-safe mode
+				{
+					cuda_kernel_exponentiate_weights_coarse<true>
+					<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
+							~pdf_orientation,
+							~pdf_offset,
+							~ipartMweight,
+							local_norm,
+							(XFLOAT)op.min_diff2[ipart],
+							sp.nr_dir*sp.nr_psi,
+							sp.nr_trans);
+				}
+				else
+				{
+
+					cuda_kernel_exponentiate_weights_coarse<false>
+					<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
+							~pdf_orientation,
+							~pdf_offset,
+							~ipartMweight,
+							local_norm,
+							(XFLOAT)op.min_diff2[ipart],
+							sp.nr_dir*sp.nr_psi,
+							sp.nr_trans);
+				}
 			}
 			else
 			{
@@ -1634,43 +1652,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					else
 						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
 		}
-		else if (exp_ipass!=0)
-		{
-			CTIC(cudaMLO->timer,"sort");
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-			size_t weightSize = PassWeights[ipart].weights.getSize();
-
-			CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
-			CudaGlobalPtr<XFLOAT> cumulative_sum(weightSize, cudaMLO->devBundle->allocator);
-
-			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
-
-			sorted.device_alloc();
-			cumulative_sum.device_alloc();
-
-			sortOnDevice(PassWeights[ipart].weights, sorted);
-			scanOnDevice(sorted, cumulative_sum);
-			CTOC(cudaMLO->timer,"sort");
-
-			if(baseMLO->adaptive_oversampling!=0)
-			{
-				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
-				size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
-				my_significant_weight = sorted.getDeviceAt(thresholdIdx);
-
-				CTIC(cudaMLO->timer,"getArgMaxOnDevice");
-				std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
-				CTOC(cudaMLO->timer,"getArgMaxOnDevice");
-				op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
-				op.max_weight[ipart] = max_pair.second;
-			}
-			else
-			{
-				my_significant_weight = sorted.getDeviceAt(0);
-			}
-
-		}
-		else
+		else if (exp_ipass == 0) //Coarse pass
 		{
 			CTIC(cudaMLO->timer,"sort");
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -1690,16 +1672,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
 			if (filteredSize == 0)
 			{
-				std::cerr << std::endl;
-				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
-				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
+				if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
+				{
+					std::cerr << std::endl;
+					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+					std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-				pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
-				pdf_offset.dump_device_to_file("error_dump_pdf_offset");
-				unsorted_ipart.dump_device_to_file("error_dump_filtered");
+					pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
+					pdf_offset.dump_device_to_file("error_dump_pdf_offset");
+					unsorted_ipart.dump_device_to_file("error_dump_filtered");
 
-				std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
+					std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
+				}
 
 				REPORT_ERROR("filteredSize == 0");
 			}
@@ -1723,19 +1708,22 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if (my_nr_significant_coarse_samples == 0)
 			{
-				std::cerr << std::endl;
-				std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
-				std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-				std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
-				std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
-				std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
+				if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
+				{
+					std::cerr << std::endl;
+					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+					std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
+					std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+					std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-				unsorted_ipart.dump_device_to_file("error_dump_unsorted");
-				filtered.dump_device_to_file("error_dump_filtered");
-				sorted.dump_device_to_file("error_dump_sorted");
-				cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
+					unsorted_ipart.dump_device_to_file("error_dump_unsorted");
+					filtered.dump_device_to_file("error_dump_filtered");
+					sorted.dump_device_to_file("error_dump_sorted");
+					cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
 
-				std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
+					std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
+				}
 
 				REPORT_ERROR("my_nr_significant_coarse_samples == 0");
 			}
@@ -1770,7 +1758,58 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, (XFLOAT) my_significant_weight);
 			Mcoarse_significant.cp_to_host();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		}
+		else //Fine pass
+		{
+			CTIC(cudaMLO->timer,"sort");
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+			size_t weightSize = PassWeights[ipart].weights.getSize();
 
+			CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
+			CudaGlobalPtr<XFLOAT> cumulative_sum(weightSize, cudaMLO->devBundle->allocator);
+
+			CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
+
+			sorted.device_alloc();
+			cumulative_sum.device_alloc();
+
+			sortOnDevice(PassWeights[ipart].weights, sorted);
+			scanOnDevice(sorted, cumulative_sum);
+			CTOC(cudaMLO->timer,"sort");
+
+			if(baseMLO->adaptive_oversampling!=0)
+			{
+				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
+
+				if (op.sum_weight[ipart]==0)
+				{
+					std::cerr << std::endl;
+					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " part_id= " << part_id << std::endl;
+					std::cerr << " ipart= " << ipart << std::endl;
+					std::cerr << " op.min_diff2[ipart]= " << op.min_diff2[ipart] << std::endl;
+					int group_id = baseMLO->mydata.getGroupId(part_id);
+					std::cerr << " group_id= " << group_id << std::endl;
+					std::cerr << " ml_model.scale_correction[group_id]= " << baseMLO->mymodel.scale_correction[group_id] << std::endl;
+					std::cerr << " exp_significant_weight[ipart]= " << op.significant_weight[ipart] << std::endl;
+					std::cerr << " exp_max_weight[ipart]= " << op.max_weight[ipart] << std::endl;
+					std::cerr << " ml_model.sigma2_noise[group_id]= " << baseMLO->mymodel.sigma2_noise[group_id] << std::endl;
+					REPORT_ERROR("op.sum_weight[ipart]==0");
+				}
+
+				size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
+				my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+
+				CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+				std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
+				CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+				op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
+				op.max_weight[ipart] = max_pair.second;
+			}
+			else
+			{
+				my_significant_weight = sorted.getDeviceAt(0);
+			}
 		}
 
 		op.significant_weight.clear();
@@ -2597,22 +2636,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			if (ires > 0)
 				logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], ires));
 		}
-		if (op.sum_weight[ipart]==0)
-		{
-			std::cerr << std::endl;
-			std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
-			std::cerr << " part_id= " << part_id << std::endl;
-			std::cerr << " ipart= " << ipart << std::endl;
-			std::cerr << " op.min_diff2[ipart]= " << op.min_diff2[ipart] << std::endl;
-			std::cerr << " logsigma2= " << logsigma2 << std::endl;
-			int group_id = baseMLO->mydata.getGroupId(part_id);
-			std::cerr << " group_id= " << group_id << std::endl;
-			std::cerr << " ml_model.scale_correction[group_id]= " << baseMLO->mymodel.scale_correction[group_id] << std::endl;
-			std::cerr << " exp_significant_weight[ipart]= " << op.significant_weight[ipart] << std::endl;
-			std::cerr << " exp_max_weight[ipart]= " << op.max_weight[ipart] << std::endl;
-			std::cerr << " ml_model.sigma2_noise[group_id]= " << baseMLO->mymodel.sigma2_noise[group_id] << std::endl;
-			REPORT_ERROR("ERROR: op.sum_weight[ipart]==0");
-		}
 		RFLOAT dLL;
 
 		XFLOAT local_norm = (XFLOAT)op.avg_diff2[ipart];
@@ -2832,6 +2855,8 @@ void MlOptimiserCuda::resetData()
 
 	transformer1.clear();
 	transformer2.clear();
+
+	failsafe_attempts = 0;
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
@@ -3013,13 +3038,27 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					deviceInitValue<XFLOAT>(Mweight, -999.);
 					Mweight.streamSync();
 
-					CTIC(timer,"getAllSquaredDifferencesCoarse");
-					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
-					CTOC(timer,"getAllSquaredDifferencesCoarse");
+					try
+					{
+						CTIC(timer,"getAllSquaredDifferencesCoarse");
+						getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
+						CTOC(timer,"getAllSquaredDifferencesCoarse");
 
-					CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
-					CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+						CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+						convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
+						CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+					}
+					catch (RelionError XE)
+					{
+						if (failsafe_attempts > 40)
+							REPORT_ERROR("Too many fail-safe attempts in one iteration");
+
+						//Rerun in fail-safe mode
+						getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
+						convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight, true);
+						std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
+						failsafe_attempts ++;
+					}
 				}
 				else
 				{
