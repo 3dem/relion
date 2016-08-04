@@ -2469,9 +2469,6 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		else
 		{
 
-			// Read in existing pipeline, in case some other window had changed it
-			pipeline.read(DO_LOCK);
-
 			//remove spaces from any potential alias
 			for (int i = 0; i < alias.length(); i++)
 			{
@@ -2502,6 +2499,9 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 				is_done = true;
 		}
 	}
+
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read(DO_LOCK);
 
 	// Remove the original .Nodes entry
 	pipeline.deleteTemporaryNodeFiles(pipeline.processList[current_job]);
