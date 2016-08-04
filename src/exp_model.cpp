@@ -409,6 +409,74 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 
 }
 
+void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves)
+{
+	//This static flag is for only randomize once
+	static bool randomised = false;
+	if (!randomised)
+	{
+
+		srand(seed);
+		std::vector<ExpOriginalParticle> new_ori_particles;
+
+		if (do_split_random_halves)
+		{
+			std::vector<long int> ori_particle_list1, ori_particle_list2;
+			ori_particle_list1.clear();
+			ori_particle_list2.clear();
+			// Fill the two particle lists
+			for (long int i = 0; i < ori_particles.size(); i++)
+			{
+				int random_subset = ori_particles[i].random_subset;
+				if (random_subset == 1)
+					ori_particle_list1.push_back(i);
+				else if (random_subset == 2)
+					ori_particle_list2.push_back(i);
+				else
+					REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
+			}
+
+			// Just a silly check for the sizes of the ori_particle_lists (to be sure)
+			if (ori_particle_list1.size() != nr_ori_particles_subset1)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid ori_particle_list1 size:" + integerToString(ori_particle_list1.size()) + " != " + integerToString(nr_ori_particles_subset1));
+			if (ori_particle_list2.size() != nr_ori_particles_subset2)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid ori_particle_list2 size:" + integerToString(ori_particle_list2.size()) + " != " + integerToString(nr_ori_particles_subset2));
+
+			// Randomise the two particle lists
+			std::random_shuffle(ori_particle_list1.begin(), ori_particle_list1.end());
+			std::random_shuffle(ori_particle_list2.begin(), ori_particle_list2.end());
+
+			// First fill new_ori_particles with the first subset, then with the second
+			for (long int i = 0; i < ori_particle_list1.size(); i++)
+				new_ori_particles.push_back(ori_particles[ori_particle_list1[i]]);
+			for (long int i = 0; i < ori_particle_list2.size(); i++)
+				new_ori_particles.push_back(ori_particles[ori_particle_list2[i]]);
+
+		}
+		else
+		{
+
+			// First fill in order
+			std::vector<long int> ori_particle_list;
+			ori_particle_list.resize(ori_particles.size());
+			for (long int i = 0; i < ori_particle_list.size(); i++)
+				ori_particle_list[i] = i;
+
+			// Randomise
+			std::random_shuffle(ori_particle_list.begin(), ori_particle_list.end());
+
+			// Refill new_ori_particles
+			for (long int i = 0; i < ori_particle_list.size(); i++)
+				new_ori_particles.push_back(ori_particles[ori_particle_list[i]]);
+		}
+
+		ori_particles=new_ori_particles;
+		randomised = true;
+
+	}
+}
+
+
 void Experiment::orderParticlesInOriginalParticles()
 {
 	// If the orders are negative (-1) then dont sort anything
