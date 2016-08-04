@@ -548,7 +548,7 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own noise spectrum, and intensity-scale correction)");
         EMDL::addLabel(EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION, EMDL_DOUBLE, "rlnSpectralOrientabilityContribution", "Spectral SNR contribution to the orientability of individual particles");
         EMDL::addLabel(EMDL_MLMODEL_ORIGINAL_SIZE, EMDL_INT, "rlnOriginalImageSize", "Original size of the images (in pixels)");
-        EMDL::addLabel(EMDL_MLMODEL_PADDING_FACTOR, EMDL_INT, "rlnPaddingFactor", "Oversampling factor for Fourier transforms of the references");
+        EMDL::addLabel(EMDL_MLMODEL_PADDING_FACTOR, EMDL_DOUBLE, "rlnPaddingFactor", "Oversampling factor for Fourier transforms of the references");
         EMDL::addLabel(EMDL_MLMODEL_PDF_CLASS, EMDL_DOUBLE, "rlnClassDistribution", "Probability Density Function of the different classes (i.e. fraction of images assigned to each class)");
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_OFFX_CLASS, EMDL_DOUBLE, "rlnClassPriorOffsetX", "Prior in the X-offset for a class (in pixels)");
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_OFFY_CLASS, EMDL_DOUBLE, "rlnClassPriorOffsetY", "Prior in the Y-offset for a class (in pixels)");

@@ -570,8 +570,8 @@ void BackProjector::getLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 		int lowres_r_max)
 {
 
-	int lowres_r2_max = padding_factor * padding_factor * lowres_r_max * lowres_r_max;
-	int lowres_pad_size = 2 * (padding_factor * lowres_r_max + 1) + 1;
+	int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
+	int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
 
 	// Check lowres_r_max is not too big
 	if (lowres_r_max > r_max)
@@ -611,8 +611,8 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 		int lowres_r_max)
 {
 
-	int lowres_r2_max = padding_factor * padding_factor * lowres_r_max * lowres_r_max;
-	int lowres_pad_size = 2 * (padding_factor * lowres_r_max + 1) + 1;
+	int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
+	int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
 
 	// Check lowres_r_max is not too big
 	if (lowres_r_max > r_max)
@@ -770,7 +770,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Fnewweight can become too large for a float: always keep this one in double-precision
 	MultidimArray<double> Fnewweight;
 	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
-	int max_r2 = r_max * r_max * padding_factor * padding_factor;
+	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
@@ -943,7 +943,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		Fconv.initZeros(); // to remove any stuff from the input volume
 		decenter(data, Fconv, max_r2);
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(data)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 		{
 			if (DIRECT_MULTIDIM_ELEM(Fweight, n) > 0.)
 				DIRECT_MULTIDIM_ELEM(Fconv, n) /= DIRECT_MULTIDIM_ELEM(Fweight, n);
@@ -1230,7 +1230,7 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 	if ( (nr_helical_asu < 2) || (ref_dim != 3) )
 		return;
 
-	int rmax2 = r_max * r_max * padding_factor * padding_factor;//TODO
+	int rmax2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 	Matrix2D<RFLOAT> R(4, 4); // A matrix from the list
 	MultidimArray<RFLOAT> sum_weight;
@@ -1396,7 +1396,7 @@ void BackProjector::applyPointGroupSymmetry()
 	std::cerr << " SL.true_symNo= " << SL.true_symNo << std::endl;
 #endif
 
-	int rmax2 = r_max * r_max * padding_factor * padding_factor;//TODO
+	int rmax2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	if (SL.SymsNo() > 0 && ref_dim == 3)
 	{
 		Matrix2D<RFLOAT> L(4, 4), R(4, 4); // A matrix from the list
@@ -1596,7 +1596,10 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	MultidimArray<Complex>& Fin = transformer.getFourierReference();
 
 	MultidimArray<Complex > Ftmp;
-	int padoridim = padding_factor * ori_size;
+	// Size of padded real-space volume
+	int padoridim = ROUND(padding_factor * ori_size);
+	// make sure padoridim is even
+	padoridim += padoridim%2;
 	RFLOAT normfft;
 
 //#define DEBUG_WINDOWORIDIMREALSPACE

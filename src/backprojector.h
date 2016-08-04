@@ -70,7 +70,7 @@ public:
 	 * @endcode
 	 */
 	BackProjector(int _ori_size, int _ref_dim, FileName fn_sym,
-			      int _interpolator = TRILINEAR, int _padding_factor_3d = 2, int _r_min_nn = 10,
+			      int _interpolator = TRILINEAR, float _padding_factor_3d = 2, int _r_min_nn = 10,
 			      int _blob_order = 0, RFLOAT _blob_radius = 1.9, RFLOAT _blob_alpha = 15, int _data_dim = 2, bool _skip_gridding = false)
 	{
     	// Store original dimension
