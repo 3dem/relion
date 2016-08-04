@@ -477,6 +477,8 @@ public:
 
 	int device_id;
 
+	unsigned failsafe_attempts;
+
 	MlDeviceBundle *devBundle;
 
 #ifdef TIMING_FILES
@@ -493,7 +495,8 @@ public:
 #ifdef TIMING_FILES
 			timer(timing_fnm),
 #endif
-			errorStatus((cudaError_t)0)
+			errorStatus((cudaError_t)0),
+			failsafe_attempts(0)
 	{};
 
 	void resetData();
