@@ -63,7 +63,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	int imic = *iptr;
 
 	// Update the count of the last one we picked...
-	if (last_pick_viewed > 0 && last_pick_viewed < count_displays.size())
+	if (last_pick_viewed >= 0 && last_pick_viewed < count_displays.size())
 	{
 		MetaDataTable MDcoord;
 
