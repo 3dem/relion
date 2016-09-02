@@ -377,6 +377,9 @@ public:
 	// Starfile with the movie-frames
 	FileName fn_data_movie;
 
+	// Movie identifier string
+	FileName movie_identifier;
+
 	// How many individual frames contribute to the priors?
 	int nr_frames_per_prior;
 
