@@ -581,7 +581,7 @@ static void Timer_CB(void *userdata)
     // If the GUI has been idle for too long, then exit
 	if (dif > o->exit_after_sec)
     {
-		std::cout << " The GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
+		std::cout << " The relion GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
 		exit(0);
     }
 

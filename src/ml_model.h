@@ -332,7 +332,7 @@ public:
 
 	// The group numbering in mydata may be different from the one in this model.
 	// Readjust all group_ids in the Experiment based on their group names
-	void reassignGroupsForMovies(Experiment &mydata);
+	void reassignGroupsForMovies(Experiment &mydata, std::string &movie_name);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 

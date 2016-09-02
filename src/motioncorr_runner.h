@@ -50,10 +50,13 @@ public:
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
 	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;
 
-	// Binning factor for binning inside MOTIONCORR
-	int bin_factor;
+	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
+	double bin_factor;
 
-	// B-factor for MOTIONCORR
+	// MOTIONCORR executable
+	FileName fn_motioncorr_exe;
+
+	// B-factor for MOTIONCORR/MOTIONCOR2
 	double bfactor;
 
 	// Also save the aligned movies?
@@ -62,10 +65,28 @@ public:
 	// Additional arguments that need to be passed to MOTIONCORR
 	FileName fn_other_motioncorr_args;
 
-	// MOTIONCORR executable
-	FileName fn_motioncorr_exe;
+	// Use MOTIONCOR2 instead of MOTIONCORR?
+	bool do_motioncor2;
 
-	// Use Unblut/summovie instead of MOTIONCORR?
+	// MOTIONCOR2 executable
+	FileName fn_motioncor2_exe;
+
+	// Voltage and dose per frame for MOTIONCOR2/UNBLUR dose-weighting
+	bool do_dose_weighting;
+	double voltage;
+	double dose_per_frame;
+	double pre_exposure;
+
+	// Gain reference file
+	FileName fn_gain_reference;
+
+	// Number of patches in X, Y direction for MOTIONCOR2
+	int patch_x, patch_y;
+
+	// How many frames to group in MOTIONCOR2
+	int group;
+
+	// Use Unblur/summovie instead of MOTIONCORR?
 	bool do_unblur;
 
 	// UNBLUR, SUMMOVIE executable
@@ -107,8 +128,14 @@ public:
 	// Execute MOTIONCORR for a single micrograph
     void executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
 
-	// Get the shifts from MOTIONCORR
+    // Get the shifts from MOTIONCORR
     void getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
+
+    // Execute MOTIONCOR2 for a single micrograph
+    void executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
+
+    // Get the shifts from MOTIONCOR2
+    void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute UNBLUR for a single micrograph
     void executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);

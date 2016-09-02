@@ -154,6 +154,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fn_data_movie = parser.getOption("--realign_movie_frames", "Input STAR file with the movie frames", "");
 
 	do_movies_in_batches = parser.checkOption("--process_movies_in_batches", "Perform movie-processing one micrograph at a time (this reduces RAM costs for large data sets)");
+	movie_identifier = parser.getOption("--movie_name", "Identified string for all movie files, e.g. (_movie.mrcs)", "movie");
 
 	// TODO: add this to EMDL_OPTIMISER and read/write of optimiser.star
 	nr_frames_per_prior = textToInteger(parser.getOption("--nr_frames_prior", "Number of movie frames to calculate running-average priors", "5"));
@@ -1235,7 +1236,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mydata.read(fn_data_movie, false, false, do_preread_images);
 
 		// The group numbering might be different: re-assign groups based on group_names
-		mymodel.reassignGroupsForMovies(mydata);
+		mymodel.reassignGroupsForMovies(mydata, movie_identifier);
 
 		// Re-normalise the power spectra of the noise, as running averages of movie frames will have more noise than the average micrographs!
 		int nframes;

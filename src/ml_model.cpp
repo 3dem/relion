@@ -664,17 +664,18 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 
 }
 
-void MlModel::reassignGroupsForMovies(Experiment &mydata)
+void MlModel::reassignGroupsForMovies(Experiment &mydata, std::string &movie_name)
 {
 
 	std::vector<long int> rename_ids(mydata.groups.size());
 	for (long int igr = 0; igr < mydata.groups.size(); igr++)
 	{
-		FileName data_name = mydata.groups[igr].name;
+		FileName data_name = (mydata.groups[igr].name);
+		data_name = data_name.beforeLastOf("_"+movie_name);
 		long int rename_id = -1;
 		for (long int id = 0; id < group_names.size(); id++)
 		{
-			if (data_name.contains(group_names[id].withoutExtension()))
+			if (data_name == group_names[id].withoutExtension())
 			{
 				rename_id = id;
 				break;
