@@ -2875,6 +2875,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
+	highres_limit.deactivate(is_continue);
 	do_ctf_correction.deactivate(is_continue);
 	ctf_phase_flipped.deactivate(is_continue);
 	ctf_intact_first_peak.deactivate(is_continue);
@@ -3508,6 +3509,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	//Optimisation
 	do_zero_mask.deactivate(is_continue);
+	highres_limit.deactivate(is_continue);
 
 	// Helix
 	do_helix.deactivate(is_continue);
