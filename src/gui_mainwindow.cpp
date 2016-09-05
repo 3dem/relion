@@ -1812,6 +1812,8 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (!jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DO_MKDIR))
 	{
 		std::cout << " Cancelling job" << std::endl;
+		// Repeat write-out to delete .lock file
+		pipeline.write(DO_LOCK);
 		return;
 	}
 
