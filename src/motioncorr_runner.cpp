@@ -355,24 +355,28 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 		fh.close();
 
 		if (system(command.c_str()))
+		{
 			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-
-		// After motion-correction, check for all-zero average micrographs
-		if (exists(fn_avg))
-		{
-			Image<RFLOAT> Itest;
-			Itest.read(fn_avg, false);
-			RFLOAT avg, stddev;
-			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
-			if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
-			{
-				break;
-			}
 		}
-		else if (ipass == 2)
+		else
 		{
-			std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+			// After motion-correction, check for all-zero average micrographs
+			if (exists(fn_avg))
+			{
+				Image<RFLOAT> Itest;
+				Itest.read(fn_avg, false);
+				RFLOAT avg, stddev;
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+				if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+				{
+					break;
+				}
+			}
+			else if (ipass == 2)
+			{
+				std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+			}
 		}
 	}
 
@@ -448,69 +452,97 @@ void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	FileName fn_err = fn_avg.withoutExtension() + ".err";
 	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
-	std::string command = fn_motioncorr_exe + " ";
-
-	if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
-		command += " -InTiff " + fn_mic;
-	else
-		command += " -InMrc " + fn_mic;
-
-	command += " -OutMrc " + fn_avg;
-
-	if (do_save_movies)
-		command += " -OutStack 1";
-
-	command += " -Patch " + integerToString(patch_x) + " " + integerToString(patch_y);
-
-	if (fn_gain_reference != "")
-		command += " -Gain " + fn_gain_reference;
-
-	// Throw away first few frames
-	if (first_frame_ali > 1)
-		command += " -Throw " + integerToString(first_frame_ali - 1);
-	// TODO: throw away last few frames
-
-	if (bin_factor > 1)
-		command += " -FtBin " + floatToString(bin_factor);
-
-	if (do_dose_weighting)
+	for (int ipass = 0; ipass < 3; ipass++)
 	{
-		command += " -Kv " + floatToString(voltage);
-		command += " -FmDose " + floatToString(dose_per_frame);
-		command += " -PixSize " + floatToString(dose_per_frame);
-	}
 
-	if (fn_other_motioncorr_args.length() > 0)
-		command += " " + fn_other_motioncorr_args;
+		std::string command = fn_motioncorr_exe + " ";
 
-	if ( allThreadIDs.size() == 0)
-	{
-		// Automated mapping
-		command += " -Gpu " + integerToString(rank % devCount);
-	}
-	else
-	{
-		if (rank >= allThreadIDs.size())
-			REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
-		command += " -Gpu " + allThreadIDs[rank][0];
-	}
+		if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
+			command += " -InTiff " + fn_mic;
+		else
+			command += " -InMrc " + fn_mic;
 
-	command += " >> " + fn_out + " 2>> " + fn_err;
+		command += " -OutMrc " + fn_avg;
 
-	// Save the command that was executed
-	std::ofstream fh;
-	fh.open(fn_cmd.c_str(), std::ios::out);
-	fh << command << std::endl;
+		if (do_save_movies)
+			command += " -OutStack 1";
 
-	if (system(command.c_str()))
-		std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+		command += " -Patch " + integerToString(patch_x) + " " + integerToString(patch_y);
+
+		if (fn_gain_reference != "")
+			command += " -Gain " + fn_gain_reference;
+
+		// Throw away first few frames
+		if (first_frame_ali > 1)
+			command += " -Throw " + integerToString(first_frame_ali - 1);
+		// TODO: throw away last few frames
+
+		if (bin_factor > 1)
+			command += " -FtBin " + floatToString(bin_factor);
+
+		if (do_dose_weighting)
+		{
+			command += " -Kv " + floatToString(voltage);
+			command += " -FmDose " + floatToString(dose_per_frame);
+			command += " -PixSize " + floatToString(dose_per_frame);
+		}
+
+		if (fn_other_motioncorr_args.length() > 0)
+			command += " " + fn_other_motioncorr_args;
+
+		if ( allThreadIDs.size() == 0)
+		{
+			// Automated mapping
+			command += " -Gpu " + integerToString(rank % devCount);
+		}
+		else
+		{
+			if (rank >= allThreadIDs.size())
+				REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
+			command += " -Gpu " + allThreadIDs[rank][0];
+		}
+
+		command += " >> " + fn_out + " 2>> " + fn_err;
+
+		// Save the command that was executed
+		std::ofstream fh;
+		fh.open(fn_cmd.c_str(), std::ios::out);
+		fh << command << std::endl;
+		fh.close();
+
+		if (system(command.c_str()))
+		{
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+		}
+		else
+		{
+			// After motion-correction, check for all-zero average micrographs
+			FileName fn_test = (do_dose_weighting) ? fn_avg.withoutExtension() + "_DW.mrc " : fn_avg;
+			if (exists(fn_test))
+			{
+				Image<RFLOAT> Itest;
+				Itest.read(fn_test, false);
+				RFLOAT avg, stddev;
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+				if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+				{
+					break;
+				}
+			}
+			else if (ipass == 2)
+			{
+				std::cerr << " WARNING: " << fn_test << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+			}
+		}
+
+	} // end loop ipass
 
 	if (do_dose_weighting)
 	{
 		command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
 		if (system(command.c_str()))
 			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-		fh << command << std::endl;
 	}
 
 	if (do_save_movies)
@@ -518,9 +550,7 @@ void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
 		if (system(command.c_str()))
 			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-		fh << command << std::endl;
 	}
-	fh.close();
 
 	// Also analyse the shifts
 	getShiftsMotioncor2(fn_out, xshifts, yshifts);
