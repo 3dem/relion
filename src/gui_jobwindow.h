@@ -321,6 +321,9 @@ public:
 
 	InputNodeEntry fn_input_autopick;
 	InputNodeEntry fn_refs_autopick;
+	BooleanEntry do_gauss_ref;
+	SliderEntry gauss_max;
+
 	BooleanEntry do_invert_refs;
 	BooleanEntry do_ctf_autopick;
 	BooleanEntry do_ignore_first_ctfpeak_autopick;
@@ -344,7 +347,7 @@ public:
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
 
-	Fl_Group *autopick_ctf_group, *autopick_helix_group, *gpu_group;
+	Fl_Group *autopick_ctf_group, *gauss_group, *autopick_helix_group, *gpu_group;
 
 public:
 
