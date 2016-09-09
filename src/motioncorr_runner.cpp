@@ -540,14 +540,14 @@ void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 
 	if (do_dose_weighting)
 	{
-		command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
+		std::string command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
 		if (system(command.c_str()))
 			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
 	}
 
 	if (do_save_movies)
 	{
-		command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
+		std::string command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
 		if (system(command.c_str()))
 			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
 	}
