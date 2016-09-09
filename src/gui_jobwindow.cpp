@@ -990,7 +990,6 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	group_frames.deactivate(is_continue);
 	bin_factor.deactivate(is_continue);
 	bfactor.deactivate(is_continue);
-	gpu_ids.deactivate(is_continue);
 	other_motioncorr_args.deactivate(is_continue);
 
 	do_unblur.deactivate(is_continue);
