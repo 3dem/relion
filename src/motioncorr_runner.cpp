@@ -452,7 +452,6 @@ void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	FileName fn_err = fn_avg.withoutExtension() + ".err";
 	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
-	bool is_ok = false;
 	for (int ipass = 0; ipass < 3; ipass++)
 	{
 
@@ -528,38 +527,33 @@ void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
 				if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
 				{
-					is_ok = true;
 					break;
 				}
 			}
 			else if (ipass == 2)
 			{
-				is_ok = false;
 				std::cerr << " WARNING: " << fn_test << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
 			}
 		}
 
 	} // end loop ipass
 
-	if (is_ok)
+	if (do_dose_weighting)
 	{
-		if (do_dose_weighting)
-		{
-			std::string command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
-			if (system(command.c_str()))
-				std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-		}
-
-		if (do_save_movies)
-		{
-			std::string command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
-			if (system(command.c_str()))
-				std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-		}
-
-		// Also analyse the shifts
-		getShiftsMotioncor2(fn_out, xshifts, yshifts);
+		command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
+		if (system(command.c_str()))
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
 	}
+
+	if (do_save_movies)
+	{
+		command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
+		if (system(command.c_str()))
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+	}
+
+	// Also analyse the shifts
+	getShiftsMotioncor2(fn_out, xshifts, yshifts);
 
 }
 
