@@ -35,11 +35,13 @@ int main(int argc, char *argv[])
 	{
 		// Fill the window, but don't show it!
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
-		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, "", fn_pipe);
+		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, "", fn_pipe, 0, INT_MAX);
 
+		FileName fn_sched = getParameter(argc, argv, "--schedule");
 		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "1"));
 		long int minutes_wait =  textToInteger(getParameter(argc, argv, "--min_wait", "10"));
-		window.runScheduledJobs(nr_repeat, minutes_wait);
+		FileName fn_jobids  = getParameter(argc, argv, "--jobids", "");
+		window.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait);
 
 	}
 

@@ -130,7 +130,7 @@ public:
 	bool fix_tau;
 
     // some parameters for debugging
-	RFLOAT debug1, debug2;
+	RFLOAT debug1, debug2, debug3;
 
 	// Starting and finishing particles (for parallelisation)
     long int my_first_ori_particle_id, my_last_ori_particle_id;
@@ -377,6 +377,9 @@ public:
 	// Starfile with the movie-frames
 	FileName fn_data_movie;
 
+	// Movie identifier string
+	FileName movie_identifier;
+
 	// How many individual frames contribute to the priors?
 	int nr_frames_per_prior;
 
@@ -410,6 +413,13 @@ public:
 	RFLOAT helical_sigma_distance;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
+
+	// Number of iterations for data subset and subset fraction of data
+	int   subset_iter;
+	float subset_frac;
+
+	// Skip gridding in reconstruction
+	bool skip_gridding;
 
 	// Number of iterations for gridding preweighting reconstruction
 	int gridding_nr_iter;
@@ -477,6 +487,12 @@ public:
 	//TMP DEBUGGING
 	MultidimArray<RFLOAT> DEBUGGING_COPY_exp_Mweight;
 
+	//Use different padding factors for the projector (PF+0) and backprojector (PF+1)
+	bool asymmetric_padding;
+
+	//Maximum number of significant weights in coarse pass of expectation
+	unsigned maximum_significants;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -515,6 +531,8 @@ public:
 		has_converged(0),
 		only_flip_phases(0),
 		gridding_nr_iter(0),
+		subset_iter(0),
+		subset_frac(1),
 		do_use_reconstruct_images(0),
 		fix_sigma_noise(0),
 		current_changes_optimal_offsets(0),
@@ -590,7 +608,9 @@ public:
 		helical_tube_inner_diameter(0),
 		helical_tube_outer_diameter(0),
 		do_helical_symmetry_local_refinement(0),
-		helical_sigma_distance(0)
+		helical_sigma_distance(0),
+		asymmetric_padding(false),
+		maximum_significants(0)
 	{};
 
 	/** ========================== I/O operations  =========================== */

@@ -29,6 +29,7 @@ std::vector<Fl_Button*> viewmic_buttons;
 std::vector<Fl_Button*> viewctf_buttons;
 std::vector<Fl_Text_Display*> text_displays;
 std::vector<Fl_Text_Display*> count_displays;
+std::vector<Fl_Text_Display*> defocus_displays;
 std::vector<Fl_Check_Button*> check_buttons;
 int last_pick_viewed;
 int last_ctf_viewed;
@@ -62,7 +63,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	int imic = *iptr;
 
 	// Update the count of the last one we picked...
-	if (last_pick_viewed > 0 && last_pick_viewed < count_displays.size())
+	if (last_pick_viewed >= 0 && last_pick_viewed < count_displays.size())
 	{
 		MetaDataTable MDcoord;
 
@@ -180,7 +181,11 @@ void cb_selectmic(Fl_Widget* w, void* data)
 		count_displays[imic]->buffer(textbuff2);
 		count_displays[imic]->activate();
 		if (global_has_ctf)
+		{
 			viewctf_buttons[imic]->activate();
+			defocus_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+			defocus_displays[imic]->activate();
+		}
 	}
 	else
 	{
@@ -192,7 +197,11 @@ void cb_selectmic(Fl_Widget* w, void* data)
 		count_displays[imic]->buffer(textbuff2);
 		count_displays[imic]->deactivate();
 		if (global_has_ctf)
+		{
 			viewctf_buttons[imic]->deactivate();
+			defocus_displays[imic]->color(GUI_BACKGROUND_COLOR, GUI_BACKGROUND_COLOR);
+			defocus_displays[imic]->deactivate();
+		}
 	}
 
 }
@@ -288,6 +297,20 @@ int manualpickerGuiWindow::fill()
 			myviewctf->color(GUI_BUTTON_COLOR);
 			myviewctf->callback(cb_viewctf, &(imics[imic]));
 			viewctf_buttons.push_back(myviewctf);
+
+			Fl_Text_Buffer *textbuffDF = new Fl_Text_Buffer();
+			RFLOAT defocus;
+			MDin.getValue(EMDL_CTF_DEFOCUSU, defocus);
+
+			std::ostringstream os;
+			os << defocus;
+			std::string str = os.str();
+			textbuffDF->text(str.c_str());
+
+			Fl_Text_Display* myDF = new Fl_Text_Display(MXCOL4, current_y, MWCOL4, ystep-5);
+			myDF->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+			myDF->buffer(textbuffDF);
+			defocus_displays.push_back(myDF);
 		}
 
 		imic++;
@@ -535,17 +558,25 @@ void ManualPicker::initialise()
 
 	if (global_angpix < 0.)
 	{
-		MetaDataTable MDt;
-		MDt.read(fn_in);
-
-		if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		if (fn_in.isStarFile())
 		{
-			RFLOAT mag, dstep;
-			MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			global_angpix = 10000. * dstep / mag;
-			std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
- 		}
+			MetaDataTable MDt;
+			MDt.read(fn_in);
+
+			if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				RFLOAT mag, dstep;
+				MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				global_angpix = 10000. * dstep / mag;
+				std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
+			}
+			else
+			{
+				std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
+				global_angpix = 1.;
+			}
+		}
 		else
 		{
 			std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;

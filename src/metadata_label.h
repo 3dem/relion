@@ -282,6 +282,7 @@ enum EMDLabel
 
     EMDL_PARTICLE_AUTOPICK_FOM,
     EMDL_PARTICLE_HELICAL_TUBE_ID,
+    EMDL_PARTICLE_HELICAL_TUBE_PITCH,
     EMDL_PARTICLE_HELICAL_TRACK_LENGTH,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
@@ -547,7 +548,7 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own noise spectrum, and intensity-scale correction)");
         EMDL::addLabel(EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION, EMDL_DOUBLE, "rlnSpectralOrientabilityContribution", "Spectral SNR contribution to the orientability of individual particles");
         EMDL::addLabel(EMDL_MLMODEL_ORIGINAL_SIZE, EMDL_INT, "rlnOriginalImageSize", "Original size of the images (in pixels)");
-        EMDL::addLabel(EMDL_MLMODEL_PADDING_FACTOR, EMDL_INT, "rlnPaddingFactor", "Oversampling factor for Fourier transforms of the references");
+        EMDL::addLabel(EMDL_MLMODEL_PADDING_FACTOR, EMDL_DOUBLE, "rlnPaddingFactor", "Oversampling factor for Fourier transforms of the references");
         EMDL::addLabel(EMDL_MLMODEL_PDF_CLASS, EMDL_DOUBLE, "rlnClassDistribution", "Probability Density Function of the different classes (i.e. fraction of images assigned to each class)");
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_OFFX_CLASS, EMDL_DOUBLE, "rlnClassPriorOffsetX", "Prior in the X-offset for a class (in pixels)");
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_OFFY_CLASS, EMDL_DOUBLE, "rlnClassPriorOffsetY", "Prior in the Y-offset for a class (in pixels)");
@@ -655,6 +656,7 @@ private:
 
         EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Helical tube ID for a helical segment");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH, EMDL_DOUBLE, "rlnHelicalTubePitch", "Corss-over distance for a helical segment (A)");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance from the position of this helical segment to the starting point of the tube");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");

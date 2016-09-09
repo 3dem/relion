@@ -31,9 +31,10 @@ class reconstruct_parameters
 	public:
    	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug;
 	MetaDataTable DF;
-	int r_max, r_min_nn, blob_order, padding_factor, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
+	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y, helical_rise, helical_twist;
-	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt;
+	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, skip_gridding;
+	float padding_factor;
 	// I/O Parser
 	IOParser parser;
 
@@ -58,7 +59,7 @@ class reconstruct_parameters
 	    fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
        	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
        	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
-       	padding_factor = textToInteger(parser.getOption("--pad", "Padding factor", "2"));
+       	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
     	nr_threads = textToInteger(parser.getOption("--j", "Number of threads to use for FFTs", "1"));
 
 	    int ctf_section = parser.addSection("CTF options");
@@ -92,6 +93,7 @@ class reconstruct_parameters
     	fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
     	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
     	ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
+    	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
     	do_reconstruct_ctf = (ctf_dim > 0);
     	if (do_reconstruct_ctf)
     		do_ctf = false;
@@ -120,7 +122,7 @@ class reconstruct_parameters
 		int data_dim = (do_3d_rot) ? 3 : 2;
 		if (fn_debug != "")
 		{
-			BackProjector backprojector(debug_ori_size, 3, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim);
+			BackProjector backprojector(debug_ori_size, 3, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
 			backprojector.initialiseDataAndWeight(debug_size);
 			backprojector.data.printShape();
 			backprojector.weight.printShape();
@@ -239,7 +241,7 @@ class reconstruct_parameters
    			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
     	}
 
-   		BackProjector backprojector(mysize, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim);
+   		BackProjector backprojector(mysize, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
 
    		if (maxres < 0.)
    			r_max = -1;

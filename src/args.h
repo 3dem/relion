@@ -121,6 +121,7 @@ class IOParser
 private:
 
 	std::vector<std::string> options;
+	std::vector<std::string> hiddenOptions;
 	std::vector<std::string> usages;
 	std::vector<bool>        optionals;
 	std::vector<std::string> defaultvalues;
@@ -174,13 +175,13 @@ public:
     }
 
     /** Add an option to the object list */
-    void addOption(std::string option, std::string usage, std::string defaultvalue = "NULL");
+    void addOption(std::string option, std::string usage, std::string defaultvalue = "NULL", bool hidden = false);
 
     /** Get the value from the command line, and adds option to the list if it did not yet exist */
-    std::string getOption(std::string option, std::string usage, std::string defaultvalue = "NULL");
+    std::string getOption(std::string option, std::string usage, std::string defaultvalue = "NULL", bool hidden = false);
 
     /** Returns true if option was given and false if not, and adds option to the list if it did not yet exist */
-	bool checkOption(std::string option, std::string usage, std::string defaultvalue = "false");
+	bool checkOption(std::string option, std::string usage, std::string defaultvalue = "false", bool hidden = false);
 
     /** Checks the whole command line and reports an error if it contains an undefined option */
     bool commandLineContainsUndefinedOption();

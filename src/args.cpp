@@ -45,6 +45,7 @@
 #include "src/args.h"
 #include "src/gcc_version.h"
 #include "src/matrix1d.h"
+#include <algorithm>
 
 // Get parameters from the command line ====================================
 std::string getParameter(int argc, char **argv, const std::string param, const std::string option)
@@ -145,22 +146,27 @@ void IOParser::setCommandLine(int _argc, char** _argv)
 	argv = _argv;
 }
 
-void IOParser::addOption(std::string option, std::string usage, std::string defaultvalue)
+void IOParser::addOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
 {
-	if (section_names.size() == 0)
-		REPORT_ERROR("IOParser::addOption: ERROR First add a section to the parser, then the options!");
-	options.push_back(option);
-	usages.push_back(usage);
-	section_numbers.push_back(current_section);
-	if (defaultvalue == "NULL")
-	{
-		optionals.push_back(false);
-		defaultvalues.push_back(" ");
-	}
+	if (hidden)
+		hiddenOptions.push_back(option);
 	else
 	{
-		optionals.push_back(true);
-		defaultvalues.push_back((std::string)defaultvalue);
+		if (section_names.size() == 0)
+			REPORT_ERROR("IOParser::addOption: ERROR First add a section to the parser, then the options!");
+		options.push_back(option);
+		usages.push_back(usage);
+		section_numbers.push_back(current_section);
+		if (defaultvalue == "NULL")
+		{
+			optionals.push_back(false);
+			defaultvalues.push_back(" ");
+		}
+		else
+		{
+			optionals.push_back(true);
+			defaultvalues.push_back((std::string)defaultvalue);
+		}
 	}
 }
 
@@ -179,21 +185,24 @@ void IOParser::setSection(int number)
 
 bool IOParser::optionExists(std::string option)
 {
-	int ii;
-	for (ii = 0; ii < options.size(); ii++)
+	for (int ii = 0; ii < options.size(); ii++)
 		if (strcmp((options[ii]).c_str(), option.c_str()) == 0)
+			return true;
+
+	for (int ii = 0; ii < hiddenOptions.size(); ii++)
+		if (strcmp((hiddenOptions[ii]).c_str(), option.c_str()) == 0)
 			return true;
 
 	return false;
 
 }
 
-std::string IOParser::getOption(std::string option, std::string usage, std::string defaultvalue)
+std::string IOParser::getOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
 {
 
 	// If this option did not exist yet, add it to the list
 	if (!optionExists(option))
-		addOption(option, usage, defaultvalue);
+		addOption(option, usage, defaultvalue, hidden);
 
     int i = 0;
 
@@ -220,11 +229,11 @@ std::string IOParser::getOption(std::string option, std::string usage, std::stri
 
 }
 // Checks if a boolean parameter was included the command line =============
-bool IOParser::checkOption(std::string option, std::string usage, std::string defaultvalue)
+bool IOParser::checkOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
 {
 	// If this option did not exist yet, add it to the list
 	if (!optionExists(option))
-		addOption(option, usage, defaultvalue);
+		addOption(option, usage, defaultvalue, hidden);
 
 	return checkParameter(argc, argv, option);
 }
@@ -303,7 +312,8 @@ void IOParser::checkForUnknownArguments()
 		if (!is_ok)
 		{
 			std::string auxstr;
-			auxstr = (std::string)"WARNING: Option " + argv[i] + " is not a valid RELION argument";
+			auxstr = (std::string)"WARNING: Option " + argv[i] + "\tis not a valid RELION argument";
+
 			warning_messages.push_back(auxstr);
 		}
 

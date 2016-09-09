@@ -115,7 +115,7 @@ void AutoPicker::read(int argc, char **argv)
 	}
 #endif
 	int ref_section = parser.addSection("References options");
-	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
+	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references, or \"gauss\" for blob-picking");
 	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
 	do_invert = parser.checkOption("--invert", "Density in micrograph is inverted w.r.t. density in template");
 	psi_sampling = textToFloat(parser.getOption("--ang", "Angular sampling (in degrees); use 360 for no rotations", "10"));
@@ -123,6 +123,7 @@ void AutoPicker::read(int argc, char **argv)
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrographs","-1"));
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
+	gauss_max_value = textToFloat(parser.getOption("--gauss_max", "Value of the peak in the Gaussian blob reference","0.1"));
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -277,7 +278,31 @@ void AutoPicker::initialise()
 
 	// Read in the references
 	Mrefs.clear();
-	if (fn_ref.isStarFile())
+	if (fn_ref == "gauss")
+	{
+		if (verb > 0)
+			std::cout << " + Will use Gaussian blob as reference, with peak value of " << gauss_max_value << std::endl;
+
+		// Set particle boxsize to be 1.5x bigger than circle with particle_diameter
+		particle_size =  1.5 * ROUND(particle_diameter/angpix);
+		particle_size += particle_size%2;
+		psi_sampling = 360.;
+		do_ctf = false;
+
+		Image<RFLOAT> Iref;
+		Iref().initZeros(particle_size, particle_size);
+		Iref().setXmippOrigin();
+		// Make a Gaussian reference. sigma is 1/6th of the particle size, such that 3 sigma is at the image edge
+		RFLOAT normgauss = gaussian1D(0., particle_size/6., 0.);
+		FOR_ALL_ELEMENTS_IN_ARRAY2D(Iref())
+		{
+			double r = sqrt((RFLOAT)(i*i + j*j));
+			A2D_ELEM(Iref(), i, j) = gauss_max_value * gaussian1D(r, particle_size/6., 0.) / normgauss;
+		}
+		Mrefs.push_back(Iref());
+
+	}
+	else if (fn_ref.isStarFile())
 	{
 		MetaDataTable MDref;
 		MDref.read(fn_ref);
@@ -317,6 +342,7 @@ void AutoPicker::initialise()
 #ifdef TIMING
 	timer.tic(TIMING_A3);
 #endif
+
 
 	// Re-scale references if necessary
 	if (angpix_ref < 0)
@@ -384,12 +410,13 @@ void AutoPicker::initialise()
 		}
 	}
 
+	// Get particle boxsize from the input reference images
 	particle_size = XSIZE(Mrefs[0]);
 
 	if (particle_diameter > particle_size * angpix_ref)
 	{
 		std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
-		REPORT_ERROR("ERROR: the particlae diameter is larger than the size of the box.");
+		REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
 	}
 
 
@@ -498,8 +525,7 @@ void AutoPicker::initialise()
 	{
 		if (verb > 0)
 		{
-			std::cout << " Initialising FFTs for the references ... " << std::endl;
-			init_progress_bar(Mrefs.size());
+			std::cout << " Initialising FFTs for the references and masks ... " << std::endl;
 		}
 
 		// Calculate a circular mask based on the particle_diameter and then store its FT
@@ -547,7 +573,11 @@ void AutoPicker::initialise()
 		std::cerr << " nr_pixels_circular_mask= " << nr_pixels_circular_mask << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
 #endif
 
+
 		PPref.clear();
+		if (verb > 0)
+			init_progress_bar(Mrefs.size());
+
 		Projector PP(micrograph_size);
 		MultidimArray<RFLOAT> dummy;
 

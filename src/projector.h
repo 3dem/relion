@@ -56,7 +56,7 @@ public:
     int interpolator;
 
     // Oversample FT by padding in real space
-    int padding_factor;
+    float padding_factor;
 
     // Dimension of the reference (currently allowed 2 or 3)
     int ref_dim;
@@ -87,7 +87,7 @@ public:
      * Projector PPref(ori_size, NEAREST_NEIGHBOUR);
      * @endcode
      */
-    Projector(int _ori_size, int _interpolator = TRILINEAR, int _padding_factor_3d = 2, int _r_min_nn = 10, int _data_dim = 2)
+    Projector(int _ori_size, int _interpolator = TRILINEAR, float _padding_factor_3d = 2., int _r_min_nn = 10, int _data_dim = 2)
     {
 
     	// Store original dimension
@@ -162,7 +162,8 @@ public:
     void clear()
     {
     	data.clear();
-    	r_max = r_min_nn = interpolator = padding_factor = ref_dim = data_dim = pad_size = 0;
+    	r_max = r_min_nn = interpolator = ref_dim = data_dim = pad_size = 0;
+    	padding_factor = 0.;
     }
 
     /*
@@ -190,6 +191,12 @@ public:
     *
     */
    void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size = -1, int nr_threads = 1, bool do_gridding = true);
+
+   /* This is experimental: apply a mask in Fourier-space to focus refinements on certain Fourier components
+    * mask_r_min and mask_r_max are the radii of the lowest and highest frequencies (only keep crown inside)
+    * mask_ang is the opening angle along z (only really useful for helices, I guess)
+    */
+   void applyFourierMask(int mask_r_min = 0, int mask_r_max = -1, RFLOAT mask_ang = 0.);
 
    /* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
     * the real-space maps by dividing them by the Fourier Transform of the interpolator

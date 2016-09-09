@@ -55,6 +55,10 @@ public:
     // Helical range
     int H;
 
+    // Skip the iterative gridding part of the reconstruction
+    bool skip_gridding;
+
+
 public:
 
     /** Empty constructor
@@ -66,8 +70,8 @@ public:
 	 * @endcode
 	 */
 	BackProjector(int _ori_size, int _ref_dim, FileName fn_sym,
-			      int _interpolator = TRILINEAR, int _padding_factor_3d = 2, int _r_min_nn = 10,
-			      int _blob_order = 0, RFLOAT _blob_radius = 1.9, RFLOAT _blob_alpha = 15, int _data_dim = 2)
+			      int _interpolator = TRILINEAR, float _padding_factor_3d = 2, int _r_min_nn = 10,
+			      int _blob_order = 0, RFLOAT _blob_radius = 1.9, RFLOAT _blob_alpha = 15, int _data_dim = 2, bool _skip_gridding = false)
 	{
     	// Store original dimension
     	ori_size = _ori_size;
@@ -77,6 +81,9 @@ public:
 
     	// and of the data
     	data_dim = _data_dim;
+
+    	// Skip gridding
+    	skip_gridding = _skip_gridding;
 
     	// Set the symmetry object
     	SL.read_sym_file(fn_sym);
@@ -129,7 +136,8 @@ public:
         	padding_factor = op.padding_factor;
         	ref_dim = op.ref_dim;
         	data_dim = op.data_dim;
-         	// BackProjector stuff
+        	skip_gridding = op.skip_gridding;
+        	// BackProjector stuff
         	weight = op.weight;
         	tab_ftblob = op.tab_ftblob;
         	SL = op.SL;
@@ -152,6 +160,7 @@ public:
 
 	void clear()
 	{
+		skip_gridding = false;
 		weight.clear();
 		Projector::clear();
 	}

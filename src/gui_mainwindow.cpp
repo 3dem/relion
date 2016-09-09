@@ -56,6 +56,128 @@ int StdOutDisplay::handle(int ev)
 	return 0;
 }
 
+int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs, std::vector<long int> _scheduled_job_ids)
+{
+	//color(GUI_BACKGROUND_COLOR);
+    int current_y = 2, max_y = 2;
+    int ystep = 35;
+
+    int xcol = w()-120;
+
+    // Scroll bars
+    Fl_Scroll scroll(0, current_y, w(), h());
+    scroll.type(Fl_Scroll::VERTICAL);
+
+    my_jobs.clear();
+    pipeline_name = _pipeline_name;
+    for (int ijob = 0; ijob < _scheduled_jobs.size(); ijob++)
+    {
+    	my_jobs.push_back(_scheduled_job_ids[ijob]);
+    	int xcoor = (ijob < 1+_scheduled_jobs.size()/2) ? 20 : w()-170;
+    	if (ijob == 1+_scheduled_jobs.size()/2)
+    		current_y = 2;
+    	Fl_Check_Button *mycheck = new Fl_Check_Button(xcoor, current_y, ystep-8, ystep-8, _scheduled_jobs[ijob].c_str());
+    	mycheck->labelsize(ENTRY_FONTSIZE);
+    	check_buttons.push_back(mycheck);
+		mycheck->value(1);
+		current_y += ystep;
+		if (current_y > max_y)
+			max_y = current_y;
+    }
+    current_y = max_y;
+    schedule_name = new Fl_Input(xcol, current_y, 100, ystep-8, "Provide a name for this schedule: ");
+    current_y += ystep;
+    repeat = new Fl_Input(xcol, current_y, 100, ystep-8, "Run the jobs how many times?");
+    current_y += ystep;
+    wait = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least in between (in minutes)?");
+    current_y += ystep;
+
+    // Set the input value
+    schedule_name->value("schedule1");
+	schedule_name->color(GUI_INPUT_COLOR);
+	schedule_name->textsize(ENTRY_FONTSIZE);
+	schedule_name->labelsize(ENTRY_FONTSIZE);
+    repeat->value("1");
+	repeat->color(GUI_INPUT_COLOR);
+	repeat->textsize(ENTRY_FONTSIZE);
+	repeat->labelsize(ENTRY_FONTSIZE);
+    wait->value("15");
+	wait->color(GUI_INPUT_COLOR);
+	wait->textsize(ENTRY_FONTSIZE);
+	wait->labelsize(ENTRY_FONTSIZE);
+
+	// Button to execute
+	Fl_Button *execute_button = new Fl_Button(w()-200, current_y, 80, 30, "Execute");
+	execute_button->color(GUI_RUNBUTTON_COLOR);
+	execute_button->labelsize(12);
+	execute_button->callback( cb_execute, this);
+
+	// Button to cancel
+	Fl_Button *cancel_button = new Fl_Button(w()-100, current_y, 80, 30, "Cancel");
+	cancel_button->color(GUI_RUNBUTTON_COLOR);
+	cancel_button->labelsize(12);
+	cancel_button->callback( cb_cancel, this);
+
+	resizable(*this);
+	show();
+
+	return Fl::run();
+
+}
+
+void SchedulerWindow::cb_cancel(Fl_Widget*, void* v)
+{
+    SchedulerWindow* T=(SchedulerWindow*)v;
+    T->hide();
+}
+
+void SchedulerWindow::cb_execute(Fl_Widget*, void* v)
+{
+    SchedulerWindow* T=(SchedulerWindow*)v;
+    T->cb_execute_i();
+    T->hide();
+}
+
+void SchedulerWindow::cb_execute_i()
+{
+	FileName fn_sched(schedule_name->value());
+	FileName fn_check = "RUNNING_PIPELINER_" + pipeline_name + "_" + fn_sched;
+	if (exists(fn_check))
+	{
+		std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
+		fl_message(msg.c_str());
+	}
+	else
+	{
+		// Make a string with all job-ids to process
+		std::string jobids="\"";
+		for (int ijob = 0; ijob < my_jobs.size(); ijob++)
+		{
+			if (check_buttons[ijob]->value())
+				jobids += integerToString(my_jobs[ijob]) + " ";
+		}
+		jobids += "\"";
+		std::cerr << " jobids= " << jobids << std::endl;
+
+		std::string myrepeat(repeat->value());
+		std::string mywait(wait->value());
+
+		std::string command = "relion_pipeliner --pipeline " + pipeline_name;
+		command += " --schedule " + fn_sched;
+		command += " --repeat " + myrepeat;
+		command += " --min_wait " + mywait;
+		command += " --jobids " + jobids;
+		// Run this in the background, so control returns to the window
+		command += " &";
+		int res = system(command.c_str());
+		std::cout << " Launching: " << command << std::endl;
+		std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
+
+	}
+
+}
+
+
 NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn_note, bool _allow_save):Fl_Window(w,h,title)
 {
 	allow_save = _allow_save;
@@ -110,8 +232,11 @@ void NoteEditorWindow::cb_save_i()
 
 
 
-RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe):Fl_Window(w,h,title)
+RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec):Fl_Window(w,h,title)
 {
+
+	// Set initial Timer
+	tickTimeLastChanged();
 
 	show_initial_screen = true;
 	do_order_alphabetically = false;
@@ -162,14 +287,22 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	// Read in the pipeline STAR file if it exists
 	pipeline.name = fn_pipe;
 	if (exists(fn_pipe + "_pipeline.star"))
-		pipeline.read();
+	{
+		pipeline.read(DO_LOCK);
+		// With the locking system, each read needs to be followed soon with a write
+		pipeline.write(DO_LOCK);
+	}
+	else
+	{
+		pipeline.write();
+	}
 
 	// Check which jobs have finished
 	pipeline.checkProcessCompletion();
 
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
-    //menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
+    menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
     menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
     menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
     menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
@@ -183,8 +316,9 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
     menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
     menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
-    menubar->add("Jobs/Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
-    menubar->add("Jobs/_Import job(s)",  FL_ALT+'i', cb_import, this);
+    menubar->add("Jobs/_Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+    menubar->add("Jobs/Export scheduled job(s)",  FL_ALT+'x', cb_export_jobs, this);
+    menubar->add("Jobs/_Import scheduled job(s)",  FL_ALT+'i', cb_import_jobs, this);
     menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
     menubar->add("Jobs/Harshly clean all jobs",  FL_ALT+'h', cb_harshly_clean_all_jobs, this);
 
@@ -427,11 +561,49 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     cb_select_browsegroup_i(); // make default active
     is_main_continue = false; // default is a new run
 
+    // Mechanism to update stdout and stderr continuously and also update the JobLists
+    // Also exit the GUI if it has been idle for too long
+    update_every_sec = _update_every_sec;
+    exit_after_sec = (float)_exit_after_sec;
+    if (update_every_sec > 0)
+    	Fl::add_timeout(update_every_sec, Timer_CB, (void*)this);
+
+}
+
+static void Timer_CB(void *userdata)
+{
+	RelionMainWindow *o = (RelionMainWindow*)userdata;
+
+	time_t now;
+	time (&now);
+
+	double dif = difftime (now, time_last_change);
+    // If the GUI has been idle for too long, then exit
+	if (dif > o->exit_after_sec)
+    {
+		std::cout << " The relion GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
+		exit(0);
+    }
+
+	// Update the stdout and stderr windows if we're currently pointing at a running job
+	if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
+    	o->fillStdOutAndErr();
+
+    // Always check for job completion
+    o->updateJobLists();
+
+    // Refresh every so many seconds
+    Fl::repeat_timeout(o->update_every_sec, Timer_CB, userdata);
 }
 
 // Update the content of the finished, running and scheduled job lists
 void RelionMainWindow::fillRunningJobLists()
 {
+	// Go back to the same positions in the vertical scroll bars of the job lists after updating...
+	int mypos_running = running_job_browser->position();
+	int mypos_scheduled = scheduled_job_browser->position();
+	int mypos_finished = finished_job_browser->position();
+
     // Clear whatever was in there
 	finished_job_browser->clear();
 	finished_processes.clear();
@@ -503,6 +675,9 @@ void RelionMainWindow::fillRunningJobLists()
 		}
 	}
 
+	running_job_browser->position(mypos_running);
+	scheduled_job_browser->position(mypos_scheduled);
+	finished_job_browser->position(mypos_finished);
 }
 
 void RelionMainWindow::fillToAndFromJobLists()
@@ -642,7 +817,7 @@ void RelionMainWindow::loadJobFromPipeline()
     else
     	alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
-	cb_fill_stdout_i();
+	fillStdOutAndErr();
 }
 
 long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
@@ -1070,27 +1245,34 @@ bool RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 	return result;
 }
 
-void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
+void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait)
 {
 
+	std::vector<long int> my_scheduled_processes;
+	std::vector<std::string> jobids;
+	int njobs = splitString(fn_jobids, " ", jobids);
+	if (njobs == 0)
+		my_scheduled_processes = scheduled_processes;
+	else
+		for (int i = 0; i < njobs; i++)
+			my_scheduled_processes.push_back(textToInteger(jobids[i]));
 
-	FileName fn_log = "pipeline_" + pipeline.name + "_scheduler.log";
+	FileName fn_log = "pipeline_" + pipeline.name + "_" + fn_sched + ".log";
 	std::ofstream  fh;
 	fh.open((fn_log).c_str(), std::ios::app);
 
 	std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
 
-	FileName fn_check = "RUNNING_PIPELINER_"+pipeline.name;
-	bool fn_check_exists = exists(fn_check);
+	// Touch the fn_check file
+	FileName fn_check = "RUNNING_PIPELINER_"+pipeline.name + "_" + fn_sched;
+	touch(fn_check);
+	bool fn_check_exists = true;
 
-	if (!fn_check_exists)
-		REPORT_ERROR(" relion_pipeliner ERROR: " + fn_check + " file does not exist. Exiting...");
-
-	if (scheduled_processes.size() < 1)
+	if (my_scheduled_processes.size() < 1)
 		REPORT_ERROR("relion_pipeliner ERROR: there are no scheduled jobs. Exiting...");
 
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-	fh << " Starting a new scheduler execution .." << std::endl;
+	fh << " Starting a new scheduler execution called " << fn_sched << std::endl;
 	fh << " The scheduled jobs are: " << std::endl;
 	for (long int i = 0; i < scheduled_processes.size(); i++)
 		fh << " - " << pipeline.processList[scheduled_processes[i]].name << std::endl;
@@ -1100,7 +1282,6 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	fh << " Will be checking for existence of file " << fn_check << "; if it no longer exists, the scheduler will stop." << std::endl;
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
 
-	std::vector<long int> my_scheduled_processes = scheduled_processes;
 	int repeat = 0;
 	for (repeat = 0 ; repeat < nr_repeat; repeat++)
 	{
@@ -1127,15 +1308,16 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 				}
 
 				sleep(10);
+				tickTimeLastChanged(); // This will make sure the pipeline never gets timed-out
 				pipeline.checkProcessCompletion();
 				if (pipeline.processList[current_job].status == PROC_FINISHED)
 				{
 					// Read in existing pipeline, in case some other window had changed something else
-					pipeline.read(true);
+					pipeline.read(DO_LOCK);
 					// Re-set set status of current_job to finished
 					pipeline.processList[current_job].status = PROC_FINISHED;
 					// Write out the modified pipeline with the status of current_job to finished
-					pipeline.write();
+					pipeline.write(DO_LOCK);
 					break;
 				}
 			}
@@ -1147,7 +1329,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 			{
 
 				// Read in existing pipeline, in case some other window had changed it
-				pipeline.read(true);
+				pipeline.read(DO_LOCK);
 
 				// Set the current job back into the job list of the repeating cycle
 				// Do we want to run this as NEW or CONTINUED NEXT TIME?
@@ -1159,7 +1341,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 					pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
 
 				// Write the pipeline to an updated STAR file
-				pipeline.write();
+				pipeline.write(DO_LOCK);
 			}
 		}
 
@@ -1180,12 +1362,12 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 
 	if (repeat == nr_repeat)
 	{
-		fh << " + performed all requested repeats, stopping now ..." << std::endl;
+		fh << " + performed all requested repeats in scheduler " << fn_sched << ". Stopping now ..." << std::endl;
 		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-start the GUI to update the job lists." << std::endl;
+		std::cout << " PIPELINER: you may want to re-read the pipeline (from the File menu) to update the job lists." << std::endl;
 
 		// Read in existing pipeline, in case some other window had changed it
-		pipeline.read(true);
+		pipeline.read(DO_LOCK);
 
 		// After breaking out of repeat, set status of the jobs to finished
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
@@ -1194,7 +1376,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 		}
 
 		// Write the pipeline to an updated STAR file
-		pipeline.write();
+		pipeline.write(DO_LOCK);
 
 		// Remove the temporary file
 		std::remove(fn_check.c_str());
@@ -1204,7 +1386,7 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	{
 		fh << " + File " << fn_check << " was removed. Stopping now .." << std::endl;
 		std::cout << " PIPELINER: the " << fn_check << " file was removed. Stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline from the File menu in the GUI to update the job lists." << std::endl;
+		std::cout << " PIPELINER: you may want to re-read the pipeline (from the File menu) to update the job lists." << std::endl;
 	}
 	else
 	{
@@ -1217,9 +1399,16 @@ void RelionMainWindow::runScheduledJobs(int nr_repeat, long int minutes_wait)
 	cb_quit_i();
 }
 
+void RelionMainWindow::tickTimeLastChanged()
+{
+	time(&time_last_change);
+}
+
 void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 {
+
 	RelionMainWindow* T=(RelionMainWindow*)v;
+
 	// When clicking the job browser on the left: reset current_job to -1 (i.e. a new job, not yet in the pipeline)
 	current_job = -1;
 	T->cb_select_browsegroup_i();
@@ -1229,6 +1418,9 @@ void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_browsegroup_i()
 {
+
+	// Update timer
+	tickTimeLastChanged();
 
 	// Hide the initial screen
 	if (show_initial_screen)
@@ -1277,6 +1469,9 @@ void RelionMainWindow::cb_select_finished_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_finished_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
+
 	// Show the 'selected' group, hide the others
     int idx = finished_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
@@ -1295,6 +1490,9 @@ void RelionMainWindow::cb_select_running_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_running_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
+
 	// Show the 'selected' group, hide the others
     int idx = running_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
@@ -1313,6 +1511,9 @@ void RelionMainWindow::cb_select_scheduled_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_scheduled_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
+
 	// Show the 'selected' group, hide the others
     int idx = scheduled_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
@@ -1331,6 +1532,8 @@ void RelionMainWindow::cb_select_input_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_input_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
     int idx = input_job_browser->value() - 1;
@@ -1351,6 +1554,8 @@ void RelionMainWindow::cb_select_output_job(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_select_output_job_i()
 {
+	// Update timer
+	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
     int idx = output_job_browser->value() - 1;
@@ -1503,7 +1708,7 @@ void RelionMainWindow::cb_toggle_continue_i()
 
 }
 
-void RelionMainWindow::cb_fill_stdout_i()
+void RelionMainWindow::fillStdOutAndErr()
 {
 
 	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
@@ -1593,17 +1798,22 @@ void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
 
+	// Update timer
+	tickTimeLastChanged();
+
 	// Make sure that whenever we write out a pipeline, we first read in the existing version on disk
 	// This prevents sync errors with multiple windows acting on the same pipeline
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-	pipeline.read(true); // true means: only_read if_file_exists
+	pipeline.read(DO_LOCK); // true means: only_read if_file_exists
 
 	// Get the command line arguments from the currently active jobwindow,
 	// If the job gets cancelled, just exit this function
 	if (!jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DO_MKDIR))
 	{
 		std::cout << " Cancelling job" << std::endl;
+		// Repeat write-out to delete .lock file
+		pipeline.write(DO_LOCK);
 		return;
 	}
 
@@ -1645,6 +1855,33 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 				}
 			}
 		}
+
+		// For continuation of relion_refine jobs, remove the original output nodes from the list
+		if (pipeline.processList[current_job].type == PROC_2DCLASS ||
+				pipeline.processList[current_job].type == PROC_3DCLASS ||
+				pipeline.processList[current_job].type == PROC_3DAUTO)
+		{
+
+			std::vector<bool> deleteNodes, deleteProcesses;
+			deleteNodes.resize(pipeline.nodeList.size(), false);
+			deleteProcesses.resize(pipeline.processList.size(), false);
+
+			for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
+			{
+				long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
+				if(!exists(pipeline.nodeList[mynode].name))
+					deleteNodes[mynode] = true;
+			}
+
+			FileName fn_del = "tmp";
+			pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
+			std::remove("tmpdeleted_pipeline.star");
+
+			// Read the updated pipeline back in again
+			pipeline.read(DO_LOCK);
+
+		}
+
 	}
 
 	// Now save the job (and its status) to the PipeLine
@@ -1663,7 +1900,7 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	updateJobLists();
 
 	// Write out the new pipeline
-	pipeline.write();
+	pipeline.write(DO_LOCK);
 
 	if (!only_schedule)
 	{
@@ -1798,10 +2035,10 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	{
 
 		// Read in existing pipeline, in case some other window had changed it
-		pipeline.read(true);
+		pipeline.read(DO_LOCK);
 
 		// Write new pipeline without the deleted processes and nodes to disc and read in again
-		pipeline.write(fn_del, deleteNodes, deleteProcesses);
+		pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
 
 		// Delete the output directories for all selected processes from the hard disk
 		// Do this after pipeline.write to get the deleted_pipeline.star still in the correct directory
@@ -1829,11 +2066,17 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			}
 		}
 
+		// Reset current_job
+		current_job = -1;
+		fillStdOutAndErr();
+
 		// Read new pipeline back in again
-		pipeline.read();
+		pipeline.read(DO_LOCK);
 
 		// Update all job lists in the main GUI
 		updateJobLists();
+
+		pipeline.write(DO_LOCK);
 	}
 
 }
@@ -2228,9 +2471,6 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		else
 		{
 
-			// Read in existing pipeline, in case some other window had changed it
-			pipeline.read(true);
-
 			//remove spaces from any potential alias
 			for (int i = 0; i < alias.length(); i++)
 			{
@@ -2262,6 +2502,9 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		}
 	}
 
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read(DO_LOCK);
+
 	// Remove the original .Nodes entry
 	pipeline.deleteTemporaryNodeFiles(pipeline.processList[current_job]);
 
@@ -2292,11 +2535,12 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 	// Remake the new .Nodes entry
 	pipeline.touchTemporaryNodeFiles(pipeline.processList[current_job]);
 
-	// Write new pipeline to disc
-	pipeline.write();
-
 	// Update the name in the lists
 	updateJobLists();
+
+	// Write new pipeline to disc
+	pipeline.write(DO_LOCK);
+
 }
 
 
@@ -2318,7 +2562,7 @@ void RelionMainWindow::cb_mark_as_finished_i()
 	}
 
 	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(true);
+	pipeline.read(DO_LOCK);
 
 	pipeline.processList[current_job].status = PROC_FINISHED;
 
@@ -2387,14 +2631,17 @@ void RelionMainWindow::cb_mark_as_finished_i()
 			deleteNodes[mynode] = true;
 	}
 	FileName fn_del = "tmp";
-	pipeline.write(fn_del, deleteNodes, deleteProcesses);
+	pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
 	std::remove("tmpdeleted_pipeline.star");
 
 	// Read the updated pipeline back in again
-	pipeline.read();
+	pipeline.read(DO_LOCK);
 
 	// Update all job lists in the main GUI
 	updateJobLists();
+
+	// With the locking mechanism, each pipeline.read(bool, DO_LOCK) needs to be followed soon by a pipeline.write(DO_LOCK)!
+	pipeline.write(DO_LOCK);
 
 }
 
@@ -2433,14 +2680,14 @@ void RelionMainWindow::cb_make_flowchart_i()
 	res = std::system(command.c_str());
 
 	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(true);
+	pipeline.read(DO_LOCK);
 
 	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
 	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
 	pipeline.addNewOutputEdge(current_job, node);
 	updateJobLists();
 
-	pipeline.write();
+	pipeline.write(DO_LOCK);
 
 	return;
 }
@@ -2522,24 +2769,17 @@ void RelionMainWindow::cb_load_i()
 }
 
 // Load button call-back function
-void RelionMainWindow::cb_import(Fl_Widget* o, void* v)
-{
-    RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_import_i(false);
-}
-
-// Load button call-back function
 void RelionMainWindow::cb_undelete_job(Fl_Widget* o, void* v)
 {
     RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_import_i(true);
+    T->cb_undelete_job_i();
 }
 
-void RelionMainWindow::cb_import_i(bool is_undelete)
+void RelionMainWindow::cb_undelete_job_i()
 {
 
-	std::string fn_dir = (is_undelete) ? "./Trash/." : ".";
-	std::string fn_filter = (is_undelete) ? "Pipeline STAR files (job_pipeline.star)" : "Pipeline STAR files (*_pipeline.star)";
+	std::string fn_dir = "./Trash/.";
+	std::string fn_filter = "Pipeline STAR files (job_pipeline.star)";
 	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
 	chooser.show();
 	// Block until user picks something.
@@ -2556,42 +2796,185 @@ void RelionMainWindow::cb_import_i(bool is_undelete)
 
 
 	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(true);
+	pipeline.read(DO_LOCK);
 
     pipeline.importPipeline(fn_pipe.beforeLastOf("_pipeline.star"));
 
-	if (is_undelete)
+	// Copy all processes in the STAR file back into the ProjectDirectory
+	MetaDataTable MDproc;
+	MDproc.read(fn_pipe, "pipeline_processes");
+	std::cout <<"  Undeleting from Trash ... " << std::endl;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
-		// Copy all processes in the STAR file back into the ProjectDirectory
-		MetaDataTable MDproc;
-		MDproc.read(fn_pipe, "pipeline_processes");
-		std::cout <<"  Undeleting from Trash ... " << std::endl;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
+		FileName fn_proc;
+		MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, fn_proc);
+
+		// Copy the job back from the Trash folder
+		FileName fn_dest = fn_proc.beforeLastOf("/"); //gets rid of ending "/"
+		FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
+		if (!exists(fn_dir_dest))
 		{
-			FileName fn_proc;
-			MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, fn_proc);
-
-			// Copy the job back from the Trash folder
-			FileName fn_dest = fn_proc.beforeLastOf("/"); //gets rid of ending "/"
-			FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
-			if (!exists(fn_dir_dest))
-			{
-				mktree(fn_dir_dest);
-			}
-			std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
-			std::cout << command << std::endl;
-			int res = system(command.c_str());
-
-			// Also re-make all entries in the .Nodes directory
-			long int myproc = pipeline.findProcessByName(fn_proc);
-			pipeline.touchTemporaryNodeFiles(pipeline.processList[myproc]);
+			mktree(fn_dir_dest);
 		}
-		std::cout << " Done undeleting! " << std::endl;
+		std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
+		std::cout << command << std::endl;
+		int res = system(command.c_str());
+
+		// Also re-make all entries in the .Nodes directory
+		long int myproc = pipeline.findProcessByName(fn_proc);
+		pipeline.touchTemporaryNodeFiles(pipeline.processList[myproc]);
 	}
+	std::cout << " Done undeleting! " << std::endl;
 
 	// Write the new pipeline to disk and reread it back in again
-	pipeline.write();
-	pipeline.read();
+	pipeline.write(DO_LOCK);
+
+}
+
+
+void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir, std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern)
+{
+	int res;
+	std::string command;
+	std::vector<std::string> myfiles;
+	myfiles.push_back("run.job");
+	myfiles.push_back("note.txt");
+	myfiles.push_back("job_pipeline.star");
+
+	// Copy the run.job, the note.txt and the job_pipeline.star
+	// Replace all instances of all find_pattern's with the replace_pattern's
+	for (int ifile = 0; ifile < myfiles.size(); ifile++)
+	{
+		for (int ipatt = 0; ipatt < find_pattern.size(); ipatt++)
+		{
+			FileName outfile = fn_out_dir + myfiles[ifile];
+			FileName tmpfile = fn_out_dir + "tmp";
+			FileName infile = (ipatt == 0) ? fn_in_dir + myfiles[ifile] : tmpfile;
+			// Create directory first time round
+			if (ipatt == 0)
+			{
+				FileName dirs = outfile.beforeLastOf("/");
+				command =  "mkdir -p " + dirs;
+				res = system(command.c_str());
+			}
+			command =  "sed 's|" + find_pattern[ipatt] + "|" + replace_pattern[ipatt] + "|g' < " + infile + " > " + outfile;
+			//std::cerr << " Executing: " << command<<std::endl;
+			res = system(command.c_str());
+			if (ipatt+1 < find_pattern.size())
+			{
+				std::rename(outfile.c_str(), tmpfile.c_str());
+				//std::cerr << " Excuting: mv " << outfile<<" "<<tmpfile<<std::endl;
+			}
+		}
+	}
+
+}
+
+void RelionMainWindow::cb_export_jobs(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_export_jobs_i();
+}
+
+void RelionMainWindow::cb_export_jobs_i()
+{
+	// Get the name of this block of exported jobs and make the corresponding directory
+	const char * answer;
+	std::string default_answer="export1";
+	answer =  fl_input("Name of the exported block of jobs? ", default_answer.c_str());
+	std::string mydir(answer);
+	mydir += "/";
+	std::string command = "mkdir -p ExportJobs/" + mydir;
+	int res = system(command.c_str());
+
+	MetaDataTable MDexported;
+
+	// Loop through all the Scheduled jobs and export them one-by-one
+	int iexp =0;
+	std::vector<std::string> find_pattern, replace_pattern;
+	for (long int i = 0; i < pipeline.processList.size(); i++)
+	{
+		if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
+				pipeline.processList[i].status == PROC_SCHEDULED_CONT)
+		{
+			iexp++;
+			if (pipeline.processList[i].alias != "None")
+			{
+				fl_message("ERROR: aliases are not allowed on Scheduled jobs that are to be exported! Make sure all scheduled jobs are made with unaliases names.");
+				return;
+			}
+
+			// A general name for the exported job:
+			FileName expname = pipeline.processList[i].name;
+			expname = expname.beforeFirstOf("/") + "/exp"+integerToString(iexp, 3)+"/";
+			//std::cerr << " pipeline.processList[i].name= " << pipeline.processList[i].name << " expname= " << expname << std::endl;
+			find_pattern.push_back(pipeline.processList[i].name);
+			replace_pattern.push_back(expname);
+
+			MDexported.addObject();
+			MDexported.setValue(EMDL_PIPELINE_PROCESS_NAME, expname);
+
+			// Copy the run.job, the note.txt and the job_pipeline.star and replace patterns
+			replaceFilesForImportExportOfScheduledJobs(pipeline.processList[i].name, "ExportJobs/" + mydir + expname, find_pattern, replace_pattern);
+		}
+	}
+
+	MDexported.write("ExportJobs/" + mydir + "exported.star");
+
+}
+
+void RelionMainWindow::cb_import_jobs(Fl_Widget* o, void* v)
+{
+    RelionMainWindow* T=(RelionMainWindow*)v;
+    T->cb_import_jobs_i();
+}
+
+
+void RelionMainWindow::cb_import_jobs_i()
+{
+
+	// Get the directory with the Exported jobs
+	std::string fn_dir = ".";
+	std::string fn_filter = "Export STAR file (exported.star)";
+	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
+	chooser.show();
+	// Block until user picks something.
+	while(chooser.shown())
+		{ Fl::wait(); }
+
+	// User hit cancel?
+	if ( chooser.value() == NULL )
+		return;
+
+	FileName fn_export(chooser.value());
+	FileName fn_export_dir = fn_export.beforeLastOf("/")+"/";
+
+	//FileName fn_dir_export = fn_export.beforeLastOf("/")+"/";
+	MetaDataTable MDexported;
+	MDexported.read(fn_export);
+
+	// Read in existing pipeline, in case some other window had changed it
+	pipeline.read(DO_LOCK);
+
+	std::vector<std::string> find_pattern, replace_pattern;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDexported)
+	{
+		FileName expname;
+		MDexported.getValue(EMDL_PIPELINE_PROCESS_NAME, expname);
+		find_pattern.push_back(expname);
+		// Make a new name for this job
+		FileName newname = expname.beforeFirstOf("/")+"/job"+integerToString(pipeline.job_counter, 3)+"/";
+		//std::cerr << " expname= " << expname << " newname= " << newname << std::endl;
+		replace_pattern.push_back(newname);
+		replaceFilesForImportExportOfScheduledJobs(fn_export_dir + expname, newname, find_pattern, replace_pattern);
+		// Import the job into the pipeline
+	    pipeline.importPipeline(newname+"job");
+	    pipeline.job_counter++;
+	}
+
+	// Write the new pipeline to disk
+	fillRunningJobLists();
+	pipeline.write(DO_LOCK);
 
 }
 
@@ -2689,7 +3072,9 @@ void RelionMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 
 void RelionMainWindow::cb_reread_pipeline_i()
 {
-	pipeline.read();
+	pipeline.read(DO_LOCK);
+	// With the locking system, each read needs to be followed soon with a write
+	pipeline.write(DO_LOCK);
 }
 
 
@@ -2728,44 +3113,19 @@ void RelionMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_start_pipeliner_i()
 {
 
-	int nr_repeat, min_wait=0;
+	std::vector<FileName> job_names;
+	std::vector<long int> job_ids;
 
-	// Ask how many times to repeat
-	const char * answer;
-	std::string default_answer="1";
-	answer =  fl_input("Run the scheduled jobs how many times? ", default_answer.c_str());
-	if (answer == NULL)
-		nr_repeat = 1;
-	else
+	for (long int ii =0; ii < scheduled_processes.size(); ii++)
 	{
-		std::string str_answer(answer);
-		nr_repeat = textToInteger(str_answer);
+		long int id = scheduled_processes[ii];
+		job_ids.push_back(id);
+		job_names.push_back(pipeline.processList[id].name);
 	}
+	std::vector<long int> my_scheduled_processes = scheduled_processes;
+	SchedulerWindow* w = new SchedulerWindow(400, 300, "Select which jobs to execute");
+	w->fill(pipeline.name, job_names, job_ids);
 
-	if (nr_repeat > 1)
-	{
-		// Ask how long to wait at least in between repeats
-		default_answer="15";
-		answer =  fl_input("Wait at least how many minutes between repeats? ", default_answer.c_str());
-		if (answer == NULL)
-			min_wait = 15;
-		else
-		{
-			std::string str_answer(answer);
-			min_wait = textToInteger(str_answer);
-		}
-	}
-
-	touch("RUNNING_PIPELINER_" + pipeline.name);
-	std::string command = "relion_pipeliner --pipeline " + pipeline.name;
-
-	command += " --repeat " + integerToString(nr_repeat);
-	command += " --min_wait " + integerToString(min_wait);
-	// Run this in the background, so control returns to the window
-	command += " &";
-	int res = system(command.c_str());
-	std::cout << " Launching: " << command << std::endl;
-	std::cout << " Stop pipeliner by deleting file PIPELINER_" + pipeline.name << std::endl;;
 }
 
 void RelionMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
@@ -2777,8 +3137,18 @@ void RelionMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_stop_pipeliner_i()
 {
-	// TODO delete file that will be checked for
-	FileName fn_del = "RUNNING_PIPELINER_"+pipeline.name;
+	std::string fn_filter = "Pipeline scheduled file (RUNNING_PIPELINER_" + pipeline.name + "_*)";
+	Fl_File_Chooser chooser(".",  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose which scheduler to stop");
+	chooser.show();
+	// Block until user picks something.
+	while(chooser.shown())
+		{ Fl::wait(); }
+
+	// User hit cancel?
+	if ( chooser.value() == NULL )
+		return;
+
+	FileName fn_del(chooser.value());
 	std::cout <<" Deleting file : " << fn_del<< std::endl;
 	std::remove(fn_del.c_str());
 }

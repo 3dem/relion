@@ -71,7 +71,7 @@ public:
 	RFLOAT LL;
 
 	// Padding factor
-	int padding_factor;
+	RFLOAT padding_factor;
 
 	// Fourier space interpolator
 	int interpolator;
@@ -191,7 +191,7 @@ public:
 		nr_groups(0),
 		nr_directions(0),
 		LL(0),
-		padding_factor(0),
+		padding_factor(0.),
 		interpolator(0),
 		r_min_nn(0),
 		ave_Pmax(0),
@@ -302,7 +302,8 @@ public:
 		pdf_class.clear();
 		pdf_direction.clear();
 		nr_particles_group.clear();
-		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn = padding_factor = 0;
+		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn;
+		padding_factor = 0.;
 		ave_Pmax = avg_norm_correction = LL = sigma2_offset = tau2_fudge_factor = 0.;
 		sigma2_rot = sigma2_tilt = sigma2_psi = 0.;
 		acc_rot.clear();
@@ -331,7 +332,7 @@ public:
 
 	// The group numbering in mydata may be different from the one in this model.
 	// Readjust all group_ids in the Experiment based on their group names
-	void reassignGroupsForMovies(Experiment &mydata);
+	void reassignGroupsForMovies(Experiment &mydata, std::string &movie_name);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
@@ -399,7 +400,7 @@ public:
 	}
 
 	// Initialise all weighted sums (according to size of corresponding model
-	void initialise(MlModel &_model, FileName fn_sym = "c1");
+	void initialise(MlModel &_model, FileName fn_sym = "c1", bool asymmetric_padding = false, bool _skip_gridding = false);
 
 	// Initialize all weighted sums to zero (with resizing the BPrefs to current_size)
 	void initZeros();

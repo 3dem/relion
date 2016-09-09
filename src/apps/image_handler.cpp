@@ -30,8 +30,8 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_shiftCOM, do_stats, do_avg_ampl, do_average;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z;
+    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_average, do_remove_nan;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan;
    	int verb;
 	// I/O Parser
 	IOParser parser;
@@ -85,6 +85,8 @@ class image_handler_parameters
 	    new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
 	    new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
 	    filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
+	    do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
+	    do_flipY = parser.checkOption("--flipY", "Flip (mirror) a 2D image or 3D map in the Y-direction?");
 	    do_flipZ = parser.checkOption("--flipZ", "Flip (mirror) a 3D map in the Z-direction?");
 	    do_shiftCOM = parser.checkOption("--shift_com", "Shift image(s) to their center-of-mass (only on positive pixel values)");
 	    shift_x = textToFloat(parser.getOption("--shift_x", "Shift images this many pixels in the X-direction", "0."));
@@ -94,6 +96,8 @@ class image_handler_parameters
 	    do_average = parser.checkOption("--average", "Calculate average of all images (without alignment)");
 	    fn_correct_ampl = parser.getOption("--correct_avg_ampl", "Correct all images with this average amplitude spectrum", "");
 	    minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
+	    do_remove_nan = parser.checkOption("--remove_nan", "Replace non-numerical values (NaN, inf, etc) in the image(s)");
+	    replace_nan = textToFloat(parser.getOption("--replace_nan", "Replace non-numerical values (NaN, inf, etc) with this value", "0"));
 
 	    int three_d_section = parser.addSection("3D operations");
 	    fn_sym = parser.getOption("--sym", "Symmetrise 3D map with this point group (e.g. D6)", "");
@@ -172,6 +176,16 @@ class image_handler_parameters
 		}
 
 		// From here on also 3D options
+		if (do_remove_nan)
+		{
+			Iout().setXmippOrigin();
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iout())
+			{
+				if (std::isnan(DIRECT_A3D_ELEM(Iout(), k, i, j)) || std::isinf(DIRECT_A3D_ELEM(Iout(), k, i, j)))
+					DIRECT_A3D_ELEM(Iout(), k, i, j) = replace_nan;
+			}
+		}
+
 		if (fabs(multiply_constant - 1.) > 0.)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
@@ -284,7 +298,21 @@ class image_handler_parameters
 		if (highpass > 0.)
 			highPassFilterMap(Iout(), highpass, angpix, filter_edge_width);
 
-		if (do_flipZ)
+		if (do_flipX)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			{
+				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, i, XSIZE(Iin()) - 1 - j);
+			}
+		}
+		else if (do_flipY)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			{
+				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, YSIZE(Iin()) - 1 - i, j);
+			}
+		}
+		else if (do_flipZ)
 		{
 			if (ZSIZE(Iout()) < 2)
 				REPORT_ERROR("ERROR: this is not a 3D map, so cannot be flipped in Z");

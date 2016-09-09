@@ -32,39 +32,6 @@
 //    }
 //}
 
-class OptimisationParamters
-{
-public:
-	unsigned metadata_offset;
-
-	unsigned long my_ori_particle;
-
-	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
-	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
-	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2, mean_diff2;
-	MultidimArray<bool> Mcoarse_significant;
-	// And from storeWeightedSums
-	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
-	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
-	std::vector<MultidimArray<RFLOAT> > power_imgs;
-	MultidimArray<XFLOAT> Mweight;
-
-	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
-		metadata_offset(0),
-		my_ori_particle(my_ori_particle)
-	{
-		power_imgs.resize(nr_particles);
-		highres_Xi2_imgs.resize(nr_particles);
-		Fimgs.resize(nr_particles);
-		Fimgs_nomask.resize(nr_particles);
-		Fctfs.resize(nr_particles);
-		old_offset.resize(nr_particles);
-		prior.resize(nr_particles);
-	};
-};
-
 class SamplingParameters
 {
 public:
@@ -155,11 +122,15 @@ public:
 	void coarseIndexToCoarseIndices(SamplingParameters sp) // converts an "ihidden" (coarsely sampled) index to coarse partial indices // FIXME Untested
 	{
 		int t_idx = coarseIdx;
+		iclass = floor( t_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans));
+		t_idx   -= iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans);
 		idir   = floor( t_idx / ( sp.nr_psi * sp.nr_trans ));
 		t_idx   -= idir       * ( sp.nr_psi * sp.nr_trans  );
 		ipsi   = floor( t_idx / ( sp.nr_trans ));
 		t_idx   -= ipsi       * ( sp.nr_trans  );
 		itrans = t_idx ;
+		ioverrot   = 0;
+		iovertrans = 0;
 	}
 
 	void coarseIndicesToCoarseIndex(SamplingParameters sp) // converts coarse partial indices to an "ihidden" (coarsely sampled) index // FIXME Untested
@@ -170,6 +141,42 @@ public:
 		idx += itrans;
 		coarseIdx = idx;
 	}
+};
+
+
+class OptimisationParamters
+{
+public:
+	unsigned metadata_offset;
+
+	unsigned long my_ori_particle;
+
+	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
+	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
+	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
+	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
+	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2, avg_diff2;
+	MultidimArray<bool> Mcoarse_significant;
+	// And from storeWeightedSums
+	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
+	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
+	std::vector<MultidimArray<RFLOAT> > power_imgs;
+	MultidimArray<XFLOAT> Mweight;
+	std::vector<Indices> max_index;
+
+	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
+		metadata_offset(0),
+		my_ori_particle(my_ori_particle)
+	{
+		power_imgs.resize(nr_particles);
+		highres_Xi2_imgs.resize(nr_particles);
+		Fimgs.resize(nr_particles);
+		Fimgs_nomask.resize(nr_particles);
+		Fctfs.resize(nr_particles);
+		old_offset.resize(nr_particles);
+		prior.resize(nr_particles);
+		max_index.resize(nr_particles);
+	};
 };
 
 
@@ -470,6 +477,8 @@ public:
 
 	int device_id;
 
+	unsigned failsafe_attempts;
+
 	MlDeviceBundle *devBundle;
 
 #ifdef TIMING_FILES
@@ -486,7 +495,8 @@ public:
 #ifdef TIMING_FILES
 			timer(timing_fnm),
 #endif
-			errorStatus((cudaError_t)0)
+			errorStatus((cudaError_t)0),
+			failsafe_attempts(0)
 	{};
 
 	void resetData();

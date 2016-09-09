@@ -570,8 +570,8 @@ void BackProjector::getLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 		int lowres_r_max)
 {
 
-	int lowres_r2_max = padding_factor * padding_factor * lowres_r_max * lowres_r_max;
-	int lowres_pad_size = 2 * (padding_factor * lowres_r_max + 1) + 1;
+	int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
+	int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
 
 	// Check lowres_r_max is not too big
 	if (lowres_r_max > r_max)
@@ -611,8 +611,8 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 		int lowres_r_max)
 {
 
-	int lowres_r2_max = padding_factor * padding_factor * lowres_r_max * lowres_r_max;
-	int lowres_pad_size = 2 * (padding_factor * lowres_r_max + 1) + 1;
+	int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
+	int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
 
 	// Check lowres_r_max is not too big
 	if (lowres_r_max > r_max)
@@ -770,7 +770,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Fnewweight can become too large for a float: always keep this one in double-precision
 	MultidimArray<double> Fnewweight;
 	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
-	int max_r2 = r_max * r_max * padding_factor * padding_factor;
+	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
@@ -793,7 +793,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     vol_out.clear(); // Reset dimensions to 0
 
     Fweight.reshape(Fconv);
-    Fnewweight.reshape(Fconv);
+    if (!skip_gridding)
+    	Fnewweight.reshape(Fconv);
 
 	// Go from projector-centered to FFTW-uncentered
 	decenter(weight, Fweight, max_r2);
@@ -935,108 +936,127 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 	} //end if do_map
 
-	// Divide both data and Fweight by normalisation factor to prevent FFT's with very large values....
-#ifdef DEBUG_RECONSTRUCT
-	std::cerr << " normalise= " << normalise << std::endl;
-#endif
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fweight)
-	{
-		DIRECT_MULTIDIM_ELEM(Fweight, n) /= normalise;
-	}
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(data)
-	{
-		DIRECT_MULTIDIM_ELEM(data, n) /= normalise;
-	}
 
-	// Initialise Fnewweight with 1's and 0's. (also see comments below)
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
+	if (skip_gridding)
 	{
-		if (k * k + i * i + j * j < max_r2)
-			A3D_ELEM(weight, k, i, j) = 1.;
-		else
-			A3D_ELEM(weight, k, i, j) = 0.;
-	}
-	decenter(weight, Fnewweight, max_r2);
+		std::cerr << "Skipping gridding!" << std::endl;
+		Fconv.initZeros(); // to remove any stuff from the input volume
+		decenter(data, Fconv, max_r2);
 
-	// Iterative algorithm as in  Eq. [14] in Pipe & Menon (1999)
-	// or Eq. (4) in Matej (2001)
-	for (int iter = 0; iter < max_iter_preweight; iter++)
-	{
-
-		// Set Fnewweight * Fweight in the transformer
-		// In Matej et al (2001), weights w_P^i are convoluted with the kernel,
-		// and the initial w_P^0 are 1 at each sampling point
-		// Here the initial weights are also 1 (see initialisation Fnewweight above),
-		// but each "sampling point" counts "Fweight" times!
-		// That is why Fnewweight is multiplied by Fweight prior to the convolution
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 		{
-			DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
+			if (DIRECT_MULTIDIM_ELEM(Fweight, n) > 0.)
+				DIRECT_MULTIDIM_ELEM(Fconv, n) /= DIRECT_MULTIDIM_ELEM(Fweight, n);
 		}
 
-        // convolute through Fourier-transform (as both grids are rectangular)
-        // Note that convoluteRealSpace acts on the complex array inside the transformer
-        convoluteBlobRealSpace(transformer);
-
-                RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
-                FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-                {
-                    if (kp * kp + ip * ip + jp * jp < max_r2)
-                    {
-
-        		// Make sure no division by zero can occur....
-        		w = XMIPP_MAX(1e-6, abs(DIRECT_A3D_ELEM(Fconv, k, i, j)));
-        		// Monitor min, max and avg conv_weight
-        		corr_min = XMIPP_MIN(corr_min, w);
-        		corr_max = XMIPP_MAX(corr_max, w);
-        		corr_avg += w;
-        		corr_nn += 1.;
-        		// Apply division of Eq. [14] in Pipe & Menon (1999)
-        		DIRECT_A3D_ELEM(Fnewweight, k, i, j) /= w;
-        	}
-        }
-
-#ifdef DEBUG_RECONSTRUCT
-        std::cerr << " PREWEIGHTING ITERATION: "<< iter + 1 << " OF " << max_iter_preweight << std::endl;
-        // report of maximum and minimum values of current conv_weight
-        std::cerr << " corr_avg= " << corr_avg / corr_nn << std::endl;
-        std::cerr << " corr_min= " << corr_min << std::endl;
-        std::cerr << " corr_max= " << corr_max << std::endl;
-#endif
 	}
-
-#ifdef DEBUG_RECONSTRUCT
-	Image<double> tttt;
-	tttt()=Fnewweight;
-	tttt.write("reconstruct_gridding_weight.spi");
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+	else
 	{
-		DIRECT_MULTIDIM_ELEM(ttt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fconv, n));
-	}
-	ttt.write("reconstruct_gridding_correction_term.spi");
-#endif
 
-	// Clear memory
-	Fweight.clear();
+		// Divide both data and Fweight by normalisation factor to prevent FFT's with very large values....
+	#ifdef DEBUG_RECONSTRUCT
+		std::cerr << " normalise= " << normalise << std::endl;
+	#endif
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fweight)
+		{
+			DIRECT_MULTIDIM_ELEM(Fweight, n) /= normalise;
+		}
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(data)
+		{
+			DIRECT_MULTIDIM_ELEM(data, n) /= normalise;
+		}
 
-	// Note that Fnewweight now holds the approximation of the inverse of the weights on a regular grid
+		// Initialise Fnewweight with 1's and 0's. (also see comments below)
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
+		{
+			if (k * k + i * i + j * j < max_r2)
+				A3D_ELEM(weight, k, i, j) = 1.;
+			else
+				A3D_ELEM(weight, k, i, j) = 0.;
+		}
+		decenter(weight, Fnewweight, max_r2);
 
-	// Now do the actual reconstruction with the data array
-	// Apply the iteratively determined weight
-	Fconv.initZeros(); // to remove any stuff from the input volume
-	decenter(data, Fconv, max_r2);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
-	{
+		// Iterative algorithm as in  Eq. [14] in Pipe & Menon (1999)
+		// or Eq. (4) in Matej (2001)
+		for (int iter = 0; iter < max_iter_preweight; iter++)
+		{
+
+			// Set Fnewweight * Fweight in the transformer
+			// In Matej et al (2001), weights w_P^i are convoluted with the kernel,
+			// and the initial w_P^0 are 1 at each sampling point
+			// Here the initial weights are also 1 (see initialisation Fnewweight above),
+			// but each "sampling point" counts "Fweight" times!
+			// That is why Fnewweight is multiplied by Fweight prior to the convolution
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+			{
+				DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
+			}
+
+			// convolute through Fourier-transform (as both grids are rectangular)
+			// Note that convoluteRealSpace acts on the complex array inside the transformer
+			convoluteBlobRealSpace(transformer);
+
+			RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+			{
+				if (kp * kp + ip * ip + jp * jp < max_r2)
+				{
+
+					// Make sure no division by zero can occur....
+					w = XMIPP_MAX(1e-6, abs(DIRECT_A3D_ELEM(Fconv, k, i, j)));
+					// Monitor min, max and avg conv_weight
+					corr_min = XMIPP_MIN(corr_min, w);
+					corr_max = XMIPP_MAX(corr_max, w);
+					corr_avg += w;
+					corr_nn += 1.;
+					// Apply division of Eq. [14] in Pipe & Menon (1999)
+					DIRECT_A3D_ELEM(Fnewweight, k, i, j) /= w;
+				}
+			}
+
+	#ifdef DEBUG_RECONSTRUCT
+			std::cerr << " PREWEIGHTING ITERATION: "<< iter + 1 << " OF " << max_iter_preweight << std::endl;
+			// report of maximum and minimum values of current conv_weight
+			std::cerr << " corr_avg= " << corr_avg / corr_nn << std::endl;
+			std::cerr << " corr_min= " << corr_min << std::endl;
+			std::cerr << " corr_max= " << corr_max << std::endl;
+	#endif
+		}
+
+	#ifdef DEBUG_RECONSTRUCT
+		Image<double> tttt;
+		tttt()=Fnewweight;
+		tttt.write("reconstruct_gridding_weight.spi");
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		{
+			DIRECT_MULTIDIM_ELEM(ttt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fconv, n));
+		}
+		ttt.write("reconstruct_gridding_correction_term.spi");
+	#endif
+
+		// Clear memory
+		Fweight.clear();
+
+		// Note that Fnewweight now holds the approximation of the inverse of the weights on a regular grid
+
+		// Now do the actual reconstruction with the data array
+		// Apply the iteratively determined weight
+		Fconv.initZeros(); // to remove any stuff from the input volume
+		decenter(data, Fconv, max_r2);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		{
 #ifdef  RELION_SINGLE_PRECISION
-            // Prevent numerical instabilities in single-precision reconstruction with very unevenly sampled orientations
-            if (DIRECT_MULTIDIM_ELEM(Fnewweight, n) > 1e20)
-                DIRECT_MULTIDIM_ELEM(Fnewweight, n) = 1e20;
+			// Prevent numerical instabilities in single-precision reconstruction with very unevenly sampled orientations
+			if (DIRECT_MULTIDIM_ELEM(Fnewweight, n) > 1e20)
+				DIRECT_MULTIDIM_ELEM(Fnewweight, n) = 1e20;
 #endif
-		DIRECT_MULTIDIM_ELEM(Fconv, n) *= DIRECT_MULTIDIM_ELEM(Fnewweight, n);
-	}
+			DIRECT_MULTIDIM_ELEM(Fconv, n) *= DIRECT_MULTIDIM_ELEM(Fnewweight, n);
+		}
 
-	// Clear memory
-	Fnewweight.clear();
+		// Clear memory
+		Fnewweight.clear();
+
+	} // end if skip_gridding
 
 // Gridding theory says one now has to interpolate the fine grid onto the coarse one using a blob kernel
 // and then do the inverse transform and divide by the FT of the blob (i.e. do the gridding correction)
@@ -1210,7 +1230,7 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 	if ( (nr_helical_asu < 2) || (ref_dim != 3) )
 		return;
 
-	int rmax2 = r_max * r_max * padding_factor * padding_factor;//TODO
+	int rmax2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 	Matrix2D<RFLOAT> R(4, 4); // A matrix from the list
 	MultidimArray<RFLOAT> sum_weight;
@@ -1376,7 +1396,7 @@ void BackProjector::applyPointGroupSymmetry()
 	std::cerr << " SL.true_symNo= " << SL.true_symNo << std::endl;
 #endif
 
-	int rmax2 = r_max * r_max * padding_factor * padding_factor;//TODO
+	int rmax2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	if (SL.SymsNo() > 0 && ref_dim == 3)
 	{
 		Matrix2D<RFLOAT> L(4, 4), R(4, 4); // A matrix from the list
@@ -1576,7 +1596,10 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	MultidimArray<Complex>& Fin = transformer.getFourierReference();
 
 	MultidimArray<Complex > Ftmp;
-	int padoridim = padding_factor * ori_size;
+	// Size of padded real-space volume
+	int padoridim = ROUND(padding_factor * ori_size);
+	// make sure padoridim is even
+	padoridim += padoridim%2;
 	RFLOAT normfft;
 
 //#define DEBUG_WINDOWORIDIMREALSPACE

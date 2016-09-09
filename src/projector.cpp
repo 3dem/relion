@@ -54,7 +54,7 @@ void Projector::initialiseData(int current_size)
 	r_max = XMIPP_MIN(r_max, ori_size / 2);
 
 	// Set pad_size
-	pad_size = 2 * (padding_factor * r_max + 1) + 1;
+	pad_size = 2 * (ROUND(padding_factor * r_max) + 1) + 1;
 
 	// Short side of data array
 	switch (ref_dim)
@@ -74,7 +74,6 @@ void Projector::initialiseData(int current_size)
 	data.xinit=0;
 
 }
-
 void Projector::initZeros(int current_size)
 {
 	initialiseData(current_size);
@@ -110,7 +109,11 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
     RFLOAT normfft;
 
 	// Size of padded real-space volume
-	int padoridim = padding_factor * ori_size;
+	int padoridim = ROUND(padding_factor * ori_size);
+	// make sure padoridim is even
+	padoridim += padoridim%2;
+	// Re-calculate padding factor
+	padding_factor = (float)padoridim/(float)ori_size;
 
 	// Initialize data array of the oversampled transform
 	ref_dim = vol_in.getDim();
@@ -179,7 +182,7 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	TIMING_TOC(TIMING_INIT2);
 
 	TIMING_TIC(TIMING_FAUX);
-	int max_r2 = r_max * r_max * padding_factor * padding_factor;
+	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 	{
 		int r2 = kp*kp + ip*ip + jp*jp;
@@ -215,6 +218,49 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
     proj_timer.printTimes(false);
 #endif
 
+}
+
+void Projector::applyFourierMask(int mask_r_min, int mask_r_max, RFLOAT mask_ang)
+{
+
+	if (mask_r_max < 0)
+		mask_r_max = r_max;
+	int mask_r_min2 = ROUND(mask_r_min * padding_factor) * ROUND(mask_r_min * padding_factor);
+	int mask_r_max2 = ROUND(mask_r_max * padding_factor) * ROUND(mask_r_max * padding_factor);
+	float mask_ang_rad = DEG2RAD(mask_ang);
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+
+		int myr2 = k*k + i*i + j*j;
+
+		// Select resolutions
+		if (myr2 < mask_r_min2 || myr2 > mask_r_max2)
+			A3D_ELEM(data, k, i, j) = 0.;
+
+		// Select opening angle along z
+		if (mask_ang > 0.)
+		{
+			float myang = atan(sqrt((float)(i*i+j*j))/fabs((float)(k)));
+			if (myang > mask_ang_rad)
+				A3D_ELEM(data, k, i, j) = 0.;
+		}
+	}
+
+//#define DEBUG_MASK
+#ifdef DEBUG_MASK
+	Image<RFLOAT> ttt;
+	ttt().resize(data);
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(ttt())
+	{
+		if (abs(DIRECT_MULTIDIM_ELEM(data, n)) > 0.)
+			DIRECT_MULTIDIM_ELEM(ttt(), n) = 1.;
+		else
+			DIRECT_MULTIDIM_ELEM(ttt(), n) = 0.;
+	}
+	ttt.write("fourier_mask.spi");
+	std::cerr << " written out fourier_mask.spi" << std::endl;
+#endif
 
 }
 

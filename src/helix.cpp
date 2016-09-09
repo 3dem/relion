@@ -274,20 +274,24 @@ void checkRangesForLocalSearchHelicalSymmetry(
 		RFLOAT twist_min_deg,
 		RFLOAT twist_max_deg)
 {
+	RFLOAT rise_range_max_percentage = 0.3334;
 	RFLOAT rise_avg_A = (rise_min_A + rise_max_A) / 2.;
 	RFLOAT twist_avg_deg = (twist_min_deg + twist_max_deg) / 2.;
+	RFLOAT rise_min_A_thres = rise_avg_A * (1. - rise_range_max_percentage);
+	RFLOAT rise_max_A_thres = rise_avg_A * (1. + rise_range_max_percentage);
 
 	if ( (rise_min_A < 0.001) || (rise_max_A < 0.001) || (rise_avg_A < 0.001) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Invalid helical rise!");
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Helical rises must be larger than 0.001 Angstroms!");
 	if ( (rise_min_A > rise_max_A) || (twist_min_deg > twist_max_deg) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Minimum values of twist/rise should be smaller than their maximum values!");
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Minimum values of twist/rise must be smaller than their maximum values!");
 #define WIDE_SEARCHES
 #ifndef WIDE_SEARCHES
-	if ( (fabs(twist_avg_deg - twist_min_deg) > 180.01) || ((fabs(rise_avg_A - rise_min_A) / fabs(rise_avg_A)) > 0.3334) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Search ranges of helical parameters are too large!");
+	if ( (fabs(twist_avg_deg - twist_min_deg) > 180.01) || ((fabs(rise_avg_A - rise_min_A) / fabs(rise_avg_A)) > rise_range_max_percentage) )
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Valid search ranges for twist and rise are < 360 degrees and within ("
+				+ floatToString(rise_min_A_thres) + " A, " + floatToString(rise_max_A_thres) + " A) respectively (under the assumption that the initial rise is " + floatToString(rise_avg_A) + " A)!");
 #endif
 	if ( (rise_A < rise_min_A) || (rise_A > rise_max_A) || (twist_deg < twist_min_deg) || (twist_deg > twist_max_deg) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Helical twist and/or rise are out of their specified ranges!");
+		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Initial helical twist and/or rise are out of their specified ranges!");
 };
 
 bool localSearchHelicalSymmetry(
@@ -651,10 +655,10 @@ void checkHelicalParametersFor3DHelicalReference(
 {
 	long int half_box_len;
 	RFLOAT nr_units_min = 2.; // Minimum nr_particles required along lenZ_max
-	RFLOAT lenZ_percentage_max, rise_A_max, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix;
+	RFLOAT lenZ_percentage_min, lenZ_percentage_max, rise_A_max, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix;
 
 	if (pixel_size_A < 0.001)
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Pixel size (in Angstroms) should be larger than 0.001!");
+		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Pixel size should be larger than 0.001 Angstroms!");
 
 	sphere_radius_pix = sphere_radius_A / pixel_size_A;
 	cyl_inner_radius_pix = cyl_inner_radius_A / pixel_size_A;
@@ -665,7 +669,7 @@ void checkHelicalParametersFor3DHelicalReference(
 	half_box_len = box_len / 2 - ((box_len + 1) % 2);
 
 	if ( (fabs(twist_deg) > 360.) || ((rise_A / pixel_size_A) < 0.001) || (lenZ_percentage < 0.001) || (lenZ_percentage > 0.999) )
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Wrong helical twist, rise or lenZ!");
+		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Wrong helical twist, rise or central Z length! Twist must be within range (-360, +360) degrees. Rise must be larger than 0.001 pixels and valid central Z length should be set to 0.1%~99.9%!");
 
 	if ( (sphere_radius_pix < 2.) || (sphere_radius_pix > half_box_len)
 			|| ( (cyl_inner_radius_pix + 2.) > cyl_outer_radius_pix)
@@ -673,22 +677,29 @@ void checkHelicalParametersFor3DHelicalReference(
 			//|| ( (sphere_radius_pix + 0.001) < cyl_outer_radius_pix ) )
 			|| (sphere_radius_pix < cyl_outer_radius_pix) )
 	{
-		std::cout << "sphere_radius_pix= " << sphere_radius_pix << ", half_box_len= " << half_box_len
-				<< ", cyl_inner_radius_pix= " << cyl_inner_radius_pix << ", cyl_outer_radius_pix= " << cyl_outer_radius_pix << std::endl;
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Radii of spherical and/or cylindrical masks are invalid!");
+		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Radii of spherical and/or cylindrical masks are invalid! sphere_radius_pix = "
+				+ floatToString(sphere_radius_pix) + ", half_box_len = " + floatToString(half_box_len) + ", cyl_inner_radius_pix = "
+				+ floatToString(cyl_inner_radius_pix) + ", cyl_outer_radius_pix = " + floatToString(cyl_outer_radius_pix));
 	}
 
+	lenZ_percentage_min = (nr_units_min * rise_A) / (pixel_size_A * box_len);
 	lenZ_percentage_max = get_lenZ_percentage_max(box_len, sphere_radius_A, cyl_outer_radius_A, pixel_size_A);
 	if (lenZ_percentage > lenZ_percentage_max)
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z part is too long. (lenZ_percentage = "
-				+ floatToString(lenZ_percentage) + "; lenZ_percentage < " + floatToString(lenZ_percentage_max) + ")");
+	{
+		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z length is too big. (lenZ_percentage = "
+				+ floatToString(lenZ_percentage * 100.) + "%; please provide a value > " + floatToString(lenZ_percentage_min * 100.) + "% and < " + floatToString(lenZ_percentage_max * 100.)
+				+ "%). Please consider a larger box size if there are no valid ranges for central Z length under current settings.");
+	}
 
 	rise_A_max = get_rise_A_max(box_len, pixel_size_A, lenZ_percentage, nr_units_min);
 	if (fabs(rise_A) > rise_A_max)
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z part is too short (< nr_particles_min * helical_rise_A). (rise_A = "
-				+ floatToString(rise_A) + ", lenZ_percentage = " + floatToString(lenZ_percentage)
-				+ ", nr_particles_min = " + floatToString(nr_units_min) + "; lenZ_percentage > "
-				+ floatToString((nr_units_min * rise_A_max) / (pixel_size_A * box_len)) + ")");
+	{
+		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z length is too small (< nr_particles_min * helical_rise_A). (rise_A = "
+				+ floatToString(rise_A) + ", pixel_size = " + floatToString(pixel_size_A) + ", lenZ_percentage = " + floatToString(lenZ_percentage * 100.)
+				+ "%, nr_particles_min = " + floatToString(nr_units_min) + ", box_size = " + floatToString(box_len)
+				+ "; please provide a value > " + floatToString(lenZ_percentage_min * 100.) + "% and < " + floatToString(lenZ_percentage_max * 100.)
+				+ "%). Please consider a larger box size if there are no valid ranges for central Z length under current settings.");
+	}
 };
 
 void imposeHelicalSymmetryInRealSpace(
@@ -1549,9 +1560,11 @@ void convertHelicalTubeCoordsToMetaDataTable(
 		bool cut_into_segments)
 {
 	int nr_segments, MDobj_id;
-	RFLOAT psi_deg, psi_rad, x1, y1, x2, y2, dx, dy, xp, yp, step_pix, half_box_size_pix, len_pix, psi_prior_flip_ratio;
+	RFLOAT psi_deg, psi_rad, x1, y1, x2, y2, dx, dy, xp, yp, step_pix, half_box_size_pix, len_pix, psi_prior_flip_ratio, pitch;
+	int id;
 	MetaDataTable MD_in;
-	std::vector<RFLOAT> x1_coord_list, y1_coord_list, x2_coord_list, y2_coord_list;
+	std::vector<RFLOAT> x1_coord_list, y1_coord_list, x2_coord_list, y2_coord_list, pitch_list;
+	std::vector<int> tube_id_list;
 
 	// Check parameters and open files
 	if ( (nr_asu < 1) || (rise_A < 0.001) || (pixel_size_A < 0.01) )
@@ -1577,10 +1590,16 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates!");
     if (MD_in.numberOfObjects() % 2)
     	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs!");
+
+    // Sjors added MDin_has_id and MDin_has_pitch to allow manual calculation of different cross-over distances to be carried onto the extracted segments...
+    bool MDin_has_id = MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+    bool MDin_has_pitch =  MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH);
     x1_coord_list.clear();
     y1_coord_list.clear();
     x2_coord_list.clear();
     y2_coord_list.clear();
+    tube_id_list.clear();
+    pitch_list.clear();
     MDobj_id = 0;
     FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
     {
@@ -1591,6 +1610,16 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	{
     		x1_coord_list.push_back(xp);
     		y1_coord_list.push_back(yp);
+    		if (MDin_has_id)
+    		{
+    			MD_in.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
+    			tube_id_list.push_back(id);
+    		}
+    		if (MDin_has_pitch)
+    		{
+    			MD_in.getValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+    			pitch_list.push_back(pitch);
+    		}
     	}
     	else
     	{
@@ -1614,6 +1643,10 @@ void convertHelicalTubeCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+    if (MDin_has_id)
+    	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+    if (MDin_has_pitch)
+    	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH);
 
 	// Calculate all coordinates for helical segments
 	nr_segments = 0;
@@ -1624,6 +1657,10 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	y1 = y1_coord_list[tube_id];
     	x2 = x2_coord_list[tube_id];
     	y2 = y2_coord_list[tube_id];
+    	if (MDin_has_id)
+    		id = tube_id_list[tube_id];
+    	if (MDin_has_pitch)
+    		pitch = pitch_list[tube_id];
 
     	psi_rad = atan2(y2 - y1, x2 - x1);
     	psi_deg = RAD2DEG(psi_rad);
@@ -1640,7 +1677,12 @@ void convertHelicalTubeCoordsToMetaDataTable(
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
 	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
 	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
-			nr_segments++;
+			if (MDin_has_id)
+				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
+			if (MDin_has_pitch)
+				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+
+	        nr_segments++;
     		continue;
     	}
 
@@ -1674,7 +1716,11 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
     	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
     	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
-    			nr_segments++;
+    			if (MDin_has_id)
+    				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
+    			if (MDin_has_pitch)
+    				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+   			nr_segments++;
     		}
     	}
     }

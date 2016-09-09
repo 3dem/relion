@@ -154,6 +154,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fn_data_movie = parser.getOption("--realign_movie_frames", "Input STAR file with the movie frames", "");
 
 	do_movies_in_batches = parser.checkOption("--process_movies_in_batches", "Perform movie-processing one micrograph at a time (this reduces RAM costs for large data sets)");
+	movie_identifier = parser.getOption("--movie_name", "Identified string for all movie files, e.g. (_movie.mrcs)", "movie");
 
 	// TODO: add this to EMDL_OPTIMISER and read/write of optimiser.star
 	nr_frames_per_prior = textToInteger(parser.getOption("--nr_frames_prior", "Number of movie frames to calculate running-average priors", "5"));
@@ -311,6 +312,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0."));
 	debug2 = textToFloat(getParameter(argc, argv, "--debug2", "0."));
+	debug3 = textToFloat(getParameter(argc, argv, "--debug3", "0."));
     do_bfactor = checkParameter(argc, argv, "--bfactor");
 	// Read in initial sigmaNoise spectrum
 	fn_sigma = getParameter(argc, argv, "--sigma","");
@@ -322,6 +324,15 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_always_cc  = checkParameter(argc, argv, "--always_cc");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
+	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+
+	// Trial feature subset
+	subset_iter = 		textToInteger(parser.getOption("--subset_iter", "", "0", true));
+	subset_frac = 		textToFloat(parser.getOption("--subset_frac", "", "1", true));
+	if(subset_frac<=0 || subset_frac>1)
+		subset_frac=1;
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -489,7 +500,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
-	mymodel.padding_factor = textToInteger(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
+	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
 	mymodel.r_min_nn = textToInteger(parser.getOption("--r_min_nn", "Minimum number of Fourier shells to perform linear Fourier-space interpolation", "10"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
@@ -506,6 +517,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	dont_raise_norm_error = parser.checkOption("--dont_check_norm", "Skip the check whether the images are normalised correctly");
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
+	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1
@@ -546,6 +558,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0"));
 	debug2 = textToFloat(getParameter(argc, argv, "--debug2", "0"));
+	debug3 = textToFloat(getParameter(argc, argv, "--debug3", "0"));
 	// Read in initial sigmaNoise spectrum
 	fn_sigma = getParameter(argc, argv, "--sigma","");
 	do_calculate_initial_sigma_noise = (fn_sigma == "") ? true : false;
@@ -556,6 +569,15 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_use_all_data = checkParameter(argc, argv, "--use_all_data");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
+	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+
+	// Trial feature subset
+	subset_iter = 		textToInteger(parser.getOption("--subset_iter", "", "0", true));
+	subset_frac = 		textToFloat(parser.getOption("--subset_frac", "", "1", true));
+	if(subset_frac<=0 || subset_frac>1)
+		subset_frac=1;
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -671,7 +693,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
     minres_map = 5;
     do_bfactor = false;
     gridding_nr_iter = 10;
-    debug1 = debug2 = 0.;
+    debug1 = debug2 = debug3 = 0.;
 
     // Then read in sampling, mydata and mymodel stuff
     // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
@@ -941,6 +963,25 @@ void MlOptimiser::initialise()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
+		cudaDeviceProp deviceProp;
+		int compatibleDevices(0);
+		// Send device count seen by this slave
+		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		for(int i=0; i<devCount; i++ )
+                {
+                	HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+                        if(deviceProp.major>CUDA_CC_MAJOR)
+                        	compatibleDevices+=1;
+                       	else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
+                        	compatibleDevices+=1;
+                        //else
+                        	std::cerr << "Found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
+                }
+		if(compatibleDevices==0)
+			REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+		else if(compatibleDevices!=devCount)
+			std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+
 		std::vector < std::vector < std::string > > allThreadIDs;
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 
@@ -1078,6 +1119,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_skip_align)
 		do_gpu = false;
 
+	if (do_always_cc)
+		do_calculate_initial_sigma_noise = false;
+
     if (do_print_metadata_labels)
 	{
 		if (verb > 0)
@@ -1192,7 +1236,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mydata.read(fn_data_movie, false, false, do_preread_images);
 
 		// The group numbering might be different: re-assign groups based on group_names
-		mymodel.reassignGroupsForMovies(mydata);
+		mymodel.reassignGroupsForMovies(mydata, movie_identifier);
 
 		// Re-normalise the power spectra of the noise, as running averages of movie frames will have more noise than the average micrographs!
 		int nframes;
@@ -1271,8 +1315,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		checkHelicalParametersFor3DHelicalReference(
 				mymodel.ori_size,
 				mymodel.pixel_size,
-				mymodel.helical_twist_min,
-				mymodel.helical_rise_min,
+				mymodel.helical_twist_max,
+				mymodel.helical_rise_max,
 				helical_z_percentage,
 				(particle_diameter / 2.),
 				(helical_tube_inner_diameter / 2.),
@@ -1280,8 +1324,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		checkHelicalParametersFor3DHelicalReference(
 				mymodel.ori_size,
 				mymodel.pixel_size,
-				mymodel.helical_twist_max,
-				mymodel.helical_rise_max,
+				mymodel.helical_twist_min,
+				mymodel.helical_rise_min,
 				helical_z_percentage,
 				(particle_diameter / 2.),
 				(helical_tube_inner_diameter / 2.),
@@ -1412,7 +1456,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
-	wsum_model.initialise(mymodel, sampling.symmetryGroup());
+	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
 
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
@@ -1983,6 +2027,19 @@ void MlOptimiser::expectation()
 	if (do_shifts_onthefly)
 		precalculateABMatrices();
 
+	long int my_first_ori_particle, my_last_ori_particle;
+	long int nr_particles_todo;
+
+	if( iter<=subset_iter)
+	{
+		//if(random_seed!=0)
+		//	mydata.randomiseOriginalParticlesOrder(random_seed);
+		nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
+	}
+	else
+	{
+		nr_particles_todo = mydata.numberOfOriginalParticles();
+	}
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
@@ -1993,10 +2050,10 @@ void MlOptimiser::expectation()
 		if (!do_auto_refine)
 			std::cout << " of " << nr_iter;
 		std::cout << std::endl;
-		init_progress_bar(mydata.numberOfOriginalParticles());
+		init_progress_bar(nr_particles_todo);
 	}
 
-	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
+	int barstep = XMIPP_MAX(1, nr_particles_todo / 60);
 	long int prev_barstep = 0, nr_ori_particles_done = 0;
 
 
@@ -2053,7 +2110,7 @@ void MlOptimiser::expectation()
 				allocationSize = free - required_free;
 
 			if (allocationSize < 200000000)
-				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
 
 #ifdef PRINT_GPU_MEM_INFO
 			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
@@ -2070,8 +2127,8 @@ void MlOptimiser::expectation()
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
-	long int my_first_ori_particle, my_last_ori_particle;
-	while (nr_ori_particles_done < mydata.numberOfOriginalParticles())
+
+	while (nr_ori_particles_done < nr_particles_todo)
 	{
 
 #ifdef TIMING
@@ -2120,7 +2177,7 @@ void MlOptimiser::expectation()
 	}
 
 	if (verb > 0)
-		progress_bar(mydata.numberOfOriginalParticles());
+		progress_bar(nr_particles_todo);
 
 #ifdef CUDA
 	if (do_gpu)
@@ -2212,6 +2269,13 @@ void MlOptimiser::expectationSetup()
 
     // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
+
+	// TMP for helices of Anthiony 12 july 2016
+	if (debug1 > 0.)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes*mymodel.nr_bodies; iclass++)
+			mymodel.PPref[iclass].applyFourierMask((int)debug1, (int)debug2, debug3);
+	}
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
@@ -3184,16 +3248,25 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			// Factor 2 because of the 2-dimensionality of the complex-plane
+			float tsum = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
-			{
-				DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
-						DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
-							(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
-				// Watch out for all-zero sigma2 in case of CTF-premultiplication!
-				if (ctf_premultiplied)
-					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
+				tsum += wsum_model.sigma2_noise[igroup].data[n];
 
+//			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
+//				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
+			if(tsum!=0)
+			{
+				// Factor 2 because of the 2-dimensionality of the complex-plane
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
+				{
+					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
+							DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
+								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
+					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
+					if (ctf_premultiplied)
+						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
+
+				}
 			}
 		}
 	}
@@ -4138,9 +4211,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE),
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_CS),
 							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_Q0),
-                                                          DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC), 
-                                                          1.,
-                                                          DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
+							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC),
+							  1.,
+							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
 
 				ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
@@ -5006,11 +5079,11 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 																											iover_rot, iover_trans);
 //#define DEBUG_DIFF2_ISNAN
 #ifdef DEBUG_DIFF2_ISNAN
-											if (std::isnan(diff2))
+											//if (std::isnan(diff2))
 											{
 												pthread_mutex_lock(&global_mutex);
 												std::cerr << " ipart= " << ipart << std::endl;
-												std::cerr << " diff2= " << diff2 << " thisthread_min_diff2[ipart]= " << thisthread_min_diff2[ipart] << " ipart= " << ipart << std::endl;
+												std::cerr << " diff2= " << diff2 << " ipart= " << ipart << std::endl;
 												std::cerr << " exp_highres_Xi2_imgs[ipart]= " << exp_highres_Xi2_imgs[ipart] << std::endl;
 												std::cerr<< " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
 												std::cerr<< " exp_nr_oversampled_rot="<<exp_nr_oversampled_rot<<std::endl;
@@ -5027,14 +5100,20 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												std::cerr << " group_id= " << group_id << std::endl;
 												Image<RFLOAT> It;
 												std::cerr << "Frefctf shape= "; Frefctf.printShape(std::cerr);
-												std::cerr << "Fimg_shift shape= "; Fimg_shift.printShape(std::cerr);
+												MultidimArray<Complex> Fish;
+												Fish.resize(exp_local_Minvsigma2s[0]);
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fish)
+												{
+													DIRECT_MULTIDIM_ELEM(Fish, n) = *(Fimg_shift + n);
+												}
+												std::cerr << "Fimg_shift shape= "; (Fish).printShape(std::cerr);
 												It()=exp_local_Fctfs[ipart];
 												It.write("exp_local_Fctf.spi");
 												std::cerr << "written exp_local_Fctf.spi" << std::endl;
 												FourierTransformer transformer;
 												Image<RFLOAT> tt;
 												tt().resize(exp_current_image_size, exp_current_image_size);
-												transformer.inverseFourierTransform(Fimg_shift, tt());
+												transformer.inverseFourierTransform(Fish, tt());
 												CenterFFT(tt(),false);
 												tt.write("Fimg_shift.spi");
 												std::cerr << "written Fimg_shift.spi" << std::endl;
@@ -5051,9 +5130,11 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												tt.write("Fref.spi");
 												std::cerr << "written Fref.spi" << std::endl;
 												std::cerr << " A= " << A << std::endl;
-												std::cerr << " exp_R_mic= " << exp_R_mic << std::endl;
 												std::cerr << "written Frefctf.spi" << std::endl;
-												REPORT_ERROR("diff2 is not a number");
+												std::cerr << " press any ket to continue.. " << std::endl;
+												char c;
+												std::cin >> c;
+												//REPORT_ERROR("diff2 is not a number");
 												pthread_mutex_unlock(&global_mutex);
 											}
 #endif
@@ -6720,9 +6801,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_VOLTAGE),
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_CS),
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_Q0),
-                                                                          DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC),
-                                                                          1., 
-                                                                          DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
+									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC),
+									  1.,
+									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
 
 						Fctf.resize(exp_current_image_size, exp_current_image_size/ 2 + 1);
 						ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);

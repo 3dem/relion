@@ -430,8 +430,26 @@ bool PipeLine::importPipeline(std::string _name)
 }
 
 // Read pipeline from STAR file
-void PipeLine::read(bool only_read_if_file_exists)
+void PipeLine::read(bool do_lock)
 {
+
+	FileName fn_lock = ".lock_" + name + "_pipeline.star";
+	if (do_lock)
+	{
+		int iwait =0;
+		while( exists(fn_lock) )
+		{
+			// If the lock exists: wait 3 seconds and try again
+			std::cout << "Trying to read pipeline.star, but " << fn_lock << " exists! Waiting 3 seconds..." << std::endl;
+			sleep(3);
+			iwait++;
+			if (iwait > 20)
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock file to disappear. You may want to manually remove the file: " + fn_lock);
+		}
+		// Generate the lock file
+		touch(fn_lock);
+	}
+
 
 	// Start from scratch
 	clear();
@@ -440,12 +458,7 @@ void PipeLine::read(bool only_read_if_file_exists)
 	std::ifstream in(fn.c_str(), std::ios_base::in);
 
 	if (in.fail())
-	{
-		if (only_read_if_file_exists)
-			return;
-		else
-			REPORT_ERROR( (std::string) "PipeLine::read: File " + fn + " cannot be read." );
-	}
+		REPORT_ERROR( (std::string) "PipeLine::read: File " + fn + " cannot be read." );
 
     MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
 
@@ -573,9 +586,17 @@ void PipeLine::read(bool only_read_if_file_exists)
 
 }
 
-void PipeLine::write(FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
+void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
 {
-    std::ofstream  fh, fh_del;
+
+	FileName fn_lock = ".lock_" + name + "_pipeline.star";
+	if (do_lock)
+	{
+		if (!exists(fn_lock))
+			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it isn't there.");
+	}
+
+	std::ofstream  fh, fh_del;
     FileName fn = name + "_pipeline.star";
     fh.open(fn.c_str(), std::ios::out);
 	if (fh.fail())
@@ -729,6 +750,14 @@ void PipeLine::write(FileName fn_del, std::vector<bool> deleteNode, std::vector<
     fh.close();
     if (fn_del != "")
     	fh_del.close();
+
+	if (do_lock)
+	{
+		if (!exists(fn_lock))
+			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it is no longer there.");
+		std::remove(fn_lock.c_str());
+	}
+
 }
 
 std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long int lower_process, long int upper_process)

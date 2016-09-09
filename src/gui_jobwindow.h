@@ -37,6 +37,7 @@
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
 #define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
+#define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/bin/MotionCor2"
 #define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
 #define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
@@ -225,24 +226,34 @@ class MotioncorrJobWindow : public RelionJobWindow
 public:
 
 	InputNodeEntry input_star_mics;
+	SliderEntry angpix;
+	SliderEntry first_frame_sum;
+	SliderEntry last_frame_sum;
+
 	FileNameEntry fn_motioncorr_exe;
 	FileNameEntry fn_summovie_exe;
 	SliderEntry bin_factor;
-	SliderEntry first_frame_ali;
-	SliderEntry last_frame_ali;
-	SliderEntry first_frame_sum;
-	SliderEntry last_frame_sum;
 	SliderEntry bfactor;
 	AnyEntry other_motioncorr_args;
 	BooleanEntry do_save_movies;
 
+	BooleanEntry do_motioncor2;
+	FileNameEntry fn_gain_ref;
+	AnyEntry patch_x, patch_y;
+	SliderEntry group_frames;
+
 	BooleanEntry do_unblur;
 	FileNameEntry fn_unblur_exe;
-	SliderEntry angpix;
+
+	// Dose-weighting
+	BooleanEntry do_dose_weighting;
+	SliderEntry voltage;
+	SliderEntry dose_per_frame;
+	SliderEntry pre_exposure;
 
     AnyEntry gpu_ids;
 
-    Fl_Group *unblur_group;
+    Fl_Group *unblur_group, *motioncor2_group, *dose_weight_group;
 
 public:
 
@@ -310,6 +321,9 @@ public:
 
 	InputNodeEntry fn_input_autopick;
 	InputNodeEntry fn_refs_autopick;
+	BooleanEntry do_gauss_ref;
+	SliderEntry gauss_max;
+
 	BooleanEntry do_invert_refs;
 	BooleanEntry do_ctf_autopick;
 	BooleanEntry do_ignore_first_ctfpeak_autopick;
@@ -333,7 +347,7 @@ public:
     BooleanEntry use_gpu;
     AnyEntry gpu_ids;
 
-	Fl_Group *autopick_ctf_group, *autopick_helix_group, *gpu_group;
+	Fl_Group *autopick_ctf_group, *gauss_group, *autopick_helix_group, *gpu_group;
 
 public:
 
@@ -1048,16 +1062,26 @@ public:
 
 	// I/O
 	InputNodeEntry fn_in;
-	InputNodeEntry fn_mask;
-
-	// Params
-	FileNameEntry fn_resmap;
 	SliderEntry angpix;
+
+
+	// ResMap params
+	BooleanEntry do_resmap_locres;
+	FileNameEntry fn_resmap;
+	InputNodeEntry fn_mask;
 	SliderEntry pval;
 	SliderEntry minres;
 	SliderEntry maxres;
 	SliderEntry stepres;
 
+	// RELION params
+	BooleanEntry do_relion_locres;
+	//SliderEntry locres_sampling;
+	//SliderEntry randomize_at;
+	SliderEntry adhoc_bfac;
+	FileNameEntry fn_mtf;
+
+	Fl_Group *do_relion_group, *do_resmap_group;
 
 public:
 

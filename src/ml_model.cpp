@@ -664,17 +664,18 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 
 }
 
-void MlModel::reassignGroupsForMovies(Experiment &mydata)
+void MlModel::reassignGroupsForMovies(Experiment &mydata, std::string &movie_name)
 {
 
 	std::vector<long int> rename_ids(mydata.groups.size());
 	for (long int igr = 0; igr < mydata.groups.size(); igr++)
 	{
-		FileName data_name = mydata.groups[igr].name;
+		FileName data_name = (mydata.groups[igr].name);
+		data_name = data_name.beforeLastOf("_"+movie_name);
 		long int rename_id = -1;
 		for (long int id = 0; id < group_names.size(); id++)
 		{
-			if (data_name.contains(group_names[id].withoutExtension()))
+			if (data_name == group_names[id].withoutExtension())
 			{
 				rename_id = id;
 				break;
@@ -864,7 +865,7 @@ void MlModel::initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _he
 }
 
 /////////// MlWsumModel
-void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
+void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
@@ -882,7 +883,6 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
     sigma2_rot = _model.sigma2_rot;
     sigma2_tilt = _model.sigma2_tilt;
     sigma2_psi = _model.sigma2_psi;
-    padding_factor = _model.padding_factor;
     interpolator = _model.interpolator;
     r_min_nn = _model.r_min_nn;
 	is_helix = _model.is_helix;
@@ -893,6 +893,10 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
 	helical_rise_min = _model.helical_rise_min;
 	helical_rise_max = _model.helical_rise_max;
 	helical_rise_inistep = _model.helical_rise_inistep;
+
+    padding_factor = _model.padding_factor;
+    if (asymmetric_padding)
+    	padding_factor ++;
 
     // Don't need forward projectors in MlWsumModel!
     PPref.clear();
@@ -919,7 +923,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym)
 
     // Resize MlWsumModel-specific vectors
     BackProjector BP(ori_size, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn,
-    		         ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim);
+    		         ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim, _skip_gridding);
     BPref.clear();
     BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
     sumw_group.resize(nr_groups);

@@ -205,8 +205,26 @@ void MlOptimiserMpi::initialise()
 		// ------------------------------ FIGURE OUT GLOBAL DEVICE MAP------------------------------------------
 		if (!node->isMaster())
 		{
+			cudaDeviceProp deviceProp;
+			int compatibleDevices(0);
 			// Send device count seen by this slave
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+			for(int i=0; i<devCount; i++ )
+			{
+				HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+				if(deviceProp.major>CUDA_CC_MAJOR)
+					compatibleDevices+=1;
+				else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
+					compatibleDevices+=1;
+				//else
+				//std::cerr << "Rank " << node->rank  << " found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
+			}
+			if(compatibleDevices==0)
+				REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+			else if(compatibleDevices!=devCount)
+				std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+
+
 			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 
 			// Send host-name seen by this slave
@@ -267,6 +285,13 @@ void MlOptimiserMpi::initialise()
 			std::vector < std::vector < std::string > > allThreadIDs;
 			untangleDeviceIDs(gpu_ids, allThreadIDs);
 
+			if(allThreadIDs.size()==1)
+			{
+				allThreadIDs.resize(node->size-1);
+				for (int rank = 1; rank<(node->size-1); rank++)
+					allThreadIDs[rank] = allThreadIDs[0];
+			}
+
 			// Sequential initialisation of GPUs on all ranks
 			bool fullAutomaticMapping(true);
 			bool semiAutomaticMapping(true);
@@ -275,7 +300,7 @@ void MlOptimiserMpi::initialise()
 				fullAutomaticMapping = true;
 				semiAutomaticMapping = true; // possible to set fully manual for specific ranks
 
-				if ((allThreadIDs.size()<node->rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+				if ((allThreadIDs.size()<rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 				{
 					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
 				}
@@ -873,7 +898,7 @@ void MlOptimiserMpi::expectation()
 				allocationSize = free - required_free;
 
 			if (allocationSize < 200000000)
-				printf("WARNING: The available space on the GPU (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
+				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
 
 #ifdef PRINT_GPU_MEM_INFO
 			printf("INFO: Projector model size %dx%dx%d\n", (int)mymodel.PPref[0].data.xdim, (int)mymodel.PPref[0].data.ydim, (int)mymodel.PPref[0].data.zdim );
@@ -893,26 +918,35 @@ void MlOptimiserMpi::expectation()
 #endif // CUDA
 
 	/************************************************************************/
-
-
+	double ss_frac(1.0);
+	long int nr_particles_todo;
     if (node->isMaster())
     {
         try
         {
+			if( iter<=subset_iter && !do_split_random_halves)
+			{
+				ss_frac = subset_frac;
+				//if(random_seed!=0)
+				//	mydata.randomiseOriginalParticlesOrder(random_seed);
+			}
+
+			nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*ss_frac;
+
     		if (verb > 0)
     		{
 				std::cout << " Expectation iteration " << iter;
 				if (!do_auto_refine)
 					std::cout << " of " << nr_iter;
 				std::cout << std::endl;
-				init_progress_bar(mydata.numberOfOriginalParticles());
+				init_progress_bar(nr_particles_todo);
     		}
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
 			int random_subset = 0;
 			long int nr_ori_particles_done = 0;
 			long int prev_step_done = nr_ori_particles_done;
-			long int progress_bar_step_size = ROUND(mydata.numberOfOriginalParticles() / 80);
+			long int progress_bar_step_size = ROUND(nr_particles_todo / 80);
 			long int nr_ori_particles_done_subset1 = 0;
 			long int nr_ori_particles_done_subset2 = 0;
 			long int my_nr_ori_particles_done = 0;
@@ -966,17 +1000,21 @@ void MlOptimiserMpi::expectation()
 						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_subset2;
 						JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, JOB_FIRST + nr_pool - 1);
 					}
+					nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset));
 				}
 				else
 				{
+					long int particles_todo  = ( (double) mydata.numberOfOriginalParticles( ) ) * ss_frac;
 					random_subset = 0;
 					my_nr_ori_particles_done = nr_ori_particles_done;
 					JOB_FIRST = nr_ori_particles_done;
-					JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, JOB_FIRST + nr_pool - 1);
+					JOB_LAST  = XMIPP_MIN(particles_todo - 1, JOB_FIRST + nr_pool - 1);
+					nr_particles_todo = particles_todo;
 				}
 
 				// Now send out a new job
-				if (my_nr_ori_particles_done < mydata.numberOfOriginalParticles(random_subset))
+
+				if(my_nr_ori_particles_done < nr_particles_todo)
 				{
 
 					MlOptimiser::getMetaAndImageDataSubset(JOB_FIRST, JOB_LAST, !do_parallel_disc_io);
@@ -1255,7 +1293,7 @@ void MlOptimiserMpi::expectation()
 	exp_metadata.clear();
 
 	if (verb > 0)
-		progress_bar(mydata.numberOfOriginalParticles());
+		progress_bar((double)(mydata.numberOfOriginalParticles())*ss_frac);
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest
