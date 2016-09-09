@@ -36,21 +36,33 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	int motioncorr_section = parser.addSection("MOTIONCORR options");
-	bin_factor =  textToInteger(parser.getOption("--bin_factor", "Binning factor (integer) for scaling inside MOTIONCORR", "1"));
-	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCORR", "150"));
+	bin_factor =  textToFloat(parser.getOption("--bin_factor", "Binning factor (integer for MOTIONCORR; float for MOTIONCOR2)", "1"));
+	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCORR/MOTIONCOR2", "150"));
 	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
 	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
-	fn_other_motioncorr_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR", "");
+	fn_other_motioncorr_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR/MOTIONCOR2", "");
 	fn_motioncorr_exe = parser.getOption("--motioncorr_exe","Location of MOTIONCORR executable (or through RELION_MOTIONCORR_EXECUTABLE environment variable)","");
+
+	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
+	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2 instead of MOTIONCORR.");
+	fn_gain_reference = parser.getOption("--gainref","Location of MRC file with the gain reference to be applied","");
+	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
+	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
 
 	int unblur_section = parser.addSection("UNBLUR/SUMMOVIE options");
 	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCORR.");
 	fn_unblur_exe = parser.getOption("--unblur_exe","Location of UNBLUR (v1.0.2) executable (or through RELION_UNBLUR_EXECUTABLE environment variable)","");
 	fn_summovie_exe = parser.getOption("--summovie_exe","Location of SUMMOVIE(v1.0.2) executable (or through RELION_SUMMOVIE_EXECUTABLE environment variable)","");
-	angpix = textToFloat(parser.getOption("--angpix","Pixel size in Angstroms","1.0"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms","-1"));
 	nr_threads = textToInteger(parser.getOption("--j","Number of threads in the unblur executable","1"));
+
+	int doseweight_section = parser.addSection("Dose-weighting options");
+	do_dose_weighting = parser.checkOption("--dose_weighting", "Use MOTIONCOR2s or UNBLURs dose-weighting scheme");
+	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR","300"));
+	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "0"));
+	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -87,6 +99,9 @@ void MotioncorrRunner::initialise()
 			if (penv!=NULL)
 				fn_summovie_exe = (std::string)penv;
 		}
+
+		if (angpix < 0)
+			REPORT_ERROR("ERROR: For Unblur it is mandatory to provide the pixel size in Angstroms through --angpix.");
 	}
 	else
 	{
@@ -98,6 +113,19 @@ void MotioncorrRunner::initialise()
 			if (penv!=NULL)
 				fn_motioncorr_exe = (std::string)penv;
 		}
+	}
+
+	// Only integer scale factors for MOTIONCORR
+	if (!do_motioncor2 && std::floor(bin_factor) != bin_factor)
+		REPORT_ERROR("ERROR: only integer binning factor allowed for MOTIONCORR. (MOTIONCOR2 permits floats.)");
+
+	if (do_dose_weighting)
+	{
+		if (!(do_unblur || do_motioncor2))
+			REPORT_ERROR("ERROR: Dose-weighting can only be done by UNBLUR or MOTIONCOR2.");
+		if (angpix < 0)
+			REPORT_ERROR("ERROR: For dose-weighting it is mandatory to provide the pixel size in Angstroms through --angpix.");
+
 	}
 
 	MDavg.clear();
@@ -233,9 +261,11 @@ void MotioncorrRunner::run()
 	if (verb > 0)
 	{
 		if (do_unblur)
-			std::cout << " Correcting beam-induced motions using Niko Grigorieff's UNBLUR ..." << std::endl;
+			std::cout << " Correcting beam-induced motions using Tim Grant's UNBLUR ..." << std::endl;
+		else if (do_motioncor2)
+			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
-			std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
+			std::cout << " Correcting beam-induced motions using Xueming Li's MOTIONCORR ..." << std::endl;
 
 		init_progress_bar(fn_micrographs.size());
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
@@ -250,6 +280,8 @@ void MotioncorrRunner::run()
 
 		if (do_unblur)
 			executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+		else if (do_motioncor2)
+			executeMotioncor2(fn_micrographs[imic], xshifts, yshifts);
 		else
 			executeMotioncorr(fn_micrographs[imic], xshifts, yshifts);
 
@@ -296,7 +328,7 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 			command += " -dsp 0 -ssc 1 -fct " + fn_mov;
 
 		if (bin_factor > 1)
-			command += " -bin " + integerToString(bin_factor);
+			command += " -bin " + floatToString(bin_factor);
 
 
 		if (fn_other_motioncorr_args.length() > 0)
@@ -323,24 +355,28 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 		fh.close();
 
 		if (system(command.c_str()))
+		{
 			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-
-		// After motion-correction, check for all-zero average micrographs
-		if (exists(fn_avg))
-		{
-			Image<RFLOAT> Itest;
-			Itest.read(fn_avg, false);
-			RFLOAT avg, stddev;
-			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-			Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
-			if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
-			{
-				break;
-			}
 		}
-		else if (ipass == 2)
+		else
 		{
-			std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+			// After motion-correction, check for all-zero average micrographs
+			if (exists(fn_avg))
+			{
+				Image<RFLOAT> Itest;
+				Itest.read(fn_avg, false);
+				RFLOAT avg, stddev;
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+				if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+				{
+					break;
+				}
+			}
+			else if (ipass == 2)
+			{
+				std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+			}
 		}
 	}
 
@@ -403,6 +439,178 @@ void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &
 
 }
 
+
+void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
+{
+
+
+	FileName fn_avg, fn_mov;
+	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+
+	FileName fn_out = fn_avg.withoutExtension() + ".out";
+	FileName fn_log = fn_avg.withoutExtension() + ".log";
+	FileName fn_err = fn_avg.withoutExtension() + ".err";
+	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
+
+	for (int ipass = 0; ipass < 3; ipass++)
+	{
+
+		std::string command = fn_motioncorr_exe + " ";
+
+		if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
+			command += " -InTiff " + fn_mic;
+		else
+			command += " -InMrc " + fn_mic;
+
+		command += " -OutMrc " + fn_avg;
+
+		if (do_save_movies)
+			command += " -OutStack 1";
+
+		command += " -Patch " + integerToString(patch_x) + " " + integerToString(patch_y);
+
+		if (fn_gain_reference != "")
+			command += " -Gain " + fn_gain_reference;
+
+		// Throw away first few frames
+		if (first_frame_ali > 1)
+			command += " -Throw " + integerToString(first_frame_ali - 1);
+		// TODO: throw away last few frames
+
+		if (bin_factor > 1)
+			command += " -FtBin " + floatToString(bin_factor);
+
+		if (do_dose_weighting)
+		{
+			command += " -Kv " + floatToString(voltage);
+			command += " -FmDose " + floatToString(dose_per_frame);
+			command += " -PixSize " + floatToString(dose_per_frame);
+		}
+
+		if (fn_other_motioncorr_args.length() > 0)
+			command += " " + fn_other_motioncorr_args;
+
+		if ( allThreadIDs.size() == 0)
+		{
+			// Automated mapping
+			command += " -Gpu " + integerToString(rank % devCount);
+		}
+		else
+		{
+			if (rank >= allThreadIDs.size())
+				REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
+			command += " -Gpu " + allThreadIDs[rank][0];
+		}
+
+		command += " >> " + fn_out + " 2>> " + fn_err;
+
+		// Save the command that was executed
+		std::ofstream fh;
+		fh.open(fn_cmd.c_str(), std::ios::out);
+		fh << command << std::endl;
+		fh.close();
+
+		if (system(command.c_str()))
+		{
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+		}
+		else
+		{
+			// After motion-correction, check for all-zero average micrographs
+			FileName fn_test = (do_dose_weighting) ? fn_avg.withoutExtension() + "_DW.mrc " : fn_avg;
+			if (exists(fn_test))
+			{
+				Image<RFLOAT> Itest;
+				Itest.read(fn_test, false);
+				RFLOAT avg, stddev;
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
+				if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
+				{
+					break;
+				}
+			}
+			else if (ipass == 2)
+			{
+				std::cerr << " WARNING: " << fn_test << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+			}
+		}
+
+	} // end loop ipass
+
+	if (do_dose_weighting)
+	{
+		command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
+		if (system(command.c_str()))
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+	}
+
+	if (do_save_movies)
+	{
+		command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
+		if (system(command.c_str()))
+			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+	}
+
+	// Also analyse the shifts
+	getShiftsMotioncor2(fn_out, xshifts, yshifts);
+
+}
+
+void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
+{
+
+	std::ifstream in(fn_log.data(), std::ios_base::in);
+	if (in.fail())
+		return;
+
+	xshifts.clear();
+	yshifts.clear();
+
+    std::string line;
+
+    // Start reading the ifstream at the top
+    in.seekg(0);
+
+    // Read through the shifts file
+    int i = 0;
+    bool have_found_final = false;
+    while (getline(in, line, '\n'))
+    {
+    	// ignore all commented lines, just read first two lines with data
+    	if (line.find("Full-frame alignment shift") != std::string::npos)
+    	{
+    		have_found_final = true;
+    	}
+    	else if (have_found_final)
+    	{
+    		size_t shiftpos = line.find("shift:");
+    		if (shiftpos != std::string::npos)
+    		{
+    			std::vector<std::string> words;
+    			tokenize(line.substr(shiftpos+7), words);;
+        		if (words.size() < 2)
+        		{
+        			std::cerr << " fn_log= " << fn_log << std::endl;
+        			REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
+        		}
+        		xshifts.push_back(textToFloat(words[0]));
+    			yshifts.push_back(textToFloat(words[1]));
+    		}
+    		else
+    		{
+    			// Stop now
+    			break;
+    		}
+    	}
+    }
+    in.close();
+
+
+    if (xshifts.size() != yshifts.size())
+    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
+
+}
 void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
@@ -454,7 +662,17 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	fh << fn_avg << std::endl;
 	fh << fn_shifts << std::endl;
 	fh << angpix << std::endl; // pixel size
-	fh << "NO" << std::endl; // no dose filtering
+	if (do_dose_weighting)
+	{
+		fh << "YES" << std::endl; // apply dose weighting
+		fh << dose_per_frame << std::endl;
+		fh << voltage << std::endl;
+		fh << pre_exposure << std::endl;
+	}
+	else
+	{
+		fh << "NO" << std::endl; // no dose filtering
+	}
 	if (do_save_movies)
 	{
 		fh << "YES" << std::endl; // save movie frames

@@ -746,8 +746,10 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 				fn_img.decompose(imgno, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
-					if (fn_open_stack != "")
-						hFile.closeFile();
+					// Manual closing isn't necessary: if still open, then openFile will first close the filehandler
+					// Also closing the last one isn't necessary, as destructor will do this.
+					//if (fn_open_stack != "")
+					//	hFile.closeFile();
 					hFile.openFile(fn_stack, WRITE_READONLY);
 					fn_open_stack = fn_stack;
 				}

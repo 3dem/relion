@@ -117,6 +117,9 @@ public:
 	// Dimension of the filtered image
 	int current_size;
 
+	// Maxmimum value in the Gaussian blob reference
+	RFLOAT gauss_max_value;
+
 	// Vector with all original reference images
 	std::vector<MultidimArray<RFLOAT> > Mrefs;
 

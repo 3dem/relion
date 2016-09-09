@@ -49,9 +49,11 @@ void MotioncorrRunnerMpi::run()
 	if (verb > 0)
 	{
 		if (do_unblur)
-			std::cout << " Correcting beam-induced motions using Niko Grigorieff's UNBLUR ..." << std::endl;
+			std::cout << " Correcting beam-induced motions using Tim Grant's UNBLUR ..." << std::endl;
+		else if (do_motioncor2)
+			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
-			std::cout << " Correcting beam-induced motions using UCSF's MOTIONCORR ..." << std::endl;
+			std::cout << " Correcting beam-induced motions using Xueming Li's MOTIONCORR ..." << std::endl;
 
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
@@ -66,6 +68,8 @@ void MotioncorrRunnerMpi::run()
 
 		if (do_unblur)
 			executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+		else if (do_motioncor2)
+			executeMotioncor2(fn_micrographs[imic], xshifts, yshifts, node->rank);
 		else
 			executeMotioncorr(fn_micrographs[imic], xshifts, yshifts, node->rank);
 

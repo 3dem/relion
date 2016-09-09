@@ -168,9 +168,6 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
             swapbytes(b+i, 4);
     }
 
-    // Convert VAX floating point types if necessary
-    if ( header->amin > header->amax )
-        REPORT_ERROR("readMRC: amin > max: VAX floating point conversion unsupported for image " + name);
     long int _xDim,_yDim,_zDim;
     long int _nDim;
     _xDim = (int) header->nx;

@@ -573,7 +573,8 @@ ImportJobWindow::ImportJobWindow() : RelionJobWindow(1, HAS_NOT_MPI, HAS_NOT_THR
 Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
 Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
 Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
-For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time.");
+For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time. \n \n \
+Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -769,7 +770,7 @@ bool ImportJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 
 }
 
-MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THREAD)
+MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THREAD)
 {
 
 	type = PROC_MOTIONCORR;
@@ -786,6 +787,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 
 	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss. ");
 	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all, only for MOTIONCORR). This will be used for MOTIONCORRs -ned and -nes.");
+	angpix.place(current_y, "Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting.");
 
 	tab1->end();
 
@@ -802,13 +804,23 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	}
 
 	fn_motioncorr_exe.place(current_y, "MOTIONCORR executable:", default_location, "*.*", NULL, "Location of the MOTIONCORR executable. You can control the default of this field by setting environment variable RELION_MOTIONCORR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	motioncor2_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	motioncor2_group->end();
+	do_motioncor2.place(current_y, "Is this MOTIONCOR2?", false ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", motioncor2_group);
+
+	motioncor2_group->begin();
+	fn_gain_ref.place(current_y, "Gain-reference image:", "", "*.mrc", NULL, "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
+	patch_x.placeOnSameYPosition(current_y, "Number of patches X, Y:", "Number of patches X:", "1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	patch_y.placeOnSameYPosition(current_y, "", "Number of patches Y:", "1", "Number of patches (in X and Y direction) to apply motioncor2.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	current_y += STEPY + 2;
+	group_frames.place(current_y, "Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
+	motioncor2_group->end();
+	do_motioncor2.cb_menu_i(); // make default active
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	bin_factor.place(current_y, "Binning factor (1 or 2):", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images.");
-	first_frame_ali.place(current_y, "First frame for alignment:", 1, 1, 32, 1, "First frame to use in alignment and corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss");
-	last_frame_ali.place(current_y, "Last frame for alignment:", 0, 0, 32, 1, "Last frame to use in alignment and corrected average (0 means use all). This will be used for MOTIONCORRs -ned and -nes");
+	bin_factor.place(current_y, "Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Only integer values are allowed for MOTIONCORR, but float-values may be used for MOTIONCOR2. Do make sure though that the resulting micrograph size is even.");
 	bfactor.place(current_y, "Bfactor:", 150, 0, 1500, 50, "The B-factor (in pixel^2) that MOTIONCORR will apply to the micrographs. The MOTIONCORR Readme.txt says: A bfactor 150 or 200pix^2 is good for most cryoEM image with 2x binned super-resolution image. For unbined image, a larger bfactor is needed.");
 
 	// Add a little spacer
@@ -820,19 +832,16 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	other_motioncorr_args.place(current_y, "Other MOTIONCORR arguments", "", "Additional arguments that need to be passed to MOTIONCORR.");
 
 	tab2->end();
-
 	tab3->begin();
 	tab3->label("Unblur");
 	resetHeight();
 
-
 	unblur_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	unblur_group->end();
 
-	do_unblur.place(current_y, "Use UNBLUR instead of MOTIONCORR?", false ,"If set to Yes, Niko Grigoerieff's UNBLUR will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", unblur_group);
+	do_unblur.place(current_y, "Use UNBLUR instead?", false ,"If set to Yes, Niko Grigoerieff's UNBLUR will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", unblur_group);
 
 	unblur_group->begin();
-
 
 	// Check for environment variable RELION_UNBLUR_EXECUTABL
 	char * default_location2 = getenv ("RELION_UNBLUR_EXECUTABLE");
@@ -852,12 +861,28 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(3, HAS_MPI, HAS_THR
 	}
 	fn_summovie_exe.place(current_y, "SUMMOVIE executable:", default_location3, "*.*", NULL, "Location of the SUMMOVIE executable. You can control the default of this field by setting environment variable RELION_SUMMOVIE_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with summovie version 1.0.2.");
 
-	angpix.place(current_y, "Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the movies. All outputs will be in Angstroms, and internally a default B-factor of 1500A^2 is calculated using this value.");
 	unblur_group->end();
-
+	do_unblur.cb_menu_i(); // make default active
 
 	tab3->end();
+	tab4->begin();
+	tab4->label("Dose-weight");
+	resetHeight();
 
+	dose_weight_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	dose_weight_group->end();
+
+	do_dose_weighting.place(current_y, "Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted using either UNBLUR or MOTIONCOR2. Note this does not work in MOTIONCORR.", dose_weight_group);
+
+	dose_weight_group->begin();
+
+	voltage.place(current_y, "Voltage (kV):", 300, 80, 300, 20, "Acceleration voltage in kV.");
+	dose_per_frame.place(current_y, "Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
+	pre_exposure.place(current_y, "Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom). This is only used by UNBLUR, not by MOTIONCOR2.");
+
+	dose_weight_group->end();
+	do_dose_weighting.cb_menu_i(); // make default active
+	tab4->end();
 
 	// read settings if hidden file exists
 	read(".gui_motioncorr", is_continue);
@@ -875,20 +900,30 @@ void MotioncorrJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star_mics.writeValue(fh);
-	fn_motioncorr_exe.writeValue(fh);
-	bin_factor.writeValue(fh);
-	first_frame_ali.writeValue(fh);
-	last_frame_ali.writeValue(fh);
+	do_save_movies.writeValue(fh);
 	first_frame_sum.writeValue(fh);
 	last_frame_sum.writeValue(fh);
-	do_save_movies.writeValue(fh);
+	angpix.writeValue(fh);
+
+	fn_motioncorr_exe.writeValue(fh);
+	do_motioncor2.writeValue(fh);
+	fn_gain_ref.writeValue(fh);
+	patch_x.writeValue(fh);
+	patch_y.writeValue(fh);
+	group_frames.writeValue(fh);
+	bin_factor.writeValue(fh);
 	bfactor.writeValue(fh);
 	gpu_ids.writeValue(fh);
 	other_motioncorr_args.writeValue(fh);
+
 	do_unblur.writeValue(fh);
 	fn_unblur_exe.writeValue(fh);
 	fn_summovie_exe.writeValue(fh);
-	angpix.writeValue(fh);
+
+	do_dose_weighting.writeValue(fh);
+	voltage.writeValue(fh);
+	dose_per_frame.writeValue(fh);
+	pre_exposure.writeValue(fh);
 
 	closeWriteFile(fh, fn);
 }
@@ -906,20 +941,30 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star_mics.readValue(fh);
-		fn_motioncorr_exe.readValue(fh);
-		bin_factor.readValue(fh);
-		first_frame_ali.readValue(fh);
-		last_frame_ali.readValue(fh);
+		do_save_movies.readValue(fh);
 		first_frame_sum.readValue(fh);
 		last_frame_sum.readValue(fh);
-		do_save_movies.readValue(fh);
+		angpix.readValue(fh);
+
+		fn_motioncorr_exe.readValue(fh);
+		do_motioncor2.readValue(fh);
+		fn_gain_ref.readValue(fh);
+		patch_x.readValue(fh);
+		patch_y.readValue(fh);
+		group_frames.readValue(fh);
+		bin_factor.readValue(fh);
 		bfactor.readValue(fh);
 		gpu_ids.readValue(fh);
 		other_motioncorr_args.readValue(fh);
+
 		do_unblur.readValue(fh);
 		fn_unblur_exe.readValue(fh);
 		fn_summovie_exe.readValue(fh);
-		angpix.readValue(fh);
+
+		do_dose_weighting.readValue(fh);
+		voltage.readValue(fh);
+		dose_per_frame.readValue(fh);
+		pre_exposure.readValue(fh);
 
 		closeReadFile(fh);
 		_is_continue = is_continue;
@@ -932,19 +977,30 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	input_star_mics.deactivate(is_continue);
-	bin_factor.deactivate(is_continue);
-	fn_motioncorr_exe.deactivate(is_continue);
-	first_frame_ali.deactivate(is_continue);
-	last_frame_ali.deactivate(is_continue);
+	do_save_movies.deactivate(is_continue);
 	first_frame_sum.deactivate(is_continue);
 	last_frame_sum.deactivate(is_continue);
-	do_save_movies.deactivate(is_continue);
+	angpix.deactivate(is_continue);
+
+	fn_motioncorr_exe.deactivate(is_continue);
+	do_motioncor2.deactivate(is_continue);
+	fn_gain_ref.deactivate(is_continue);
+	patch_x.deactivate(is_continue);
+	patch_y.deactivate(is_continue);
+	group_frames.deactivate(is_continue);
+	bin_factor.deactivate(is_continue);
 	bfactor.deactivate(is_continue);
+	gpu_ids.deactivate(is_continue);
 	other_motioncorr_args.deactivate(is_continue);
+
 	do_unblur.deactivate(is_continue);
 	fn_unblur_exe.deactivate(is_continue);
 	fn_summovie_exe.deactivate(is_continue);
-	angpix.deactivate(is_continue);
+
+	do_dose_weighting.deactivate(is_continue);
+	voltage.deactivate(is_continue);
+	dose_per_frame.deactivate(is_continue);
+	pre_exposure.deactivate(is_continue);
 
 }
 
@@ -977,8 +1033,11 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	pipelineOutputName = outputname;
 	Node node2(outputname + "corrected_micrographs.star", NODE_MICS);
 	pipelineOutputNodes.push_back(node2);
-	Node node3(outputname + "corrected_micrograph_movies.star", NODE_MOVIES);
-	pipelineOutputNodes.push_back(node3);
+	if (do_save_movies.getValue())
+	{
+		Node node3(outputname + "corrected_micrograph_movies.star", NODE_MOVIES);
+		pipelineOutputNodes.push_back(node3);
+	}
 	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
 	pipelineOutputNodes.push_back(node4);
 
@@ -988,7 +1047,7 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 	command += " --first_frame_sum " + floatToString(first_frame_sum.getValue());
 	command += " --last_frame_sum " + floatToString(last_frame_sum.getValue());
 
-		if (do_unblur.getValue())
+	if (do_unblur.getValue())
 	{
 		command += " --use_unblur";
 		command += " --j " + floatToString(nr_threads.getValue());
@@ -1001,9 +1060,18 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 		// Motioncorr-specific stuff
 		command += " --bin_factor " + floatToString(bin_factor.getValue());
 		command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
-		command += " --first_frame_ali " + floatToString(first_frame_ali.getValue());
-		command += " --last_frame_ali " + floatToString(last_frame_ali.getValue());
 		command += " --bfactor " + floatToString(bfactor.getValue());
+
+		// Motioncor2-specific stuff
+		if (do_motioncor2.getValue())
+		{
+			command += " --use_motioncor2";
+			command += " --angpix " +  floatToString(angpix.getValue());
+			command += " --patch_x " + patch_x.getValue();
+			command += " --patch_y " + patch_y.getValue();
+			if ((fn_gain_ref.getValue()).length() > 0)
+				command += " --gainref " + fn_gain_ref.getValue();
+		}
 
 		if ((other_motioncorr_args.getValue()).length() > 0)
 			command += " --other_motioncorr_args \" " + other_motioncorr_args.getValue() + " \"";
@@ -1011,6 +1079,14 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 		// Which GPUs to use?
 		command += " --gpu " + gpu_ids.getValue();
 
+	}
+
+	if (do_dose_weighting.getValue())
+	{
+		command += " --dose_weighting";
+		command += " --voltage " + floatToString(voltage.getValue());
+		command += " --dose_per_frame " + floatToString(dose_per_frame.getValue());
+		command += " --preexposure " + floatToString(pre_exposure.getValue());
 	}
 
 	if (is_continue)
@@ -1610,10 +1686,22 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	fn_input_autopick.place(current_y, "Input micrographs for autopick:", NODE_MICS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
 	fn_refs_autopick.place(current_y, "References:", NODE_2DREFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 
+	gauss_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	gauss_group->end();
+	do_gauss_ref.place(current_y, "Or use Gaussian blob?", false, "If set to Yes, a Gaussian blob will be used as a reference (you can then leave the 'References' field empty. The preferred way to autopick is by setting this to no and providing references that were generated by 2D classification from this data set in RELION. The Gaussian blob references may be useful to kickstart a new data set.", gauss_group);
+
+	gauss_group->begin();
+
+	gauss_max.place(current_y, "Gaussian peak value", 0.1, 0.01, 0.5, 0.01, "The peak value of the Gaussian blob. Weaker data will need lower values.");
+	gauss_group->end();
+
+	do_gauss_ref.cb_menu_i();
+
 	// Add a little spacer
 	current_y += STEPY/2;
-
 	angpix.place(current_y, "Pixel size in micrographs (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+	particle_diameter.place(current_y, "Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
+
 
 	tab1->end();
 	tab2->begin();
@@ -1628,7 +1716,6 @@ AutopickJobWindow::AutopickJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THR
 	lowpass.place(current_y, "Lowpass filter references (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
 	highpass.place(current_y, "Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter.  Useful values are often in the range of 200-400 Angstroms.");
 	angpix_ref.place(current_y, "Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
-	particle_diameter.place(current_y, "Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1733,6 +1820,8 @@ void AutopickJobWindow::write(std::string fn)
 
 	fn_input_autopick.writeValue(fh);
 	fn_refs_autopick.writeValue(fh);
+	do_gauss_ref.writeValue(fh);
+	gauss_max.writeValue(fh);
 	do_invert_refs.writeValue(fh);
 	do_ctf_autopick.writeValue(fh);
 	do_ignore_first_ctfpeak_autopick.writeValue(fh);
@@ -1774,6 +1863,8 @@ void AutopickJobWindow::read(std::string fn, bool &_is_continue)
 
 		fn_input_autopick.readValue(fh);
 		fn_refs_autopick.readValue(fh);
+		do_gauss_ref.readValue(fh);
+		gauss_max.readValue(fh);
 		do_invert_refs.readValue(fh);
 		do_ctf_autopick.readValue(fh);
 		do_ignore_first_ctfpeak_autopick.readValue(fh);
@@ -1809,6 +1900,7 @@ void AutopickJobWindow::toggle_new_continue(bool _is_continue)
 
 	fn_input_autopick.deactivate(is_continue);
 	fn_refs_autopick.deactivate(is_continue);
+	do_gauss_ref.deactivate(is_continue);
 	do_invert_refs.deactivate(is_continue);
 	do_ctf_autopick.deactivate(is_continue);
 	do_ignore_first_ctfpeak_autopick.deactivate(is_continue);
@@ -1846,14 +1938,22 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	Node node(fn_input_autopick.getValue(), fn_input_autopick.type);
 	pipelineInputNodes.push_back(node);
 
-	if (fn_refs_autopick.getValue() == "")
+	if (do_gauss_ref.getValue())
 	{
-		fl_message("ERROR: empty field for input references...");
-		return false;
+		command += " --ref gauss ";
+		command += " --gauss_max " + floatToString(gauss_max.getValue());
 	}
-	command += " --ref " + fn_refs_autopick.getValue();
-	Node node2(fn_refs_autopick.getValue(), fn_refs_autopick.type);
-	pipelineInputNodes.push_back(node2);
+	else
+	{
+		if (fn_refs_autopick.getValue() == "")
+		{
+			fl_message("ERROR: empty field for references...");
+			return false;
+		}
+		command += " --ref " + fn_refs_autopick.getValue();
+		Node node2(fn_refs_autopick.getValue(), fn_refs_autopick.type);
+		pipelineInputNodes.push_back(node2);
+	}
 
 	// Output
 	Node node3(outputname + "coords_suffix_autopick.star", NODE_MIC_COORDS);
@@ -2799,6 +2899,7 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
+	highres_limit.deactivate(is_continue);
 	do_ctf_correction.deactivate(is_continue);
 	ctf_phase_flipped.deactivate(is_continue);
 	ctf_intact_first_peak.deactivate(is_continue);
@@ -3432,6 +3533,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	//Optimisation
 	do_zero_mask.deactivate(is_continue);
+	highres_limit.deactivate(is_continue);
 
 	// Helix
 	do_helix.deactivate(is_continue);
@@ -4662,6 +4764,7 @@ bool MovieRefineJobWindow::getCommands(std::string &outputname, std::vector<std:
 	}
 
 	command += " --movie_frames_running_avg " + floatToString(movie_runavg_window.getValue());
+	command += " --movie_name " + movie_rootname.getValue();
 	command += " --sigma_off " + floatToString(movie_sigma_offset.getValue());
 
 	if (do_alsorot_movies.getValue())

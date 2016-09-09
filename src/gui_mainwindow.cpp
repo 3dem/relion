@@ -581,7 +581,7 @@ static void Timer_CB(void *userdata)
     // If the GUI has been idle for too long, then exit
 	if (dif > o->exit_after_sec)
     {
-		std::cout << " The GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
+		std::cout << " The relion GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
 		exit(0);
     }
 
@@ -1812,6 +1812,8 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (!jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DO_MKDIR))
 	{
 		std::cout << " Cancelling job" << std::endl;
+		// Repeat write-out to delete .lock file
+		pipeline.write(DO_LOCK);
 		return;
 	}
 
