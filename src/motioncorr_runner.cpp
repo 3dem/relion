@@ -128,9 +128,6 @@ void MotioncorrRunner::initialise()
 
 	}
 
-	MDavg.clear();
-	MDmov.clear();
-
 #ifdef CUDA
 	if (!do_unblur)
 	{
@@ -141,8 +138,6 @@ void MotioncorrRunner::initialise()
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	}
 #endif
-
-	FileName fn_avg, fn_mov;
 
 	// Set up which micrograph movies to run MOTIONCORR on
 	if (fn_in.isStarFile())
@@ -155,29 +150,11 @@ void MotioncorrRunner::initialise()
 			FileName fn_mic;
 			MDin.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
 			fn_micrographs.push_back(fn_mic);
-
-			// For output STAR file
-			getOutputFileNames(fn_mic, fn_avg, fn_mov);
-			MDmov.addObject();
-			MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
-			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
-			MDavg.addObject();
-			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 		}
 	}
 	else
 	{
 		fn_in.globFiles(fn_micrographs);
-
-		// For output STAR file
-		for (size_t imic = 0; imic < fn_micrographs.size(); imic++)
-		{
-			getOutputFileNames(fn_micrographs[imic], fn_avg, fn_mov);
-			MDmov.addObject();
-			MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
-			MDavg.addObject();
-			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
-		}
 	}
 
 	// If we're continuing an old run, see which micrographs have not been finished yet...
@@ -278,30 +255,31 @@ void MotioncorrRunner::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
-		if (do_unblur)
-			executeUnblur(fn_micrographs[imic], xshifts, yshifts);
-		else if (do_motioncor2)
-			executeMotioncor2(fn_micrographs[imic], xshifts, yshifts);
-		else
-			executeMotioncorr(fn_micrographs[imic], xshifts, yshifts);
 
-		plotShifts(fn_micrographs[imic], xshifts, yshifts);
+		bool result = false;
+		if (do_unblur)
+			result = executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+		else if (do_motioncor2)
+			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts);
+		else
+			result = executeMotioncorr(fn_micrographs[imic], xshifts, yshifts);
+
+		if (result)
+			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+
 	}
 
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
-	// Make a logfile with the shifts in pdf format
-	generateLogFilePDF();
+	// Make a logfile with the shifts in pdf format and write output STAR files
+	generateLogFilePDFAndWriteStarFiles();
 
-	// Write out STAR files at the end
-	MDavg.write(fn_out + "corrected_micrographs.star");
-	MDmov.write(fn_out + "corrected_micrograph_movies.star");
 
 }
 
 
-void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
+bool MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
 {
 
 
@@ -376,6 +354,7 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 			else if (ipass == 2)
 			{
 				std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
+				return false;
 			}
 		}
 	}
@@ -383,6 +362,8 @@ void MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xs
 	// Also analyse the shifts
 	getShiftsMotioncorr(fn_log, xshifts, yshifts);
 
+	// Success!
+	return true;
 }
 
 void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
@@ -440,7 +421,7 @@ void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &
 }
 
 
-void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
+bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
 {
 
 
@@ -510,27 +491,38 @@ void MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	if (system(command.c_str()))
 	{
 		std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+		return false;
 	}
 	else
 	{
 		if (do_dose_weighting)
 		{
-			command = "mv " + fn_avg.withoutExtension() + "_DW.mrc " + fn_avg;
-			if (system(command.c_str()))
-				std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+			// Move movie .mrc to new .mrcs filename
+			FileName fn_tmp = fn_avg.withoutExtension() + "_DW.mrc";
+			if (std::rename(fn_tmp.c_str(), fn_avg.c_str()))
+			{
+				std::cerr << "ERROR in renaming: " << fn_tmp << " to " << fn_avg <<std::endl;
+				return false;
+			}
 		}
 
 		if (do_save_movies)
 		{
-			command = "mv " + fn_avg.withoutExtension() + "_Stk.mrc " + fn_mov;
-			if (system(command.c_str()))
-				std::cerr << " WARNING: there was an error executing: " << command << std::endl;
+			// Move movie .mrc to new .mrcs filename
+			FileName fn_tmp = fn_avg.withoutExtension() + "_Stk.mrc";
+			if (std::rename(fn_tmp.c_str(), fn_mov.c_str()))
+			{
+				std::cerr << "ERROR in renaming: " << fn_tmp << " to " << fn_mov <<std::endl;
+				return false;
+			}
 		}
 
 		// Also analyse the shifts
 		getShiftsMotioncor2(fn_out, xshifts, yshifts);
 	}
 
+	// Success!
+	return true;
 }
 
 void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
@@ -587,7 +579,7 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &
     	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
 
 }
-void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
+bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
 {
 
 	FileName fn_avg, fn_mov;
@@ -665,10 +657,10 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	// Execute unblur
 	std::string command = "csh "+ fn_com;
 	if (system(command.c_str()))
-        {
-            std::cerr << "ERROR in executing: " << command << std::endl;
-            return;
-        }
+	{
+		std::cerr << "ERROR in executing: " << command << std::endl;
+		return false;
+    }
 
 	// Also analyse the shifts
 	getShiftsUnblur(fn_shifts, xshifts, yshifts);
@@ -707,7 +699,7 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 		if (system(command2.c_str()))
 		{
 			std::cerr << "ERROR in executing: " << command2 <<std::endl;
-			return;
+			return false;
 		}
 
 		// Plot ther FRC
@@ -715,11 +707,20 @@ void MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	}
 
 	// Move movie .mrc to new .mrcs filename
-	std::rename(fn_tmp_mov.c_str(), fn_mov.c_str());
+	if (do_save_movies)
+	{
+		if (std::rename(fn_tmp_mov.c_str(), fn_mov.c_str()))
+		{
+			std::cerr << "ERROR in renaming: " << fn_tmp_mov << " to " << fn_mov <<std::endl;
+			return false;
+		}
+	}
 
 	// remove symbolic link
 	std::remove(fn_tmp_mic.c_str());
 
+	// Success!
+	return true;
 }
 
 void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, std::vector<float> &yshifts)
@@ -855,7 +856,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 }
 
 
-void MotioncorrRunner::generateLogFilePDF()
+void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 {
 
 	if (fn_ori_micrographs.size() > 0)
@@ -876,5 +877,33 @@ void MotioncorrRunner::generateLogFilePDF()
 		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
 
 	}
+
+	// Also write out the output star files
+	MDavg.clear();
+	MDmov.clear();
+
+	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
+	{
+		// For output STAR file
+		FileName fn_avg, fn_mov;
+		getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
+		if (exists(fn_avg))
+		{
+			MDavg.addObject();
+			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			if (do_save_movies && exists(fn_mov))
+			{
+				MDmov.addObject();
+				MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+				MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+			}
+		}
+	}
+
+	// Write out STAR files at the end
+	MDavg.write(fn_out + "corrected_micrographs.star");
+	if (do_save_movies)
+		MDmov.write(fn_out + "corrected_micrograph_movies.star");
+
 }
 
