@@ -188,12 +188,15 @@ void MotioncorrRunner::initialise()
 	}
 
 	// Motioncorr starts counting frames at 0:
-	first_frame_ali -= 1;
-	first_frame_sum -= 1;
-	if (last_frame_ali != 0)
-		last_frame_ali -= 1;
-	if (last_frame_sum != 0)
-		last_frame_sum -= 1;
+	if (!(do_unblur || do_motioncor2))
+	{
+		first_frame_ali -= 1;
+		first_frame_sum -= 1;
+		if (last_frame_ali != 0)
+			last_frame_ali -= 1;
+		if (last_frame_sum != 0)
+			last_frame_sum -= 1;
+	}
 
 	if (verb > 0)
 	{
@@ -451,8 +454,8 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -Gain " + fn_gain_reference;
 
 	// Throw away first few frames
-	if (first_frame_ali > 1)
-		command += " -Throw " + integerToString(first_frame_ali - 1);
+	if (first_frame_sum > 1)
+		command += " -Throw " + integerToString(first_frame_sum - 1);
 	// TODO: throw away last few frames
 
 	if (bin_factor > 1)
@@ -666,8 +669,8 @@ bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	getShiftsUnblur(fn_shifts, xshifts, yshifts);
 
 	// If the requested sum is only a subset, then use summovie to make the average
-	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum + 1;
-	if (first_frame_sum != 0 || mylastsum != Nframes)
+	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum;
+	if (first_frame_sum != 1 || mylastsum != Nframes)
 	{
 		FileName fn_com2 = fn_root + "_summovie.com";
 		FileName fn_log2 = fn_root + "_summovie.log";
@@ -687,7 +690,7 @@ bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 		fh2 << fn_avg << std::endl;
 		fh2 << fn_shifts << std::endl;
 		fh2 << fn_frc << std::endl;
-		fh2 << first_frame_sum + 1 << std::endl;
+		fh2 << first_frame_sum << std::endl;
 		fh2 << mylastsum << std::endl;
 		fh2 << angpix << std::endl; // pixel size
 		fh2 << "NO" << std::endl; // dont set expert options
