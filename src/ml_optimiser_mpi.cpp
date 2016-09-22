@@ -549,7 +549,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	}
 
 	// Now copy particle stacks to scratch if needed
-    if (fn_scratch != "" && !do_preread_images)
+    if (fn_scratch != "" && !do_preread_images && !do_reuse_scratch)
     {
     	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
     	if (do_parallel_disc_io)
