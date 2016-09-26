@@ -1274,8 +1274,8 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
 	fh << " Starting a new scheduler execution called " << fn_sched << std::endl;
 	fh << " The scheduled jobs are: " << std::endl;
-	for (long int i = 0; i < scheduled_processes.size(); i++)
-		fh << " - " << pipeline.processList[scheduled_processes[i]].name << std::endl;
+	for (long int i = 0; i < my_scheduled_processes.size(); i++)
+		fh << " - " << pipeline.processList[my_scheduled_processes[i]].name << std::endl;
 	fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
 	if (nr_repeat > 1)
 		fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
@@ -1295,6 +1295,17 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 		{
 			current_job = my_scheduled_processes[i];
 			loadJobFromPipeline();
+
+			// Check whether the input nodes are there, before executing the job
+			for (long int inode = 0; inode < pipeline.processList[current_job].inputNodeList.size(); inode++)
+			{
+				long int mynode = pipeline.processList[current_job].inputNodeList[inode];
+				while (!exists(pipeline.nodeList[mynode].name))
+				{
+					fh << " + -- Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
+					sleep(10);
+				}
+			}
 			fh << " + -- Executing " << pipeline.processList[current_job].name << " .. " << std::endl;
 			cb_run_i(false, false); //dont only schedule and dont open the editor window
 
@@ -1343,7 +1354,8 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 				// Write the pipeline to an updated STAR file
 				pipeline.write(DO_LOCK);
 			}
-		}
+		} //end loop my_scheudled_processes
+
 
 		if (!fn_check_exists)
 			break;
@@ -1833,28 +1845,16 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	// If this is a continuation job, check whether output files exist and move away!
 	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
+	bool do_move_output_nodes_to_old = false;
 	if (!only_schedule && is_main_continue)
 	{
-		bool skip_this = (pipeline.processList[current_job].type == PROC_2DCLASS ||
+		do_move_output_nodes_to_old = !(pipeline.processList[current_job].type == PROC_2DCLASS ||
 				pipeline.processList[current_job].type == PROC_3DCLASS ||
 				pipeline.processList[current_job].type == PROC_3DAUTO ||
 				pipeline.processList[current_job].type == PROC_MANUALPICK ||
 				pipeline.processList[current_job].type == PROC_CLASSSELECT ||
 				pipeline.processList[current_job].type == PROC_MOVIEREFINE ||
 				pipeline.processList[current_job].type == PROC_POLISH);
-		if (!skip_this )
-		{
-			for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
-			{
-				int j = pipeline.processList[current_job].outputNodeList[i];
-				std::string fn_node = pipeline.nodeList[j].name;
-				if (exists(fn_node))
-				{
-					std::string path2 =  fn_node + ".old";
-					rename(fn_node.c_str(), path2.c_str());
-				}
-			}
-		}
 
 		// For continuation of relion_refine jobs, remove the original output nodes from the list
 		if (pipeline.processList[current_job].type == PROC_2DCLASS ||
@@ -1881,7 +1881,25 @@ void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 			pipeline.read(DO_LOCK);
 
 		}
+	} // end if !only_schedule && is_main_continue
 
+	// If a job is executed with PROC_SCHEDULED_NEW, then also move away any existing output node files
+	if (current_job >= 0 && pipeline.processList[current_job].status == PROC_SCHEDULED_NEW)
+		do_move_output_nodes_to_old = true;
+
+	// Move away existing output nodes
+	if (do_move_output_nodes_to_old)
+	{
+		for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
+		{
+			int j = pipeline.processList[current_job].outputNodeList[i];
+			std::string fn_node = pipeline.nodeList[j].name;
+			if (exists(fn_node))
+			{
+				std::string path2 =  fn_node + ".old";
+				rename(fn_node.c_str(), path2.c_str());
+			}
+		}
 	}
 
 	// Now save the job (and its status) to the PipeLine
@@ -3186,16 +3204,20 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
  * Sub-tomogram averaging : \n \
      Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
 Please also cite the following EXTERNAL programs: \n \n \
-* CTFFIND for CTF-estimation: \n \
-    Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
 * MOTIONCORR for beam-induced motion correction: \n \
     Li et al (2013) Nat. Methods (PMID: 23644547) \n \n\
-* ResMap for local-resolution estimation:  \n\
-    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
+* UNBLUR for beam-induced motion correction: \n \
+    Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
+* MOTIONCOR2 for beam-induced motion correction: \n \
+    Zheng et al (2013) bioRxiv 061960 \n \n\
+* CTFFIND for CTF-estimation: \n \
+    Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
 * CTFFIND4 for CTF-estimation: \n \
     Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
 * Gctf for CTF-estimation: \n \
     Zhang (2016) J. Struct. Biol. (PMID: 2659270) \n \n\
+* ResMap for local-resolution estimation:  \n\
+    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
 * Postscript plots are made using CPlot2D from  www.amzsaki.com\n \
 ");
 }

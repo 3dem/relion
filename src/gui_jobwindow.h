@@ -36,8 +36,7 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
 #define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
-#define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCORR/bin/motioncorr"
-#define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/bin/MotionCor2"
+#define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
 #define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
