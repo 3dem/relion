@@ -117,6 +117,9 @@ bool replaceStringOnce(Fl_Text_Buffer *textbuf, std::string replacethis, std::st
 void replaceStringAll(Fl_Text_Buffer *textbuf, std::string replacethis, std::string replaceby);
 void appendLineString(Fl_Text_Buffer *textbuf, std::string copylinewiththis, int times);
 
+// A text to Float converter that raises an error window.
+float fltkTextToFloat(const char* str);
+
 /** This class displays opens an additional window with (help) text
  *
  */

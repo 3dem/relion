@@ -19,6 +19,17 @@
  ***************************************************************************/
 #include "src/gui_entries.h"
 
+float fltkTextToFloat(const char* str)
+{
+	float result = -999.;
+    if (str == NULL)
+    	fl_message("ERROR: NULL entry for TextToFloat conversion. Check your inputs!");
+    else if (!sscanf(str, "%f", &result))
+    	fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
+
+    return result;
+}
+
 // This allows CURRENT_ODIR browse buttons
 std::string current_browse_directory;
 
@@ -797,7 +808,7 @@ void SliderEntry::deactivate(bool do_deactivate)
 
 float SliderEntry::getValue()
 {
-	return textToFloat(inp->value());
+	return fltkTextToFloat(inp->value());
 }
 
 void SliderEntry::readValue(std::ifstream& in)
@@ -806,7 +817,7 @@ void SliderEntry::readValue(std::ifstream& in)
 	{
 		AnyEntry::readValue(in);
 		// Also reset the slider
-		slider->value(textToFloat(inp->value()));
+		slider->value(fltkTextToFloat(inp->value()));
 	}
 }
 
@@ -845,9 +856,7 @@ void SliderEntry::cb_input_i() {
         return;
     } else {
         recurse = 1;
-        //slider->value(textToFloat(my_input->value()));         // pass input's value to slider
-        slider->value(textToFloat(inp->value()));         // pass input's value to slider
-        //inp->value(my_input->value()); // also set the normal input for getValue!
+        slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
         recurse = 0;
     }
 }
