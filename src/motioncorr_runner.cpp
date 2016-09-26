@@ -465,7 +465,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	{
 		command += " -Kv " + floatToString(voltage);
 		command += " -FmDose " + floatToString(dose_per_frame);
-		command += " -PixSize " + floatToString(dose_per_frame);
+		command += " -PixSize " + floatToString(angpix);
 	}
 
 	if (fn_other_motioncorr_args.length() > 0)
