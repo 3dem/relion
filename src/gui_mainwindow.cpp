@@ -208,7 +208,7 @@ NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn
 	cancel_button->color(GUI_RUNBUTTON_COLOR);
 	cancel_button->labelsize(12);
 	cancel_button->callback( cb_cancel, this);
-
+	resizable(*this);
 
 }
 
