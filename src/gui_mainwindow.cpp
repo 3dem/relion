@@ -1283,9 +1283,10 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
 
 	int repeat = 0;
+	time_t now = time(0);
 	for (repeat = 0 ; repeat < nr_repeat; repeat++)
 	{
-		fh << " + Starting the " << repeat+1 << "th repeat .." << std::endl;
+		fh << " + " << ctime(&now) << " -- Starting the " << repeat+1 << "th repeat" << std::endl;
 
 		// Get starting time of the repeat cycle
 		timeval time_start, time_end;
@@ -1306,7 +1307,8 @@ void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, i
 					sleep(10);
 				}
 			}
-			fh << " + -- Executing " << pipeline.processList[current_job].name << " .. " << std::endl;
+			now = time(0);
+			fh << " + " << ctime(&now) << " ---- Executing " << pipeline.processList[current_job].name  << std::endl;
 			cb_run_i(false, false); //dont only schedule and dont open the editor window
 
 			// Now wait until that job is done!
