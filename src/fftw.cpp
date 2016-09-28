@@ -1114,8 +1114,28 @@ void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpi
 	{
 		if (img.getDim() == 2)
 		{
+			int my_small_size = XMIPP_MIN(my_xsize, my_ysize);
+			RFLOAT avg,stddev,minn,maxx;
+			img.computeStats(avg,stddev,minn,maxx);
 			img.window(FIRST_XMIPP_INDEX(my_size), FIRST_XMIPP_INDEX(my_size),
 					   LAST_XMIPP_INDEX(my_size),  LAST_XMIPP_INDEX(my_size));
+			if (my_small_size == my_xsize)
+			{
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+				{
+					if (j <  FIRST_XMIPP_INDEX(my_small_size) || j >  LAST_XMIPP_INDEX(my_small_size))
+						A2D_ELEM(img, i, j) = rnd_gaus(avg, stddev);
+				}
+			}
+			else
+			{
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+				{
+					if (i <  FIRST_XMIPP_INDEX(my_small_size) || i >  LAST_XMIPP_INDEX(my_small_size))
+						A2D_ELEM(img, i, j) = rnd_gaus(avg, stddev);
+				}
+
+			}
 		}
 		else
 		{

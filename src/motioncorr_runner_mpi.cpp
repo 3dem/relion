@@ -66,14 +66,16 @@ void MotioncorrRunnerMpi::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
+		bool result;
 		if (do_unblur)
-			executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+			result = executeUnblur(fn_micrographs[imic], xshifts, yshifts);
 		else if (do_motioncor2)
-			executeMotioncor2(fn_micrographs[imic], xshifts, yshifts, node->rank);
+			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts, node->rank);
 		else
-			executeMotioncorr(fn_micrographs[imic], xshifts, yshifts, node->rank);
+			result = executeMotioncorr(fn_micrographs[imic], xshifts, yshifts, node->rank);
 
-		plotShifts(fn_micrographs[imic], xshifts, yshifts);
+		if (result)
+			plotShifts(fn_micrographs[imic], xshifts, yshifts);
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
@@ -82,14 +84,7 @@ void MotioncorrRunnerMpi::run()
 
 	// Only the master writes the joined result file
 	if (node->isMaster())
-	{
-		// Make a logfile with the shifts in pdf format
-		generateLogFilePDF();
-
-		// Write out STAR files at the end
-		MDavg.write(fn_out + "/corrected_micrographs.star");
-		MDmov.write(fn_out + "/corrected_micrograph_movies.star");
-	}
+		generateLogFilePDFAndWriteStarFiles();
 
 }
 
