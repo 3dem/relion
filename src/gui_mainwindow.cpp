@@ -603,6 +603,9 @@ void RelionMainWindow::fillRunningJobLists()
 	int mypos_running = running_job_browser->position();
 	int mypos_scheduled = scheduled_job_browser->position();
 	int mypos_finished = finished_job_browser->position();
+	int myhpos_running = running_job_browser->hposition();
+	int myhpos_scheduled = scheduled_job_browser->hposition();
+	int myhpos_finished = finished_job_browser->hposition();
 
     // Clear whatever was in there
 	finished_job_browser->clear();
@@ -678,6 +681,9 @@ void RelionMainWindow::fillRunningJobLists()
 	running_job_browser->position(mypos_running);
 	scheduled_job_browser->position(mypos_scheduled);
 	finished_job_browser->position(mypos_finished);
+	running_job_browser->hposition(myhpos_running);
+	scheduled_job_browser->hposition(myhpos_scheduled);
+	finished_job_browser->hposition(myhpos_finished);
 }
 
 void RelionMainWindow::fillToAndFromJobLists()
