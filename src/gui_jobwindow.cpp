@@ -806,7 +806,7 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 	fn_motioncorr_exe.place(current_y, "MOTIONCORR executable:", default_location, "*.*", NULL, "Location of the MOTIONCORR executable. You can control the default of this field by setting environment variable RELION_MOTIONCORR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	motioncor2_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	motioncor2_group->end();
-	do_motioncor2.place(current_y, "Is this MOTIONCOR2?", false ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", motioncor2_group);
+	do_motioncor2.place(current_y, "Is this MOTIONCOR2?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", motioncor2_group);
 
 	motioncor2_group->begin();
 	fn_gain_ref.place(current_y, "Gain-reference image:", "", "*.mrc", NULL, "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");

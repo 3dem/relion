@@ -440,7 +440,14 @@ void PipeLine::read(bool do_lock)
 		while( exists(fn_lock) )
 		{
 			// If the lock exists: wait 3 seconds and try again
-			std::cout << "Trying to read pipeline.star, but " << fn_lock << " exists! Waiting 3 seconds..." << std::endl;
+			// First time round, print a warning message
+			if (iwait == 0)
+			{
+				std::cout << "WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
+				std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
+				std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
+				std::cout << " This instance of the GUI will try for 1 minute to see whether the lock disappears." << std::endl;
+			}
 			sleep(3);
 			iwait++;
 			if (iwait > 20)

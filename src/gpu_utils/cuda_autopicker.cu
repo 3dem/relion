@@ -89,21 +89,17 @@ AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char
 void AutoPickerCuda::run()
 {
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
-	int first(0),last(0);
 	if(node!=NULL)
 	{
 		// Each node does part of the work
 		divide_equally(basePckr->fn_micrographs.size(), node->size, node->rank, my_first_micrograph, my_last_micrograph);
-		my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
-		first = my_first_micrograph;
-		last = my_last_micrograph+1;
 	}
 	else
 	{
-		first = 0;
-		last = basePckr->fn_micrographs.size();
-		my_nr_micrographs = basePckr->fn_micrographs.size();
+		my_first_micrograph = 0;
+		my_last_micrograph = basePckr->fn_micrographs.size() - 1;
 	}
+	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
 	int barstep;
 	if (basePckr->verb > 0)
@@ -133,7 +129,7 @@ void AutoPickerCuda::run()
 
 	FileName fn_olddir="";
 
-	for (long int imic = first; imic < last; imic++)
+	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 	{
 		if (basePckr->verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
@@ -157,7 +153,7 @@ void AutoPickerCuda::run()
 		basePckr->timer.toc(basePckr->TIMING_A5);
 #endif
 	if (basePckr->verb > 0)
-		progress_bar(basePckr->fn_micrographs.size());
+		progress_bar(my_nr_micrographs);
 
 	cudaDeviceReset();
 

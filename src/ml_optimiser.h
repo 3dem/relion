@@ -299,6 +299,9 @@ public:
 	// Amount of scratch space to be left free (in Gb)
 	int keep_free_scratch_Gb;
 
+	// Re-use data on scratch dir, i.e. dont delete data already there and copy again
+	bool do_reuse_scratch;
+
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
