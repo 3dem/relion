@@ -62,7 +62,7 @@ public:
         angpix = textToFloat(parser.getOption("--angpix", "Pixel size (A)", "1."));
         nr_asu = textToFloat(parser.getOption("--asu", "Number of asymmetrical units to expand", "1"));
         frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Fractional sampling in between a single asymmetrical unit", "1"));
-        frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [0-0.5] to be sampled", "0.5"));
+        frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
 
         if (do_helix)
         {
