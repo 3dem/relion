@@ -1666,7 +1666,9 @@ bool ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	// Also make the suffix file (do this after previous command was pushed back!)
 	// Inside it, store the name of the micrograph STAR file, so we can display these later
-	command = "echo " + fn_in.getValue() + " > " + fn_suffix;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineSymlinkName(fn_in.getValue(), fn_pre, fn_jobnr, fn_post);
+	command = "echo " + fn_pre + fn_jobnr + fn_post + " > " + fn_suffix;
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
@@ -2022,7 +2024,10 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	commands.push_back(command);
 
 	// Also touch the suffix file. Do this after the first command had completed
-	command = "echo " + fn_input_autopick.getValue() + " > " +  outputname + "coords_suffix_autopick.star";
+	// Instead of the symlink from the alias, use the original jobnr filename
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineSymlinkName(fn_input_autopick.getValue(), fn_pre, fn_jobnr, fn_post);
+	command = "echo " + fn_pre + fn_jobnr + fn_post + " > " +  outputname + "coords_suffix_autopick.star";
 	commands.push_back(command.c_str());
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
@@ -2895,6 +2900,8 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
@@ -3515,6 +3522,8 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 
@@ -4165,6 +4174,8 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
 	fn_img.deactivate(is_continue);
 
 	// Reference
