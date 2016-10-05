@@ -2699,7 +2699,7 @@ performing both alignment and classification, only classification will be perfor
 This requires that the optimal orientations of all particles are already stored in the input STAR file. ", dont_skip_align_group);
 	dont_skip_align_group->begin();
 
-	psi_sampling.place(current_y, "In-plane angular sampling:", 5., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
+	psi_sampling.place(current_y, "In-plane angular sampling:", 6., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
 Using fine values will slow down the program. Recommended value for most 2D refinements: 5 degrees.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
 
