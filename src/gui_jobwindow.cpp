@@ -2549,6 +2549,13 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	{
 		if (is_autopick.getValue())
 		{
+
+			if (autopick_refs.getValue() == "")
+			{
+				fl_message("ERROR: empty field for autopicking references. This is compulsory for Extract jobs...");
+				return false;
+			}
+
 			fn_ref = autopick_refs.getValue();
 			node_type= NODE_2DREFS;
 		}
