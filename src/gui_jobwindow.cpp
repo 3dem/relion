@@ -355,6 +355,7 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh, std::string fn)
 	if (have_extra2)
 		qsub_extra2.writeValue(fh);
 	qsubscript.writeValue(fh);
+	min_dedicated.writeValue(fh);
 	other_args.writeValue(fh);
 
 	fh.close();
@@ -377,6 +378,7 @@ void RelionJobWindow::closeReadFile(std::ifstream& fh)
 	if (have_extra2)
 		qsub_extra2.readValue(fh);
 	qsubscript.readValue(fh);
+	min_dedicated.readValue(fh);
 	other_args.readValue(fh);
 
 }
