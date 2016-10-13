@@ -47,6 +47,9 @@ public:
     // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
     bool only_do_unfinished_movies;
 
+    // Original verb
+    int ori_verb;
+
 	/** Destructor, calls MPI_Finalize */
     ~MlOptimiserMpi()
     {
