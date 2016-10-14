@@ -28,7 +28,7 @@
 class image_handler_parameters
 {
 	public:
-   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl;
+   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
     bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_average, do_remove_nan;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan;
@@ -75,6 +75,7 @@ class image_handler_parameters
 	    fn_subtract = parser.getOption("--subtract", "Subtract the pixel values in this image to the input image(s) ", "");
 	    fn_fsc = parser.getOption("--fsc", "Calculate FSC curve of the input image with this image ", "");
 	    fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
+	    fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
 
 	    int four_section = parser.addSection("per-image operations");
 	    do_stats = parser.checkOption("--stats", "Calculate per-image statistics?");
@@ -126,7 +127,7 @@ class image_handler_parameters
 
 
 
-	void perImageOperations(Image<RFLOAT> &Iin, FileName &my_fn_out)
+	void perImageOperations(Image<RFLOAT> &Iin, FileName &my_fn_out, RFLOAT psi = 0.)
 	{
 
 		Image<RFLOAT> Iout;
@@ -284,6 +285,31 @@ class image_handler_parameters
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
 			{
 				DIRECT_MULTIDIM_ELEM(FT, n) /=  DIRECT_MULTIDIM_ELEM(avg_ampl, n);
+			}
+			transformer.inverseFourierTransform();
+			Iout = Iin;
+		}
+		else if (fn_fourfilter != "")
+		{
+			MultidimArray<Complex> FT;
+			transformer.FourierTransform(Iin(), FT, false);
+
+			// Note: only 2D rotations are done! 3D application assumes zero rot and tilt!
+			Matrix2D<RFLOAT> A;
+			rotation2DMatrix(psi, A);
+
+			Iop().setXmippOrigin();
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+			{
+				int jpp = ROUND(jp * A(0, 0) + ip * A(0, 1));
+	            int ipp = ROUND(jp * A(1, 0) + ip * A(1, 1));
+	            int kpp = kp;
+	            RFLOAT fil;
+	            if (jpp >= STARTINGX(Iop()) && jpp <= FINISHINGX(Iop()) && ipp >= STARTINGY(Iop()) && ipp <= FINISHINGY(Iop()))
+					fil = A3D_ELEM(Iop(), kpp, ipp, jpp);
+				else
+					fil = 0.;
+				DIRECT_A3D_ELEM(FT, k, i, j) *=  fil;
 			}
 			transformer.inverseFourierTransform();
 			Iout = Iin;
@@ -483,10 +509,16 @@ class image_handler_parameters
    		if (verb > 0)
    			init_progress_bar(MD.numberOfObjects());
 
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+		bool do_md_out = false;
+   		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
 			FileName fn_img;
 			MD.getValue(EMDL_IMAGE_NAME, fn_img);
+
+			// For fourfilter...
+			RFLOAT psi;
+			if (!MD.getValue(EMDL_ORIENT_PSI, psi))
+				psi =0.;
 
 			Image<RFLOAT> Iin;
 			// Initialise for the first image
@@ -514,6 +546,8 @@ class image_handler_parameters
 					Iop.read(fn_fsc);
 				else if (fn_adjust_power != "")
 					Iop.read(fn_adjust_power);
+				else if (fn_fourfilter != "")
+					Iop.read(fn_fourfilter);
 				else if (fn_correct_ampl != "")
 				{
 					Iop.read(fn_correct_ampl);
@@ -546,7 +580,7 @@ class image_handler_parameters
 					Iop.write("test.mrc");
 
 				}
-				if (fn_mult != "" || fn_div != "" || fn_add != "" || fn_subtract != "" || fn_fsc != "" || fn_adjust_power != "")
+				if (fn_mult != "" || fn_div != "" || fn_add != "" || fn_subtract != "" || fn_fsc != "" || fn_adjust_power != "" ||fn_fourfilter != "")
 					if (XSIZE(Iop()) != xdim || YSIZE(Iop()) != ydim || ZSIZE(Iop()) != zdim)
 						REPORT_ERROR("Error: operate-image is not of the correct size");
 
@@ -587,7 +621,6 @@ class image_handler_parameters
 					DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  DIRECT_MULTIDIM_ELEM(Iin(), n);
 				}
 			}
-
 			else if (bin_avg > 0 || (avg_first >= 0 && avg_last >= 0))
 			{
 				// movie-frame averaging operations
@@ -646,7 +679,9 @@ class image_handler_parameters
 						my_fn_out = fn_out;
 					}
 				}
-				perImageOperations(Iin, my_fn_out);
+				perImageOperations(Iin, my_fn_out, psi);
+				do_md_out = true;
+				MD.setValue(EMDL_IMAGE_NAME, my_fn_out);
 			}
 
 			i_img++;
@@ -664,6 +699,13 @@ class image_handler_parameters
 
 		if (verb > 0)
 			progress_bar(MD.numberOfObjects());
+
+		if (do_md_out && fn_in.getExtension() == "star")
+		{
+			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
+			std::cout << " Written out new STAR file: " << fn_md_out;
+			MD.write(fn_md_out);
+		}
 
 	}
 

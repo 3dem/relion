@@ -33,7 +33,8 @@ public:
 	// Helical symmetry
 	bool do_helix;
 	RFLOAT twist, rise, angpix;
-	int nr_asu, frac_sampling, frac_range;
+	int nr_asu, frac_sampling;
+	RFLOAT frac_range;
 
 	// I/O Parser
 	IOParser parser;
@@ -61,7 +62,7 @@ public:
         rise = textToFloat(parser.getOption("--rise", "Helical rise (A)", "0."));
         angpix = textToFloat(parser.getOption("--angpix", "Pixel size (A)", "1."));
         nr_asu = textToFloat(parser.getOption("--asu", "Number of asymmetrical units to expand", "1"));
-        frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Fractional sampling in between a single asymmetrical unit", "1"));
+        frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Number of samplings in between a single asymmetrical unit", "1"));
         frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
 
         if (do_helix)
@@ -103,8 +104,8 @@ public:
 			}
 			else if (frac_sampling > 1)
 			{
-				z_start = -frac_range;
-				z_stop = frac_range - 0.001;
+				z_start = -frac_range * rise;
+				z_stop = (frac_range - 0.001) * rise;
 				z_step = 1. / frac_sampling;
 			}
 			std::cout << " Helical: z_start= " << z_start << " z_stop= " << z_stop << " z_step= " << z_step << std::endl;
