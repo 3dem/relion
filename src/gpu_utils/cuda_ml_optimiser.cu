@@ -31,7 +31,6 @@
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
@@ -57,16 +56,24 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		MultidimArray<Complex > Faux(cudaMLO->transformer.fFourier,true);
 		MultidimArray<RFLOAT> Fctf;
 
+		// What is my particle_id?
+		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
+		// Which group do I belong?
+		int group_id =baseMLO->mydata.getGroupId(part_id);
+
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
 		for (long int ii = baseMLO->exp_my_first_ori_particle; ii < my_ori_particle; ii++)
 			istop += baseMLO->mydata.ori_particles[ii].particles_id.size();
 		istop += ipart;
 
-		// What is my particle_id?
-		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
-		// Which group do I belong?
-		int group_id =baseMLO->mydata.getGroupId(part_id);
+		if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
+		{
+			std::istringstream split(baseMLO->exp_fn_img);
+			for (int i = 0; i <= istop; i++)
+				getline(split, fn_img);
+		}
+		sp.current_img = fn_img;
 
 		// Get the norm_correction
 		RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
@@ -161,14 +168,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			{
 				if (baseMLO->mymodel.data_dim == 3)
 				{
-					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
-					FileName fn_img;
-					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
-					{
-						std::istringstream split(baseMLO->exp_fn_img);
-						for (int i = 0; i <= istop; i++)
-							getline(split, fn_img);
-					}
 					img.read(fn_img);
 					img().setXmippOrigin();
 				}
@@ -1670,12 +1669,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			MoreThanCubOpt<XFLOAT> moreThanOpt(0.);
 			size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+
 			if (filteredSize == 0)
 			{
 				if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
 				{
 					std::cerr << std::endl;
-					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " fn_img= " << sp.current_img << std::endl;
 					std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 					std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
@@ -1711,7 +1711,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
 				{
 					std::cerr << std::endl;
-					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " fn_img= " << sp.current_img << std::endl;
 					std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 					std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 					std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
@@ -1784,7 +1784,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (op.sum_weight[ipart]==0)
 				{
 					std::cerr << std::endl;
-					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " fn_img= " << sp.current_img << std::endl;
 					std::cerr << " part_id= " << part_id << std::endl;
 					std::cerr << " ipart= " << ipart << std::endl;
 					std::cerr << " op.min_diff2[ipart]= " << op.min_diff2[ipart] << std::endl;
