@@ -51,12 +51,19 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 {
 	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
 
+	try
+	{
 #ifdef CUDA
-	if (MLO->do_gpu)
-		((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
-	else
+		if (MLO->do_gpu)
+			((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
+		else
 #endif
 		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
+	}
+	catch (RelionError XE)
+	{
+		MLO->threadException = &XE;
+	}
 }
 
 
@@ -2585,6 +2592,9 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
 	exp_ipart_ThreadTaskDistributor->reset();
     global_ThreadManager->run(globalThreadExpectationSomeParticles);
+
+    if (threadException != NULL)
+    	throw *threadException;
 
 #ifdef TIMING
     timer.toc(TIMING_ESP);
