@@ -787,8 +787,8 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss. ");
-	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all, only for MOTIONCORR). This will be used for MOTIONCORRs -ned and -nes.");
+	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
+	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
 	angpix.place(current_y, "Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting.");
 
 	tab1->end();
@@ -1078,7 +1078,7 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 			command += " --other_motioncorr_args \" " + other_motioncorr_args.getValue() + " \"";
 
 		// Which GPUs to use?
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 
 	}
 
@@ -1436,7 +1436,7 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --EPA";
 
 		// GPU-allocation
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 
 		if ((other_gctf_args.getValue()).length() > 0)
 			command += " --extra_gctf_options \" " + other_gctf_args.getValue() + " \"";
@@ -2017,7 +2017,7 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	if (use_gpu.getValue())
 	{
 		// for the moment always use --shrink 0 with GPUs ...
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 	}
 
 	// Other arguments
@@ -3054,7 +3054,7 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// GPU-stuff
 	if (use_gpu.getValue())
 	{
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() +"\"";
 	}
 
 	// Other arguments
@@ -3765,7 +3765,7 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// GPU-stuff
 	if (use_gpu.getValue())
 	{
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 	}
 
 	// Other arguments
@@ -4417,7 +4417,7 @@ bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// GPU-stuff
 	if (use_gpu.getValue())
 	{
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 	}
 
 	// Other arguments
