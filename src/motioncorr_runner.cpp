@@ -444,6 +444,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -InMrc " + fn_mic;
 
 	command += " -OutMrc " + fn_avg;
+	command += " -Bft " + floatToString(bfactor);
 
 	if (do_save_movies)
 		command += " -OutStack 1";
@@ -466,6 +467,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -Kv " + floatToString(voltage);
 		command += " -FmDose " + floatToString(dose_per_frame);
 		command += " -PixSize " + floatToString(angpix);
+		command += " -InitDose " + floatToString(pre_exposure);
 	}
 
 	if (fn_other_motioncorr_args.length() > 0)
