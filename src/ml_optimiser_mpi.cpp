@@ -52,12 +52,13 @@ void MlOptimiserMpi::read(int argc, char **argv)
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
 
     // Don't put any output to screen for mpi slaves
+    ori_verb = verb;
     if (verb != 0)
-    	verb = (node->isMaster()) ? 1 : 0;
+    	verb = (node->isMaster()) ? ori_verb : 0;
 
 //#define DEBUG_BODIES
 #ifdef DEBUG_BODIES
-    verb = (node->rank==1) ? 1 : 0;
+    verb = (node->rank==1) ? ori_verb : 0;
 #endif
 
     // TMP for debugging only
@@ -570,7 +571,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
     			MPI_Barrier(MPI_COMM_WORLD);
     		}
 
-    		int myverb = (node->rank == 1) ? 1 : 0; // Only the first slave
+    		int myverb = (node->rank == 1) ? ori_verb : 0; // Only the first slave
     		if (!node->isMaster())
     		{
     			mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
@@ -815,7 +816,8 @@ void MlOptimiserMpi::expectation()
 	if (!node->isMaster())
 	{
 		// Check whether everything fits into memory
-		MlOptimiser::expectationSetupCheckMemory(node->rank == first_slave);
+		int myverb = (node->rank == first_slave) ? 1 : 0;
+		MlOptimiser::expectationSetupCheckMemory(myverb);
 
 		// F. Precalculate AB-matrices for on-the-fly shifts
 		if (do_shifts_onthefly)

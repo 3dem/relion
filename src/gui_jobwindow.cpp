@@ -355,6 +355,7 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh, std::string fn)
 	if (have_extra2)
 		qsub_extra2.writeValue(fh);
 	qsubscript.writeValue(fh);
+	min_dedicated.writeValue(fh);
 	other_args.writeValue(fh);
 
 	fh.close();
@@ -377,6 +378,7 @@ void RelionJobWindow::closeReadFile(std::ifstream& fh)
 	if (have_extra2)
 		qsub_extra2.readValue(fh);
 	qsubscript.readValue(fh);
+	min_dedicated.readValue(fh);
 	other_args.readValue(fh);
 
 }
@@ -2547,6 +2549,13 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	{
 		if (is_autopick.getValue())
 		{
+
+			if (autopick_refs.getValue() == "")
+			{
+				fl_message("ERROR: empty field for autopicking references. This is compulsory for Extract jobs...");
+				return false;
+			}
+
 			fn_ref = autopick_refs.getValue();
 			node_type= NODE_2DREFS;
 		}
@@ -2699,7 +2708,7 @@ performing both alignment and classification, only classification will be perfor
 This requires that the optimal orientations of all particles are already stored in the input STAR file. ", dont_skip_align_group);
 	dont_skip_align_group->begin();
 
-	psi_sampling.place(current_y, "In-plane angular sampling:", 5., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
+	psi_sampling.place(current_y, "In-plane angular sampling:", 6., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
 Using fine values will slow down the program. Recommended value for most 2D refinements: 5 degrees.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
 

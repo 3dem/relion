@@ -685,7 +685,7 @@ public:
 	void expectationSetup();
 
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */
-	void expectationSetupCheckMemory(bool myverb = true);
+	void expectationSetupCheckMemory(int myverb = 1);
 
 	/* For on-the-fly shifts, precalculates AB-matrices */
 	void precalculateABMatrices();

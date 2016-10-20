@@ -2030,7 +2030,7 @@ void MlOptimiser::expectation()
 		updateAngularSampling();
 
 	// E. Check whether everything fits into memory
-	expectationSetupCheckMemory();
+	expectationSetupCheckMemory(verb);
 
 	// F. Precalculate AB-matrices for on-the-fly shifts
 	if (do_shifts_onthefly)
@@ -2291,7 +2291,7 @@ void MlOptimiser::expectationSetup()
 
 }
 
-void MlOptimiser::expectationSetupCheckMemory(bool myverb)
+void MlOptimiser::expectationSetupCheckMemory(int myverb)
 {
 
 #ifdef DEBUG_BODIES
@@ -2379,7 +2379,8 @@ void MlOptimiser::expectationSetupCheckMemory(bool myverb)
 		}
 	}
 
-	if (myverb > 0)
+
+	if (myverb > 1)
 	{
 		std::cout << " Estimated memory for expectation  step > " << total_mem_Gb_exp << " Gb."<<std::endl;
 		std::cout << " Estimated memory for maximization step > " << total_mem_Gb_max << " Gb."<<std::endl;
