@@ -47,6 +47,7 @@ public:
 	idir_min, idir_max,
 	ipsi_min, ipsi_max,
 	itrans_min, itrans_max;
+	std::string current_img;
 
 	SamplingParameters():
 		nr_dir(0),
@@ -60,7 +61,8 @@ public:
 		iclass_min(0), iclass_max(0),
 		idir_min(0), idir_max(0),
 		ipsi_min(0), ipsi_max(0),
-		itrans_min(0), itrans_max(0)
+		itrans_min(0), itrans_max(0),
+		current_img()
 	{};
 };
 

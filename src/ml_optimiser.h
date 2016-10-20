@@ -476,6 +476,9 @@ public:
 	int x_pool;
 	int nr_threads;
 
+	//for catching exceptions in threads
+	RelionError * threadException;
+
 	long int exp_my_first_ori_particle, exp_my_last_ori_particle;
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
@@ -613,7 +616,8 @@ public:
 		do_helical_symmetry_local_refinement(0),
 		helical_sigma_distance(0),
 		asymmetric_padding(false),
-		maximum_significants(0)
+		maximum_significants(0),
+		threadException(NULL)
 	{};
 
 	/** ========================== I/O operations  =========================== */
