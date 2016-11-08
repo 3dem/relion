@@ -46,6 +46,7 @@
 #include <FL/Fl_XPM_Image.H>
 #include "src/macros.h"
 #include "src/strings.h"
+#include "src/filename.h"
 #include <string>
 #include <sstream>
 #include <iomanip>
