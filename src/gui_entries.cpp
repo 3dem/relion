@@ -423,7 +423,12 @@ void FileNameEntry::cb_browse_i() {
 
     char relname[FL_PATH_MAX];
     fl_filename_relative(relname,sizeof(relname),G_chooser->value());
-    inp->value(relname);
+
+    FileName fn_pre, fn_jobnr, fn_post, fn_out;
+    decomposePipelineSymlinkName(relname, fn_pre, fn_jobnr, fn_post);
+    fn_out = fn_pre + fn_jobnr + fn_post;
+
+    inp->value(fn_out.c_str());
 }
 
 
@@ -541,7 +546,11 @@ void InputNodeEntry::cb_browse_node_i() {
     char relname2[FL_PATH_MAX];
     strcpy(relname2, replace2.c_str());
 
-    inp->value(relname2);
+    FileName fn_pre, fn_jobnr, fn_post, fn_out;
+    decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
+    fn_out = fn_pre + fn_jobnr + fn_post;
+
+    inp->value(fn_out.c_str());
 }
 
 

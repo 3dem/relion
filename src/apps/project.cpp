@@ -227,7 +227,7 @@ public:
                 F2D.initZeros();
                 projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
 
-                if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001)
+                if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001 || (do_3d_rot && ABS(zoff) > 0.001) )
                 {
                     Matrix1D<RFLOAT> shift(2);
                     XX(shift) = -xoff;
@@ -247,10 +247,27 @@ public:
                 CTF ctf;
                 if (do_ctf || do_ctf2)
                 {
-                	ctf.read(MDang, MDang);
-                    Fctf.resize(F2D);
-                    ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
-                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+                	if (do_3d_rot)
+                	{
+                		Image<RFLOAT> Ictf;
+                		FileName fn_ctf;
+                		MDang.getValue(EMDL_CTF_IMAGE, fn_ctf);
+                		Ictf.read(fn_ctf);
+        				Ictf().setXmippOrigin();
+        				// Set the CTF-image in Fctf
+        				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+        				{
+        					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+        					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+        				}
+                	}
+                	else
+                	{
+						ctf.read(MDang, MDang);
+						Fctf.resize(F2D);
+						ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
+                	}
+                	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
                     {
                         DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
                         if (do_ctf2)
