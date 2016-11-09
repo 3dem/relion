@@ -41,7 +41,11 @@ class helix_bilder_parameters
 public:
 	IOParser parser;
 
+	// Available options
+	// PLEASE MAKE SURE THAT ALL THESE OPTIONS ARE INITIALISED IN THE PARSING STEP!
+	// ----------------------------------------
 	bool show_usage_for_an_option;
+
 	bool do_extract_coords_relion;
 	bool do_extract_coords_ximdisp;
 	bool do_convert_coords_xim2rln;
@@ -148,6 +152,36 @@ public:
 	// Random seed
 	int random_seed;
 
+	void initBoolOptions()
+	{
+		show_usage_for_an_option = false;
+
+		do_extract_coords_relion = false;
+		do_extract_coords_ximdisp = false;
+		do_convert_coords_xim2rln = false;
+		do_extract_coords_eman = false;
+		do_convert_coords_emn2rln = false;
+		do_combine_GCTF_results = false;
+		do_apply_spherical_mask_3D = false;
+		do_crop_central_Z = false;
+		do_create_cylinder_3D = false;
+		do_set_default_tilt = false;
+		do_remove_segments_with_bad_tilt = false;
+		do_remove_segments_with_bad_psi = false;
+		do_remove_mics_with_bad_ctf = false;
+		do_simulate_helix_3D = false;
+		do_impose_helical_symmetry = false;
+		do_local_search_helical_symmetry = false;
+		do_PDB_helix = false;
+		do_divide_star_file = false;
+		do_merge_star_files = false;
+		do_sort_datastar_tubeID = false;
+		do_simulate_helical_segments_2D = false;
+		do_cut_out = false;
+		do_set_xmipp_origin = false;
+		//do_impose_helical_symmetry_fourier_space = false;
+	};
+
 	helix_bilder_parameters()
 	{
 		clear();
@@ -168,13 +202,14 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (MAY 15, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (OCT 01, 2015)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
 		do_create_cylinder_3D = parser.checkOption("--cylinder", "Create a cylinder as 3D initial reference");
 		do_impose_helical_symmetry = parser.checkOption("--impose", "Impose helical symmetry (in real space)");
 		do_PDB_helix = parser.checkOption("--pdb_helix", "Simulate a helix from a single PDB file of protein molecule");
+		do_remove_mics_with_bad_ctf = parser.checkOption("--remove_bad_ctf", "Remove micrographs with poor-quality CTF");
 		do_remove_segments_with_bad_tilt = parser.checkOption("--remove_bad_tilt", "Remove helical segments with large tilt angle deviation (away from 90 degrees)");
 		do_remove_segments_with_bad_psi = parser.checkOption("--remove_bad_psi", "Remove helical segments with large psi angle deviation (away from psi prior)");
 		do_local_search_helical_symmetry = parser.checkOption("--search", "Local search of helical symmetry");
@@ -251,6 +286,7 @@ public:
 	void clear()
 	{
 		parser.clear();
+		initBoolOptions();
 	};
 
 	void displayEmptyLine()
@@ -263,30 +299,30 @@ public:
 		// Check options
 		int valid_options = 0;
 
-		valid_options += (int)(do_extract_coords_relion);
-		valid_options += (int)(do_extract_coords_ximdisp);
-		valid_options += (int)(do_extract_coords_eman);
-		valid_options += (int)(do_convert_coords_emn2rln);
-		valid_options += (int)(do_convert_coords_xim2rln);
-		valid_options += (int)(do_combine_GCTF_results);
-		valid_options += (int)(do_apply_spherical_mask_3D);
-		valid_options += (int)(do_crop_central_Z);
-		valid_options += (int)(do_create_cylinder_3D);
-		valid_options += (int)(do_set_default_tilt);
-		valid_options += (int)(do_remove_segments_with_bad_tilt);
-		valid_options += (int)(do_remove_segments_with_bad_psi);
-		valid_options += (int)(do_remove_mics_with_bad_ctf);
-		valid_options += (int)(do_simulate_helix_3D);
-		valid_options += (int)(do_impose_helical_symmetry);
-		valid_options += (int)(do_local_search_helical_symmetry);
-		valid_options += (int)(do_PDB_helix);
-		valid_options += (int)(do_divide_star_file);
-		valid_options += (int)(do_merge_star_files);
-		valid_options += (int)(do_sort_datastar_tubeID);
-		valid_options += (int)(do_simulate_helical_segments_2D);
-		valid_options += (int)(do_cut_out);
-		valid_options += (int)(do_set_xmipp_origin);
-//		valid_options += (int)(do_impose_helical_symmetry_fourier_space);
+		valid_options += (do_extract_coords_relion) ? (1) : (0);
+		valid_options += (do_extract_coords_ximdisp) ? (1) : (0);
+		valid_options += (do_extract_coords_eman) ? (1) : (0);
+		valid_options += (do_convert_coords_emn2rln) ? (1) : (0);
+		valid_options += (do_convert_coords_xim2rln) ? (1) : (0);
+		valid_options += (do_combine_GCTF_results) ? (1) : (0);
+		valid_options += (do_apply_spherical_mask_3D) ? (1) : (0);
+		valid_options += (do_crop_central_Z) ? (1) : (0);
+		valid_options += (do_create_cylinder_3D) ? (1) : (0);
+		valid_options += (do_set_default_tilt) ? (1) : (0);
+		valid_options += (do_remove_segments_with_bad_tilt) ? (1) : (0);
+		valid_options += (do_remove_segments_with_bad_psi) ? (1) : (0);
+		valid_options += (do_remove_mics_with_bad_ctf) ? (1) : (0);
+		valid_options += (do_simulate_helix_3D) ? (1) : (0);
+		valid_options += (do_impose_helical_symmetry) ? (1) : (0);
+		valid_options += (do_local_search_helical_symmetry) ? (1) : (0);
+		valid_options += (do_PDB_helix) ? (1) : (0);
+		valid_options += (do_divide_star_file) ? (1) : (0);
+		valid_options += (do_merge_star_files) ? (1) : (0);
+		valid_options += (do_sort_datastar_tubeID) ? (1) : (0);
+		valid_options += (do_simulate_helical_segments_2D) ? (1) : (0);
+		valid_options += (do_cut_out) ? (1) : (0);
+		valid_options += (do_set_xmipp_origin) ? (1) : (0);
+		//valid_options += (do_impose_helical_symmetry_fourier_space) ? (1) : (0);
 
 		if (valid_options <= 0)
 			REPORT_ERROR("Please specify one option!");
