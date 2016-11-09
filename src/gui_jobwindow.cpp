@@ -421,11 +421,25 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 		replaceStringAll(textbuf, "XXXextra2XXX", qsub_extra2.getValue() );
 
 	// Get commands.size() entries with the actual command
-	if (commands.size() > 1)
-		appendLineString(textbuf, "XXXcommandXXX", commands.size() - 1);
-
+	int nr_mpi_commands = 0;
 	for (int icom = 0; icom < commands.size(); icom++)
-		replaceStringOnce(textbuf, "XXXcommandXXX", commands[icom] );
+	{
+		// Is this a relion mpi program?
+		if ((commands[icom]).find("_mpi`") != std::string::npos && (commands[icom]).find("relion_") != std::string::npos)
+		{
+			replaceStringOnce(textbuf, "XXXcommandXXX", commands[icom] );
+			nr_mpi_commands++;
+			// If more than one MPI commands, extend the XXXcommandXXX line
+			if (nr_mpi_commands > 1)
+				appendLineString(textbuf, "XXXcommandXXX", commands.size() - 1);
+		}
+		else
+		{
+			// Just add the sequential command
+			textbuf->append(commands[icom].c_str());
+			textbuf->append("\n");
+		}
+	}
 
 	// Make sure the file ends with an empty line
 	textbuf->append("\n");
@@ -480,12 +494,15 @@ bool RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	else
 	{
 		// If there are multiple commands, then join them all on a single line (final_command)
-		// Also add mpirun in front of those commands that have _mpi` in it (if no submission via the queue is done)
+		// Also add mpirun in front of those commands that have relion_ and _mpi` in it (if no submission via the queue is done)
 		std::string one_command;
 		final_command = "";
 		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
-			if (has_mpi && nr_mpi.getValue() > 1 && (commands[icom]).find("_mpi`") != std::string::npos)
+			// Is this a relion mpi program?
+			if (has_mpi && nr_mpi.getValue() > 1 &&
+					(commands[icom]).find("_mpi`") != std::string::npos &&
+					(commands[icom]).find("relion_") != std::string::npos)
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
 			else
 				one_command = commands[icom];
