@@ -420,17 +420,26 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	if (have_extra2)
 		replaceStringAll(textbuf, "XXXextra2XXX", qsub_extra2.getValue() );
 
-	// Get commands.size() entries with the actual command
+
+	// First, find out how many mpirun commands there are
 	int nr_mpi_commands = 0;
 	for (int icom = 0; icom < commands.size(); icom++)
 	{
 		// Is this a relion mpi program?
 		if ((commands[icom]).find("_mpi`") != std::string::npos && (commands[icom]).find("relion_") != std::string::npos)
-		{
 			nr_mpi_commands++;
-			// If more than one MPI commands, extend the XXXcommandXXX line
-			if (nr_mpi_commands > 1)
-				appendLineString(textbuf, "XXXcommandXXX", 1);
+	}
+
+	// Now append that many XXXcommandXXX entries
+	if (nr_mpi_commands > 1)
+		appendLineString(textbuf, "XXXcommandXXX", nr_mpi_commands - 1);
+
+	// Get commands.size() entries with the actual command
+	for (int icom = 0; icom < commands.size(); icom++)
+	{
+		// Is this a relion mpi program?
+		if ((commands[icom]).find("_mpi`") != std::string::npos && (commands[icom]).find("relion_") != std::string::npos)
+		{
 			replaceStringOnce(textbuf, "XXXcommandXXX", commands[icom] );
 		}
 		else
