@@ -1768,7 +1768,7 @@ void MlOptimiserMpi::maximization()
 					}
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
-					if ( (iter > 1) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+					if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 					{
 						localSearchHelicalSymmetry(
 								mymodel.Iref[ith_recons],
@@ -1787,7 +1787,7 @@ void MlOptimiserMpi::maximization()
 								mymodel.helical_twist[ith_recons]);
 					}
 					// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
-					if ( (do_helical_refine) && (!has_converged) )
+					if ( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) )
 					{
 						imposeHelicalSymmetryInRealSpace(
 								mymodel.Iref[ith_recons],
@@ -1843,7 +1843,7 @@ void MlOptimiserMpi::maximization()
 						}
 
 						// Shaoda Jul26,2015 - Helical symmetry local refinement
-						if ( (iter > 1) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+						if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 						{
 							localSearchHelicalSymmetry(
 									mymodel.Iref[ith_recons],
@@ -1862,7 +1862,7 @@ void MlOptimiserMpi::maximization()
 									helical_twist_half2);
 						}
 						// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
-						if( (do_helical_refine) && (!has_converged) )
+						if( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) )
 						{
 							imposeHelicalSymmetryInRealSpace(
 									mymodel.Iref[ith_recons],
@@ -1969,7 +1969,7 @@ void MlOptimiserMpi::maximization()
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
 						MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast helical rise and twist of this 3D class
-				if (do_helical_refine)
+				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				{
 					node->relion_MPI_Bcast(&mymodel.helical_rise[iclass], 1, MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 					node->relion_MPI_Bcast(&mymodel.helical_twist[iclass], 1, MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
@@ -1980,7 +1980,7 @@ void MlOptimiserMpi::maximization()
 			mymodel.Iref[ith_recons].setXmippOrigin();
 
 			// Aug05,2015 - Shaoda, helical symmetry refinement, broadcast refined helical parameters
-			if ( (iter > 1) && (do_helical_refine) && (do_helical_symmetry_local_refinement) )
+			if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 			{
 				int reconstruct_rank1;
 				if (do_split_random_halves)
@@ -2028,7 +2028,7 @@ void MlOptimiserMpi::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
-	if ( (verb > 0) && (do_helical_refine) )
+	if ( (verb > 0) && (do_helical_refine) && (!ignore_helical_symmetry) )
 	{
 		outputHelicalSymmetryStatus(
 				iter,
@@ -2048,7 +2048,7 @@ void MlOptimiserMpi::maximization()
 				do_split_random_halves, // TODO: && !join_random_halves ???
 				std::cout);
 	}
-	if (do_helical_refine && do_split_random_halves)
+	if ( (do_helical_refine) && (!ignore_helical_symmetry) && (do_split_random_halves))
 	{
 		mymodel.helical_rise[0] = (helical_rise_half1 + helical_rise_half2) / 2.;
 		mymodel.helical_twist[0] = (helical_twist_half1 + helical_twist_half2) / 2.;
@@ -2571,7 +2571,7 @@ void MlOptimiserMpi::iterate()
 		// DEBUG
 		if ( (verb > 0) && (node->isMaster()) )
 		{
-			if (do_helical_refine)
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 			{
 				if (mymodel.helical_nr_asu > 1)
 					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
@@ -2672,7 +2672,7 @@ void MlOptimiserMpi::iterate()
 					do_local_angular_searches = true;
 
 				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg);
+					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
 				else
 				{
 					updatePriorsForHelicalReconstruction(
@@ -2685,7 +2685,8 @@ void MlOptimiserMpi::iterate()
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
-							mymodel.sigma2_offset);
+							mymodel.sigma2_offset,
+							helical_keep_tilt_prior_fixed);
 
 					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
 					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));

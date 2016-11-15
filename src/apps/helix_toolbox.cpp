@@ -69,7 +69,10 @@ public:
 	bool do_simulate_helical_segments_2D;
 	bool do_cut_out;
 	bool do_set_xmipp_origin;
-//	bool do_impose_helical_symmetry_fourier_space;
+	bool do_impose_helical_symmetry_fourier_space;
+	bool do_check_parameters;
+	bool do_debug;
+	// ----------------------------------------
 
 	// Input files
 	FileName fn_in, fn_in1, fn_in2;
@@ -137,8 +140,8 @@ public:
 	// Diameter of helical subunits (in Angstroms)
 	RFLOAT subunit_diameter_A;
 
-	// Minimum threshold of CTF FOM value and lowest resolution of EPA
-	RFLOAT ctf_fom_min, EPA_lowest_res;
+	// Minimum threshold of CTF FOM value, lowest resolution of EPA, minimum and maximum of defocus values
+	RFLOAT ctf_fom_min, EPA_lowest_res, df_min, df_max;
 
 	// Do bimoidal searches of tilt and psi angles in 3D helical reconstruction?
 	bool do_bimodal_searches;
@@ -146,11 +149,26 @@ public:
 	// Cut helical tubes into segments?
 	bool do_cut_into_segments;
 
+	// Ignore helical symmetry in 3D reconstruction?
+	bool ignore_helical_symmetry;
+
+	// Perform local searches of helical symmetry in 3D reconstruction?
+	bool do_helical_symmetry_local_refinement;
+
+	// Construct a 3D reference for helical reconstruction with polarity along Z axis?
+	bool do_polar_reference;
+
+	// Top-bottom width ratio for construction of polarised helical reference
+	RFLOAT topbottom_ratio;
+
 	// Cut out a small part of the helix within this angle (in degrees)
 	RFLOAT ang;
 
 	// Random seed
 	int random_seed;
+
+	// Verbosity?
+	bool verb;
 
 	void initBoolOptions()
 	{
@@ -179,7 +197,9 @@ public:
 		do_simulate_helical_segments_2D = false;
 		do_cut_out = false;
 		do_set_xmipp_origin = false;
-		//do_impose_helical_symmetry_fourier_space = false;
+		do_impose_helical_symmetry_fourier_space = false;
+		do_check_parameters = false;
+		do_debug = false;
 	};
 
 	helix_bilder_parameters()
@@ -202,9 +222,10 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (OCT 01, 2015)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (NOV 13, 2016)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
+		do_check_parameters = parser.checkOption("--check", "Check parameters for 3D helical reconstruction in RELION");
 		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
 		do_create_cylinder_3D = parser.checkOption("--cylinder", "Create a cylinder as 3D initial reference");
 		do_impose_helical_symmetry = parser.checkOption("--impose", "Impose helical symmetry (in real space)");
@@ -227,10 +248,11 @@ public:
 		do_extract_coords_eman = parser.checkOption("--extract_emn", "Extract EMAN2 coordinates of helical segments from specified straight tubes");
 		do_extract_coords_relion = parser.checkOption("--extract_rln", "Extract RELION coordinates of helical segments from specified straight tubes");
 		do_extract_coords_ximdisp = parser.checkOption("--extract_xim", "Extract XIMDISP coordinates of helical segments from specified straight tubes");
-//		do_impose_helical_symmetry_fourier_space = parser.checkOption("--impose_fourier", "Impose helical symmetry (simulate what is done in 3D reconstruction in Fourier space)");
+		do_impose_helical_symmetry_fourier_space = parser.checkOption("--impose_fourier", "Impose helical symmetry (simulate what is done in 3D reconstruction in Fourier space)");
 		do_set_default_tilt = parser.checkOption("--init_tilt", "Set tilt angles to 90 degrees for all helical segments");
 		do_merge_star_files = parser.checkOption("--merge", "Merge small STAR files into a huge one");
 		do_set_xmipp_origin = parser.checkOption("--set_xmipp_origin", "Set Xmipp origin");
+		do_debug = parser.checkOption("--debug", "(Debug only)");
 
 		int params_section = parser.addSection("Parameters (alphabetically ordered)");
 		ang = textToFloat(parser.getOption("--ang", "Cut out a small part of the helix within this angle (in degrees)", "91."));
@@ -241,6 +263,8 @@ public:
 		ctf_fom_min = textToFloat(parser.getOption("--ctf_fom_min", "Minimum figure-of-merit - threshold used in removing micrographs with bad CTF", "-999"));
 		cyl_inner_diameter_A = textToFloat(parser.getOption("--cyl_inner_diameter", "Inner diameter of the cylindrical mask (in Angstroms)", "-1"));
 		cyl_outer_diameter_A = textToFloat(parser.getOption("--cyl_outer_diameter", "Outer diameter of the cylindrical mask (in Angstroms)", "-1"));
+		df_min = textToFloat(parser.getOption("--df_min", "Minimum defocus (in Angstroms)", "-999999."));
+		df_max = textToFloat(parser.getOption("--df_max", "Maximum defocus (in Angstroms)", "999999."));
 		EPA_lowest_res = textToFloat(parser.getOption("--EPA_lowest_res", "Lowest EPA resolution (in Angstroms) - threshold used in removing micrographs with bad CTF", "999"));
 		fn_in = parser.getOption("--i", "Input file", "file.in");
 		fn_in1 = parser.getOption("--i1", "Input file #1", "file01.in");
@@ -248,29 +272,34 @@ public:
 		fn_in_root = parser.getOption("--i_root", "Rootname of input files", "_rootnameIn.star");
 		fn_in1_root = parser.getOption("--i1_root", "Rootname #1 of input files", "_rootnameIn01.star");
 		fn_in2_root = parser.getOption("--i2_root", "Rootname #2 of input files", "_rootnameIn02.star");
+		ignore_helical_symmetry = parser.checkOption("--ignore_helical_symmetry", "Ignore helical symmetry in 3D reconstruction?");
 		nr_asu = textToInteger(parser.getOption("--nr_asu", "Number of helical asymmetrical units", "1"));
 		nr_outfiles = textToInteger(parser.getOption("--nr_outfiles", "Number of output files", "10"));
 		nr_subunits = textToInteger(parser.getOption("--nr_subunits", "Number of helical subunits", "-1"));
 		nr_tubes = textToInteger(parser.getOption("--nr_tubes", "Number of helical tubes", "-1"));
 		fn_out = parser.getOption("--o", "Output file", "file.out");
 		fn_out_root = parser.getOption("--o_root", "Rootname of output files", "_rootnameOut.star");
+		do_polar_reference = parser.checkOption("--polar", "Construct a 3D reference for helical reconstruction with polarity along Z axis?");
 		psi_max_dev_deg = textToFloat(parser.getOption("--psi_max_dev", "Maximum deviation of psi angles allowed (away from psi prior)", "15."));
 		random_seed = textToFloat(parser.getOption("--random_seed", "Random seed (set to system time if negative)", "-1"));
 		rise_A = textToFloat(parser.getOption("--rise", "Helical rise (in Angstroms)", "-1"));
 		rise_inistep_A = textToFloat(parser.getOption("--rise_inistep", "Initial step of helical rise search (in Angstroms)", "-1"));
 		rise_min_A = textToFloat(parser.getOption("--rise_min", "Minimum helical rise (in Angstroms)", "-1"));
 		rise_max_A = textToFloat(parser.getOption("--rise_max", "Maximum helical rise (in Angstroms)", "-1"));
+		do_helical_symmetry_local_refinement = parser.checkOption("--search_sym", "Perform local searches of helical symmetry in 3D reconstruction?");
 		do_cut_into_segments = parser.checkOption("--segments", "Cut helical tubes into segments?");
 		sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Sigma of psi angles (in degrees)", "5."));
 		sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Sigma of tilt angles (in degrees)", "5."));
-		sphere_percentage = textToFloat(parser.getOption("--sphere_percentage", "Diameter of spherical mask divided by the box size", "0.9"));
+		sphere_percentage = textToFloat(parser.getOption("--sphere_percentage", "Diameter of spherical mask divided by the box size (0.10~0.90 or 0.01~0.99)", "0.9"));
 		subunit_diameter_A = textToFloat(parser.getOption("--subunit_diameter", "Diameter of helical subunits (in Angstroms)", "-1"));
 		sym_Cn = textToInteger(parser.getOption("--sym_Cn", "Rotational symmetry Cn", "1"));
 		tilt_max_dev_deg = textToFloat(parser.getOption("--tilt_max_dev", "Maximum deviation of tilt angles allowed (away from +90 degrees)", "15."));
+		topbottom_ratio = textToFloat(parser.getOption("--topbottom_ratio", "Top-bottom width ratio for construction of polarised helical reference", "0.5"));
 		twist_deg = textToFloat(parser.getOption("--twist", "Helical twist (in degrees, + for right-handedness)", "-1"));
 		twist_inistep_deg = textToFloat(parser.getOption("--twist_inistep", "Initial step of helical twist search (in degrees)", "-1"));
 		twist_min_deg = textToFloat(parser.getOption("--twist_min", "Minimum helical twist (in degrees, + for right-handedness)", "-1"));
 		twist_max_deg = textToFloat(parser.getOption("--twist_max", "Maximum helical twist (in degrees, + for right-handedness)", "-1"));
+		verb = parser.checkOption("--verb", "Detailed screen output?");
 		width_edge_pix = textToFloat(parser.getOption("--width", "Width of cosine soft edge (in pixels)", "5."));
 		Xdim = textToInteger(parser.getOption("--xdim", "Dimension X (in pixels) of the micrographs", "4096"));
 		Ydim = textToInteger(parser.getOption("--ydim", "Dimension Y (in pixels) of the micrographs", "4096"));
@@ -322,7 +351,9 @@ public:
 		valid_options += (do_simulate_helical_segments_2D) ? (1) : (0);
 		valid_options += (do_cut_out) ? (1) : (0);
 		valid_options += (do_set_xmipp_origin) ? (1) : (0);
-		//valid_options += (do_impose_helical_symmetry_fourier_space) ? (1) : (0);
+		valid_options += (do_impose_helical_symmetry_fourier_space) ? (1) : (0);
+		valid_options += (do_check_parameters) ? (1) : (0);
+		valid_options += (do_debug) ? (1) : (0);
 
 		if (valid_options <= 0)
 			REPORT_ERROR("Please specify one option!");
@@ -416,8 +447,8 @@ public:
 			}
 
 			int box_size;
-			if ( (sphere_percentage < 0.1) || (sphere_percentage > 0.9) )
-				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.1~0.9!");
+			if ( (sphere_percentage < 0.009) || (sphere_percentage > 0.991) )
+				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.01~0.99!");
 			Image<RFLOAT> img;
 			img.read(fn_in);
 			img().setXmippOrigin();
@@ -454,7 +485,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Create a cylinder for 3D initial reference" << std::endl;
-				std::cout << "  USAGE: --cylinder --o out.mrc --boxdim 300 (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.34 (--sphere_percentage 0.9 --width 5)" << std::endl;
+				std::cout << "  USAGE: --cylinder --o out.mrc --boxdim 300 (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.34 (--polar --topbottom_ratio 0.5) (--sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -463,19 +494,25 @@ public:
 				REPORT_ERROR("Pixel size should be larger than 0!");
 			if (boxdim < 20)
 				REPORT_ERROR("Box size should be larger than 20 pixels!");
-			if ( (sphere_percentage < 0.1) || (sphere_percentage > 0.9) )
-				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.1~0.9!");
+			if ( (sphere_percentage < 0.009) || (sphere_percentage > 0.991) )
+				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.01~0.99!");
 			Image<RFLOAT> img;
-			createCylindricalReference(
+			if (!do_polar_reference)
+				topbottom_ratio = 1.;
+			createCylindricalReferenceWithPolarity(
 					img(),
 					boxdim,
 					(cyl_inner_diameter_A / pixel_size_A),
 					(cyl_outer_diameter_A / pixel_size_A),
+					topbottom_ratio,
 					width_edge_pix);
 			applySoftSphericalMask(
 					img(),
 					(RFLOAT(boxdim) * sphere_percentage),
 					width_edge_pix);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size_A);
 			img.write(fn_out);
 		}
 		else if (do_set_default_tilt)
@@ -530,8 +567,8 @@ public:
 			if (show_usage_for_an_option)
 			{
 				displayEmptyLine();
-				std::cout << " Remove micrographs with bad CTF FOM values" << std::endl;
-				std::cout << "  USAGE: --remove_bad_ctf --i in.star --o out.star --ctf_fom_min 0.1 --EPA_lowest_res 5" << std::endl;
+				std::cout << " Remove micrographs with poor-quality CTF" << std::endl;
+				std::cout << "  USAGE: --remove_bad_ctf --i in.star --o out.star (--ctf_fom_min 0.1 --EPA_lowest_res 5 --df_min 10000 --df_max 30000)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -540,7 +577,9 @@ public:
 					fn_in,
 					fn_out,
 					ctf_fom_min,
-					EPA_lowest_res);
+					EPA_lowest_res,
+					df_min,
+					df_max);
 		}
 		else if (do_simulate_helix_3D)
 		{
@@ -548,7 +587,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Create a helical 3D reference of spheres" << std::endl;
-				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1 --sphere_percentage 0.9 --width 5)" << std::endl;
+				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1) (--polar --topbottom_ratio 0.5 --cyl_inner_diameter 20) (--sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -557,11 +596,11 @@ public:
 				REPORT_ERROR("Pixel size should be larger than 0!");
 			if (boxdim < 20)
 				REPORT_ERROR("Box size should be larger than 20 pixels!");
-			if ( (sphere_percentage < 0.1) || (sphere_percentage > 0.9) )
-				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.1~0.9!");
+			if ( (sphere_percentage < 0.009) || (sphere_percentage > 0.991) )
+				REPORT_ERROR("Diameter of spherical mask divided by the box size should be within range 0.01~0.99!");
 
 			Image<RFLOAT> img;
-			makeHelicalReference3D(
+			makeHelicalReference3DWithPolarity(
 					img(),
 					boxdim,
 					pixel_size_A,
@@ -569,11 +608,16 @@ public:
 					rise_A,
 					cyl_outer_diameter_A,
 					subunit_diameter_A,
+					cyl_inner_diameter_A,
+					(do_polar_reference) ? (topbottom_ratio) : (1.),
 					sym_Cn);
 			applySoftSphericalMask(
 					img(),
 					(RFLOAT(boxdim) * sphere_percentage),
 					width_edge_pix);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size_A);
 			img.write(fn_out);
 		}
 		else if (do_impose_helical_symmetry)
@@ -608,6 +652,9 @@ public:
 					rise_A,
 					twist_deg,
 					width_edge_pix);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size_A);
 			img.write(fn_out);
 		}
 		else if (do_local_search_helical_symmetry)
@@ -616,7 +663,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Local search of helical symmetry" << std::endl;
-				std::cout << "  USAGE: --search --i in.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise_min 1.3 --rise_max 1.5 (--rise_inistep -1) --twist_min 20 --twist_max 24 (--twist_inistep -1) (--z_percentage 0.3)" << std::endl;
+				std::cout << "  USAGE: --search --i in.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise_min 1.3 --rise_max 1.5 (--rise_inistep -1) --twist_min 20 --twist_max 24 (--twist_inistep -1) (--z_percentage 0.3) (--verb)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -646,8 +693,9 @@ public:
 					twist_min_deg,
 					twist_max_deg,
 					twist_inistep_deg,
-					twist_refined_deg);
-			std::cout << " Refined helical rise = " << rise_refined_A << " Angstroms, twist = " << twist_refined_deg << " degrees." << std::endl;
+					twist_refined_deg,
+					((verb == true) ? (&std::cout) : (NULL)) );
+			std::cout << " Done! Refined helical rise = " << rise_refined_A << " Angstroms, twist = " << twist_refined_deg << " degrees." << std::endl;
 		}
 		else if (do_PDB_helix)
 		{
@@ -662,6 +710,8 @@ public:
 
 			if ( (fn_in.getExtension() != "pdb") || (fn_out.getExtension() != "pdb") )
 				REPORT_ERROR("Input and output files should be in .pdb format!");
+			if (cyl_outer_diameter_A < 0.) // TODO: PLEASE CHECK THIS FOR OTHER OPTIONS !
+				cyl_outer_diameter_A = 0.;
 
 			Assembly pdb_ori, pdb_helix;
 			pdb_ori.readPDB(fn_in);
@@ -777,14 +827,13 @@ public:
 			img().setXmippOrigin();
 			img.write(fn_out);
 		}
-		/*
 		else if (do_impose_helical_symmetry_fourier_space)
 		{
 			if (show_usage_for_an_option)
 			{
 				displayEmptyLine();
-				std::cout << " Impose helical symmetry (only in Fourier space)" << std::endl;
-				std::cout << "  USAGE: --fimpose --i in.mrc --o out.mrc --angpix 1.126 --nr_asu 5 --rise 1.408 --twist 22.03" << std::endl;
+				std::cout << " Impose helical symmetry (Fourier space simulation)" << std::endl;
+				std::cout << "  USAGE: --impose_fourier --i in.mrc --o out.mrc --angpix 1.126 --nr_asu 5 --rise 1.408 --twist 22.03" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -826,12 +875,58 @@ public:
 				}
 			}
 			img() = Msum / RFLOAT(nr_asu);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size_A);
+			img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size_A);
 			img.write(fn_out);
 		}
-		*/
+		else if (do_check_parameters)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Check parameters for 3D helical reconstruction in RELION" << std::endl;
+				std::cout << "  USAGE: --check --boxdim 300 --angpix 1.126 --sphere_percentage 0.9 (--cyl_inner_diameter 20) --cyl_outer_diameter 240 (--ignore_helical_symmetry --search_sym --z_percentage 0.3 --nr_asu 20 --rise 1.408 --rise_min 1.3 --rise_max 1.5 --twist 22.03 --twist_min 21 --twist_max 23)" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			bool result = checkParametersFor3DHelicalReconstruction(
+					ignore_helical_symmetry,
+					do_helical_symmetry_local_refinement,
+					nr_asu,
+					rise_A,
+					rise_min_A,
+					rise_max_A,
+					twist_deg,
+					twist_min_deg,
+					twist_max_deg,
+					boxdim,
+					pixel_size_A,
+					z_percentage,
+					sphere_percentage * boxdim * pixel_size_A,
+					cyl_inner_diameter_A,
+					cyl_outer_diameter_A,
+					true);
+			if (result)
+				std::cout << " Done! All the parameters seem OK for 3D helical reconstruction in RELION." << std::endl;
+		}
+		else if (do_debug)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " (Debug only)" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			//MetaDataTable MD;
+			//MD.read(fn_in);
+			//setPsiFlipRatioInStarFile(MD);
+			//MD.write(fn_out);
+		}
 		else
 		{
-			REPORT_ERROR("Please specify one option!");
+			REPORT_ERROR("Please specify an option!");
 		}
 	};
 };
