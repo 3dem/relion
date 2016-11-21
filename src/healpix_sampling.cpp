@@ -2022,15 +2022,30 @@ void HealpixSampling::removeSymmetryEquivalentPointsGeometric(const int symmetry
     {
         for (long int i = 0; i < rot_angles.size(); i++)
         {
-            if (rot_angles[i] >= -180. / (sym_order) + 90. &&
-                rot_angles[i] <=  180. / (sym_order) + 90. &&
-                tilt_angles[i] <=    90.
-               )
+            if (sym_order == 1)
             {
-                no_redundant_rot_angles.push_back(rot_angles[i]);
-                no_redundant_tilt_angles.push_back(tilt_angles[i]);
-                no_redundant_directions_vector.push_back(directions_vector[i]);
-                no_redundant_directions_ipix.push_back(directions_ipix[i]);
+            	// D1 is special!
+            	if (tilt_angles[i] <=    90.)
+				{
+					no_redundant_rot_angles.push_back(rot_angles[i]);
+					no_redundant_tilt_angles.push_back(tilt_angles[i]);
+					no_redundant_directions_vector.push_back(directions_vector[i]);
+					no_redundant_directions_ipix.push_back(directions_ipix[i]);
+				}
+            }
+            else
+            {
+
+				if (rot_angles[i] >= -180. / (sym_order) + 90. &&
+					rot_angles[i] <=  180. / (sym_order) + 90. &&
+					tilt_angles[i] <=    90.
+				   )
+				{
+					no_redundant_rot_angles.push_back(rot_angles[i]);
+					no_redundant_tilt_angles.push_back(tilt_angles[i]);
+					no_redundant_directions_vector.push_back(directions_vector[i]);
+					no_redundant_directions_ipix.push_back(directions_ipix[i]);
+				}
             }
         }// for i
     }

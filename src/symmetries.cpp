@@ -643,19 +643,21 @@ void SymList::fill_symmetry_class(const FileName symmetry, int pgGroup, int pgOr
     }
     else if (pgGroup == pg_DN)
     {
-
-    	fileContent.push_back("rot_axis " + integerToString(pgOrder) + " 0 0 1");
+    	if (pgOrder > 1)
+    		fileContent.push_back("rot_axis " + integerToString(pgOrder) + " 0 0 1");
     	fileContent.push_back("rot_axis 2 1 0 0");
     }
     else if (pgGroup == pg_DNV)
     {
-    	fileContent.push_back("rot_axis " + integerToString(pgOrder) + " 0 0 1");
+    	if (pgOrder > 1)
+    		fileContent.push_back("rot_axis " + integerToString(pgOrder) + " 0 0 1");
         fileContent.push_back("rot_axis 2 1 0 0");
         fileContent.push_back("mirror_plane 1 0 0");
     }
     else if (pgGroup == pg_DNH)
     {
-        fileContent.push_back("rot_axis " + integerToString(pgOrder) + " 0 0 1");
+    	if (pgOrder > 1)
+    		fileContent.push_back("rot_axis " + integerToString(pgOrder) + " 0 0 1");
         fileContent.push_back("rot_axis 2 1 0 0");
         fileContent.push_back("mirror_plane 0 0 1");
     }

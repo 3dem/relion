@@ -394,6 +394,9 @@ public:
 	// Flag whether to do helical refinement
 	bool do_helical_refine;
 
+	// Ignore helical symmetry?
+	bool ignore_helical_symmetry;
+
 	// Initial helical twist in degrees
 	RFLOAT helical_twist_initial;
 
@@ -414,6 +417,9 @@ public:
 
 	// Sigma of distance along the helical tracks
 	RFLOAT helical_sigma_distance;
+
+	// Keep helical tilt priors fixed (at 90 degrees) in global angular searches?
+	bool helical_keep_tilt_prior_fixed;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -608,6 +614,7 @@ public:
 		random_seed(0),
 		do_gpu(0),
 		do_helical_refine(0),
+		ignore_helical_symmetry(0),
 		helical_twist_initial(0),
 		helical_rise_initial(0),
 		helical_z_percentage(0),
@@ -615,6 +622,7 @@ public:
 		helical_tube_outer_diameter(0),
 		do_helical_symmetry_local_refinement(0),
 		helical_sigma_distance(0),
+		helical_keep_tilt_prior_fixed(0),
 		asymmetric_padding(false),
 		maximum_significants(0),
 		threadException(NULL)
@@ -685,7 +693,7 @@ public:
 	void expectationSetup();
 
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */
-	void expectationSetupCheckMemory(bool myverb = true);
+	void expectationSetupCheckMemory(int myverb = 1);
 
 	/* For on-the-fly shifts, precalculates AB-matrices */
 	void precalculateABMatrices();
