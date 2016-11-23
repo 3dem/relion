@@ -535,8 +535,8 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
-		RFLOAT sigma_cutoff = 3.,
-		bool keep_tilt_prior_fixed = false);
+		bool keep_tilt_prior_fixed = false,
+		RFLOAT sigma_cutoff = 3.);
 // TESTING...
 
 void updateAngularPriorsForHelicalReconstruction(
