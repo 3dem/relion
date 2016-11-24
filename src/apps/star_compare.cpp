@@ -20,6 +20,7 @@
 
 #include <src/image.h>
 #include <src/metadata_table.h>
+#include <src/filename.h>
 
 class star_compare_parameters
 {
