@@ -1154,11 +1154,20 @@ void Postprocessing::run()
 
 	global_resol = 999.;
 	// See where corrected FSC drops below 0.143
+	int global_resol_i = 0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
 	{
 		if ( DIRECT_A1D_ELEM(fsc_true, i) < 0.143)
 			break;
 		global_resol = XSIZE(I1())*angpix/(RFLOAT)i;
+		global_resol_i = i;
+	}
+
+	// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
+	if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)
+	{
+		std::cerr << " WARNING: The phase-randomised FSC is larger than 0.10 at the estimated resolution!" << std::endl;
+		std::cerr << " WARNING: This may result in an incorrect resolution estimation. Provide a softer mask with less features to get lower phase-randomised FSCs." << std::endl;
 	}
 
 	// Add the two half-maps together for subsequent sharpening

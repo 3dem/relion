@@ -227,6 +227,7 @@ enum EMDLabel
     EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT,
     EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO,
     EMDL_OPTIMISER_DO_HELICAL_REFINE,
+    EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY,
     EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
     EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
     EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
@@ -234,6 +235,7 @@ enum EMDLabel
     EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
     EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
     EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE,
+    EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
@@ -601,6 +603,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, EMDL_BOOL, "rlnHasHighFscAtResolLimit", "Flag to indicate that the FSC at the resolution limit is significant");
         EMDL::addLabel(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, EMDL_INT, "rlnHasLargeSizeIncreaseIterationsAgo", "How many iterations have passed since the last large increase in image size");
         EMDL::addLabel(EMDL_OPTIMISER_DO_HELICAL_REFINE, EMDL_BOOL, "rlnDoHelicalRefine", "Flag to indicate that helical refinement should be performed");
+        EMDL::addLabel(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, EMDL_BOOL, "rlnIgnoreHelicalSymmetry", "Flag to indicate that helical symmetry is ignored in 3D reconstruction");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
@@ -608,6 +611,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaDistance", "Sigma of distance along the helical tracks");
+        EMDL::addLabel(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, EMDL_BOOL, "rlnHelicalKeepTiltPriorFixed", "Flag to indicate that helical tilt priors are kept fixed (at 90 degrees) in global angular searches");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");

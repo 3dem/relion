@@ -467,9 +467,9 @@ void runDiff2KernelCoarse(
 	{
 		if(projector.mdlZ!=0)
 		{
-			if (translation_num > D2C_BLOCK_SIZE_3D)
+			if (translation_num > D2C_BLOCK_SIZE_3D*8)
 			{
-				printf("Number of coarse translations larger than %d not supported yet.\n", D2C_BLOCK_SIZE_3D);
+				printf("Number of coarse translations larger than %d on the GPU not supported.\n", D2C_BLOCK_SIZE_3D*8);
 				fflush(stdout);
 				exit(1);
 			}
@@ -477,38 +477,141 @@ void runDiff2KernelCoarse(
 			unsigned rest = orientation_num % D2C_EULERS_PER_BLOCK_3D;
 			long unsigned even_orientation_num = orientation_num - rest;
 
-			if (even_orientation_num != 0)
+			if (translation_num <= D2C_BLOCK_SIZE_3D)
 			{
-				cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, D2C_EULERS_PER_BLOCK_3D, 4>
-				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D,0,stream>>>(
-					d_eulers,
-					trans_x,
-					trans_y,
-					Fimg_real,
-					Fimg_imag,
-					projector,
-					corr_img,
-					diff2s,
-					translation_num,
-					image_size);
-				LAUNCH_HANDLE_ERROR(cudaGetLastError());
-			}
+				if (even_orientation_num != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, D2C_EULERS_PER_BLOCK_3D, 4>
+					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D,0,stream>>>(
+						d_eulers,
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						diff2s,
+						translation_num,
+						image_size);
+				}
 
-			if (rest != 0)
+				if (rest != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, 1, 4>
+					<<<rest,D2C_BLOCK_SIZE_3D,0,stream>>>(
+						&d_eulers[9*even_orientation_num],
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						&diff2s[translation_num*even_orientation_num],
+						translation_num,
+						image_size);
+				}
+			}
+			else if (translation_num <= D2C_BLOCK_SIZE_3D*2)
 			{
-				cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, 1, 4>
-				<<<rest,D2C_BLOCK_SIZE_3D,0,stream>>>(
-					&d_eulers[9*even_orientation_num],
-					trans_x,
-					trans_y,
-					Fimg_real,
-					Fimg_imag,
-					projector,
-					corr_img,
-					&diff2s[translation_num*even_orientation_num],
-					translation_num,
-					image_size);
-				LAUNCH_HANDLE_ERROR(cudaGetLastError());
+				if (even_orientation_num != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*2, D2C_EULERS_PER_BLOCK_3D, 4>
+					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D*2,0,stream>>>(
+						d_eulers,
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						diff2s,
+						translation_num,
+						image_size);
+				}
+
+				if (rest != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*2, 1, 4>
+					<<<rest,D2C_BLOCK_SIZE_3D*2,0,stream>>>(
+						&d_eulers[9*even_orientation_num],
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						&diff2s[translation_num*even_orientation_num],
+						translation_num,
+						image_size);
+				}
+			}
+			else if (translation_num <= D2C_BLOCK_SIZE_3D*4)
+			{
+				if (even_orientation_num != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*4, D2C_EULERS_PER_BLOCK_3D, 4>
+					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D*4,0,stream>>>(
+						d_eulers,
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						diff2s,
+						translation_num,
+						image_size);
+				}
+
+				if (rest != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*4, 1, 4>
+					<<<rest,D2C_BLOCK_SIZE_3D*4,0,stream>>>(
+						&d_eulers[9*even_orientation_num],
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						&diff2s[translation_num*even_orientation_num],
+						translation_num,
+						image_size);
+				}
+			}
+			else
+			{
+				if (even_orientation_num != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*8, D2C_EULERS_PER_BLOCK_3D, 4>
+					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D*8,0,stream>>>(
+						d_eulers,
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						diff2s,
+						translation_num,
+						image_size);
+				}
+
+				if (rest != 0)
+				{
+					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*8, 1, 4>
+					<<<rest,D2C_BLOCK_SIZE_3D*8,0,stream>>>(
+						&d_eulers[9*even_orientation_num],
+						trans_x,
+						trans_y,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						&diff2s[translation_num*even_orientation_num],
+						translation_num,
+						image_size);
+				}
 			}
 
 		}
@@ -517,7 +620,7 @@ void runDiff2KernelCoarse(
 
 			if (translation_num > D2C_BLOCK_SIZE_2D)
 			{
-				printf("Number of coarse translations larger than %d not supported yet.\n", D2C_BLOCK_SIZE_2D);
+				printf("Number of coarse translations larger than %d on the GPU not supported.\n", D2C_BLOCK_SIZE_2D);
 				fflush(stdout);
 				exit(1);
 			}

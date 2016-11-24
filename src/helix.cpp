@@ -21,7 +21,7 @@
 #include "src/macros.h"
 #include "src/helix.h"
 
-//#define DEBUG_SEARCH_HELICAL_SYMMETRY
+#define WIDE_HELICAL_TWIST_AND_RISE_SEARCHES
 
 void makeHelicalSymmetryList(
 		std::vector<HelicalSymmetryItem>& list,
@@ -266,34 +266,6 @@ bool calcCCofHelicalSymmetry(
 	return true;
 };
 
-void checkRangesForLocalSearchHelicalSymmetry(
-		RFLOAT rise_A,
-		RFLOAT rise_min_A,
-		RFLOAT rise_max_A,
-		RFLOAT twist_deg,
-		RFLOAT twist_min_deg,
-		RFLOAT twist_max_deg)
-{
-	RFLOAT rise_range_max_percentage = 0.3334;
-	RFLOAT rise_avg_A = (rise_min_A + rise_max_A) / 2.;
-	RFLOAT twist_avg_deg = (twist_min_deg + twist_max_deg) / 2.;
-	RFLOAT rise_min_A_thres = rise_avg_A * (1. - rise_range_max_percentage);
-	RFLOAT rise_max_A_thres = rise_avg_A * (1. + rise_range_max_percentage);
-
-	if ( (rise_min_A < 0.001) || (rise_max_A < 0.001) || (rise_avg_A < 0.001) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Helical rises must be larger than 0.001 Angstroms!");
-	if ( (rise_min_A > rise_max_A) || (twist_min_deg > twist_max_deg) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Minimum values of twist/rise must be smaller than their maximum values!");
-#define WIDE_SEARCHES
-#ifndef WIDE_SEARCHES
-	if ( (fabs(twist_avg_deg - twist_min_deg) > 180.01) || ((fabs(rise_avg_A - rise_min_A) / fabs(rise_avg_A)) > rise_range_max_percentage) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Valid search ranges for twist and rise are < 360 degrees and within ("
-				+ floatToString(rise_min_A_thres) + " A, " + floatToString(rise_max_A_thres) + " A) respectively (under the assumption that the initial rise is " + floatToString(rise_avg_A) + " A)!");
-#endif
-	if ( (rise_A < rise_min_A) || (rise_A > rise_max_A) || (twist_deg < twist_min_deg) || (twist_deg > twist_max_deg) )
-		REPORT_ERROR("helix.cpp::checkRangesForLocalSearchHelicalSymmetry(): Initial helical twist and/or rise are out of their specified ranges!");
-};
-
 bool localSearchHelicalSymmetry(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT pixel_size_A,
@@ -308,7 +280,8 @@ bool localSearchHelicalSymmetry(
 		RFLOAT twist_min_deg,
 		RFLOAT twist_max_deg,
 		RFLOAT twist_inistep_deg,
-		RFLOAT& twist_refined_deg)
+		RFLOAT& twist_refined_deg,
+		std::ostream* o_ptr)
 {
 	// TODO: whether iterations can exit & this function works for negative twist
 	int iter, box_len, nr_asym_voxels, nr_rise_samplings, nr_twist_samplings, nr_min_samplings, nr_max_samplings, best_id, iter_not_converged;
@@ -326,37 +299,27 @@ bool localSearchHelicalSymmetry(
 	box_len = (XSIZE(v) < YSIZE(v)) ? XSIZE(v) : YSIZE(v);
 	box_len = (box_len < ZSIZE(v)) ? box_len : ZSIZE(v);
 
-	// Check helical parameters
-	checkHelicalParametersFor3DHelicalReference(
-			box_len,
-			pixel_size_A,
-			twist_min_deg,
-			rise_min_A,
-			z_percentage,
-			sphere_radius_A,
-			cyl_inner_radius_A,
-			cyl_outer_radius_A);
-	checkHelicalParametersFor3DHelicalReference(
-			box_len,
-			pixel_size_A,
-			twist_max_deg,
-			rise_max_A,
-			z_percentage,
-			sphere_radius_A,
-			cyl_inner_radius_A,
-			cyl_outer_radius_A);
-
 	// Initialise refined helical parameters
+	// Check helical parameters
 	rise_refined_A = (rise_min_A + rise_max_A) / 2.;
-	rise_refined_pix = rise_refined_A / pixel_size_A;
 	twist_refined_deg = (twist_min_deg + twist_max_deg) / 2.;
-	checkRangesForLocalSearchHelicalSymmetry(
+	checkParametersFor3DHelicalReconstruction(
+			false,
+			true,
+			1,
 			rise_refined_A,
 			rise_min_A,
 			rise_max_A,
 			twist_refined_deg,
 			twist_min_deg,
-			twist_max_deg);
+			twist_max_deg,
+			box_len,
+			pixel_size_A,
+			z_percentage,
+			sphere_radius_A * 2.,
+			cyl_inner_radius_A * 2.,
+			cyl_outer_radius_A * 2.);
+	rise_refined_pix = rise_refined_A / pixel_size_A;
 
 	// Initialise other parameters
 	out_of_range = false;
@@ -367,6 +330,15 @@ bool localSearchHelicalSymmetry(
 	rise_local_max_pix = rise_max_pix = rise_max_A / pixel_size_A;
 	twist_local_min_deg = twist_min_deg;
 	twist_local_max_deg = twist_max_deg;
+	if (o_ptr != NULL)
+	{
+		(*o_ptr) << " ### RELION helix toolbox - local searches of helical symmetry" << std::endl;
+		(*o_ptr) << " --> Box size = " << ((long int)(XSIZE(v))) << ", Z(%) = " << (z_percentage * 100.)
+				<< "%, pixel size = " << pixel_size_A << " Angstroms, inner diameter = " << (cyl_inner_radius_A * 2.)
+				<< " Angstroms, outer diameter = " << (cyl_outer_radius_A * 2.) << " Angstroms." << std::endl;
+		(*o_ptr) << " --> Searching twist from " << twist_min_deg << " to " << twist_max_deg << " degrees, rise from "
+				<< rise_min_A << " to " << rise_max_A << " Angstroms." << std::endl;
+	}
 
 	// Initial searches - Iteration 1
 	// Sampling of twist should be smaller than 1 degree
@@ -389,9 +361,13 @@ bool localSearchHelicalSymmetry(
 		twist_step_deg = 0.;
 		twist_min_deg = twist_max_deg = twist_local_min_deg = twist_local_max_deg = twist_refined_deg;
 	}
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-	std::cout << " ### twist_step_deg = " << twist_step_deg << ", nr_twist_samplings = " << nr_twist_samplings << ", search_twist = " << (int)(search_twist) << std::endl;
-#endif
+	if (o_ptr != NULL)
+	{
+		if (search_twist)
+			(*o_ptr) << " --> Initial searching step of twist is " << twist_step_deg << " degrees (" << nr_twist_samplings << " samplings)." << std::endl;
+		else
+			(*o_ptr) << " --> No need to search for twist..." << std::endl;
+	}
 
 	rise_inistep_pix = (rise_inistep_pix < (1e-5)) ? (1e30) : (rise_inistep_pix);
 	rise_step_pix = 0.01 * ((fabs(rise_local_min_pix) + fabs(rise_local_max_pix)) / 2.);
@@ -406,12 +382,20 @@ bool localSearchHelicalSymmetry(
 		rise_step_pix = 0.;
 		rise_min_pix = rise_max_pix = rise_local_min_pix = rise_local_max_pix = rise_refined_pix;
 	}
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-	std::cout << " ### rise_step_A = " << rise_step_pix * pixel_size_A << ", nr_rise_samplings = " << nr_rise_samplings << ", search_rise = " << (int)(search_rise) << std::endl;
-#endif
+	if (o_ptr != NULL)
+	{
+		if (search_rise)
+			(*o_ptr) << " --> Initial searching step of rise is " << rise_step_pix * pixel_size_A << " Angstroms (" << nr_rise_samplings << " samplings)." << std::endl;
+		else
+			(*o_ptr) << " --> No need to search for rise..." << std::endl;
+		(*o_ptr) << " --> " << nr_twist_samplings * nr_rise_samplings << " initial samplings." << std::endl;
+	}
 
 	if ( (!search_twist) && (!search_rise) )
 		return true;
+
+	if (o_ptr != NULL)
+		(*o_ptr) << std::endl << " TAG   TWIST(DEGREES)  RISE(ANGSTROMS)         DEV" << std::endl;
 
 	// Local searches
 	helical_symmetry_list.clear();
@@ -450,15 +434,13 @@ bool localSearchHelicalSymmetry(
 						helical_symmetry_list[ii].twist_deg,
 						helical_symmetry_list[ii].dev,
 						nr_asym_voxels);
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-				std::cout << " NEW -->" << std::flush;
-#endif
+				if (o_ptr != NULL)
+					(*o_ptr) << " NEW" << std::flush;
 			}
 			else
 			{
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-				std::cout << " OLD -->" << std::flush;
-#endif
+				if (o_ptr != NULL)
+					(*o_ptr) << " OLD" << std::flush;
 			}
 
 			if (helical_symmetry_list[ii].dev < best_dev)
@@ -466,20 +448,24 @@ bool localSearchHelicalSymmetry(
 				best_dev = helical_symmetry_list[ii].dev;
 				best_id = ii;
 			}
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-			std::cout << " Twist = " << helical_symmetry_list[ii].twist_deg << ", Rise = " << helical_symmetry_list[ii].rise_pix * pixel_size_A << ", Dev = " << helical_symmetry_list[ii].dev << std::endl;
-#endif
+			if (o_ptr != NULL)
+			{
+				(*o_ptr) << std::setw(15) << std::setiosflags(std::ios::fixed) << helical_symmetry_list[ii].twist_deg << std::resetiosflags(std::ios::fixed)
+						<< std::setw(15) << std::setiosflags(std::ios::fixed) << (helical_symmetry_list[ii].rise_pix * pixel_size_A) << std::resetiosflags(std::ios::fixed)
+						<< std::setw(20) << std::setiosflags(std::ios::scientific) << helical_symmetry_list[ii].dev << std::resetiosflags(std::ios::scientific) << std::endl;
+			}
 		}
 
 		// Update refined symmetry
 		rise_refined_pix = helical_symmetry_list[best_id].rise_pix;
 		rise_refined_A = rise_refined_pix * pixel_size_A;
 		twist_refined_deg = helical_symmetry_list[best_id].twist_deg;
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-		std::cout << " ################################################################################" << std::endl;
-		std::cout << " ##### Refined Twist = " << twist_refined_deg << ", Rise = " << rise_refined_A << ", Dev = " << helical_symmetry_list[best_id].dev << std::endl;
-		std::cout << " ################################################################################" << std::endl;
-#endif
+		if (o_ptr != NULL)
+		{
+			(*o_ptr) << " ################################################################################" << std::endl;
+			(*o_ptr) << " ##### Refined Twist = " << twist_refined_deg << ", Rise = " << rise_refined_A << ", Dev = " << helical_symmetry_list[best_id].dev << std::endl;
+			(*o_ptr) << " ################################################################################" << std::endl;
+		}
 		// Out of range...
 		if ( (search_rise) && (rise_refined_pix < rise_min_pix) )
 		{
@@ -541,12 +527,14 @@ bool localSearchHelicalSymmetry(
 			if (this_iter_not_converged)
 			{
 				iter_not_converged++;
-#ifdef DEBUG_SEARCH_HELICAL_SYMMETRY
-				std::cout << " !!! NR_ITERATION_NOT_CONVERGED = " << iter_not_converged << " !!!" << std::endl;
-#endif
+				if (o_ptr != NULL)
+					(*o_ptr) << " !!! NR_ITERATION_NOT_CONVERGED = " << iter_not_converged << " !!!" << std::endl;
 				if (iter_not_converged > 10) // Up to 25*25 samplings are allowed (original 5*5 samplings)
 				{
-					std::cout << " WARNING: Local searches of helical symmetry cannot converge. Consider a finer initial sampling of helical parameters." << std::endl;
+					if (o_ptr != NULL)
+						(*o_ptr) << " WARNING: Local searches of helical symmetry cannot converge. Consider a finer initial sampling of helical parameters." << std::endl;
+					else
+						std::cout << " WARNING: Local searches of helical symmetry cannot converge. Consider a finer initial sampling of helical parameters." << std::endl;
 					return false;
 				}
 				continue;
@@ -591,7 +579,10 @@ bool localSearchHelicalSymmetry(
 
 	if (out_of_range)
 	{
-		std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial guess of helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
+		if (o_ptr != NULL)
+			(*o_ptr) << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial guess of helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
+		else
+			std::cout << " WARNING: Refined helical symmetry is out of the search range. Check whether the initial guess of helical symmetry is reasonable. Or you may want to modify the search range." << std::endl;
 		return false;
 	}
 	return true;
@@ -623,84 +614,259 @@ RFLOAT getHelicalSigma2Rot(
 	return new_sigma2_rot;
 };
 
-// Assume all parameters are within range
-RFLOAT get_lenZ_percentage_max(
-		int box_len,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A,
-		RFLOAT pixel_size_A)
-{
-	return (((2.) * sqrt(sphere_radius_A * sphere_radius_A - cyl_outer_radius_A * cyl_outer_radius_A) / pixel_size_A) / box_len);
-};
-
-// Assume all parameters are within range
-RFLOAT get_rise_A_max(
+bool checkParametersFor3DHelicalReconstruction(
+		bool ignore_symmetry,
+		bool do_symmetry_local_refinement,
+		int nr_asu,
+		RFLOAT rise_initial_A,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT twist_initial_deg,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
 		int box_len,
 		RFLOAT pixel_size_A,
-		RFLOAT lenZ_percentage,
-		RFLOAT nr_units_min)
+		RFLOAT z_percentage,
+		RFLOAT particle_diameter_A,
+		RFLOAT tube_inner_diameter_A,
+		RFLOAT tube_outer_diameter_A,
+		bool verboseOutput)
 {
-	return (pixel_size_A * box_len * lenZ_percentage / nr_units_min);
-};
-
-void checkHelicalParametersFor3DHelicalReference(
-		int box_len,
-		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT lenZ_percentage,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_inner_radius_A,
-		RFLOAT cyl_outer_radius_A)
-{
-	long int half_box_len;
 	RFLOAT nr_units_min = 2.; // Minimum nr_particles required along lenZ_max
-	RFLOAT lenZ_percentage_min, lenZ_percentage_max, rise_A_max, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix;
+	RFLOAT rise_range_max_percentage = 0.3334;
 
+	// Verbose output
+	if (verboseOutput)
+	{
+		std::cout << "##########################################################" << std::endl;
+		std::cout << "   CHECKING PARAMETERS FOR 3D HELICAL RECONSTRUCTION..." << std::endl;
+		std::cout << "##########################################################" << std::endl;
+	}
+
+	// Check pixel size
+	if (verboseOutput)
+		std::cout << " Pixel size = " << pixel_size_A << " Angstrom(s)" << std::endl;
 	if (pixel_size_A < 0.001)
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Pixel size should be larger than 0.001 Angstroms!");
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Pixel size should be larger than 0.001 Angstroms!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Pixel size should be larger than 0.001 Angstroms!");
+		return false;
+	}
 
-	sphere_radius_pix = sphere_radius_A / pixel_size_A;
-	cyl_inner_radius_pix = cyl_inner_radius_A / pixel_size_A;
-	cyl_outer_radius_pix = cyl_outer_radius_A / pixel_size_A;
-
+	// Check box size and calculate half box size
+	if (verboseOutput)
+		std::cout << " Box size = " << box_len << " pixels = " << (RFLOAT)(box_len) * pixel_size_A << " Angstroms" << std::endl;
 	if (box_len < 10)
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Input box size should be larger than 5!");
-	half_box_len = box_len / 2 - ((box_len + 1) % 2);
-
-	if ( (fabs(twist_deg) > 360.) || ((rise_A / pixel_size_A) < 0.001) || (lenZ_percentage < 0.001) || (lenZ_percentage > 0.999) )
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Wrong helical twist, rise or central Z length! Twist must be within range (-360, +360) degrees. Rise must be larger than 0.001 pixels and valid central Z length should be set to 0.1%~99.9%!");
-
-	if ( (sphere_radius_pix < 2.) || (sphere_radius_pix > half_box_len)
-			|| ( (cyl_inner_radius_pix + 2.) > cyl_outer_radius_pix)
-			|| (cyl_outer_radius_pix < 2.) || (cyl_outer_radius_pix > half_box_len)
-			//|| ( (sphere_radius_pix + 0.001) < cyl_outer_radius_pix ) )
-			|| (sphere_radius_pix < cyl_outer_radius_pix) )
 	{
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Radii of spherical and/or cylindrical masks are invalid! sphere_radius_pix = "
-				+ floatToString(sphere_radius_pix) + ", half_box_len = " + floatToString(half_box_len) + ", cyl_inner_radius_pix = "
-				+ floatToString(cyl_inner_radius_pix) + ", cyl_outer_radius_pix = " + floatToString(cyl_outer_radius_pix));
+		if (verboseOutput)
+			std::cout << " ERROR! Input box size should be larger than 10!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Input box size should be larger than 10!");
+		return false;
+	}
+	int half_box_len = box_len / 2 - ((box_len + 1) % 2);
+
+	// Calculate radii in pixels
+	RFLOAT particle_radius_pix = particle_diameter_A * 0.5 / pixel_size_A;
+	RFLOAT tube_inner_radius_pix = tube_inner_diameter_A * 0.5 / pixel_size_A;
+	RFLOAT tube_outer_radius_pix = tube_outer_diameter_A * 0.5 / pixel_size_A;
+
+	// Check particle radius
+	if (verboseOutput)
+	{
+		std::cout << " Particle diameter = " << particle_radius_pix * 2. << " pixels = " << particle_diameter_A << " Angstroms" << std::endl;
+		std::cout << " Half box size = " << half_box_len << " pixels = " << (RFLOAT)(half_box_len) * pixel_size_A << " Angstroms" << std::endl;
+	}
+	if ( (particle_radius_pix < 2.) || (particle_radius_pix > half_box_len) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Particle radius should be > 2 pixels and < half the box size!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Particle radius should be > 2 and < half the box size!");
+		return false;
 	}
 
-	lenZ_percentage_min = (nr_units_min * rise_A) / (pixel_size_A * box_len);
-	lenZ_percentage_max = get_lenZ_percentage_max(box_len, sphere_radius_A, cyl_outer_radius_A, pixel_size_A);
-	if (lenZ_percentage > lenZ_percentage_max)
+	// Check inner and outer tube radii
+	if (verboseOutput)
 	{
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z length is too big. (lenZ_percentage = "
-				+ floatToString(lenZ_percentage * 100.) + "%; please provide a value > " + floatToString(lenZ_percentage_min * 100.) + "% and < " + floatToString(lenZ_percentage_max * 100.)
-				+ "%). Please consider a larger box size if there are no valid ranges for central Z length under current settings.");
+		if (tube_inner_diameter_A > 0.)
+			std::cout << " Inner tube diameter = " << tube_inner_radius_pix * 2. << " pixels = " << tube_inner_diameter_A << " Angstroms" << std::endl;
+		std::cout << " Outer tube diameter = " << tube_outer_radius_pix * 2. << " pixels = " << tube_outer_diameter_A << " Angstroms" << std::endl;
+	}
+	if ( (tube_outer_radius_pix < 2.) || (tube_outer_radius_pix > half_box_len)
+			//|| ( (particle_radius_pix + 0.001) < tube_outer_radius_pix ) )
+			|| (particle_radius_pix < tube_outer_radius_pix) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Outer tube diameter should be > 4 pixels, < particle diameter and < half the box size!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Outer tube diameter should be > 4 pixels, < particle diameter and < half the box size");
+		return false;
+	}
+	if ( (tube_inner_radius_pix > 0.) && ((tube_inner_radius_pix + 2.) > tube_outer_radius_pix) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Inner tube diameter should be remarkably smaller (> 4 pixels) than the outer one!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Inner tube diameter should be remarkably smaller (> 4 pixels) than the outer one!");
+		return false;
 	}
 
-	rise_A_max = get_rise_A_max(box_len, pixel_size_A, lenZ_percentage, nr_units_min);
-	if (fabs(rise_A) > rise_A_max)
+	// STOP CHECKING OTHER PARAMETERS IF HELICAL SYMMETRY IS IGNORED IN 3D RECONSTRUCTION!
+	if (ignore_symmetry)
 	{
-		REPORT_ERROR("helix.cpp::checkHelicalParametersFor3DHelicalReference(): Central Z length is too small (< nr_particles_min * helical_rise_A). (rise_A = "
-				+ floatToString(rise_A) + ", pixel_size = " + floatToString(pixel_size_A) + ", lenZ_percentage = " + floatToString(lenZ_percentage * 100.)
-				+ "%, nr_particles_min = " + floatToString(nr_units_min) + ", box_size = " + floatToString(box_len)
-				+ "; please provide a value > " + floatToString(lenZ_percentage_min * 100.) + "% and < " + floatToString(lenZ_percentage_max * 100.)
-				+ "%). Please consider a larger box size if there are no valid ranges for central Z length under current settings.");
+		if (verboseOutput)
+			std::cout << " You have chosen to ignore helical symmetry! Stop checking now..." << std::endl;
+		return true;
 	}
-};
+
+	// CHECKING HELICAL SYMMETRY RELATED PARAMETERS...
+
+	// Force same helical twist and rise if local refinement is not to be performed
+	if (!do_symmetry_local_refinement)
+	{
+		twist_min_deg = twist_max_deg = twist_initial_deg;
+		rise_min_A = rise_max_A = rise_initial_A;
+	}
+	RFLOAT rise_avg_A = (rise_min_A + rise_max_A) / 2.;
+	RFLOAT twist_avg_deg = (twist_min_deg + twist_max_deg) / 2.;
+
+	// Check helical twist and rise
+	if (verboseOutput)
+	{
+		if (do_symmetry_local_refinement)
+		{
+			std::cout << " Helical twist (min, initial, average, max) = " << twist_min_deg << ", " << twist_initial_deg << ", " << twist_avg_deg << ", " << twist_max_deg << " degrees" << std::endl;
+			std::cout << " Helical rise  (min, initial, average, max) = " << rise_min_A / pixel_size_A << ", " << rise_initial_A / pixel_size_A << ", " << rise_avg_A / pixel_size_A << ", " << rise_max_A / pixel_size_A << " pixels" << std::endl;
+			std::cout << " Helical rise  (min, initial, average, max) = " << rise_min_A << ", " << rise_initial_A << ", " << rise_avg_A << ", " << rise_max_A << " Angstroms" << std::endl;
+		}
+		else
+		{
+			std::cout << " Helical twist = " << twist_initial_deg << " degree(s)" << std::endl;
+			std::cout << " Helical rise  = " << rise_initial_A / pixel_size_A << " pixel(s) = " << rise_initial_A << " Angstrom(s)" << std::endl;
+		}
+	}
+	if ( (fabs(twist_min_deg) > 360.) || (fabs(twist_initial_deg) > 360.) || (fabs(twist_max_deg) > 360.) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Helical twist should be > -360 and < +360 degrees!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Helical twist should be > -360 and < +360 degrees!");
+		return false;
+	}
+	if ( (rise_min_A < 0.001) || ((rise_min_A / pixel_size_A) < 0.001)
+			|| (rise_initial_A < 0.001) || ((rise_initial_A / pixel_size_A) < 0.001)
+			|| (rise_max_A < 0.001) || ((rise_max_A / pixel_size_A) < 0.001) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Helical rise should be > +0.001 Angstroms and > +0.001 pixels!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Helical rise should be > +0.001 Angstroms and > +0.001 pixels!");
+		return false;
+	}
+	if (do_symmetry_local_refinement)
+	{
+		if ( (twist_min_deg > twist_max_deg) || (twist_initial_deg < twist_min_deg) || (twist_initial_deg > twist_max_deg)
+				|| (rise_min_A > rise_max_A) || (rise_initial_A < rise_min_A) || (rise_initial_A > rise_max_A) )
+		{
+			if (verboseOutput)
+				std::cout << " ERROR! The following condition must be satisfied (both for helical twist and rise): min < initial < max !" << std::endl;
+			else
+				REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): The following condition must be satisfied (both for helical twist and rise): min < initial < max !");
+			return false;
+		}
+#ifndef WIDE_HELICAL_TWIST_AND_RISE_SEARCHES
+		//RFLOAT rise_min_A_thres = rise_avg_A * (1. - rise_range_max_percentage);
+		//RFLOAT rise_max_A_thres = rise_avg_A * (1. + rise_range_max_percentage);
+		if ( (fabs(twist_avg_deg - twist_min_deg) > 180.01) || ((fabs(rise_avg_A - rise_min_A) / fabs(rise_avg_A)) > rise_range_max_percentage) )
+		{
+			if (verboseOutput)
+				std::cout << " ERROR! Searching ranges of helical twist and rise should be < 180 degrees and < +/-33.34% from the min-max average respectively!" << std::endl;
+			else
+				REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Searching ranges of helical twist and rise should be < 180 degrees and < +/-33.34% from the min-max average respectively!");
+			return false;
+		}
+#endif
+	}
+
+	// Check Z percentage
+	if (verboseOutput)
+		std::cout << " Z percentage = " << z_percentage << " = " << z_percentage * 100. << " %" << std::endl;
+	if ( (z_percentage < 0.001) || (z_percentage > 0.999) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Z percentage should at least be > 0.001 and < 0.999 (0.1% ~ 99.9%)!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Z percentage should at least be > 0.001 and < 0.999 (0.1% ~ 99.9%)!");
+		return false;
+	}
+	RFLOAT z_percentage_min = (nr_units_min * rise_max_A) / (pixel_size_A * (RFLOAT)(box_len));
+	z_percentage_min = (z_percentage_min < 0.001) ? (0.001) : (z_percentage_min);
+	RFLOAT z_percentage_max = ( (2.) * sqrt( (particle_diameter_A * particle_diameter_A / 4.) - (tube_outer_diameter_A * tube_outer_diameter_A / 4.) ) / pixel_size_A) / ((RFLOAT)(box_len));
+	z_percentage_max = (z_percentage_max > 0.999) ? (0.999) : (z_percentage_max);
+	if (verboseOutput)
+		std::cout << " Z percentage should be > " << z_percentage_min << " and < " << z_percentage_max << " (under current settings)" << std::endl;
+	if (z_percentage_min > z_percentage_max)
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! The range of Z percentage is invalid! To decrease the lower bound, make maximum rise smaller or box size larger. To increase the upper bound, make the particle diameter (along with the box size) larger and the outer tube diameter smaller!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): The range of Z percentage is invalid! To decrease the lower bound, make maximum rise smaller or box size larger. To increase the upper bound, make the particle diameter (along with the box size) larger and the outer tube diameter smaller!");
+		return false;
+	}
+	if ( (z_percentage < z_percentage_min) || (z_percentage > z_percentage_max) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Z percentage is out of range under current settings!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Z percentage is out of range under current settings!");
+		return false;
+	}
+
+	// Check maximum rise (DO I NEED THIS???)
+	RFLOAT rise_max_upper_bound_A = pixel_size_A * (RFLOAT)(box_len) * z_percentage / nr_units_min;
+	if (do_symmetry_local_refinement)
+	{
+		if (verboseOutput)
+			std::cout << " Upper bound of maximum rise = " << rise_max_upper_bound_A / pixel_size_A << " pixels = " << rise_max_upper_bound_A << " Angstroms (under current settings)" << std::endl;
+		if (fabs(rise_max_A) > rise_max_upper_bound_A) // THIS CANNOT HAPPEN. ERRORS HAVE ALREADY BEEN RAISED IN Z PERCENTAGE CHECK.
+		{
+			if (verboseOutput)
+				std::cout << " ERROR! Maximum rise exceeds its upper bound!" << std::endl;
+			else
+				REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Maximum rise exceeds its upper bound!");
+			return false;
+		}
+	}
+
+	// Check number of asymmetrical units
+	RFLOAT half_nr_asu_max = 0.5 * (1. - z_percentage) * (RFLOAT(box_len)) * pixel_size_A / rise_max_A;
+	int nr_asu_max = 2 * (int(floor(half_nr_asu_max))) + 1;
+	nr_asu_max = (nr_asu_max < 1) ? (1) : (nr_asu_max);
+	if (verboseOutput)
+		std::cout << " Number of asymmetrical units = " << nr_asu << ", maximum value = " << nr_asu_max << " (under current settings)" << std::endl;
+	if (nr_asu < 1)
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Number of asymmetrical units (an integer) should be at least 1!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Number of asymmetrical units (a positive integer) should be at least 1!");
+		return false;
+	}
+	if ( (nr_asu > 1) && (nr_asu > nr_asu_max) )
+	{
+		if (verboseOutput)
+			std::cout << " ERROR! Number of asymmetrical units exceeds its upper bound!" << std::endl;
+		else
+			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Number of asymmetrical units exceeds its upper bound!");
+		return false;
+	}
+
+	// Everything seems fine :)
+	return true;
+}
 
 void imposeHelicalSymmetryInRealSpace(
 		MultidimArray<RFLOAT>& v,
@@ -713,6 +879,7 @@ void imposeHelicalSymmetryInRealSpace(
 		RFLOAT twist_deg,
 		RFLOAT cosine_width_pix)
 {
+	bool ignore_helical_symmetry = false;
 	long int Xdim, Ydim, Zdim, Ndim, box_len;
 	RFLOAT rise_pix, sphere_radius_pix, cyl_inner_radius_pix, cyl_outer_radius_pix, r_min, r_max, d_min, d_max, D_min, D_max, z_min, z_max;
 
@@ -727,15 +894,22 @@ void imposeHelicalSymmetryInRealSpace(
 	box_len = (box_len < Zdim) ? box_len : Zdim;
 
 	// Check helical parameters
-	checkHelicalParametersFor3DHelicalReference(
+	checkParametersFor3DHelicalReconstruction(
+			false,
+			false,
+			1,
+			rise_A,
+			rise_A,
+			rise_A,
+			twist_deg,
+			twist_deg,
+			twist_deg,
 			box_len,
 			pixel_size_A,
-			twist_deg,
-			rise_A,
 			z_percentage,
-			sphere_radius_A,
-			cyl_inner_radius_A,
-			cyl_outer_radius_A);
+			sphere_radius_A * 2.,
+			cyl_inner_radius_A * 2.,
+			cyl_outer_radius_A * 2.);
 
 	// Parameters of mask
 	if (cosine_width_pix < 1.)
@@ -1186,10 +1360,10 @@ void createCylindricalReference(
 	RFLOAT r, dist, inner_radius_pix, outer_radius_pix;
 
 	// Check dimensions
-	if(box_size < 5)
+	if (box_size < 5)
 		REPORT_ERROR("helix.cpp::createCylindricalReference(): Invalid box size.");
 
-	if( (inner_diameter_pix > outer_diameter_pix)
+	if ( (inner_diameter_pix > outer_diameter_pix)
 			|| (outer_diameter_pix < 0.) || (outer_diameter_pix > (box_size - 1))
 			|| (cosine_width < 0.) )
 		REPORT_ERROR("helix.cpp::createCylindricalReference(): Parameter(s) error!");
@@ -1203,23 +1377,85 @@ void createCylindricalReference(
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
 	{
 		r = sqrt(i * i + j * j);
-		if( (r > inner_radius_pix) && (r < outer_radius_pix) )
+		if ( (r > inner_radius_pix) && (r < outer_radius_pix) )
 		{
 			A3D_ELEM(v, k, i, j) = 1.;
 			continue;
 		}
 		dist = -9999.;
-		if( (r > outer_radius_pix) && (r < (outer_radius_pix + cosine_width)) )
+		if ( (r > outer_radius_pix) && (r < (outer_radius_pix + cosine_width)) )
 			dist = r - outer_radius_pix;
-		else if( (r < inner_radius_pix) && (r > (inner_radius_pix - cosine_width)) )
+		else if ( (r < inner_radius_pix) && (r > (inner_radius_pix - cosine_width)) )
 			dist = inner_radius_pix - r;
-		if(dist > 0.)
+		if (dist > 0.)
 		{
 			A3D_ELEM(v, k, i, j) = 0.5 + 0.5 * cos(PI * dist / cosine_width);
 			continue;
 		}
 		A3D_ELEM(v, k, i, j) = 0.;
 	}
+	return;
+}
+
+void createCylindricalReferenceWithPolarity(
+		MultidimArray<RFLOAT>& v,
+		int box_size,
+		RFLOAT inner_diameter_pix,
+		RFLOAT outer_diameter_pix,
+		RFLOAT ratio_topbottom,
+		RFLOAT cosine_width)
+{
+	RFLOAT r, r_min, r_max, dist, top_radius_pix, bottom_radius_pix;
+
+	// Check dimensions
+	if (box_size < 5)
+		REPORT_ERROR("helix.cpp::createCylindricalReferenceWithPolarity(): Invalid box size.");
+
+	if ( (inner_diameter_pix > outer_diameter_pix)
+			|| (outer_diameter_pix < 0.) || (outer_diameter_pix > (box_size - 1))
+			|| (ratio_topbottom < 0.) || (ratio_topbottom > 1.) || (cosine_width < 0.) )
+		REPORT_ERROR("helix.cpp::createCylindricalReferenceWithPolarity(): Parameter(s) error!");
+
+	// Set top and bottom radii
+	top_radius_pix = outer_diameter_pix / 2.;
+	bottom_radius_pix = outer_diameter_pix * ratio_topbottom / 2.;
+	if (inner_diameter_pix > 0.)
+		bottom_radius_pix = (inner_diameter_pix / 2.) + ratio_topbottom * (outer_diameter_pix / 2. - inner_diameter_pix / 2.);
+
+	v.clear();
+	v.resize(box_size, box_size, box_size);
+	v.setXmippOrigin();
+
+	r_min = r_max = -1.;
+	if (inner_diameter_pix > 0.)
+		r_min = inner_diameter_pix / 2.;
+    for (long int k=STARTINGZ(v); k<=FINISHINGZ(v); k++)
+    {
+    	r_max = top_radius_pix - (top_radius_pix - bottom_radius_pix) * ((RFLOAT)(k - STARTINGZ(v))) / ((RFLOAT)(box_size));
+        for (long int i=STARTINGY(v); i<=FINISHINGY(v); i++)
+        {
+            for (long int j=STARTINGX(v); j<=FINISHINGX(v); j++)
+            {
+            	r = sqrt(i * i + j * j);
+        		if ( (r > r_min) && (r < r_max) )
+        		{
+        			A3D_ELEM(v, k, i, j) = 1.;
+        			continue;
+        		}
+        		dist = -9999.;
+        		if ( (r > r_max) && (r < (r_max + cosine_width)) )
+        			dist = r - r_max;
+        		if ( (r < r_min) && (r > (r_min - cosine_width)) )
+        			dist = r_min - r;
+        		if (dist > 0.)
+        		{
+        			A3D_ELEM(v, k, i, j) = 0.5 + 0.5 * cos(PI * dist / cosine_width);
+        			continue;
+        		}
+        		A3D_ELEM(v, k, i, j) = 0.;
+            }
+        }
+    }
 	return;
 }
 
@@ -1479,9 +1715,10 @@ void applySoftSphericalMask(
 	v.setXmippOrigin();
 	r_max = (XSIZE(v) < YSIZE(v)) ? (XSIZE(v)) : (YSIZE(v));
 	r_max = (r_max < ZSIZE(v)) ? (r_max) : (ZSIZE(v));
-	if (cosine_width > 0.05 * r_max)
-		r_max -= 2. * cosine_width;
-	r_max *= 0.45;
+	// Nov11,2016 - Commented the following lines for r > 90% masks
+	//if (cosine_width > 0.05 * r_max)
+	//	r_max -= 2. * cosine_width;
+	//r_max *= 0.45;
 	if ( (sphere_diameter > 0.01) && ((sphere_diameter / 2.) < r_max) )
 		r_max = sphere_diameter / 2.;
 	r_max_edge = r_max + cosine_width;
@@ -3063,7 +3300,146 @@ void makeHelicalReference3D(
 			}
 		}
 	}
+	return;
+}
 
+void makeHelicalReference3DWithPolarity(
+		MultidimArray<RFLOAT>& out,
+		int box_size,
+		RFLOAT pixel_size_A,
+		RFLOAT twist_deg,
+		RFLOAT rise_A,
+		RFLOAT tube_diameter_A,
+		RFLOAT particle_diameter_A,
+		RFLOAT cyl_diameter_A,
+		RFLOAT topbottom_ratio,
+		int sym_Cn)
+{
+	RFLOAT rise_pix, tube_diameter_pix, particle_diameter_pix, particle_radius_pix, cyl_radius_pix, top_radius_pix, bottom_radius_pix;
+	int particle_radius_max_pix;
+	Matrix2D<RFLOAT> matrix1, matrix2;
+	Matrix1D<RFLOAT> vec0, vec1, vec2;
+	out.clear();
+
+	if (box_size < 5)
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Box size should be larger than 5!");
+	if (pixel_size_A < 0.001)
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Pixel size (in Angstroms) should be larger than 0.001!");
+	if ( (fabs(twist_deg) < 0.01) || (fabs(twist_deg) > 179.99) || ((rise_A / pixel_size_A) < 0.001) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Wrong helical twist or rise!");
+	if (sym_Cn < 1)
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Rotation symmetry Cn is invalid (n should be positive integer)!");
+	if ( (topbottom_ratio < 0.) || (topbottom_ratio > 1.) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Top-bottom width ratio should be 0~1!");
+
+	rise_pix = rise_A / pixel_size_A;
+	tube_diameter_pix = tube_diameter_A / pixel_size_A;
+	particle_diameter_pix = particle_diameter_A / pixel_size_A;
+	particle_radius_pix = particle_diameter_pix / 2.;
+	particle_radius_max_pix = (CEIL(particle_diameter_pix / 2.)) + 1;
+	top_radius_pix = cyl_radius_pix = cyl_diameter_A / pixel_size_A;
+	bottom_radius_pix = top_radius_pix * topbottom_ratio;
+
+	if (particle_diameter_pix < 2.)
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Particle diameter should be larger than 2 pixels!");
+	if ( (tube_diameter_pix < 0.001) || (tube_diameter_pix > (RFLOAT)(box_size)) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Tube diameter should be larger than 1 pixel and smaller than box size!");
+	if ( (cyl_radius_pix < 1.) || (cyl_radius_pix > particle_diameter_pix) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Cylindrical diameter should be > 1 pixel and < particle diameter!");
+
+	out.resize(box_size, box_size, box_size);
+	out.initZeros();
+	out.setXmippOrigin();
+
+	RFLOAT x0, y0, z0;
+	x0 = tube_diameter_pix / 2.;
+	y0 = 0.;
+	z0 = (RFLOAT)(FIRST_XMIPP_INDEX(box_size));
+	vec0.clear();
+	vec0.resize(2);
+	XX(vec0) = x0;
+	YY(vec0) = y0;
+	vec1.clear();
+	vec1.resize(2);
+	vec2.clear();
+	vec2.resize(2);
+
+	for (int id = 0; ;id++)
+	{
+		RFLOAT rot1_deg, x1, y1, z1;
+		rot1_deg = (RFLOAT)(id) * twist_deg;
+		rotation2DMatrix(rot1_deg, matrix1, false);
+		vec1 = matrix1 * vec0;
+
+		x1 = XX(vec1);
+		y1 = YY(vec1);
+		z1 = z0 + (RFLOAT)(id) * rise_pix;
+		if (z1 > LAST_XMIPP_INDEX(box_size))
+			break;
+
+		for (int Cn = 0; Cn < sym_Cn; Cn++)
+		{
+			RFLOAT rot2_deg, x2, y2, z2;
+			rot2_deg = (360.) * (RFLOAT)(Cn) / (RFLOAT)(sym_Cn);
+			rotation2DMatrix(rot2_deg, matrix2, false);
+			vec2 = matrix2 * vec1;
+			x2 = XX(vec2);
+			y2 = YY(vec2);
+			z2 = z1;
+
+			for (int dz = -particle_radius_max_pix; dz <= particle_radius_max_pix; dz++)
+			{
+				RFLOAT thres_xy = (top_radius_pix - bottom_radius_pix) * 0.5 * dz / particle_radius_pix + (top_radius_pix + bottom_radius_pix) / 2.;
+				for (int dy = -particle_radius_max_pix; dy <= particle_radius_max_pix; dy++)
+				{
+					for (int dx = -particle_radius_max_pix; dx <= particle_radius_max_pix; dx++)
+					{
+						RFLOAT _x, _y, _z, dist, val_old, val_new;
+						int x3, y3, z3;
+
+						x3 = ROUND(x2) + dx;
+						y3 = ROUND(y2) + dy;
+						z3 = ROUND(z2) + dz;
+
+						if ( (x3 < FIRST_XMIPP_INDEX(box_size)) || (x3 > LAST_XMIPP_INDEX(box_size))
+								|| (y3 < FIRST_XMIPP_INDEX(box_size)) || (y3 > LAST_XMIPP_INDEX(box_size))
+								|| (z3 < FIRST_XMIPP_INDEX(box_size)) || (z3 > LAST_XMIPP_INDEX(box_size)) )
+							continue;
+
+						_x = (RFLOAT)(x3) - x2;
+						_y = (RFLOAT)(y3) - y2;
+						_z = (RFLOAT)(z3) - z2;
+
+						dist = sqrt(_x * _x + _y * _y + _z * _z);
+						if (dist > particle_radius_pix)
+							continue;
+
+						val_old = A3D_ELEM(out, z3, y3, x3);
+						val_new = 0.;
+
+						// Draw the shape you want!
+						if (topbottom_ratio > 0.9999) // Without polarity. Thus spheres.
+						{
+							val_new = 0.5 + 0.5 * cos(PI * dist / particle_radius_pix);
+							if (val_new > val_old)
+								A3D_ELEM(out, z3, y3, x3) = val_new;
+						}
+						else // With polarity
+						{
+							dist = sqrt(_x * _x + _y * _y);
+							if (dist < thres_xy)
+							{
+								val_new = 0.5 + 0.5 * cos(PI * dist / thres_xy);
+								val_new *= 0.5 + 0.5 * cos(PI * 0.5 * _z / particle_radius_pix); // something arbitrary
+								if (val_new > val_old)
+									A3D_ELEM(out, z3, y3, x3) = val_new;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	return;
 }
 
@@ -3223,19 +3599,28 @@ void mergeStarFiles(FileName& fn_in)
 void sortHelicalTubeID(MetaDataTable& MD)
 {
 	std::string str_particle_fullname, str_particle_name, str_comment, str_particle_id;
-	int int_tube_id;
-	bool contain_helicalTubeID;
+	int int_tube_id, total_opposite_polarity, nr_tubes;
+	std::vector<HelicalSegmentPriorInfoEntry> list;
+	std::set<std::string> tubes;
+	long int MDobjectID;
 
-	if (!MD.containsLabel(EMDL_IMAGE_NAME))
-		REPORT_ERROR("helix.cpp::sortHelicalTubeID: MetaDataTable should contain rlnImageName!");
-	contain_helicalTubeID = MD.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+	if ( (!MD.containsLabel(EMDL_IMAGE_NAME))
+			|| (!MD.containsLabel(EMDL_ORIENT_TILT))
+			|| (!MD.containsLabel(EMDL_ORIENT_PSI))
+			|| (!MD.containsLabel(EMDL_ORIENT_TILT_PRIOR))
+			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR))
+			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
+			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
+			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
+		REPORT_ERROR("helix.cpp::sortHelicalTubeID: Labels of helical prior information are missing!");
 
 	int_tube_id = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		MD.getValue(EMDL_IMAGE_NAME, str_particle_fullname);
-		if (contain_helicalTubeID)
-			MD.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, int_tube_id);
+		MD.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, int_tube_id);
+		str_comment = str_particle_name + "@TUBE@" + integerToString(int_tube_id, 6);
+		tubes.insert(str_comment);
 
 		str_particle_name = str_particle_fullname.substr(str_particle_fullname.find("@") + 1);
 		str_particle_id = str_particle_fullname.substr(0, str_particle_fullname.find("@"));
@@ -3247,6 +3632,8 @@ void sortHelicalTubeID(MetaDataTable& MD)
 		MD.setValue(EMDL_IMAGE_NAME, str_comment);
 	}
 	MD.newSort(EMDL_IMAGE_NAME);
+	nr_tubes = tubes.size();
+	tubes.clear();
 
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
@@ -3256,6 +3643,21 @@ void sortHelicalTubeID(MetaDataTable& MD)
 		str_comment = str_particle_id + "@" + str_particle_name;
 		MD.setValue(EMDL_IMAGE_NAME, str_comment);
 	}
+
+	updatePriorsForHelicalReconstruction(
+			MD, total_opposite_polarity, 1.,
+			false, false, false,
+			0., 0., 0., 1.);
+
+	RFLOAT ratio = 100. * ((RFLOAT)(total_opposite_polarity)) / ((RFLOAT)(MD.numberOfObjects()));
+	std::cout << " Total number of segments / tubes = " << MD.numberOfObjects() << " / " << nr_tubes
+			<< " = " << ((RFLOAT)(MD.numberOfObjects())) / ((RFLOAT)(nr_tubes)) << ", % of segments with wrong polarity = "
+			<< ratio << "%" << std::endl;
+	if (fabs(ratio) < (1e-5))
+		std::cout << " WARNING: YOU MIGHT HAVE NOT PROVIDED A RANGE FACTOR FOR LOCAL AVERAGING FOR THIS RECONSTRUCTION! OR YOU MIGHT BE USING A DATA STAR FILE GENERATED IN A LOCAL ANGULAR SEARCH ITERATION. POLARITY CHECK IS ONLY USEFUL FOR ITERATIONS WHERE GLOBAL SEARCHES HAVE BEEN PERFORMED!" << std::endl;
+
+	list.clear();
+
 	return;
 }
 
@@ -3404,17 +3806,20 @@ void excludeLowCTFCCMicrographs(
 		FileName& fn_in,
 		FileName& fn_out,
 		RFLOAT cc_min,
-		RFLOAT EPA_lowest_res)
+		RFLOAT EPA_lowest_res,
+		RFLOAT df_min,
+		RFLOAT df_max)
 {
-	EMDLabel EMDL_ctf_EPA_final_resolution = EMDL_POSTPROCESS_FINAL_RESOLUTION;
 	bool contain_EPA_res;
 	MetaDataTable MD_in, MD_out;
 	int nr_mics_old, nr_mics_new;
-	RFLOAT cc, EPA_res;
+	RFLOAT cc, EPA_res, dU, dV;
 	if ( (fn_in.getFileFormat() != "star") || (fn_out.getFileFormat() != "star") )
 		REPORT_ERROR("helix.cpp::excludeLowCTFCCMicrographs(): MetaDataTable should have .star extension.");
 	if (fn_in == fn_out)
 		REPORT_ERROR("helix.cpp::excludeLowCTFCCMicrographs(): File names must be different.");
+	if (df_min > df_max)
+		REPORT_ERROR("helix.cpp::excludeLowCTFCCMicrographs(): Minimum defocus threshold should be smaller the maximum.");
 
 	MD_in.clear();
 	MD_in.read(fn_in);
@@ -3427,9 +3832,9 @@ void excludeLowCTFCCMicrographs(
 			|| (!MD_in.containsLabel(EMDL_CTF_MAGNIFICATION))
 			|| (!MD_in.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 			|| (!MD_in.containsLabel(EMDL_CTF_FOM)) )
-		REPORT_ERROR("helix.cpp::removeBadTiltParticlesFromDataStar(): Input STAR file should contain CTF information.");
+		REPORT_ERROR("helix.cpp::excludeLowCTFCCMicrographs(): Input STAR file should contain CTF information.");
 
-	contain_EPA_res = MD_in.containsLabel(EMDL_ctf_EPA_final_resolution);
+	contain_EPA_res = MD_in.containsLabel(EMDL_CTF_MAXRES);
 
 	nr_mics_old = nr_mics_new = 0;
 	MD_out.clear();
@@ -3437,8 +3842,10 @@ void excludeLowCTFCCMicrographs(
 	{
 		nr_mics_old++;
 		MD_in.getValue(EMDL_CTF_FOM, cc);
-		MD_in.getValue(EMDL_ctf_EPA_final_resolution, EPA_res);
-		if (cc > cc_min)
+		MD_in.getValue(EMDL_CTF_MAXRES, EPA_res);
+		MD_in.getValue(EMDL_CTF_DEFOCUSU, dU);
+		MD_in.getValue(EMDL_CTF_DEFOCUSV, dV);
+		if ( (cc > cc_min) && (dU > df_min) && (dU < df_max) && (dV > df_min) && (dV < df_max) )
 		{
 			if ( (contain_EPA_res) && (EPA_res > EPA_lowest_res) )
 			{}
@@ -3453,8 +3860,8 @@ void excludeLowCTFCCMicrographs(
 	std::cout << " Number of micrographs (input / output) = " << nr_mics_old << " / " << nr_mics_new << std::endl;
 	if (MD_out.numberOfObjects() < 1)
 		std::cout << " No micrographs in output file!" << std::endl;
-	else
-		MD_out.write(fn_out);
+
+	MD_out.write(fn_out);
 	return;
 }
 
@@ -3769,7 +4176,8 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
-		RFLOAT sigma_cutoff)
+		bool keep_tilt_prior_fixed,
+                RFLOAT sigma_cutoff)
 {
 	std::vector<HelicalSegmentPriorInfoEntry> list;
 	bool do_exclude_out_of_range_trans = true;
@@ -3778,7 +4186,12 @@ void updatePriorsForHelicalReconstruction(
 
 	if (sigma_segment_dist < 0.)
 	{
-		updateAngularPriorsForHelicalReconstruction(MD);
+		updateAngularPriorsForHelicalReconstruction(MD, keep_tilt_prior_fixed);
+		return;
+	}
+	else if (keep_tilt_prior_fixed)
+	{
+		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction(): cannot keep tilt priors fixed while doing local averaging of helical segments along the same filaments!");
 		return;
 	}
 
@@ -3897,7 +4310,9 @@ void updatePriorsForHelicalReconstruction(
 	list.clear();
 }
 
-void updateAngularPriorsForHelicalReconstruction(MetaDataTable& MD)
+void updateAngularPriorsForHelicalReconstruction(
+		MetaDataTable& MD,
+		bool keep_tilt_prior_fixed)
 {
 	if (MD.numberOfObjects() < 1)
 		REPORT_ERROR("helix.cpp::updateAngularPriorsForHelicalReconstruction: MetaDataTable is empty!");
@@ -3913,7 +4328,7 @@ void updateAngularPriorsForHelicalReconstruction(MetaDataTable& MD)
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		RFLOAT val;
-		if (have_tilt && have_tilt_prior)
+		if (have_tilt && have_tilt_prior && (!keep_tilt_prior_fixed) )
 		{
 			MD.getValue(EMDL_ORIENT_TILT, val);
 			MD.setValue(EMDL_ORIENT_TILT_PRIOR, val);
@@ -3950,5 +4365,15 @@ void testDataFileTransformXY(MetaDataTable& MD)
 
 		MD.setValue(EMDL_ORIENT_ORIGIN_X, XX(vec_helix));
 		MD.setValue(EMDL_ORIENT_ORIGIN_Y, YY(vec_helix));
+	}
+}
+
+void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio)
+{
+	if (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO))
+		REPORT_ERROR("helix.cpp::setPsiFlipRatioInStarFile: Psi flip ratio is not found in this STAR file!");
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, ratio);
 	}
 }

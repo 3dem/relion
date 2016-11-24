@@ -31,7 +31,6 @@
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
@@ -57,16 +56,24 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		MultidimArray<Complex > Faux(cudaMLO->transformer.fFourier,true);
 		MultidimArray<RFLOAT> Fctf;
 
+		// What is my particle_id?
+		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
+		// Which group do I belong?
+		int group_id =baseMLO->mydata.getGroupId(part_id);
+
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
 		for (long int ii = baseMLO->exp_my_first_ori_particle; ii < my_ori_particle; ii++)
 			istop += baseMLO->mydata.ori_particles[ii].particles_id.size();
 		istop += ipart;
 
-		// What is my particle_id?
-		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
-		// Which group do I belong?
-		int group_id =baseMLO->mydata.getGroupId(part_id);
+		if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
+		{
+			std::istringstream split(baseMLO->exp_fn_img);
+			for (int i = 0; i <= istop; i++)
+				getline(split, fn_img);
+		}
+		sp.current_img = fn_img;
 
 		// Get the norm_correction
 		RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
@@ -104,10 +111,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
 			RFLOAT prior_psi_flip_ratio =  (baseMLO->mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
+			bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
+
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
+				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
+			if ( (baseMLO->do_helical_refine) && (baseMLO->helical_keep_tilt_prior_fixed) && (do_auto_refine_local_searches) )
 				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op. metadata_offset + ipart, METADATA_PSI);
@@ -119,7 +130,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			if (baseMLO->do_helical_refine)
 			{
-				bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
 				baseMLO->sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
 										op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior,
@@ -161,14 +171,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			{
 				if (baseMLO->mymodel.data_dim == 3)
 				{
-					// Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
-					FileName fn_img;
-					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
-					{
-						std::istringstream split(baseMLO->exp_fn_img);
-						for (int i = 0; i <= istop; i++)
-							getline(split, fn_img);
-					}
 					img.read(fn_img);
 					img().setXmippOrigin();
 				}
@@ -282,7 +284,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		Matrix1D<RFLOAT> my_old_offset_helix_coords;
 		RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
 		RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
-		if (baseMLO->do_helical_refine)
+		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 		{
 			// TODO: calculate my_old_offset_helix_coords from my_old_offset and psi angle
 			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
@@ -358,7 +360,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 		}
 
-		if (baseMLO->do_helical_refine)
+		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 		{
 			// Transform rounded Cartesian offsets to corresponding helical ones
 			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
@@ -903,7 +905,7 @@ void getAllSquaredDifferencesCoarse(
 		{
 			baseMLO->sampling.getTranslations(itrans, 0, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z,
-					baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
 			RFLOAT xshift, yshift, zshift;
 			zshift = 0.;
@@ -913,7 +915,7 @@ void getAllSquaredDifferencesCoarse(
 			if (baseMLO->mymodel.data_dim == 3)
 				zshift = oversampled_translations_z[0];
 
-			if (baseMLO->do_helical_refine)
+			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 			{
 				RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op.metadata_offset + ipart, METADATA_PSI);
 				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
@@ -1090,7 +1092,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		{
 			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z,
-					baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
@@ -1102,7 +1104,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				if (baseMLO->mymodel.data_dim == 3)
 					zshift = oversampled_translations_z[iover_trans];
 
-				if (baseMLO->do_helical_refine)
+				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
@@ -1495,7 +1497,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
-					if ( (baseMLO->do_helical_refine) && (mypriors_len2 > 0.00001) )
+					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 					{
 						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
@@ -1510,7 +1512,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
 					double tdiff2 = 0.;
 
-					if (! baseMLO->do_helical_refine)
+					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
 						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
 					if (baseMLO->mymodel.data_dim == 3)
@@ -1670,12 +1672,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			MoreThanCubOpt<XFLOAT> moreThanOpt(0.);
 			size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+
 			if (filteredSize == 0)
 			{
 				if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
 				{
 					std::cerr << std::endl;
-					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " fn_img= " << sp.current_img << std::endl;
 					std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 					std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
@@ -1711,7 +1714,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
 				{
 					std::cerr << std::endl;
-					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " fn_img= " << sp.current_img << std::endl;
 					std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 					std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
 					std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
@@ -1784,7 +1787,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (op.sum_weight[ipart]==0)
 				{
 					std::cerr << std::endl;
-					std::cerr << " exp_fn_img= " << baseMLO->exp_fn_img << std::endl;
+					std::cerr << " fn_img= " << sp.current_img << std::endl;
 					std::cerr << " part_id= " << part_id << std::endl;
 					std::cerr << " ipart= " << ipart << std::endl;
 					std::cerr << " op.min_diff2[ipart]= " << op.min_diff2[ipart] << std::endl;
@@ -1978,7 +1981,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			{
 				baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
 						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-						baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+						(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 				for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
@@ -1990,14 +1993,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
-					if ( (baseMLO->do_helical_refine) && (mypriors_len2 > 0.00001) )
+					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 					{
 						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, baseMLO->mymodel.data_dim, CART_TO_HELICAL_COORDS);
 					}
 
-					if (! baseMLO->do_helical_refine)
+					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
 						RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 
 
@@ -2137,7 +2140,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		baseMLO->sampling.getTranslations(op.max_index[ipart].itrans, baseMLO->adaptive_oversampling,
 				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-				baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+				(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
 
 		//TODO We already have rot, tilt and psi don't calculated them again
 		if(baseMLO->do_skip_align || baseMLO->do_skip_rotate)
@@ -2191,7 +2194,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 
 		// HELICAL TODO! Use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
-		if (baseMLO->do_helical_refine)
+		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 			transformCartesianAndHelicalCoords(shifts, shifts, old_psi, old_tilt, HELICAL_TO_CART_COORDS);
 
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_xoff) = XX(shifts);
@@ -2238,7 +2241,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		{
 			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z,
-					baseMLO->do_helical_refine, baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial); //TODO Called multiple time to generate same list, reuse the same list
+					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial); //TODO Called multiple time to generate same list, reuse the same list
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
@@ -2250,7 +2253,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				if (baseMLO->mymodel.data_dim == 3)
 					zshift = oversampled_translations_z[iover_trans];
 
-				if (baseMLO->do_helical_refine)
+				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);

@@ -444,6 +444,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -InMrc " + fn_mic;
 
 	command += " -OutMrc " + fn_avg;
+	command += " -Bft " + floatToString(bfactor);
 
 	if (do_save_movies)
 		command += " -OutStack 1";
@@ -453,10 +454,26 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	if (fn_gain_reference != "")
 		command += " -Gain " + fn_gain_reference;
 
-	// Throw away first few frames
+	// Throw away first few frames?
 	if (first_frame_sum > 1)
 		command += " -Throw " + integerToString(first_frame_sum - 1);
-	// TODO: throw away last few frames
+
+	// Throw away last few frames?
+	if (last_frame_sum > 0)
+	{
+		// Cannot read TIFFs here...
+		if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
+			REPORT_ERROR("ERROR: you cannot use --last_frame_sum > 0 when reading TIFFs. Try using -Trunk in the --other_motioncorr_args instead.");
+
+		// Read in header of the movie, to see how many frames it has
+		Image<RFLOAT> Ihead;
+		Ihead.read(fn_mic, false);
+		int n_frames = NSIZE(Ihead());
+		int trunk = n_frames - last_frame_sum;
+		if (trunk < 0)
+			REPORT_ERROR("ERROR: movie " + fn_mic + " does not have enough frames.");
+		command += " -Trunk " + integerToString(trunk);
+	}
 
 	if (bin_factor > 1)
 		command += " -FtBin " + floatToString(bin_factor);
@@ -466,6 +483,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -Kv " + floatToString(voltage);
 		command += " -FmDose " + floatToString(dose_per_frame);
 		command += " -PixSize " + floatToString(angpix);
+		command += " -InitDose " + floatToString(pre_exposure);
 	}
 
 	if (fn_other_motioncorr_args.length() > 0)

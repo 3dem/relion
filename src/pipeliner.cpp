@@ -191,6 +191,9 @@ long int PipeLine::findProcessByAlias(std::string name)
 
 bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 {
+	if (do_read_only)
+		return false;
+
 	FileName fn_dir = ".Nodes/";
 	FileName fnt;
 
@@ -233,6 +236,9 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 void PipeLine::touchTemporaryNodeFiles(Process &process)
 {
 
+	if (do_read_only)
+		return;
+
 	bool touch_if_not_exist = (process.status == PROC_SCHEDULED_CONT || process.status == PROC_SCHEDULED_NEW);
 
 	for (int j = 0; j < process.outputNodeList.size(); j++)
@@ -245,6 +251,9 @@ void PipeLine::touchTemporaryNodeFiles(Process &process)
 
 void PipeLine::deleteTemporaryNodeFile(Node &node)
 {
+	if (do_read_only)
+		return;
+
 	FileName fn_dir = ".Nodes/";
 	FileName fnt;
 
@@ -278,6 +287,8 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 
 void PipeLine::deleteTemporaryNodeFiles(Process &process)
 {
+	if (do_read_only)
+		return;
 
 	for (int j = 0; j < process.outputNodeList.size(); j++)
 	{
@@ -289,6 +300,9 @@ void PipeLine::deleteTemporaryNodeFiles(Process &process)
 
 void PipeLine::remakeNodeDirectory()
 {
+	if (do_read_only)
+		return;
+
 	// Clear existing directory
 	FileName fn_dir = ".Nodes/";
 	std::string command = " rm -rf " + fn_dir;
@@ -308,6 +322,8 @@ void PipeLine::remakeNodeDirectory()
 
 void PipeLine::checkProcessCompletion()
 {
+	if (do_read_only)
+		return;
 
 	for (long int i=0; i < processList.size(); i++)
 	{
@@ -434,7 +450,7 @@ void PipeLine::read(bool do_lock)
 {
 
 	FileName fn_lock = ".lock_" + name + "_pipeline.star";
-	if (do_lock)
+	if (do_lock && !do_read_only)
 	{
 		int iwait =0;
 		while( exists(fn_lock) )
@@ -595,6 +611,9 @@ void PipeLine::read(bool do_lock)
 
 void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
 {
+
+	if (do_read_only)
+		return;
 
 	FileName fn_lock = ".lock_" + name + "_pipeline.star";
 	if (do_lock)

@@ -29,6 +29,7 @@
 #include "src/transformations.h"
 #include "src/euler.h"
 #include "src/assembly.h"
+#include <set>
 
 #define CART_TO_HELICAL_COORDS true
 #define HELICAL_TO_CART_COORDS false
@@ -79,14 +80,6 @@ bool calcCCofHelicalSymmetry(
 		RFLOAT& cc,
 		int& nr_asym_voxels);
 
-void checkRangesForLocalSearchHelicalSymmetry(
-		RFLOAT rise_A,
-		RFLOAT rise_min_A,
-		RFLOAT rise_max_A,
-		RFLOAT twist_deg,
-		RFLOAT twist_min_deg,
-		RFLOAT twist_max_deg);
-
 bool localSearchHelicalSymmetry(
 		const MultidimArray<RFLOAT>& v,
 		RFLOAT pixel_size_A,
@@ -101,7 +94,8 @@ bool localSearchHelicalSymmetry(
 		RFLOAT twist_min_deg,
 		RFLOAT twist_max_deg,
 		RFLOAT twist_inistep_deg,
-		RFLOAT& twist_refined_deg);
+		RFLOAT& twist_refined_deg,
+		std::ostream* o_ptr = NULL);
 
 RFLOAT getHelicalSigma2Rot(
 		RFLOAT helical_rise_pix,
@@ -110,29 +104,23 @@ RFLOAT getHelicalSigma2Rot(
 		RFLOAT rot_step_deg,
 		RFLOAT old_sigma2_rot);
 
-// Assume all parameters are within range
-RFLOAT get_lenZ_percentage_max(
-		int box_len,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A,
-		RFLOAT pixel_size_A);
-
-// Assume all parameters are within range
-RFLOAT get_rise_A_max(
-		int box_len,
-		RFLOAT pixel_size_A,
-		RFLOAT lenZ_percentage,
-		RFLOAT nr_units_min);
-
-void checkHelicalParametersFor3DHelicalReference(
+bool checkParametersFor3DHelicalReconstruction(
+		bool ignore_symmetry,
+		bool do_symmetry_local_refinement,
+		int nr_asu,
+		RFLOAT rise_initial_A,
+		RFLOAT rise_min_A,
+		RFLOAT rise_max_A,
+		RFLOAT twist_initial_deg,
+		RFLOAT twist_min_deg,
+		RFLOAT twist_max_deg,
 		int box_len,
 		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT lenZ_percentage,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_inner_radius_A,
-		RFLOAT cyl_outer_radius_A);
+		RFLOAT z_percentage,
+		RFLOAT particle_diameter_A,
+		RFLOAT tube_inner_diameter_A,
+		RFLOAT tube_outer_diameter_A,
+		bool verboseOutput = false);
 
 void imposeHelicalSymmetryInRealSpace(
 		MultidimArray<RFLOAT>& v,
@@ -198,6 +186,14 @@ void createCylindricalReference(
 		int box_size,
 		RFLOAT inner_diameter_pix,
 		RFLOAT outer_diameter_pix,
+		RFLOAT cosine_width = 5.);
+
+void createCylindricalReferenceWithPolarity(
+		MultidimArray<RFLOAT>& v,
+		int box_size,
+		RFLOAT inner_diameter_pix,
+		RFLOAT outer_diameter_pix,
+		RFLOAT ratio_topbottom = 0.5,
 		RFLOAT cosine_width = 5.);
 
 void transformCartesianAndHelicalCoords(
@@ -403,6 +399,18 @@ void makeHelicalReference3D(
 		RFLOAT particle_diameter_A,
 		int sym_Cn);
 
+void makeHelicalReference3DWithPolarity(
+		MultidimArray<RFLOAT>& out,
+		int box_size,
+		RFLOAT pixel_size_A,
+		RFLOAT twist_deg,
+		RFLOAT rise_A,
+		RFLOAT tube_diameter_A,
+		RFLOAT particle_diameter_A,
+		RFLOAT cyl_diameter_A,
+		RFLOAT topbottom_ratio,
+		int sym_Cn);
+
 /*
 void makeHelicalReconstructionStarFileFromSingle2DClassAverage(
 		FileName& fn_in_class2D,
@@ -456,8 +464,10 @@ void outputHelicalSymmetryStatus(
 void excludeLowCTFCCMicrographs(
 		FileName& fn_in,
 		FileName& fn_out,
-		RFLOAT cc_min,
-		RFLOAT EPA_lowest_res);
+		RFLOAT cc_min = -1.,
+		RFLOAT EPA_lowest_res = 999999.,
+		RFLOAT df_min = -999999.,
+		RFLOAT df_max = 999999.);
 
 void cutOutPartOfHelix(
 		const MultidimArray<RFLOAT>& vin,
@@ -525,11 +535,16 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
+		bool keep_tilt_prior_fixed = false,
 		RFLOAT sigma_cutoff = 3.);
 // TESTING...
 
-void updateAngularPriorsForHelicalReconstruction(MetaDataTable& MD);
+void updateAngularPriorsForHelicalReconstruction(
+		MetaDataTable& MD,
+		bool keep_tilt_prior_fixed);
 
 void testDataFileTransformXY(MetaDataTable& MD);
+
+void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);
 
 #endif /* HELIX_H_ */

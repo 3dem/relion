@@ -355,6 +355,7 @@ void RelionJobWindow::closeWriteFile(std::ofstream& fh, std::string fn)
 	if (have_extra2)
 		qsub_extra2.writeValue(fh);
 	qsubscript.writeValue(fh);
+	min_dedicated.writeValue(fh);
 	other_args.writeValue(fh);
 
 	fh.close();
@@ -377,6 +378,7 @@ void RelionJobWindow::closeReadFile(std::ifstream& fh)
 	if (have_extra2)
 		qsub_extra2.readValue(fh);
 	qsubscript.readValue(fh);
+	min_dedicated.readValue(fh);
 	other_args.readValue(fh);
 
 }
@@ -418,12 +420,35 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	if (have_extra2)
 		replaceStringAll(textbuf, "XXXextra2XXX", qsub_extra2.getValue() );
 
-	// Get commands.size() entries with the actual command
-	if (commands.size() > 1)
-		appendLineString(textbuf, "XXXcommandXXX", commands.size() - 1);
 
+	// First, find out how many mpirun commands there are
+	int nr_mpi_commands = 0;
 	for (int icom = 0; icom < commands.size(); icom++)
-		replaceStringOnce(textbuf, "XXXcommandXXX", commands[icom] );
+	{
+		// Is this a relion mpi program?
+		if ((commands[icom]).find("_mpi`") != std::string::npos && (commands[icom]).find("relion_") != std::string::npos)
+			nr_mpi_commands++;
+	}
+
+	// Now append that many XXXcommandXXX entries
+	if (nr_mpi_commands > 1)
+		appendLineString(textbuf, "XXXcommandXXX", nr_mpi_commands - 1);
+
+	// Get commands.size() entries with the actual command
+	for (int icom = 0; icom < commands.size(); icom++)
+	{
+		// Is this a relion mpi program?
+		if ((commands[icom]).find("_mpi`") != std::string::npos && (commands[icom]).find("relion_") != std::string::npos)
+		{
+			replaceStringOnce(textbuf, "XXXcommandXXX", commands[icom] );
+		}
+		else
+		{
+			// Just add the sequential command
+			textbuf->append(commands[icom].c_str());
+			textbuf->append("\n");
+		}
+	}
 
 	// Make sure the file ends with an empty line
 	textbuf->append("\n");
@@ -478,12 +503,15 @@ bool RelionJobWindow::prepareFinalCommand(std::string &outputname, std::vector<s
 	else
 	{
 		// If there are multiple commands, then join them all on a single line (final_command)
-		// Also add mpirun in front of those commands that have _mpi` in it (if no submission via the queue is done)
+		// Also add mpirun in front of those commands that have relion_ and _mpi` in it (if no submission via the queue is done)
 		std::string one_command;
 		final_command = "";
 		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
-			if (has_mpi && nr_mpi.getValue() > 1 && (commands[icom]).find("_mpi`") != std::string::npos)
+			// Is this a relion mpi program?
+			if (has_mpi && nr_mpi.getValue() > 1 &&
+					(commands[icom]).find("_mpi`") != std::string::npos &&
+					(commands[icom]).find("relion_") != std::string::npos)
 				one_command = "mpirun -n " + floatToString(nr_mpi.getValue()) + " " + commands[icom] ;
 			else
 				one_command = commands[icom];
@@ -785,8 +813,8 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). This will be used for MOTIONCORRs -nst and -nss. ");
-	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average (0 means use all, only for MOTIONCORR). This will be used for MOTIONCORRs -ned and -nes.");
+	first_frame_sum.place(current_y, "First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
+	last_frame_sum.place(current_y, "Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
 	angpix.place(current_y, "Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting.");
 
 	tab1->end();
@@ -1076,7 +1104,7 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 			command += " --other_motioncorr_args \" " + other_motioncorr_args.getValue() + " \"";
 
 		// Which GPUs to use?
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 
 	}
 
@@ -1434,7 +1462,7 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --EPA";
 
 		// GPU-allocation
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 
 		if ((other_gctf_args.getValue()).length() > 0)
 			command += " --extra_gctf_options \" " + other_gctf_args.getValue() + " \"";
@@ -1666,7 +1694,9 @@ bool ManualpickJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	// Also make the suffix file (do this after previous command was pushed back!)
 	// Inside it, store the name of the micrograph STAR file, so we can display these later
-	command = "echo " + fn_in.getValue() + " > " + fn_suffix;
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineSymlinkName(fn_in.getValue(), fn_pre, fn_jobnr, fn_post);
+	command = "echo " + fn_pre + fn_jobnr + fn_post + " > " + fn_suffix;
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
@@ -2013,7 +2043,7 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	if (use_gpu.getValue())
 	{
 		// for the moment always use --shrink 0 with GPUs ...
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 	}
 
 	// Other arguments
@@ -2022,7 +2052,10 @@ bool AutopickJobWindow::getCommands(std::string &outputname, std::vector<std::st
 	commands.push_back(command);
 
 	// Also touch the suffix file. Do this after the first command had completed
-	command = "echo " + fn_input_autopick.getValue() + " > " +  outputname + "coords_suffix_autopick.star";
+	// Instead of the symlink from the alias, use the original jobnr filename
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineSymlinkName(fn_input_autopick.getValue(), fn_pre, fn_jobnr, fn_post);
+	command = "echo " + fn_pre + fn_jobnr + fn_post + " > " +  outputname + "coords_suffix_autopick.star";
 	commands.push_back(command.c_str());
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
@@ -2542,6 +2575,13 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	{
 		if (is_autopick.getValue())
 		{
+
+			if (autopick_refs.getValue() == "")
+			{
+				fl_message("ERROR: empty field for autopicking references. This is compulsory for Extract jobs...");
+				return false;
+			}
+
 			fn_ref = autopick_refs.getValue();
 			node_type= NODE_2DREFS;
 		}
@@ -2694,7 +2734,7 @@ performing both alignment and classification, only classification will be perfor
 This requires that the optimal orientations of all particles are already stored in the input STAR file. ", dont_skip_align_group);
 	dont_skip_align_group->begin();
 
-	psi_sampling.place(current_y, "In-plane angular sampling:", 5., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
+	psi_sampling.place(current_y, "In-plane angular sampling:", 6., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
 Using fine values will slow down the program. Recommended value for most 2D refinements: 5 degrees.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
 
@@ -2895,6 +2935,8 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
@@ -3038,7 +3080,7 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// GPU-stuff
 	if (use_gpu.getValue())
 	{
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() +"\"";
 	}
 
 	// Other arguments
@@ -3515,6 +3557,8 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 
@@ -3747,7 +3791,7 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	// GPU-stuff
 	if (use_gpu.getValue())
 	{
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 	}
 
 	// Other arguments
@@ -4165,6 +4209,8 @@ void Auto3DJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
 	fn_img.deactivate(is_continue);
 
 	// Reference
@@ -4397,7 +4443,7 @@ bool Auto3DJobWindow::getCommands(std::string &outputname, std::vector<std::stri
 	// GPU-stuff
 	if (use_gpu.getValue())
 	{
-		command += " --gpu " + gpu_ids.getValue();
+		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 	}
 
 	// Other arguments

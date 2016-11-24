@@ -621,8 +621,8 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 		std::string command;
 		deleteDataOnScratch();
 
-		// Make the scratch directory
-		command = "mkdir -m 0777 -p " + fn_scratch;
+		// Make the scratch directory with write permissions
+		command = "install -d -m 0777 " + fn_scratch;
 		if (system(command.c_str()))
 			REPORT_ERROR("ERROR: cannot execute: " + command);
 
