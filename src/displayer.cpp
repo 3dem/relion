@@ -1746,7 +1746,7 @@ void displayerGuiWindow::writeLastSettings()
     fh.open(fn.c_str(), std::ios::out);
     if (!fh)
     {
-    	std::cerr << "Cannot write last settings to file: "<<fn<<std::endl;
+    	//std::cerr << "Cannot write last settings to file: "<<fn<<std::endl;
     	return;
     }
 

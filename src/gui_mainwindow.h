@@ -102,6 +102,8 @@ static Fl_Text_Buffer *textbuff_stderr;
 static FileName fn_settings;
 // Initial screen
 static bool show_initial_screen;
+// Read-only GUI?
+static bool maingui_do_read_only;
 
 // A manualpicker jobwindow for display of micrographs....
 static ManualpickJobWindow global_manualpickjob;
@@ -210,7 +212,7 @@ public:
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec);
+	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
 
     // Destructor
     ~RelionMainWindow(){};

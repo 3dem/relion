@@ -36,11 +36,20 @@ int StdOutDisplay::handle(int ev)
 			{
 				if (fn_file == "run.out")
 				{
-					std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn + " > .gui_tmpstd";
-					int res = system(command.c_str());
-					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", false); // false means dont_allow_save
-					w->show();
-					return 1;
+					if (maingui_do_read_only)
+					{
+						NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), fn.c_str(), false); // false means dont_allow_save
+						w->show();
+						return 1;
+					}
+					else
+					{
+						std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn + " > .gui_tmpstd";
+						int res = system(command.c_str());
+						NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", false); // false means dont_allow_save
+						w->show();
+						return 1;
+					}
 				}
 				else
 				{
@@ -232,11 +241,15 @@ void NoteEditorWindow::cb_save_i()
 
 
 
-RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec):Fl_Window(w,h,title)
+RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only):Fl_Window(w,h,title)
 {
 
 	// Set initial Timer
 	tickTimeLastChanged();
+
+	// Setup read_only
+	maingui_do_read_only = _do_read_only;
+	pipeline.do_read_only = _do_read_only;
 
 	show_initial_screen = true;
 	do_order_alphabetically = false;
@@ -304,26 +317,32 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
     menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
     menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
-    menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
-    menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
+    if (!maingui_do_read_only)
+    	menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
+    if (!maingui_do_read_only)
+    	menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
     menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
     menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
-    menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
+    if (!maingui_do_read_only)
+    	menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
     menubar->add("File/About", 0, cb_about, this);
     menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
 
-    menubar->add("Jobs/Save job settings",  FL_ALT+'s', cb_save, this);
-    menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
+    if (!maingui_do_read_only)
+    {	menubar->add("Jobs/Save job settings",  FL_ALT+'s', cb_save, this);
+    	menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
+    }
     menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
     menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
-    menubar->add("Jobs/_Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
-    menubar->add("Jobs/Export scheduled job(s)",  FL_ALT+'x', cb_export_jobs, this);
-    menubar->add("Jobs/_Import scheduled job(s)",  FL_ALT+'i', cb_import_jobs, this);
-    menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
-    menubar->add("Jobs/Harshly clean all jobs",  FL_ALT+'h', cb_harshly_clean_all_jobs, this);
-
-    menubar->add("Autorun/Run scheduled jobs", 0, cb_start_pipeliner, this);
-    menubar->add("Autorun/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
+    if (!maingui_do_read_only)
+    {	menubar->add("Jobs/_Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+    	menubar->add("Jobs/Export scheduled job(s)",  FL_ALT+'x', cb_export_jobs, this);
+    	menubar->add("Jobs/_Import scheduled job(s)",  FL_ALT+'i', cb_import_jobs, this);
+    	menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
+    	menubar->add("Jobs/Harshly clean all jobs",  FL_ALT+'h', cb_harshly_clean_all_jobs, this);
+    	menubar->add("Autorun/Run scheduled jobs", 0, cb_start_pipeliner, this);
+    	menubar->add("Autorun/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
+    }
 
     current_y = MENUHEIGHT + 10;
 
@@ -338,12 +357,16 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	schedule_button->labelfont(FL_ITALIC);
 	schedule_button->labelsize(14);
 	schedule_button->callback( cb_schedule, this);
+    if (maingui_do_read_only)
+    	schedule_button->deactivate();
 
 	run_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Run now");
 	run_button->color(GUI_RUNBUTTON_COLOR);
 	run_button->labelfont(FL_ITALIC);
 	run_button->labelsize(14);
 	run_button->callback( cb_run, this);
+    if (maingui_do_read_only)
+    	run_button->deactivate();
 
 	// Fill browser in the right order
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
@@ -467,12 +490,15 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT_START, 100, MENUHEIGHT);
     menubar2->color(GUI_BUTTON_COLOR);
     menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
-    menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
-    menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
-    menubar2->add("Job actions/Make flowchart", 0, cb_make_flowchart, this);
-    menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
-    menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
-    menubar2->add("Job actions/Delete", 0, cb_delete, this);
+    if (!maingui_do_read_only)
+    {
+    	menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
+		menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+		menubar2->add("Job actions/Make flowchart", 0, cb_make_flowchart, this);
+		menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
+		menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
+		menubar2->add("Job actions/Delete", 0, cb_delete, this);
+    }
 
     // Fl_input with the alias of the new job (or the name of an existing one)
     alias_current_job = new Fl_Input(XJOBCOL2-50 , GUIHEIGHT_EXT_START+3, JOBCOLWIDTH, MENUHEIGHT-6, "Current job:");
@@ -1735,14 +1761,21 @@ void RelionMainWindow::fillStdOutAndErr()
 	FileName fn_err = (current_job >= 0) ? pipeline.processList[current_job].name + "run.err" : "";
 	if (exists(fn_out))
 	{
-		// Remove annoying carriage returns
-		std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > .gui_tmpout";
-		int res = system(command.c_str());
-		std::ifstream in(".gui_tmpout", std::ios_base::in);
-		if (in.fail())
-			REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmpout does not exists" );
-		int err = textbuff_stdout->loadfile(".gui_tmpout");
-		in.close();
+		if (maingui_do_read_only)
+		{
+			int err = textbuff_stdout->loadfile(fn_out.c_str());
+		}
+		else
+		{
+			// Remove annoying carriage returns
+			std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > .gui_tmpout";
+			int res = system(command.c_str());
+			std::ifstream in(".gui_tmpout", std::ios_base::in);
+			if (in.fail())
+				REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmpout does not exists" );
+			int err = textbuff_stdout->loadfile(".gui_tmpout");
+			in.close();
+		}
 		// Scroll to the bottom
 		disp_stdout->insert_position(textbuff_stdout->length()-1);
 		disp_stdout->show_insert_position();
@@ -1752,13 +1785,20 @@ void RelionMainWindow::fillStdOutAndErr()
 
 	if (exists(fn_err))
 	{
-		std::string command = "tail -3 " + fn_err + " > .gui_tmperr";
-		int res = system(command.c_str());
-		std::ifstream in(".gui_tmperr", std::ios_base::in);
-		if (in.fail())
-			REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmperr does not exists" );
-		int err = textbuff_stderr->loadfile(".gui_tmperr");
-		in.close();
+		if (maingui_do_read_only)
+		{
+			int err = textbuff_stderr->loadfile(fn_err.c_str());
+		}
+		else
+		{
+			std::string command = "tail -3 " + fn_err + " > .gui_tmperr";
+			int res = system(command.c_str());
+			std::ifstream in(".gui_tmperr", std::ios_base::in);
+			if (in.fail())
+				REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmperr does not exists" );
+			int err = textbuff_stderr->loadfile(".gui_tmperr");
+			in.close();
+		}
 		// Scroll to the bottom
 		disp_stderr->insert_position(textbuff_stderr->length()-1);
 		disp_stderr->show_insert_position();
@@ -2751,7 +2791,7 @@ void RelionMainWindow::cb_edit_note_i(bool is_project_note)
 		fn_note = pipeline.processList[current_job].name + "note.txt";
 		title = (pipeline.processList[current_job].alias == "None") ? pipeline.processList[current_job].name : pipeline.processList[current_job].alias;
 	}
-	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note);
+	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note, !maingui_do_read_only);
 	w->show();
 
 }
