@@ -153,6 +153,7 @@ class PipeLine
 
 	public:
 	int job_counter;
+	bool do_read_only;
 
 	std::string name;
 	std::vector<Node> nodeList; //list of all Nodes in the pipeline
@@ -228,7 +229,7 @@ class PipeLine
 	void write(bool do_lock = false, FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
 
 	// Read in the pipeline from a STAR file
-	void read(bool do_lock=false);
+	void read(bool do_lock = false);
 
 	// Make LaTeX and TikZ-based flowcharts
 	void makeUpwardsFlowChart(long int from_process);

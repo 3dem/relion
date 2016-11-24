@@ -74,10 +74,11 @@ int main(int argc, char *argv[])
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
 		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
-		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, _update_every_sec, _exit_after_sec);
+		bool _do_read_only = checkParameter(argc, argv, "--readonly");
+		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, _update_every_sec, _exit_after_sec, _do_read_only);
 
 		// Show and run the window
-		window.show(argc, argv);
+		window.show();
 		Fl::run();
 	}
 
