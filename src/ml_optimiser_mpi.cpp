@@ -238,7 +238,6 @@ void MlOptimiserMpi::initialise()
 		}
 		else
 		{
-
 			for (int slave = 1; slave < node->size; slave++)
 			{
 				// Receive device count seen by this slave
@@ -267,7 +266,7 @@ void MlOptimiserMpi::initialise()
 				{
 					uniqueHosts.push_back(hostName);
 					ranksOnHost.push_back(1);
-					hostId[slave] = ranksOnHost.size();
+					hostId[slave] = ranksOnHost.size()-1;
 				}
 			}
 		}
@@ -286,11 +285,18 @@ void MlOptimiserMpi::initialise()
 			std::vector < std::vector < std::string > > allThreadIDs;
 			untangleDeviceIDs(gpu_ids, allThreadIDs);
 
-			if(allThreadIDs.size()==1)
+			/*if(allThreadIDs.size()==1) // if devices are specified for exactly one rank, use it for all ranks
 			{
 				allThreadIDs.resize(node->size-1);
 				for (int rank = 1; rank<(node->size-1); rank++)
 					allThreadIDs[rank] = allThreadIDs[0];
+			}*/
+			if( allThreadIDs.size()>0 && allThreadIDs.size()<(node->size-1) ) // if one or more devices are specified, but not for all ranks, extend selection to all ranks by modulus
+			{
+				int N = allThreadIDs.size();
+				allThreadIDs.resize(node->size-1);
+				for (int rank = 1; rank<(node->size-1); rank++)
+					allThreadIDs[rank] = allThreadIDs[rank%N];
 			}
 
 			// Sequential initialisation of GPUs on all ranks
@@ -318,7 +324,7 @@ void MlOptimiserMpi::initialise()
 					else
 					{
 						semiAutomaticMapping = false;
-						std::cout << " Using explicit indexing on slave " << node->rank << " to assign devices ";
+						std::cout << " Using explicit indexing on slave " << rank << " to assign devices ";
 						for (int j = 0; j < allThreadIDs[rank-1].size(); j++)
 							std::cout << " "  << allThreadIDs[rank-1][j];
 						std::cout  << std::endl;
@@ -333,10 +339,12 @@ void MlOptimiserMpi::initialise()
 						if (fullAutomaticMapping)
 						{
 							int ranksOnThisHost = ranksOnHost[hostId[rank]];
+							//std::cout << rank << ", " << hostId[rank] << ", "  << hostId.size()  << std::endl;
 							if(ranksOnThisHost > 1)
 								dev_id = (deviceCounts[rank]*(  ((rank-1)%ranksOnThisHost)*nr_threads + i ) )  / (ranksOnThisHost*nr_threads);
 							else
 								dev_id = deviceCounts[rank]*i / nr_threads;
+							//std::cout << deviceCounts[rank] << "," << (rank-1) << "," << ranksOnThisHost << "," << nr_threads << "," << i << "," << dev_id << std::endl;
 						}
 						else
 						{
