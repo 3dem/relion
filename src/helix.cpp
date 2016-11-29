@@ -4176,8 +4176,8 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
-		RFLOAT sigma_cutoff,
-		bool keep_tilt_prior_fixed)
+		bool keep_tilt_prior_fixed,
+                RFLOAT sigma_cutoff)
 {
 	std::vector<HelicalSegmentPriorInfoEntry> list;
 	bool do_exclude_out_of_range_trans = true;
