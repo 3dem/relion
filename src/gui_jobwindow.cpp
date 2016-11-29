@@ -438,7 +438,8 @@ void RelionJobWindow::saveJobSubmissionScript(std::string newfilename, std::stri
 	for (int icom = 0; icom < commands.size(); icom++)
 	{
 		// Is this a relion mpi program?
-		if ((commands[icom]).find("_mpi`") != std::string::npos && (commands[icom]).find("relion_") != std::string::npos)
+		if ((commands[icom]).find("relion_") != std::string::npos &&
+				((commands[icom]).find("_mpi`") != std::string::npos || nr_mpi_commands == 0) ) // if there are no MPI programs, then still use XXXcommandXXX once
 		{
 			replaceStringOnce(textbuf, "XXXcommandXXX", commands[icom] );
 		}
