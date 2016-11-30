@@ -467,12 +467,14 @@ void runDiff2KernelCoarse(
 	{
 		if(projector.mdlZ!=0)
 		{
+
+#ifdef CUDA_DOUBLE_PRECISION
+			if (translation_num > D2C_BLOCK_SIZE_3D*4)
+				REPORT_ERROR("Number of coarse translations not supported on the GPU.");
+#else
 			if (translation_num > D2C_BLOCK_SIZE_3D*8)
-			{
-				printf("Number of coarse translations larger than %d on the GPU not supported.\n", D2C_BLOCK_SIZE_3D*8);
-				fflush(stdout);
-				exit(1);
-			}
+				REPORT_ERROR("Number of coarse translations not supported on the GPU.");
+#endif
 
 			unsigned rest = orientation_num % D2C_EULERS_PER_BLOCK_3D;
 			long unsigned even_orientation_num = orientation_num - rest;
@@ -579,6 +581,7 @@ void runDiff2KernelCoarse(
 						image_size);
 				}
 			}
+#ifndef CUDA_DOUBLE_PRECISION
 			else
 			{
 				if (even_orientation_num != 0)
@@ -613,7 +616,7 @@ void runDiff2KernelCoarse(
 						image_size);
 				}
 			}
-
+#endif
 		}
 		else
 		{
