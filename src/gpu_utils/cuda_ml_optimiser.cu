@@ -382,6 +382,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTIC(cudaMLO->timer,"calcFimg");
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		size_t current_size_y = baseMLO->mymodel.current_size;
+		size_t current_size_z = (baseMLO->mymodel.data_dim == 3) ? baseMLO->mymodel.current_size : 1;
 
 		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 
@@ -397,6 +398,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				cudaMLO->transformer1.reals,
 				(int)cudaMLO->transformer1.xSize,
 				(int)cudaMLO->transformer1.ySize,
+				(int)cudaMLO->transformer1.zSize,
 				false
 				);
 
@@ -412,7 +414,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						cudaMLO->transformer1.fouriers.getSize()*2);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
-		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z, cudaMLO->devBundle->allocator);
 		d_Fimg.device_alloc();
 
 		cudaMLO->transformer1.fouriers.streamSync();
@@ -420,8 +422,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		windowFourierTransform2(
 				cudaMLO->transformer1.fouriers,
 				d_Fimg,
-				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
-				current_size_x, current_size_y, 1  //Output dimensions
+				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, cudaMLO->transformer1.zFSize, //Input dimensions
+				current_size_x, current_size_y, current_size_z  //Output dimensions
 				);
 		CTOC(cudaMLO->timer,"calcFimg");
 		cudaMLO->transformer1.fouriers.streamSync();
@@ -430,7 +432,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		d_Fimg.cp_to_host();
 		d_Fimg.streamSync();
 
-		Fimg.initZeros(current_size_y, current_size_x);
+		Fimg.initZeros(current_size_z, current_size_y, current_size_x);
 		for (int i = 0; i < Fimg.nzyxdim; i ++)
 		{
 			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
@@ -558,7 +560,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																				img.data.zdim,
 																				img.data.xdim/2,
 																				img.data.ydim/2,
-																				img.data.zdim/2,
+																				img.data.zdim/2, //unused
 																				true,
 																				radius,
 																				radius_p,
@@ -596,9 +598,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				cudaMLO->transformer1.reals,
 				(int)cudaMLO->transformer1.xSize,
 				(int)cudaMLO->transformer1.ySize,
+				(int)cudaMLO->transformer1.zSize,
 				false
 				);
-
 		cudaMLO->transformer1.reals.streamSync();
 		cudaMLO->transformer1.forward();
 		cudaMLO->transformer1.fouriers.streamSync();
@@ -622,7 +624,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			cudaMLO->transformer1.fouriers.cp_to_host();
 			cudaMLO->transformer1.fouriers.streamSync();
 
-			Faux.initZeros(img().ydim, img().xdim/2+1);
+			Faux.initZeros(img().zdim, img().ydim, img().xdim/2+1);
 			for (int i = 0; i < Faux.nzyxdim; i ++)
 			{
 				Faux.data[i].real = (RFLOAT) cudaMLO->transformer1.fouriers[i].x;
@@ -635,7 +637,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			if(!powerClassOnGPU || baseMLO->mymodel.data_dim == 3) //TODO 3D-powerClass
+			if(!powerClassOnGPU)
 			{
 				MultidimArray<RFLOAT> spectrum;
 				spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
@@ -667,7 +669,22 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				spectrumAndXi2.streamSync();
 
 				dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
-				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+				if(cudaMLO->transformer1.zSize>1)
+				{
+					cuda_kernel_powerClass3D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+						~cudaMLO->transformer1.fouriers,
+						~spectrumAndXi2,
+						cudaMLO->transformer1.fouriers.getSize(),
+						spectrumAndXi2.getSize()-1,
+						cudaMLO->transformer1.xFSize,
+						cudaMLO->transformer1.yFSize,
+						cudaMLO->transformer1.zFSize,
+						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+				}
+				else
+				{
+					cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
 						~cudaMLO->transformer1.fouriers,
 						~spectrumAndXi2,
 						cudaMLO->transformer1.fouriers.getSize(),
@@ -676,6 +693,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						cudaMLO->transformer1.yFSize,
 						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
 						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+				}
 				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 				spectrumAndXi2.streamSync();
@@ -702,8 +720,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		windowFourierTransform2(
 				cudaMLO->transformer1.fouriers,
 				d_Fimg,
-				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, 1, //Input dimensions
-				current_size_x, current_size_y, 1,  //Output dimensions
+				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, cudaMLO->transformer1.zFSize, //Input dimensions
+				current_size_x, current_size_y, current_size_z,  //Output dimensions
 				1, 	//Npsi
 				0,	//pos
 				cudaMLO->transformer1.fouriers.getStream()

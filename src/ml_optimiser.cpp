@@ -1496,8 +1496,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (mymodel.data_dim == 3)
 	{
 
-		if (do_gpu)
-			REPORT_ERROR("ERROR: GPU-acceleration does not yet work for 3D input images!");
+//		if (do_gpu)
+//			REPORT_ERROR("ERROR: GPU-acceleration does not yet work for 3D input images!");
 
 		// TODO: later do norm correction?!
 		// Don't do norm correction for volume averaging at this stage....
