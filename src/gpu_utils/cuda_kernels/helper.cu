@@ -183,15 +183,15 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 				{
 					img_pixels[tid]=__ldg(&vol[texel]);
 
-					z = (XFLOAT)0.0;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+					z = floor( (float) texel                   / (float)((xdim)*(ydim)));
 					y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT) xdim );
 					x = texel - z*(xdim)*(ydim) - y*xdim;
 
-	//				z-=zinit;
+					z-=zinit;
 					y-=yinit;
 					x-=xinit;
 
-					r = sqrt(x*x + y*y);// + z*z);
+					r = sqrt(x*x + y*y + z*z);
 
 					if (r < radius)
 						continue;
@@ -236,15 +236,15 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 			{
 				img_pixels[tid]=__ldg(&vol[texel]);
 
-				z = (XFLOAT)0.0;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+				z =  floor( (float) texel                  / (float)((xdim)*(ydim)));
 				y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT)  xdim         );
 				x = texel - z*(xdim)*(ydim) - y*xdim;
 
-//				z-=zinit;
+				z-=zinit;
 				y-=yinit;
 				x-=xinit;
 
-				r = sqrt(x*x + y*y);// + z*z);
+				r = sqrt(x*x + y*y + z*z);
 
 				if (r < radius)
 					continue;
