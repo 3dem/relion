@@ -19,7 +19,7 @@
  * Assuming block_sz % eulers_per_block == 0
  * Assuming eulers_per_block * 3 < block_sz
  */
-template<bool do_3DProjection, int block_sz, int eulers_per_block, int prefetch_fraction>
+template<bool REF3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
@@ -78,7 +78,7 @@ __global__ void cuda_kernel_diff2_coarse(
 //			#pragma unroll
 			for (int i = tid%prefetch_fraction; i < eulers_per_block; i += prefetch_fraction)
 			{
-				if(do_3DProjection)
+				if(REF3D)
 					projector.project3Dmodel(
 						x,y,
 						s_eulers[i*9  ],
@@ -145,7 +145,7 @@ __global__ void cuda_kernel_diff2_coarse(
 }
 
 
-template<bool do_3DProjection>
+template<bool REF3D>
 __global__ void cuda_kernel_diff2_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -211,7 +211,7 @@ __global__ void cuda_kernel_diff2_fine(
 						x = projector.maxR;
 				}
 
-				if(do_3DProjection)
+				if(REF3D)
 					projector.project3Dmodel(
 						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
@@ -268,7 +268,7 @@ __global__ void cuda_kernel_diff2_fine(
  *   	CROSS-CORRELATION-BASED KERNELS
  */
 
-template<bool do_3DProjection>
+template<bool REF3D>
 __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -323,7 +323,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 					x = projector.maxR;
 			}
 
-			if(do_3DProjection)
+			if(REF3D)
 				projector.project3Dmodel(
 					x,y,
 					e0,e1,e3,e4,e6,e7,
@@ -356,7 +356,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 }
 
-template<bool do_3DProjection>
+template<bool REF3D>
 __global__ void cuda_kernel_diff2_CC_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -423,7 +423,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 					else
 						x = projector.maxR;
 				}
-				if(do_3DProjection)
+				if(REF3D)
 					projector.project3Dmodel(
 						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),

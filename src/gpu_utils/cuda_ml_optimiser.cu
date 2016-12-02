@@ -605,7 +605,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CTIC(cudaMLO->timer,"powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
-		if (current_size < .ori_size)
+		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
 			CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
 			spectrumAndXi2.device_alloc();
@@ -854,6 +854,7 @@ void getAllSquaredDifferencesCoarse(
 
 		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_z(translation_num, cudaMLO->devBundle->allocator);
 
 		CudaGlobalPtr<XFLOAT> Fimg_real(image_size, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> Fimg_imag(image_size, cudaMLO->devBundle->allocator);
@@ -883,6 +884,8 @@ void getAllSquaredDifferencesCoarse(
 
 			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 			trans_y[itrans] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
+			if (baseMLO->mymodel.data_dim == 3)
+				trans_y[itrans] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
@@ -908,6 +911,8 @@ void getAllSquaredDifferencesCoarse(
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
+		if (baseMLO->mymodel.data_dim == 3)
+			trans_z.put_on_device();
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
 
