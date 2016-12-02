@@ -605,7 +605,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CTIC(cudaMLO->timer,"powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
-		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
+		if (current_size < .ori_size)
 		{
 			CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
 			spectrumAndXi2.device_alloc();
@@ -613,9 +613,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			spectrumAndXi2.streamSync();
 
 			dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
-			if(cudaMLO->transformer1.zSize>1)
-			{
-				cuda_kernel_powerClass3D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+			if(baseMLO->mymodel.data_dim == 3)
+				cuda_kernel_powerClass<true><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
 					~cudaMLO->transformer1.fouriers,
 					~spectrumAndXi2,
 					cudaMLO->transformer1.fouriers.getSize(),
@@ -625,19 +624,18 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					cudaMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
 					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-			}
 			else
-			{
-				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+				cuda_kernel_powerClass<false><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
 					~cudaMLO->transformer1.fouriers,
 					~spectrumAndXi2,
 					cudaMLO->transformer1.fouriers.getSize(),
 					spectrumAndXi2.getSize()-1,
 					cudaMLO->transformer1.xFSize,
 					cudaMLO->transformer1.yFSize,
+					cudaMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
 					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-			}
+
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 			spectrumAndXi2.streamSync();
