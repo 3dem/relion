@@ -325,12 +325,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 								YY(my_old_offset));
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 		CTOC(cudaMLO->timer,"kernel_translate");
-//		d_img.cp_to_host();
-//		d_img.streamSync();
-//		for (int i=0; i<img_size; i++)
-//			img.data.data[i] = d_img[i];
 
-//		selfTranslate(img(), my_old_offset, DONT_WRAP);
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) //rec_img is NOT norm_corrected in the CPU-code, so nor do we.
 		{
 			for (int i=0; i<img_size; i++)
@@ -374,10 +369,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		op.prior[ipart] = my_prior;
 
 		CTOC(cudaMLO->timer,"selfTranslate");
-
-//		// Always store FT of image without mask (to be used for the reconstruction)
-//		MultidimArray<RFLOAT> img_aux;
-//		img_aux = (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) ? rec_img() : img();
 
 		CTIC(cudaMLO->timer,"calcFimg");
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
@@ -588,11 +579,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTOC(cudaMLO->timer,"setSize");
 
 		CTIC(cudaMLO->timer,"transform");
-
 		d_img.cp_on_device(cudaMLO->transformer1.reals);
-//		for (int i = 0; i < img().nzyxdim; i ++)
-//			cudaMLO->transformer1.reals[i] = (XFLOAT) img().data[i];
-//		cudaMLO->transformer1.reals.cp_to_device();
 
 		runCenterFFT(								// runs on input GlobalPtr.stream
 				cudaMLO->transformer1.reals,
@@ -616,96 +603,52 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		cudaMLO->transformer1.fouriers.streamSync();
 
-		bool powerClassOnGPU(true); //keep it like this until stable
-
-		if(!powerClassOnGPU)
-		{
-			CTIC(cudaMLO->timer,"cpResults");
-			cudaMLO->transformer1.fouriers.cp_to_host();
-			cudaMLO->transformer1.fouriers.streamSync();
-
-			Faux.initZeros(img().zdim, img().ydim, img().xdim/2+1);
-			for (int i = 0; i < Faux.nzyxdim; i ++)
-			{
-				Faux.data[i].real = (RFLOAT) cudaMLO->transformer1.fouriers[i].x;
-				Faux.data[i].imag = (RFLOAT) cudaMLO->transformer1.fouriers[i].y;
-			}
-			CTOC(cudaMLO->timer,"cpResults");
-		}
-
 		CTIC(cudaMLO->timer,"powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			if(!powerClassOnGPU)
+			CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
+			spectrumAndXi2.device_alloc();
+			spectrumAndXi2.device_init(0);
+			spectrumAndXi2.streamSync();
+
+			dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
+			if(cudaMLO->transformer1.zSize>1)
 			{
-				MultidimArray<RFLOAT> spectrum;
-				spectrum.initZeros(baseMLO->mymodel.ori_size/2 + 1);
-				RFLOAT highres_Xi2 = 0.;
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
-				{
-					int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
-					// Skip Hermitian pairs in the x==0 column
-
-					if (ires > 0 && ires < baseMLO->mymodel.ori_size/2 + 1 && !(jp==0 && ip < 0) )
-					{
-						RFLOAT normFaux = norm(DIRECT_A3D_ELEM(Faux, k, i, j));
-						DIRECT_A1D_ELEM(spectrum, ires) += normFaux;
-						// Store sumXi2 from current_size until ori_size
-						if (ires >= baseMLO->mymodel.current_size/2 + 1)
-							highres_Xi2 += normFaux;
-					}
-				}
-
-				// Let's use .at() here instead of [] to check whether we go outside the vectors bounds
-				op.power_imgs.at(ipart) = spectrum;
-				op.highres_Xi2_imgs.at(ipart) = highres_Xi2;
+				cuda_kernel_powerClass3D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+					~cudaMLO->transformer1.fouriers,
+					~spectrumAndXi2,
+					cudaMLO->transformer1.fouriers.getSize(),
+					spectrumAndXi2.getSize()-1,
+					cudaMLO->transformer1.xFSize,
+					cudaMLO->transformer1.yFSize,
+					cudaMLO->transformer1.zFSize,
+					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 			}
 			else
 			{
-				CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
-				spectrumAndXi2.device_alloc();
-				spectrumAndXi2.device_init(0);
-				spectrumAndXi2.streamSync();
-
-				dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
-				if(cudaMLO->transformer1.zSize>1)
-				{
-					cuda_kernel_powerClass3D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
-						~cudaMLO->transformer1.fouriers,
-						~spectrumAndXi2,
-						cudaMLO->transformer1.fouriers.getSize(),
-						spectrumAndXi2.getSize()-1,
-						cudaMLO->transformer1.xFSize,
-						cudaMLO->transformer1.yFSize,
-						cudaMLO->transformer1.zFSize,
-						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-				}
-				else
-				{
-					cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
-						~cudaMLO->transformer1.fouriers,
-						~spectrumAndXi2,
-						cudaMLO->transformer1.fouriers.getSize(),
-						spectrumAndXi2.getSize()-1,
-						cudaMLO->transformer1.xFSize,
-						cudaMLO->transformer1.yFSize,
-						(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-						&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-				}
-				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-
-				spectrumAndXi2.streamSync();
-				spectrumAndXi2.cp_to_host();
-				spectrumAndXi2.streamSync();
-
-				op.power_imgs.at(ipart).resize(baseMLO->mymodel.ori_size/2 + 1);
-
-				for (int i = 0; i<(spectrumAndXi2.getSize()-1); i ++)
-					op.power_imgs.at(ipart).data[i] = spectrumAndXi2[i];
-				op.highres_Xi2_imgs.at(ipart) = spectrumAndXi2[spectrumAndXi2.getSize()-1];
+				cuda_kernel_powerClass2D<<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+					~cudaMLO->transformer1.fouriers,
+					~spectrumAndXi2,
+					cudaMLO->transformer1.fouriers.getSize(),
+					spectrumAndXi2.getSize()-1,
+					cudaMLO->transformer1.xFSize,
+					cudaMLO->transformer1.yFSize,
+					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 			}
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+
+			spectrumAndXi2.streamSync();
+			spectrumAndXi2.cp_to_host();
+			spectrumAndXi2.streamSync();
+
+			op.power_imgs.at(ipart).resize(baseMLO->mymodel.ori_size/2 + 1);
+
+			for (int i = 0; i<(spectrumAndXi2.getSize()-1); i ++)
+				op.power_imgs.at(ipart).data[i] = spectrumAndXi2[i];
+			op.highres_Xi2_imgs.at(ipart) = spectrumAndXi2[spectrumAndXi2.getSize()-1];
 		}
 		else
 		{
