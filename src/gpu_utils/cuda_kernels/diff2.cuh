@@ -19,11 +19,12 @@
  * Assuming block_sz % eulers_per_block == 0
  * Assuming eulers_per_block * 3 < block_sz
  */
-template<bool REF3D, int block_sz, int eulers_per_block, int prefetch_fraction>
+template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *g_real,
 		XFLOAT *g_imag,
 		CudaProjectorKernel projector,
@@ -57,7 +58,7 @@ __global__ void cuda_kernel_diff2_coarse(
 
 	XFLOAT tx = trans_x[tid%translation_num];
 	XFLOAT ty = trans_y[tid%translation_num];
-
+	XFLOAT tz = trans_z[tid%translation_num];
 
 	//Step through data
 	int max_block_pass_pixel( ceilfracf(image_size,block_sz) * block_sz );
@@ -69,16 +70,42 @@ __global__ void cuda_kernel_diff2_coarse(
 		//Prefetch block-fraction-wise
 		if(init_pixel + tid/prefetch_fraction < image_size)
 		{
-			int x = (init_pixel + tid/prefetch_fraction) % projector.imgX;
-			int y = floorfracf( init_pixel + tid/prefetch_fraction, projector.imgX);
-
+			int x,y,z,xy;
+			if(DATA3D)
+			{
+				z =  floorfracf(init_pixel + tid/prefetch_fraction, projector.imgX*projector.imgY);
+				xy = (init_pixel + tid/prefetch_fraction) % (projector.imgX*projector.imgY);
+				x =             xy  % projector.imgX;
+				y = floorfracf( xy,   projector.imgX);
+				if (z > projector.maxR)
+					z -= projector.imgZ;
+			}
+			else
+			{
+				x =             init_pixel + tid/prefetch_fraction  % projector.imgX;
+				y = floorfracf( init_pixel + tid/prefetch_fraction,   projector.imgX);
+			}
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
 //			#pragma unroll
 			for (int i = tid%prefetch_fraction; i < eulers_per_block; i += prefetch_fraction)
 			{
-				if(REF3D)
+				if(DATA3D) // if DATA3D, then REF3D as well.
+					projector.project3Dmodel(
+						x,y,z,
+						s_eulers[i*9  ],
+						s_eulers[i*9+1],
+						s_eulers[i*9+2],
+						s_eulers[i*9+3],
+						s_eulers[i*9+4],
+						s_eulers[i*9+5],
+						s_eulers[i*9+6],
+						s_eulers[i*9+7],
+						s_eulers[i*9+8],
+						s_ref_real[eulers_per_block * (tid/prefetch_fraction) + i],
+						s_ref_imag[eulers_per_block * (tid/prefetch_fraction) + i]);
+				else if(REF3D)
 					projector.project3Dmodel(
 						x,y,
 						s_eulers[i*9  ],
@@ -118,15 +145,31 @@ __global__ void cuda_kernel_diff2_coarse(
 		{
 			if((init_pixel + i) >= image_size) break;
 
-			int x = (init_pixel + i) % projector.imgX;
-			int y = floorfracf(init_pixel+i, projector.imgX);
-
+			int x,y,z,xy;
+			if(DATA3D)
+			{
+				z =  floorfracf(init_pixel +i, projector.imgX*projector.imgY); //TODO optimize index extraction.
+				xy = init_pixel + i % (projector.imgX*projector.imgY);
+				x =             xy  % projector.imgX;
+				y = floorfracf( xy,   projector.imgX);
+				if (z > projector.maxR)
+					z -= projector.imgZ;
+			}
+			else
+			{
+				x =             init_pixel + i  % projector.imgX;
+				y = floorfracf( init_pixel + i,   projector.imgX);
+			}
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
 			XFLOAT real, imag;
 
-			translatePixel(x, y, tx, ty, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
+			if(DATA3D)
+				translatePixel(x, y, z, tx, ty, tz, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
+			else
+				translatePixel(x, y,    tx, ty,     s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
+
 
 			#pragma unroll
 			for (int j = 0; j < eulers_per_block; j ++)

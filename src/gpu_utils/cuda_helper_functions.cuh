@@ -223,6 +223,7 @@ void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *corr_img,
 		XFLOAT *Fimg_real,
 		XFLOAT *Fimg_imag,
@@ -233,7 +234,8 @@ void runDiff2KernelCoarse(
 		int translation_num,
 		int image_size,
 		cudaStream_t stream,
-		bool do_CC);
+		bool do_CC,
+		bool data_is_3D);
 
 void runDiff2KernelFine(
 		CudaProjectorKernel &projector,
