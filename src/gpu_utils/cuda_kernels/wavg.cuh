@@ -74,7 +74,7 @@ __global__ void cuda_kernel_wavg(
 			if (y > projector.maxR)
 				y -= projector.imgY;
 
-//          NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also diff-fine
+//          NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also diff-fine + BP_3D
 //
 //			if (y > projector.maxR)
 //			{

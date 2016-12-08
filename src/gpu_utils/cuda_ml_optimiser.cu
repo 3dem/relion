@@ -2475,6 +2475,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				~Fimgs_nomask_imag,
 				~trans_x,
 				~trans_y,
+				~trans_z,
 				&sorted_weights.d_ptr[classPos],
 				~Minvsigma2s,
 				~ctfs,
@@ -2484,7 +2485,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				~eulers[exp_iclass],
 				op.local_Minvsigma2s[0].xdim,
 				op.local_Minvsigma2s[0].ydim,
+				op.local_Minvsigma2s[0].zdim,
 				orientation_num,
+				(baseMLO->mymodel.data_dim == 3),
 				cudaMLO->classStreams[exp_iclass]);
 
 			CTOC(cudaMLO->timer,"backproject");

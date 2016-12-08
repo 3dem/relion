@@ -2,6 +2,7 @@
 #include "src/gpu_utils/cuda_device_utils.cuh"
 #include <signal.h>
 #include "src/gpu_utils/cuda_projector.cuh"
+#include "src/gpu_utils/cuda_kernels/helper.cuh"
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
@@ -150,14 +151,11 @@ __global__ void cuda_kernel_backproject2D(
 				weight = (weight / weight_norm) * ctf * minvsigma2;
 				Fweight += weight * ctf;
 
-				XFLOAT s, c;
-#ifdef CUDA_DOUBLE_PRECISION
-				sincos( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
-#else
-				sincosf( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
-#endif
-				real += ( c * img_real - s * img_imag ) * weight;
-				imag += ( c * img_imag + s * img_real ) * weight;
+				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, real, imag);
+
+				real *= weight;
+				imag *= weight;
+
 			}
 		}
 
@@ -213,11 +211,13 @@ __global__ void cuda_kernel_backproject2D(
 	}
 }
 
+template < bool DATA3D >
 __global__ void cuda_kernel_backproject3D(
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
 		XFLOAT* g_weights,
 		XFLOAT* g_Minvsigma2s,
 		XFLOAT* g_ctfs,
@@ -233,7 +233,8 @@ __global__ void cuda_kernel_backproject3D(
 		XFLOAT padding_factor,
 		unsigned img_x,
 		unsigned img_y,
-		unsigned img_xy,
+		unsigned img_z,
+		unsigned img_xyz,
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int mdl_inity,
@@ -250,28 +251,52 @@ __global__ void cuda_kernel_backproject3D(
 
 	__syncthreads();
 
-	int pixel_pass_num(ceilf((float)img_xy/(float)BP_2D_BLOCK_SIZE));
+	int pixel_pass_num(ceilf((float)img_xyz/(float)BP_2D_BLOCK_SIZE));
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
     {
 		unsigned pixel = (pass * BP_2D_BLOCK_SIZE) + tid;
 
-		if (pixel >= img_xy)
+		if (pixel >= img_xyz)
 			continue;
 
-		int x = pixel % img_x;
-		int y = (int)floorf( (float)pixel / (float)img_x);
+		int x,y,z,xy;
 
-		// Don't search beyond square with side max_r
-		if (y > max_r)
+		if(DATA3D)
 		{
-			if (y >= img_y - max_r)
-				y -= img_y;
-			else
-				continue;
+			z =  floorfracf(pixel, img_x*img_y);
+			xy = pixel % (img_x*img_y);
+			x =             xy  % img_x;
+			y = floorfracf( xy,   img_y);
+			if (z > max_r)
+				z -= img_z;
 		}
+		else
+		{
+			x =             pixel % img_x;
+			y = floorfracf( pixel , img_x);
+		}
+		if (y > max_r)
+			y -= img_y;
 
-		if (x * x + y * y > max_r2)
-			continue;
+// 		NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also wavg + diff_fine
+//		int x = pixel % img_x;
+//		int y = (int)floorf( (float)pixel / (float)img_x);
+//
+//		// Don't search beyond square with side max_r
+//		if (y > max_r)
+//		{
+//			if (y >= img_y - max_r)
+//				y -= img_y;
+//			else
+//				continue;
+//		}
+
+		if(DATA3D)
+			if ( ( x * x + y * y  + z * z ) > max_r2)
+				continue;
+		else
+			if ( ( x * x + y * y ) > max_r2)
+				continue;
 
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
@@ -291,38 +316,49 @@ __global__ void cuda_kernel_backproject3D(
 				weight = (weight / weight_norm) * ctf * minvsigma2;
 				Fweight += weight * ctf;
 
-				XFLOAT s, c;
-#ifdef CUDA_DOUBLE_PRECISION
-				sincos( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
-#else
-				sincosf( x * g_trans_x[itrans] + y * g_trans_y[itrans] , &s, &c );
-#endif
-				real += ( c * img_real - s * img_imag ) * weight;
-				imag += ( c * img_imag + s * img_real ) * weight;
+				if(DATA3D)
+					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, real, imag);
+				else
+					translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, real, imag);
+
+				real *= weight;
+				imag *= weight;
 			}
 		}
 
 		//BP
 		if (Fweight > (XFLOAT) 0.0)
 		{
-			int x = pixel % img_x;
-			int y = (int)floorf( (float)pixel / (float)img_x);
 
-			// Don't search beyond square with side max_r
-			if (y > max_r)
-			{
-				if (y >= img_y - max_r)
-					y -= img_y;
-			}
-
-			if (x * x + y * y > max_r2)
-				continue;
+//			NOTE : re-use from above instead of make again.
+//			int x = pixel % img_x;
+//			int y = (int)floorf( (float)pixel / (float)img_x);
+//
+//			// Don't search beyond square with side max_r
+//			if (y > max_r)
+//			{
+//				if (y >= img_y - max_r)
+//					y -= img_y;
+//			}
+//
+//			if (x * x + y * y > max_r2)
+//				continue;
 
 			// Get logical coordinates in the 3D map
-			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-			XFLOAT yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
-			XFLOAT zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 
+			XFLOAT xp,yp,zp;
+			if(DATA3D)
+			{
+				xp = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
+				yp = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
+				zp = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
+			}
+			else
+			{
+				xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
+				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
+			}
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{
@@ -409,6 +445,7 @@ void CudaBackprojector::backproject(
 		XFLOAT *d_img_imag,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT* d_weights,
 		XFLOAT* d_Minvsigma2s,
 		XFLOAT* d_ctfs,
@@ -418,7 +455,9 @@ void CudaBackprojector::backproject(
 		XFLOAT *d_eulers,
 		int imgX,
 		int imgY,
+		int imgZ,
 		unsigned long imageCount,
+		bool data_is_3D,
 		cudaStream_t optStream)
 {
 
@@ -451,11 +490,13 @@ void CudaBackprojector::backproject(
 	}
 	else
 	{
-		cuda_kernel_backproject3D<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+		if(data_is_3D)
+			cuda_kernel_backproject3D<true><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
 				d_img_real,
 				d_img_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				d_weights,
 				d_Minvsigma2s,
 				d_ctfs,
@@ -471,7 +512,36 @@ void CudaBackprojector::backproject(
 				padding_factor,
 				imgX,
 				imgY,
-				imgX*imgY,
+				imgZ,
+				imgX*imgY*imgZ,
+				mdlX,
+				mdlY,
+				mdlInitY,
+				mdlInitZ);
+		else
+			cuda_kernel_backproject3D<false><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+				d_img_real,
+				d_img_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				d_weights,
+				d_Minvsigma2s,
+				d_ctfs,
+				translation_num,
+				significant_weight,
+				weight_norm,
+				d_eulers,
+				d_mdlReal,
+				d_mdlImag,
+				d_mdlWeight,
+				maxR,
+				maxR2,
+				padding_factor,
+				imgX,
+				imgY,
+				imgZ,
+				imgX*imgY*imgZ,
 				mdlX,
 				mdlY,
 				mdlInitY,

@@ -262,7 +262,7 @@ __global__ void cuda_kernel_diff2_fine(
 				if (y > projector.maxR)
 					y -= projector.imgY;
 
-// 				NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also wavg
+// 				NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also wavg + BP_3D
 //
 //				if (y > projector.maxR)
 //				{
@@ -298,7 +298,7 @@ __global__ void cuda_kernel_diff2_fine(
 					iy = d_trans_idx[d_job_idx[bid]] + itrans;
 
 					if(DATA3D)
-						translatePixel(x, y, z, trans_x[iy], trans_y[iy], trans_x[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+						translatePixel(x, y, z, trans_x[iy], trans_y[iy], trans_z[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
 					else
 						translatePixel(x, y, trans_x[iy], trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
 
