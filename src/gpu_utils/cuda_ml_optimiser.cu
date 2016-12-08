@@ -90,7 +90,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
 			YY(my_prior) = 0.;
 
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 		{
 			my_old_offset.resize(3);
 			my_prior.resize(3);
@@ -169,7 +169,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 			else
 			{
-				if (baseMLO->mymodel.data_dim == 3)
+				if (cudaMLO->dataIs3D)
 				{
 					img.read(fn_img);
 					img().setXmippOrigin();
@@ -193,7 +193,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		else
 		{
 			// Unpack the image from the imagedata
-			if (baseMLO->mymodel.data_dim == 3)
+			if (cudaMLO->dataIs3D)
 			{
 				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size,baseMLO-> mymodel.ori_size);
 				// Only allow a single image per call of this function!!! nr_pool needs to be set to 1!!!!
@@ -303,7 +303,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		my_old_offset.selfROUND();
 		CTIC(cudaMLO->timer,"kernel_translate");
-		if(baseMLO->mymodel.data_dim == 3)
+		if(cudaMLO->dataIs3D)
 			cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
 								~temp,  // translate from temp...
 								~d_img, // ... into d_img
@@ -332,7 +332,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				temp[i] = rec_img.data.data[i];
 			temp.cp_to_device();
 			temp.streamSync();
-			if(baseMLO->mymodel.data_dim == 3)
+			if(cudaMLO->dataIs3D)
 				cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
 									~temp,  // translate from temp...
 									~d_img, // ... into d_img
@@ -373,7 +373,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTIC(cudaMLO->timer,"calcFimg");
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		size_t current_size_y = baseMLO->mymodel.current_size;
-		size_t current_size_z = (baseMLO->mymodel.data_dim == 3) ? baseMLO->mymodel.current_size : 1;
+		size_t current_size_z = (cudaMLO->dataIs3D) ? baseMLO->mymodel.current_size : 1;
 
 		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 
@@ -613,7 +613,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			spectrumAndXi2.streamSync();
 
 			dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
-			if(baseMLO->mymodel.data_dim == 3)
+			if(cudaMLO->dataIs3D)
 				cuda_kernel_powerClass<true><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
 					~cudaMLO->transformer1.fouriers,
 					~spectrumAndXi2,
@@ -685,7 +685,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Now calculate the actual CTF
 		if (baseMLO->do_ctf_correction)
 		{
-			if (baseMLO->mymodel.data_dim == 3)
+			if (cudaMLO->dataIs3D)
 			{
 				Image<RFLOAT> Ictf;
 				if (baseMLO->do_parallel_disc_io)
@@ -771,7 +771,6 @@ void getAllSquaredDifferencesCoarse(
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
 
 	CTIC(cudaMLO->timer,"diff_pre_gpu");
-	bool data_is_3D = (baseMLO->mymodel.data_dim == 3);
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	std::vector<MultidimArray<Complex > > dummy;
@@ -872,7 +871,7 @@ void getAllSquaredDifferencesCoarse(
 
 			xshift = oversampled_translations_x[0];
 			yshift = oversampled_translations_y[0];
-			if (baseMLO->mymodel.data_dim == 3)
+			if (cudaMLO->dataIs3D)
 				zshift = oversampled_translations_z[0];
 
 			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -884,7 +883,7 @@ void getAllSquaredDifferencesCoarse(
 
 			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 			trans_y[itrans] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
-			if (baseMLO->mymodel.data_dim == 3)
+			if (cudaMLO->dataIs3D)
 				trans_z[itrans] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 		}
 
@@ -911,7 +910,7 @@ void getAllSquaredDifferencesCoarse(
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			trans_z.put_on_device();
 		else
 			trans_z.d_ptr = trans_y.d_ptr; // so as to not get kernel-cast on NULL ptr in templated coarse kernel
@@ -963,7 +962,7 @@ void getAllSquaredDifferencesCoarse(
 						image_size,
 						cudaMLO->classStreams[exp_iclass],
 						do_CC,
-						data_is_3D);
+						cudaMLO->dataIs3D);
 
 				mapAllWeightsToMweights(
 						~projectorPlans[exp_iclass].iorientclasses,
@@ -1070,7 +1069,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				xshift = oversampled_translations_x[iover_trans];
 				yshift = oversampled_translations_y[iover_trans];
-				if (baseMLO->mymodel.data_dim == 3)
+				if (cudaMLO->dataIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -1082,7 +1081,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 				trans_y[j] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
-				if (baseMLO->mymodel.data_dim == 3)
+				if (cudaMLO->dataIs3D)
 					trans_z[j] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 				j ++;
 			}
@@ -1121,7 +1120,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			trans_z.put_on_device();
 		else
 			trans_z.d_ptr = trans_y.d_ptr;
@@ -1273,7 +1272,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						cudaMLO->classStreams[exp_iclass],
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
-						(baseMLO->mymodel.data_dim == 3)
+						cudaMLO->dataIs3D
 						);
 
 //				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -1390,7 +1389,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		RFLOAT old_offset_z;
 		RFLOAT old_offset_x = XX(op.old_offset[ipart]);
 		RFLOAT old_offset_y = YY(op.old_offset[ipart]);
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			old_offset_z = ZZ(op.old_offset[ipart]);
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
@@ -1457,14 +1456,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				{
 					myprior_x = XX(op.prior[ipart]);
 					myprior_y = YY(op.prior[ipart]);
-					if (baseMLO->mymodel.data_dim == 3)
+					if (cudaMLO->dataIs3D)
 						myprior_z = ZZ(op.prior[ipart]);
 				}
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-					if (baseMLO->mymodel.data_dim == 3)
+					if (cudaMLO->dataIs3D)
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
@@ -1486,7 +1485,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
 						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-					if (baseMLO->mymodel.data_dim == 3)
+					if (cudaMLO->dataIs3D)
 					{
 						RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
 						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
@@ -1867,7 +1866,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CudaGlobalPtr<XFLOAT> myp_oo_otrans_x2y2z2(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator); // my_prior_old_offs....x^2*y^2*z^2
 		oo_otrans_x.device_alloc();
 		oo_otrans_y.device_alloc();
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			oo_otrans_z.device_alloc();
 		else
 			oo_otrans_z.d_ptr = oo_otrans_y.d_ptr;
@@ -1908,7 +1907,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			{
 				myprior_x = XX(op.prior[ipart]);
 				myprior_y = YY(op.prior[ipart]);
-				if (baseMLO->mymodel.data_dim == 3)
+				if (cudaMLO->dataIs3D)
 				{
 					myprior_z = ZZ(op.prior[ipart]);
 					old_offset_z = ZZ(op.old_offset[ipart]);
@@ -1929,12 +1928,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
 					oo_otrans_y[fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
-					if (baseMLO->mymodel.data_dim == 3)
+					if (cudaMLO->dataIs3D)
 						oo_otrans_z[fake_class*nr_transes+iitrans] = old_offset_z + oversampled_translations_z[iover_trans];
 
 					// Calculate the vector length of myprior
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-					if (baseMLO->mymodel.data_dim == 3)
+					if (cudaMLO->dataIs3D)
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
@@ -1951,7 +1950,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 					RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
-					if (baseMLO->mymodel.data_dim == 3)
+					if (cudaMLO->dataIs3D)
 					{
 						RFLOAT diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
 						myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
@@ -1967,7 +1966,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		stagerSWS[ipart].cp_to_device();
 		oo_otrans_x.cp_to_device();
 		oo_otrans_y.cp_to_device();
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			oo_otrans_z.cp_to_device();
 
 		myp_oo_otrans_x2y2z2.cp_to_device();
@@ -1982,7 +1981,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		p_thr_wsum_prior_offsetx_class.device_alloc();
 		p_thr_wsum_prior_offsety_class.device_alloc();
 
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			p_thr_wsum_prior_offsetz_class.device_alloc();
 		else
 			p_thr_wsum_prior_offsetz_class.d_ptr  = p_thr_wsum_prior_offsety_class.d_ptr;
@@ -2026,7 +2025,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[ipart][exp_iclass].jobOrigin,
 						~FPCMasks[ipart][exp_iclass].jobExtent,
-						(baseMLO->mymodel.data_dim == 3));
+						cudaMLO->dataIs3D);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
 			partial_pos+=block_num;
@@ -2037,7 +2036,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		p_thr_wsum_sigma2_offset.cp_to_host();
 		p_thr_wsum_prior_offsetx_class.cp_to_host();
 		p_thr_wsum_prior_offsety_class.cp_to_host();
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			p_thr_wsum_prior_offsetz_class.cp_to_host();
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -2147,7 +2146,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			XX(shifts) = oversampled_translations_x[op.max_index[ipart].iovertrans];
 			YY(shifts) = oversampled_translations_y[op.max_index[ipart].iovertrans];
 		}
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 		{
 			shifts.resize(3);
 			if (baseMLO->mymodel.nr_bodies == 1)
@@ -2162,7 +2161,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_xoff) = XX(shifts);
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_yoff) = YY(shifts);
-		if (baseMLO->mymodel.data_dim == 3)
+		if (cudaMLO->dataIs3D)
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_zoff) = ZZ(shifts);
 
 		if (ibody == 0)
@@ -2214,7 +2213,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				xshift = oversampled_translations_x[iover_trans];
 				yshift = oversampled_translations_y[iover_trans];
-				if (baseMLO->mymodel.data_dim == 3)
+				if (cudaMLO->dataIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -2232,7 +2231,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
-		if(baseMLO->mymodel.data_dim == 3)
+		if(cudaMLO->dataIs3D)
 			trans_z.put_on_device();
 		else
 			trans_z.d_ptr = trans_y.d_ptr;
@@ -2456,7 +2455,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					exp_iclass,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
-					(baseMLO->mymodel.data_dim == 3),
+					cudaMLO->dataIs3D,
 					cudaMLO->classStreams[exp_iclass]);
 
 			/*======================================================
@@ -2487,7 +2486,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2s[0].ydim,
 				op.local_Minvsigma2s[0].zdim,
 				orientation_num,
-				(baseMLO->mymodel.data_dim == 3),
+				cudaMLO->dataIs3D,
 				cudaMLO->classStreams[exp_iclass]);
 
 			CTOC(cudaMLO->timer,"backproject");
