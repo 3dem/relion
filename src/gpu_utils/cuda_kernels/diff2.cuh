@@ -188,13 +188,14 @@ __global__ void cuda_kernel_diff2_coarse(
 }
 
 
-template<bool REF3D>
+template<bool REF3D, bool DATA3D>
 __global__ void cuda_kernel_diff2_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
@@ -243,18 +244,42 @@ __global__ void cuda_kernel_diff2_fine(
 
 			if(pixel < image_size)
 			{
-				int x = pixel % projector.imgX;
-				int y = floorfracf(pixel, projector.imgX);
-
-				if (y > projector.maxR)
+				int x,y,z,xy;
+				if(DATA3D)
 				{
-					if (y >= projector.imgY - projector.maxR)
-						y = y - projector.imgY;
-					else
-						x = projector.maxR;
+					z =  floorfracf(pixel, projector.imgX*projector.imgY);
+					xy = pixel % (projector.imgX*projector.imgY);
+					x =             xy  % projector.imgX;
+					y = floorfracf( xy,   projector.imgX);
+					if (z > projector.maxR)
+						z -= projector.imgZ;
 				}
+				else
+				{
+					x =             pixel % projector.imgX;
+					y = floorfracf( pixel , projector.imgX);
+				}
+				if (y > projector.maxR)
+					y -= projector.imgY;
 
-				if(REF3D)
+// 				NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also wavg
+//
+//				if (y > projector.maxR)
+//				{
+//					if (y >= projector.imgY - projector.maxR)
+//						y = y - projector.imgY;
+//					else
+//						x = projector.maxR;
+//				}
+
+				if(DATA3D)
+					projector.project3Dmodel(
+						x,y,z,
+						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]), __ldg(&g_eulers[ix*9+2]),
+						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]), __ldg(&g_eulers[ix*9+5]),
+						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]), __ldg(&g_eulers[ix*9+8]),
+						ref_real, ref_imag);
+				else if(REF3D)
 					projector.project3Dmodel(
 						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
@@ -272,7 +297,10 @@ __global__ void cuda_kernel_diff2_fine(
 				{
 					iy = d_trans_idx[d_job_idx[bid]] + itrans;
 
-					translatePixel(x, y, trans_x[iy], trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					if(DATA3D)
+						translatePixel(x, y, z, trans_x[iy], trans_y[iy], trans_x[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					else
+						translatePixel(x, y, trans_x[iy], trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
 
 					diff_real =  ref_real - shifted_real;
 					diff_imag =  ref_imag - shifted_imag;

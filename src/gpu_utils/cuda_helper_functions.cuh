@@ -81,8 +81,9 @@ void runWavgKernel(
 		XFLOAT *eulers,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
-		XFLOAT *Fimgs_nomask_real,
-		XFLOAT *Fimgs_nomask_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *sorted_weights,
 		XFLOAT *ctfs,
 		XFLOAT *wdiff2s_parts,
@@ -97,6 +98,7 @@ void runWavgKernel(
 		int exp_iclass,
 		XFLOAT part_scale,
 		bool refs_are_ctf_corrected,
+		bool data_is_3D,
 		cudaStream_t stream);
 
 #define INIT_VALUE_BLOCK_SIZE 512
@@ -244,6 +246,7 @@ void runDiff2KernelFine(
 		XFLOAT *Fimgs_imag,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
@@ -261,7 +264,8 @@ void runDiff2KernelFine(
 		int exp_iclass,
 		cudaStream_t stream,
 		long unsigned job_num_count,
-		bool do_CC);
+		bool do_CC,
+		bool data_is_3D);
 
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
@@ -307,6 +311,31 @@ __global__ void cuda_kernel_window_fourier_transform(
 	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 }
+
+void runCollect2jobs(	dim3 grid_dim,
+						XFLOAT * oo_otrans_x,          // otrans-size -> make const
+						XFLOAT * oo_otrans_y,          // otrans-size -> make const
+						XFLOAT * oo_otrans_z,          // otrans-size -> make const
+						XFLOAT * myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						XFLOAT * weights,
+						XFLOAT significant_weight,    // TODO Put in const
+						XFLOAT sum_weight,    		  // TODO Put in const
+						int nr_trans,
+						int oversampled_trans,
+						int oversampled_rot,
+						int oversamples,
+						bool skip_rots,
+						XFLOAT * p_weights,
+						XFLOAT * p_thr_wsum_prior_offsetx_class,
+						XFLOAT * p_thr_wsum_prior_offsety_class,
+						XFLOAT * p_thr_wsum_prior_offsetz_class,
+						XFLOAT * p_thr_wsum_sigma2_offset,
+						unsigned long * rot_idx,
+						unsigned long * trans_idx,
+						unsigned long * jobOrigin,
+						unsigned long * jobExtent,
+						bool data_is_3D
+						);
 
 void windowFourierTransform2(
 		XFLOAT *d_in_real,

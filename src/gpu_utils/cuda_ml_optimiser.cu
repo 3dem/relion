@@ -1051,6 +1051,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_z(translation_num, cudaMLO->devBundle->allocator);
+
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -1080,7 +1082,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 				trans_y[j] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
-
+				if (baseMLO->mymodel.data_dim == 3)
+					trans_z[j] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 				j ++;
 			}
 		}
@@ -1118,6 +1121,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
+		if (baseMLO->mymodel.data_dim == 3)
+			trans_z.put_on_device();
+		else
+			trans_z.d_ptr = trans_y.d_ptr;
+
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
 		corr_img.cp_to_device();
@@ -1246,6 +1254,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						~Fimg_imag,
 						~trans_x,
 						~trans_y,
+						~trans_z,
 						~eulers[exp_iclass-sp.iclass_min],
 						~thisClassFinePassWeights.rot_id,
 						~thisClassFinePassWeights.rot_idx,
@@ -1263,7 +1272,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						exp_iclass,
 						cudaMLO->classStreams[exp_iclass],
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
-						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
+						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
+						(baseMLO->mymodel.data_dim == 3)
 						);
 
 //				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -1853,9 +1863,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
 		CudaGlobalPtr<XFLOAT>          oo_otrans_x(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator); // old_offset_oversampled_trans_x
 		CudaGlobalPtr<XFLOAT>          oo_otrans_y(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT>          oo_otrans_z(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> myp_oo_otrans_x2y2z2(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator); // my_prior_old_offs....x^2*y^2*z^2
 		oo_otrans_x.device_alloc();
 		oo_otrans_y.device_alloc();
+		if (baseMLO->mymodel.data_dim == 3)
+			oo_otrans_z.device_alloc();
+		else
+			oo_otrans_z.d_ptr = oo_otrans_y.d_ptr;
 		myp_oo_otrans_x2y2z2.device_alloc();
 
 		int sumBlockNum =0;
@@ -1914,6 +1929,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
 					oo_otrans_y[fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
+					if (baseMLO->mymodel.data_dim == 3)
+						oo_otrans_z[fake_class*nr_transes+iitrans] = old_offset_z + oversampled_translations_z[iover_trans];
 
 					// Calculate the vector length of myprior
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
@@ -1950,16 +1967,26 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		stagerSWS[ipart].cp_to_device();
 		oo_otrans_x.cp_to_device();
 		oo_otrans_y.cp_to_device();
+		if (baseMLO->mymodel.data_dim == 3)
+			oo_otrans_z.cp_to_device();
+
 		myp_oo_otrans_x2y2z2.cp_to_device();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		CudaGlobalPtr<XFLOAT>                      p_weights(sumBlockNum, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetx_class(sumBlockNum, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsety_class(sumBlockNum, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetz_class(sumBlockNum, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT>       p_thr_wsum_sigma2_offset(sumBlockNum, cudaMLO->devBundle->allocator);
 		p_weights.device_alloc();
 		p_thr_wsum_prior_offsetx_class.device_alloc();
 		p_thr_wsum_prior_offsety_class.device_alloc();
+
+		if (baseMLO->mymodel.data_dim == 3)
+			p_thr_wsum_prior_offsetz_class.device_alloc();
+		else
+			p_thr_wsum_prior_offsetz_class.d_ptr  = p_thr_wsum_prior_offsety_class.d_ptr;
+
 		p_thr_wsum_sigma2_offset.device_alloc();
 		CTOC(cudaMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
@@ -1972,38 +1999,46 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Use the constructed mask to construct a partial class-specific input
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
 
+
 			int cpos=fake_class*nr_transes;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 			dim3 grid_dim_collect2 = block_num;
-			cuda_kernel_collect2jobs<<<grid_dim_collect2,SUMW_BLOCK_SIZE>>>(
+
+			runCollect2jobs(grid_dim_collect2,
 						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
 						&(oo_otrans_y(cpos) ),          // otrans-size -> make const
+						&(oo_otrans_z(cpos) ),          // otrans-size -> make const
 						&(myp_oo_otrans_x2y2z2(cpos) ), // otrans-size -> make const
 						~thisClassFinePassWeights.weights,
-					(XFLOAT)op.significant_weight[ipart],
-					(XFLOAT)op.sum_weight[ipart],
-					sp.nr_trans,
-					sp.nr_oversampled_trans,
-					sp.nr_oversampled_rot,
-					oversamples,
-					(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+						(XFLOAT)op.significant_weight[ipart],
+						(XFLOAT)op.sum_weight[ipart],
+						sp.nr_trans,
+						sp.nr_oversampled_trans,
+						sp.nr_oversampled_rot,
+						oversamples,
+						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
 						&p_weights(partial_pos),
 						&p_thr_wsum_prior_offsetx_class(partial_pos),
 						&p_thr_wsum_prior_offsety_class(partial_pos),
+						&p_thr_wsum_prior_offsetz_class(partial_pos),
 						&p_thr_wsum_sigma2_offset(partial_pos),
-					~thisClassFinePassWeights.rot_idx,
-					~thisClassFinePassWeights.trans_idx,
-					~FPCMasks[ipart][exp_iclass].jobOrigin,
-					~FPCMasks[ipart][exp_iclass].jobExtent
-						);
+						~thisClassFinePassWeights.rot_idx,
+						~thisClassFinePassWeights.trans_idx,
+						~FPCMasks[ipart][exp_iclass].jobOrigin,
+						~FPCMasks[ipart][exp_iclass].jobExtent,
+						(baseMLO->mymodel.data_dim == 3));
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+
 			partial_pos+=block_num;
 		}
+
 		CTIC(cudaMLO->timer,"collect_data_2_post_kernel");
 		p_weights.cp_to_host();
+		p_thr_wsum_sigma2_offset.cp_to_host();
 		p_thr_wsum_prior_offsetx_class.cp_to_host();
 		p_thr_wsum_prior_offsety_class.cp_to_host();
-		p_thr_wsum_sigma2_offset.cp_to_host();
+		if (baseMLO->mymodel.data_dim == 3)
+			p_thr_wsum_prior_offsetz_class.cp_to_host();
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 		int iorient = 0;
@@ -2163,6 +2198,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> trans_z(translation_num, cudaMLO->devBundle->allocator);
 
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
@@ -2196,6 +2232,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
+		if(baseMLO->mymodel.data_dim == 3)
+			trans_z.put_on_device();
+		else
+			trans_z.d_ptr = trans_y.d_ptr;
 
 		/*======================================================
 		                     IMAGES
@@ -2401,6 +2441,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~Fimgs_imag,
 					~trans_x,
 					~trans_y,
+					~trans_z,
 					&sorted_weights.d_ptr[classPos],
 					~ctfs,
 					~wdiff2s_sum,
@@ -2415,6 +2456,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					exp_iclass,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
+					(baseMLO->mymodel.data_dim == 3),
 					cudaMLO->classStreams[exp_iclass]);
 
 			/*======================================================
@@ -3037,7 +3079,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					CTIC(timer,"getAllSquaredDifferencesFine");
 					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
 					CTOC(timer,"getAllSquaredDifferencesFine");
-
+					FinePassWeights[0].weights.cp_to_host();
 					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
 
 					CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
