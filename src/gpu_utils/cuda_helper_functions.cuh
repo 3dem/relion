@@ -320,9 +320,9 @@ void runCollect2jobs(	dim3 grid_dim,
 						XFLOAT * weights,
 						XFLOAT significant_weight,    // TODO Put in const
 						XFLOAT sum_weight,    		  // TODO Put in const
-						int nr_trans,
-						int oversampled_trans,
-						int oversampled_rot,
+						unsigned long nr_trans,
+						unsigned long oversampled_trans,
+						unsigned long oversampled_rot,
 						int oversamples,
 						bool skip_rots,
 						XFLOAT * p_weights,
@@ -330,10 +330,10 @@ void runCollect2jobs(	dim3 grid_dim,
 						XFLOAT * p_thr_wsum_prior_offsety_class,
 						XFLOAT * p_thr_wsum_prior_offsetz_class,
 						XFLOAT * p_thr_wsum_sigma2_offset,
-						unsigned long * rot_idx,
-						unsigned long * trans_idx,
-						unsigned long * jobOrigin,
-						unsigned long * jobExtent,
+						size_t * rot_idx,
+						size_t * trans_idx,
+						size_t * jobOrigin,
+						size_t * jobExtent,
 						bool data_is_3D
 						);
 
