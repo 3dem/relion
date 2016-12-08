@@ -1291,6 +1291,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 }
 
 
+template<typename weights_t>
 void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
@@ -1512,8 +1513,25 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if(exp_ipass==0)
 			{
-				CudaGlobalPtr<XFLOAT>  ipartMweight(
-						Mweight,
+				CudaGlobalPtr<weights_t> weights(Mweight.getAllocator());
+				weights.setSize(Mweight.getSize());
+
+				if (sizeof(weights_t) == sizeof(XFLOAT))
+				{
+					weights.setHstPtr((weights_t*) Mweight.h_ptr);
+					weights.setDevPtr((weights_t*) Mweight.d_ptr);
+					weights.setAllocator(Mweight.getAllocator());
+				}
+				else
+				{
+					weights.device_alloc();
+					block_num = ceilf((float)Mweight.getSize()/(float)BLOCK_SIZE);
+					cuda_kernel_cast<XFLOAT,weights_t><<<block_num,BLOCK_SIZE,0>>>
+							(~Mweight,~weights,Mweight.getSize());
+				}
+
+				CudaGlobalPtr<weights_t>  ipartMweight(
+						weights,
 						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
@@ -1522,7 +1540,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if (failsafeMode) //Prevent zero prior products in fail-safe mode
 				{
-					cuda_kernel_exponentiate_weights_coarse<true>
+					cuda_kernel_exponentiate_weights_coarse<true,weights_t>
 					<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
 							~pdf_orientation,
 							~pdf_offset,
@@ -1534,8 +1552,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				else
 				{
-
-					cuda_kernel_exponentiate_weights_coarse<false>
+					cuda_kernel_exponentiate_weights_coarse<false,weights_t>
 					<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
 							~pdf_orientation,
 							~pdf_offset,
@@ -1550,17 +1567,17 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 				//Wrap the current ipart data in a new pointer
-				CudaGlobalPtr<XFLOAT> unsorted_ipart(Mweight,
+				CudaGlobalPtr<weights_t> unsorted_ipart(weights,
 						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
-				CudaGlobalPtr<XFLOAT> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
+				CudaGlobalPtr<weights_t> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
 
 				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
 
 				filtered.device_alloc();
 
-				MoreThanCubOpt<XFLOAT> moreThanOpt(0.);
+				MoreThanCubOpt<weights_t> moreThanOpt(0.);
 				size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
 
 				if (filteredSize == 0)
@@ -1583,8 +1600,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				filtered.setSize(filteredSize);
 
-				CudaGlobalPtr<XFLOAT> sorted(filteredSize, cudaMLO->devBundle->allocator);
-				CudaGlobalPtr<XFLOAT> cumulative_sum(filteredSize, cudaMLO->devBundle->allocator);
+				CudaGlobalPtr<weights_t> sorted(filteredSize, cudaMLO->devBundle->allocator);
+				CudaGlobalPtr<weights_t> cumulative_sum(filteredSize, cudaMLO->devBundle->allocator);
 				sorted.device_alloc();
 				cumulative_sum.device_alloc();
 
@@ -1596,7 +1613,27 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
 				long int my_nr_significant_coarse_samples;
-				size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
+				size_t thresholdIdx(0);
+
+				int grid_size = ceil((float)(cumulative_sum.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
+				if(grid_size > 0)
+				{
+					CudaGlobalPtr<size_t >  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
+					idx[0] = 0;
+					idx.put_on_device();
+					cuda_kernel_find_threshold_idx_in_cumulative<weights_t>
+					<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, cumulative_sum.getStream() >>>(
+							~cumulative_sum,
+							(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart],
+							cumulative_sum.getSize()-1,
+							~idx);
+					idx.cp_to_host();
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cumulative_sum.getStream()));
+
+					thresholdIdx = idx[0];
+				}
+
+
 				my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
 
 				if (my_nr_significant_coarse_samples == 0)
@@ -1628,10 +1665,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
 				}
 
-				my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+				weights_t significant_weight = sorted.getDeviceAt(thresholdIdx);
 
 				CTIC(cudaMLO->timer,"getArgMaxOnDevice");
-				std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(unsorted_ipart);
+				std::pair<int, weights_t> max_pair = getArgMaxOnDevice(unsorted_ipart);
 				CTOC(cudaMLO->timer,"getArgMaxOnDevice");
 				op.max_index[ipart].coarseIdx = max_pair.first;
 				op.max_weight[ipart] = max_pair.second;
@@ -1648,7 +1685,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				Mcoarse_significant.device_alloc();
 
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-				arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, (XFLOAT) my_significant_weight);
+				arrayOverThreshold<weights_t>(unsorted_ipart, Mcoarse_significant, significant_weight);
 				Mcoarse_significant.cp_to_host();
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 			}
@@ -2965,26 +3002,34 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					deviceInitValue<XFLOAT>(Mweight, -999.);
 					Mweight.streamSync();
 
+					CTIC(timer,"getAllSquaredDifferencesCoarse");
+					getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
+					CTOC(timer,"getAllSquaredDifferencesCoarse");
+
 					try
 					{
-						CTIC(timer,"getAllSquaredDifferencesCoarse");
-						getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
-						CTOC(timer,"getAllSquaredDifferencesCoarse");
-
 						CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
-						convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
+						convertAllSquaredDifferencesToWeights<XFLOAT>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
 						CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 					}
 					catch (RelionError XE)
 					{
-						if (failsafe_attempts > 40)
-							REPORT_ERROR("Too many fail-safe attempts in one iteration");
-
-						//Rerun in fail-safe mode
 						getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
-						convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight, true);
-						std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
-						failsafe_attempts ++;
+#ifndef CUDA_DOUBLE_PRECISION
+						try {
+							convertAllSquaredDifferencesToWeights<double>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
+						}
+						catch (RelionError XE)
+#endif
+						{
+							if (failsafe_attempts > 40)
+								REPORT_ERROR("Too many fail-safe attempts in one iteration");
+
+							//Rerun in fail-safe mode
+							convertAllSquaredDifferencesToWeights<XFLOAT>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight, true);
+							std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
+							failsafe_attempts ++;
+						}
 					}
 				}
 				else
@@ -3036,7 +3081,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
 
 					CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
-					convertAllSquaredDifferencesToWeights(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, Mweight);
+					convertAllSquaredDifferencesToWeights<XFLOAT>(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, Mweight);
 					CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
 
 				}
