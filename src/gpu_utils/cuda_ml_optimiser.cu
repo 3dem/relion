@@ -883,8 +883,7 @@ void getAllSquaredDifferencesCoarse(
 
 			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 			trans_y[itrans] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
-			if (cudaMLO->dataIs3D)
-				trans_z[itrans] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
+			trans_z[itrans] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
@@ -910,10 +909,8 @@ void getAllSquaredDifferencesCoarse(
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
-		if (cudaMLO->dataIs3D)
-			trans_z.put_on_device();
-		else
-			trans_z.d_ptr = trans_y.d_ptr; // so as to not get kernel-cast on NULL ptr in templated coarse kernel
+		trans_z.put_on_device();
+
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
 
@@ -983,7 +980,7 @@ void getAllSquaredDifferencesCoarse(
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-
+		allWeights.cp_to_host();
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
 
@@ -1081,8 +1078,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 				trans_y[j] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
-				if (cudaMLO->dataIs3D)
-					trans_z[j] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
+				trans_z[j] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 				j ++;
 			}
 		}
@@ -1120,10 +1116,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
-		if (cudaMLO->dataIs3D)
-			trans_z.put_on_device();
-		else
-			trans_z.d_ptr = trans_y.d_ptr;
+		trans_z.put_on_device();
+
 
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
@@ -1864,12 +1858,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CudaGlobalPtr<XFLOAT>          oo_otrans_y(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT>          oo_otrans_z(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> myp_oo_otrans_x2y2z2(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator); // my_prior_old_offs....x^2*y^2*z^2
-		oo_otrans_x.device_alloc();
-		oo_otrans_y.device_alloc();
-		if (cudaMLO->dataIs3D)
-			oo_otrans_z.device_alloc();
-		else
-			oo_otrans_z.d_ptr = oo_otrans_y.d_ptr;
+
 		myp_oo_otrans_x2y2z2.device_alloc();
 
 		int sumBlockNum =0;
@@ -1964,10 +1953,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 
 		stagerSWS[ipart].cp_to_device();
-		oo_otrans_x.cp_to_device();
-		oo_otrans_y.cp_to_device();
-		if (cudaMLO->dataIs3D)
-			oo_otrans_z.cp_to_device();
+		oo_otrans_x.put_on_device();
+		oo_otrans_y.put_on_device();
+		oo_otrans_z.put_on_device();
 
 		myp_oo_otrans_x2y2z2.cp_to_device();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -2225,16 +2213,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 				trans_y[j] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
+				trans_z[j] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 				j ++;
 			}
 		}
 
 		trans_x.put_on_device();
 		trans_y.put_on_device();
-		if(cudaMLO->dataIs3D)
-			trans_z.put_on_device();
-		else
-			trans_z.d_ptr = trans_y.d_ptr;
+		trans_z.put_on_device();
+
 
 		/*======================================================
 		                     IMAGES
