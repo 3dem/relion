@@ -771,7 +771,7 @@ void getAllSquaredDifferencesCoarse(
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
 
 	CTIC(cudaMLO->timer,"diff_pre_gpu");
-
+	bool data_is_3D = (baseMLO->mymodel.data_dim == 3);
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	std::vector<MultidimArray<Complex > > dummy;
@@ -885,7 +885,7 @@ void getAllSquaredDifferencesCoarse(
 			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
 			trans_y[itrans] = -2 * PI * yshift / (double)baseMLO->mymodel.ori_size;
 			if (baseMLO->mymodel.data_dim == 3)
-				trans_y[itrans] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
+				trans_z[itrans] = -2 * PI * zshift / (double)baseMLO->mymodel.ori_size;
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
@@ -913,13 +913,14 @@ void getAllSquaredDifferencesCoarse(
 		trans_y.put_on_device();
 		if (baseMLO->mymodel.data_dim == 3)
 			trans_z.put_on_device();
+		else
+			trans_z.d_ptr = trans_y.d_ptr; // so as to not get kernel-cast on NULL ptr in templated coarse kernel
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		CTOC(cudaMLO->timer,"translation_1");
-
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
 		CudaGlobalPtr<XFLOAT> corr_img(image_size, cudaMLO->devBundle->allocator);
@@ -929,7 +930,6 @@ void getAllSquaredDifferencesCoarse(
 		corr_img.cp_to_device();
 
 		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
-
 		allWeights_pos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -944,12 +944,14 @@ void getAllSquaredDifferencesCoarse(
 						cudaMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
+						op.local_Minvsigma2s[0].zdim,
 						op.local_Minvsigma2s[0].xdim-1);
 
 				runDiff2KernelCoarse(
 						projKernel,
 						~trans_x,
 						~trans_y,
+						~trans_z,
 						~corr_img,
 						~Fimg_real,
 						~Fimg_imag,
@@ -960,7 +962,8 @@ void getAllSquaredDifferencesCoarse(
 						translation_num,
 						image_size,
 						cudaMLO->classStreams[exp_iclass],
-						do_CC);
+						do_CC,
+						data_is_3D);
 
 				mapAllWeightsToMweights(
 						~projectorPlans[exp_iclass].iorientclasses,
@@ -1227,6 +1230,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						cudaMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
+						op.local_Minvsigma2s[0].zdim,
 						op.local_Minvsigma2s[0].xdim-1);
 				CTOC(cudaMLO->timer,"Diff2MakeKernel");
 
@@ -2424,6 +2428,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					cudaMLO->devBundle->cudaProjectors[exp_iclass],
 					op.local_Minvsigma2s[0].xdim,
 					op.local_Minvsigma2s[0].ydim,
+					op.local_Minvsigma2s[0].zdim,
 					op.local_Minvsigma2s[0].xdim-1);
 
 			runWavgKernel(

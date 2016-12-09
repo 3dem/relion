@@ -482,5 +482,27 @@ __device__ __forceinline__ void translatePixel(
 	tImag = c * imag + s * real;
 }
 
+__device__ __forceinline__ void translatePixel(
+		int x,
+		int y,
+		int z,
+		XFLOAT tx,
+		XFLOAT ty,
+		XFLOAT tz,
+		XFLOAT &real,
+		XFLOAT &imag,
+		XFLOAT &tReal,
+		XFLOAT &tImag)
+{
+	XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+	sincos( x * tx + y * ty + z * tz, &s, &c );
+#else
+	sincosf( x * tx + y * ty + z * tz, &s, &c );
+#endif
+
+	tReal = c * real - s * imag;
+	tImag = c * imag + s * real;
+}
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
