@@ -5379,7 +5379,12 @@ bool ClassSelectJobWindow::getCommands(std::string &outputname, std::vector<std:
 	// Re-grouping
 	if (do_regroup.getValue() && fn_coords.getValue() == "")
 	{
-		command += " --regroup " + floatToString(nr_groups.getValue());
+            if (fn_model.getValue() == "")
+            {
+                fl_message("Re-grouping only works for model.star files...");
+		return false;
+            }
+            command += " --regroup " + floatToString(nr_groups.getValue());
 	}
 
 	// Other arguments
