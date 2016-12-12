@@ -1416,6 +1416,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = true;
 					else
 						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
+			else
+			{
+				std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
+				op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
+				op.max_weight[ipart] = max_pair.second;
+			}
 
 		}
 		else
