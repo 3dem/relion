@@ -266,7 +266,7 @@ __global__ void cuda_kernel_backproject3D(
 			z =  floorfracf(pixel, img_x*img_y);
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
-			y = floorfracf( xy,   img_y);
+			y = floorfracf( xy,   img_x);
 			if (z > max_r)
 				z -= img_z;
 		}

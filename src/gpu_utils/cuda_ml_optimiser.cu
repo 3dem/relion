@@ -1939,15 +1939,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 					RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
+					RFLOAT diffz = 0;
+
 					if (cudaMLO->dataIs3D)
-					{
-						RFLOAT diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
-						myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz ;
-					}
-					else
-					{
-						myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy ;
-					}
+						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
+
+					myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz;
 				}
 			}
 		}
