@@ -16,11 +16,11 @@
 #define FAILSAFE_PRIOR_MIN_LIM 1e-30
 #endif
 
-template<bool failsafe>
+template<bool failsafe,typename weights_t>
 __global__ void cuda_kernel_exponentiate_weights_coarse(
 		XFLOAT *g_pdf_orientation,
 		XFLOAT *g_pdf_offset,
-		XFLOAT *g_Mweight,
+		weights_t *g_Mweight,
 		XFLOAT avg_diff2,
 		XFLOAT min_diff2,
 		int nr_coarse_orient,
@@ -34,15 +34,15 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 
 	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
 
-	XFLOAT weight;
+	weights_t weight;
 	if(iorient<nr_coarse_orient)
 	{
 		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
 		{
 			pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
-			XFLOAT diff2 = g_Mweight[pos];
+			weights_t diff2 = g_Mweight[pos];
 			if( diff2 < min_diff2 ) //TODO Might be slow (divergent threads)
-				diff2 = (XFLOAT)0.0;
+				weight = (weights_t)0.0;
 			else
 			{
 				diff2 -= avg_diff2;
@@ -63,12 +63,11 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 				else
 					weight *= expf(-diff2);
 #endif
-				diff2=weight;
 				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
 			}
 
 			// Store the weight
-			g_Mweight[pos] = diff2; // TODO put in shared mem
+			g_Mweight[pos] = weight; // TODO put in shared mem
 		}
 	}
 }

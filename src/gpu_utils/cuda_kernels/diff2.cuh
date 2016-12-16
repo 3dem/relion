@@ -82,8 +82,8 @@ __global__ void cuda_kernel_diff2_coarse(
 			}
 			else
 			{
-				x =             init_pixel + tid/prefetch_fraction  % projector.imgX;
-				y = floorfracf( init_pixel + tid/prefetch_fraction,   projector.imgX);
+				x =           ( init_pixel + tid/prefetch_fraction) % projector.imgX;
+				y = floorfracf( init_pixel + tid/prefetch_fraction  , projector.imgX);
 			}
 			if (y > projector.maxR)
 				y -= projector.imgY;
@@ -148,8 +148,8 @@ __global__ void cuda_kernel_diff2_coarse(
 			int x,y,z,xy;
 			if(DATA3D)
 			{
-				z =  floorfracf(init_pixel +i, projector.imgX*projector.imgY); //TODO optimize index extraction.
-				xy = init_pixel + i % (projector.imgX*projector.imgY);
+				z =  floorfracf( init_pixel + i   ,  projector.imgX*projector.imgY); //TODO optimize index extraction.
+				xy =           ( init_pixel + i ) % (projector.imgX*projector.imgY);
 				x =             xy  % projector.imgX;
 				y = floorfracf( xy,   projector.imgX);
 				if (z > projector.maxR)
@@ -157,8 +157,8 @@ __global__ void cuda_kernel_diff2_coarse(
 			}
 			else
 			{
-				x =             init_pixel + i  % projector.imgX;
-				y = floorfracf( init_pixel + i,   projector.imgX);
+				x =           ( init_pixel + i ) % projector.imgX;
+				y = floorfracf( init_pixel + i   , projector.imgX);
 			}
 			if (y > projector.maxR)
 				y -= projector.imgY;
