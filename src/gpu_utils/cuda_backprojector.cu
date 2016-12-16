@@ -142,6 +142,8 @@ __global__ void cuda_kernel_backproject2D(
 		real = (XFLOAT) 0.0;
 		imag = (XFLOAT) 0.0;
 
+		XFLOAT temp_real, temp_imag;
+
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
 			weight = g_weights[img * translation_num + itrans];
@@ -151,10 +153,10 @@ __global__ void cuda_kernel_backproject2D(
 				weight = (weight / weight_norm) * ctf * minvsigma2;
 				Fweight += weight * ctf;
 
-				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, real, imag);
+				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
-				real *= weight;
-				imag *= weight;
+				real += temp_real * weight;
+				imag += temp_imag * weight;
 
 			}
 		}
@@ -307,6 +309,8 @@ __global__ void cuda_kernel_backproject3D(
 		real = (XFLOAT) 0.0;
 		imag = (XFLOAT) 0.0;
 
+		XFLOAT temp_real, temp_imag;
+
 		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 		{
 			weight = g_weights[img * translation_num + itrans];
@@ -317,12 +321,12 @@ __global__ void cuda_kernel_backproject3D(
 				Fweight += weight * ctf;
 
 				if(DATA3D)
-					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, real, imag);
+					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 				else
-					translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, real, imag);
+					translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
 
-				real *= weight;
-				imag *= weight;
+				real += temp_real * weight;
+				imag += temp_imag * weight;
 			}
 		}
 
