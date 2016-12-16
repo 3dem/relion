@@ -64,7 +64,12 @@ __global__ void cuda_kernel_wavg(
 				x =             xy  % projector.imgX;
 				y = floorfracf( xy,   projector.imgX);
 				if (z > projector.maxR)
-					z -= projector.imgZ;
+				{
+					if (z >= projector.imgZ - projector.maxR)
+						z = z - projector.imgZ;
+					else
+						x = projector.maxR;
+				}
 			}
 			else
 			{
@@ -72,7 +77,12 @@ __global__ void cuda_kernel_wavg(
 				y = floorfracf( pixel , projector.imgX);
 			}
 			if (y > projector.maxR)
-				y -= projector.imgY;
+			{
+				if (y >= projector.imgY - projector.maxR)
+					y = y - projector.imgY;
+				else
+					x = projector.maxR;
+			}
 
 //          NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also diff-fine + BP_3D
 //
