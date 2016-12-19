@@ -161,8 +161,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// If all slaves had preread images into RAM: get those now
 			if (baseMLO->do_preread_images)
 			{
-				CTIC(cudaMLO->timer,"ParaReadPrereadImages");
+
                 img().reshape(baseMLO->mydata.particles[part_id].img);
+                CTIC(cudaMLO->timer,"ParaReadPrereadImages");
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mydata.particles[part_id].img)
 				{
                 	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(baseMLO->mydata.particles[part_id].img, n);
@@ -613,14 +614,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																			sum_bg);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
-			d_img.streamSync();
-			d_img.cp_to_host();
+//			d_img.streamSync();
+//			d_img.cp_to_host();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-			{
-				img.data.data[n]=(RFLOAT)d_img[n];
-			}
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+//			{
+//				img.data.data[n]=(RFLOAT)d_img[n];
+//			}
 
 			CTOC(cudaMLO->timer,"softMaskOutsideMap");
 		}
