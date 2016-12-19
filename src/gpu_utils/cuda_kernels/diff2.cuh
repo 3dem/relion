@@ -349,13 +349,14 @@ __global__ void cuda_kernel_diff2_fine(
  *   	CROSS-CORRELATION-BASED KERNELS
  */
 
-template<bool REF3D>
+template<bool REF3D, bool DATA3D>
 __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
@@ -376,13 +377,16 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 	XFLOAT real, imag, ref_real, ref_imag;
 
-	XFLOAT e0,e1,e3,e4,e6,e7;
+	XFLOAT e0,e1,e2,e3,e4,e5,e6,e7,e8;
 	e0 = __ldg(&g_eulers[iorient*9  ]);
 	e1 = __ldg(&g_eulers[iorient*9+1]);
+	e2 = __ldg(&g_eulers[iorient*9+2]);
 	e3 = __ldg(&g_eulers[iorient*9+3]);
 	e4 = __ldg(&g_eulers[iorient*9+4]);
+	e5 = __ldg(&g_eulers[iorient*9+5]);
 	e6 = __ldg(&g_eulers[iorient*9+6]);
 	e7 = __ldg(&g_eulers[iorient*9+7]);
+	e8 = __ldg(&g_eulers[iorient*9+8]);
 
 	__syncthreads();
 
@@ -393,9 +397,26 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 		if(pixel < image_size)
 		{
-			int x = pixel % projector.imgX;
-			int y = floorfracf(pixel,projector.imgX);
-
+			int x,y,z,xy;
+			if(DATA3D)
+			{
+				z =  floorfracf(pixel, projector.imgX*projector.imgY);
+				xy = pixel % (projector.imgX*projector.imgY);
+				x =             xy  % projector.imgX;
+				y = floorfracf( xy,   projector.imgX);
+				if (z > projector.maxR)
+				{
+					if (z >= projector.imgZ - projector.maxR)
+						z = z - projector.imgZ;
+					else
+						x = projector.maxR;
+				}
+			}
+			else
+			{
+				x =             pixel % projector.imgX;
+				y = floorfracf( pixel , projector.imgX);
+			}
 			if (y > projector.maxR)
 			{
 				if (y >= projector.imgY - projector.maxR)
@@ -404,7 +425,12 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 					x = projector.maxR;
 			}
 
-			if(REF3D)
+			if(DATA3D)
+				projector.project3Dmodel(
+					x,y,z,
+					e0,e1,e2,e3,e4,e5,e6,e7,e8,
+					ref_real, ref_imag);
+			else if(REF3D)
 				projector.project3Dmodel(
 					x,y,
 					e0,e1,e3,e4,e6,e7,
@@ -415,7 +441,10 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 					e0,e1,e3,e4,
 					ref_real, ref_imag);
 
-			translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
+			if(DATA3D)
+				translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
+			else
+				translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
 
 			s_weight[tid] += (ref_real * real     + ref_imag * imag)      * __ldg(&g_corr_img[pixel]);
 			s_norm[tid]   += (ref_real * ref_real + ref_imag * ref_imag ) * __ldg(&g_corr_img[pixel]);
@@ -437,13 +466,14 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 }
 
-template<bool REF3D>
+template<bool REF3D, bool DATA3D>
 __global__ void cuda_kernel_diff2_CC_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
 		CudaProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
@@ -494,8 +524,26 @@ __global__ void cuda_kernel_diff2_CC_fine(
 
 			if(pixel < image_size)
 			{
-				int x = pixel % projector.imgX;
-				int y = floorfracf(pixel, projector.imgX);
+				int x,y,z,xy;
+				if(DATA3D)
+				{
+					z =  floorfracf(pixel, projector.imgX*projector.imgY);
+					xy = pixel % (projector.imgX*projector.imgY);
+					x =             xy  % projector.imgX;
+					y = floorfracf( xy,   projector.imgX);
+					if (z > projector.maxR)
+					{
+						if (z >= projector.imgZ - projector.maxR)
+							z = z - projector.imgZ;
+						else
+							x = projector.maxR;
+					}
+				}
+				else
+				{
+					x =             pixel % projector.imgX;
+					y = floorfracf( pixel , projector.imgX);
+				}
 
 				if (y > projector.maxR)
 				{
@@ -504,7 +552,15 @@ __global__ void cuda_kernel_diff2_CC_fine(
 					else
 						x = projector.maxR;
 				}
-				if(REF3D)
+
+				if(DATA3D)
+					projector.project3Dmodel(
+						x,y,z,
+						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]), __ldg(&g_eulers[ix*9+2]),
+						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]), __ldg(&g_eulers[ix*9+5]),
+						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]), __ldg(&g_eulers[ix*9+8]),
+						ref_real, ref_imag);
+				else if(REF3D)
 					projector.project3Dmodel(
 						x,y,
 						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
@@ -522,7 +578,11 @@ __global__ void cuda_kernel_diff2_CC_fine(
 				{
 					iy = d_trans_idx[d_job_idx[bid]] + itrans;
 
-					translatePixel(x, y, g_trans_x[iy], g_trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					if(DATA3D)
+						translatePixel(x, y, z, g_trans_x[iy], g_trans_y[iy], g_trans_z[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					else
+						translatePixel(x, y,    g_trans_x[iy], g_trans_y[iy],                g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+
 					s[   itrans*BLOCK_SIZE + tid] += (ref_real * shifted_real + ref_imag * shifted_imag) * __ldg(&g_corr_img[pixel]);
 					s_cc[itrans*BLOCK_SIZE + tid] += (ref_real*ref_real + ref_imag*ref_imag) * __ldg(&g_corr_img[pixel]);
 				}

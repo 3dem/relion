@@ -881,14 +881,30 @@ void runDiff2KernelCoarse(
 	else
 	{
 		dim3 CCblocks(orientation_num,translation_num);
-		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_coarse<true>
+		if(data_is_3D)
+			cuda_kernel_diff2_CC_coarse<true,true>
 		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
+				projector,
+				corr_img,
+				diff2s,
+				translation_num,
+				image_size,
+				local_sqrtXi2);
+		else if(projector.mdlZ!=0)
+			cuda_kernel_diff2_CC_coarse<true,false>
+		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
+				d_eulers,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -896,13 +912,14 @@ void runDiff2KernelCoarse(
 				image_size,
 				local_sqrtXi2);
 		else
-			cuda_kernel_diff2_CC_coarse<false>
+			cuda_kernel_diff2_CC_coarse<false,false>
 		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -1036,14 +1053,37 @@ void runDiff2KernelFine(
     }
     else
     {
-		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_fine<true>
+    	if(data_is_3D)
+			cuda_kernel_diff2_CC_fine<true,true>
 			<<<block_dim,BLOCK_SIZE,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
 				trans_x,
 				trans_y,
+				trans_z,
+				projector,
+				corr_img,
+				diff2s,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.,
+				(XFLOAT) op.local_sqrtXi2[ipart],
+				orientation_num,
+				translation_num,
+				job_num_count, //significant_num,
+				rot_idx,
+				trans_idx,
+				job_idx,
+				job_num);
+    	else if(projector.mdlZ!=0)
+			cuda_kernel_diff2_CC_fine<true,false>
+			<<<block_dim,BLOCK_SIZE,0,stream>>>(
+				eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				trans_x,
+				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -1058,13 +1098,14 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_CC_fine<false>
+			cuda_kernel_diff2_CC_fine<false,false>
 			<<<block_dim,BLOCK_SIZE,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
