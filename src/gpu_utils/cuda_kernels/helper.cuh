@@ -195,6 +195,36 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												XFLOAT radius,
 												XFLOAT radius_p,
 												XFLOAT cosine_width	);
+
+__global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
+														long int vol_size,
+														long int xdim,
+														long int ydim,
+														long int zdim,
+														long int xinit,
+														long int yinit,
+														long int zinit,
+														bool do_Mnoise,
+														XFLOAT radius,
+														XFLOAT radius_p,
+														XFLOAT cosine_width,
+														XFLOAT *g_sum,
+														XFLOAT *g_sum_bg);
+
+__global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
+											long int vol_size,
+											long int xdim,
+											long int ydim,
+											long int zdim,
+											long int xinit,
+											long int yinit,
+											long int zinit,
+											bool do_Mnoise,
+											XFLOAT radius,
+											XFLOAT radius_p,
+											XFLOAT cosine_width,
+											XFLOAT sum_bg_total);
+
 //----------------------------------------------------------------------------
 
 __global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,

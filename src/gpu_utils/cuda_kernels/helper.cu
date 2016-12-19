@@ -188,6 +188,142 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 		}
 }
 
+__global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
+														long int vol_size,
+														long int xdim,
+														long int ydim,
+														long int zdim,
+														long int xinit,
+														long int yinit,
+														long int zinit,
+														bool do_Mnoise,
+														XFLOAT radius,
+														XFLOAT radius_p,
+														XFLOAT cosine_width,
+														XFLOAT *g_sum,
+														XFLOAT *g_sum_bg)
+{
+
+		int tid = threadIdx.x;
+		int bid = blockIdx.x;
+
+//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+		XFLOAT r, raisedcos;
+		int x,y,z;
+		__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
+		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
+		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
+
+		long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
+		int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+
+		partial_sum[tid]=(XFLOAT)0.0;
+		partial_sum_bg[tid]=(XFLOAT)0.0;
+
+		for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+		{
+			if(texel<vol_size)
+			{
+				img_pixels[tid]=__ldg(&vol[texel]);
+
+				z =   texel / (xdim*ydim) ;
+				y = ( texel % (xdim*ydim) ) / xdim ;
+				x = ( texel % (xdim*ydim) ) % xdim ;
+
+				z-=zinit;
+				y-=yinit;
+				x-=xinit;
+
+				r = sqrt(XFLOAT(x*x + y*y + z*z));
+
+				if (r < radius)
+					continue;
+				else if (r > radius_p)
+				{
+					partial_sum[tid]    += (XFLOAT)1.0;
+					partial_sum_bg[tid] += img_pixels[tid];
+				}
+				else
+				{
+#if defined(CUDA_DOUBLE_PRECISION)
+					raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
+#else
+					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+#endif
+					partial_sum[tid] += raisedcos;
+					partial_sum_bg[tid] += raisedcos * img_pixels[tid];
+				}
+			}
+		}
+
+		cuda_atomic_add(&g_sum[tid]   , partial_sum[tid]);
+		cuda_atomic_add(&g_sum_bg[tid], partial_sum_bg[tid]);
+}
+
+
+__global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
+											long int vol_size,
+											long int xdim,
+											long int ydim,
+											long int zdim,
+											long int xinit,
+											long int yinit,
+											long int zinit,
+											bool do_Mnoise,
+											XFLOAT radius,
+											XFLOAT radius_p,
+											XFLOAT cosine_width,
+											XFLOAT bg_value)
+{
+
+	int tid = threadIdx.x;
+	int bid = blockIdx.x;
+
+//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+	XFLOAT r, raisedcos;
+	int x,y,z;
+	__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
+
+	long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
+	int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+
+	for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+	{
+		if(texel<vol_size)
+		{
+			img_pixels[tid]=__ldg(&vol[texel]);
+
+			z =   texel / (xdim*ydim) ;
+			y = ( texel % (xdim*ydim) ) / xdim ;
+			x = ( texel % (xdim*ydim) ) % xdim ;
+
+			z-=zinit;
+			y-=yinit;
+			x-=xinit;
+
+			r = sqrt(XFLOAT(x*x + y*y + z*z));
+
+			if (r < radius)
+				continue;
+			else if (r > radius_p)
+				img_pixels[tid]=bg_value;
+			else
+			{
+#if defined(CUDA_DOUBLE_PRECISION)
+				raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
+#else
+				raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+#endif
+				img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + bg_value*raisedcos;
+
+			}
+			vol[texel]=img_pixels[tid];
+		}
+
+	}
+}
+
+
 __global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
 											XFLOAT * g_image_out,
 											int image_size,

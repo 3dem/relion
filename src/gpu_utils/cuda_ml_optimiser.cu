@@ -153,7 +153,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		CTOC(cudaMLO->timer,"nonZeroProb");
 
-		CTIC(cudaMLO->timer,"setXmippOrigin");
+		CTIC(cudaMLO->timer,"setXmippOrigin1");
 		// Get the image and recimg data
 		if (baseMLO->do_parallel_disc_io)
 		{
@@ -161,22 +161,28 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// If all slaves had preread images into RAM: get those now
 			if (baseMLO->do_preread_images)
 			{
+				CTIC(cudaMLO->timer,"ParaReadPrereadImages");
                 img().reshape(baseMLO->mydata.particles[part_id].img);
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mydata.particles[part_id].img)
 				{
                 	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(baseMLO->mydata.particles[part_id].img, n);
 				}
+				CTOC(cudaMLO->timer,"ParaReadPrereadImages");
 			}
 			else
 			{
 				if (cudaMLO->dataIs3D)
 				{
+					CTIC(cudaMLO->timer,"ParaRead3DImages");
 					img.read(fn_img);
 					img().setXmippOrigin();
+					CTOC(cudaMLO->timer,"ParaRead3DImages");
 				}
 				else
 				{
+					CTIC(cudaMLO->timer,"ParaRead2DImages");
 					img() = baseMLO->exp_imgs[istop];
+					CTOC(cudaMLO->timer,"ParaRead2DImages");
 				}
 			}
 			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
@@ -195,7 +201,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// Unpack the image from the imagedata
 			if (cudaMLO->dataIs3D)
 			{
+				CTIC(cudaMLO->timer,"Read3DImages");
+				CTIC(cudaMLO->timer,"resize");
 				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size,baseMLO-> mymodel.ori_size);
+				CTOC(cudaMLO->timer,"resize");
 				// Only allow a single image per call of this function!!! nr_pool needs to be set to 1!!!!
 				// This will save memory, as we'll need to store all translated images in memory....
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
@@ -215,10 +224,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					rec_img().setXmippOrigin();
 
 				}
+				CTOC(cudaMLO->timer,"Read3DImages");
 
 			}
 			else
 			{
+				CTIC(cudaMLO->timer,"Read2DImages");
 				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
 				{
@@ -236,9 +247,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					}
 					rec_img().setXmippOrigin();
 				}
+				CTOC(cudaMLO->timer,"Read2DImages");
 			}
 		}
-		CTOC(cudaMLO->timer,"setXmippOrigin");
+		CTOC(cudaMLO->timer,"setXmippOrigin1");
 
 		CTIC(cudaMLO->timer,"selfTranslate");
 
@@ -495,9 +507,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			cudaMLO->transformer.inverseFourierTransform();
 			CTOC(cudaMLO->timer,"inverseFourierTransform");
 
-			CTIC(cudaMLO->timer,"setXmippOrigin");
+			CTIC(cudaMLO->timer,"setXmippOrigin2");
 			Mnoise.setXmippOrigin();
-			CTOC(cudaMLO->timer,"setXmippOrigin");
+			CTOC(cudaMLO->timer,"setXmippOrigin2");
 
 			CTIC(cudaMLO->timer,"softMaskOutsideMap");
 			d_img.cp_to_host();
@@ -543,8 +555,30 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				radius = ((RFLOAT)img.data.xdim)/2.;
 			XFLOAT radius_p = radius + cosine_width;
 
-			dim3 block_dim = 1; //TODO
-			cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
+//			dim3 block_dim = 1; //TODO
+//			cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
+//																				img().nzyxdim,
+//																				img.data.xdim,
+//																				img.data.ydim,
+//																				img.data.zdim,
+//																				img.data.xdim/2,
+//																				img.data.ydim/2,
+//																				img.data.zdim/2, //unused
+//																				true,
+//																				radius,
+//																				radius_p,
+//																				cosine_width);
+//			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+
+			XFLOAT sum_bg(0.);
+			dim3 block_dim = 128; //TODO: set balanced (hardware-dep?)
+			CudaGlobalPtr<XFLOAT> softMaskSum   (SOFTMASK_BLOCK_SIZE,0,cudaMLO->devBundle->allocator);
+			CudaGlobalPtr<XFLOAT> softMaskSum_bg(SOFTMASK_BLOCK_SIZE,0,cudaMLO->devBundle->allocator);
+			softMaskSum.device_alloc();
+			softMaskSum_bg.device_alloc();
+			softMaskSum.device_init(0.f);
+			softMaskSum_bg.device_init(0.f);
+			cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
 																				img().nzyxdim,
 																				img.data.xdim,
 																				img.data.ydim,
@@ -555,9 +589,31 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																				true,
 																				radius,
 																				radius_p,
-																				cosine_width);
+																				cosine_width,
+																				~softMaskSum,
+																				~softMaskSum_bg);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
 
+			softMaskSum.streamSync();
+			sum_bg = (RFLOAT) getSumOnDevice(softMaskSum_bg) / (RFLOAT) getSumOnDevice(softMaskSum);
+			softMaskSum.streamSync();
+
+			cuda_kernel_cosineFilter<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
+																			img().nzyxdim,
+																			img.data.xdim,
+																			img.data.ydim,
+																			img.data.zdim,
+																			img.data.xdim/2,
+																			img.data.ydim/2,
+																			img.data.zdim/2, //unused
+																			true,
+																			radius,
+																			radius_p,
+																			cosine_width,
+																			sum_bg);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+
+			d_img.streamSync();
 			d_img.cp_to_host();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
@@ -690,6 +746,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				Image<RFLOAT> Ictf;
 				if (baseMLO->do_parallel_disc_io)
 				{
+					CTIC(cudaMLO->timer,"CTFRead3D_disk");
 					// Read CTF-image from disc
 					FileName fn_ctf;
 					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_ctf, true))
@@ -700,26 +757,32 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
+					CTOC(cudaMLO->timer,"CTFRead3D_disk");
 				}
 				else
 				{
+					CTIC(cudaMLO->timer,"CTFRead3D_array");
 					// Unpack the CTF-image from the exp_imagedata array
 					Ictf().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Ictf())
 					{
 						DIRECT_A3D_ELEM(Ictf(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, baseMLO->mymodel.ori_size + k, i, j);
 					}
+					CTOC(cudaMLO->timer,"CTFRead3D_array");
 				}
 				// Set the CTF-image in Fctf
+				CTIC(cudaMLO->timer,"CTFSet3D_array");
 				Ictf().setXmippOrigin();
 				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
 				{
 					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
 					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
 				}
+				CTIC(cudaMLO->timer,"CTFSet3D_array");
 			}
 			else
 			{
+				CTIC(cudaMLO->timer,"CTFRead2D");
 				CTF ctf;
 				ctf.setValues(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
 							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
@@ -733,6 +796,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 				ctf.getFftwImage(Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
+				CTIC(cudaMLO->timer,"CTFRead2D");
 			}
 		}
 		else
