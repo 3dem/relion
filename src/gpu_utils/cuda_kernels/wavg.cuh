@@ -9,7 +9,7 @@
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
 
-template<bool REFCTF, bool REF3D, bool DATA3D>
+template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 __global__ void cuda_kernel_wavg(
 		XFLOAT *g_eulers,
 		CudaProjectorKernel projector,
@@ -35,16 +35,17 @@ __global__ void cuda_kernel_wavg(
 	int bid = blockIdx.x; //block ID
 	int tid = threadIdx.x;
 
-	__shared__ XFLOAT s_eulers[9];
+	extern __shared__ XFLOAT buffer[];
+
+	unsigned pass_num(ceilfracf(image_size,block_sz)),pixel;
+	XFLOAT * s_wdiff2s_parts	= &buffer[0];
+	XFLOAT * s_sumXA			= &buffer[block_sz];
+	XFLOAT * s_sumA2			= &buffer[2*block_sz];
+	XFLOAT * s_eulers           = &buffer[3*block_sz];
 
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
 	__syncthreads();
-
-	unsigned pass_num(ceilfracf(image_size,WAVG_BLOCK_SIZE)),pixel;
-	__shared__ XFLOAT s_wdiff2s_parts[WAVG_BLOCK_SIZE];
-	__shared__ XFLOAT s_sumXA[WAVG_BLOCK_SIZE];
-	__shared__ XFLOAT s_sumA2[WAVG_BLOCK_SIZE];
 
 	for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 	{
@@ -52,7 +53,7 @@ __global__ void cuda_kernel_wavg(
 		s_sumXA[tid] = 0.0f;
 		s_sumA2[tid] = 0.0f;
 
-		pixel = pass * WAVG_BLOCK_SIZE + tid;
+		pixel = pass * block_sz + tid;
 
 		if(pixel<image_size)
 		{
@@ -83,16 +84,6 @@ __global__ void cuda_kernel_wavg(
 				else
 					x = projector.maxR;
 			}
-
-//          NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also diff-fine + BP_3D
-//
-//			if (y > projector.maxR)
-//			{
-//				if (y >= projector.imgY - projector.maxR)
-//					y = y - projector.imgY;
-//				else
-//					x = projector.maxR;
-//			}
 
 			if(DATA3D)
 				projector.project3Dmodel(

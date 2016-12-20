@@ -8,6 +8,8 @@
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_PREFETCH_COUNT 3
 #define BP_2D_BLOCK_SIZE 128
+#define BP_REF3D_BLOCK_SIZE 128
+#define BP_DATA3D_BLOCK_SIZE 640
 
 size_t CudaBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
@@ -253,10 +255,19 @@ __global__ void cuda_kernel_backproject3D(
 
 	__syncthreads();
 
-	int pixel_pass_num(ceilf((float)img_xyz/(float)BP_2D_BLOCK_SIZE));
+	int pixel_pass_num(0);
+	if(DATA3D)
+		pixel_pass_num = (ceilf((float)img_xyz/(float)BP_DATA3D_BLOCK_SIZE));
+	else
+		pixel_pass_num = (ceilf((float)img_xyz/(float)BP_REF3D_BLOCK_SIZE));
+
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
     {
-		unsigned pixel = (pass * BP_2D_BLOCK_SIZE) + tid;
+		unsigned pixel(0);
+		if(DATA3D)
+			pixel = (pass * BP_DATA3D_BLOCK_SIZE) + tid;
+		else
+			pixel = (pass * BP_REF3D_BLOCK_SIZE) + tid;
 
 		if (pixel >= img_xyz)
 			continue;
@@ -292,19 +303,6 @@ __global__ void cuda_kernel_backproject3D(
 			else
 				continue;
 		}
-
-// 		NOTE : Below (y >= projector.imgY - projector.maxR) check is removed since diff-coarse can do without. See also wavg + diff_fine
-//		int x = pixel % img_x;
-//		int y = (int)floorf( (float)pixel / (float)img_x);
-//
-//		// Don't search beyond square with side max_r
-//		if (y > max_r)
-//		{
-//			if (y >= img_y - max_r)
-//				y -= img_y;
-//			else
-//				continue;
-//		}
 
 		if(DATA3D)
 			if ( ( x * x + y * y  + z * z ) > max_r2)
@@ -346,21 +344,6 @@ __global__ void cuda_kernel_backproject3D(
 		//BP
 		if (Fweight > (XFLOAT) 0.0)
 		{
-
-//			NOTE : re-use from above instead of make again.
-//			int x = pixel % img_x;
-//			int y = (int)floorf( (float)pixel / (float)img_x);
-//
-//			// Don't search beyond square with side max_r
-//			if (y > max_r)
-//			{
-//				if (y >= img_y - max_r)
-//					y -= img_y;
-//			}
-//
-//			if (x * x + y * y > max_r2)
-//				continue;
-
 			// Get logical coordinates in the 3D map
 
 			XFLOAT xp,yp,zp;
@@ -508,7 +491,7 @@ void CudaBackprojector::backproject(
 	else
 	{
 		if(data_is_3D)
-			cuda_kernel_backproject3D<true><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+			cuda_kernel_backproject3D<true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
 				d_img_real,
 				d_img_imag,
 				trans_x,
@@ -536,7 +519,7 @@ void CudaBackprojector::backproject(
 				mdlInitY,
 				mdlInitZ);
 		else
-			cuda_kernel_backproject3D<false><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+			cuda_kernel_backproject3D<false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
 				d_img_real,
 				d_img_imag,
 				trans_x,
