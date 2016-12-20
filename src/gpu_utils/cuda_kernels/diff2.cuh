@@ -223,7 +223,7 @@ __global__ void cuda_kernel_diff2_fine(
 		shifted_real, shifted_imag,
 		diff_real, diff_imag;
 
-	__shared__ XFLOAT s[block_sz*chunk_sz]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
+	__shared__ XFLOAT s[block_sz*chunk_sz]; //We MAY have to do up to chunk_sz translations in each block
 	__shared__ XFLOAT s_outs[chunk_sz];
 	// inside the padded 2D orientation gri
 //	if( bid < todo_blocks ) // we only need to make
@@ -339,7 +339,7 @@ __global__ void cuda_kernel_diff2_fine(
  *   	CROSS-CORRELATION-BASED KERNELS
  */
 
-template<bool REF3D, bool DATA3D>
+template<bool REF3D, bool DATA3D, int block_sz>
 __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -360,9 +360,9 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 	int itrans =  blockIdx.y;
 	int tid = threadIdx.x;
 
-    __shared__ XFLOAT s_weight[BLOCK_SIZE];
+    __shared__ XFLOAT s_weight[block_sz];
     s_weight[tid] = (XFLOAT)0.0;
-	__shared__ XFLOAT s_norm[BLOCK_SIZE];
+	__shared__ XFLOAT s_norm[block_sz];
 	s_norm[tid] = (XFLOAT)0.0;
 
 	XFLOAT real, imag, ref_real, ref_imag;
@@ -380,10 +380,10 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 	__syncthreads();
 
-	unsigned pixel_pass_num( ceilfracf(image_size,BLOCK_SIZE) );
+	unsigned pixel_pass_num( ceilfracf(image_size,block_sz) );
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 	{
-		unsigned pixel = (pass * BLOCK_SIZE) + tid;
+		unsigned pixel = (pass * block_sz) + tid;
 
 		if(pixel < image_size)
 		{
@@ -443,7 +443,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 	}
 
 
-	for(int j=(BLOCK_SIZE/2); j>0; j/=2)
+	for(int j=(block_sz/2); j>0; j/=2)
 	{
 		if(tid<j)
 		{
@@ -456,7 +456,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 
 }
 
-template<bool REF3D, bool DATA3D>
+template<bool REF3D, bool DATA3D, int block_sz,int chunk_sz>
 __global__ void cuda_kernel_diff2_CC_fine(
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -490,27 +490,27 @@ __global__ void cuda_kernel_diff2_CC_fine(
 	int pixel;
 	XFLOAT ref_real, ref_imag, shifted_real, shifted_imag;
 
-	__shared__ XFLOAT      s[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE]; //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
-	__shared__ XFLOAT   s_cc[BLOCK_SIZE*PROJDIFF_CHUNK_SIZE];
-	__shared__ XFLOAT s_outs[PROJDIFF_CHUNK_SIZE];
+	__shared__ XFLOAT      s[block_sz*chunk_sz]; //We MAY have to do up to chunk_sz translations in each block
+	__shared__ XFLOAT   s_cc[block_sz*chunk_sz];
+	__shared__ XFLOAT s_outs[chunk_sz];
 
 	if( bid < todo_blocks ) // we only need to make
 	{
 		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot
 		for (int itrans=0; itrans<trans_num; itrans++)
 		{
-			s[   itrans*BLOCK_SIZE+tid] = 0.0f;
-			s_cc[itrans*BLOCK_SIZE+tid] = 0.0f;
+			s[   itrans*block_sz+tid] = 0.0f;
+			s_cc[itrans*block_sz+tid] = 0.0f;
 		}
 		__syncthreads();
 		// index of comparison
 		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
 		unsigned long int iy;
-		unsigned pass_num( ceilfracf(image_size,BLOCK_SIZE) );
+		unsigned pass_num( ceilfracf(image_size,block_sz) );
 
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
-			pixel = (pass * BLOCK_SIZE) + tid;
+			pixel = (pass * block_sz) + tid;
 
 			if(pixel < image_size)
 			{
@@ -573,27 +573,27 @@ __global__ void cuda_kernel_diff2_CC_fine(
 					else
 						translatePixel(x, y,    g_trans_x[iy], g_trans_y[iy],                g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
 
-					s[   itrans*BLOCK_SIZE + tid] += (ref_real * shifted_real + ref_imag * shifted_imag) * __ldg(&g_corr_img[pixel]);
-					s_cc[itrans*BLOCK_SIZE + tid] += (ref_real*ref_real + ref_imag*ref_imag) * __ldg(&g_corr_img[pixel]);
+					s[   itrans*block_sz + tid] += (ref_real * shifted_real + ref_imag * shifted_imag) * __ldg(&g_corr_img[pixel]);
+					s_cc[itrans*block_sz + tid] += (ref_real*ref_real + ref_imag*ref_imag) * __ldg(&g_corr_img[pixel]);
 				}
 				__syncthreads();
 			}
 		}
-		for(int j=(BLOCK_SIZE/2); j>0; j/=2)
+		for(int j=(block_sz/2); j>0; j/=2)
 		{
 			if(tid<j)
 			{
 				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
-					s[   itrans*BLOCK_SIZE+tid] += s[   itrans*BLOCK_SIZE+tid+j];
-					s_cc[itrans*BLOCK_SIZE+tid] += s_cc[itrans*BLOCK_SIZE+tid+j];
+					s[   itrans*block_sz+tid] += s[   itrans*block_sz+tid+j];
+					s_cc[itrans*block_sz+tid] += s_cc[itrans*block_sz+tid+j];
 				}
 			}
 			__syncthreads();
 		}
 		if (tid < trans_num)
 		{
-			s_outs[tid]= - s[tid*BLOCK_SIZE] / (sqrt(s_cc[tid*BLOCK_SIZE]));// * exp_local_sqrtXi2 );
+			s_outs[tid]= - s[tid*block_sz] / (sqrt(s_cc[tid*block_sz]));// * exp_local_sqrtXi2 );
 		}
 		if (tid < trans_num)
 		{

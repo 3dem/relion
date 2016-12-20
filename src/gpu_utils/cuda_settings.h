@@ -41,15 +41,15 @@
 // -------------------------------------
 
 
-// FINE DIFF ---------------------------   // NOTE : D2F seems to be implicitly hard-coded to 128, 14
-#define D2F_BLOCK_SIZE_2D 			128
-#define D2F_CHUNK_2D 				14
+// FINE DIFF ---------------------------
+#define D2F_BLOCK_SIZE_2D 			256
+#define D2F_CHUNK_2D 				7
 
-#define D2F_BLOCK_SIZE_REF3D 		128
-#define D2F_CHUNK_REF3D 			14
+#define D2F_BLOCK_SIZE_REF3D 		256
+#define D2F_CHUNK_REF3D 			7
 
-#define D2F_BLOCK_SIZE_DATA3D 		128 // not "tuned"
-#define D2F_CHUNK_DATA3D			14  // not "tuned"
+#define D2F_BLOCK_SIZE_DATA3D 		512
+#define D2F_CHUNK_DATA3D			4
 // -------------------------------------
 
 

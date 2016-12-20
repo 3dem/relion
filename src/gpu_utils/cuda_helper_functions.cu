@@ -10,7 +10,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask &dataMask)
+		IndexedDataArrayMask &dataMask,
+		int chunk)
 {
 	long int w_base = dataMask.firstPos, w(0), k(0);
 	// be on the safe side with the jobArrays: make them as large as they could possibly be
@@ -38,7 +39,7 @@ long int makeJobsForDiff2Fine(
 				FPW.trans_idx[w_base+w] = j;					// which trans       - || -
 				FPW.ihidden_overs[w_base+w]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
-				if(tk>=PROJDIFF_CHUNK_SIZE)
+				if(tk>=chunk)
 				{
 					tk=0;             // reset counter
 					k++;              // use new element
@@ -884,8 +885,8 @@ void runDiff2KernelCoarse(
 	{
 		dim3 CCblocks(orientation_num,translation_num);
 		if(data_is_3D)
-			cuda_kernel_diff2_CC_coarse<true,true>
-		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_coarse<true,true,D2C_BLOCK_SIZE_DATA3D>
+		<<<CCblocks,D2C_BLOCK_SIZE_DATA3D,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
@@ -899,8 +900,8 @@ void runDiff2KernelCoarse(
 				image_size,
 				local_sqrtXi2);
 		else if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_coarse<true,false>
-		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_coarse<true,false,D2C_BLOCK_SIZE_REF3D>
+		<<<CCblocks,D2C_BLOCK_SIZE_REF3D,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
@@ -914,8 +915,8 @@ void runDiff2KernelCoarse(
 				image_size,
 				local_sqrtXi2);
 		else
-			cuda_kernel_diff2_CC_coarse<false,false>
-		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_coarse<false,false,D2C_BLOCK_SIZE_2D>
+		<<<CCblocks,D2C_BLOCK_SIZE_2D,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
@@ -1033,8 +1034,8 @@ void runDiff2KernelFine(
     else
     {
     	if(data_is_3D)
-			cuda_kernel_diff2_CC_fine<true,true>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_fine<true,true,D2F_BLOCK_SIZE_DATA3D,D2F_CHUNK_DATA3D>
+			<<<block_dim,D2F_BLOCK_SIZE_DATA3D,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -1055,8 +1056,8 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
     	else if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_fine<true,false>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_fine<true,false,D2F_BLOCK_SIZE_REF3D,D2F_CHUNK_REF3D>
+			<<<block_dim,D2F_BLOCK_SIZE_REF3D,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
@@ -1077,8 +1078,8 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_CC_fine<false,false>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_fine<false,false,D2F_BLOCK_SIZE_2D,D2F_CHUNK_2D>
+			<<<block_dim,D2F_BLOCK_SIZE_2D,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,

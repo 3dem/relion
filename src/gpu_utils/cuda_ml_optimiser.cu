@@ -1231,6 +1231,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 					}
 				}
 
+				int chunkSize(0);
+				if(cudaMLO->dataIs3D)
+					chunkSize = D2F_CHUNK_DATA3D;
+				else if(cudaMLO->refIs3D)
+					chunkSize = D2F_CHUNK_DATA3D;
+				else
+					chunkSize = D2F_CHUNK_2D;
+
 				// Do more significance checks on translations and create jobDivision
 				significant_num = makeJobsForDiff2Fine(	op,	sp,												// alot of different type inputs...
 														orientation_num, translation_num,
@@ -1238,7 +1246,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 														iover_transes, ihiddens,
 														nr_over_orient, nr_over_trans, ipart,
 														FinePassWeights[ipart],
-														FPCMasks[ipart][exp_iclass]);                // ..and output into index-arrays mask
+														FPCMasks[ipart][exp_iclass],   // ..and output into index-arrays mask...
+														chunkSize);                    // ..based on a given maximum chunk-size
 
 				// extend size by number of significants found this class
 				newDataSize += significant_num;

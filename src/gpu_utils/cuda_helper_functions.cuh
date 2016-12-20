@@ -26,8 +26,8 @@
  * which translations should be included in the list of those which differences will be calculated for.
  *
  * Any contiguous translations with a shared orientation are grouped together into a "job" which is supplied
- * to the difference kernel. If there are more contiguous translations than the specified PROJDIFF_CHUNK_SIZE,
- * these are split into separate jobs, to increase paralllelism at the cost of redundant memory reads.
+ * to the difference kernel. If there are more contiguous translations than the specified "chunk" number,
+ * these are split into separate jobs, to increase parallelism at the cost of redundant memory reads.
  */
 long int makeJobsForDiff2Fine(
 		OptimisationParamters &op,  SamplingParameters &sp,
@@ -37,7 +37,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask &dataMask);
+		IndexedDataArrayMask &dataMask,
+		int chunk);
 
 /*
  * This assisting function goes over the weight-array and groups all weights with shared
