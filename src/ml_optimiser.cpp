@@ -1146,7 +1146,12 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::cout << " Running CPU instructions in double precision. " << std::endl;
 #endif
 
-	if (do_skip_align)
+	// Check if output directory exists
+	FileName fn_dir = fn_out.beforeLastOf("/");
+	if (!exists(fn_dir))
+		REPORT_ERROR("ERROR: output directory does not exist!");
+
+    if (do_skip_align)
 		do_gpu = false;
 
     if (do_print_metadata_labels)
