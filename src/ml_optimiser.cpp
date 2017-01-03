@@ -1518,6 +1518,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = x_pool*nr_threads;
 
+	// Check image size model and data are the same
+	int data_image_size;
+	mydata.MDexp.getValue(EMDL_IMAGE_SIZE, data_image_size);
+	if (XSIZE(mymodel.Iref[0]) != data_image_size)
+		REPORT_ERROR("ERROR: reference and data image sizes are not the same!");
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
