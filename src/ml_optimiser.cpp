@@ -1149,9 +1149,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_skip_align)
 		do_gpu = false;
 
-	if (do_always_cc)
-		do_calculate_initial_sigma_noise = false;
-
     if (do_print_metadata_labels)
 	{
 		if (verb > 0)
@@ -3176,7 +3173,7 @@ void MlOptimiser::maximizationOtherParameters()
 		mymodel.avg_norm_correction = wsum_model.avg_norm_correction / sum_weight;
 	}
 
-	if (do_scale_correction && !(iter==1 && do_firstiter_cc) )
+	if (do_scale_correction && !((iter==1 && do_firstiter_cc) || do_always_cc ))
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
@@ -3277,7 +3274,7 @@ void MlOptimiser::maximizationOtherParameters()
 	// TODO: update estimates for sigma2_rot, sigma2_tilt and sigma2_psi!
 
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
-	if (!fix_sigma_noise && !(iter == 1 && do_firstiter_cc))
+	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc))
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
@@ -6505,7 +6502,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) = normcorr;
 
 			// Print warning for strange norm-correction values
-			if (!(iter == 1 && do_firstiter_cc) && DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) > 10.)
+			if (!((iter == 1 && do_firstiter_cc) || do_always_cc) && DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM) > 10.)
 			{
 				std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM)
 						<< " for particle " << part_id << " in group " << group_id + 1
