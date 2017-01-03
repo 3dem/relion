@@ -393,7 +393,7 @@ void AutoPicker::initialise()
 	if (fabs(angpix_ref - angpix) > 1e-3)
 	{
 		int halfoldsize = XSIZE(Mrefs[0]) / 2;
-		int newsize = (int)(float)halfoldsize * angpix_ref/angpix;
+		int newsize = ROUND(halfoldsize * (angpix_ref/angpix));
 		newsize *= 2;
 		RFLOAT rescale_greyvalue = 1.;
 		// If the references came from downscaled particles, then those were normalised differently
