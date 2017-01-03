@@ -1497,7 +1497,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 
 		if (do_gpu)
-			REPORT_ERROR("ERROR: GPU-acceleration does not yet work for 3D input images!");
+			std::cerr << "NOTE: Input 3D data on GPU is development feature: please report unexpected behaviour" << std::endl;
 
 		// TODO: later do norm correction?!
 		// Don't do norm correction for volume averaging at this stage....

@@ -9,7 +9,7 @@
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
 
-template<bool do_3DProjection, bool refs_are_ctf_corrected>
+template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 __global__ void cuda_kernel_wavg(
 		XFLOAT *g_eulers,
 		CudaProjectorKernel projector,
@@ -19,6 +19,7 @@ __global__ void cuda_kernel_wavg(
 		XFLOAT *g_img_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
 		XFLOAT* g_weights,
 		XFLOAT* g_ctfs,
 		XFLOAT *g_wdiff2s_parts,
@@ -34,16 +35,17 @@ __global__ void cuda_kernel_wavg(
 	int bid = blockIdx.x; //block ID
 	int tid = threadIdx.x;
 
-	__shared__ XFLOAT s_eulers[9];
+	extern __shared__ XFLOAT buffer[];
+
+	unsigned pass_num(ceilfracf(image_size,block_sz)),pixel;
+	XFLOAT * s_wdiff2s_parts	= &buffer[0];
+	XFLOAT * s_sumXA			= &buffer[block_sz];
+	XFLOAT * s_sumA2			= &buffer[2*block_sz];
+	XFLOAT * s_eulers           = &buffer[3*block_sz];
 
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
 	__syncthreads();
-
-	unsigned pass_num(ceilfracf(image_size,WAVG_BLOCK_SIZE)),pixel;
-	__shared__ XFLOAT s_wdiff2s_parts[WAVG_BLOCK_SIZE];
-	__shared__ XFLOAT s_sumXA[WAVG_BLOCK_SIZE];
-	__shared__ XFLOAT s_sumA2[WAVG_BLOCK_SIZE];
 
 	for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 	{
@@ -51,13 +53,30 @@ __global__ void cuda_kernel_wavg(
 		s_sumXA[tid] = 0.0f;
 		s_sumA2[tid] = 0.0f;
 
-		pixel = pass * WAVG_BLOCK_SIZE + tid;
+		pixel = pass * block_sz + tid;
 
 		if(pixel<image_size)
 		{
-			int x = pixel % projector.imgX;
-			int y = floorfracf(pixel,projector.imgX);
-
+			int x,y,z,xy;
+			if(DATA3D)
+			{
+				z =  floorfracf(pixel, projector.imgX*projector.imgY);
+				xy = pixel % (projector.imgX*projector.imgY);
+				x =             xy  % projector.imgX;
+				y = floorfracf( xy,   projector.imgX);
+				if (z > projector.maxR)
+				{
+					if (z >= projector.imgZ - projector.maxR)
+						z = z - projector.imgZ;
+					else
+						x = projector.maxR;
+				}
+			}
+			else
+			{
+				x =             pixel % projector.imgX;
+				y = floorfracf( pixel , projector.imgX);
+			}
 			if (y > projector.maxR)
 			{
 				if (y >= projector.imgY - projector.maxR)
@@ -66,7 +85,14 @@ __global__ void cuda_kernel_wavg(
 					x = projector.maxR;
 			}
 
-			if(do_3DProjection)
+			if(DATA3D)
+				projector.project3Dmodel(
+					x,y,z,
+					s_eulers[0], s_eulers[1], s_eulers[2],
+					s_eulers[3], s_eulers[4], s_eulers[5],
+					s_eulers[6], s_eulers[7], s_eulers[8],
+					ref_real, ref_imag);
+			else if(REF3D)
 				projector.project3Dmodel(
 					x,y,
 					s_eulers[0], s_eulers[1],
@@ -80,7 +106,7 @@ __global__ void cuda_kernel_wavg(
 					s_eulers[3], s_eulers[4],
 					ref_real, ref_imag);
 
-			if (refs_are_ctf_corrected) //FIXME Create two kernels for the different cases
+			if (REFCTF)
 			{
 				ref_real *= __ldg(&g_ctfs[pixel]);
 				ref_imag *= __ldg(&g_ctfs[pixel]);
@@ -102,7 +128,10 @@ __global__ void cuda_kernel_wavg(
 				{
 					weight /= weight_norm;
 
-					translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, trans_real, trans_imag);
+					if(DATA3D)
+						translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, trans_real, trans_imag);
+					else
+						translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, trans_real, trans_imag);
 
 					XFLOAT diff_real = ref_real - trans_real;
 					XFLOAT diff_imag = ref_imag - trans_imag;

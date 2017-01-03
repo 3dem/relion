@@ -476,6 +476,7 @@ public:
 	MlOptimiser *baseMLO;
 
 	bool refIs3D;
+	bool dataIs3D;
 
 	int device_id;
 
@@ -492,6 +493,7 @@ public:
 			transformer1(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			transformer2(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
+			dataIs3D(baseMLO->mymodel.data_dim == 3),
 			devBundle(bundle),
 			device_id(bundle->device_id),
 #ifdef TIMING_FILES

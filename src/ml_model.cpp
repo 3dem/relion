@@ -585,7 +585,12 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 		if (fn_ref.isStarFile())
 		{
 			MetaDataTable MDref;
-			MDref.read(fn_ref);
+			MDref.read(fn_ref,"model_classes");
+			if(!MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp)) // if we did not find the meta-data label _rlnReferenceImage in a directed search, try more generally
+				MDref.read(fn_ref);
+			if(!MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp)) // if we still did not find the meta-data label _rlnReferenceImage, report an error
+				REPORT_ERROR("When specifying a .star-file as --ref input, you need to have the _rlnReferenceImage field");
+
 			do_generate_seeds = false;
 			// ignore nr_classes from the command line, use number of entries in STAR file
 			nr_classes = 0;
