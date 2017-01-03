@@ -23,25 +23,50 @@
 	#define RFLOAT double
 #endif
 
-#define MAX_RESOL_SHARED_MEM 32
-#define BLOCK_SIZE  128         	// -- Number of threads in a block --
-									// This is optimally set as big as possible without
-									// its ceil:ed multiple exceeding imagesize by too much.
+// GENERAL -----------------------------
+#define MAX_RESOL_SHARED_MEM 		32
+#define BLOCK_SIZE  				128
+// -------------------------------------
 
 
-#define D2C_BLOCK_SIZE_3D 		128
-#define D2C_BLOCK_SIZE_2D 		512
-#define D2C_EULERS_PER_BLOCK_3D 16
-#define D2C_EULERS_PER_BLOCK_2D 4
+// COARSE DIFF -------------------------
+#define D2C_BLOCK_SIZE_2D 			512
+#define D2C_EULERS_PER_BLOCK_2D 	4
+
+#define D2C_BLOCK_SIZE_REF3D 		128
+#define D2C_EULERS_PER_BLOCK_REF3D 	16
+
+#define D2C_BLOCK_SIZE_DATA3D 		64
+#define D2C_EULERS_PER_BLOCK_DATA3D 32
+// -------------------------------------
 
 
-#define WAVG_BLOCK_SIZE 	 	256
+// FINE DIFF ---------------------------
+#define D2F_BLOCK_SIZE_2D 			256
+#define D2F_CHUNK_2D 				7
+
+#define D2F_BLOCK_SIZE_REF3D 		256
+#define D2F_CHUNK_REF3D 			7
+
+#define D2F_BLOCK_SIZE_DATA3D 		512
+#define D2F_CHUNK_DATA3D			4
+// -------------------------------------
+
+
+// WAVG --------------------------------
+#define WAVG_BLOCK_SIZE_DATA3D	 	512
+#define WAVG_BLOCK_SIZE 	 		256
+// -------------------------------------
+
+
+// MISC --------------------------------
 #define SUMW_BLOCK_SIZE 	  	32
-#define SOFTMASK_BLOCK_SIZE 	1024
+#define SOFTMASK_BLOCK_SIZE 	128
 #define CFTT_BLOCK_SIZE 	 	128
 #define PROBRATIO_BLOCK_SIZE 	128
 #define POWERCLASS_BLOCK_SIZE 	128
 #define PROJDIFF_CHUNK_SIZE 	14
+// -------------------------------------
 
 #define REF_GROUP_SIZE 3			// -- Number of references to be treated per block --
 									// This applies to wavg and reduces global memory

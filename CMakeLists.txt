@@ -16,8 +16,11 @@ endif()
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-add_definitions(-DINSTALL_LIBRARY_DIR="${CMAKE_INSTALL_PREFIX}/lib/")
-add_definitions(-DSOURCE_DIR="${CMAKE_SOURCE_DIR}/src/")
+add_definitions(-DINSTALL_LIBRARY_DIR=${CMAKE_INSTALL_PREFIX}/lib/)
+add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
+
+# message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
+# message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
 
 # ------------------------------------------------------------------RPATH SETTINGS--
 if(NOT APPLE)

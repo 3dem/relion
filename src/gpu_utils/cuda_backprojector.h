@@ -43,6 +43,7 @@ public:
 			XFLOAT *d_imgs_nomask_imag,
 			XFLOAT *trans_x,
 			XFLOAT *trans_y,
+			XFLOAT *trans_z,
 			XFLOAT* d_weights,
 			XFLOAT* d_Minvsigma2s,
 			XFLOAT* d_ctfs,
@@ -52,7 +53,9 @@ public:
 			XFLOAT *d_eulers,
 			int imgX,
 			int imgY,
+			int imgZ,
 			unsigned long imageCount,
+			bool data_is_3D,
 			cudaStream_t optStream);
 
 	void getMdlData(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
