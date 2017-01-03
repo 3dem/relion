@@ -132,7 +132,7 @@ public:
 
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool do_class = false, MetaDataTable *MDdata = NULL,
+			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, bool do_class = false, MetaDataTable *MDdata = NULL,
 			int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
 			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="");
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
@@ -173,7 +173,7 @@ public:
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
 	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false);
+			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1);
 	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 
 private:
@@ -221,6 +221,9 @@ public:
 
 	// To know which contrast to apply to original image display
 	RFLOAT sigma_contrast;
+
+	// Limit number of images to be shown
+	long int multi_max_nr_images;
 
 	// Constructor with w x h size of the window and a title
 	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title) { }
@@ -381,6 +384,9 @@ public:
 	// Recenter images?
 	bool do_recenter;
 
+	// Maximum number of images to show
+	long int max_nr_images;
+
 	// FileName for selected class average images and particles
 	FileName fn_imgs, fn_parts;
 
@@ -390,7 +396,7 @@ public:
 
 	// Input for the display parameters
 	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
-	Fl_Input *col_input, *ori_scale_input;
+	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input;
 	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
 	Fl_Choice *display_choice, *sort_choice;
 
@@ -514,6 +520,9 @@ public:
 
 	// Show Fourier phase angles?
 	bool show_fourier_phase_angles;
+
+	// Only show a limited number of images
+	long int max_nr_images;
 
 public:
 	// Read command line arguments
