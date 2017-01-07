@@ -477,6 +477,7 @@ public:
 	InputNodeEntry autopick_refs;
 	BooleanEntry do_ctf;
 	BooleanEntry do_ignore_first_ctfpeak;
+	SliderEntry angpix_ref;
 
 	Fl_Group *ctf_group, *autopick_group;
 
