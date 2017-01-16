@@ -2462,8 +2462,13 @@ SortJobWindow::SortJobWindow() : RelionJobWindow(2, HAS_MPI, HAS_NOT_THREAD)
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("CTF");
+	tab2->label("References");
 	resetHeight();
+
+	angpix_ref.place(current_y, "Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	ctf_group->end();
@@ -2493,6 +2498,7 @@ void SortJobWindow::write(std::string fn)
 	input_star.writeValue(fh);
 	is_autopick.writeValue(fh);
 	autopick_refs.writeValue(fh);
+	angpix_ref.writeValue(fh);
 	do_ctf.writeValue(fh);
 	do_ignore_first_ctfpeak.writeValue(fh);
 
@@ -2513,6 +2519,7 @@ void SortJobWindow::read(std::string fn, bool &_is_continue)
 		input_star.readValue(fh);
 		is_autopick.readValue(fh);
 		autopick_refs.readValue(fh);
+		angpix_ref.readValue(fh);
 		do_ctf.readValue(fh);
 		do_ignore_first_ctfpeak.readValue(fh);
 
@@ -2529,6 +2536,7 @@ void SortJobWindow::toggle_new_continue(bool _is_continue)
 	input_star.deactivate(is_continue);
 	is_autopick.deactivate(is_continue);
 	autopick_refs.deactivate(is_continue);
+	angpix_ref.deactivate(is_continue);
 	do_ctf.deactivate(is_continue);
 	do_ignore_first_ctfpeak.deactivate(is_continue);
 
@@ -2555,6 +2563,9 @@ bool SortJobWindow::getCommands(std::string &outputname, std::vector<std::string
 	command += " --i " + input_star.getValue();
 	Node node(input_star.getValue(), input_star.type);
 	pipelineInputNodes.push_back(node);
+
+	if (angpix_ref.getValue() > 0.)
+		command += " --angpix_ref " + floatToString(angpix_ref.getValue());
 
 	// Determine the --ref automatically, from the particle input filename
 	FileName fn_ref, fn_in = input_star.getValue();

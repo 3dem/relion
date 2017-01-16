@@ -139,7 +139,7 @@ void AutoPicker::read(int argc, char **argv)
 
 	int expert_section = parser.addSection("Expert options");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
-	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "-1"));
+	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves emory and time)", "1.0"));
 
 	// Check for errors in the command-line option
@@ -393,7 +393,7 @@ void AutoPicker::initialise()
 	if (fabs(angpix_ref - angpix) > 1e-3)
 	{
 		int halfoldsize = XSIZE(Mrefs[0]) / 2;
-		int newsize = (int)(float)halfoldsize * angpix_ref/angpix;
+		int newsize = ROUND(halfoldsize * (angpix_ref/angpix));
 		newsize *= 2;
 		RFLOAT rescale_greyvalue = 1.;
 		// If the references came from downscaled particles, then those were normalised differently

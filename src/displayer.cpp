@@ -163,7 +163,7 @@ bool DisplayBox::unSelect()
 }
 
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
-		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, bool _do_class,
+		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, bool _do_class,
 		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
 		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts)
 {
@@ -182,6 +182,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		int nrow = CEIL((RFLOAT)nimgs/_ncol);
 		int ysize_canvas = nrow * (CEIL(YSIZE(img())*_scale) + BOX_OFFSET);
 		multiViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
+		canvas.multi_max_nr_images = max_nr_images;
 		canvas.SetScroll(&scroll);
 		canvas.do_read_whole_stacks = _do_read_whole_stacks;
 		canvas.is_data = _is_data;
@@ -191,7 +192,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		canvas.do_allow_save = do_allow_save;
 		canvas.fn_selected_imgs= fn_selected_imgs;
 		canvas.fn_selected_parts = fn_selected_parts;
-		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter);
+		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter, max_nr_images);
 		canvas.nr_regroups = _nr_regroup;
 		canvas.do_recenter = _do_recenter;
 		if (canvas.nr_regroups > 0)
@@ -289,7 +290,7 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 
 }
 int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter)
+		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter, long int max_images)
 {
 
 	ncol = _ncol;
@@ -322,6 +323,8 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 	std::vector<long int> numbers_in_stack;
 
 	long int number_of_images = MDin.numberOfObjects();
+	if (max_images > 0 && max_images < number_of_images)
+		number_of_images = max_images;
 	boxes.clear();
 	boxes.resize(number_of_images);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
@@ -420,6 +423,9 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 		}
 
 		ipos++;
+
+		if (ipos >= number_of_images)
+			break;
 
 		if (nr_imgs > 1 && ipos % barstep == 0)
 			progress_bar(ipos);
@@ -1074,7 +1080,7 @@ void multiViewerCanvas::showSelectedParticles(bool save_selected)
 	if (nparts > 0)
 	{
         basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Particles in the selected classes");
-        win.fillCanvas(MULTIVIEWER, MDpart, EMDL_IMAGE_NAME, do_read_whole_stacks, true, 0., 0., 0., boxes[0]->scale, ori_scale, ncol);
+        win.fillCanvas(MULTIVIEWER, MDpart, EMDL_IMAGE_NAME, do_read_whole_stacks, true, 0., 0., 0., boxes[0]->scale, ori_scale, ncol, multi_max_nr_images);
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
@@ -1313,24 +1319,16 @@ int pickerViewerCanvas::handle(int ev)
 				if (xcoor_p*xcoor_p + ycoor_p*ycoor_p < rad2)
 					return 0;
 			}
-			// Else store new coordinate (copy last line of MDcoords)
-			if (MDcoords.numberOfObjects() > 0)
-				MDcoords.addObject(MDcoords.getObject());
-			else
-				MDcoords.addObject();
+			// Else store new coordinate
+			MDcoords.addObject();
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
+			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
 			RFLOAT aux = -999.;
 			int iaux = -999;
-			// If a autopicking file was read in, now store -999 in all the corresponding values....
-			if (MDcoords.containsLabel(EMDL_PARTICLE_CLASS))
-				MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
-			if (MDcoords.containsLabel(EMDL_ORIENT_PSI))
-				MDcoords.setValue(EMDL_ORIENT_PSI, aux);
-			if (MDcoords.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
-				MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
-			if (MDcoords.containsLabel(color_label))
-				MDcoords.setValue(color_label, aux);
+			MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
+			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
+			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
 
 			redraw();
 			return 1;
@@ -1653,13 +1651,21 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		box3->color(GUI_BACKGROUND_COLOR);
 		box3->box(FL_DOWN_BOX);
 
-		col_input = new Fl_Input(x, y, inputwidth, height, "Number of columns:");
+		int x1p = 125;
+		int x2p = x1p + 130;
+		int x3p = x2p + 170;
+
+		col_input = new Fl_Input(x1p, y, 40, height, "Nr. columns:");
 		col_input->value("5");
 		col_input->color(GUI_INPUT_COLOR);
 
-		ori_scale_input = new Fl_Input(x2, y, inputwidth, height, "Scale original images:");
+		ori_scale_input = new Fl_Input(x2p, y, 40, height, "Ori scale:");
 		ori_scale_input->value("1");
 		ori_scale_input->color(GUI_INPUT_COLOR);
+
+		max_nr_images_input = new Fl_Input(x3p, y, 40, height, "Max. nr. images:");
+		max_nr_images_input->value("-1");
+		max_nr_images_input->color(GUI_INPUT_COLOR);
 		y += ROUND(1.75*ystep);
 
 	}
@@ -1727,6 +1733,10 @@ void displayerGuiWindow::readLastSettings()
 			sigma_contrast_input->value(value.c_str());
 		else if (is_multi && label == col_input->label())
 			col_input->value(value.c_str());
+		else if (is_multi && label == ori_scale_input->label())
+			ori_scale_input->value(value.c_str());
+		else if (is_multi && label == max_nr_images_input->label())
+			max_nr_images_input->value(value.c_str());
 		else if (!is_multi && label == lowpass_input->label())
 			lowpass_input->value(value.c_str());
 		else if (!is_multi && label == highpass_input->label())
@@ -1757,6 +1767,8 @@ void displayerGuiWindow::writeLastSettings()
     if (is_multi)
     {
     	fh << col_input->label() << " = " << col_input->value() << std::endl;
+    	fh << ori_scale_input->label() << " = " << ori_scale_input->value() << std::endl;
+    	fh << max_nr_images_input->label() << " = " << max_nr_images_input->value() << std::endl;
     }
     else
     {
@@ -1817,6 +1829,7 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --col " + (std::string)col_input->value();
 		cl += " --ori_scale " + (std::string)ori_scale_input->value();
+		cl += " --max_nr_images " + (std::string)max_nr_images_input->value();
 	}
 	else
 	{
@@ -1888,6 +1901,7 @@ void Displayer::read(int argc, char **argv)
 	fn_selected_imgs = parser.getOption("--fn_imgs", "Name of the STAR file in which to save selected images.", "");
 	fn_selected_parts = parser.getOption("--fn_parts", "Name of the STAR file in which to save particles from selected classes.", "");
 	do_recenter = parser.checkOption("--recenter", "Recenter the selected images to the center-of-mass of all positive pixel values. ");
+	max_nr_images = textToInteger(parser.getOption("--max_nr_images", "Only show this many images (default is show all)", "-1"));
 
 	int pick_section  = parser.addSection("Picking options");
 	do_pick = parser.checkOption("--pick", "Pick coordinates in input image");
@@ -2156,7 +2170,7 @@ int Displayer::run()
 
         basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
         win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-        		do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups, do_allow_save, fn_selected_imgs, fn_selected_parts);
+        		max_nr_images, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups, do_allow_save, fn_selected_imgs, fn_selected_parts);
 
     }
     else
@@ -2177,7 +2191,7 @@ int Displayer::run()
         		MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
         	}
             basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-            win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol);
+            win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
         }
         else if (ZSIZE(img()) > 1)
         {
@@ -2206,7 +2220,7 @@ int Displayer::run()
         	}
 
             basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-            win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol);
+            win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
         }
         else
         {

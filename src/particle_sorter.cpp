@@ -30,6 +30,7 @@ void ParticleSorter::read(int argc, char **argv)
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
 	fn_out = parser.getOption("--o", "Output rootname (if empty the input file will be overwritten)", "");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1"));
+	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circ. mask for the experimental images (in Angstroms, default=automatic)", "-1"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the references (prevent Einstein-from-noise!)","-1"));
 	do_invert = parser.checkOption("--invert", "Density in particles is inverted w.r.t. density in template");
@@ -123,8 +124,6 @@ void ParticleSorter::initialise()
 		}
 	}
 
-	particle_size = XSIZE(Mrefs[0]);
-
 	// Automated determination of bg_radius (same code as in autopicker.cpp!)
 	if (particle_diameter < 0.)
 	{
@@ -151,7 +150,7 @@ void ParticleSorter::initialise()
 		}
 		sumr /= 2. * Mrefs.size(); // factor 2 to go from diameter to radius; Mref.size() for averaging
 		particle_radius2 = sumr*sumr;
-		std::cout << " Automatically set the background radius to " << sumr << " pixels " << std::endl;
+		std::cout << " Automatically set the background radius to " << sumr << " pixels in the references" << std::endl;
 		std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
 	}
 	else
@@ -160,6 +159,38 @@ void ParticleSorter::initialise()
 		particle_radius2 = ROUND(particle_diameter/(2. * angpix));
 		particle_radius2*= particle_radius2;
 	}
+
+
+	// Re-scale references if necessary
+	if (angpix_ref < 0)
+		angpix_ref = angpix;
+	if (fabs(angpix_ref - angpix) > 1e-3)
+	{
+		int halfoldsize = XSIZE(Mrefs[0]) / 2;
+		int newsize = ROUND(halfoldsize * (angpix_ref/angpix));
+		newsize *= 2;
+		RFLOAT rescale_greyvalue = 1.;
+		// If the references came from downscaled particles, then those were normalised differently
+		// (the stddev is N times smaller after downscaling N times)
+		// This needs to be corrected again
+		RFLOAT rescale_factor = 1.;
+		if (newsize > XSIZE(Mrefs[0]))
+			rescale_factor *= (RFLOAT)(XSIZE(Mrefs[0]))/(RFLOAT)newsize;
+		for (int iref = 0; iref < Mrefs.size(); iref++)
+		{
+			resizeMap(Mrefs[iref], newsize);
+			Mrefs[iref] *= rescale_factor;
+			Mrefs[iref].setXmippOrigin();
+		}
+
+		// Also adjust particle_radius2
+		particle_radius2 = ROUND(particle_radius2 * (angpix_ref/angpix) * angpix_ref/angpix);
+
+	}
+
+	particle_size = XSIZE(Mrefs[0]);
+
+
 
 	// Invert references if necessary (do this AFTER automasking them!)
 	if (do_invert)
