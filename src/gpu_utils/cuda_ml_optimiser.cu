@@ -1653,128 +1653,139 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CTIC(cudaMLO->timer,"sort");
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 
-				//Wrap the current ipart data in a new pointer
-				CudaGlobalPtr<weights_t> unsorted_ipart(weights,
-						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
-						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
+				long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
 
-				CudaGlobalPtr<weights_t> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
-
-				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
-
-				filtered.device_alloc();
-
-				MoreThanCubOpt<weights_t> moreThanOpt(0.);
-				size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
-
-				if (filteredSize == 0)
+				if (ipart_length > 1)
 				{
-					if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
+					//Wrap the current ipart data in a new pointer
+					CudaGlobalPtr<weights_t> unsorted_ipart(weights,
+							ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
+							ipart_length);
+
+					CudaGlobalPtr<weights_t> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
+
+					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
+
+					filtered.device_alloc();
+
+					MoreThanCubOpt<weights_t> moreThanOpt(0.);
+					size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+
+					if (filteredSize == 0)
 					{
-						std::cerr << std::endl;
-						std::cerr << " fn_img= " << sp.current_img << std::endl;
-						std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-						std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
+						if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
+						{
+							std::cerr << std::endl;
+							std::cerr << " fn_img= " << sp.current_img << std::endl;
+							std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-						pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
-						pdf_offset.dump_device_to_file("error_dump_pdf_offset");
-						unsorted_ipart.dump_device_to_file("error_dump_filtered");
+							pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
+							pdf_offset.dump_device_to_file("error_dump_pdf_offset");
+							unsorted_ipart.dump_device_to_file("error_dump_filtered");
 
-						std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
+							std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
+						}
+
+						REPORT_ERROR("filteredSize == 0");
+					}
+					filtered.setSize(filteredSize);
+
+					CudaGlobalPtr<weights_t> sorted(filteredSize, cudaMLO->devBundle->allocator);
+					CudaGlobalPtr<weights_t> cumulative_sum(filteredSize, cudaMLO->devBundle->allocator);
+					sorted.device_alloc();
+					cumulative_sum.device_alloc();
+
+					sortOnDevice(filtered, sorted);
+					scanOnDevice(sorted, cumulative_sum);
+
+					CTOC(cudaMLO->timer,"sort");
+
+					op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
+
+					long int my_nr_significant_coarse_samples;
+					size_t thresholdIdx(0);
+
+					int grid_size = ceil((float)(cumulative_sum.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
+					if(grid_size > 0)
+					{
+						CudaGlobalPtr<size_t >  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
+						idx[0] = 0;
+						idx.put_on_device();
+						cuda_kernel_find_threshold_idx_in_cumulative<weights_t>
+						<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, cumulative_sum.getStream() >>>(
+								~cumulative_sum,
+								(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart],
+								cumulative_sum.getSize()-1,
+								~idx);
+						idx.cp_to_host();
+						DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cumulative_sum.getStream()));
+
+						thresholdIdx = idx[0];
 					}
 
-					REPORT_ERROR("filteredSize == 0");
-				}
-				filtered.setSize(filteredSize);
 
-				CudaGlobalPtr<weights_t> sorted(filteredSize, cudaMLO->devBundle->allocator);
-				CudaGlobalPtr<weights_t> cumulative_sum(filteredSize, cudaMLO->devBundle->allocator);
-				sorted.device_alloc();
-				cumulative_sum.device_alloc();
+					my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
 
-				sortOnDevice(filtered, sorted);
-				scanOnDevice(sorted, cumulative_sum);
-
-				CTOC(cudaMLO->timer,"sort");
-
-				op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
-
-				long int my_nr_significant_coarse_samples;
-				size_t thresholdIdx(0);
-
-				int grid_size = ceil((float)(cumulative_sum.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
-				if(grid_size > 0)
-				{
-					CudaGlobalPtr<size_t >  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
-					idx[0] = 0;
-					idx.put_on_device();
-					cuda_kernel_find_threshold_idx_in_cumulative<weights_t>
-					<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, cumulative_sum.getStream() >>>(
-							~cumulative_sum,
-							(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart],
-							cumulative_sum.getSize()-1,
-							~idx);
-					idx.cp_to_host();
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cumulative_sum.getStream()));
-
-					thresholdIdx = idx[0];
-				}
-
-
-				my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
-
-				if (my_nr_significant_coarse_samples == 0)
-				{
-					if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
+					if (my_nr_significant_coarse_samples == 0)
 					{
-						std::cerr << std::endl;
-						std::cerr << " fn_img= " << sp.current_img << std::endl;
-						std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-						std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
-						std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
-						std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
+						if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
+						{
+							std::cerr << std::endl;
+							std::cerr << " fn_img= " << sp.current_img << std::endl;
+							std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+							std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart] << " thresholdIdx= " << thresholdIdx << std::endl;
+							std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
+							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-						unsorted_ipart.dump_device_to_file("error_dump_unsorted");
-						filtered.dump_device_to_file("error_dump_filtered");
-						sorted.dump_device_to_file("error_dump_sorted");
-						cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
+							unsorted_ipart.dump_device_to_file("error_dump_unsorted");
+							filtered.dump_device_to_file("error_dump_filtered");
+							sorted.dump_device_to_file("error_dump_sorted");
+							cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
 
-						std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
+							std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
+						}
+
+						REPORT_ERROR("my_nr_significant_coarse_samples == 0");
 					}
 
-					REPORT_ERROR("my_nr_significant_coarse_samples == 0");
-				}
+					if (baseMLO->maximum_significants != 0 &&
+							my_nr_significant_coarse_samples > baseMLO->maximum_significants)
+					{
+						my_nr_significant_coarse_samples = baseMLO->maximum_significants;
+						thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
+					}
 
-				if (baseMLO->maximum_significants != 0 &&
-						my_nr_significant_coarse_samples > baseMLO->maximum_significants)
+					weights_t significant_weight = sorted.getDeviceAt(thresholdIdx);
+
+					CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+					std::pair<int, weights_t> max_pair = getArgMaxOnDevice(unsorted_ipart);
+					CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+					op.max_index[ipart].coarseIdx = max_pair.first;
+					op.max_weight[ipart] = max_pair.second;
+
+					// Store nr_significant_coarse_samples for this particle
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
+
+					CudaGlobalPtr<bool> Mcoarse_significant(
+							&op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min],
+							(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
+							cudaMLO->devBundle->allocator);
+
+					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
+					Mcoarse_significant.device_alloc();
+
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+					arrayOverThreshold<weights_t>(unsorted_ipart, Mcoarse_significant, significant_weight);
+					Mcoarse_significant.cp_to_host();
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+				}
+				else if (ipart_length == 1)
 				{
-					my_nr_significant_coarse_samples = baseMLO->maximum_significants;
-					thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
+					op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min] = 1;
 				}
-
-				weights_t significant_weight = sorted.getDeviceAt(thresholdIdx);
-
-				CTIC(cudaMLO->timer,"getArgMaxOnDevice");
-				std::pair<int, weights_t> max_pair = getArgMaxOnDevice(unsorted_ipart);
-				CTOC(cudaMLO->timer,"getArgMaxOnDevice");
-				op.max_index[ipart].coarseIdx = max_pair.first;
-				op.max_weight[ipart] = max_pair.second;
-
-				// Store nr_significant_coarse_samples for this particle
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
-
-				CudaGlobalPtr<bool> Mcoarse_significant(
-						&op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min],
-						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
-						cudaMLO->devBundle->allocator);
-
-				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
-				Mcoarse_significant.device_alloc();
-
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-				arrayOverThreshold<weights_t>(unsorted_ipart, Mcoarse_significant, significant_weight);
-				Mcoarse_significant.cp_to_host();
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+				else
+					REPORT_ERROR("Parameter space for coarse sampling is invalid.");
 			}
 			else
 			{
