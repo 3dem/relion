@@ -102,6 +102,7 @@ void AutoPicker::read(int argc, char **argv)
 	decrease_radius = textToInteger(parser.getOption("--shrink_particle_mask", "Shrink the particle mask by this many pixels (to detect Einstein-from-noise classes)", "2"));
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
+	no_fom_limit = parser.checkOption("--no_fom_limit", "Ignore default maximum limit of 30 fom maps being written","false");
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
 	do_optimise_scale = !parser.checkOption("--skip_optimise_scale", "Skip the optimisation of the micrograph scale for better prime factors in the FFTs. This runs slower, but at exactly the requested resolution.");
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
@@ -259,6 +260,10 @@ void AutoPicker::initialise()
 
 	if (verb > 0)
 	{
+		if((fn_micrographs.size()>30 && do_write_fom_maps) && !no_fom_limit)
+		{
+			REPORT_ERROR("\n If you really want to write this many (" + integerToString(fn_micrographs.size()) + ") FOM-maps, add --no_fom_limit");
+		}
 		std::cout << " + Run autopicking on the following micrographs: " << std::endl;
 		for(unsigned  int  i = 0; i < fn_micrographs.size(); ++i)
 			std::cout << "    * " << fn_micrographs[i] << std::endl;

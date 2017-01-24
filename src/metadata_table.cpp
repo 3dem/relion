@@ -257,6 +257,36 @@ void MetaDataTable::deactivateLabel(EMDLabel label)
 
 void MetaDataTable::append(MetaDataTable &app)
 {
+
+	bool some_labels_missing = false;
+	// Find which labels occur in all input tables
+	std::vector<EMDLabel> mylabels = (*this).getActiveLabels();
+	std::vector<EMDLabel> labelsin = app.getActiveLabels();
+
+	// Loop over all labels to see whether they are the same in the two tables
+	bool have_all_labels = false;
+	if (mylabels.size() == 0)
+	{
+		// empty curent one, just append
+		have_all_labels = true;
+	}
+	else if (mylabels.size() == labelsin.size())
+	{
+		// non-empty current one: need same number of labels and all labels overlap
+		have_all_labels = true;
+		for (size_t i = 0; i < mylabels.size(); i++)
+		{
+			if (!vectorContainsLabel(labelsin, mylabels[i]))
+			{
+				have_all_labels = false;
+				break;
+			}
+		}
+	}
+
+	if (!have_all_labels)
+		REPORT_ERROR("ERROR in appending metadata tables with not the same columns!");
+
 	// Go to the end of the table
 	current_objectID = objects.size();
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(app)

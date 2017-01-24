@@ -1319,24 +1319,16 @@ int pickerViewerCanvas::handle(int ev)
 				if (xcoor_p*xcoor_p + ycoor_p*ycoor_p < rad2)
 					return 0;
 			}
-			// Else store new coordinate (copy last line of MDcoords)
-			if (MDcoords.numberOfObjects() > 0)
-				MDcoords.addObject(MDcoords.getObject());
-			else
-				MDcoords.addObject();
+			// Else store new coordinate
+			MDcoords.addObject();
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
+			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
 			RFLOAT aux = -999.;
 			int iaux = -999;
-			// If a autopicking file was read in, now store -999 in all the corresponding values....
-			if (MDcoords.containsLabel(EMDL_PARTICLE_CLASS))
-				MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
-			if (MDcoords.containsLabel(EMDL_ORIENT_PSI))
-				MDcoords.setValue(EMDL_ORIENT_PSI, aux);
-			if (MDcoords.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
-				MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
-			if (MDcoords.containsLabel(color_label))
-				MDcoords.setValue(color_label, aux);
+			MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
+			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
+			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
 
 			redraw();
 			return 1;
