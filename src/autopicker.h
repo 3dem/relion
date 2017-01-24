@@ -133,6 +133,8 @@ public:
 
 	// Write precalculated best_localCCF and SPI arrays to disc
 	bool do_write_fom_maps;
+	// We impose a limit to not write insane number of images by mistake, but you can override through --fom_override
+	bool no_fom_limit;
 
 	/// Only autopick those micrographs for which the coordinate file does not yet exist
 	bool do_only_unfinished;
