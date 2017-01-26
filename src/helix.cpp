@@ -1981,16 +1981,16 @@ void combineParticlePriorsWithKaiLocalCTF(
 		FileName& fn_combined)
 {
 	MetaDataTable MD_priors, MD_local_ctf;
-	std::vector<RFLOAT> x, y, rot, tilt, psi, xoff, yoff, tube_len, psi_flip_ratio;
-	std::vector<int> tube_id;
-	RFLOAT _x, _y, _rot, _tilt, _psi, _xoff, _yoff, _tube_len, _psi_flip_ratio;
-	int _tube_id, ii;
-	bool have_rot, have_tilt, have_psi, have_xoff, have_yoff, have_tube_id, have_tube_len, have_psi_flip_ratio;
+	std::vector<RFLOAT> x, y, dU, dV, dAng, Cs, pix, mag, Q0, volt, fom, maxres, bfac, sfac, phase;
+	RFLOAT _x, _y, _dU, _dV, _dAng, _Cs, _pix, _mag, _Q0, _volt, _fom, _maxres, _bfac, _sfac, _phase;
+	int ii;
 
 	if ( (fn_priors.getFileFormat() != "star") || (fn_local_ctf.getFileFormat() != "star") || (fn_combined.getFileFormat() != "star") )
 		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): MetaDataTable should have .star extension.");
-	if ( (fn_priors == fn_local_ctf) || (fn_local_ctf == fn_combined) || (fn_combined == fn_priors) )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): File names must be different.");
+//	if ( (fn_priors == fn_local_ctf) || (fn_local_ctf == fn_combined) || (fn_combined == fn_priors) )
+//		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): File names must be different.");
+	if (fn_priors == fn_local_ctf)
+		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): Input file names must be different.");
 
 	MD_priors.clear();
 	MD_local_ctf.clear();
@@ -2001,7 +2001,7 @@ void combineParticlePriorsWithKaiLocalCTF(
 
 	if ( (!MD_priors.containsLabel(EMDL_IMAGE_COORD_X))
 			|| (!MD_priors.containsLabel(EMDL_IMAGE_COORD_Y))
-			|| (!MD_local_ctf.containsLabel(EMDL_MICROGRAPH_NAME))
+//			|| (!MD_local_ctf.containsLabel(EMDL_MICROGRAPH_NAME))
 			|| (!MD_local_ctf.containsLabel(EMDL_IMAGE_COORD_X))
 			|| (!MD_local_ctf.containsLabel(EMDL_IMAGE_COORD_Y))
 			|| (!MD_local_ctf.containsLabel(EMDL_CTF_VOLTAGE))
@@ -2010,119 +2010,98 @@ void combineParticlePriorsWithKaiLocalCTF(
 			|| (!MD_local_ctf.containsLabel(EMDL_CTF_DEFOCUS_ANGLE))
 			|| (!MD_local_ctf.containsLabel(EMDL_CTF_CS))
 			|| (!MD_local_ctf.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-			|| (!MD_local_ctf.containsLabel(EMDL_CTF_FOM))
 			|| (!MD_local_ctf.containsLabel(EMDL_CTF_MAGNIFICATION))
 			|| (!MD_local_ctf.containsLabel(EMDL_CTF_Q0))
 			)
 		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): Labels missing in MetaDataTables.");
 
-	have_rot = MD_priors.containsLabel(EMDL_ORIENT_ROT_PRIOR);
-	have_tilt = MD_priors.containsLabel(EMDL_ORIENT_TILT_PRIOR);
-	have_psi = MD_priors.containsLabel(EMDL_ORIENT_PSI_PRIOR);
-	have_xoff = MD_priors.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
-	have_yoff = MD_priors.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
-	have_tube_id = MD_priors.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
-	have_tube_len = MD_priors.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
-	have_psi_flip_ratio = MD_priors.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
-	if ( (!have_rot) && (!have_tilt) && (!have_psi) && (!have_xoff) && (!have_yoff) && (!have_tube_id) && (!have_tube_len) && (!have_psi_flip_ratio) )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): No priors are found in the input file.");
+	x.clear(); y.clear(); dU.clear(); dV.clear(); dAng.clear(); // necessary
+	Cs.clear(); pix.clear(); mag.clear(); Q0.clear(); volt.clear(); // necessary
+	fom.clear(); maxres.clear(); bfac.clear(); sfac.clear(); phase.clear(); // optional
 
-	x.clear(); y.clear(); rot.clear(); tilt.clear(); psi.clear(); xoff.clear(); yoff.clear();
-
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_priors)
-	{
-		MD_priors.getValue(EMDL_IMAGE_COORD_X, _x);
-		x.push_back(_x);
-		MD_priors.getValue(EMDL_IMAGE_COORD_Y, _y);
-		y.push_back(_y);
-		if (have_rot)
-		{
-			MD_priors.getValue(EMDL_ORIENT_ROT_PRIOR, _rot);
-			rot.push_back(_rot);
-		}
-		if (have_tilt)
-		{
-			MD_priors.getValue(EMDL_ORIENT_TILT_PRIOR, _tilt);
-			tilt.push_back(_tilt);
-		}
-		if (have_psi)
-		{
-			MD_priors.getValue(EMDL_ORIENT_PSI_PRIOR, _psi);
-			psi.push_back(_psi);
-		}
-		if (have_xoff)
-		{
-			MD_priors.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR, _xoff);
-			xoff.push_back(_xoff);
-		}
-		if (have_yoff)
-		{
-			MD_priors.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, _yoff);
-			yoff.push_back(_yoff);
-		}
-		if (have_tube_id)
-		{
-			MD_priors.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, _tube_id);
-			tube_id.push_back(_tube_id);
-		}
-		if (have_tube_len)
-		{
-			MD_priors.getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, _tube_len);
-			tube_len.push_back(_tube_len);
-		}
-		if (have_psi_flip_ratio)
-		{
-			MD_priors.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, _psi_flip_ratio);
-			psi_flip_ratio.push_back(_psi_flip_ratio);
-		}
-	}
-
-	if ( (have_tube_id) && (!MD_local_ctf.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID)) )
-		MD_local_ctf.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
-	if ( (have_rot) && (!MD_local_ctf.containsLabel(EMDL_ORIENT_ROT_PRIOR)) )
-		MD_local_ctf.addLabel(EMDL_ORIENT_ROT_PRIOR);
-	if ( (have_tilt) && (!MD_local_ctf.containsLabel(EMDL_ORIENT_TILT_PRIOR)) )
-		MD_local_ctf.addLabel(EMDL_ORIENT_TILT_PRIOR);
-	if ( (have_psi) && (!MD_local_ctf.containsLabel(EMDL_ORIENT_PSI_PRIOR)) )
-		MD_local_ctf.addLabel(EMDL_ORIENT_PSI_PRIOR);
-	if ( (have_xoff) && (!MD_local_ctf.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR)) )
-		MD_local_ctf.addLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
-	if ( (have_yoff) && (!MD_local_ctf.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR)) )
-		MD_local_ctf.addLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
-	if ( (have_tube_len) && (!MD_local_ctf.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH)) )
-		MD_local_ctf.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
-	if ( (have_psi_flip_ratio) && (!MD_local_ctf.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
-		MD_local_ctf.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
-
-	ii = -1;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_local_ctf)
 	{
-		ii++;
-		MD_local_ctf.getValue(EMDL_IMAGE_COORD_X, _x);
-		MD_local_ctf.getValue(EMDL_IMAGE_COORD_Y, _y);
-		if ( (fabs(x[ii] - _x) > 1.001) || (fabs(y[ii] - _y) > 1.001) )
-			REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): Coordinates from the two MetaDataTables do not match.");
-		MD_local_ctf.setValue(EMDL_IMAGE_COORD_X, x[ii]);
-		MD_local_ctf.setValue(EMDL_IMAGE_COORD_Y, y[ii]);
-		if (have_tube_id)
-			MD_local_ctf.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id[ii]);
-		if (have_rot)
-			MD_local_ctf.setValue(EMDL_ORIENT_ROT_PRIOR, rot[ii]);
-		if (have_tilt)
-			MD_local_ctf.setValue(EMDL_ORIENT_TILT_PRIOR, tilt[ii]);
-		if (have_psi)
-			MD_local_ctf.setValue(EMDL_ORIENT_PSI_PRIOR, psi[ii]);
-		if (have_xoff)
-			MD_local_ctf.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR, xoff[ii]);
-		if (have_yoff)
-			MD_local_ctf.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, yoff[ii]);
-		if (have_tube_len)
-			MD_local_ctf.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, tube_len[ii]);
-		if (have_psi_flip_ratio)
-			MD_local_ctf.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio[ii]);
+		MD_local_ctf.getValue(EMDL_IMAGE_COORD_X, _x); x.push_back(_x);
+		MD_local_ctf.getValue(EMDL_IMAGE_COORD_Y, _y); y.push_back(_y);
+		MD_local_ctf.getValue(EMDL_CTF_DEFOCUSU, _dU); dU.push_back(_dU);
+		MD_local_ctf.getValue(EMDL_CTF_DEFOCUSV, _dV); dV.push_back(_dV);
+		MD_local_ctf.getValue(EMDL_CTF_DEFOCUS_ANGLE, _dAng); dAng.push_back(_dAng);
+		MD_local_ctf.getValue(EMDL_CTF_CS, _Cs); Cs.push_back(_Cs);
+		MD_local_ctf.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, _pix); pix.push_back(_pix);
+		MD_local_ctf.getValue(EMDL_CTF_MAGNIFICATION, _mag); mag.push_back(_mag);
+		MD_local_ctf.getValue(EMDL_CTF_Q0, _Q0); Q0.push_back(_Q0);
+		MD_local_ctf.getValue(EMDL_CTF_VOLTAGE, _volt); volt.push_back(_volt);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_FOM))
+			MD_local_ctf.getValue(EMDL_CTF_FOM, _fom); fom.push_back(_fom);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_MAXRES))
+			MD_local_ctf.getValue(EMDL_CTF_MAXRES, _maxres); maxres.push_back(_maxres);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_BFACTOR))
+			MD_local_ctf.getValue(EMDL_CTF_BFACTOR, _bfac); bfac.push_back(_bfac);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_SCALEFACTOR))
+			MD_local_ctf.getValue(EMDL_CTF_SCALEFACTOR, _sfac); sfac.push_back(_sfac);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_PHASESHIFT))
+			MD_local_ctf.getValue(EMDL_CTF_PHASESHIFT, _phase); phase.push_back(_phase);
 	}
 
-	MD_local_ctf.write(fn_combined);
+	if (!MD_priors.containsLabel(EMDL_CTF_DEFOCUSU))
+		MD_priors.addLabel(EMDL_CTF_DEFOCUSU);
+	if (!MD_priors.containsLabel(EMDL_CTF_DEFOCUSV))
+		MD_priors.addLabel(EMDL_CTF_DEFOCUSV);
+	if (!MD_priors.containsLabel(EMDL_CTF_DEFOCUS_ANGLE))
+		MD_priors.addLabel(EMDL_CTF_DEFOCUS_ANGLE);
+	if (!MD_priors.containsLabel(EMDL_CTF_CS))
+		MD_priors.addLabel(EMDL_CTF_CS);
+	if (!MD_priors.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		MD_priors.addLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
+	if (!MD_priors.containsLabel(EMDL_CTF_MAGNIFICATION))
+		MD_priors.addLabel(EMDL_CTF_MAGNIFICATION);
+	if (!MD_priors.containsLabel(EMDL_CTF_Q0))
+		MD_priors.addLabel(EMDL_CTF_Q0);
+	if (!MD_priors.containsLabel(EMDL_CTF_VOLTAGE))
+		MD_priors.addLabel(EMDL_CTF_VOLTAGE);
+	if (!MD_priors.containsLabel(EMDL_CTF_FOM))
+		MD_priors.addLabel(EMDL_CTF_FOM);
+	if (!MD_priors.containsLabel(EMDL_CTF_MAXRES))
+		MD_priors.addLabel(EMDL_CTF_MAXRES);
+	if (!MD_priors.containsLabel(EMDL_CTF_BFACTOR))
+		MD_priors.addLabel(EMDL_CTF_BFACTOR);
+	if (!MD_priors.containsLabel(EMDL_CTF_SCALEFACTOR))
+		MD_priors.addLabel(EMDL_CTF_SCALEFACTOR);
+	if (!MD_priors.containsLabel(EMDL_CTF_PHASESHIFT))
+		MD_priors.addLabel(EMDL_CTF_PHASESHIFT);
+
+	ii = -1;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_priors)
+	{
+		ii++;
+		MD_priors.getValue(EMDL_IMAGE_COORD_X, _x);
+		MD_priors.getValue(EMDL_IMAGE_COORD_Y, _y);
+		if ( (fabs(x[ii] - _x) > 1.001) || (fabs(y[ii] - _y) > 1.001) )
+			REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF(): Coordinates from the two MetaDataTables do not match.");
+
+		//MD_priors.setValue(EMDL_IMAGE_COORD_X, x[ii]);
+		//MD_priors.setValue(EMDL_IMAGE_COORD_Y, y[ii]);
+		MD_priors.setValue(EMDL_CTF_DEFOCUSU, dU[ii]);
+		MD_priors.setValue(EMDL_CTF_DEFOCUSV, dV[ii]);
+		MD_priors.setValue(EMDL_CTF_DEFOCUS_ANGLE, dAng[ii]);
+		MD_priors.setValue(EMDL_CTF_CS, Cs[ii]);
+		MD_priors.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, pix[ii]);
+		MD_priors.setValue(EMDL_CTF_MAGNIFICATION, mag[ii]);
+		MD_priors.setValue(EMDL_CTF_Q0, Q0[ii]);
+		MD_priors.setValue(EMDL_CTF_VOLTAGE, volt[ii]);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_FOM))
+			MD_priors.setValue(EMDL_CTF_FOM, fom[ii]);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_MAXRES))
+			MD_priors.setValue(EMDL_CTF_MAXRES, maxres[ii]);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_BFACTOR))
+			MD_priors.setValue(EMDL_CTF_BFACTOR, bfac[ii]);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_SCALEFACTOR))
+			MD_priors.setValue(EMDL_CTF_SCALEFACTOR, sfac[ii]);
+		if (MD_local_ctf.containsLabel(EMDL_CTF_PHASESHIFT))
+			MD_priors.setValue(EMDL_CTF_PHASESHIFT, phase[ii]);
+	}
+
+	MD_priors.write(fn_combined);
 	return;
 }
 
@@ -2288,8 +2267,10 @@ void combineParticlePriorsWithKaiLocalCTF_Multiple(
 	FileName fns_priors;
 	std::vector<FileName> fn_priors_list;
 
-	if ( (suffix_priors == suffix_local_ctf) || (suffix_priors == suffix_combined) || (suffix_combined == suffix_priors) )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF_Multiple(): File names error!");
+//	if ( (suffix_priors == suffix_local_ctf) || (suffix_priors == suffix_combined) || (suffix_combined == suffix_priors) )
+//		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF_Multiple(): File names error!");
+	if (suffix_priors == suffix_local_ctf)
+		REPORT_ERROR("helix.cpp::combineParticlePriorsWithKaiLocalCTF_Multiple(): Input file names error!");
 
 	fns_priors = "*" + suffix_priors;
 	fns_priors.globFiles(fn_priors_list);
@@ -3189,6 +3170,7 @@ void makeHelicalReference2D(
 	return;
 };
 
+/*
 void makeHelicalReference3D(
 		MultidimArray<RFLOAT>& out,
 		int box_size,
@@ -3302,6 +3284,7 @@ void makeHelicalReference3D(
 	}
 	return;
 }
+*/
 
 void makeHelicalReference3DWithPolarity(
 		MultidimArray<RFLOAT>& out,
@@ -3337,14 +3320,14 @@ void makeHelicalReference3DWithPolarity(
 	particle_diameter_pix = particle_diameter_A / pixel_size_A;
 	particle_radius_pix = particle_diameter_pix / 2.;
 	particle_radius_max_pix = (CEIL(particle_diameter_pix / 2.)) + 1;
-	top_radius_pix = cyl_radius_pix = cyl_diameter_A / pixel_size_A;
+	top_radius_pix = cyl_radius_pix = 0.5 * cyl_diameter_A / pixel_size_A;
 	bottom_radius_pix = top_radius_pix * topbottom_ratio;
 
 	if (particle_diameter_pix < 2.)
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Particle diameter should be larger than 2 pixels!");
 	if ( (tube_diameter_pix < 0.001) || (tube_diameter_pix > (RFLOAT)(box_size)) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Tube diameter should be larger than 1 pixel and smaller than box size!");
-	if ( (cyl_radius_pix < 1.) || (cyl_radius_pix > particle_diameter_pix) )
+	if ( (cyl_radius_pix < 1.) || (cyl_radius_pix > particle_radius_pix) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Cylindrical diameter should be > 1 pixel and < particle diameter!");
 
 	out.resize(box_size, box_size, box_size);
@@ -3352,9 +3335,13 @@ void makeHelicalReference3DWithPolarity(
 	out.setXmippOrigin();
 
 	RFLOAT x0, y0, z0;
-	x0 = tube_diameter_pix / 2.;
-	y0 = 0.;
-	z0 = (RFLOAT)(FIRST_XMIPP_INDEX(box_size));
+	// OLD
+	//x0 = tube_diameter_pix / 2.;
+	//y0 = 0.;
+	// NEW - To generate references with Dn symmetry. TODO: Am I doing what I want?
+	z0 = rise_pix * FLOOR((RFLOAT)(FIRST_XMIPP_INDEX(box_size)) / rise_pix);
+	x0 = (tube_diameter_pix / 2.) * cos( (PI * twist_deg * z0) / (rise_pix * 180.) );
+	y0 = (tube_diameter_pix / 2.) * sin( (PI * twist_deg * z0) / (rise_pix * 180.) );
 	vec0.clear();
 	vec0.resize(2);
 	XX(vec0) = x0;
@@ -3662,29 +3649,59 @@ void sortHelicalTubeID(MetaDataTable& MD)
 }
 
 void simulateHelicalSegments(
-		FileName& fn_out,
+		bool is_3d_tomo,
+		FileName& fn_vol_in,
+		FileName& fn_star_out,
+		RFLOAT white_noise,
+		int new_box_size,
 		int nr_subunits,
 		int nr_asu,
 		int nr_tubes,
 		bool do_bimodal_searches,
-		RFLOAT rise_pix,
+		RFLOAT angpix,
+		RFLOAT rise_A,
 		RFLOAT twist_deg,
 		RFLOAT sigma_psi,
 		RFLOAT sigma_tilt,
+		RFLOAT sigma_offset,
 		int random_seed)
 {
+	Image<RFLOAT> img;
 	int nr_segments, tube_id;
-	RFLOAT rot, psi, tilt, new_psi, new_tilt, step_pix, psi_flip_ratio, len_pix;
+	RFLOAT rot, psi, tilt, new_psi, new_tilt, xoff, yoff, zoff, new_xoff, new_yoff, new_zoff, step_pix, psi_flip_ratio, len_pix;
 	MetaDataTable MD;
 	FileName fn_mic;
+	std::ofstream fout;
+	std::string command;
+
+	if (fn_vol_in.getExtension() != "mrc")
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Input 3D volume should be in .mrc format!");
+	img.read(fn_vol_in, false); // Read the header only!
+	if ( (img().getDim() != 3) || (XSIZE(img()) != YSIZE(img())) || (YSIZE(img()) != ZSIZE(img())) || (XSIZE(img()) < 10) )
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Input volume should be a 3D cube (>10*10*10)!");
+	if ( (new_box_size > XSIZE(img())) || (new_box_size < 10) || (new_box_size % 2) )
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Cropped box size (an even number) should be at least 10, and smaller than the box size of the input 3D volume!");
 
 	// TODO: raise error if nr_asu<0 or too big, n too small!
-	if ( (nr_tubes < 2) || (nr_subunits < 100) || (nr_asu < 1) || (((nr_subunits / nr_asu) / nr_tubes) < 5) || ((nr_subunits / nr_asu) > 999999) )
+	if ( (nr_tubes < 2) || (nr_subunits < 10) || (nr_asu < 1) || (((nr_subunits / nr_asu) / nr_tubes) < 5) || ((nr_subunits / nr_asu) > 999000) )
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Errors in the number of tubes, asymmetrical units or total subunits!");
 	if ( (sigma_psi > 10.) || (sigma_tilt > 10.) )
-		REPORT_ERROR("helix.cpp::simulateHelicalSegments: sigma_psi or sigma_tilt should not be larger than 10 degrees.");
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: sigma_psi and sigma_tilt should not be larger than 10 degrees.");
+	if (sigma_offset > 50.)
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: sigma_trans should not be larger than 50 pixels.");
 	if ( (fabs(twist_deg) < 0.001) || (fabs(twist_deg) > 180.))
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Error in helical twist!");
+
+	if (is_3d_tomo)
+		fout.open("simulate-3d-subtomos.sh", std::ios::out);
+	else
+		fout.open("simulate-2d-segments.sh", std::ios::out);
+    if (!fout)
+        REPORT_ERROR( (std::string)"helix.cpp::simulateHelicalSegments: Cannot write to .sh script!");
+
+	sigma_tilt = (sigma_tilt > 0.) ? (sigma_tilt) : (0.);
+	sigma_psi = (sigma_psi > 0.) ? (sigma_psi) : (0.);
+	sigma_offset = (sigma_offset > 0.) ? (sigma_offset) : (0.);
 
 	if (random_seed < 0)
 		random_seed = time(NULL);
@@ -3699,14 +3716,20 @@ void simulateHelicalSegments(
     MD.addLabel(EMDL_ORIENT_ROT_PRIOR);
     MD.addLabel(EMDL_ORIENT_TILT_PRIOR);
     MD.addLabel(EMDL_ORIENT_PSI_PRIOR);
+    MD.addLabel(EMDL_ORIENT_ORIGIN_X);
+    MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
+    if (is_3d_tomo)
+    	MD.addLabel(EMDL_ORIENT_ORIGIN_Z);
     MD.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
     MD.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
     MD.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
     MD.addLabel(EMDL_IMAGE_NAME);
     MD.addLabel(EMDL_MICROGRAPH_NAME);
+    MD.addLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
+    MD.addLabel(EMDL_CTF_MAGNIFICATION);
 
     tube_id = 0;
-    step_pix = nr_asu * rise_pix;
+    step_pix = nr_asu * rise_A / angpix;
     psi_flip_ratio = (do_bimodal_searches) ? (0.5) : (0.);
 	for (int id = 0; id < nr_segments; id++)
 	{
@@ -3714,23 +3737,59 @@ void simulateHelicalSegments(
 		{
 			tube_id++;
 			len_pix = -step_pix;
-			tilt = rnd_unif(85., 95.);
+
+			if (is_3d_tomo)
+				tilt = rnd_unif(10., 170.); // If realWRAP function works well, set this to 0-180.
+			else
+				tilt = rnd_unif(85., 95.);
 			rot = rnd_unif(0.01, 359.99);
 			psi = rnd_unif(-179.99, 179.99);
 		}
 
 		len_pix += step_pix;
 		rot += twist_deg * ((RFLOAT)(nr_asu));
-		rot = realWRAP(rot, -180., 180.);
+		rot = realWRAP(rot, -180., 180.); // Does this realWRAP function works well? No...
+		rot = (rot < -180.) ? (rot + 360.) : (rot);
+		rot = (rot > 180.) ? (rot - 360.) : (rot);
 
 		if (sigma_tilt < 0.0001)
-			new_tilt = realWRAP(tilt, 0., 180.);
+			new_tilt = tilt;
 		else
-			new_tilt = realWRAP(tilt + rnd_gaus(0., sigma_tilt), 0., 180.);
+			new_tilt = tilt + rnd_gaus(0., sigma_tilt);
+		new_tilt = (new_tilt < 0.) ? (new_tilt + 180.) : (new_tilt);
+		new_tilt = (new_tilt > 180.) ? (new_tilt - 180.) : (new_tilt);
+
 		if (sigma_psi < 0.0001)
-			new_psi = realWRAP(psi, -180., 180.);
+			new_psi = psi;
 		else
-			new_psi = realWRAP(psi + rnd_gaus(0., sigma_psi), -180., 180.);
+			new_psi = psi + rnd_gaus(0., sigma_psi);
+		new_psi = (new_psi < -180.) ? (new_psi + 360.) : (new_psi);
+		new_psi = (new_psi > 180.) ? (new_psi - 360.) : (new_psi);
+
+		if (sigma_offset < 0.0001)
+		{
+			xoff = yoff = zoff = 0.;
+			new_xoff = new_yoff = new_zoff = 0.;
+		}
+		else
+		{
+			xoff = rnd_gaus(0., sigma_offset);
+			yoff = rnd_gaus(0., sigma_offset);
+			zoff = rnd_gaus(0., sigma_offset);
+			transformCartesianAndHelicalCoords(
+					xoff, yoff, zoff,
+					new_xoff, new_yoff, new_zoff,
+					new_psi, new_tilt,
+					(is_3d_tomo) ? (3) : (2),
+					CART_TO_HELICAL_COORDS);
+			new_xoff = 0.;
+			transformCartesianAndHelicalCoords(
+					new_xoff, new_yoff, new_zoff,
+					xoff, yoff, zoff,
+					new_psi, new_tilt,
+					(is_3d_tomo) ? (3) : (2),
+					HELICAL_TO_CART_COORDS);
+		}
 
 		MD.addObject();
     	MD.setValue(EMDL_ORIENT_ROT, rot);
@@ -3739,14 +3798,66 @@ void simulateHelicalSegments(
     	MD.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
     	MD.setValue(EMDL_ORIENT_TILT_PRIOR, new_tilt);
     	MD.setValue(EMDL_ORIENT_PSI_PRIOR, new_psi);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+    	if (is_3d_tomo)
+    		MD.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
     	MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
-    	fn_mic.compose((id + 1), "M.mrc");
+    	if (is_3d_tomo)
+    	{
+    		fn_mic.compose((id + 1), "dummy");
+    		fn_mic = fn_mic.beforeFirstOf("@");
+    		fn_mic = (std::string)("subtomo-3d-") + (std::string)(fn_mic) + (std::string)(".mrc");
+    	}
+    	else
+    		fn_mic.compose((id + 1), "segments-2d.mrcs");
     	MD.setValue(EMDL_IMAGE_NAME, fn_mic);
-    	MD.setValue(EMDL_MICROGRAPH_NAME, (std::string)("M.mrc"));
+    	if (is_3d_tomo)
+    		MD.setValue(EMDL_MICROGRAPH_NAME, (std::string)("tomogram-01.mrc"));
+    	else
+    		MD.setValue(EMDL_MICROGRAPH_NAME, (std::string)("micrograph-01.mrc"));
+    	MD.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, 14.0);
+    	MD.setValue(EMDL_CTF_MAGNIFICATION, (140000. / angpix));
+
+    	// Generate .sh script
+    	if (is_3d_tomo)
+    	{
+    		fout << "relion_project --i " << fn_vol_in << " --o temporary-image-3d.mrc --angpix " << angpix << " --rot "
+    				<< rot << " --tilt " << new_tilt << " --psi " << new_psi << " --xoff " << xoff << " --yoff "
+    				<< yoff << " --zoff " << zoff << " --3d_rot" << std::flush;
+    		if (white_noise > 0.)
+    			fout << " --add_noise --white_noise " << white_noise;
+    		fout << std::endl;
+
+    		fout << "relion_image_handler --i temporary-image-3d.mrc --o " << fn_mic << " --new_box " << new_box_size << std::endl;
+    		fout << "rm -rf temporary-image-3d.mrc" << std::endl;
+    	}
 	}
-	MD.write(fn_out);
+	MD.write(fn_star_out);
+
+	if (!is_3d_tomo)
+	{
+		fout << "relion_project --i " << fn_vol_in << " --o temporary-images-2d --angpix " << angpix << " --ang " << fn_star_out << std::flush;
+		if (white_noise > 0.)
+			fout << " --add_noise --white_noise " << white_noise;
+		fout << std::endl;
+
+		fout << "relion_image_handler --i temporary-images-2d.mrcs --o t.mrcs --new_box " << new_box_size << std::endl;
+		fout << "mv temporary-images-2d_t.mrcs.mrcs segments-2d.mrcs" << std::endl;
+		fout << "rm -rf temporary-images-2d.mrcs temporary-images-2d.star" << std::endl;
+	}
+	fout.close();
+
+	if (is_3d_tomo)
+		command = "chmod u+x simulate-3d-subtomos.sh";
+	else
+		command = "chmod u+x simulate-2d-segments.sh";
+	int res = system(command.c_str());
+
+	std::cout << " WARNING: Please check the output STAR file before you execute the .sh script!" << std::endl;
+
 	return;
 };
 
@@ -4177,7 +4288,7 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
 		bool keep_tilt_prior_fixed,
-                RFLOAT sigma_cutoff)
+		RFLOAT sigma_cutoff)
 {
 	std::vector<HelicalSegmentPriorInfoEntry> list;
 	bool do_exclude_out_of_range_trans = true;
@@ -4375,5 +4486,122 @@ void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio)
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, ratio);
+	}
+}
+
+void plotLatticePoints(MetaDataTable& MD,
+		int x1, int y1, int x2, int y2)
+{
+	MD.clear();
+	MD.addLabel(EMDL_IMAGE_COORD_X);
+	MD.addLabel(EMDL_IMAGE_COORD_Y);
+	for (int i = -10; i <= 10; i++)
+	{
+		for (int j = -10; j <= 10; j++)
+		{
+			MD.addObject();
+			MD.setValue(EMDL_IMAGE_COORD_X, RFLOAT(i * x1 + j * x2));
+			MD.setValue(EMDL_IMAGE_COORD_Y, RFLOAT(i * y1 + j * y2));
+		}
+	}
+}
+
+void grabParticleCoordinates(
+		FileName& fn_in,
+		FileName& fn_out)
+{
+	MetaDataTable MD_in, MD_out;
+	RFLOAT x, y, z;
+	bool contain_z_coord = false;
+
+	if (fn_in.getExtension() != "star")
+		REPORT_ERROR("helix.cpp::grabParticleCoordinates: Input file must have STAR extension!");
+
+	MD_in.clear();
+	MD_in.read(fn_in);
+	if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) )
+		REPORT_ERROR("helix.cpp::grabParticleCoordinates: Input file must have X and Y coordinates!");
+	contain_z_coord = MD_in.containsLabel(EMDL_IMAGE_COORD_Z);
+
+	MD_out.clear();
+	x = y = z = 0.;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
+	{
+		MD_in.getValue(EMDL_IMAGE_COORD_X, x);
+		MD_in.getValue(EMDL_IMAGE_COORD_Y, y);
+		if (contain_z_coord)
+			MD_in.getValue(EMDL_IMAGE_COORD_Z, z);
+
+		MD_out.addObject();
+		MD_out.setValue(EMDL_IMAGE_COORD_X, x);
+		MD_out.setValue(EMDL_IMAGE_COORD_Y, y);
+		if (contain_z_coord)
+			MD_out.setValue(EMDL_IMAGE_COORD_Z, z);
+	}
+	MD_out.write(fn_out);
+
+	return;
+}
+
+void grabParticleCoordinates_Multiple(
+		std::string& suffix_fin,
+		std::string& suffix_fout)
+{
+	FileName fns_in;
+	std::vector<FileName> fn_in_list;
+
+	if (suffix_fin == suffix_fout)
+		REPORT_ERROR("helix.cpp::grabParticleCoordinates_Multiple(): File names error!");
+
+	fns_in = "*" + suffix_fin;
+	fns_in.globFiles(fn_in_list);
+	std::cout << "Number of input files = " << fn_in_list.size() << std::endl;
+	if (fn_in_list.size() < 1)
+		REPORT_ERROR("helix.cpp::grabParticleCoordinates_Multiple(): No input files are found!");
+
+	for (int ii = 0; ii < fn_in_list.size(); ii++)
+	{
+		FileName fn_out = fn_in_list[ii].beforeFirstOf(suffix_fin) + suffix_fout;
+		grabParticleCoordinates(fn_in_list[ii], fn_out);
+	}
+	return;
+}
+
+void calculateRadialAvg(MultidimArray<RFLOAT> &v, RFLOAT angpix)
+{
+	std::vector<RFLOAT> rval, rcount;
+	long int size, rint;
+
+	if ( (XSIZE(v) < 5) || (YSIZE(v) < 5) || (ZSIZE(v) < 5) || (NSIZE(v) != 1) )
+		REPORT_ERROR("helix.cpp::calculateRadialAvg(): Input image should be a 3D box larger than 5*5*5 !");
+	if (!(angpix > 0.))
+		REPORT_ERROR("helix.cpp::calculateRadialAvg(): Pixel size should be larger than 0 !");
+
+	v.setXmippOrigin();
+	size = (XSIZE(v) < YSIZE(v)) ? XSIZE(v) : YSIZE(v);
+	size = size / 2 + 2;
+
+	rval.resize(size);
+	rcount.resize(size);
+	for (int ii = 0; ii < rval.size(); ii++)
+		rval[ii] = rcount[ii] = 0.;
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
+	{
+		rint = ROUND(sqrt((RFLOAT)(i * i + j * j)));
+		if (rint >= size)
+			continue;
+
+		rval[rint] += A3D_ELEM(v, k, i, j);
+		rcount[rint] += 1.;
+	}
+
+	for (int ii = 0; ii < rval.size(); ii++)
+	{
+		if (rcount[ii] < 0.5)
+			rval[ii] = 0.;
+		else
+			rval[ii] /= rcount[ii];
+		std::cout << ii * angpix << "      " << rval[ii] << std::endl;
 	}
 }
