@@ -10,7 +10,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask &dataMask)
+		IndexedDataArrayMask &dataMask,
+		int chunk)
 {
 	long int w_base = dataMask.firstPos, w(0), k(0);
 	// be on the safe side with the jobArrays: make them as large as they could possibly be
@@ -38,7 +39,7 @@ long int makeJobsForDiff2Fine(
 				FPW.trans_idx[w_base+w] = j;					// which trans       - || -
 				FPW.ihidden_overs[w_base+w]= (ihidden * nr_over_orient + iover_rot) * nr_over_trans + iover_trans;
 
-				if(tk>=PROJDIFF_CHUNK_SIZE)
+				if(tk>=chunk)
 				{
 					tk=0;             // reset counter
 					k++;              // use new element
@@ -275,6 +276,7 @@ void runWavgKernel(
 		XFLOAT *Fimg_imag,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *sorted_weights,
 		XFLOAT *ctfs,
 		XFLOAT *wdiff2s_parts,
@@ -289,6 +291,7 @@ void runWavgKernel(
 		int exp_iclass,
 		XFLOAT part_scale,
 		bool refs_are_ctf_corrected,
+		bool data_is_3D,
 		cudaStream_t stream)
 {
 	//We only want as many blocks as there are chunks of orientations to be treated
@@ -299,8 +302,8 @@ void runWavgKernel(
 
 	if (refs_are_ctf_corrected)
 	{
-		if(projector.mdlZ!=0)
-			cuda_kernel_wavg<true,true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+		if(data_is_3D)
+			cuda_kernel_wavg<true,true,true,WAVG_BLOCK_SIZE_DATA3D><<<block_dim,WAVG_BLOCK_SIZE_DATA3D,(3*WAVG_BLOCK_SIZE_DATA3D+9)*sizeof(XFLOAT),stream>>>(
 				eulers,
 				projector,
 				image_size,
@@ -309,6 +312,28 @@ void runWavgKernel(
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+		else if (projector.mdlZ!=0)
+			cuda_kernel_wavg<true,true,false,WAVG_BLOCK_SIZE><<<block_dim,WAVG_BLOCK_SIZE,(3*WAVG_BLOCK_SIZE+9)*sizeof(XFLOAT),stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
 				sorted_weights,
 				ctfs,
 				wdiff2s_parts,
@@ -320,7 +345,7 @@ void runWavgKernel(
 				part_scale
 				);
 		else
-			cuda_kernel_wavg<false,true><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_wavg<true,false,false,WAVG_BLOCK_SIZE><<<block_dim,WAVG_BLOCK_SIZE,(3*WAVG_BLOCK_SIZE+9)*sizeof(XFLOAT),stream>>>(
 				eulers,
 				projector,
 				image_size,
@@ -329,6 +354,7 @@ void runWavgKernel(
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				sorted_weights,
 				ctfs,
 				wdiff2s_parts,
@@ -342,8 +368,8 @@ void runWavgKernel(
 	}
 	else
 	{
-		if(projector.mdlZ!=0)
-			cuda_kernel_wavg<true,false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+		if(data_is_3D)
+			cuda_kernel_wavg<false,true,true,WAVG_BLOCK_SIZE_DATA3D><<<block_dim,WAVG_BLOCK_SIZE_DATA3D,(3*WAVG_BLOCK_SIZE_DATA3D+9)*sizeof(XFLOAT),stream>>>(
 				eulers,
 				projector,
 				image_size,
@@ -352,6 +378,28 @@ void runWavgKernel(
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[ipart],
+				(XFLOAT) op.significant_weight[ipart],
+				part_scale
+				);
+		else if (projector.mdlZ!=0)
+			cuda_kernel_wavg<false,true,false,WAVG_BLOCK_SIZE><<<block_dim,WAVG_BLOCK_SIZE,(3*WAVG_BLOCK_SIZE+9)*sizeof(XFLOAT),stream>>>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
 				sorted_weights,
 				ctfs,
 				wdiff2s_parts,
@@ -363,7 +411,7 @@ void runWavgKernel(
 				part_scale
 				);
 		else
-			cuda_kernel_wavg<false,false><<<block_dim,WAVG_BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_wavg<false,false,false,WAVG_BLOCK_SIZE><<<block_dim,WAVG_BLOCK_SIZE,(3*WAVG_BLOCK_SIZE+9)*sizeof(XFLOAT),stream>>>(
 				eulers,
 				projector,
 				image_size,
@@ -372,6 +420,7 @@ void runWavgKernel(
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				sorted_weights,
 				ctfs,
 				wdiff2s_parts,
@@ -451,6 +500,7 @@ void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *corr_img,
 		XFLOAT *Fimg_real,
 		XFLOAT *Fimg_imag,
@@ -461,159 +511,294 @@ void runDiff2KernelCoarse(
 		int translation_num,
 		int image_size,
 		cudaStream_t stream,
-		bool do_CC)
+		bool do_CC,
+		bool data_is_3D)
 {
+	const int blocks3D = (data_is_3D? D2C_BLOCK_SIZE_DATA3D : D2C_BLOCK_SIZE_REF3D);
+
 	if(!do_CC)
 	{
 		if(projector.mdlZ!=0)
 		{
-			if (translation_num > D2C_BLOCK_SIZE_3D*8)
-			{
-				printf("Number of coarse translations larger than %d on the GPU not supported.\n", D2C_BLOCK_SIZE_3D*8);
-				fflush(stdout);
-				exit(1);
-			}
 
-			unsigned rest = orientation_num % D2C_EULERS_PER_BLOCK_3D;
+#ifdef CUDA_DOUBLE_PRECISION
+			if (translation_num > blocks3D*4)
+				REPORT_ERROR("Number of coarse translations not supported on the GPU.");
+#else
+			if (translation_num > blocks3D*8)
+				REPORT_ERROR("Number of coarse translations not supported on the GPU.");
+#endif
+
+			unsigned rest = orientation_num % blocks3D;
 			long unsigned even_orientation_num = orientation_num - rest;
 
-			if (translation_num <= D2C_BLOCK_SIZE_3D)
+			if (translation_num <= blocks3D)
 			{
 				if (even_orientation_num != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, D2C_EULERS_PER_BLOCK_3D, 4>
-					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D,0,stream>>>(
-						d_eulers,
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						diff2s,
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, D2C_EULERS_PER_BLOCK_DATA3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,D2C_BLOCK_SIZE_DATA3D,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, D2C_EULERS_PER_BLOCK_REF3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,D2C_BLOCK_SIZE_REF3D,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
 				}
 
 				if (rest != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D, 1, 4>
-					<<<rest,D2C_BLOCK_SIZE_3D,0,stream>>>(
-						&d_eulers[9*even_orientation_num],
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						&diff2s[translation_num*even_orientation_num],
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_DATA3D,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_REF3D,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
 				}
 			}
-			else if (translation_num <= D2C_BLOCK_SIZE_3D*2)
+			else if (translation_num <= blocks3D*2)
 			{
 				if (even_orientation_num != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*2, D2C_EULERS_PER_BLOCK_3D, 4>
-					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D*2,0,stream>>>(
-						d_eulers,
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						diff2s,
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*2, D2C_EULERS_PER_BLOCK_DATA3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,D2C_BLOCK_SIZE_DATA3D*2,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*2, D2C_EULERS_PER_BLOCK_REF3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,D2C_BLOCK_SIZE_REF3D*2,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
+
 				}
 
 				if (rest != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*2, 1, 4>
-					<<<rest,D2C_BLOCK_SIZE_3D*2,0,stream>>>(
-						&d_eulers[9*even_orientation_num],
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						&diff2s[translation_num*even_orientation_num],
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true, true, D2C_BLOCK_SIZE_DATA3D*2, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_DATA3D*2,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*2, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_REF3D*2,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
 				}
 			}
-			else if (translation_num <= D2C_BLOCK_SIZE_3D*4)
+			else if (translation_num <= blocks3D*4)
 			{
 				if (even_orientation_num != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*4, D2C_EULERS_PER_BLOCK_3D, 4>
-					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D*4,0,stream>>>(
-						d_eulers,
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						diff2s,
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*4, D2C_EULERS_PER_BLOCK_DATA3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,D2C_BLOCK_SIZE_DATA3D*4,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*4, D2C_EULERS_PER_BLOCK_REF3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,D2C_BLOCK_SIZE_REF3D*4,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
 				}
 
 				if (rest != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*4, 1, 4>
-					<<<rest,D2C_BLOCK_SIZE_3D*4,0,stream>>>(
-						&d_eulers[9*even_orientation_num],
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						&diff2s[translation_num*even_orientation_num],
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*4, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_DATA3D*4,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*4, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_REF3D*4,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
 				}
 			}
+#ifndef CUDA_DOUBLE_PRECISION
 			else
 			{
 				if (even_orientation_num != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*8, D2C_EULERS_PER_BLOCK_3D, 4>
-					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_3D,D2C_BLOCK_SIZE_3D*8,0,stream>>>(
-						d_eulers,
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						diff2s,
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*8, D2C_EULERS_PER_BLOCK_DATA3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,D2C_BLOCK_SIZE_DATA3D*8,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*8, D2C_EULERS_PER_BLOCK_REF3D, 4>
+						<<<even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,D2C_BLOCK_SIZE_REF3D*8,0,stream>>>(
+							d_eulers,
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							diff2s,
+							translation_num,
+							image_size);
 				}
 
 				if (rest != 0)
 				{
-					cuda_kernel_diff2_coarse<true, D2C_BLOCK_SIZE_3D*8, 1, 4>
-					<<<rest,D2C_BLOCK_SIZE_3D*8,0,stream>>>(
-						&d_eulers[9*even_orientation_num],
-						trans_x,
-						trans_y,
-						Fimg_real,
-						Fimg_imag,
-						projector,
-						corr_img,
-						&diff2s[translation_num*even_orientation_num],
-						translation_num,
-						image_size);
+					if(data_is_3D)
+						cuda_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*8, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_DATA3D*8,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
+					else
+						cuda_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*8, 1, 4>
+						<<<rest,D2C_BLOCK_SIZE_REF3D*8,0,stream>>>(
+							&d_eulers[9*even_orientation_num],
+							trans_x,
+							trans_y,
+							trans_z,
+							Fimg_real,
+							Fimg_imag,
+							projector,
+							corr_img,
+							&diff2s[translation_num*even_orientation_num],
+							translation_num,
+							image_size);
 				}
 			}
-
+#endif
 		}
 		else
 		{
@@ -631,35 +816,67 @@ void runDiff2KernelCoarse(
 
 			if (even_orientation_num != 0)
 			{
-				cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
-				<<<even_orientation_num/D2C_EULERS_PER_BLOCK_2D,D2C_BLOCK_SIZE_2D,0,stream>>>(
-					d_eulers,
-					trans_x,
-					trans_y,
-					Fimg_real,
-					Fimg_imag,
-					projector,
-					corr_img,
-					diff2s,
-					translation_num,
-					image_size);
+				if(data_is_3D)
+					cuda_kernel_diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
+					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_2D,D2C_BLOCK_SIZE_2D,0,stream>>>(
+						d_eulers,
+						trans_x,
+						trans_y,
+						trans_z,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						diff2s,
+						translation_num,
+						image_size);
+				else
+					cuda_kernel_diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
+					<<<even_orientation_num/D2C_EULERS_PER_BLOCK_2D,D2C_BLOCK_SIZE_2D,0,stream>>>(
+						d_eulers,
+						trans_x,
+						trans_y,
+						trans_z,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						diff2s,
+						translation_num,
+						image_size);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
 
 			if (rest != 0)
 			{
-				cuda_kernel_diff2_coarse<false, D2C_BLOCK_SIZE_2D, 1, 2>
-				<<<rest,D2C_BLOCK_SIZE_2D,0,stream>>>(
-					&d_eulers[9*even_orientation_num],
-					trans_x,
-					trans_y,
-					Fimg_real,
-					Fimg_imag,
-					projector,
-					corr_img,
-					&diff2s[translation_num*even_orientation_num],
-					translation_num,
-					image_size);
+				if(data_is_3D)
+					cuda_kernel_diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, 1, 2>
+					<<<rest,D2C_BLOCK_SIZE_2D,0,stream>>>(
+						&d_eulers[9*even_orientation_num],
+						trans_x,
+						trans_y,
+						trans_z,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						&diff2s[translation_num*even_orientation_num],
+						translation_num,
+						image_size);
+				else
+					cuda_kernel_diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, 1, 2>
+					<<<rest,D2C_BLOCK_SIZE_2D,0,stream>>>(
+						&d_eulers[9*even_orientation_num],
+						trans_x,
+						trans_y,
+						trans_z,
+						Fimg_real,
+						Fimg_imag,
+						projector,
+						corr_img,
+						&diff2s[translation_num*even_orientation_num],
+						translation_num,
+						image_size);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
 		}
@@ -667,14 +884,30 @@ void runDiff2KernelCoarse(
 	else
 	{
 		dim3 CCblocks(orientation_num,translation_num);
-		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_coarse<true>
-		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
+		if(data_is_3D)
+			cuda_kernel_diff2_CC_coarse<true,true,D2C_BLOCK_SIZE_DATA3D>
+		<<<CCblocks,D2C_BLOCK_SIZE_DATA3D,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
+				projector,
+				corr_img,
+				diff2s,
+				translation_num,
+				image_size,
+				local_sqrtXi2);
+		else if(projector.mdlZ!=0)
+			cuda_kernel_diff2_CC_coarse<true,false,D2C_BLOCK_SIZE_REF3D>
+		<<<CCblocks,D2C_BLOCK_SIZE_REF3D,0,stream>>>(
+				d_eulers,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -682,13 +915,14 @@ void runDiff2KernelCoarse(
 				image_size,
 				local_sqrtXi2);
 		else
-			cuda_kernel_diff2_CC_coarse<false>
-		<<<CCblocks,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_coarse<false,false,D2C_BLOCK_SIZE_2D>
+		<<<CCblocks,D2C_BLOCK_SIZE_2D,0,stream>>>(
 				d_eulers,
 				Fimg_real,
 				Fimg_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -707,6 +941,7 @@ void runDiff2KernelFine(
 		XFLOAT *Fimgs_imag,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
@@ -724,64 +959,111 @@ void runDiff2KernelFine(
 		int exp_iclass,
 		cudaStream_t stream,
 		long unsigned job_num_count,
-		bool do_CC)
+		bool do_CC,
+		bool data_is_3D)
 {
     dim3 block_dim = job_num_count;
 
     if(!do_CC)
     {
-		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_fine<true>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
-				eulers,
-				Fimgs_real,
-				Fimgs_imag,
-				trans_x,
-				trans_y,
-				projector,
-				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
-				diff2s,
-				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.,
-				orientation_num,
-				translation_num,
-				job_num_count, //significant_num,
-				rot_idx,
-				trans_idx,
-				job_idx,
-				job_num);
-		else
-			cuda_kernel_diff2_fine<false>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
-				eulers,
-				Fimgs_real,
-				Fimgs_imag,
-				trans_x,
-				trans_y,
-				projector,
-				corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
-				diff2s,
-				image_size,
-				op.highres_Xi2_imgs[ipart] / 2.,
-				orientation_num,
-				translation_num,
-				job_num_count, //significant_num,
-				rot_idx,
-				trans_idx,
-				job_idx,
-				job_num);
+			if(data_is_3D)
+				cuda_kernel_diff2_fine<true,true, D2F_BLOCK_SIZE_DATA3D, D2F_CHUNK_DATA3D>
+				<<<block_dim,D2F_BLOCK_SIZE_DATA3D,0,stream>>>(
+					eulers,
+					Fimgs_real,
+					Fimgs_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					projector,
+					corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
+					diff2s,
+					image_size,
+					op.highres_Xi2_imgs[ipart] / 2.,
+					orientation_num,
+					translation_num,
+					job_num_count, //significant_num,
+					rot_idx,
+					trans_idx,
+					job_idx,
+					job_num);
+			else if(projector.mdlZ!=0)
+				cuda_kernel_diff2_fine<true,false,D2F_BLOCK_SIZE_REF3D,D2F_CHUNK_REF3D>
+				<<<block_dim,D2F_BLOCK_SIZE_REF3D,0,stream>>>(
+					eulers,
+					Fimgs_real,
+					Fimgs_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					projector,
+					corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
+					diff2s,
+					image_size,
+					op.highres_Xi2_imgs[ipart] / 2.,
+					orientation_num,
+					translation_num,
+					job_num_count, //significant_num,
+					rot_idx,
+					trans_idx,
+					job_idx,
+					job_num);
+			else
+				cuda_kernel_diff2_fine<false,false,D2F_BLOCK_SIZE_2D,D2F_CHUNK_2D>
+				<<<block_dim,D2F_BLOCK_SIZE_2D,0,stream>>>(
+					eulers,
+					Fimgs_real,
+					Fimgs_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					projector,
+					corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
+					diff2s,
+					image_size,
+					op.highres_Xi2_imgs[ipart] / 2.,
+					orientation_num,
+					translation_num,
+					job_num_count, //significant_num,
+					rot_idx,
+					trans_idx,
+					job_idx,
+					job_num);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
     }
     else
     {
-		if(projector.mdlZ!=0)
-			cuda_kernel_diff2_CC_fine<true>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
+    	if(data_is_3D)
+			cuda_kernel_diff2_CC_fine<true,true,D2F_BLOCK_SIZE_DATA3D,D2F_CHUNK_DATA3D>
+			<<<block_dim,D2F_BLOCK_SIZE_DATA3D,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
 				trans_x,
 				trans_y,
+				trans_z,
+				projector,
+				corr_img,
+				diff2s,
+				image_size,
+				op.highres_Xi2_imgs[ipart] / 2.,
+				(XFLOAT) op.local_sqrtXi2[ipart],
+				orientation_num,
+				translation_num,
+				job_num_count, //significant_num,
+				rot_idx,
+				trans_idx,
+				job_idx,
+				job_num);
+    	else if(projector.mdlZ!=0)
+			cuda_kernel_diff2_CC_fine<true,false,D2F_BLOCK_SIZE_REF3D,D2F_CHUNK_REF3D>
+			<<<block_dim,D2F_BLOCK_SIZE_REF3D,0,stream>>>(
+				eulers,
+				Fimgs_real,
+				Fimgs_imag,
+				trans_x,
+				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -796,13 +1078,14 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num);
 		else
-			cuda_kernel_diff2_CC_fine<false>
-			<<<block_dim,BLOCK_SIZE,0,stream>>>(
+			cuda_kernel_diff2_CC_fine<false,false,D2F_BLOCK_SIZE_2D,D2F_CHUNK_2D>
+			<<<block_dim,D2F_BLOCK_SIZE_2D,0,stream>>>(
 				eulers,
 				Fimgs_real,
 				Fimgs_imag,
 				trans_x,
 				trans_y,
+				trans_z,
 				projector,
 				corr_img,
 				diff2s,
@@ -821,6 +1104,84 @@ void runDiff2KernelFine(
 
 }
 
+void runCollect2jobs(	dim3 grid_dim,
+						XFLOAT * oo_otrans_x,          // otrans-size -> make const
+						XFLOAT * oo_otrans_y,          // otrans-size -> make const
+						XFLOAT * oo_otrans_z,          // otrans-size -> make const
+						XFLOAT * myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						XFLOAT * weights,
+						XFLOAT significant_weight,
+						XFLOAT sum_weight,
+						unsigned long nr_trans,
+						unsigned long nr_oversampled_trans,
+						unsigned long nr_oversampled_rot,
+						int oversamples,
+						bool skip_rots,
+						XFLOAT * p_weights,
+						XFLOAT * p_thr_wsum_prior_offsetx_class,
+						XFLOAT * p_thr_wsum_prior_offsety_class,
+						XFLOAT * p_thr_wsum_prior_offsetz_class,
+						XFLOAT * p_thr_wsum_sigma2_offset,
+						size_t * rot_idx,
+						size_t * trans_idx,
+						size_t * jobOrigin,
+						size_t * jobExtent,
+						bool data_is_3D
+						)
+{
+	if(data_is_3D)
+	{
+		size_t shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*5; // x+y+z+myp+weights
+		cuda_kernel_collect2jobs<true><<<grid_dim,SUMW_BLOCK_SIZE,shared_buffer>>>(
+				oo_otrans_x,          // otrans-size -> make const
+				oo_otrans_y,          // otrans-size -> make const
+				oo_otrans_z,          // otrans-size -> make const
+				myp_oo_otrans_x2y2z2, // otrans-size -> make const
+				weights,
+				significant_weight,
+				sum_weight,
+				nr_trans,
+				nr_oversampled_trans,
+				nr_oversampled_rot,
+				oversamples,
+				skip_rots,
+				p_weights,
+				p_thr_wsum_prior_offsetx_class,
+				p_thr_wsum_prior_offsety_class,
+				p_thr_wsum_prior_offsetz_class,
+				p_thr_wsum_sigma2_offset,
+				rot_idx,
+				trans_idx,
+				jobOrigin,
+				jobExtent);
+	}
+	else
+	{
+		size_t shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*4; // x+y+myp+weights
+		cuda_kernel_collect2jobs<false><<<grid_dim,SUMW_BLOCK_SIZE,shared_buffer>>>(
+				oo_otrans_x,          // otrans-size -> make const
+				oo_otrans_y,          // otrans-size -> make const
+				oo_otrans_z,          // otrans-size -> make const
+				myp_oo_otrans_x2y2z2, // otrans-size -> make const
+				weights,
+				significant_weight,
+				sum_weight,
+				nr_trans,
+				nr_oversampled_trans,
+				nr_oversampled_rot,
+				oversamples,
+				skip_rots,
+				p_weights,
+				p_thr_wsum_prior_offsetx_class,
+				p_thr_wsum_prior_offsety_class,
+				p_thr_wsum_prior_offsetz_class,
+				p_thr_wsum_sigma2_offset,
+				rot_idx,
+				trans_idx,
+				jobOrigin,
+				jobExtent);
+	}
+}
 //void windowFourierTransform2(
 //		XFLOAT *d_in_real,
 //		XFLOAT *d_in_imag,

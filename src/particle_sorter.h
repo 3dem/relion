@@ -59,6 +59,9 @@ public:
 	// Pixel size (for low-pass filter and particle diameter)
 	RFLOAT angpix;
 
+	// Pixel size in the references (could be different from angpix)
+	RFLOAT angpix_ref;
+
 	// Particle diameter (in Angstroms)
 	RFLOAT particle_diameter;
 	int particle_radius2;

@@ -66,84 +66,6 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 	}
 }
 
-__global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
-										XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
-										XFLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const
-										XFLOAT *g_i_weights,
-										XFLOAT op_significant_weight,    // TODO Put in const
-										XFLOAT op_sum_weight,            // TODO Put in const
-										int   coarse_trans,
-										int   oversamples_trans,
-										int   oversamples_orient,
-										int   oversamples,
-										bool  do_ignore_pdf_direction,
-										XFLOAT *g_o_weights,
-										XFLOAT *g_thr_wsum_prior_offsetx_class,
-										XFLOAT *g_thr_wsum_prior_offsety_class,
-										XFLOAT *g_thr_wsum_sigma2_offset,
-								     	unsigned long *d_rot_idx,
-								     	unsigned long *d_trans_idx,
-								     	unsigned long *d_job_idx,
-								     	unsigned long *d_job_num
-								     	)
-{
-	// blockid
-	int bid = blockIdx.x;
-	//threadid
-	int tid = threadIdx.x;
-
-	__shared__ XFLOAT                    s_o_weights[SUMW_BLOCK_SIZE];
-	__shared__ XFLOAT s_thr_wsum_prior_offsetx_class[SUMW_BLOCK_SIZE];
-	__shared__ XFLOAT s_thr_wsum_prior_offsety_class[SUMW_BLOCK_SIZE];
-	__shared__ XFLOAT       s_thr_wsum_sigma2_offset[SUMW_BLOCK_SIZE];
-	s_o_weights[tid]                    = (XFLOAT)0.0;
-	s_thr_wsum_prior_offsetx_class[tid] = (XFLOAT)0.0;
-	s_thr_wsum_prior_offsety_class[tid] = (XFLOAT)0.0;
-	s_thr_wsum_sigma2_offset[tid]       = (XFLOAT)0.0;
-
-	long int pos = d_job_idx[bid];
-    	int job_size = d_job_num[bid];
-	pos += tid;	   					// pos is updated to be thread-resolved
-
-    int pass_num = ceilfracf(job_size,SUMW_BLOCK_SIZE);
-    __syncthreads();
-    for (int pass = 0; pass < pass_num; pass++, pos+=SUMW_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
-    {
-    	if ((pass*SUMW_BLOCK_SIZE+tid)<job_size) // if there is a translation that needs to be done still for this thread
-    	{
-			// index of comparison
-			long int iy = d_trans_idx[pos];              // ...and its own trans...
-
-			XFLOAT weight = g_i_weights[pos];
-			if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
-				weight /= op_sum_weight;
-			else
-				weight = (XFLOAT)0.0;
-
-			s_o_weights[tid] += weight;
-			s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy];
-			s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy];
-			s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy];
-    	}
-    }
-    __syncthreads();
-    // Reduction of all treanslations this orientation
-	for(int j=(SUMW_BLOCK_SIZE/2); j>0; j/=2)
-	{
-		if(tid<j)
-		{
-			s_o_weights[tid]                    += s_o_weights[tid+j];
-			s_thr_wsum_prior_offsetx_class[tid] += s_thr_wsum_prior_offsetx_class[tid+j];
-			s_thr_wsum_prior_offsety_class[tid] += s_thr_wsum_prior_offsety_class[tid+j];
-			s_thr_wsum_sigma2_offset[tid]       += s_thr_wsum_sigma2_offset[tid+j];
-		}
-		__syncthreads();
-	}
-	g_o_weights[bid]			           = s_o_weights[0];
-	g_thr_wsum_prior_offsetx_class[bid] = s_thr_wsum_prior_offsetx_class[0];
-	g_thr_wsum_prior_offsety_class[bid] = s_thr_wsum_prior_offsety_class[0];
-	g_thr_wsum_sigma2_offset[bid]       = s_thr_wsum_sigma2_offset[0];
-}
 __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												long int vol_size,
 												long int xdim,
@@ -183,15 +105,15 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 				{
 					img_pixels[tid]=__ldg(&vol[texel]);
 
-					z = (XFLOAT)0.0;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+					z = floor( (float) texel                   / (float)((xdim)*(ydim)));
 					y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT) xdim );
 					x = texel - z*(xdim)*(ydim) - y*xdim;
 
-	//				z-=zinit;
+					z-=zinit;
 					y-=yinit;
 					x-=xinit;
 
-					r = sqrt(x*x + y*y);// + z*z);
+					r = sqrt(x*x + y*y + z*z);
 
 					if (r < radius)
 						continue;
@@ -236,15 +158,15 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 			{
 				img_pixels[tid]=__ldg(&vol[texel]);
 
-				z = (XFLOAT)0.0;// floor( (float) texel                  / (float)((xdim)*(ydim)));
+				z =  floor( (float) texel                  / (float)((xdim)*(ydim)));
 				y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT)  xdim         );
 				x = texel - z*(xdim)*(ydim) - y*xdim;
 
-//				z-=zinit;
+				z-=zinit;
 				y-=yinit;
 				x-=xinit;
 
-				r = sqrt(x*x + y*y);// + z*z);
+				r = sqrt(x*x + y*y + z*z);
 
 				if (r < radius)
 					continue;
@@ -265,6 +187,142 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 
 		}
 }
+
+__global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
+														long int vol_size,
+														long int xdim,
+														long int ydim,
+														long int zdim,
+														long int xinit,
+														long int yinit,
+														long int zinit,
+														bool do_Mnoise,
+														XFLOAT radius,
+														XFLOAT radius_p,
+														XFLOAT cosine_width,
+														XFLOAT *g_sum,
+														XFLOAT *g_sum_bg)
+{
+
+		int tid = threadIdx.x;
+		int bid = blockIdx.x;
+
+//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+		XFLOAT r, raisedcos;
+		int x,y,z;
+		__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
+		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
+		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
+
+		long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
+		int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+
+		partial_sum[tid]=(XFLOAT)0.0;
+		partial_sum_bg[tid]=(XFLOAT)0.0;
+
+		for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+		{
+			if(texel<vol_size)
+			{
+				img_pixels[tid]=__ldg(&vol[texel]);
+
+				z =   texel / (xdim*ydim) ;
+				y = ( texel % (xdim*ydim) ) / xdim ;
+				x = ( texel % (xdim*ydim) ) % xdim ;
+
+				z-=zinit;
+				y-=yinit;
+				x-=xinit;
+
+				r = sqrt(XFLOAT(x*x + y*y + z*z));
+
+				if (r < radius)
+					continue;
+				else if (r > radius_p)
+				{
+					partial_sum[tid]    += (XFLOAT)1.0;
+					partial_sum_bg[tid] += img_pixels[tid];
+				}
+				else
+				{
+#if defined(CUDA_DOUBLE_PRECISION)
+					raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
+#else
+					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+#endif
+					partial_sum[tid] += raisedcos;
+					partial_sum_bg[tid] += raisedcos * img_pixels[tid];
+				}
+			}
+		}
+
+		cuda_atomic_add(&g_sum[tid]   , partial_sum[tid]);
+		cuda_atomic_add(&g_sum_bg[tid], partial_sum_bg[tid]);
+}
+
+
+__global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
+											long int vol_size,
+											long int xdim,
+											long int ydim,
+											long int zdim,
+											long int xinit,
+											long int yinit,
+											long int zinit,
+											bool do_Mnoise,
+											XFLOAT radius,
+											XFLOAT radius_p,
+											XFLOAT cosine_width,
+											XFLOAT bg_value)
+{
+
+	int tid = threadIdx.x;
+	int bid = blockIdx.x;
+
+//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+	XFLOAT r, raisedcos;
+	int x,y,z;
+	__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
+
+	long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
+	int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+
+	for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+	{
+		if(texel<vol_size)
+		{
+			img_pixels[tid]=__ldg(&vol[texel]);
+
+			z =   texel / (xdim*ydim) ;
+			y = ( texel % (xdim*ydim) ) / xdim ;
+			x = ( texel % (xdim*ydim) ) % xdim ;
+
+			z-=zinit;
+			y-=yinit;
+			x-=xinit;
+
+			r = sqrt(XFLOAT(x*x + y*y + z*z));
+
+			if (r < radius)
+				continue;
+			else if (r > radius_p)
+				img_pixels[tid]=bg_value;
+			else
+			{
+#if defined(CUDA_DOUBLE_PRECISION)
+				raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
+#else
+				raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
+#endif
+				img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + bg_value*raisedcos;
+
+			}
+			vol[texel]=img_pixels[tid];
+		}
+
+	}
+}
+
 
 __global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
 											XFLOAT * g_image_out,
@@ -338,116 +396,6 @@ __global__ void cuda_kernel_translate3D(	XFLOAT * g_image_in,
 	}
 }
 
-__global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
-											XFLOAT * g_spectrum,
-											int image_size,
-											int spectrum_size,
-											int xdim,
-											int ydim,
-											int res_limit,
-											XFLOAT * g_highres_Xi2)
-{
-	int tid = threadIdx.x;
-	int bid =  blockIdx.x;
-
-	XFLOAT normFaux;
-	__shared__ XFLOAT s_highres_Xi2[POWERCLASS_BLOCK_SIZE];
-	s_highres_Xi2[tid] = (XFLOAT)0.;
-
-	int x,y,xp,yp;
-	int pixel=tid + bid*POWERCLASS_BLOCK_SIZE;
-
-	if(pixel<image_size)
-	{
-		x = pixel % xdim;
-		y = (pixel-x) / (xdim);
-
-		xp = x;
-		yp = ((y<xdim) ? y : y-ydim);
-#if defined(CUDA_DOUBLE_PRECISION)
-		int ires = __double2int_rn(sqrt((XFLOAT)(xp*xp + yp*yp)));
-#else
-		int ires = __float2int_rn(sqrtf((XFLOAT)(xp*xp + yp*yp)));
-#endif
-		if((ires>0.f) && (ires<spectrum_size) && !(xp==0 && yp<0.f))
-		{
-			normFaux = g_image[pixel].x*g_image[pixel].x + g_image[pixel].y*g_image[pixel].y;
-			cuda_atomic_add(&g_spectrum[ires], normFaux);
-			if(ires>=res_limit)
-				s_highres_Xi2[tid] = normFaux;
-		}
-	}
-
-	// Reduce the higres_Xi2-values for all threads. (I tried a straight atomic-write: for 128 threads it was ~3x slower)
-	__syncthreads();
-	for(int j=(POWERCLASS_BLOCK_SIZE/2); j>0.f; j/=2)
-	{
-		if(tid<j)
-			s_highres_Xi2[tid] += s_highres_Xi2[tid+j];
-		__syncthreads();
-	}
-	if(tid==0)
-		cuda_atomic_add(&g_highres_Xi2[0], s_highres_Xi2[0]);
-
-}
-
-__global__ void cuda_kernel_powerClass3D(	CUDACOMPLEX * g_image,
-											XFLOAT * g_spectrum,
-											int image_size,
-											int spectrum_size,
-											int xdim,
-											int ydim,
-											int zdim,
-											int res_limit,
-											XFLOAT * g_highres_Xi2)
-{
-	int tid = threadIdx.x;
-	int bid =  blockIdx.x;
-
-	XFLOAT normFaux;
-	__shared__ XFLOAT s_highres_Xi2[POWERCLASS_BLOCK_SIZE];
-	s_highres_Xi2[tid] = (XFLOAT)0.;
-
-	int x,y,z,xy;
-	int xydim = xdim*ydim;
-	int voxel=tid + bid*POWERCLASS_BLOCK_SIZE;
-
-	if(voxel<image_size)
-	{
-		z =  voxel / xydim;
-		xy = voxel % xydim;
-		y =  xy / xdim;
-		x =  xy % xdim;
-
-		y = ((y<xdim) ? y : y-ydim);
-		z = ((z<xdim) ? z : z-zdim);
-#if defined(CUDA_DOUBLE_PRECISION)
-		int ires = __double2int_rn(sqrt((XFLOAT)(x*x + y*y + z*z)));
-#else
-		int ires = __float2int_rn(sqrtf((XFLOAT)(x*x + y*y + z*z)));
-#endif
-		if((ires>0.f) && (ires<spectrum_size) && !(x==0 && y<0.f && z<0.f))
-		{
-			normFaux = g_image[voxel].x*g_image[voxel].x + g_image[voxel].y*g_image[voxel].y;
-			cuda_atomic_add(&g_spectrum[ires], normFaux);
-			if(ires>=res_limit)
-				s_highres_Xi2[tid] = normFaux;
-		}
-	}
-
-	// Reduce the higres_Xi2-values for all threads. (I tried a straight atomic-write: for 128 threads it was ~3x slower)
-	__syncthreads();
-	for(int j=(POWERCLASS_BLOCK_SIZE/2); j>0.f; j/=2)
-	{
-		if(tid<j)
-			s_highres_Xi2[tid] += s_highres_Xi2[tid+j];
-		__syncthreads();
-	}
-	if(tid==0)
-		cuda_atomic_add(&g_highres_Xi2[0], s_highres_Xi2[0]);
-
-}
-
 __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 int image_size,
 										 int xdim,
@@ -513,6 +461,7 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
 			int x = xy % xdim;
 
+
 			int yp = y + yshift;
 			if (yp < 0)
 				yp += ydim;
@@ -531,7 +480,7 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 			else if (zp >= zdim)
 				zp -= zdim;
 
-			int n_pixel = zp+xydim + yp*xdim + xp;
+			int n_pixel = zp*xydim + yp*xdim + xp;
 
 			buffer[tid]                    = img_in[image_offset + n_pixel];
 			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];

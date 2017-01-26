@@ -679,6 +679,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 									cudaProjectors[iref],
 									(int)basePckr->workSize/2+1,
 									(int)basePckr->workSize,
+									1, // Zdim, always 1 in autopicker.
 									(int)basePckr->workSize/2+1 -1 );
 
 			int FauxStride = (basePckr->workSize/2+1)*basePckr->workSize;

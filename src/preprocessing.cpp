@@ -395,9 +395,10 @@ void Preprocessing::runExtractParticles()
 		init_progress_bar(nr_mics);
 		barstep = XMIPP_MAX(1, nr_mics / 60);
 	}
-
+	MetaDataTable MDoutMics;  // during re-extraction we may not always use particles from all mics.
 	FileName fn_mic, fn_olddir = "";
 	long int imic = 0;
+	bool micIsUsed;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 	{
 		if (do_movie_extract)
@@ -419,12 +420,16 @@ void Preprocessing::runExtractParticles()
 			progress_bar(imic);
 
 		TIMING_TIC(TIMING_TOP);
-		extractParticlesFromFieldOfView(fn_mic, imic);
+		micIsUsed = extractParticlesFromFieldOfView(fn_mic, imic);
 		TIMING_TOC(TIMING_TOP);
+
+		if(micIsUsed)
+			MDoutMics.addObject(MDmics.getObject(current_object));
 
 		imic++;
 	}
 
+	MDmics = MDoutMics;
 	if (verb > 0)
 		progress_bar(fn_coords.size());
 
@@ -572,7 +577,7 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
 		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (*.star, *.box and *.coords are supported).");
 }
 
-void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int imic)
+bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int imic)
 {
 
 	// Name of the output particle stack
@@ -587,7 +592,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 
     if (exists(fn_star) && only_extract_unfinished)
     {
-    	return;
+    	return(true);
     }
 
 	TIMING_TIC(TIMING_READ_COORD);
@@ -602,7 +607,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	{
 		FileName fn_coord = getCoordinateFileName(fn_mic);
 		if (!exists(fn_coord))
-			return;
+			return(false);
 		if (do_extract_helix)
 			readHelicalCoordinates(fn_mic, fn_coord, MDin);
 		else
@@ -641,7 +646,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		if (!exists(fn_mic))
 		{
 			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles, because cannot find the file..." << std::endl;
-			return;
+			return(false);
 		}
 
 		// Read the header of the micrograph to see how many frames there are.
@@ -659,7 +664,7 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		if (do_movie_extract && ndim < movie_last_frame)
 		{
 			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles,  because it has only " << ndim << " frames..." << std::endl;
-			return;
+			return(false);
 		}
 
 		long int my_current_nr_images = 0;
@@ -692,10 +697,12 @@ void Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 
 		MDout.setName("images");
 		MDout.write(fn_star);
+		return(true);
 	}
 	else
 	{
 		std::cerr << " WARNING: no particles on micrograph: " << fn_mic << std::endl;
+		return(false);
 	}
 
 }

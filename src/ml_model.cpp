@@ -585,7 +585,12 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 		if (fn_ref.isStarFile())
 		{
 			MetaDataTable MDref;
-			MDref.read(fn_ref);
+			MDref.read(fn_ref,"model_classes");
+			if(!MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp)) // if we did not find the meta-data label _rlnReferenceImage in a directed search, try more generally
+				MDref.read(fn_ref);
+			if(!MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp)) // if we still did not find the meta-data label _rlnReferenceImage, report an error
+				REPORT_ERROR("When specifying a .star-file as --ref input, you need to have the _rlnReferenceImage field");
+
 			do_generate_seeds = false;
 			// ignore nr_classes from the command line, use number of entries in STAR file
 			nr_classes = 0;
@@ -977,8 +982,8 @@ void MlWsumModel::initZeros()
 
 void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 {
-	// for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
-	long long int packed_size = 0;
+    // for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
+    unsigned long long packed_size = 0;
     int spectral_size = (ori_size / 2) + 1;
 
     packed_size += 7 ;
@@ -1004,7 +1009,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
     packed.resize(packed_size);
 
     // Start packing
-    long long int idx = 0;
+    unsigned long long idx = 0;
 
     DIRECT_MULTIDIM_ELEM(packed, idx++) = LL;
     DIRECT_MULTIDIM_ELEM(packed, idx++) = ave_Pmax;
@@ -1085,7 +1090,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
 {
     int spectral_size = (ori_size / 2) + 1;
 
-    long long int idx = 0;
+    unsigned long long idx = 0;
 
     LL = DIRECT_MULTIDIM_ELEM(packed, idx++);
     ave_Pmax = DIRECT_MULTIDIM_ELEM(packed, idx++);
@@ -1144,7 +1149,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
         }
     }
 
-    long long int packed_size = MULTIDIM_SIZE(packed);
+    unsigned long long packed_size = MULTIDIM_SIZE(packed);
     packed.clear();
 
     // Just to check whether we went outside our memory...
@@ -1165,8 +1170,8 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     int nr_classes_bodies = BPref.size();
     int nr_classes = pdf_class.size();
     int spectral_size = (ori_size / 2) + 1;
-    long long int packed_size = 0;
-    long long int idx_start, idx_stop;
+    unsigned long long packed_size = 0;
+    unsigned long long idx_start, idx_stop;
 
 	// for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
     packed_size += 7 ;
@@ -1220,8 +1225,8 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     packed.clear();
     packed.resize(idx_stop - idx_start);
 
-    long long int idx = 0;
-    long long int ori_idx = 0;
+    unsigned long long idx = 0;
+    unsigned long long ori_idx = 0;
     if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = LL;
     ori_idx++;
     if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = ave_Pmax;
@@ -1334,8 +1339,8 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     int nr_classes_bodies = BPref.size();
     int nr_classes = pdf_class.size();
     int spectral_size = (ori_size / 2) + 1;
-    long long int idx_start;
-    long long int idx_stop;
+    unsigned long long idx_start;
+    unsigned long long idx_stop;
     if (piece < 0)
     {
     	// Special case: prevent making multiple pieces if input piece is negative
@@ -1347,8 +1352,8 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     	idx_start = piece * MAX_PACK_SIZE;
     	idx_stop  = idx_start + MULTIDIM_SIZE(packed);
     }
-    long long int ori_idx = 0;
-    long long int idx = 0;
+    unsigned long long ori_idx = 0;
+    unsigned long long idx = 0;
 #ifdef DEBUG_PACK
     std::cerr << " UNPACK piece= " << piece << " idx_start= " << idx_start << " idx_stop= " << idx_stop << std::endl;
 #endif
@@ -1455,7 +1460,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     }
 
 
-    long long int packed_size = MULTIDIM_SIZE(packed);
+    unsigned long long packed_size = MULTIDIM_SIZE(packed);
     // Free memory
     if (do_clear)
         packed.clear();
