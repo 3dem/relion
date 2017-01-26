@@ -202,7 +202,7 @@ public:
 	void readHelicalCoordinates(FileName fn_mic, FileName fn_coord, MetaDataTable &MD);
 
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
-	void extractParticlesFromFieldOfView(FileName fn_mic, long int imic);
+	bool extractParticlesFromFieldOfView(FileName fn_mic, long int imic);
 
 	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
 	void extractParticlesFromOneFrame(MetaDataTable &MD,

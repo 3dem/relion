@@ -452,8 +452,11 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		}
 		__syncthreads();
 	}
+#ifdef CUDA_DOUBLE_PRECISION
 	g_diff2s[iorient * translation_num + itrans] = - ( s_weight[0] / sqrt(s_norm[0]));
-
+#else
+	g_diff2s[iorient * translation_num + itrans] = - ( s_weight[0] / sqrtf(s_norm[0]));
+#endif
 }
 
 template<bool REF3D, bool DATA3D, int block_sz,int chunk_sz>
@@ -593,7 +596,11 @@ __global__ void cuda_kernel_diff2_CC_fine(
 		}
 		if (tid < trans_num)
 		{
-			s_outs[tid]= - s[tid*block_sz] / (sqrt(s_cc[tid*block_sz]));// * exp_local_sqrtXi2 );
+#ifdef CUDA_DOUBLE_PRECISION
+			s_outs[tid]= - s[tid*block_sz] / (sqrt(s_cc[tid*block_sz]));
+#else
+			s_outs[tid]= - s[tid*block_sz] / (sqrtf(s_cc[tid*block_sz]));
+#endif
 		}
 		if (tid < trans_num)
 		{

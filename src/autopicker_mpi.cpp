@@ -31,8 +31,8 @@ void AutoPickerMpi::read(int argc, char **argv)
     // Don't put any output to screen for mpi slaves
     verb = (node->isMaster()) ? 1 : 0;
 
-    if (do_write_fom_maps)
-    	REPORT_ERROR("AutoPickerMpi::read ERROR: --write_fom_maps is very heavy on disc I/O and therefore disabled in parallel execution. Use the sequential program instead!");
+    if (do_write_fom_maps && node->isMaster())
+    	std::cerr << "WARNING : --write_fom_maps is very heavy on disc I/O and is not advised in parallel execution. If possible, using --shrink 0 and lowpass makes I/O less significant." << std::endl;
 
     // Possibly also read parallelisation-dependent variables here
 
