@@ -26,8 +26,8 @@
  * which translations should be included in the list of those which differences will be calculated for.
  *
  * Any contiguous translations with a shared orientation are grouped together into a "job" which is supplied
- * to the difference kernel. If there are more contiguous translations than the specified PROJDIFF_CHUNK_SIZE,
- * these are split into separate jobs, to increase paralllelism at the cost of redundant memory reads.
+ * to the difference kernel. If there are more contiguous translations than the specified "chunk" number,
+ * these are split into separate jobs, to increase parallelism at the cost of redundant memory reads.
  */
 long int makeJobsForDiff2Fine(
 		OptimisationParamters &op,  SamplingParameters &sp,
@@ -37,7 +37,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask &dataMask);
+		IndexedDataArrayMask &dataMask,
+		int chunk);
 
 /*
  * This assisting function goes over the weight-array and groups all weights with shared
@@ -81,8 +82,9 @@ void runWavgKernel(
 		XFLOAT *eulers,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
-		XFLOAT *Fimgs_nomask_real,
-		XFLOAT *Fimgs_nomask_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *sorted_weights,
 		XFLOAT *ctfs,
 		XFLOAT *wdiff2s_parts,
@@ -97,6 +99,7 @@ void runWavgKernel(
 		int exp_iclass,
 		XFLOAT part_scale,
 		bool refs_are_ctf_corrected,
+		bool data_is_3D,
 		cudaStream_t stream);
 
 #define INIT_VALUE_BLOCK_SIZE 512
@@ -223,6 +226,7 @@ void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *corr_img,
 		XFLOAT *Fimg_real,
 		XFLOAT *Fimg_imag,
@@ -233,7 +237,8 @@ void runDiff2KernelCoarse(
 		int translation_num,
 		int image_size,
 		cudaStream_t stream,
-		bool do_CC);
+		bool do_CC,
+		bool data_is_3D);
 
 void runDiff2KernelFine(
 		CudaProjectorKernel &projector,
@@ -242,6 +247,7 @@ void runDiff2KernelFine(
 		XFLOAT *Fimgs_imag,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
+		XFLOAT *trans_z,
 		XFLOAT *eulers,
 		long unsigned *rot_id,
 		long unsigned *rot_idx,
@@ -259,7 +265,8 @@ void runDiff2KernelFine(
 		int exp_iclass,
 		cudaStream_t stream,
 		long unsigned job_num_count,
-		bool do_CC);
+		bool do_CC,
+		bool data_is_3D);
 
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
@@ -305,6 +312,31 @@ __global__ void cuda_kernel_window_fourier_transform(
 	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 }
+
+void runCollect2jobs(	dim3 grid_dim,
+						XFLOAT * oo_otrans_x,          // otrans-size -> make const
+						XFLOAT * oo_otrans_y,          // otrans-size -> make const
+						XFLOAT * oo_otrans_z,          // otrans-size -> make const
+						XFLOAT * myp_oo_otrans_x2y2z2, // otrans-size -> make const
+						XFLOAT * weights,
+						XFLOAT significant_weight,    // TODO Put in const
+						XFLOAT sum_weight,    		  // TODO Put in const
+						unsigned long nr_trans,
+						unsigned long oversampled_trans,
+						unsigned long oversampled_rot,
+						int oversamples,
+						bool skip_rots,
+						XFLOAT * p_weights,
+						XFLOAT * p_thr_wsum_prior_offsetx_class,
+						XFLOAT * p_thr_wsum_prior_offsety_class,
+						XFLOAT * p_thr_wsum_prior_offsetz_class,
+						XFLOAT * p_thr_wsum_sigma2_offset,
+						size_t * rot_idx,
+						size_t * trans_idx,
+						size_t * jobOrigin,
+						size_t * jobExtent,
+						bool data_is_3D
+						);
 
 void windowFourierTransform2(
 		XFLOAT *d_in_real,
@@ -595,33 +627,55 @@ void runCenterFFT( CudaGlobalPtr< T > &img_in,
 //	CudaGlobalPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
 //	img_aux.device_alloc();
 
-	int xshift = (xSize / 2);
-	int yshift = (ySize / 2);
-	int zshift = (ySize / 2);
-
-	if (!forward)
+	if(zSize>1)
 	{
-		xshift = -xshift;
-		yshift = -yshift;
-		zshift = -zshift;
+		int xshift = (xSize / 2);
+		int yshift = (ySize / 2);
+		int zshift = (ySize / 2);
+
+		if (!forward)
+		{
+			xshift = -xshift;
+			yshift = -yshift;
+			zshift = -zshift;
+		}
+
+		dim3 blocks(ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
+		cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
+				~img_in,
+				xSize*ySize*zSize,
+				xSize,
+				ySize,
+				zSize,
+				xshift,
+				yshift,
+				zshift);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+
+		//	HANDLE_ERROR(cudaStreamSynchronize(0));
+		//	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
 	}
+	else
+	{
+		int xshift = (xSize / 2);
+		int yshift = (ySize / 2);
 
-	dim3 blocks(ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
-	cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
-			~img_in,
-			xSize*ySize*zSize,
-			xSize,
-			ySize,
-			zSize,
-			xshift,
-			yshift,
-			zshift);
-	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+		if (!forward)
+		{
+			xshift = -xshift;
+			yshift = -yshift;
+		}
 
-//	HANDLE_ERROR(cudaStreamSynchronize(0));
-//	img_aux.cp_on_device(img_in.d_ptr); //update input image with centered kernel-output.
-
-
+		dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
+		cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
+				~img_in,
+				xSize*ySize,
+				xSize,
+				ySize,
+				xshift,
+				yshift);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+	}
 }
 
 template <typename T>

@@ -146,7 +146,7 @@ __global__ void cuda_kernel_make_eulers_3D(
 	if (oid >= orientation_num)
 		return;
 
-	for (int i = 0; i < 8; i ++)
+	for (int i = 0; i < 9; i ++)
 		B[i] = (XFLOAT) 0.f;
 
 	a = alphas[oid] * (XFLOAT)PI / (XFLOAT)180.0;

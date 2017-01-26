@@ -20,6 +20,10 @@
 #include "src/gui_mainwindow.h"
 
 #define DEBUG
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define INSTD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
+#define SRCD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
 
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
@@ -154,7 +158,7 @@ void SchedulerWindow::cb_execute_i()
 	if (exists(fn_check))
 	{
 		std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
-		fl_message(msg.c_str());
+		fl_message("%s",msg.c_str());
 	}
 	else
 	{
@@ -277,11 +281,12 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 
     // First look for image in the binary install directory,
     // then in the source tree.
-    FileName fn_bg = std::string(INSTALL_LIBRARY_DIR) + std::string("gui_background.xpm");
+
+    FileName fn_bg = std::string(INSTD_BG);
 
     if(!exists(fn_bg))
     {
-        fn_bg = std::string(SOURCE_DIR) + std::string("gui_background.xpm");
+        fn_bg = std::string(SRCD_BG);
     }
 
 	if (exists(fn_bg))

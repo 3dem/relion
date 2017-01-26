@@ -134,8 +134,14 @@ public:
 	// Simulate helical segments with a STAR file - Number of helical tubes
 	int nr_tubes;
 
-	// Simulate helical segments with a STAR file - sigma tilt and psi
-	RFLOAT sigma_tilt, sigma_psi;
+	// Simulate helical subtomograms with a STAR file ?
+	bool is_3d_tomo;
+
+	// Simulate helical segments / subtomograms with a STAR file - sigma tilt, psi and offset
+	RFLOAT sigma_tilt, sigma_psi, sigma_offset;
+
+	// Simulate helical segments / subtomograms - Standard deviation of added white Gaussian noise
+	RFLOAT white_noise;
 
 	// Diameter of helical subunits (in Angstroms)
 	RFLOAT subunit_diameter_A;
@@ -217,12 +223,27 @@ public:
 		parser.writeUsage(std::cerr);
 	};
 
+	void writeCommand(FileName fn_cmd)
+	{
+		std::ofstream ofs;
+		ofs.open(fn_cmd.c_str(), std::ofstream::out | std::ofstream::app);
+
+		time_t now = time(0);
+	    char nodename[64] = "undefined";
+	    gethostname(nodename,sizeof(nodename));
+	    std::string hostname(nodename);
+		ofs << std::endl << " ++++ Executed the following command at host " << hostname << " on " << ctime(&now);
+		ofs << "  `which relion_helix_toolbox` " << std::flush;
+		parser.writeCommandLine(ofs);
+		ofs.close();
+	};
+
 	void read(int argc, char **argv)
 	{
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (NOV 13, 2016)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (JAN 15, 2017)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_check_parameters = parser.checkOption("--check", "Check parameters for 3D helical reconstruction in RELION");
@@ -255,6 +276,7 @@ public:
 		do_debug = parser.checkOption("--debug", "(Debug only)");
 
 		int params_section = parser.addSection("Parameters (alphabetically ordered)");
+		is_3d_tomo = parser.checkOption("--3d_tomo", "Simulate 3D subtomograms using a STAR file?");
 		ang = textToFloat(parser.getOption("--ang", "Cut out a small part of the helix within this angle (in degrees)", "91."));
 		pixel_size_A = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1."));
 		do_bimodal_searches = parser.checkOption("--bimodal", "Do bimodal searches of tilt and psi angles in 3D helical reconstruction?");
@@ -288,6 +310,7 @@ public:
 		rise_max_A = textToFloat(parser.getOption("--rise_max", "Maximum helical rise (in Angstroms)", "-1"));
 		do_helical_symmetry_local_refinement = parser.checkOption("--search_sym", "Perform local searches of helical symmetry in 3D reconstruction?");
 		do_cut_into_segments = parser.checkOption("--segments", "Cut helical tubes into segments?");
+		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Sigma of translational offsets (in pixels)", "5."));
 		sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Sigma of psi angles (in degrees)", "5."));
 		sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Sigma of tilt angles (in degrees)", "5."));
 		sphere_percentage = textToFloat(parser.getOption("--sphere_percentage", "Diameter of spherical mask divided by the box size (0.10~0.90 or 0.01~0.99)", "0.9"));
@@ -300,6 +323,7 @@ public:
 		twist_min_deg = textToFloat(parser.getOption("--twist_min", "Minimum helical twist (in degrees, + for right-handedness)", "-1"));
 		twist_max_deg = textToFloat(parser.getOption("--twist_max", "Maximum helical twist (in degrees, + for right-handedness)", "-1"));
 		verb = parser.checkOption("--verb", "Detailed screen output?");
+		white_noise = textToFloat(parser.getOption("--white_noise", "Standard deviation of added white Gaussian noise", "1."));
 		width_edge_pix = textToFloat(parser.getOption("--width", "Width of cosine soft edge (in pixels)", "5."));
 		Xdim = textToInteger(parser.getOption("--xdim", "Dimension X (in pixels) of the micrographs", "4096"));
 		Ydim = textToInteger(parser.getOption("--ydim", "Dimension Y (in pixels) of the micrographs", "4096"));
@@ -608,7 +632,7 @@ public:
 					rise_A,
 					cyl_outer_diameter_A,
 					subunit_diameter_A,
-					cyl_inner_diameter_A,
+					(do_polar_reference) ? (cyl_inner_diameter_A) : (subunit_diameter_A),
 					(do_polar_reference) ? (topbottom_ratio) : (1.),
 					sym_Cn);
 			applySoftSphericalMask(
@@ -772,8 +796,9 @@ public:
 			if (show_usage_for_an_option)
 			{
 				displayEmptyLine();
-				std::cout << " Simulate helical segments using a STAR file" << std::endl;
-				std::cout << "  USAGE: --simulate_segments --o out.star --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --angpix 1.126 (--bimodal --sigma_tilt 5 --sigma_psi 5 --random_seed 1400014000)" << std::endl;
+				std::cout << " Simulate helical segments / subtomograms using a STAR file" << std::endl;
+				std::cout << "  USAGE: --simulate_segments --i 3dvol-for-projection.mrc --o segments.star --boxdim 200 --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --angpix 1.126 (--bimodal --3d_tomo --sigma_tilt 5 --sigma_psi 5 --sigma_offset 5 --white_noise 1 --random_seed 1400014000)" << std::endl;
+				std::cout << "  BEWARE: '--boxdim' is the shrunk box size of the simulated output (2D or 3D). It should not be bigger than the box size of the input 3D volume." << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -782,15 +807,21 @@ public:
 				REPORT_ERROR("Helical rise should be larger than 0.001 pixels!");
 
 			simulateHelicalSegments(
+					is_3d_tomo,
+					fn_in,
 					fn_out,
+					white_noise,
+					boxdim,
 					nr_subunits,
 					nr_asu,
 					nr_tubes,
 					do_bimodal_searches,
-					rise_A / pixel_size_A,
+					pixel_size_A,
+					rise_A,
 					twist_deg,
 					sigma_psi,
 					sigma_tilt,
+					sigma_offset,
 					random_seed);
 		}
 		else if (do_cut_out)
@@ -923,10 +954,19 @@ public:
 			//MD.read(fn_in);
 			//setPsiFlipRatioInStarFile(MD);
 			//MD.write(fn_out);
+			grabParticleCoordinates_Multiple(fn_in, fn_out);
+
+			//Image<RFLOAT> img;
+			//img.read(fn_in);
+			//calculateRadialAvg(img(), pixel_size_A);
 		}
 		else
 		{
 			REPORT_ERROR("Please specify an option!");
+		}
+		if ( (!show_usage_for_an_option) && (!do_debug) )
+		{
+			writeCommand("relion_helix_toolbox.log");
 		}
 	};
 };
@@ -997,6 +1037,7 @@ public:
 
 	void run()
 	{
+		/*
 		Image<RFLOAT> img;
 		img.read(fn_in);
 		img().setXmippOrigin();
@@ -1007,6 +1048,12 @@ public:
 				180. * 0.5,
 				5.);
 		img.write(fn_out);
+		*/
+		MetaDataTable MD;
+		plotLatticePoints(MD,
+				1, 5, 2, 4);
+		MD.write(fn_out);
+
 
 
 		/*
