@@ -102,7 +102,7 @@ void AutoPicker::read(int argc, char **argv)
 	decrease_radius = textToInteger(parser.getOption("--shrink_particle_mask", "Shrink the particle mask by this many pixels (to detect Einstein-from-noise classes)", "2"));
 	outlier_removal_zscore= textToFloat(parser.getOption("--outlier_removal_zscore", "Remove pixels that are this many sigma away from the mean", "8."));
 	do_write_fom_maps = parser.checkOption("--write_fom_maps", "Write calculated probability-ratio maps to disc (for re-reading in subsequent runs)");
-	no_fom_limit = parser.checkOption("--no_fom_limit", "Ignore default maximum limit of 20 fom maps being written","false");
+	no_fom_limit = parser.checkOption("--no_fom_limit", "Ignore default maximum limit of 30 fom maps being written","false");
 	do_read_fom_maps = parser.checkOption("--read_fom_maps", "Skip probability calculations, re-read precalculated maps from disc");
 	do_optimise_scale = !parser.checkOption("--skip_optimise_scale", "Skip the optimisation of the micrograph scale for better prime factors in the FFTs. This runs slower, but at exactly the requested resolution.");
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");

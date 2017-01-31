@@ -389,6 +389,7 @@ void makeHelicalReference2D(
 		RFLOAT pixel_size_A,
 		bool is_tube_white = true);
 
+/*
 void makeHelicalReference3D(
 		MultidimArray<RFLOAT>& out,
 		int box_size,
@@ -398,6 +399,7 @@ void makeHelicalReference3D(
 		RFLOAT tube_diameter_A,
 		RFLOAT particle_diameter_A,
 		int sym_Cn);
+*/
 
 void makeHelicalReference3DWithPolarity(
 		MultidimArray<RFLOAT>& out,
@@ -432,15 +434,21 @@ void mergeStarFiles(FileName& fn_in);
 void sortHelicalTubeID(MetaDataTable& MD);
 
 void simulateHelicalSegments(
-		FileName& fn_out,
+		bool is_3d_tomo,
+		FileName& fn_vol_in,
+		FileName& fn_star_out,
+		RFLOAT white_noise,
+		int new_box_size,
 		int nr_subunits,
 		int nr_asu,
 		int nr_tubes,
 		bool do_bimodal_searches,
-		RFLOAT rise_pix,
+		RFLOAT angpix,
+		RFLOAT rise_A,
 		RFLOAT twist_deg,
 		RFLOAT sigma_psi,
 		RFLOAT sigma_tilt,
+		RFLOAT sigma_offset,
 		int random_seed = -1);
 
 void outputHelicalSymmetryStatus(
@@ -546,5 +554,21 @@ void updateAngularPriorsForHelicalReconstruction(
 void testDataFileTransformXY(MetaDataTable& MD);
 
 void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);
+
+void plotLatticePoints(MetaDataTable& MD,
+		int x1, int y1, int x2, int y2);
+
+
+void grabParticleCoordinates(
+		FileName& fn_in,
+		FileName& fn_out);
+
+// Files of priors: mic1_priors.star, files of local CTF: mic1_local.star
+// Then suffix_priors = _priors.star, suffix_local_ctf = _local.star
+void grabParticleCoordinates_Multiple(
+		std::string& suffix_fin,
+		std::string& suffix_fout);
+
+void calculateRadialAvg(MultidimArray<RFLOAT> &v, RFLOAT angpix);
 
 #endif /* HELIX_H_ */
