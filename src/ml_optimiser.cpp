@@ -24,6 +24,14 @@
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
 
+#ifdef TIMING
+		#define RCTIC(timer,label) (timer.tic(label))
+		#define RCTOC(timer,label) (timer.toc(label))
+#else
+		#define RCTIC(timer,label)
+    	#define RCTOC(timer,label)
+#endif
+
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
@@ -1136,6 +1144,16 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_EXTRA1= timer.setNew(" -extra1");
 	TIMING_EXTRA2= timer.setNew(" -extra2");
 	TIMING_EXTRA3= timer.setNew(" -extra3");
+
+	RCT_1 = timer.setNew(" RcT1_BPrefRecon ");
+	RCT_2 = timer.setNew(" RcT2_BroadCast ");
+	RCT_3 = timer.setNew(" RcT3_maxiOthers ");
+	RCT_4 = timer.setNew(" RcT4_monitorHidden ");
+	RCT_5 = timer.setNew(" RcT5_sums ");
+	RCT_6 = timer.setNew(" RcT6_updatePdf ");
+	RCT_7 = timer.setNew(" RcT7_updateNoise ");
+	RCT_8 = timer.setNew(" RcT8_initials ");
+
 #endif
 
 #ifdef RELION_SINGLE_PRECISION
@@ -3134,33 +3152,36 @@ void MlOptimiser::maximization()
 		std::cout << " Maximization ..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
-
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
+		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
+
 			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 					mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 					mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-					false, false, nr_threads, minres_map);
+					false, false, nr_threads, minres_map, (iclass==0));
 		}
 		else
 		{
 			mymodel.Iref[iclass].initZeros();
 		}
-
+		RCTOC(timer,RCT_1);
 		if (verb > 0)
 			progress_bar(iclass);
 	}
 
+	RCTIC(timer,RCT_3);
 	// Then perform the update of all other model parameters
 	maximizationOtherParameters();
-
+	RCTOC(timer,RCT_3);
+	RCTIC(timer,RCT_4);
 	// Keep track of changes in hidden variables
 	updateOverallChangesInHiddenVariables();
-
+	RCTOC(timer,RCT_4);
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
@@ -3173,6 +3194,7 @@ void MlOptimiser::maximizationOtherParameters()
 	std::cerr << "Entering maximizationOtherParameters" << std::endl;
 #endif
 
+	RCTIC(timer,RCT_5);
 	// Calculate total sum of weights, and average CTF for each class (for SSNR estimation)
 	RFLOAT sum_weight = 0.;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3237,7 +3259,8 @@ void MlOptimiser::maximizationOtherParameters()
 		}
 
 	}
-
+	RCTOC(timer,RCT_5);
+	RCTIC(timer,RCT_6);
 	// Update model.pdf_class vector (for each k)
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
@@ -3283,7 +3306,8 @@ void MlOptimiser::maximizationOtherParameters()
 	}
 
 	// TODO: update estimates for sigma2_rot, sigma2_tilt and sigma2_psi!
-
+	RCTOC(timer,RCT_6);
+	RCTIC(timer,RCT_7);
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
 	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc))
 	{
@@ -3311,7 +3335,8 @@ void MlOptimiser::maximizationOtherParameters()
 			}
 		}
 	}
-
+	RCTIC(timer,RCT_7);
+	RCTOC(timer,RCT_8);
 	// After the first iteration the references are always CTF-corrected
     if (do_ctf_correction)
     	refs_are_ctf_corrected = true;
@@ -3372,7 +3397,7 @@ void MlOptimiser::maximizationOtherParameters()
 		}
 
 	}
-
+	RCTOC(timer,RCT_8);
 #ifdef DEBUG
 	std::cerr << "Leaving maximizationOtherParameters" << std::endl;
 #endif

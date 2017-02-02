@@ -34,6 +34,11 @@
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
         int TIMING_MPISLAVEWAIT1, TIMING_MPISLAVEWAIT2, TIMING_MPISLAVEWAIT3;
+		#define RCTIC(timer,label) (timer.tic(label))
+		#define RCTOC(timer,label) (timer.toc(label))
+#else
+		#define RCTIC(timer,label)
+    	#define RCTOC(timer,label)
 #endif
 
 void MlOptimiserMpi::read(int argc, char **argv)
@@ -1736,6 +1741,7 @@ void MlOptimiserMpi::maximization()
 	{
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
+			RCTIC(timer,RCT_1);
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
 
@@ -1750,11 +1756,17 @@ void MlOptimiserMpi::maximization()
 
 				if (node->rank == reconstruct_rank1)
 				{
+#ifdef TIMING
+					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
+#else
 					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
-
+#endif
 					// Also perform the unregularized reconstruction
 					if (do_auto_refine && has_converged)
 						readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 1);
@@ -1892,7 +1904,7 @@ void MlOptimiserMpi::maximization()
 			{
 				mymodel.Iref[ith_recons].initZeros();
 			}
-
+			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
 			MPI_Barrier( MPI_COMM_WORLD);
@@ -1908,7 +1920,7 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 	std::cerr << "All classes have been reconstructed" << std::endl;
 #endif
-
+	RCTIC(timer,RCT_2);
 	// Once reconstructed, broadcast new models to all other nodes
 	// This cannot be done in the reconstruction loop itself because then it will be executed sequentially
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -2008,20 +2020,25 @@ void MlOptimiserMpi::maximization()
 			}
 		}
 	}
+	RCTOC(timer,RCT_2);
 #ifdef TIMING
 		timer.toc(TIMING_RECONS);
 #endif
 
 	if (node->isMaster())
 	{
+		RCTIC(timer,RCT_4);
 		// The master also updates the changes in hidden variables
 		updateOverallChangesInHiddenVariables();
+		RCTOC(timer,RCT_4);
 	}
 	else
 	{
 		// Now do the maximisation of all other parameters (and calculate the tau2_class-spectra of the reconstructions
 		// The lazy master never does this: it only handles metadata and does not have the weighted sums
+		RCTIC(timer,RCT_3);
 		maximizationOtherParameters();
+		RCTOC(timer,RCT_3);
 	}
 
 	// The master broadcasts the changes in hidden variables to all other nodes

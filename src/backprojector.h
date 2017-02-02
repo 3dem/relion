@@ -270,7 +270,8 @@ public:
                      bool update_tau2_with_fsc = false,
                      bool is_whole_instead_of_half = false,
                      int nr_threads = 1,
-                     int minres_map = -1);
+                     int minres_map = -1,
+                     bool printTimes= false);
 
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
@@ -300,7 +301,7 @@ public:
 	/* Calculate the inverse FFT of Fin and windows the result to ori_size
 	 * Also pass the transformer, to prevent making and clearing a new one before clearing the one in reconstruct()
 	 */
-	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, int nr_threads = 1);
+	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, int nr_threads = 1, bool printTimes = false);
 
    /*
 	* Go from the Projector-centered fourier transform back to FFTW-uncentered one
