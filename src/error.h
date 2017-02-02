@@ -166,16 +166,19 @@ but doing this in a general and memory-efficient way is difficult.\n\n\
 If none of the above applies, please report the error to the relion\n\
 developers at    github.com/3dem/relion/issues\n\n")
 
-#define ERR_MDLDIM ("The model dimension was not set properly." DEVERR)
-#define ERR_MDLSET ("The model was set twice." DEVERR)
+#define ERR_CANZ      ("There is an allocation on the GPU left between iterations." DEVERR)
+#define ERR_CAMUX     ("A mutex could not be created for a GPU memory allocation." DEVERR)
+#define ERR_STAGEMEM  ("A zero-size array was attempted to be made, which should not happen." DEVERR)
+#define ERR_MDLDIM    ("The model dimension was not set properly." DEVERR)
+#define ERR_MDLSET    ("The model was set twice." DEVERR)
 
-#define ERRCTIC ("You are trying to benchmark a (CPU) section, but started timing it twice." ADVERR)
+#define ERRCTIC ("You are trying to benchmark a (CPU) section, but started timing it twice."    ADVERR)
 #define ERRCTOC ("You are trying to benchmark a (CPU) section, but this section has not begun." ADVERR)
-#define ERRGTIC ("You are trying to benchmark a (GPU) section, but started timing it twice." ADVERR)
+#define ERRGTIC ("You are trying to benchmark a (GPU) section, but started timing it twice."    ADVERR)
 #define ERRGTOC ("You are trying to benchmark a (GPU) section, but this section has not begun." ADVERR)
-#define ERRTPC  ("You are trying to benchmark a (GPU) section, but there is nothing to print." ADVERR)
+#define ERRTPC  ("You are trying to benchmark a (GPU) section, but there is nothing to print."  ADVERR)
 
-#define ERRCUFFTDIR ("You are setting the direction of a CUFFT-transform to something other than forward/inverse" DEVERR)
+#define ERRCUFFTDIR  ("You are setting the direction of a CUFFT-transform to something other than forward/inverse" DEVERR)
 #define ERRCUFFTDIRF ("You are trying to run a forward CUFFT-transform for an inverse transform" DEVERR)
 #define ERRCUFFTDIRR ("You are trying to run an inverse CUFFT-transform for a forward transform" DEVERR)
 

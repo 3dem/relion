@@ -40,6 +40,8 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include "src/macros.h"
+#include "src/error.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
 #include "src/gpu_utils/cuda_ml_optimiser.h"
@@ -2147,7 +2149,7 @@ void MlOptimiser::expectation()
 			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
 			{
 				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
-				raise(SIGSEGV);
+				CRITICAL(ERR_GPUID);
 			}
 			else
 				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
@@ -2287,7 +2289,7 @@ void MlOptimiser::expectation()
 				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
 				((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
 				fflush(stdout);
-				raise(SIGSEGV);
+				CRITICAL(ERR_CANZ);
 			}
 
 #endif

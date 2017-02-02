@@ -609,7 +609,7 @@ public:
 		{
 			printf("ERROR: Mutex could not be created for alloactor. CODE: %d.\n", mutex_error);
 			fflush(stdout);
-			raise(SIGSEGV);
+			CRITICAL(ERR_CAMUX);
 		}
 	}
 
@@ -1447,7 +1447,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to host-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=size;
@@ -1462,7 +1462,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
@@ -1477,7 +1477,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to host-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=size;
@@ -1492,7 +1492,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;

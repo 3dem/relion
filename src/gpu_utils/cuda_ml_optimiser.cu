@@ -2795,7 +2795,7 @@ void MlDeviceBundle::setupFixedSizedObjects()
 	if(device_id >= devCount)
 	{
 		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		CRITICAL(ERRCUDACAOOM);
+		CRITICAL(ERR_GPUID);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(device_id));
@@ -2858,7 +2858,7 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	if(device_id >= devCount)
 	{
 		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		raise(SIGSEGV);
+		CRITICAL(ERR_GPUID);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(device_id));
@@ -2931,7 +2931,7 @@ void MlOptimiserCuda::resetData()
 	if(device_id >= devCount)
 	{
 		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		raise(SIGSEGV);
+		CRITICAL(ERR_GPUID);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(device_id));
@@ -2962,7 +2962,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if(device_id >= devCount)
 	{
 		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		raise(SIGSEGV);
+		CRITICAL(ERR_GPUID);
 	}
 	else
 		DEBUG_HANDLE_ERROR(cudaSetDevice(device_id));
