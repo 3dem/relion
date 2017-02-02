@@ -2476,7 +2476,7 @@ void MlOptimiser::precalculateABMatrices()
 			// Then also loop over all its oversampled relatives
 			// Then loop over all its oversampled relatives
 			// Jun01,2015 - Shaoda & Sjors, Helical refinement
-			sampling.getTranslations(itrans, 1, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+			sampling.getTranslations(itrans, adaptive_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 					(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
