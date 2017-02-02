@@ -3234,7 +3234,16 @@ void RelionMainWindow::cb_about(Fl_Widget* o, void* v)
 void RelionMainWindow::cb_about_i()
 {
 	ShowHelpText *help = new ShowHelpText("\
-RELION is written by Sjors Scheres at the MRC Laboratory of Molecular Biology (scheres@mrc-lmb.cam.ac.uk).\n \
+RELION v2.0.3 \n \n \
+RELION is is developed in the groups of\n \
+Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
+- Sjors H.W. Scheres\n \
+- Shaoda He\n \
+\n \n \
+and Erik Lindahl at Stockholm University\n \n \
+- Erik Lindahl\n \
+- Björn O. Forsberg\n \
+- Dari Kimanius\n \
 \n\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of Sjors Scheres is acknowledged appropriately. In order to maintain an overview of existing versions, he would also appreciate being \
@@ -3256,6 +3265,8 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
  * Sub-tomogram averaging : \n \
      Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
+ * v.2.0 GPU capability and autopicking acceleration : \n \
+     Kimanius et al. (2016) eLife (PMID: 27845625) \n \n \
 Please also cite the following EXTERNAL programs: \n \n \
 * MOTIONCORR for beam-induced motion correction: \n \
     Li et al (2013) Nat. Methods (PMID: 23644547) \n \n\

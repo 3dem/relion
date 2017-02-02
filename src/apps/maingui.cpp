@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 	}
 
 	char titletext[67];
-	strcpy (titletext,"RELION-");
+	strcpy (titletext,"RELION v2.0.3");
 #ifdef PACKAGE_VERSION
         strcat(titletext,PACKAGE_VERSION);
 #endif
