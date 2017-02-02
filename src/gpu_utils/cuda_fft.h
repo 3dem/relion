@@ -122,7 +122,7 @@ public:
 		if( !( (setDirection==-1)||(setDirection==0)||(setDirection==1) ) )
 		{
 			std::cerr << "*ERROR : Setting a cuda transformer direction to non-defined value" << std::endl;
-			raise(SIGSEGV);
+			CRITICAL(ERRCUFFTDIR);
 		}
 
 		direction = setDirection;
@@ -283,7 +283,7 @@ public:
 		if(direction==1)
 		{
 			std::cout << "trying to execute a forward plan for a cudaFFT transformer which is backwards-only" << std::endl;
-			raise(SIGSEGV);
+			CRITICAL(ERRCUFFTDIRF);
 		}
 		HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) );
 	}
@@ -293,7 +293,7 @@ public:
 		if(direction==-1)
 		{
 			std::cout << "trying to execute a backwards plan for a cudaFFT transformer which is forwards-only" << std::endl;
-			raise(SIGSEGV);
+			CRITICAL(ERRCUFFTDIRR);
 		}
 		HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) );
 	}

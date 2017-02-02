@@ -46,6 +46,7 @@
 #define MACROS_H
 
 #include <math.h>
+#include "src/error.h"
 
 #ifndef _CYGWIN
 #ifdef __APPLE__
@@ -72,7 +73,11 @@
 #define MY_MPI_DOUBLE MPI_DOUBLE
 #endif
 
-
+#ifdef DEBUG_CUDA
+#define CRITICAL(string) raise(SIGSEGV);
+#else
+#define CRITICAL(string) REPORT_ERROR(string);
+#endif
 
 //#define DEBUG
 //#define DEBUG_CHECKSIZES

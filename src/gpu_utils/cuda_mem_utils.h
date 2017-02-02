@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "src/macros.h"
+#include "src/error.h"
+
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 #include <execinfo.h>
 #include <cxxabi.h>
@@ -87,7 +90,7 @@ static void LaunchHandleError( cudaError_t err, const char *file, int line )
         printf( "KERNEL_ERROR: %s in %s at line %d (error-code %d)\n",
                         cudaGetErrorString( err ), file, line, err );
         fflush(stdout);
-              raise(SIGSEGV);
+              CRITICAL(ERRGPUKERN);
     }
 }
 #endif
@@ -684,7 +687,7 @@ public:
 					pthread_mutex_unlock(&mutex);
 
 					fflush(stdout);
-					raise(SIGSEGV);
+					CRITICAL(ERRCUDACAOOM);
 				}
 			}
 

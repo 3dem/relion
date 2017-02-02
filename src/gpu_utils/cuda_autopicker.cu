@@ -16,6 +16,8 @@
 #include "src/gpu_utils/cuda_helper_functions.cuh"
 #include "src/gpu_utils/cuda_fft.h"
 
+#include "src/macros.h"
+#include "src/error.h"
 
 #ifdef CUDA_FORCESTL
 #include "src/gpu_utils/cuda_utils_stl.cuh"
@@ -48,7 +50,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * 
 	if(dev_id >= devCount)
 	{
 		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		raise(SIGSEGV);
+		CRITICAL(ERR_GPUID);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(dev_id));
@@ -80,7 +82,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char
 	if(dev_id >= devCount)
 	{
 		std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		raise(SIGSEGV);
+		CRITICAL(ERR_GPUID);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(dev_id));

@@ -8,6 +8,9 @@
 #include <string>
 #include <signal.h>
 
+#include "src/macros.h"
+#include "src/error.h"
+
 int relion_timer::cuda_benchmark_find_id(std::string id, std::vector<std::string> v)
 {
 	for (unsigned i = 0; i < v.size(); i++)
@@ -27,7 +30,7 @@ void relion_timer::cuda_cpu_tic(std::string id)
 	else
 	{
 		printf("DEBUG_ERROR: Provided identifier '%s' already exists in call to cuda_cpu_tic.\n", id.c_str());
-		raise(SIGSEGV);
+		CRITICAL(ERRCTIC);
 	}
 }
 
@@ -68,7 +71,7 @@ void relion_timer::cuda_gpu_tic(std::string id)
 	{
 		printf("DEBUG_ERROR: Provided identifier '%s' already exists in call to cuda_gpu_tic.\n",
 				id.c_str());
-		raise(SIGSEGV);
+		CRITICAL(ERRGTIC);
 	}
 }
 
@@ -79,7 +82,7 @@ void relion_timer::cuda_gpu_toc(std::string id)
 	{
 		printf("DEBUG_ERROR: Provided identifier '%s' not found in call to cuda_gpu_tac.\n",
 				id.c_str());
-		raise(SIGSEGV);
+		CRITICAL(ERRGTOC);
 	}
 	else
 	{
@@ -93,7 +96,7 @@ void relion_timer::cuda_gpu_printtictoc()
 	if (cuda_gpu_benchmark_identifiers.size() == 0)
 	{
 		printf("DEBUG_ERROR: There were no identifiers found in the list, on call to cuda_gpu_toc.\n");
-		raise(SIGSEGV);
+		CRITICAL(ERRTPC);
 	}
 	else
 	{

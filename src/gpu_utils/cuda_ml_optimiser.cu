@@ -17,6 +17,7 @@
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/complex.h"
 #include "src/helix.h"
+#include "src/error.h"
 #include <fstream>
 #include <cuda_runtime.h>
 #include "src/parallel.h"
@@ -2282,7 +2283,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CLASS) = (RFLOAT)op.max_index[ipart].iclass + 1;
 			RFLOAT pmax = op.max_weight[ipart]/op.sum_weight[ipart];
 			if(pmax>1) //maximum normalised probability weight is (unreasonably) larger than unity
-				raise(SIGSEGV);
+				CRITICAL("Relion is finding a normalised probability greater than 1");
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = pmax;
 		}
 		CTOC(cudaMLO->timer,"setMetadata");
@@ -2794,7 +2795,7 @@ void MlDeviceBundle::setupFixedSizedObjects()
 	if(device_id >= devCount)
 	{
 		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
-		raise(SIGSEGV);
+		CRITICAL(ERRCUDACAOOM);
 	}
 	else
 		HANDLE_ERROR(cudaSetDevice(device_id));
