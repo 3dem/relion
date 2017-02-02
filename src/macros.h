@@ -45,6 +45,8 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+#include <math.h>
+
 #ifndef _CYGWIN
 #ifdef __APPLE__
 #include <limits.h>
