@@ -503,7 +503,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	sgd_stepsize = textToFloat(parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "0.5"));
 	sgd_max_subsets = textToInteger(parser.getOption("--sgd_max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "-1"));
 	write_every_subset = textToInteger(parser.getOption("--sgd_write_subsets", "Write out model every so many subsets (default is not writing any)", "-1"));
-
+	sgd_max_effective  = textToInteger(parser.getOption("--sgd_max_effective", "Maximum number of effective particles for regularisation control (higher value: higher resolution, negative no limit)", "-1"));
 	// Computation stuff
 	// The number of threads is always read from the command line
 	int computation_section = parser.addSection("Computation");
@@ -3292,7 +3292,8 @@ void MlOptimiser::maximization()
 				// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
 				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
 				RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-				RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : nr_subsets * subset_size;
+				int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
+				RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
 				number_of_effective_particles *= (1. - total_mu_fraction);
 				RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
 
