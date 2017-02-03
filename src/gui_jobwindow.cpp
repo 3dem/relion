@@ -3155,7 +3155,7 @@ of several thousand (downscaled) particles.", denovo_group);
 
 	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
 
-	sgd_write_subsets.place(current_y, "SGD subset size:", -1, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
+	sgd_write_subsets.place(current_y, "SGD write subsets:", -1, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
 
 	denovo_group-> end();
 	do_denovo_ref3d.cb_menu_i(); // To make default effective
