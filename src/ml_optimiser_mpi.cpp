@@ -855,7 +855,11 @@ void MlOptimiserMpi::expectation()
         	if (do_sgd)
         	{
          		if (do_split_random_halves)
-        		{
+         		{
+         			REPORT_ERROR("For now disable split_random_halves and SGD, although code below should work!")
+         		}
+        		/*
+				{
                		// Halfset 1
          			divide_equally(mydata.numberOfOriginalParticles(1), nr_subsets, subset,
                				my_subset_first_ori_particle_halfset1, my_subset_last_ori_particle_halfset1);
@@ -867,9 +871,6 @@ void MlOptimiserMpi::expectation()
                		my_subset_first_ori_particle_halfset2 += mydata.numberOfOriginalParticles(1);
                		my_subset_last_ori_particle_halfset2 += mydata.numberOfOriginalParticles(1);
 
-               		//std::cerr << " mydata.numberOfOriginalParticles(1)= " << mydata.numberOfOriginalParticles(1) << " mydata.numberOfOriginalParticles(2)= " << mydata.numberOfOriginalParticles(2) << std::endl;
-               		//std::cerr << " my_subset_first_ori_particle_halfset1= " << my_subset_first_ori_particle_halfset1 << " my_subset_last_ori_particle_halfset1= " << my_subset_last_ori_particle_halfset1 << std::endl;
-               		//std::cerr << " my_subset_first_ori_particle_halfset2= " << my_subset_first_ori_particle_halfset2 << " my_subset_last_ori_particle_halfset2= " << my_subset_last_ori_particle_halfset2 << std::endl;
                		// Some safeguards
                		if (my_subset_last_ori_particle_halfset1 >= mydata.numberOfOriginalParticles(1))
                			REPORT_ERROR("my_subset_last_ori_particle_halfset1 >= mydata.numberOfOriginalParticles(1)");
@@ -877,12 +878,14 @@ void MlOptimiserMpi::expectation()
                			REPORT_ERROR("my_subset_last_ori_particle_halfset2 >= mydata.numberOfOriginalParticles()");
 
         		}
+        		*/
         		else
         		{
                		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset, my_subset_first_ori_particle, my_subset_last_ori_particle);
                		//std::cerr << " my_subset_first_ori_particle= " << my_subset_first_ori_particle << " my_subset_last_ori_particle= " << my_subset_last_ori_particle << std::endl;
                		subset_size = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
         		}
+
         		if (verb > 0)
         		{
         			if (subset == 0)
@@ -901,6 +904,10 @@ void MlOptimiserMpi::expectation()
         	{
         		my_subset_first_ori_particle = 0.;
         		my_subset_last_ori_particle = mydata.numberOfOriginalParticles() - 1;
+        		my_subset_first_ori_particle_halfset1 = 0;
+        		my_subset_last_ori_particle_halfset1 = mydata.numberOfOriginalParticles(1) - 1;
+        		my_subset_first_ori_particle_halfset2 = mydata.numberOfOriginalParticles(1);
+        		my_subset_last_ori_particle_halfset2 = mydata.numberOfOriginalParticles() - 1;
         		subset_size = mydata.numberOfOriginalParticles();
         		if (verb > 0)
         		{
@@ -975,10 +982,10 @@ void MlOptimiserMpi::expectation()
 					{
 						my_nr_subset_particles_done = nr_subset_particles_done_halfset1;
 						// random_halfset1 is stored in first half of OriginalParticles
-						if (do_sgd)
+						//if (do_sgd)
 							nr_particles_todo = my_subset_last_ori_particle_halfset1 - my_subset_first_ori_particle_halfset1 + 1;
-						else
-							nr_particles_todo = (mydata.numberOfOriginalParticles(random_halfset));
+						//else
+						//	nr_particles_todo = (mydata.numberOfOriginalParticles(random_halfset));
 						JOB_FIRST = nr_ori_particles_done_halfset1;
 						JOB_LAST  = XMIPP_MIN(my_subset_last_ori_particle_halfset1, JOB_FIRST + nr_pool - 1);
 					}
@@ -986,10 +993,10 @@ void MlOptimiserMpi::expectation()
 					{
 						my_nr_subset_particles_done = nr_subset_particles_done_halfset2;
 						// random_halfset2 is stored in second half of OriginalParticles
-						if (do_sgd)
+						//if (do_sgd)
 							nr_particles_todo = my_subset_last_ori_particle_halfset2 - my_subset_first_ori_particle_halfset2 + 1;
-						else
-							nr_particles_todo = (mydata.numberOfOriginalParticles(random_halfset));
+						//else
+						//	nr_particles_todo = (mydata.numberOfOriginalParticles(random_halfset));
 						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_halfset2;
 						JOB_LAST  = XMIPP_MIN(my_subset_last_ori_particle_halfset2, JOB_FIRST + nr_pool - 1);
 					}
