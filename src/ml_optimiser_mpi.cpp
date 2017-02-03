@@ -856,7 +856,7 @@ void MlOptimiserMpi::expectation()
         	{
          		if (do_split_random_halves)
          		{
-         			REPORT_ERROR("For now disable split_random_halves and SGD, although code below should work!")
+         			REPORT_ERROR("For now disable split_random_halves and SGD, although code below should work!");
          		}
         		/*
 				{
@@ -1045,7 +1045,7 @@ void MlOptimiserMpi::expectation()
 #endif
 				node->relion_MPI_Send(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, this_slave, MPITAG_JOB_REPLY, MPI_COMM_WORLD);
 
-				// Master also sends the required metadata and imagedata for this job
+				//806 Master also sends the required metadata and imagedata for this job
 				if (JOB_NIMG > 0)
 				{
 					node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD);
