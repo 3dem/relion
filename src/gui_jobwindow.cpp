@@ -3143,6 +3143,25 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	tab2->label("Reference");
 	resetHeight();
 
+	denovo_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	denovo_group->end();
+
+	resetHeight();
+	do_denovo_ref3d.place(current_y, "Do de-novo reference?", false, "If set to Yes, A Stochastic Gradient Descent optimisaion will be run, started from random angles for each particle. \
+This may refine towards a suitable model, provided enough different views are present in the data. You may want to run wthis with a subset \
+of several thousand (downscaled) particles.", denovo_group);
+
+	denovo_group->begin();
+
+	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
+
+	sgd_write_subsets.place(current_y, "SGD subset size:", -1, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
+
+	denovo_group-> end();
+	do_denovo_ref3d.cb_menu_i(); // To make default effective
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	ref_correct_greyscale.place(current_y, "Ref. map is on absolute greyscale?", false, "Probabilities are calculated based on a Gaussian noise model, \
 which contains a squared difference term between the reference and the experimental image. This has a consequence that the \
@@ -3428,6 +3447,9 @@ void Class3DJobWindow::write(std::string fn)
 	nr_classes.writeValue(fh);
 
 	// Reference
+	do_denovo_ref3d.writeValue(fh);
+	sgd_subset_size.writeValue(fh);
+	sgd_write_subsets.writeValue(fh);
 	fn_ref.writeValue(fh);
 	ref_correct_greyscale.writeValue(fh);
 	ini_high.writeValue(fh);
@@ -3504,6 +3526,9 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		nr_classes.readValue(fh);
 
 		// Reference
+		do_denovo_ref3d.readValue(fh);
+		sgd_subset_size.readValue(fh);
+		sgd_write_subsets.readValue(fh);
 		fn_ref.readValue(fh);
 		ref_correct_greyscale.readValue(fh);
 		ini_high.readValue(fh);
@@ -3575,6 +3600,9 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	nr_classes.deactivate(is_continue);
 
 	// Reference
+	do_denovo_ref3d.deactivate(is_continue);
+	sgd_subset_size.deactivate(is_continue);
+	sgd_write_subsets.deactivate(is_continue);
 	fn_ref.deactivate(is_continue);
 	ref_correct_greyscale.deactivate(is_continue);
 	ini_high.deactivate(is_continue);
@@ -3658,22 +3686,33 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
-		if (fn_ref.getValue() != "None")
-		{
-			if (fn_ref.getValue() == "")
-			{
-				fl_message("ERROR: empty field for reference...");
-				return false;
-			}
-			command += " --ref " + fn_ref.getValue();
-			Node node(fn_ref.getValue(), fn_ref.type);
-			pipelineInputNodes.push_back(node);
-		}
-		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
-			command += " --firstiter_cc";
-		if (ini_high.getValue() > 0.)
-			command += " --ini_high " + floatToString(ini_high.getValue());
 
+
+		if (do_denovo_ref3d.getValue())
+		{
+			command += " --denovo_3dref --sgd ";
+			command += " --subset_size " + floatToString(sgd_subset_size.getValue());
+			command += " --sgd_write_subsets " + floatToString(sgd_write_subsets.getValue());
+		}
+		else
+		{
+			if (fn_ref.getValue() != "None")
+			{
+				if (fn_ref.getValue() == "")
+				{
+					fl_message("ERROR: empty field for reference...");
+					return false;
+				}
+				command += " --ref " + fn_ref.getValue();
+				Node node(fn_ref.getValue(), fn_ref.type);
+				pipelineInputNodes.push_back(node);
+			}
+			if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
+				command += " --firstiter_cc";
+
+			if (ini_high.getValue() > 0.)
+				command += " --ini_high " + floatToString(ini_high.getValue());
+		}
 	}
 
 	// Always do compute stuff

@@ -581,6 +581,10 @@ public:
 	SliderEntry nr_classes;
 
 	// Reference
+	BooleanEntry do_denovo_ref3d;
+	SliderEntry sgd_subset_size;
+	SliderEntry sgd_write_subsets;
+
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -634,7 +638,7 @@ public:
     AnyEntry gpu_ids;
     AnyEntry scratch_dir;
 
-	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
+	Fl_Group *denovo_group, *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 
 public:
 
