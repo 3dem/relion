@@ -128,7 +128,7 @@ void Preprocessing::initialise()
 		if (verb > 0)
 		{
 			if (fn_star_in=="" || (fn_coord_suffix=="" && fn_data == ""))
-				REPORT_ERROR("Preprocessing::initialise ERROR: please provide --i and either (--coord_suffix or __reextract_data_star) to extract particles");
+				REPORT_ERROR("Preprocessing::initialise ERROR: please provide --i and either (--coord_suffix or --reextract_data_star) to extract particles");
 
 			if (extract_size < 0)
 				REPORT_ERROR("Preprocessing::initialise ERROR: please provide the size of the box to extract particle using --extract_size ");
