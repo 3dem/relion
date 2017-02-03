@@ -2991,30 +2991,11 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 			// The optimal orientation is based on signal-product (rather than the signal-intensity sensitive Gaussian)
 			// If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
 
-			// Decide which classes to integrate over (for random class assignment in 1st iteration)
+			// Sjors: From Jan2016 the seed generation is done inside the initial estimation of the power spectra
+			// Just set sp.iclass_min to 0 and sp.iclass_max to maximum class number to prevent changing code all over.
+			sp.iclass_min = 0;
 			sp.iclass_max = baseMLO->mymodel.nr_classes - 1;
-			// low-pass filter again and generate the seeds
-			if (baseMLO->do_generate_seeds)
-			{
-				if (baseMLO->do_firstiter_cc && baseMLO->iter == 1)
-				{
-					// In first (CC) iter, use a single reference (and CC)
-					sp.iclass_min = sp.iclass_max = 0;
-				}
-				else if ( (baseMLO->do_firstiter_cc && baseMLO->iter == 2) ||
-						(!baseMLO->do_firstiter_cc && baseMLO->iter == 1))
-				{
-					// In second CC iter, or first iter without CC: generate the seeds
-					// Now select a single random class
-					// exp_part_id is already in randomized order (controlled by -seed)
-					// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-		    		// Make sure random division is always the same with the same seed
-					long int idx = my_ori_particle - baseMLO->exp_my_first_ori_particle;
-					if (idx >= baseMLO->exp_random_class_some_particles.size())
-						REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
-					sp.iclass_min = sp.iclass_max = baseMLO->exp_random_class_some_particles[idx];
-				}
-			}
+
 			// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?
 			for (long int iori = baseMLO->exp_my_first_ori_particle; iori <= baseMLO->exp_my_last_ori_particle; iori++)
 			{

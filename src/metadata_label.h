@@ -187,6 +187,7 @@ enum EMDLabel
     EMDL_MLMODEL_SIGMA_TILT,
     EMDL_MLMODEL_SIGMA_PSI,
     EMDL_MLMODEL_REF_IMAGE,
+    EMDL_MLMODEL_SGD_GRADIENT_IMAGE,
     EMDL_MLMODEL_SIGMA2_NOISE,
     EMDL_MLMODEL_SIGMA2_REF,
     EMDL_MLMODEL_SSNR_REF,
@@ -215,6 +216,11 @@ enum EMDLabel
     EMDL_OPTIMISER_DO_CORRECT_SCALE,
     EMDL_OPTIMISER_DO_REALIGN_MOVIES,
     EMDL_OPTIMISER_DO_MAP,
+    EMDL_OPTIMISER_DO_SGD,
+    EMDL_OPTIMISER_SGD_MU,
+    EMDL_OPTIMISER_SGD_SUBSET_SIZE,
+    EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
+    EMDL_OPTIMISER_SGD_MAX_SUBSETS,
     EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
     EMDL_OPTIMISER_DO_SKIP_ALIGN,
     EMDL_OPTIMISER_DO_SKIP_ROTATE,
@@ -559,6 +565,7 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_POWER_REF, EMDL_DOUBLE, "rlnReferenceSpectralPower", "Spherical average of the power of the reference");
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_MODE, EMDL_INT, "rlnOrientationalPriorMode", "Mode for prior distributions on the orientations (0=no prior; 1=(rot,tilt,psi); 2=(rot,tilt); 3=rot; 4=tilt; 5=psi) ");
         EMDL::addLabel(EMDL_MLMODEL_REF_IMAGE, EMDL_STRING, "rlnReferenceImage", "Name of a reference image");
+        EMDL::addLabel(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, EMDL_STRING, "rlnSGDGradientImage", "Name of image containing the SGD gradient");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET, EMDL_DOUBLE, "rlnSigmaOffsets","Standard deviation in the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA2_NOISE, EMDL_DOUBLE, "rlnSigma2Noise", "Spherical average of the standard deviation in the noise (sigma)");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA2_REF, EMDL_DOUBLE, "rlnReferenceSigma2", "Spherical average of the estimated power in the noise of a reference");
@@ -589,6 +596,11 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_SCALE, EMDL_BOOL, "rlnDoCorrectScale", "Flag to indicate that internal (per-group) intensity-scale correction should be performed");
         EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
         EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
+        EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_MU, EMDL_DOUBLE, "rlnSgdMuFactor", "The mu-parameter that controls the momentum of the SGD gradients");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_LONG, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many subsets the model is written to disk");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_LONG, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
         EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
         EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, EMDL_BOOL, "rlnDoSolventFlattening", "Flag to indicate that the references should be masked to set their solvent areas to a constant density");
