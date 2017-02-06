@@ -90,8 +90,8 @@ public:
 #define DEVERR "\n\
 This is a developer error message which you cannot fix \n\
 through changing the run config. Either your data is broken or\n\
-an unforseen combination of options was encountered. Please this\n\
-report error, the command used and a brief description to\n\
+an unforseen combination of options was encountered. Please report\n\
+this error, the command used and a brief description to\n\
 the relion developers at \n\n github.com/3dem/relion/issues \n\n"
 
 #define ADVERR "\n\
@@ -178,12 +178,70 @@ developers at    github.com/3dem/relion/issues\n\n")
 #define ERRGTOC ("You are trying to benchmark a (GPU) section, but this section has not begun." ADVERR)
 #define ERRTPC  ("You are trying to benchmark a (GPU) section, but there is nothing to print."  ADVERR)
 
+#define ERRCUFFTDIM  ("You are changing the dimension of a CUFFT-transform (plan)" DEVERR)
 #define ERRCUFFTDIR  ("You are setting the direction of a CUFFT-transform to something other than forward/inverse" DEVERR)
 #define ERRCUFFTDIRF ("You are trying to run a forward CUFFT-transform for an inverse transform" DEVERR)
 #define ERRCUFFTDIRR ("You are trying to run an inverse CUFFT-transform for a forward transform" DEVERR)
+#define ERRFFTMEMLIM ("\n\
+When trying to plan one or more Fourier transforms, it was found that the available\n\
+GPU memory was insufficient. Relion attempts to reduce the memory by segmenting\n\
+the required number of transformations, but in this case not even a single\n\
+transform could fit into memory. Either you are (1) performing very large transforms,\n\
+or (2) the GPU had very little available memory.\n\n\
+	(1) may occur during autopicking if the 'shrink' parameter was set to 1. The \n\
+	recommended value is 0 (--shrink 0), which is argued in the RELION-2 paper (eLife).\n\
+	This reduces memory requirements proportionally to the low-pass used. \n\n\
+	(2) may occur if multiple processes were using the same GPU without being aware\n\
+	of each other, or if there were too many such processes. Parallel execution of \n\
+	relion binaries ending with _mpi ARE aware, but you may need to reduce the number\n\
+	of mpi-ranks to equal the total number of GPUs. If you are running other instances \n\
+	of GPU-accelerated programs (relion or other), these may be competing for space.\n\
+	Relion currently reserves all available space during initialization and distributes\n\
+	this space across all sub-processes using the available resources. This behaviour \n\
+	can be escaped by the auxiliary flag --free_gpu_memory X [MB]. You can also go \n\
+	further and force use of full dynamic runtime memory allocation, relion can be \n\
+	built with the cmake -DCachedAlloc=OFF\n")
 
+#define ERR_TRANSLIM ("You have an unexpectedly large number of translations as a result\n\
+of your offset search parameters, going outside the scope of relions optimized \n\
+GPU functions. Please let the relion developers know if you require a translational \n\
+search this extensive (at github.com/3dem/relion/issues). If you are running with\n\
+double precision on the GPUs, you can reduce to single precision, otherwise the\n\
+only way to currently overcome this is to reduce the translational search.\n")
 
+#define ERRFILTEREDZERO ("No orientation was found as better than any other.\n\n\
+A particle image was compared to the reference and resulted in all-zero\n\
+weights (for all orientations). This should not happen, unless your data\n\
+has very special characteristics. This has historically happened for some \n\
+lower-precision calculations, but multiple fallbacks have since been \n\
+implemented. Please report this error to the relion developers at \n\n\
+	         github.com/3dem/relion/issues  \n ")
 
+#define ERRNOSIGNIFS ("The number of contributing orientations for an image\n\
+was found to be zero. This should not happen, unless your data\n\
+has very special characteristics. Please report this error to \n\
+the relion developers at \n\n\
+	         github.com/3dem/relion/issues   ")
 
+#define ERRSUMWEIGHTZERO ("The sum of weights for all orientations was\n\
+found to be zero for an image. This should not happen, unless your data\n\
+has very special characteristics. Please report this error to \n\
+the relion developers at \n\n\
+			 github.com/3dem/relion/issues   ")
+
+#define ERRNUMFAILSAFE ("Relion had to use extra-precision fallbacks too often.\n\n\
+In some cases relion find it difficult to reconcile the data with the\n\
+assumptions and axioms for the refinement procedure. If you e.g. have very\n\
+strong preferred orientations, or very noisy data or small molecules, \n\
+alignment can become sensitive to numerical accuracies, and if relion \n\
+detects this, it uses higher-precision fallback functions. This error \n\
+indicates that this had to be used more often than what is judged \n\
+acceptable. Assess your data and if in doubt, report this error to \n\
+the relion developers at \n\n\
+	         github.com/3dem/relion/issues   ")
+
+#define ERRNEGLENGTH ("Parameter space for coarse sampling is invalid (negative)" DEVERR)
+
+#define ERRHIGHSCALE ("rlnMicrographScaleCorrection is very high. Did you normalize your data?")
 
 #endif

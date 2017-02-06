@@ -117,7 +117,7 @@ public:
 		else
 			checkDim=1;
 		if(checkDim != dimension)
-			REPORT_ERROR("You are trying to change the dimesion of a cudaFFT transformer, which is not allowed");
+			CRITICAL(ERRCUFFTDIM);
 
 		if( !( (setDirection==-1)||(setDirection==0)||(setDirection==1) ) )
 		{
@@ -210,7 +210,7 @@ public:
 			batchSize[batchIters-1] = batchSpace - (batchSpace*batchIters - batch); // set last to care for remainder.
 
 			if(needed>avail)
-				REPORT_ERROR("Not enough memory for even a single orientation.");
+				CRITICAL(ERRFFTMEMLIM);
 
 //			std::cerr << std::endl << "NOTE: Having to use " << batchIters << " batches of orientations ";
 //			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;

@@ -1688,7 +1688,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
 						}
 
-						REPORT_ERROR("filteredSize == 0");
+						CRITICAL(ERRFILTEREDZERO); // "filteredSize == 0"
 					}
 					filtered.setSize(filteredSize);
 
@@ -1747,7 +1747,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
 						}
 
-						REPORT_ERROR("my_nr_significant_coarse_samples == 0");
+						CRITICAL(ERRNOSIGNIFS); // "my_nr_significant_coarse_samples == 0"
 					}
 
 					if (baseMLO->maximum_significants != 0 &&
@@ -1786,7 +1786,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min] = 1;
 				}
 				else
-					REPORT_ERROR("Parameter space for coarse sampling is invalid.");
+					CRITICAL(ERRNEGLENGTH);
 			}
 			else
 			{
@@ -1860,7 +1860,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						std::cerr << " exp_significant_weight[ipart]= " << op.significant_weight[ipart] << std::endl;
 						std::cerr << " exp_max_weight[ipart]= " << op.max_weight[ipart] << std::endl;
 						std::cerr << " ml_model.sigma2_noise[group_id]= " << baseMLO->mymodel.sigma2_noise[group_id] << std::endl;
-						REPORT_ERROR("op.sum_weight[ipart]==0");
+						CRITICAL(ERRSUMWEIGHTZERO); //"op.sum_weight[ipart]==0"
 					}
 
 					size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
@@ -2394,7 +2394,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			if (part_scale > 10000.)
 			{
 				std::cerr << " rlnMicrographScaleCorrection= " << part_scale << " group= " << group_id + 1 << std::endl;
-				REPORT_ERROR("ERROR: rlnMicrographScaleCorrection is very high. Did you normalize your data?");
+				CRITICAL(ERRHIGHSCALE);
 			}
 			else if (part_scale < 0.001)
 			{
@@ -2794,7 +2794,7 @@ void MlDeviceBundle::setupFixedSizedObjects()
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	if(device_id >= devCount)
 	{
-		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		//std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		CRITICAL(ERR_GPUID);
 	}
 	else
@@ -2857,7 +2857,7 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	if(device_id >= devCount)
 	{
-		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		//std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		CRITICAL(ERR_GPUID);
 	}
 	else
@@ -2930,7 +2930,7 @@ void MlOptimiserCuda::resetData()
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	if(device_id >= devCount)
 	{
-		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		//std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		CRITICAL(ERR_GPUID);
 	}
 	else
@@ -2961,7 +2961,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	if(device_id >= devCount)
 	{
-		std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		//std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		CRITICAL(ERR_GPUID);
 	}
 	else
@@ -3148,7 +3148,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 #endif
 						{
 							if (failsafe_attempts > 40)
-								REPORT_ERROR("Too many fail-safe attempts in one iteration");
+								CRITICAL(ERRNUMFAILSAFE);
 
 							//Rerun in fail-safe mode
 							convertAllSquaredDifferencesToWeights<XFLOAT>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight, true);

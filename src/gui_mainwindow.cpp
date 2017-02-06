@@ -158,7 +158,7 @@ void SchedulerWindow::cb_execute_i()
 	if (exists(fn_check))
 	{
 		std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
-		fl_message(msg.c_str());
+		fl_message("%s",msg.c_str());
 	}
 	else
 	{
