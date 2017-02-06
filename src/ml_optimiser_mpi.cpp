@@ -391,6 +391,43 @@ void MlOptimiserMpi::initialise()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
+
+	MPI_Status status;
+	if(do_auto_refine)
+	{
+		if (do_gpu && !node->isMaster())
+		{
+			size_t boxLim (10000);
+			for (int i = 0; i < cudaDevices.size(); i ++)
+			{
+				MlDeviceBundle *b = new MlDeviceBundle(this);
+				b->setDevice(cudaDevices[i]);
+				size_t t = b->checkFixedSizedObjects(cudaDeviceShares[i]);
+				boxLim = ((t < boxLim) ? t : boxLim );
+			}
+			node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+		}
+		else
+		{
+			size_t boxLim, LowBoxLim(10000);
+			for(int slave = 1; slave < node->size; slave++)
+			{
+				node->relion_MPI_Recv(&boxLim, sizeof(size_t), MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
+				LowBoxLim = (boxLim < LowBoxLim ? boxLim : LowBoxLim );
+			}
+
+			Experiment temp;
+			temp.read(fn_data);
+			int t_ori_size = -1;
+			temp.MDexp.getValue(EMDL_IMAGE_SIZE, t_ori_size);
+
+			if(LowBoxLim < t_ori_size)
+			{
+				std::cerr << std::endl << "With the current division of slaves across GPUs, you will be able to \n   use a image-size of " << LowBoxLim << " pixels to Nyquist (last iteration)" << std::endl;
+				std::cerr << std::endl << "your input image size is " << t_ori_size << " pixels." << std::endl << std::endl;
+			}
+		}
+	}
 	/************************************************************************/
 #endif // CUDA
 

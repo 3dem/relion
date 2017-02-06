@@ -2785,7 +2785,24 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_WSUM);
 #endif
 }
+size_t MlDeviceBundle::checkFixedSizedObjects(int shares)
+{
+	int devCount;
+	size_t BoxLimit;
+	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+	if(device_id >= devCount)
+		CRITICAL(ERR_GPUID);
 
+	HANDLE_ERROR(cudaSetDevice(device_id));
+
+	size_t free(0), total(0);
+	DEBUG_HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+	float margin(1.05);
+	BoxLimit = pow(free/(margin*2.5*sizeof(XFLOAT)*((float)shares)),(1/3.0)) / (2.0);
+	size_t BytesNeeded = ((float)shares)*margin*2.5*sizeof(XFLOAT)*pow((baseMLO->mymodel.ori_size*2),3);
+
+	return(BoxLimit);
+}
 void MlDeviceBundle::setupFixedSizedObjects()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
