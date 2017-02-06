@@ -912,91 +912,6 @@ void MlOptimiser::initialise()
     std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
 
-    initialiseGeneral();
-
-    initialiseWorkLoad();
-
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-
-	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
-	{
-		MultidimArray<RFLOAT> Mavg;
-
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-	}
-
-	// First low-pass filter the initial references
-	if (iter == 0)
-		initialLowPassFilterReferences();
-
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	// Check minimum group size of 10 particles
-	if (verb > 0)
-	{
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			if (mymodel.nr_particles_group[igroup] < 10)
-			{
-				std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				do_warn = true;
-			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName label for particles from multiple different micrographs in the input STAR file. " << std::endl;
-		}
-	}
-
-	// Write out initial mymodel
-	if (!do_movies_in_batches)
-		write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
-	// Do this after writing out the model, so that still the random halves are written in separate files.
-	if (do_realign_movies)
-	{
-		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
-		has_converged = true;
-		// Then use join random halves
-		do_join_random_halves = true;
-
-		// If we skip the maximization step, then there is no use in using all data
-		if (!do_skip_maximization)
-		{
-			// Use all data out to Nyquist because resolution gains may be substantial
-			do_use_all_data = true;
-		}
-	}
-
 	if (do_gpu)
 	{
 #ifdef CUDA
@@ -1089,6 +1004,91 @@ void MlOptimiser::initialise()
 #else
         REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
 #endif
+	}
+
+    initialiseGeneral();
+
+    initialiseWorkLoad();
+
+	if (fn_sigma != "")
+	{
+		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
+		MetaDataTable MDsigma;
+		RFLOAT val;
+		int idx;
+		MDsigma.read(fn_sigma);
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+		{
+			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
+			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
+			if (idx < XSIZE(mymodel.sigma2_noise[0]))
+				mymodel.sigma2_noise[0](idx) = val;
+		}
+		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
+		{
+			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
+		}
+		// Use the same spectrum for all classes
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+
+	}
+	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	{
+		MultidimArray<RFLOAT> Mavg;
+
+		// Calculate initial sigma noise model from power_class spectra of the individual images
+		calculateSumOfPowerSpectraAndAverageImage(Mavg);
+
+		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
+		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
+	}
+
+	// First low-pass filter the initial references
+	if (iter == 0)
+		initialLowPassFilterReferences();
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (iter == 0)
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
+	// Check minimum group size of 10 particles
+	if (verb > 0)
+	{
+		bool do_warn = false;
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		{
+			if (mymodel.nr_particles_group[igroup] < 10)
+			{
+				std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
+				do_warn = true;
+			}
+		}
+		if (do_warn)
+		{
+			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
+			std:: cout << "         You can do so by using the same rlnMicrographName label for particles from multiple different micrographs in the input STAR file. " << std::endl;
+		}
+	}
+
+	// Write out initial mymodel
+	if (!do_movies_in_batches)
+		write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+
+	// Do this after writing out the model, so that still the random halves are written in separate files.
+	if (do_realign_movies)
+	{
+		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
+		has_converged = true;
+		// Then use join random halves
+		do_join_random_halves = true;
+
+		// If we skip the maximization step, then there is no use in using all data
+		if (!do_skip_maximization)
+		{
+			// Use all data out to Nyquist because resolution gains may be substantial
+			do_use_all_data = true;
+		}
 	}
 
 
