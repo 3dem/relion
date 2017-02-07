@@ -7425,8 +7425,14 @@ void MlOptimiser::checkConvergence(bool myverb)
 
             if (has_converged)
             {
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            	std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+            	std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            	if(anticipate_oom)
+            	{
+            		std::cout << " You were warned at the beginning of the run that memory on the GPU might run out, and this final iteration\n\
+is where this is likely to happen. If you should encounter an out-of-memory error, you can then continue \n\
+from the last completed iteration by continuing from the gui and specifying the optimiser.star-file from iteration " << iter << "." << std::endl;
+            	}
             }
         }
 

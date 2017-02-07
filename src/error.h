@@ -141,7 +141,7 @@ Each MPI-rank running on a GPU increases the use of GPU-memory. Relion\n\
 tries to distribute load over multiple GPUs to increase performance,\n\
 but doing this in a general and memory-efficient way is difficult.\n\n\
 1. Check the device-mapping presented at the beginning of each run,\n\
-   and be particularly wary of 'device X is plit between N slaves', which \n\
+   and be particularly wary of 'device X is split between N slaves', which \n\
    will result in a higher memory cost on GPU X. In classifications, GPU-\n\
    sharing between MPI-ranks is typically fine, whereas it will usually \n\
    cause out-of-memory during the last iteration of high-resolution refinement.\n\n\
@@ -156,7 +156,7 @@ but doing this in a general and memory-efficient way is difficult.\n\n\
    reduced, which means that memory use is much lower.\n\n\
 3. If the above estimation fits onto (all of) your GPU(s), you may have \n\
    a very large number of orientations which are found as possible during\n\
-   the expectation step, which results in large arrays beeing needed on the \n\
+   the expectation step, which results in large arrays being needed on the \n\
    GPU. If this is the case, you should find large (>10'000) values of \n\
    '_rlnNrOfSignificantSamples' in your _data.star output files. You can try\n\
    adding the --maxsig <P>, flag, where P is an integer limit, but you \n\

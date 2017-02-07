@@ -96,6 +96,7 @@ void MlOptimiserMpi::initialise()
     /************************************************************************/
 	//Setup GPU related resources
     int devCount, deviceAffinity;
+	bool is_split(false);
 
 	if (do_gpu)
 	{
@@ -367,8 +368,10 @@ void MlOptimiserMpi::initialise()
 
 			for (int i = 0; i < uniqueDeviceIdentifiers.size(); i++)
 				if (uniqueDeviceIdentifierCounts[i] > 1)
+				{
 					std::cout << uniqueDeviceIdentifiers[i] << " is split between " << uniqueDeviceIdentifierCounts[i] << " slaves" << std::endl;
-
+					is_split = true;
+				}
 	        int global_did = 0;
 
 	        for (int slave = 1; slave < node->size; slave++)
@@ -423,8 +426,26 @@ void MlOptimiserMpi::initialise()
 
 			if(LowBoxLim < t_ori_size)
 			{
-				std::cerr << std::endl << "With the current division of slaves across GPUs, you will be able to \n   use a image-size of " << LowBoxLim << " pixels to Nyquist (last iteration)" << std::endl;
-				std::cerr << std::endl << "your input image size is " << t_ori_size << " pixels." << std::endl << std::endl;
+				anticipate_oom = true;
+				std::cerr << "\n\n                         ***WARNING***\n\nWith the current settings and hardware, you will be able to \n\
+use an estimated image-size of " << LowBoxLim << " pixels during the last iteration...\n\n\
+...but your input box-size (image_size) is however " << t_ori_size << ". This means that \n\
+you will likely run out of memory on the GPU(s), and will have to then re-start \n\
+from the last completed iteration (i.e. continue from it) with the use of GPUs.\n " << std::endl;
+
+				if(is_split)
+				{
+					std::cerr << "You are also splitting at least one GPU between two or more mpi-slaves, which \n\
+might be the limiting factor, since each mpi-slave that shares a GPU increases the \n\
+use of memory. In this case we recommend running a single mpi-slave per GPU, which \n\
+will still yield good performance and possibly a more stable execution. \n" << std::endl;
+				}
+#ifdef CUDA_DOUBLE_PRECISION
+				int sLowBoxLim = (int)((float)LowBoxLim*pow(2,1.0/3.0));
+				std::cerr << "You are also using double precison on the GPU. If you were using single precision\n\
+(which in all tested cases is perfectly fine), then you could use an box-size of ~"  << sLowBoxLim << "." << std::endl;
+#endif
+				std::cerr << std::endl << std::endl;
 			}
 		}
 	}

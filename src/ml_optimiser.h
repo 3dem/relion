@@ -286,6 +286,7 @@ public:
 
 	// Use gpu resources?
 	bool do_gpu;
+	bool anticipate_oom;
 
 	// Which GPU devices to use?
 	std::string gpu_ids;
@@ -615,6 +616,7 @@ public:
 		do_split_random_halves(0),
 		random_seed(0),
 		do_gpu(0),
+		anticipate_oom(0),
 		do_helical_refine(0),
 		ignore_helical_symmetry(0),
 		helical_twist_initial(0),
