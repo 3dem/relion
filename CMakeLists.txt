@@ -233,6 +233,11 @@ if(HAVE___SINCOS)
     add_definitions(-DHAVE___SINCOS)
 endif()
 
+# install fftw if we built our own version
+if(FORCE_OWN_FFTW)
+    install(DIRECTORY external/fftw/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
+endif()
+
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 list(APPEND RELION_SCRIPT_FILES star_printtable 
