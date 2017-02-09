@@ -57,7 +57,7 @@ if(NOT FFTW_FOUND)
     set(FFTW_FFTW3_LIB_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
     set(FFTW_FFTW3_BUILD_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
    
-# removing as this overrides user-specifed prefix
+# removing as this overrides user-specified prefix
 #    set(CMAKE_INSTALL_PREFIX  ${FFTW_EXTERNAL_PATH})
     externalproject_add(OWN_FFTW
     URL ${FFTW_FFTW3_TAR_FILE}
