@@ -20,6 +20,15 @@
 
 #include "src/ml_model.h"
 
+#ifdef MDL_TIMING
+    Timer mdl_timer;
+	int TIMING_MDL_1 = 		proj_timer.setNew("MDL_1");
+#define TIMING_TOC(id) mdl_timer.toc(id)
+#else
+#define TIMING_TIC(id)
+#define TIMING_TOC(id)
+#endif
+
 void MlModel::initialise()
 {
 

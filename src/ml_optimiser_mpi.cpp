@@ -783,6 +783,9 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 void MlOptimiserMpi::expectation()
 {
+#ifdef TIMING
+		timer.tic(TIMING_EXP_1);
+#endif
 
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::expectation: Entering " << std::endl;
@@ -798,8 +801,13 @@ void MlOptimiserMpi::expectation()
 
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
+#ifdef TIMING
+		timer.tic(TIMING_EXP_1a);
+#endif
 	updateImageSizeAndResolutionPointers();
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_1a);
+#endif
 	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
 	// The master only holds metadata, it does not set up the wsum_model (to save memory)
 	if (!node->isMaster())
@@ -817,7 +825,10 @@ void MlOptimiserMpi::expectation()
 #endif
 
 	}
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_1);
+		timer.tic(TIMING_EXP_2);
+#endif
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
@@ -860,7 +871,10 @@ void MlOptimiserMpi::expectation()
 		node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
 		node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
 	}
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_2);
+		timer.tic(TIMING_EXP_3);
+#endif
 	// D. Update the angular sampling (all nodes except master)
 	if (!node->isMaster() && do_auto_refine && iter > 1 )
 	{
@@ -900,12 +914,18 @@ void MlOptimiserMpi::expectation()
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
 	node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&do_join_random_halves, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_3);
+		timer.tic(TIMING_EXP_4);
+		timer.tic(TIMING_EXP_4a);
+#endif
 
 	// Wait until expected angular errors have been calculated
 	MPI_Barrier(MPI_COMM_WORLD);
 	sleep(1);
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4a);
+#endif
 	// Now perform real expectation step in parallel, use an on-demand master-slave system
 #define JOB_FIRST (first_last_nr_images(0))
 #define JOB_LAST  (first_last_nr_images(1))
@@ -927,10 +947,16 @@ void MlOptimiserMpi::expectation()
 	{
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
+#ifdef TIMING
+		timer.tic(TIMING_EXP_4b);
+#endif
 			MlDeviceBundle *b = new MlDeviceBundle(this);
 			b->setDevice(cudaDevices[i]);
 			b->setupFixedSizedObjects();
 			cudaDeviceBundles.push_back((void*)b);
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4b);
+#endif
 		}
 
 		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
@@ -993,11 +1019,16 @@ void MlOptimiserMpi::expectation()
 	}
 	/************************************************************************/
 #endif // CUDA
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4);
+#endif
 	double ss_frac(1.0);
 	long int nr_particles_todo;
     if (node->isMaster())
     {
+#ifdef TIMING
+		timer.tic(TIMING_EXP_5);
+#endif
         try
         {
 			if( iter<=subset_iter && !do_split_random_halves)
@@ -1158,11 +1189,15 @@ void MlOptimiserMpi::expectation()
             MlOptimiser::usage();
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_5);
+#endif
     }
     else
     {
-
+#ifdef TIMING
+		timer.tic(TIMING_EXP_6);
+#endif
     	try
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
@@ -1295,6 +1330,9 @@ void MlOptimiserMpi::expectation()
 			{
 				for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 				{
+#ifdef TIMING
+		timer.tic(TIMING_EXP_7);
+#endif
 					MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
 					b->syncAllBackprojects();
 
@@ -1322,8 +1360,13 @@ void MlOptimiserMpi::expectation()
 						b->cudaBackprojectors[j].clear();
 						b->coarseProjectionPlans[j].clear();
 					}
+#ifdef TIMING
+		timer.toc(TIMING_EXP_7);
+#endif
 				}
-
+#ifdef TIMING
+		timer.tic(TIMING_EXP_8);
+#endif
 				for (int i = 0; i < cudaOptimisers.size(); i ++)
 					delete (MlOptimiserCuda*) cudaOptimisers[i];
 
@@ -1351,6 +1394,9 @@ void MlOptimiserMpi::expectation()
 					delete (MlDeviceBundle*) cudaDeviceBundles[i];
 
 				cudaDeviceBundles.clear();
+#ifdef TIMING
+		timer.toc(TIMING_EXP_8);
+#endif
 			}
 #endif // CUDA
 
@@ -1361,7 +1407,9 @@ void MlOptimiserMpi::expectation()
             MlOptimiser::usage();
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_6);
+#endif
     }
 
     // Just make sure the temporary arrays are empty...
@@ -2789,12 +2837,20 @@ void MlOptimiserMpi::iterate()
 
 		// Mask the reconstructions to get rid of noisy solvent areas
 		// Skip masking upon convergence (for validation purposes)
+#ifdef TIMING
+		timer.tic(TIMING_SOLVFLAT);
+#endif
 		if (do_solvent && !has_converged)
 			solventFlatten();
-
+#ifdef TIMING
+		timer.toc(TIMING_SOLVFLAT);
+		timer.tic(TIMING_UPDATERES);
+#endif
 		// Re-calculate the current resolution, do this before writing to get the correct values in the output files
 		updateCurrentResolution();
-
+#ifdef TIMING
+		timer.toc(TIMING_UPDATERES);
+#endif
 		// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
 		bool do_write_optimiser = !do_join_random_halves;
 		// Write out final map without iteration number in the filename
