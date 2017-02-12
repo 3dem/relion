@@ -813,7 +813,19 @@ void MlOptimiserMpi::expectation()
 	if (!node->isMaster())
 	{
 		MlOptimiser::expectationSetup();
-
+		if(node->rank==1)
+		{
+			for(int i=0; i<mymodel.PPref.size(); i++)
+			{
+				FileName fn_tmp;
+				fn_tmp.compose("PPref_", i,"mrc");
+				Image<RFLOAT> Itmp;
+				Itmp().resize(mymodel.PPref[i].data);
+				for(int j=0; j<Itmp().nzyxdim; j++)
+					Itmp.data.data[j] = mymodel.PPref[i].data.data[j].real;
+				Itmp.write(fn_tmp);
+			}
+		}
 		// All slaves no longer need mydata.MD tables
 		mydata.MDimg.clear();
 		mydata.MDmic.clear();
