@@ -98,7 +98,7 @@ long int Projector::getSize()
 }
 
 // Fill data array with oversampled Fourier transform, and calculate its power spectrum
-void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding)
+void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding, bool skip_heavy)
 {
 	TIMING_TIC(TIMING_TOP);
 
@@ -158,12 +158,14 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	TIMING_TIC(TIMING_CENTER);
 	// Translate padded map to put origin of FT in the center
-	CenterFFT(Mpad, true);
+	if(!skip_heavy)
+		CenterFFT(Mpad, true);
 	TIMING_TOC(TIMING_CENTER);
 
 	TIMING_TIC(TIMING_TRANS);
 	// Calculate the oversampled Fourier transform
-	transformer.FourierTransform(Mpad, Faux, false);
+	if(!skip_heavy)
+		transformer.FourierTransform(Mpad, Faux, false);
 	TIMING_TOC(TIMING_TRANS);
 
 	TIMING_TIC(TIMING_INIT2);
@@ -183,33 +185,35 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	TIMING_TIC(TIMING_FAUX);
 	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
-	{
-		int r2 = kp*kp + ip*ip + jp*jp;
-		// The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
-		if (r2 <= max_r2)
+	if(!skip_heavy)
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 		{
-			// Set data array
-			A3D_ELEM(data, kp, ip, jp) = DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
+			int r2 = kp*kp + ip*ip + jp*jp;
+			// The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
+			if (r2 <= max_r2)
+			{
+				// Set data array
+				A3D_ELEM(data, kp, ip, jp) = DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
 
-			// Calculate power spectrum
-			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
-			// Factor two because of two-dimensionality of the complex plane
-			DIRECT_A1D_ELEM(power_spectrum, ires) += norm(A3D_ELEM(data, kp, ip, jp)) / 2.;
-			DIRECT_A1D_ELEM(counter, ires) += 1.;
+				// Calculate power spectrum
+				int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+				// Factor two because of two-dimensionality of the complex plane
+				DIRECT_A1D_ELEM(power_spectrum, ires) += norm(A3D_ELEM(data, kp, ip, jp)) / 2.;
+				DIRECT_A1D_ELEM(counter, ires) += 1.;
+			}
 		}
-	}
 	TIMING_TOC(TIMING_FAUX);
 
 	TIMING_TIC(TIMING_POW);
 	// Calculate radial average of power spectrum
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
-	{
-		if (DIRECT_A1D_ELEM(counter, i) < 1.)
-			DIRECT_A1D_ELEM(power_spectrum, i) = 0.;
-		else
-			DIRECT_A1D_ELEM(power_spectrum, i) /= DIRECT_A1D_ELEM(counter, i);
-	}
+	if(!skip_heavy)
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
+		{
+			if (DIRECT_A1D_ELEM(counter, i) < 1.)
+				DIRECT_A1D_ELEM(power_spectrum, i) = 0.;
+			else
+				DIRECT_A1D_ELEM(power_spectrum, i) /= DIRECT_A1D_ELEM(counter, i);
+		}
 	TIMING_TOC(TIMING_POW);
 
 	TIMING_TOC(TIMING_TOP);

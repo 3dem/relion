@@ -694,8 +694,8 @@ public:
 	 */
 	void expectation();
 
-	/* Setup expectation step */
-	void expectationSetup();
+	/* Setup expectation step ( thisClass == -1  => do all classes this call) */
+	void expectationSetup(int thisClass=-1);
 
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */
 	void expectationSetupCheckMemory(int myverb = 1);

@@ -801,116 +801,54 @@ void MlOptimiserMpi::expectation()
 
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
+
+	updateImageSizeAndResolutionPointers();
+
+	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
+	// The master only holds metadata, it does not set up the wsum_model (to save memory)
 #ifdef TIMING
 		timer.tic(TIMING_EXP_1a);
 #endif
-	updateImageSizeAndResolutionPointers();
-#ifdef TIMING
-		timer.toc(TIMING_EXP_1a);
-#endif
-	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
-	// The master only holds metadata, it does not set up the wsum_model (to save memory)
-
-	if(node->rank==1)
+	if (!node->isMaster())
 	{
-		MlOptimiser::expectationSetup();
+		/*
+		 * Currently only works when nr_classes == nr_slaves.
+		 *
+		 * The logic is to call setups for all classes, but heavy setups
+		 * are divided over slaves, and heavy data is then communicated.
+		 */
+		MlOptimiser::expectationSetup(node->rank-1);//node->rank==1);
+
+		mydata.MDimg.clear();
+		mydata.MDmic.clear();
+
+#if !defined(__APPLE__)
+		malloc_trim(0);
+#endif
 	}
 	else
 	{
 		for(int i=0; i<mymodel.PPref.size(); i++)
 		{
+			//std::cout << " rank " << node->rank << " calling initData for model " << i <<  std::endl;
 			mymodel.PPref[i].ref_dim = mymodel.ref_dim;
 			mymodel.PPref[i].initialiseData(mymodel.current_size); //set size(s)
 		}
 	}
 
-	if (!node->isMaster())
-	{
-		mydata.MDimg.clear();
-		mydata.MDmic.clear();
-
-#if !defined(__APPLE__)
-		malloc_trim(0);
+	MPI_Barrier(MPI_COMM_WORLD);
+#ifdef TIMING
+		timer.toc(TIMING_EXP_1a);
 #endif
-
-	}
-/*	if (!node->isMaster())
-	{
-		if(node->rank==1)
-		{
-			MlOptimiser::expectationSetup();
-		}
-
-			for(int i=0; i<mymodel.PPref.size(); i++)
-			{
-				std::cout << "sending "	<< i << std::endl;
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-				MULTIDIM_SIZE(mymodel.PPref[i].data), MY_MPI_COMPLEX, 1, MPI_COMM_WORLD);
-				std::cout << "sent "	<< i << std::endl;
-			}
-		}
-		else
-		{
-			for(int i=0; i<mymodel.PPref.size(); i++)
-			{	
-				std::cout << "recieving " << i << std::endl;
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-				MULTIDIM_SIZE(mymodel.PPref[i].data), MY_MPI_COMPLEX, 1, MPI_COMM_WORLD);
-				std::cout << "recieved " << i << std::endl;
-			}
-			
-			for(int i=0; i<mymodel.PPref.size(); i++)
-			{
-				FileName fn_tmp;
-				fn_tmp.compose("PPref_", i,"dat");
-				std::ofstream f;
-                		f.open(fn_tmp.c_str());
-                		for (unsigned j = 0; j < mymodel.PPref[i].data.nzyxdim; j++)
-                        		f << mymodel.PPref[i].data.data[j].real << std::endl;
-                		f.close();
-				//Image<RFLOAT> Itmp;
-				//Itmp().resize(mymodel.PPref[i].data);
-				//for(int j=0; j<Itmp().nzyxdim; j++)
-				//	Itmp.data.data[j] = mymodel.PPref[i].data.data[j].real;
-				//Itmp.write(fn_tmp);
-		
-				//int reconstruct_rank = (ith_recons % (node->size - 1) ) + 1;
-				// Broadcast the reconstructed references to all other MPI nodes
-				// Broadcast the data_vs_prior spectra to all other MPI nodes
-			}
-
-		//}
-
-//		for(int i=0; i<mymodel.PPref.size(); i++)
-//		{
-//			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-//				MULTIDIM_SIZE(mymodel.PPref[i].data), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-//		}	
-
-		// All slaves no longer need mydata.MD tables
-		mydata.MDimg.clear();
-		mydata.MDmic.clear();
-
-		// Many small new's are not returned to the OS upon free-ing them. To force this, use the following call
-		// from http://stackoverflow.com/questions/10943907/linux-allocator-does-not-release-small-chunks-of-memory
-#if !defined(__APPLE__)
-		malloc_trim(0);
-#endif
-
-	} */
-//	else
-//	{
-//
-//	}
-
 	for(int i=0; i<mymodel.PPref.size(); i++)
 	{
-		std::cout << "sending on " << node->rank << std::endl;
-		std::cout << "size " << i << " on " << node->rank << " = " << MULTIDIM_SIZE(mymodel.PPref[i].data) << std::endl;
+		//std::cout << "sending on " << node->rank << std::endl;
+		//std::cout << "size " << i << " on " << node->rank << " = " << MULTIDIM_SIZE(mymodel.PPref[i].data) << std::endl;
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-				MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, 1, MPI_COMM_WORLD);
-		std::cout << "sent on " << node->rank << std::endl;
+				MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, i+1, MPI_COMM_WORLD);
+		//std::cout << "sent on " << node->rank << std::endl;
 	}
+
 	MPI_Barrier(MPI_COMM_WORLD);
 	if(node->rank==2)
 	{

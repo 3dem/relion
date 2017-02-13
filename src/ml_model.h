@@ -351,8 +351,8 @@ public:
 	void initialiseBodyMasks(FileName fn_masks, FileName fn_root_out);
 
 	// Set FourierTransforms in Projector of each class
-	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector
-	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false);
+	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
+	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false, int thisClass = -1);
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
