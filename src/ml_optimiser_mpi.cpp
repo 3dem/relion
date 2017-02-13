@@ -664,6 +664,21 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+	if(!node->isMaster())
+	{
+		/* Set up a bool-array with reference responsibilities for each rank. That is;
+		 * if(PPrefRank[i]==true)  //on this rank
+		 * 		(set up reference vol and MPI_Bcast)
+		 * else()
+		 * 		(prepare to receive from MPI_Bcast)
+		 */
+		mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
+
+		for(int i=0; i<mymodel.PPref.size(); i++)
+			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1);
+	}
+
+	 MPI_Barrier(MPI_COMM_WORLD);
 //#define DEBUG_WORKLOAD
 #ifdef DEBUG_WORKLOAD
 	std::cerr << " node->rank= " << node->rank << " my_first_ori_particle_id= " << my_first_ori_particle_id << " my_last_ori_particle_id= " << my_last_ori_particle_id << std::endl;
@@ -811,18 +826,7 @@ void MlOptimiserMpi::expectation()
 #endif
 	if (!node->isMaster())
 	{
-		/* Set up a bool-array with reference responsibilities for each rank. That is;
-		 * if(PPrefRank[i]==true)  //on this rank
-		 * 		(set up reference vol and MPI_Bcast)
-		 * else()
-		 * 		(prepare to receive from MPI_Bcast)
-		 */
-		mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
-
-		for(int i=0; i<mymodel.PPref.size(); i++)
-			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1);
-
-		MlOptimiser::expectationSetup();;
+		MlOptimiser::expectationSetup();
 
 		mydata.MDimg.clear();
 		mydata.MDmic.clear();

@@ -21,7 +21,7 @@
 #include <src/time.h>
 //#define DEBUG
 
-#define PROJ_TIMING
+//#define PROJ_TIMING
 #ifdef PROJ_TIMING
     Timer proj_timer;
 	int TIMING_TOP = 		proj_timer.setNew("PROJECTOR - computeFourierTransformMap");
