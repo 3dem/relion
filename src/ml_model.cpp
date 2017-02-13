@@ -69,6 +69,7 @@ void MlModel::initialise()
 
 	Projector ref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
     PPref.clear();
+    PPrefRank.clear();
     // Now fill the entire vector with instances of "ref"
     PPref.resize(nr_classes * nr_bodies, ref);
 
@@ -773,7 +774,7 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
 {
-	bool do_heavy(false);
+	bool do_heavy(true);
 	int nr_classes_bodies = nr_classes * nr_bodies; // also set multiple bodies!
 	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     {

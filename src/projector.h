@@ -190,7 +190,7 @@ public:
     * Depending on whether 2D or 3D Fourier Transforms will be extracted, the map is normalized internally in a different manner
     *
     */
-   void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size = -1, int nr_threads = 1, bool do_gridding = true, bool skip_heavy = false);
+   void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size = -1, int nr_threads = 1, bool do_gridding = true, bool do_heavy = true);
 
    /* This is experimental: apply a mask in Fourier-space to focus refinements on certain Fourier components
     * mask_r_min and mask_r_max are the radii of the lowest and highest frequencies (only keep crown inside)
