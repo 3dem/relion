@@ -820,7 +820,7 @@ void MlOptimiserMpi::expectation()
 		mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
 
 		for(int i=0; i<mymodel.PPref.size(); i++)
-			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1) ;
+			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1);
 
 		MlOptimiser::expectationSetup();;
 
@@ -831,29 +831,29 @@ void MlOptimiserMpi::expectation()
 		malloc_trim(0);
 #endif
 	}
-	else // initialize on master to broadcast TODO: set up slave communicator instead.
-	{
-		for(int i=0; i<mymodel.PPref.size(); i++)
-		{
-			//std::cout << " rank " << node->rank << " calling initData for model " << i <<  std::endl;
-			mymodel.PPref[i].ref_dim = mymodel.ref_dim;
-			mymodel.PPref[i].initialiseData(mymodel.current_size); //set size(s)
-		}
-	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
 #ifdef TIMING
 		timer.toc(TIMING_EXP_1a);
 #endif
 
-	for(int i=0; i<mymodel.PPref.size(); i++)
-	{
-		int sender = (i+1)%(node->size - 1);
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-				MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, MPI_COMM_WORLD);
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
-						MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, MPI_COMM_WORLD);
-	}
+	if (!node->isMaster())
+		for(int i=0; i<mymodel.PPref.size(); i++)
+		{
+			/* NOTE: the first slave has rank 0 on the slave communicator node->slaveC,
+			 *       that's why we don't have to add 1, like this;
+			 *       int sender = (i)%(node->size - 1)+1 ;
+			 */
+
+			int sender = (i)%(node->size - 1); // which rank did the heavy lifting? -> sender of information
+			{
+				// Communicating over all slaves means we don't have to allocate on the master.
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
+						MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
+						MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
+			}
+		}
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
