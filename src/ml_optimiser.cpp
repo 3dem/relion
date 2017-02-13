@@ -2329,7 +2329,7 @@ void MlOptimiser::expectation()
 }
 
 
-void MlOptimiser::expectationSetup(int thisClass)
+void MlOptimiser::expectationSetup()
 {
 #ifdef DEBUG
 	std::cerr << "Entering expectationSetup" << std::endl;
@@ -2342,8 +2342,7 @@ void MlOptimiser::expectationSetup(int thisClass)
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
-    // Initialise Projectors and fill vector with power_spectra for all classes
-	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu, thisClass);
+	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// TMP for helices of Anthiony 12 july 2016
 	if (debug1 > 0.)

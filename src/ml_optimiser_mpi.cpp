@@ -811,13 +811,18 @@ void MlOptimiserMpi::expectation()
 #endif
 	if (!node->isMaster())
 	{
-		/*
-		 * Currently only works when nr_classes == nr_slaves.
-		 *
-		 * The logic is to call setups for all classes, but heavy setups
-		 * are divided over slaves, and heavy data is then communicated.
+		/* Set up a bool-array with reference responsibilities for each rank. That is;
+		 * if(PPrefRank[i]==true)  //on this rank
+		 * 		(set up reference vol and MPI_Bcast)
+		 * else()
+		 * 		(prepare to receive from MPI_Bcast)
 		 */
-		MlOptimiser::expectationSetup(node->rank-1);//node->rank==1);
+		mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
+
+		for(int i=0; i<mymodel.PPref.size(); i++)
+			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1) ;
+
+		MlOptimiser::expectationSetup();;
 
 		mydata.MDimg.clear();
 		mydata.MDmic.clear();
@@ -826,7 +831,7 @@ void MlOptimiserMpi::expectation()
 		malloc_trim(0);
 #endif
 	}
-	else
+	else // initialize on master to broadcast TODO: set up slave communicator instead.
 	{
 		for(int i=0; i<mymodel.PPref.size(); i++)
 		{
@@ -840,16 +845,18 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.toc(TIMING_EXP_1a);
 #endif
+
 	for(int i=0; i<mymodel.PPref.size(); i++)
 	{
-		//std::cout << "sending on " << node->rank << std::endl;
-		//std::cout << "size " << i << " on " << node->rank << " = " << MULTIDIM_SIZE(mymodel.PPref[i].data) << std::endl;
+		int sender = (i+1)%(node->size - 1);
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-				MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, i+1, MPI_COMM_WORLD);
-		//std::cout << "sent on " << node->rank << std::endl;
+				MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, MPI_COMM_WORLD);
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
+						MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, MPI_COMM_WORLD);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
+
 	if(node->rank==2)
 	{
 		for(int i=0; i<mymodel.PPref.size(); i++)

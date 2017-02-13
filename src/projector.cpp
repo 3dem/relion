@@ -21,7 +21,7 @@
 #include <src/time.h>
 //#define DEBUG
 
-//#define PROJ_TIMING
+#define PROJ_TIMING
 #ifdef PROJ_TIMING
     Timer proj_timer;
 	int TIMING_TOP = 		proj_timer.setNew("PROJECTOR - computeFourierTransformMap");
@@ -31,7 +31,7 @@
 	int TIMING_TRANS = 		proj_timer.setNew("PROJECTOR - transform");
 	int TIMING_FAUX =		proj_timer.setNew("PROJECTOR - Faux");
 	int TIMING_POW =		proj_timer.setNew("PROJECTOR - power_spectrum");
-	int TIMING_INIT1 =		proj_timer.setNew("PROJECTOR - inti1");
+	int TIMING_INIT1 =		proj_timer.setNew("PROJECTOR - init1");
 	int TIMING_INIT2 = 		proj_timer.setNew("PROJECTOR - init2");
 #define TIMING_TIC(id) proj_timer.tic(id)
 #define TIMING_TOC(id) proj_timer.toc(id)
@@ -98,7 +98,7 @@ long int Projector::getSize()
 }
 
 // Fill data array with oversampled Fourier transform, and calculate its power spectrum
-void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding, bool skip_heavy)
+void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding, bool do_heavy)
 {
 	TIMING_TIC(TIMING_TOP);
 
@@ -122,11 +122,17 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	switch (ref_dim)
 	{
 	case 2:
-	   Mpad.initZeros(padoridim, padoridim);
+		if(do_heavy)
+			Mpad.initZeros(padoridim, padoridim);
+		else
+			Mpad.reshape(padoridim, padoridim);
 	   normfft = (RFLOAT)(padding_factor * padding_factor);
 	   break;
 	case 3:
-	   Mpad.initZeros(padoridim, padoridim, padoridim);
+		if(do_heavy)
+			Mpad.initZeros(padoridim, padoridim, padoridim);
+		else
+			Mpad.reshape(padoridim, padoridim, padoridim);
 	   if (data_dim ==3)
 		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
 	   else
@@ -143,7 +149,13 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 	// 10feb11: at least in 2D case, this seems to be the wrong thing to do!!!
 	// TODO: check what is best for subtomo!
 	if (do_gridding)// && data_dim != 3)
-		griddingCorrect(vol_in);
+	{
+		if(do_heavy)
+			griddingCorrect(vol_in);
+		else
+			vol_in.setXmippOrigin();
+	}
+
 	TIMING_TOC(TIMING_GRID);
 
 	TIMING_TIC(TIMING_PAD);
@@ -158,13 +170,13 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	TIMING_TIC(TIMING_CENTER);
 	// Translate padded map to put origin of FT in the center
-	if(!skip_heavy)
+	if(do_heavy)
 		CenterFFT(Mpad, true);
 	TIMING_TOC(TIMING_CENTER);
 
 	TIMING_TIC(TIMING_TRANS);
 	// Calculate the oversampled Fourier transform
-	if(!skip_heavy)
+	if(do_heavy)
 		transformer.FourierTransform(Mpad, Faux, false);
 	TIMING_TOC(TIMING_TRANS);
 
@@ -185,7 +197,7 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	TIMING_TIC(TIMING_FAUX);
 	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
-	if(!skip_heavy)
+	if(do_heavy)
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 		{
 			int r2 = kp*kp + ip*ip + jp*jp;
@@ -206,7 +218,7 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	TIMING_TIC(TIMING_POW);
 	// Calculate radial average of power spectrum
-	if(!skip_heavy)
+	if(do_heavy)
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
 		{
 			if (DIRECT_A1D_ELEM(counter, i) < 1.)

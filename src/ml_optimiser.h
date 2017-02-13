@@ -694,8 +694,13 @@ public:
 	 */
 	void expectation();
 
-	/* Setup expectation step ( thisClass == -1  => do all classes this call) */
-	void expectationSetup(int thisClass=-1);
+	/* Setup expectation step. We divide the heavy steps over mpi-slaves,
+	 * so each call needs a list of which to skip heavy setup for. For
+	 * these classes, only some formatting is done. Data is copied
+	 * explicitly later.*/
+	void expectationSetup(std::vector<bool> cheapSetup);
+
+	void expectationSetup();
 
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */
 	void expectationSetupCheckMemory(int myverb = 1);
