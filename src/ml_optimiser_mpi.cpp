@@ -861,6 +861,7 @@ void MlOptimiserMpi::expectation()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
+#ifdef DEBUG
 	if(node->rank==2)
 	{
 		for(int i=0; i<mymodel.PPref.size(); i++)
@@ -874,6 +875,7 @@ void MlOptimiserMpi::expectation()
 			f.close();
 		}
 	}
+#endif
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_1);
