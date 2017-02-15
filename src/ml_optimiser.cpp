@@ -122,8 +122,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	int general_section = parser.addSection("General options");
 	// Not all parameters are accessible here...
 	FileName fn_out_new = parser.getOption("--o", "Output rootname", "OLD_ctX");
+
+	char buff[6];
+	snprintf(buff, sizeof(buff), "_ct%03d", iter);
 	if (fn_out_new == "OLD_ctX" || fn_out_new == fn_out )
-		fn_out += "_ct" + integerToString(iter);
+		fn_out += buff;
 	else
 		fn_out = fn_out_new;
 
