@@ -510,7 +510,8 @@ public:
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
 	int TIMING_WSUM_PROJ, TIMING_WSUM_BACKPROJ, TIMING_WSUM_DIFF2, TIMING_WSUM_SUMSHIFT;
-	int TIMING_EXP, TIMING_MAX, TIMING_RECONS;
+	int TIMING_EXP, TIMING_MAX, TIMING_RECONS, TIMING_SOLVFLAT, TIMING_UPDATERES;
+	int TIMING_EXP_1,TIMING_EXP_1a,TIMING_EXP_2,TIMING_EXP_3,TIMING_EXP_4,TIMING_EXP_4a,TIMING_EXP_4b,TIMING_EXP_4c,TIMING_EXP_4d,TIMING_EXP_5,TIMING_EXP_6,TIMING_EXP_7,TIMING_EXP_8,TIMING_EXP_9;
 	int TIMING_ESP, TIMING_ESP_THR, TIMING_ESP_ONEPART, TIMING_ESP_ONEPARTN, TIMING_EXP_METADATA, TIMING_EXP_CHANGES;
 	int TIMING_ESP_FT, TIMING_ESP_INI, TIMING_ESP_DIFF1, TIMING_ESP_DIFF2;
 	int TIMING_ESP_DIFF2_A, TIMING_ESP_DIFF2_B, TIMING_ESP_DIFF2_C, TIMING_ESP_DIFF2_D, TIMING_ESP_DIFF2_E;
@@ -693,7 +694,12 @@ public:
 	 */
 	void expectation();
 
-	/* Setup expectation step */
+	/* Setup expectation step. We divide the heavy steps over mpi-slaves,
+	 * so each call needs a list of which to skip heavy setup for. For
+	 * these classes, only some formatting is done. Data is copied
+	 * explicitly later.*/
+	void expectationSetup(std::vector<bool> cheapSetup);
+
 	void expectationSetup();
 
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */

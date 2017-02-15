@@ -1107,9 +1107,26 @@ void MlOptimiser::initialiseGeneral(int rank)
 #ifdef TIMING
 	//DIFFF = timer.setNew("difff");
 	TIMING_EXP =           timer.setNew("expectation");
+	TIMING_EXP_1 =           timer.setNew("expectation_1");
+	TIMING_EXP_1a =           timer.setNew("expectation_1a");
+	TIMING_EXP_2 =           timer.setNew("expectation_2");
+	TIMING_EXP_3 =           timer.setNew("expectation_3");
+	TIMING_EXP_4 =           timer.setNew("expectation_4");
+	TIMING_EXP_4a =           timer.setNew("expectation_4a");
+	TIMING_EXP_4b =           timer.setNew("expectation_4b");
+	TIMING_EXP_4c =           timer.setNew("expectation_4c");
+	TIMING_EXP_4d =           timer.setNew("expectation_4d");
+	TIMING_EXP_5 =           timer.setNew("expectation_5");
+	TIMING_EXP_6 =           timer.setNew("expectation_6");
+	TIMING_EXP_7 =           timer.setNew("expectation_7");
+	TIMING_EXP_8 =           timer.setNew("expectation_8");
+	TIMING_EXP_9 =           timer.setNew("expectation_9");
+
 	TIMING_EXP_METADATA =  timer.setNew(" - EXP: metadata shuffling");
 	TIMING_EXP_CHANGES =   timer.setNew(" - EXP: monitor changes hidden variables");
 	TIMING_MAX =           timer.setNew("maximization");
+	TIMING_SOLVFLAT =      timer.setNew("flatten solvent");
+	TIMING_UPDATERES =     timer.setNew("update resolution");
 	TIMING_RECONS =        timer.setNew("reconstruction");
 	TIMING_ESP =           timer.setNew("expectationSomeParticles");
 	TIMING_ESP_THR =       timer.setNew("doThreadExpectationSomeParticles");
@@ -2325,7 +2342,6 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
-    // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// TMP for helices of Anthiony 12 july 2016
