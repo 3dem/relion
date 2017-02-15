@@ -3233,9 +3233,9 @@ void RelionMainWindow::cb_about(Fl_Widget* o, void* v)
 
 void RelionMainWindow::cb_about_i()
 {
-	ShowHelpText *help = new ShowHelpText("\
-RELION v2.0.3 \n \n \
-RELION is is developed in the groups of\n \
+
+#define HELPTEXT ("RELION " RELION_VERSION "\n \n \
+RELION is is developed in the groups of\n\n \
 Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
 - Sjors H.W. Scheres\n \
 - Shaoda He\n \
@@ -3246,8 +3246,8 @@ and Erik Lindahl at Stockholm University\n \n \
 - Dari Kimanius\n \
 \n\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
-the contribution of Sjors Scheres is acknowledged appropriately. In order to maintain an overview of existing versions, he would also appreciate being \
-notified of any redistribution of (modified versions of) the code. \n \n \n \
+the contribution of the developers are acknowledged appropriately. In order to maintain an overview of existing versions, a notification regarding  \
+any redistribution of (modified versions of) the code is appreciated (contact Sjors directly). \n \n \n \
 If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
  * General Bayesian approach (and first mention of RELION): \n \
      Scheres (2012) J. Mol. Biol. (PMID: 22100448)	 \n \n\
@@ -3282,8 +3282,9 @@ Please also cite the following EXTERNAL programs: \n \n \
     Zhang (2016) J. Struct. Biol. (PMID: 2659270) \n \n\
 * ResMap for local-resolution estimation:  \n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
-* Postscript plots are made using CPlot2D from  www.amzsaki.com\n \
-");
+* Postscript plots are made using CPlot2D from  www.amzsaki.com\n ")
+
+	ShowHelpText *help = new ShowHelpText(HELPTEXT);
 }
 
 
