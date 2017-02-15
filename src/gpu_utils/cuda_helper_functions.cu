@@ -1,6 +1,8 @@
 #include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
+#include "src/macros.h"
+#include "src/error.h"
 
 long int makeJobsForDiff2Fine(
 		OptimisationParamters &op,  SamplingParameters &sp,
@@ -523,10 +525,10 @@ void runDiff2KernelCoarse(
 
 #ifdef CUDA_DOUBLE_PRECISION
 			if (translation_num > blocks3D*4)
-				REPORT_ERROR("Number of coarse translations not supported on the GPU.");
+				CRITICAL(ERR_TRANSLIM);
 #else
 			if (translation_num > blocks3D*8)
-				REPORT_ERROR("Number of coarse translations not supported on the GPU.");
+				CRITICAL(ERR_TRANSLIM);
 #endif
 
 			unsigned rest = orientation_num % blocks3D;

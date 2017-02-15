@@ -102,6 +102,7 @@ public:
 
 	// One projector for each class;
 	std::vector<Projector > PPref;
+	std::vector<bool> PPrefRank;
 
 	// One name for each group
 	std::vector<FileName> group_names;
@@ -261,6 +262,7 @@ public:
     		masks_bodies = MD.masks_bodies;
     		com_bodies = MD.com_bodies;
     		PPref = MD.PPref;
+    		PPrefRank = MD.PPrefRank;
     		group_names = MD.group_names;
     		sigma2_noise = MD.sigma2_noise;
     		scale_correction = MD.scale_correction;
@@ -290,6 +292,7 @@ public:
 		masks_bodies.clear();
 		com_bodies.clear();
 		PPref.clear();
+		PPrefRank.clear();
 		group_names.clear();
 		sigma2_noise.clear();
 		scale_correction.clear();
@@ -351,8 +354,11 @@ public:
 	void initialiseBodyMasks(FileName fn_masks, FileName fn_root_out);
 
 	// Set FourierTransforms in Projector of each class
-	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector
+	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
 	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false);
+
+	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
+	void setFourierTransformMaps(bool update_tau2_spectra, std::vector<bool> ListCheapSetup, int nr_threads = 1, bool do_gpu = false);
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */

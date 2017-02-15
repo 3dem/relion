@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "src/macros.h"
+#include "src/error.h"
+
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 #include <execinfo.h>
 #include <cxxabi.h>
@@ -87,7 +90,7 @@ static void LaunchHandleError( cudaError_t err, const char *file, int line )
         printf( "KERNEL_ERROR: %s in %s at line %d (error-code %d)\n",
                         cudaGetErrorString( err ), file, line, err );
         fflush(stdout);
-              raise(SIGSEGV);
+              CRITICAL(ERRGPUKERN);
     }
 }
 #endif
@@ -606,7 +609,7 @@ public:
 		{
 			printf("ERROR: Mutex could not be created for alloactor. CODE: %d.\n", mutex_error);
 			fflush(stdout);
-			raise(SIGSEGV);
+			CRITICAL(ERR_CAMUX);
 		}
 	}
 
@@ -684,7 +687,7 @@ public:
 					pthread_mutex_unlock(&mutex);
 
 					fflush(stdout);
-					raise(SIGSEGV);
+					CRITICAL(ERRCUDACAOOM);
 				}
 			}
 
@@ -1444,7 +1447,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to host-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=size;
@@ -1459,7 +1462,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
@@ -1474,7 +1477,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to host-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=size;
@@ -1489,7 +1492,7 @@ public:
 		if(size==0)
 		{
 			printf("trying to device-alloc a stager with size=0");
-			raise(SIGSEGV);
+			CRITICAL(ERR_STAGEMEM);
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;

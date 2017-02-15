@@ -34,6 +34,11 @@
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
         int TIMING_MPISLAVEWAIT1, TIMING_MPISLAVEWAIT2, TIMING_MPISLAVEWAIT3;
+		#define RCTIC(timer,label) (timer.tic(label))
+		#define RCTOC(timer,label) (timer.toc(label))
+#else
+		#define RCTIC(timer,label)
+    	#define RCTOC(timer,label)
 #endif
 
 void MlOptimiserMpi::read(int argc, char **argv)
@@ -87,107 +92,11 @@ void MlOptimiserMpi::initialise()
     if (!do_movies_in_batches)
     	printMpiNodesMachineNames(*node, nr_threads);
 
-    MlOptimiser::initialiseGeneral(node->rank);
-
-    initialiseWorkLoad();
-
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-
-	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
-	{
-		MultidimArray<RFLOAT> Mavg;
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		// This is done in parallel
-		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		if (!node->isMaster())
-			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-	}
-
-
-	MlOptimiser::initialLowPassFilterReferences();
-
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-	// Only master writes out initial mymodel (do not gather metadata yet)
-	int nr_subsets = (do_split_random_halves) ? 2 : 1;
-	if (node->isMaster() && !do_movies_in_batches)
-		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-	else if (node->rank <= nr_subsets)
-	{
-		//Only the first_slave of each subset writes model to disc
-		if (!do_movies_in_batches)
-			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
-
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			if (mymodel.nr_particles_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
-			{
-				if (nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
-				do_warn = true;
-			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
-            std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
-		}
-	}
-
-	// Do this after writing out the model, so that still the random halves are written in separate files.
-	if (do_realign_movies)
-	{
-		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
-		has_converged = true;
-		// Then use join random halves
-		do_join_random_halves = true;
-
-		// If we skip the maximization step, then there is no use in using all data
-		if (!do_skip_maximization)
-		{
-			// Use all data out to Nyquist because resolution gains may be substantial
-			do_use_all_data = true;
-		}
-	}
-
-
 #ifdef CUDA
     /************************************************************************/
 	//Setup GPU related resources
     int devCount, deviceAffinity;
+	bool is_split(false);
 
 	if (do_gpu)
 	{
@@ -459,8 +368,10 @@ void MlOptimiserMpi::initialise()
 
 			for (int i = 0; i < uniqueDeviceIdentifiers.size(); i++)
 				if (uniqueDeviceIdentifierCounts[i] > 1)
+				{
 					std::cout << uniqueDeviceIdentifiers[i] << " is split between " << uniqueDeviceIdentifierCounts[i] << " slaves" << std::endl;
-
+					is_split = true;
+				}
 	        int global_did = 0;
 
 	        for (int slave = 1; slave < node->size; slave++)
@@ -483,8 +394,163 @@ void MlOptimiserMpi::initialise()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
-#endif // CUDA
+
+	MPI_Status status;
+	if(do_auto_refine)
+	{
+		if (do_gpu && !node->isMaster())
+		{
+			size_t boxLim (10000);
+			for (int i = 0; i < cudaDevices.size(); i ++)
+			{
+				MlDeviceBundle *b = new MlDeviceBundle(this);
+				b->setDevice(cudaDevices[i]);
+				size_t t = b->checkFixedSizedObjects(cudaDeviceShares[i]);
+				boxLim = ((t < boxLim) ? t : boxLim );
+			}
+			node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+		}
+		else
+		{
+			size_t boxLim, LowBoxLim(10000);
+			for(int slave = 1; slave < node->size; slave++)
+			{
+				node->relion_MPI_Recv(&boxLim, sizeof(size_t), MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
+				LowBoxLim = (boxLim < LowBoxLim ? boxLim : LowBoxLim );
+			}
+
+			Experiment temp;
+			temp.read(fn_data);
+			int t_ori_size = -1;
+			temp.MDexp.getValue(EMDL_IMAGE_SIZE, t_ori_size);
+
+			if(LowBoxLim < t_ori_size)
+			{
+				anticipate_oom = true;
+				std::cerr << "\n\n                         ***WARNING***\n\nWith the current settings and hardware, you will be able to \n\
+use an estimated image-size of " << LowBoxLim << " pixels during the last iteration...\n\n\
+...but your input box-size (image_size) is however " << t_ori_size << ". This means that \n\
+you will likely run out of memory on the GPU(s), and will have to then re-start \n\
+from the last completed iteration (i.e. continue from it) with the use of GPUs.\n " << std::endl;
+
+				if(is_split)
+				{
+					std::cerr << "You are also splitting at least one GPU between two or more mpi-slaves, which \n\
+might be the limiting factor, since each mpi-slave that shares a GPU increases the \n\
+use of memory. In this case we recommend running a single mpi-slave per GPU, which \n\
+will still yield good performance and possibly a more stable execution. \n" << std::endl;
+				}
+#ifdef CUDA_DOUBLE_PRECISION
+				int sLowBoxLim = (int)((float)LowBoxLim*pow(2,1.0/3.0));
+				std::cerr << "You are also using double precison on the GPU. If you were using single precision\n\
+(which in all tested cases is perfectly fine), then you could use an box-size of ~"  << sLowBoxLim << "." << std::endl;
+#endif
+				std::cerr << std::endl << std::endl;
+			}
+		}
+	}
 	/************************************************************************/
+#endif // CUDA
+
+
+
+    MlOptimiser::initialiseGeneral(node->rank);
+
+    initialiseWorkLoad();
+
+	if (fn_sigma != "")
+	{
+		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
+		MetaDataTable MDsigma;
+		RFLOAT val;
+		int idx;
+		MDsigma.read(fn_sigma);
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+		{
+			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
+			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
+			if (idx < XSIZE(mymodel.sigma2_noise[0]))
+				mymodel.sigma2_noise[0](idx) = val;
+		}
+		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
+		{
+			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
+		}
+		// Use the same spectrum for all classes
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+
+	}
+	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	{
+		MultidimArray<RFLOAT> Mavg;
+		// Calculate initial sigma noise model from power_class spectra of the individual images
+		// This is done in parallel
+		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+		calculateSumOfPowerSpectraAndAverageImage(Mavg);
+
+		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
+		if (!node->isMaster())
+			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
+		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+	}
+
+
+	MlOptimiser::initialLowPassFilterReferences();
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (iter == 0)
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
+	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+
+	// Only master writes out initial mymodel (do not gather metadata yet)
+	int nr_subsets = (do_split_random_halves) ? 2 : 1;
+	if (node->isMaster() && !do_movies_in_batches)
+		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+	else if (node->rank <= nr_subsets)
+	{
+		//Only the first_slave of each subset writes model to disc
+		if (!do_movies_in_batches)
+			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
+
+		bool do_warn = false;
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		{
+			if (mymodel.nr_particles_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
+			{
+				if (nr_subsets == 1)
+					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
+				else
+					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
+				do_warn = true;
+			}
+		}
+		if (do_warn)
+		{
+			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
+			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
+            std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
+		}
+	}
+
+	// Do this after writing out the model, so that still the random halves are written in separate files.
+	if (do_realign_movies)
+	{
+		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
+		has_converged = true;
+		// Then use join random halves
+		do_join_random_halves = true;
+
+		// If we skip the maximization step, then there is no use in using all data
+		if (!do_skip_maximization)
+		{
+			// Use all data out to Nyquist because resolution gains may be substantial
+			do_use_all_data = true;
+		}
+	}
+
+
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
@@ -598,6 +664,21 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+	if(!node->isMaster())
+	{
+		/* Set up a bool-array with reference responsibilities for each rank. That is;
+		 * if(PPrefRank[i]==true)  //on this rank
+		 * 		(set up reference vol and MPI_Bcast)
+		 * else()
+		 * 		(prepare to receive from MPI_Bcast)
+		 */
+		mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
+
+		for(int i=0; i<mymodel.PPref.size(); i++)
+			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1);
+	}
+
+	 MPI_Barrier(MPI_COMM_WORLD);
 //#define DEBUG_WORKLOAD
 #ifdef DEBUG_WORKLOAD
 	std::cerr << " node->rank= " << node->rank << " my_first_ori_particle_id= " << my_first_ori_particle_id << " my_last_ori_particle_id= " << my_last_ori_particle_id << std::endl;
@@ -717,6 +798,9 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 void MlOptimiserMpi::expectation()
 {
+#ifdef TIMING
+		timer.tic(TIMING_EXP_1);
+#endif
 
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::expectation: Entering " << std::endl;
@@ -732,26 +816,71 @@ void MlOptimiserMpi::expectation()
 
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
+
 	updateImageSizeAndResolutionPointers();
 
 	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
 	// The master only holds metadata, it does not set up the wsum_model (to save memory)
+#ifdef TIMING
+		timer.tic(TIMING_EXP_1a);
+#endif
 	if (!node->isMaster())
 	{
 		MlOptimiser::expectationSetup();
 
-		// All slaves no longer need mydata.MD tables
 		mydata.MDimg.clear();
 		mydata.MDmic.clear();
 
-		// Many small new's are not returned to the OS upon free-ing them. To force this, use the following call
-		// from http://stackoverflow.com/questions/10943907/linux-allocator-does-not-release-small-chunks-of-memory
 #if !defined(__APPLE__)
 		malloc_trim(0);
 #endif
-
 	}
 
+	MPI_Barrier(MPI_COMM_WORLD);
+#ifdef TIMING
+		timer.toc(TIMING_EXP_1a);
+#endif
+
+	if (!node->isMaster())
+		for(int i=0; i<mymodel.PPref.size(); i++)
+		{
+			/* NOTE: the first slave has rank 0 on the slave communicator node->slaveC,
+			 *       that's why we don't have to add 1, like this;
+			 *       int sender = (i)%(node->size - 1)+1 ;
+			 */
+
+			int sender = (i)%(node->size - 1); // which rank did the heavy lifting? -> sender of information
+			{
+				// Communicating over all slaves means we don't have to allocate on the master.
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
+						MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
+						MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
+			}
+		}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+#ifdef DEBUG
+	if(node->rank==2)
+	{
+		for(int i=0; i<mymodel.PPref.size(); i++)
+		{
+			FileName fn_tmp;
+			fn_tmp.compose("PPref_", i,"dat");
+			std::ofstream f;
+			f.open(fn_tmp.c_str());
+			for (unsigned j = 0; j < mymodel.PPref[i].data.nzyxdim; j++)
+					f << mymodel.PPref[i].data.data[j].real << std::endl;
+			f.close();
+		}
+	}
+#endif
+
+#ifdef TIMING
+		timer.toc(TIMING_EXP_1);
+		timer.tic(TIMING_EXP_2);
+#endif
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
@@ -794,7 +923,10 @@ void MlOptimiserMpi::expectation()
 		node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
 		node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
 	}
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_2);
+		timer.tic(TIMING_EXP_3);
+#endif
 	// D. Update the angular sampling (all nodes except master)
 	if (!node->isMaster() && do_auto_refine && iter > 1 )
 	{
@@ -834,12 +966,18 @@ void MlOptimiserMpi::expectation()
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
 	node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&do_join_random_halves, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_3);
+		timer.tic(TIMING_EXP_4);
+		timer.tic(TIMING_EXP_4a);
+#endif
 
 	// Wait until expected angular errors have been calculated
 	MPI_Barrier(MPI_COMM_WORLD);
 	sleep(1);
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4a);
+#endif
 	// Now perform real expectation step in parallel, use an on-demand master-slave system
 #define JOB_FIRST (first_last_nr_images(0))
 #define JOB_LAST  (first_last_nr_images(1))
@@ -861,10 +999,16 @@ void MlOptimiserMpi::expectation()
 	{
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
+#ifdef TIMING
+		timer.tic(TIMING_EXP_4b);
+#endif
 			MlDeviceBundle *b = new MlDeviceBundle(this);
 			b->setDevice(cudaDevices[i]);
 			b->setupFixedSizedObjects();
 			cudaDeviceBundles.push_back((void*)b);
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4b);
+#endif
 		}
 
 		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
@@ -887,8 +1031,8 @@ void MlOptimiserMpi::expectation()
 		{
 			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
 			{
-				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
-				raise(SIGSEGV);
+				//std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
+				CRITICAL(ERR_GPUID);
 			}
 			else
 				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
@@ -925,13 +1069,18 @@ void MlOptimiserMpi::expectation()
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
-#endif // CUDA
-
 	/************************************************************************/
+#endif // CUDA
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4);
+#endif
 	double ss_frac(1.0);
 	long int nr_particles_todo;
     if (node->isMaster())
     {
+#ifdef TIMING
+		timer.tic(TIMING_EXP_5);
+#endif
         try
         {
 			if( iter<=subset_iter && !do_split_random_halves)
@@ -1092,11 +1241,15 @@ void MlOptimiserMpi::expectation()
             MlOptimiser::usage();
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_5);
+#endif
     }
     else
     {
-
+#ifdef TIMING
+		timer.tic(TIMING_EXP_6);
+#endif
     	try
     	{
 			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
@@ -1229,6 +1382,9 @@ void MlOptimiserMpi::expectation()
 			{
 				for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 				{
+#ifdef TIMING
+		timer.tic(TIMING_EXP_7);
+#endif
 					MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
 					b->syncAllBackprojects();
 
@@ -1256,8 +1412,13 @@ void MlOptimiserMpi::expectation()
 						b->cudaBackprojectors[j].clear();
 						b->coarseProjectionPlans[j].clear();
 					}
+#ifdef TIMING
+		timer.toc(TIMING_EXP_7);
+#endif
 				}
-
+#ifdef TIMING
+		timer.tic(TIMING_EXP_8);
+#endif
 				for (int i = 0; i < cudaOptimisers.size(); i ++)
 					delete (MlOptimiserCuda*) cudaOptimisers[i];
 
@@ -1276,7 +1437,7 @@ void MlOptimiserMpi::expectation()
 						printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
 						((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
 						fflush(stdout);
-						raise(SIGSEGV);
+						CRITICAL(ERR_CANZ);
 					}
 #endif
 				}
@@ -1285,6 +1446,9 @@ void MlOptimiserMpi::expectation()
 					delete (MlDeviceBundle*) cudaDeviceBundles[i];
 
 				cudaDeviceBundles.clear();
+#ifdef TIMING
+		timer.toc(TIMING_EXP_8);
+#endif
 			}
 #endif // CUDA
 
@@ -1295,7 +1459,9 @@ void MlOptimiserMpi::expectation()
             MlOptimiser::usage();
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-
+#ifdef TIMING
+		timer.toc(TIMING_EXP_6);
+#endif
     }
 
     // Just make sure the temporary arrays are empty...
@@ -1736,6 +1902,7 @@ void MlOptimiserMpi::maximization()
 	{
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
+			RCTIC(timer,RCT_1);
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
 
@@ -1750,11 +1917,17 @@ void MlOptimiserMpi::maximization()
 
 				if (node->rank == reconstruct_rank1)
 				{
+#ifdef TIMING
+					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
+#else
 					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
-
+#endif
 					// Also perform the unregularized reconstruction
 					if (do_auto_refine && has_converged)
 						readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 1);
@@ -1892,7 +2065,7 @@ void MlOptimiserMpi::maximization()
 			{
 				mymodel.Iref[ith_recons].initZeros();
 			}
-
+			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
 			MPI_Barrier( MPI_COMM_WORLD);
@@ -1908,7 +2081,7 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 	std::cerr << "All classes have been reconstructed" << std::endl;
 #endif
-
+	RCTIC(timer,RCT_2);
 	// Once reconstructed, broadcast new models to all other nodes
 	// This cannot be done in the reconstruction loop itself because then it will be executed sequentially
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -2008,20 +2181,25 @@ void MlOptimiserMpi::maximization()
 			}
 		}
 	}
+	RCTOC(timer,RCT_2);
 #ifdef TIMING
 		timer.toc(TIMING_RECONS);
 #endif
 
 	if (node->isMaster())
 	{
+		RCTIC(timer,RCT_4);
 		// The master also updates the changes in hidden variables
 		updateOverallChangesInHiddenVariables();
+		RCTOC(timer,RCT_4);
 	}
 	else
 	{
 		// Now do the maximisation of all other parameters (and calculate the tau2_class-spectra of the reconstructions
 		// The lazy master never does this: it only handles metadata and does not have the weighted sums
+		RCTIC(timer,RCT_3);
 		maximizationOtherParameters();
+		RCTOC(timer,RCT_3);
 	}
 
 	// The master broadcasts the changes in hidden variables to all other nodes
@@ -2711,12 +2889,20 @@ void MlOptimiserMpi::iterate()
 
 		// Mask the reconstructions to get rid of noisy solvent areas
 		// Skip masking upon convergence (for validation purposes)
+#ifdef TIMING
+		timer.tic(TIMING_SOLVFLAT);
+#endif
 		if (do_solvent && !has_converged)
 			solventFlatten();
-
+#ifdef TIMING
+		timer.toc(TIMING_SOLVFLAT);
+		timer.tic(TIMING_UPDATERES);
+#endif
 		// Re-calculate the current resolution, do this before writing to get the correct values in the output files
 		updateCurrentResolution();
-
+#ifdef TIMING
+		timer.toc(TIMING_UPDATERES);
+#endif
 		// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
 		bool do_write_optimiser = !do_join_random_halves;
 		// Write out final map without iteration number in the filename

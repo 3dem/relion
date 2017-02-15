@@ -425,11 +425,14 @@ public:
 
 	int rank_shared_count;
 
+	bool haveWarnedRefinementMem;
+
 	MlDeviceBundle(MlOptimiser *baseMLOptimiser):
 			baseMLO(baseMLOptimiser),
 			generateProjectionPlanOnTheFly(false),
 			rank_shared_count(1),
 			device_id(-1),
+			haveWarnedRefinementMem(false),
 			allocator(NULL)
 	{};
 
@@ -438,6 +441,7 @@ public:
 		device_id = did;
 	}
 
+	size_t checkFixedSizedObjects(int shares);
 	void setupFixedSizedObjects();
 	void setupTunableSizedObjects(size_t allocationSize);
 

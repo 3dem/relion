@@ -1,0 +1,213 @@
+ 
+mpirun -n 3 ../bin/relion_refine_mpi --o test_output/gpu3Dc_small --i /nethome/projects/RELION/refData/inputData/ryr/benchmark_ryr_10_local.star --j 1 --particle_diameter 400 --angpix 1.34 --ref /nethome/projects/RELION/refData/inputData/ryr/ref_8A.mrc --ini_high 30 --ctf --ctf_corrected_ref --iter 2 --tau2_fudge 2 --K 2 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 3 --offset_step 2 --sym C1 --norm --scale --random_seed 1 --onthefly_shifts --perturb 0 --gpu
+
+=== RELION MPI setup ===
+ + Number of MPI processes             = 3
+ + Master  (0) runs on host            = tcbl20
+ + Slave     1 runs on host            = tcbl20
+ =================
+ + Slave     2 runs on host            = tcbl20
+ uniqueHost tcbl20 has 2 ranks.
+GPU-ids not specified for this rank, threads will automatically be mapped to available devices.
+ Thread 0 on slave 1 mapped to device 0
+GPU-ids not specified for this rank, threads will automatically be mapped to available devices.
+ Thread 0 on slave 2 mapped to device 1
+ Running CPU instructions in double precision. 
+ Estimating initial noise spectra 
+000/??? sec ~~(,_,">                                                          [oo]   0/   0 sec ...........~~(,_,">   0/   0 sec .......................~~(,_,">   0/   0 sec ....................................~~(,_,">   0/   0 sec ................................................~~(,_,">   0/   0 sec ............................................................~~(,_,">
+ Estimating accuracies in the orientational assignment ... 
+000/??? sec ~~(,_,">                                                          [oo]   0/   0 sec ...~~(,_,">   0/   0 sec ......~~(,_,">   0/   0 sec ........~~(,_,">   0/   0 sec ...........~~(,_,">   0/   0 sec ...............~~(,_,">   0/   0 sec ..................~~(,_,">   0/   0 sec .....................~~(,_,">   0/   0 sec .......................~~(,_,">   0/   0 sec ...........................~~(,_,">   0/   0 sec ..............................~~(,_,">   0/   0 sec .................................~~(,_,">   0/   0 sec ....................................~~(,_,">   0/   0 sec .......................................~~(,_,">   0/   0 sec ..........................................~~(,_,">   0/   0 sec .............................................~~(,_,">   0/   0 sec ................................................~~(,_,">   0/   0 sec ...................................................~~(,_,">   0/   0 sec ......................................................~~(,_,">   0/   0 sec .........................................................~~(,_,">   0/   0 sec ............................................................~~(,_,">
+ Auto-refine: Estimated accuracy angles= 3.01 degrees; offsets= 2.01 pixels
+ CurrentResolution= 30.15 Angstroms, which requires orientationSampling of at least 8.57143 degrees for a particle of diameter 400 Angstroms
+ Oversampling= 0 NrHiddenVariableSamplingPoints= 82944
+ OrientationalSampling= 15 NrOrientations= 4608
+ TranslationalSampling= 2 NrTranslations= 9
+=============================
+ Oversampling= 1 NrHiddenVariableSamplingPoints= 2654208
+ OrientationalSampling= 7.5 NrOrientations= 36864
+ TranslationalSampling= 1 NrTranslations= 36
+=============================
+ Expectation iteration 1 of 2
+000/??? sec ~~(,_,">                                                          [oo]   0/   0 sec ..................~~(,_,">   0/   0 sec .......................~~(,_,">   0/   0 sec ..............................~~(,_,">   0/   0 sec ....................................~~(,_,">   0/   0 sec ..........................................~~(,_,">   0/   0 sec ................................................~~(,_,">   0/   0 sec ......................................................~~(,_,">   0/   0 sec ............................................................~~(,_,">
+ Maximization ...
+000/??? sec ~~(,_,">                                                          [oo]
+FFTrealDims = (720 , 720 , 720 ) 
+
+FFTrealDims = (720 , 720 , 720 ) 
+ OrD1_getFourier                   : 0 sec (0 microsec/operation)
+ OrD2_windowFFT                    : 0.625 sec (625971 microsec/operation)
+ OrD3_reshape                      : 0 sec (11 microsec/operation)
+ OrD4_setReal                      : 0 sec (307 microsec/operation)
+ OrD5_invFFT                       : 4.23 sec (4230109 microsec/operation)
+ OrD6_centerFFT                    : 3.279 sec (3279972 microsec/operation)
+ OrD7_window                       : 0.136 sec (136213 microsec/operation)
+ OrD8_norm                         : 0.042 sec (42310 microsec/operation)
+ OrD9_softMask                     : 0.49 sec (490544 microsec/operation)
+ OrD1_getFourier                   : 0 sec (0 microsec/operation)
+ OrD2_windowFFT                    : 0.695 sec (695510 microsec/operation)
+ OrD3_reshape                      : 0 sec (15 microsec/operation)
+ OrD4_setReal                      : 0 sec (300 microsec/operation)
+ OrD5_invFFT                       : 3.953 sec (3953618 microsec/operation)
+ OrD6_centerFFT                    : 3.493 sec (3493384 microsec/operation)
+ OrD7_window                       : 0.14 sec (140889 microsec/operation)
+ OrD8_norm                         : 0.03 sec (30159 microsec/operation)
+ OrD9_softMask                     : 0.492 sec (492155 microsec/operation)
+ RcS1_Init                         : 0.006 sec (6435 microsec/operation)
+ RcS2_Shape&Noise                  : 0.011 sec (11295 microsec/operation)
+ RcS4_doGridding_norm              : 0.001 sec (1732 microsec/operation)
+ RcS5_doGridding_init              : 0.001 sec (1973 microsec/operation)
+ RcS6_doGridding_iter              : 1.763 sec (176349 microsec/operation)
+ RcS7_doGridding_apply             : 0.002 sec (2637 microsec/operation)
+ RcS17_WindowReal                  : 8.811 sec (8811437 microsec/operation)
+ RcS18_GriddingCorrect             : 1.667 sec (1667572 microsec/operation)
+ RcS23_tauShrinkToFit              : 0 sec (44 microsec/operation)
+ RcS1_Init                         : 0.006 sec (6202 microsec/operation)
+ RcS2_Shape&Noise                  : 0.011 sec (11787 microsec/operation)
+ RcS4_doGridding_norm              : 0.001 sec (1752 microsec/operation)
+ RcS5_doGridding_init              : 0.001 sec (1935 microsec/operation)
+ RcS6_doGridding_iter              : 1.834 sec (183482 microsec/operation)
+ RcS7_doGridding_apply             : 0.003 sec (3472 microsec/operation)
+ RcS17_WindowReal                  : 8.811 sec (8811479 microsec/operation)
+ RcS18_GriddingCorrect             : 1.674 sec (1674544 microsec/operation)
+ RcS23_tauShrinkToFit              : 0 sec (42 microsec/operation)
+  13/  13 sec ............................................................~~(,_,">
+expectation                        : 23.992 sec (23992524 microsec/operation)
+expectation_1                      : 22.002 sec (22002876 microsec/operation)
+expectation_1a                     : 0 sec (421 microsec/operation)
+expectation_2                      : 0.131 sec (131334 microsec/operation)
+expectation_3                      : 0.003 sec (3070 microsec/operation)
+expectation_4                      : 1.205 sec (1205529 microsec/operation)
+expectation_4a                     : 1 sec (1000112 microsec/operation)
+expectation_4b                     : 0.182 sec (182926 microsec/operation)
+expectation_6                      : 0.294 sec (294657 microsec/operation)
+expectation_7                      : 0.007 sec (7276 microsec/operation)
+expectation_8                      : 0.091 sec (91829 microsec/operation)
+maximization                       : 12.472 sec (12472866 microsec/operation)
+flatten solvent                    : 0.6 sec (600545 microsec/operation)
+update resolution                  : 0 sec (1 microsec/operation)
+reconstruction                     : 12.472 sec (12472858 microsec/operation)
+expectationSomeParticles           : 0.195 sec (48862 microsec/operation)
+doThreadExpectationSomeParticles   : 0.186 sec (23372 microsec/operation)
+ - EOP: getFourierTransforms       : 0.179 sec (44958 microsec/operation)
+ - EOP: precalcShifts1             : 0 sec (5 microsec/operation)
+ - EOP: precalcShifts2             : 0 sec (12 microsec/operation)
+ - EOP: getAllSquaredDifferences1  : 0.001 sec (322 microsec/operation)
+ - EOP: getAllSquaredDifferences2  : 0.001 sec (268 microsec/operation)
+ - EOP: getD2: A                   : 0 sec (4 microsec/operation)
+ - EOP: getD2: B                   : 0 sec (0 microsec/operation)
+ - EOP: getD2: D                   : 0 sec (39 microsec/operation)
+ - EOP: getD2: E                   : 0 sec (5 microsec/operation)
+ - EOP: convertDiff2ToWeights1     : 0.001 sec (486 microsec/operation)
+ - EOP: convertDiff2ToWeights2     : 0 sec (123 microsec/operation)
+ - EOP: storeWeightedSums          : 0.001 sec (488 microsec/operation)
+ -  - EOPwsum: backproject         : 0 sec (4 microsec/operation)
+ RcT1_BPrefRecon                   : 12.263 sec (6131613 microsec/operation)
+ RcT2_BroadCast                    : 0.13 sec (130432 microsec/operation)
+ RcT3_maxiOthers                   : 0 sec (5 microsec/operation)
+ RcT5_sums                         : 0 sec (1 microsec/operation)
+ RcT6_updatePdf                    : 0 sec (2 microsec/operation)
+ RcT7_updateNoise                  : 0 sec (0 microsec/operation)
+mpiWaitEndOfExpectation            : 0.013 sec (13138 microsec/operation)
+mpiCombineThroughDisc              : 0.34 sec (340639 microsec/operation)
+mpiSlaveWorking                    : 0.195 sec (48867 microsec/operation)
+mpiSlaveWaiting1                   : 0 sec (9 microsec/operation)
+mpiSlaveWaiting2                   : 0 sec (2 microsec/operation)
+mpiSlaveWaiting3                   : 0 sec (6 microsec/operation)
+ Estimating accuracies in the orientational assignment ... 
+000/??? sec ~~(,_,">                                                          [oo]   0/   0 sec ...~~(,_,">   0/   0 sec ......~~(,_,">   0/   0 sec ........~~(,_,">   0/   0 sec ...........~~(,_,">   0/   0 sec ...............~~(,_,">   0/   0 sec ..................~~(,_,">   0/   0 sec .....................~~(,_,">   0/   0 sec .......................~~(,_,">   0/   0 sec ...........................~~(,_,">   0/   0 sec ..............................~~(,_,">   0/   0 sec .................................~~(,_,">   0/   0 sec ....................................~~(,_,">   0/   0 sec .......................................~~(,_,">   0/   0 sec ..........................................~~(,_,">   0/   0 sec .............................................~~(,_,">   0/   0 sec ................................................~~(,_,">   0/   0 sec ...................................................~~(,_,">   0/   0 sec ......................................................~~(,_,">   0/   0 sec .........................................................~~(,_,">   0/   0 sec ............................................................~~(,_,">
+ Auto-refine: Estimated accuracy angles= 8.45 degrees; offsets= 7.5 pixels
+ CurrentResolution= 96.48 Angstroms, which requires orientationSampling of at least 25.7143 degrees for a particle of diameter 400 Angstroms
+ Oversampling= 0 NrHiddenVariableSamplingPoints= 82944
+ OrientationalSampling= 15 NrOrientations= 4608
+ TranslationalSampling= 2 NrTranslations= 9
+=============================
+ Oversampling= 1 NrHiddenVariableSamplingPoints= 2654208
+ OrientationalSampling= 7.5 NrOrientations= 36864
+ TranslationalSampling= 1 NrTranslations= 36
+=============================
+ Expectation iteration 2 of 2
+000/??? sec ~~(,_,">                                                          [oo]   0/   0 sec ..................~~(,_,">   0/   0 sec .......................~~(,_,">   0/   0 sec ..............................~~(,_,">   0/   0 sec ....................................~~(,_,">   0/   0 sec ..........................................~~(,_,">   0/   0 sec ................................................~~(,_,">   0/   0 sec ......................................................~~(,_,">   0/   0 sec ............................................................~~(,_,">
+ Maximization ...
+000/??? sec ~~(,_,">                                                          [oo]
+FFTrealDims = (720 , 720 , 720 ) 
+
+FFTrealDims = (720 , 720 , 720 ) 
+ OrD1_getFourier                   : 0 sec (0 microsec/operation)
+ OrD2_windowFFT                    : 0.692 sec (692670 microsec/operation)
+ OrD3_reshape                      : 0 sec (36 microsec/operation)
+ OrD4_setReal                      : 0 sec (448 microsec/operation)
+ OrD5_invFFT                       : 3.946 sec (3946503 microsec/operation)
+ OrD6_centerFFT                    : 3.277 sec (3277791 microsec/operation)
+ OrD7_window                       : 0.161 sec (161030 microsec/operation)
+ OrD8_norm                         : 0.044 sec (44585 microsec/operation)
+ OrD9_softMask                     : 0.489 sec (489941 microsec/operation)
+ OrD1_getFourier                   : 0 sec (0 microsec/operation)
+ OrD2_windowFFT                    : 0.713 sec (713608 microsec/operation)
+ OrD3_reshape                      : 0 sec (15 microsec/operation)
+ OrD4_setReal                      : 0 sec (316 microsec/operation)
+ OrD5_invFFT                       : 3.94 sec (3940393 microsec/operation)
+ OrD6_centerFFT                    : 3.258 sec (3258319 microsec/operation)
+ OrD7_window                       : 0.149 sec (149134 microsec/operation)
+ OrD8_norm                         : 0.054 sec (54189 microsec/operation)
+ OrD9_softMask                     : 0.513 sec (513468 microsec/operation)
+ RcS1_Init                         : 0.002 sec (2792 microsec/operation)
+ RcS2_Shape&Noise                  : 0.002 sec (2172 microsec/operation)
+ RcS4_doGridding_norm              : 0 sec (312 microsec/operation)
+ RcS5_doGridding_init              : 0 sec (325 microsec/operation)
+ RcS6_doGridding_iter              : 0.1 sec (10011 microsec/operation)
+ RcS7_doGridding_apply             : 0 sec (513 microsec/operation)
+ RcS17_WindowReal                  : 8.618 sec (8618702 microsec/operation)
+ RcS18_GriddingCorrect             : 1.401 sec (1401946 microsec/operation)
+ RcS23_tauShrinkToFit              : 0 sec (51 microsec/operation)
+ RcS1_Init                         : 0.002 sec (2926 microsec/operation)
+ RcS2_Shape&Noise                  : 0.002 sec (2150 microsec/operation)
+ RcS4_doGridding_norm              : 0 sec (349 microsec/operation)
+ RcS5_doGridding_init              : 0 sec (353 microsec/operation)
+ RcS6_doGridding_iter              : 0.101 sec (10117 microsec/operation)
+ RcS7_doGridding_apply             : 0 sec (558 microsec/operation)
+ RcS17_WindowReal                  : 8.635 sec (8635191 microsec/operation)
+ RcS18_GriddingCorrect             : 1.398 sec (1398332 microsec/operation)
+ RcS23_tauShrinkToFit              : 0 sec (47 microsec/operation)
+  10/  10 sec ............................................................~~(,_,">
+expectation                        : 22.141 sec (22141967 microsec/operation)
+expectation_1                      : 20.464 sec (20464006 microsec/operation)
+expectation_1a                     : 0 sec (445 microsec/operation)
+expectation_2                      : 0.065 sec (65667 microsec/operation)
+expectation_3                      : 0 sec (734 microsec/operation)
+expectation_4                      : 1.196 sec (1196133 microsec/operation)
+expectation_4a                     : 1 sec (1000071 microsec/operation)
+expectation_4b                     : 0.19 sec (190477 microsec/operation)
+expectation_6                      : 0.357 sec (357546 microsec/operation)
+expectation_7                      : 0.001 sec (1856 microsec/operation)
+expectation_8                      : 0.106 sec (106976 microsec/operation)
+maximization                       : 10.27 sec (10270219 microsec/operation)
+flatten solvent                    : 0.607 sec (607131 microsec/operation)
+update resolution                  : 0 sec (1 microsec/operation)
+reconstruction                     : 10.27 sec (10270212 microsec/operation)
+expectationSomeParticles           : 0.248 sec (49706 microsec/operation)
+doThreadExpectationSomeParticles   : 0.233 sec (23384 microsec/operation)
+ - EOP: getFourierTransforms       : 0.224 sec (44964 microsec/operation)
+ - EOP: precalcShifts1             : 0 sec (7 microsec/operation)
+ - EOP: precalcShifts2             : 0 sec (7 microsec/operation)
+ - EOP: getAllSquaredDifferences1  : 0.001 sec (221 microsec/operation)
+ - EOP: getAllSquaredDifferences2  : 0.002 sec (401 microsec/operation)
+ - EOP: getD2: A                   : 0 sec (10 microsec/operation)
+ - EOP: getD2: B                   : 0 sec (0 microsec/operation)
+ - EOP: getD2: D                   : 0 sec (115 microsec/operation)
+ - EOP: getD2: E                   : 0 sec (6 microsec/operation)
+ - EOP: convertDiff2ToWeights1     : 0.001 sec (385 microsec/operation)
+ - EOP: convertDiff2ToWeights2     : 0.001 sec (208 microsec/operation)
+ - EOP: storeWeightedSums          : 0.001 sec (395 microsec/operation)
+ -  - EOPwsum: backproject         : 0 sec (5 microsec/operation)
+ RcT1_BPrefRecon                   : 10.126 sec (5063159 microsec/operation)
+ RcT2_BroadCast                    : 0.129 sec (129551 microsec/operation)
+ RcT3_maxiOthers                   : 0 sec (3 microsec/operation)
+ RcT5_sums                         : 0 sec (0 microsec/operation)
+ RcT6_updatePdf                    : 0 sec (2 microsec/operation)
+ RcT7_updateNoise                  : 0 sec (0 microsec/operation)
+mpiWaitEndOfExpectation            : 0.006 sec (6444 microsec/operation)
+mpiCombineThroughDisc              : 0.051 sec (51130 microsec/operation)
+mpiSlaveWorking                    : 0.248 sec (49712 microsec/operation)
+mpiSlaveWaiting1                   : 0 sec (15 microsec/operation)
+mpiSlaveWaiting2                   : 0 sec (3 microsec/operation)
+mpiSlaveWaiting3                   : 0 sec (6 microsec/operation)
