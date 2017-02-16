@@ -1911,17 +1911,60 @@ void MlOptimiserMpi::maximization()
 
 				if (node->rank == reconstruct_rank1)
 				{
+
+					if (do_sgd)
+					{
+
+						MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
+
+						// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
+						// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
+						long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+						RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+						int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
+						RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
+						number_of_effective_particles *= (1. - total_mu_fraction);
+						RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+
+						// This worked for several 3D cases, but cannot be right....
+						//long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+						//RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+						//RFLOAT number_of_effective_particles = mydata.particles.size() * (1. - total_mu_fraction);
+						//RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+
+						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+								sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+								mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+
+						// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
+						// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
+							DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) +
+									(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n);
+
+						// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
+						{
+							DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n);
+						}
+
+					}
+					else
+					{
 #ifdef TIMING
-					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
+						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+								mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
 #else
-					wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-							mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-							mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-							do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+								mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 #endif
+					}
+
 					// Also perform the unregularized reconstruction
 					if (do_auto_refine && has_converged)
 						readTemporaryDataAndWeightArraysAndReconstruct(ith_recons, 1);
