@@ -20,6 +20,15 @@
 
 #include "src/ml_model.h"
 
+#ifdef MDL_TIMING
+    Timer mdl_timer;
+	int TIMING_MDL_1 = 		proj_timer.setNew("MDL_1");
+#define TIMING_TOC(id) mdl_timer.toc(id)
+#else
+#define TIMING_TIC(id)
+#define TIMING_TOC(id)
+#endif
+
 void MlModel::initialise(bool _do_sgd)
 {
 
@@ -60,6 +69,7 @@ void MlModel::initialise(bool _do_sgd)
 
 	Projector ref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
     PPref.clear();
+    PPrefRank.clear();
     // Now fill the entire vector with instances of "ref"
     PPref.resize(nr_classes * nr_bodies, ref);
 
@@ -832,9 +842,11 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
 {
+	bool do_heavy(true);
 	int nr_classes_bodies = nr_classes * nr_bodies; // also set multiple bodies!
 	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     {
+
 		MultidimArray<RFLOAT> Irefp;
 		//19may2015: if multi-body refinement: place each body with its center-of-mass in the center
 		if (nr_bodies > 1)
@@ -846,14 +858,17 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 			Irefp = Iref[iclass];
 		}
 
+		if(PPrefRank.size() > 1)
+			do_heavy = PPrefRank[iclass];
+
         if (update_tau2_spectra)
         {
-        	PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads);
+        	PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy);
         }
         else
         {
         	MultidimArray<RFLOAT> dummy;
-        	PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads);
+        	PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy);
         }
     }
 
