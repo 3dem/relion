@@ -3321,6 +3321,12 @@ void MlOptimiser::maximization()
 		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
+
+			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+					mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+					mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+					false, false, nr_threads, minres_map, (iclass==0));
+xxxxxxxxxx remove above lines after resolved conflict
 			if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
 
