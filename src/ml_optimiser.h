@@ -307,6 +307,7 @@ public:
 
 	// Use gpu resources?
 	bool do_gpu;
+	bool anticipate_oom;
 
 	// Which GPU devices to use?
 	std::string gpu_ids;
@@ -526,13 +527,16 @@ public:
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
 	int TIMING_WSUM_PROJ, TIMING_WSUM_BACKPROJ, TIMING_WSUM_DIFF2, TIMING_WSUM_SUMSHIFT;
-	int TIMING_EXP, TIMING_MAX, TIMING_RECONS;
+	int TIMING_EXP, TIMING_MAX, TIMING_RECONS, TIMING_SOLVFLAT, TIMING_UPDATERES;
+	int TIMING_EXP_1,TIMING_EXP_1a,TIMING_EXP_2,TIMING_EXP_3,TIMING_EXP_4,TIMING_EXP_4a,TIMING_EXP_4b,TIMING_EXP_4c,TIMING_EXP_4d,TIMING_EXP_5,TIMING_EXP_6,TIMING_EXP_7,TIMING_EXP_8,TIMING_EXP_9;
 	int TIMING_ESP, TIMING_ESP_THR, TIMING_ESP_ONEPART, TIMING_ESP_ONEPARTN, TIMING_EXP_METADATA, TIMING_EXP_CHANGES;
 	int TIMING_ESP_FT, TIMING_ESP_INI, TIMING_ESP_DIFF1, TIMING_ESP_DIFF2;
 	int TIMING_ESP_DIFF2_A, TIMING_ESP_DIFF2_B, TIMING_ESP_DIFF2_C, TIMING_ESP_DIFF2_D, TIMING_ESP_DIFF2_E;
 	int TIMING_ESP_PREC1, TIMING_ESP_PREC2, TIMING_ESP_PRECW, TIMING_WSUM_GETSHIFT, TIMING_DIFF2_GETSHIFT, TIMING_WSUM_SCALE, TIMING_WSUM_LOCALSUMS;
 	int TIMING_ESP_WEIGHT1, TIMING_ESP_WEIGHT2, TIMING_WEIGHT_EXP, TIMING_WEIGHT_SORT, TIMING_ESP_WSUM;
 	int TIMING_EXTRA1, TIMING_EXTRA2, TIMING_EXTRA3;
+
+	int RCT_1, RCT_2, RCT_3, RCT_4, RCT_5, RCT_6, RCT_7, RCT_8;
 #endif
 
 public:
@@ -628,6 +632,7 @@ public:
 		do_split_random_halves(0),
 		random_seed(0),
 		do_gpu(0),
+		anticipate_oom(0),
 		do_helical_refine(0),
 		ignore_helical_symmetry(0),
 		helical_twist_initial(0),
@@ -704,7 +709,12 @@ public:
 	 */
 	void expectation();
 
-	/* Setup expectation step */
+	/* Setup expectation step. We divide the heavy steps over mpi-slaves,
+	 * so each call needs a list of which to skip heavy setup for. For
+	 * these classes, only some formatting is done. Data is copied
+	 * explicitly later.*/
+	void expectationSetup(std::vector<bool> cheapSetup);
+
 	void expectationSetup();
 
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */

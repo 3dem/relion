@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     {
         if (optimiser.verb > 0)
         {
-        	optimiser.usage();
+        	//optimiser.usage();
         }
     	std::cerr << XE;
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);

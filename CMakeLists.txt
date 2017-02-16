@@ -149,15 +149,6 @@ if(CudaForceSTL)
     add_definitions(-DCUDA_FORCESTL)
     message(STATUS "Building cuda files wusing stl-libs for sort, min and max.")
 endif(CudaForceSTL)
-# ----------------------------------------------------------------------CUFFT OR NOT--
-option(CUFFT "CUFFT" OFF)
-if(CUFFT)
-    if (NOT CUDA_FOUND)
-        message(FATAL_ERROR "CUFFT required, but cuda was not found.")
-    endif(NOT CUDA_FOUND)
-    add_definitions(-DUSE_CUFFT)
-    message(STATUS "Using cuda-based fftw libraries and functions")
-endif(CUFFT)
 
 # ------------------------------------------------------------------------GUI OR NOT--
 # Skip FLTK/X11-dependent binaries or not

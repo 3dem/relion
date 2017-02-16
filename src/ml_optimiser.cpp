@@ -2528,7 +2528,6 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
-    // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// TMP for helices of Anthiony 12 july 2016
@@ -3313,7 +3312,6 @@ void MlOptimiser::maximization()
 		std::cout << " Maximization ..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
-
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
@@ -7656,8 +7654,14 @@ void MlOptimiser::checkConvergence(bool myverb)
 
             if (has_converged)
             {
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            	std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+            	std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            	if(anticipate_oom)
+            	{
+            		std::cout << " You were warned at the beginning of the run that memory on the GPU might run out, and this final iteration\n\
+is where this is likely to happen. If you should encounter an out-of-memory error, you can then continue \n\
+from the last completed iteration by continuing from the gui and specifying the optimiser.star-file from iteration " << iter << "." << std::endl;
+            	}
             }
         }
 

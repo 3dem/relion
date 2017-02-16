@@ -168,12 +168,12 @@ void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	if (mdlXYZ == 0)
 	{
         printf("DEBUG_ERROR: Model dimensions must be set with setMdlDim before call to setMdlData.");
-		raise(SIGSEGV);
+		CRITICAL(ERR_MDLDIM);
 	}
 	if (mdlReal != 0)
 	{
         printf("DEBUG_ERROR: Duplicated call to setMdlData.");
-		raise(SIGSEGV);
+		CRITICAL(ERR_MDLSET);
 	}
 #endif
 

@@ -117,12 +117,12 @@ public:
 		else
 			checkDim=1;
 		if(checkDim != dimension)
-			REPORT_ERROR("You are trying to change the dimesion of a cudaFFT transformer, which is not allowed");
+			CRITICAL(ERRCUFFTDIM);
 
 		if( !( (setDirection==-1)||(setDirection==0)||(setDirection==1) ) )
 		{
 			std::cerr << "*ERROR : Setting a cuda transformer direction to non-defined value" << std::endl;
-			raise(SIGSEGV);
+			CRITICAL(ERRCUFFTDIR);
 		}
 
 		direction = setDirection;
@@ -210,7 +210,7 @@ public:
 			batchSize[batchIters-1] = batchSpace - (batchSpace*batchIters - batch); // set last to care for remainder.
 
 			if(needed>avail)
-				REPORT_ERROR("Not enough memory for even a single orientation.");
+				CRITICAL(ERRFFTMEMLIM);
 
 //			std::cerr << std::endl << "NOTE: Having to use " << batchIters << " batches of orientations ";
 //			std::cerr << "to achieve the total requested " << batch << " orientations" << std::endl;
@@ -283,7 +283,7 @@ public:
 		if(direction==1)
 		{
 			std::cout << "trying to execute a forward plan for a cudaFFT transformer which is backwards-only" << std::endl;
-			raise(SIGSEGV);
+			CRITICAL(ERRCUFFTDIRF);
 		}
 		HANDLE_CUFFT_ERROR( cufftExecR2C(cufftPlanForward, ~reals, ~fouriers) );
 	}
@@ -293,7 +293,7 @@ public:
 		if(direction==-1)
 		{
 			std::cout << "trying to execute a backwards plan for a cudaFFT transformer which is forwards-only" << std::endl;
-			raise(SIGSEGV);
+			CRITICAL(ERRCUFFTDIRR);
 		}
 		HANDLE_CUFFT_ERROR( cufftExecC2R(cufftPlanBackward, ~fouriers, ~reals) );
 	}

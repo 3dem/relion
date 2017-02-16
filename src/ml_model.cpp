@@ -839,7 +839,6 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 }
 
 
-
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
 {
 	bool do_heavy(true);
