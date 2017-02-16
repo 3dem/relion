@@ -147,7 +147,6 @@ void MlOptimiserMpi::initialise()
 		}
 		else
 		{
-
 			for (int slave = 1; slave < node->size; slave++)
 			{
 				// Receive device count seen by this slave
@@ -599,19 +598,19 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	{
 		if (do_split_random_halves)
 		{
-	    	int nr_slaves_halfset1 = (node->size - 1) / 2;
-	    	int nr_slaves_halfset2 = nr_slaves_halfset1;
+	    	int nr_slaves_subset1 = (node->size - 1) / 2;
+	    	int nr_slaves_subset2 = nr_slaves_subset1;
 	    	if ( (node->size - 1) % 2 != 0)
-	    		nr_slaves_halfset1 += 1;
+	    		nr_slaves_subset1 += 1;
 	    	if (node->myRandomSubset() == 1)
 	    	{
 	    		// Divide first half of the images
-	    		divide_equally(mydata.numberOfOriginalParticles(1), nr_slaves_halfset1, node->rank / 2, my_first_ori_particle_id, my_last_ori_particle_id);
+	    		divide_equally(mydata.numberOfOriginalParticles(1), nr_slaves_subset1, node->rank / 2, my_first_ori_particle_id, my_last_ori_particle_id);
 	    	}
 	    	else
 	    	{
 	    		// Divide second half of the images
-	    		divide_equally(mydata.numberOfOriginalParticles(2), nr_slaves_halfset2, node->rank / 2 - 1, my_first_ori_particle_id, my_last_ori_particle_id);
+	    		divide_equally(mydata.numberOfOriginalParticles(2), nr_slaves_subset2, node->rank / 2 - 1, my_first_ori_particle_id, my_last_ori_particle_id);
 	    		my_first_ori_particle_id += mydata.numberOfOriginalParticles(1);
 	    		my_last_ori_particle_id += mydata.numberOfOriginalParticles(1);
 	    	}
@@ -691,23 +690,109 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 	// First calculate the sum of all individual power spectra on each subset
 	MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg, node->rank == 1);
+	//std::cout << " Hello world22! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 
-	// Now combine all weighted sums
-	// Leave the option of both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
-	if (combine_weights_thru_disc)
-		combineAllWeightedSumsViaFile();
-	else
-		combineAllWeightedSums();
+	// When splitting the data into two random halves, perform two passes: one for each subset
+	int nr_subsets = (do_split_random_halves) ? 2 : 1;
 
-	// After introducing SGD code in Dec 2016: no longer calculate Mavg for the 2 halves separately...
-	// Just calculate Mavg from AllReduce, and divide by 2 * the accumulated wsum_group
-	MultidimArray<RFLOAT> Msum;
-	Msum.initZeros(Mavg);
-	MPI_Allreduce(MULTIDIM_ARRAY(Mavg), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	Mavg = Msum;
-	// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
-	if (do_split_random_halves)
-		Mavg /= 2.;
+	MultidimArray<RFLOAT> Msum, MsumI;
+	MultidimArray<int> Mnr, Msumnr;
+	RFLOAT dsum;
+	int isum;
+	MPI_Status status;
+
+
+	for (int isubset = 1; isubset <= nr_subsets; isubset++)
+	{
+		int my_first_slave = isubset; // first pass subset1: my_first_rank = 1, second pass subset2: my_first_rank = 2
+		int my_first_other_slave = XMIPP_MIN(my_first_slave + nr_subsets, node->size);
+		//std::cerr << " my_first_slave= " << my_first_slave << " my_first_other_slave= " << my_first_other_slave << std::endl;
+		// Initialise on the first slave
+		if (node->rank == my_first_slave)
+		{
+			Msum = wsum_model.sigma2_noise[0];
+			MsumI = Mavg;
+			dsum = wsum_model.sumw_group[0];
+			Mnr.resize(mymodel.nr_groups);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mnr)
+			{
+				DIRECT_A1D_ELEM(Mnr, i) = mymodel.nr_particles_group[i];
+			}
+			Msumnr = Mnr;
+
+    	}
+		for (int other_slave = my_first_other_slave; other_slave < node->size; other_slave += nr_subsets)
+		{
+			if (node->rank == other_slave)
+			{
+				//std::cerr << "Sending from "<<other_slave<< " to "<<my_first_slave << std::endl;
+				node->relion_MPI_Send(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MY_MPI_DOUBLE, my_first_slave, MPITAG_PACK, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MY_MPI_DOUBLE, my_first_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
+				Mnr.resize(mymodel.nr_groups);
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mnr)
+				{
+					DIRECT_A1D_ELEM(Mnr, i) = mymodel.nr_particles_group[i];
+        		}
+				node->relion_MPI_Send(MULTIDIM_ARRAY(Mnr), MULTIDIM_SIZE(Mnr), MPI_INT, my_first_slave, MPITAG_METADATA, MPI_COMM_WORLD);
+				node->relion_MPI_Send(&wsum_model.sumw_group[0], 1, MY_MPI_DOUBLE, my_first_slave, MPITAG_RFLOAT, MPI_COMM_WORLD);
+
+    		}
+			else if (node->rank == my_first_slave)
+			{
+				//std::cerr << "Receiving at "<<my_first_slave<< " from "<<other_slave<<std::endl;
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MY_MPI_DOUBLE, other_slave, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mnr), MULTIDIM_SIZE(Mnr), MPI_INT, other_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(&wsum_model.sumw_group[0], 1, MY_MPI_DOUBLE, other_slave, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+				// Add the contribution of this other slave
+				Msum  += wsum_model.sigma2_noise[0];
+				MsumI += Mavg;
+				Msumnr += Mnr;
+				dsum += wsum_model.sumw_group[0];
+    		}
+		}
+
+		// Now the first slave has the sum of all other slaves in its Msum
+		// Send this sum to all relevant other slaves
+		for (int other_slave = my_first_other_slave; other_slave < node->size; other_slave += nr_subsets)
+		{
+			if (node->rank == my_first_slave)
+			{
+				//std::cerr << "Sending from my_first_slave"<<my_first_slave<< " to other_slave "<<other_slave<< std::endl;
+				node->relion_MPI_Send(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, other_slave, MPITAG_PACK, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(Msumnr), MULTIDIM_SIZE(Msumnr), MPI_INT, other_slave, MPITAG_METADATA, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(MsumI), MULTIDIM_SIZE(MsumI), MY_MPI_DOUBLE, other_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(&dsum, 1, MY_MPI_DOUBLE, other_slave, MPITAG_RFLOAT, MPI_COMM_WORLD);
+			}
+			else if (node->rank == other_slave)
+			{
+				//std::cerr << "Receiving at other_slave "<<other_slave<<" from my_first_slave "<<my_first_slave<< std::endl;
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(wsum_model.sigma2_noise[0]), MULTIDIM_SIZE(wsum_model.sigma2_noise[0]), MY_MPI_DOUBLE, my_first_slave, MPITAG_PACK, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mnr), MULTIDIM_SIZE(Mnr), MPI_INT, my_first_slave, MPITAG_METADATA, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(Mavg), MULTIDIM_SIZE(Mavg), MY_MPI_DOUBLE, my_first_slave, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(&wsum_model.sumw_group[0], 1, MY_MPI_DOUBLE, my_first_slave, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+				// Unpack Mnr on the other slave
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mnr)
+				{
+					mymodel.nr_particles_group[i] = DIRECT_A1D_ELEM(Mnr, i);
+				}
+			}
+		}
+
+		// Also set sums on the first slave
+		if (node->rank == my_first_slave)
+		{
+			wsum_model.sigma2_noise[0] = Msum;
+			Mavg = MsumI;
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Msumnr)
+			{
+				mymodel.nr_particles_group[i] = DIRECT_A1D_ELEM(Msumnr, i);
+			}
+			wsum_model.sumw_group[0] = dsum;
+		}
+
+	}
+	//std::cout << " Hello world23! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 
 }
 
@@ -731,6 +816,7 @@ void MlOptimiserMpi::expectation()
 
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
+
 	updateImageSizeAndResolutionPointers();
 
 	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
@@ -798,7 +884,8 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && subset == 0)
+	////TMP if (!(iter==1 && do_firstiter_cc) && (mymodel.data_dim == 2) && !do_skip_align )
+	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) )
 	{
 		int my_nr_images, length_fn_ctf;
 		if (node->isMaster())
@@ -841,7 +928,7 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && do_auto_refine && iter > 1 && subset == 0)
+	if (!node->isMaster() && do_auto_refine && iter > 1 )
 	{
 		updateAngularSampling(node->rank == 1);
 	}
@@ -870,11 +957,10 @@ void MlOptimiserMpi::expectation()
 	{
 		// Check whether everything fits into memory
 		int myverb = (node->rank == first_slave) ? 1 : 0;
-		if (subset == 0)
-			MlOptimiser::expectationSetupCheckMemory(myverb);
+		MlOptimiser::expectationSetupCheckMemory(myverb);
 
 		// F. Precalculate AB-matrices for on-the-fly shifts
-		if (do_shifts_onthefly && subset == 0)
+		if (do_shifts_onthefly)
 			precalculateABMatrices();
 	}
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
@@ -997,100 +1083,32 @@ void MlOptimiserMpi::expectation()
 #endif
         try
         {
-        	int old_verb = verb;
-        	long int my_subset_first_ori_particle, my_subset_last_ori_particle, nr_particles_todo;
-        	long int my_subset_first_ori_particle_halfset1, my_subset_last_ori_particle_halfset1;
-        	long int my_subset_first_ori_particle_halfset2, my_subset_last_ori_particle_halfset2;
-        	if (do_sgd)
-        	{
-         		if (do_split_random_halves)
-         		{
-         			REPORT_ERROR("For now disable split_random_halves and SGD, although code below should work!");
-         		}
-        		/*
-				{
-               		// Halfset 1
-         			divide_equally(mydata.numberOfOriginalParticles(1), nr_subsets, subset,
-               				my_subset_first_ori_particle_halfset1, my_subset_last_ori_particle_halfset1);
-               		subset_size = my_subset_last_ori_particle_halfset1 - my_subset_first_ori_particle_halfset1 + 1;
+			if( iter<=subset_iter && !do_split_random_halves)
+			{
+				ss_frac = subset_frac;
+				//if(random_seed!=0)
+				//	mydata.randomiseOriginalParticlesOrder(random_seed);
+			}
 
-               		// Halfset 2
-               		divide_equally(mydata.numberOfOriginalParticles(2), nr_subsets, subset,
-               				my_subset_first_ori_particle_halfset2, my_subset_last_ori_particle_halfset2);
-               		my_subset_first_ori_particle_halfset2 += mydata.numberOfOriginalParticles(1);
-               		my_subset_last_ori_particle_halfset2 += mydata.numberOfOriginalParticles(1);
+			nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*ss_frac;
 
-               		// Some safeguards
-               		if (my_subset_last_ori_particle_halfset1 >= mydata.numberOfOriginalParticles(1))
-               			REPORT_ERROR("my_subset_last_ori_particle_halfset1 >= mydata.numberOfOriginalParticles(1)");
-               		if (my_subset_last_ori_particle_halfset2 >= mydata.numberOfOriginalParticles())
-               			REPORT_ERROR("my_subset_last_ori_particle_halfset2 >= mydata.numberOfOriginalParticles()");
-
-        		}
-        		*/
-        		else
-        		{
-               		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset, my_subset_first_ori_particle, my_subset_last_ori_particle);
-               		//std::cerr << " my_subset_first_ori_particle= " << my_subset_first_ori_particle << " my_subset_last_ori_particle= " << my_subset_last_ori_particle << std::endl;
-               		subset_size = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
-        		}
-
-        		if (verb > 0)
-        		{
-        			if (subset == 0)
-        			{
-        				std::cout << " Stochastic Gradient Descent iteration " << iter;
-        				if (!do_auto_refine)
-        					std::cout << " of " << nr_iter;
-        				std::cout << std::endl;
-        				long int barsize = (sgd_max_subsets > 0) ? sgd_max_subsets * subset_size : mydata.numberOfOriginalParticles();
-        				barsize = XMIPP_MIN(barsize, mydata.numberOfOriginalParticles());
-        				init_progress_bar(barsize);
-        			}
-        		}
-        	}
-        	else
-        	{
-        		my_subset_first_ori_particle = 0.;
-        		my_subset_last_ori_particle = mydata.numberOfOriginalParticles() - 1;
-        		my_subset_first_ori_particle_halfset1 = 0;
-        		my_subset_last_ori_particle_halfset1 = mydata.numberOfOriginalParticles(1) - 1;
-        		my_subset_first_ori_particle_halfset2 = mydata.numberOfOriginalParticles(1);
-        		my_subset_last_ori_particle_halfset2 = mydata.numberOfOriginalParticles() - 1;
-        		subset_size = mydata.numberOfOriginalParticles();
-        		if (verb > 0)
-        		{
-        			std::cout << " Expectation iteration " << iter;
-        			if (!do_auto_refine)
-        				std::cout << " of " << nr_iter;
-        			std::cout << std::endl;
-        			init_progress_bar(mydata.numberOfOriginalParticles());
-        		}
-        	}
-
+    		if (verb > 0)
+    		{
+				std::cout << " Expectation iteration " << iter;
+				if (!do_auto_refine)
+					std::cout << " of " << nr_iter;
+				std::cout << std::endl;
+				init_progress_bar(nr_particles_todo);
+    		}
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
-			int random_halfset = 0;
-			long int nr_ori_particles_done, nr_ori_particles_done_halfset1, nr_ori_particles_done_halfset2;
-			if (do_split_random_halves)
-			{
-				nr_ori_particles_done_halfset1 = my_subset_first_ori_particle_halfset1;
-				nr_ori_particles_done_halfset2 = my_subset_first_ori_particle_halfset2 - mydata.numberOfOriginalParticles(1);
-				nr_ori_particles_done = nr_ori_particles_done_halfset1 + nr_ori_particles_done_halfset2;
-			}
-			else
-			{
-				nr_ori_particles_done = my_subset_first_ori_particle; // 0 normally
-			}
-			//std::cerr << " nr_ori_particles_done= " << nr_ori_particles_done << " nr_ori_particles_done_halfset1= " << nr_ori_particles_done_halfset1 << " nr_ori_particles_done_halfset2= " << nr_ori_particles_done_halfset2 << std::endl;
+			int random_subset = 0;
+			long int nr_ori_particles_done = 0;
 			long int prev_step_done = nr_ori_particles_done;
-			long int progress_bar_step_size = ROUND(mydata.numberOfOriginalParticles() / 60);
-			if (do_sgd)
-				progress_bar_step_size = XMIPP_MIN(progress_bar_step_size, subset_size);
-			long int nr_subset_particles_done = 0;
-			long int nr_subset_particles_done_halfset1 = 0;
-			long int nr_subset_particles_done_halfset2 = 0;
-			long int my_nr_subset_particles_done = 0;
+			long int progress_bar_step_size = ROUND(nr_particles_todo / 80);
+			long int nr_ori_particles_done_subset1 = 0;
+			long int nr_ori_particles_done_subset2 = 0;
+			long int my_nr_ori_particles_done = 0;
 
 			while (nr_slaves_done < node->size - 1)
 			{
@@ -1099,7 +1117,7 @@ void MlOptimiserMpi::expectation()
 				// Which slave sent this request?
 				int this_slave = status.MPI_SOURCE;
 
-//#define DEBUG_MPIEXP2
+				//#define DEBUG_MPIEXP2
 #ifdef DEBUG_MPIEXP2
 				std::cerr << " MASTER RECEIVING from slave= " << this_slave<< " JOB_FIRST= " << JOB_FIRST << " JOB_LAST= " << JOB_LAST
 						<< " JOB_NIMG= "<<JOB_NIMG<< " JOB_NPAR= "<<JOB_NPAR<< std::endl;
@@ -1123,45 +1141,41 @@ void MlOptimiserMpi::expectation()
 					}
 				}
 
-				// See which random_halfset this slave belongs to, and keep track of the number of ori_particles that have been processed already
+				// See which random_subset this slave belongs to, and keep track of the number of ori_particles that have been processed already
 				if (do_split_random_halves)
 				{
-					random_halfset = (this_slave % 2 == 1) ? 1 : 2;
-					if (random_halfset == 1)
+					random_subset = (this_slave % 2 == 1) ? 1 : 2;
+					if (random_subset == 1)
 					{
-						my_nr_subset_particles_done = nr_subset_particles_done_halfset1;
-						// random_halfset1 is stored in first half of OriginalParticles
-						//if (do_sgd)
-							nr_particles_todo = my_subset_last_ori_particle_halfset1 - my_subset_first_ori_particle_halfset1 + 1;
-						//else
-						//	nr_particles_todo = (mydata.numberOfOriginalParticles(random_halfset));
-						JOB_FIRST = nr_ori_particles_done_halfset1;
-						JOB_LAST  = XMIPP_MIN(my_subset_last_ori_particle_halfset1, JOB_FIRST + nr_pool - 1);
+						my_nr_ori_particles_done = nr_ori_particles_done_subset1;
+						// random_subset1 is stored in second half of OriginalParticles
+						JOB_FIRST = nr_ori_particles_done_subset1;
+						JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles(1) - 1, JOB_FIRST + nr_pool - 1);
 					}
 					else
 					{
-						my_nr_subset_particles_done = nr_subset_particles_done_halfset2;
-						// random_halfset2 is stored in second half of OriginalParticles
-						//if (do_sgd)
-							nr_particles_todo = my_subset_last_ori_particle_halfset2 - my_subset_first_ori_particle_halfset2 + 1;
-						//else
-						//	nr_particles_todo = (mydata.numberOfOriginalParticles(random_halfset));
-						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_halfset2;
-						JOB_LAST  = XMIPP_MIN(my_subset_last_ori_particle_halfset2, JOB_FIRST + nr_pool - 1);
+						my_nr_ori_particles_done = nr_ori_particles_done_subset2;
+						// random_subset2 is stored in second half of OriginalParticles
+						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_subset2;
+						JOB_LAST  = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, JOB_FIRST + nr_pool - 1);
 					}
+					nr_particles_todo = (double)(mydata.numberOfOriginalParticles(random_subset));
 				}
 				else
 				{
-					random_halfset = 0;
-					my_nr_subset_particles_done = nr_subset_particles_done;
-					nr_particles_todo =  my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
+					long int particles_todo  = ( (double) mydata.numberOfOriginalParticles( ) ) * ss_frac;
+					random_subset = 0;
+					my_nr_ori_particles_done = nr_ori_particles_done;
 					JOB_FIRST = nr_ori_particles_done;
-					JOB_LAST  = XMIPP_MIN(my_subset_last_ori_particle, JOB_FIRST + nr_pool - 1);
+					JOB_LAST  = XMIPP_MIN(particles_todo - 1, JOB_FIRST + nr_pool - 1);
+					nr_particles_todo = particles_todo;
 				}
 
 				// Now send out a new job
-				if (my_nr_subset_particles_done < nr_particles_todo)
+
+				if(my_nr_ori_particles_done < nr_particles_todo)
 				{
+
 					MlOptimiser::getMetaAndImageDataSubset(JOB_FIRST, JOB_LAST, !do_parallel_disc_io);
 					JOB_NIMG = YSIZE(exp_metadata);
 					JOB_LEN_FN_IMG = exp_fn_img.length() + 1; // +1 to include \0 at the end of the string
@@ -1183,18 +1197,13 @@ void MlOptimiserMpi::expectation()
 					// No more particles, this slave is done now
 					nr_slaves_done++;
 				}
-
-				//std::cerr << "subset= " << subset << " half-set= " << random_halfset
-				//		<< " nr_subset_particles_done= " << nr_subset_particles_done
-				//		<< " nr_particles_todo=" << nr_particles_todo << " JOB_FIRST= " << JOB_FIRST << " JOB_LAST= " << JOB_LAST << std::endl;
-
 #ifdef DEBUG_MPIEXP2
 				std::cerr << " MASTER SENDING to slave= " << this_slave<< " JOB_FIRST= " << JOB_FIRST << " JOB_LAST= " << JOB_LAST
 								<< " JOB_NIMG= "<<JOB_NIMG<< " JOB_NPAR= "<<JOB_NPAR<< std::endl;
 #endif
 				node->relion_MPI_Send(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, this_slave, MPITAG_JOB_REPLY, MPI_COMM_WORLD);
 
-				//806 Master also sends the required metadata and imagedata for this job
+				// Master also sends the required metadata and imagedata for this job
 				if (JOB_NIMG > 0)
 				{
 					node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, this_slave, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -1216,20 +1225,13 @@ void MlOptimiserMpi::expectation()
 
 				// Update the total number of particles that has been done already
 				nr_ori_particles_done += JOB_NPAR;
-				nr_subset_particles_done += JOB_NPAR;
 				if (do_split_random_halves)
 				{
 					// Also update the number of particles that has been done for each subset
-					if (random_halfset == 1)
-					{
-						nr_ori_particles_done_halfset1 += JOB_NPAR;
-						nr_subset_particles_done_halfset1 += JOB_NPAR;
-					}
+					if (random_subset == 1)
+						nr_ori_particles_done_subset1 += JOB_NPAR;
 					else
-					{
-						nr_ori_particles_done_halfset2 += JOB_NPAR;
-						nr_subset_particles_done_halfset2 += JOB_NPAR;
-					}
+						nr_ori_particles_done_subset2 += JOB_NPAR;
 				}
 			}
         }
@@ -1250,7 +1252,7 @@ void MlOptimiserMpi::expectation()
 #endif
     	try
     	{
-			// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
+			// Slaves do the real work (The slave does not need to know to which random_subset he belongs)
     		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -1466,8 +1468,8 @@ void MlOptimiserMpi::expectation()
 	exp_imagedata.clear();
 	exp_metadata.clear();
 
-	if (!do_sgd && verb > 0)
-		progress_bar(mydata.numberOfOriginalParticles());
+	if (verb > 0)
+		progress_bar((double)(mydata.numberOfOriginalParticles())*ss_frac);
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest
@@ -1479,7 +1481,7 @@ void MlOptimiserMpi::expectation()
 	// Wait until expected angular errors have been calculated
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	// All slaves reset the size of their projector to zero to save memory
+	// All slaves reset the size of their projector to zero tosave memory
 	if (!node->isMaster())
 	{
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -1503,10 +1505,10 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 	MultidimArray<RFLOAT> Mpack;
 	FileName fn_pack;
 
-	int nr_halfsets = (do_split_random_halves) ? 2 : 1;
+	int nr_subsets = (do_split_random_halves) ? 2 : 1;
 
 	// Only need to combine if there are more than one slaves per subset!
-	if ((node->size - 1)/nr_halfsets > 1)
+	if ((node->size - 1)/nr_subsets > 1)
 	{
 		// A. First all slaves pack up their wsum_model (this is done simultaneously)
 		if (!node->isMaster())
@@ -1530,11 +1532,11 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 
 		// C. First slave of each subset reads all other slaves' Mpack; sum; and write sum to disc
 		// Again, do this SEQUENTIALLY to prevent heavy load on disc I/O
-		for (int first_slave = 1; first_slave <= nr_halfsets; first_slave++)
+		for (int first_slave = 1; first_slave <= nr_subsets; first_slave++)
 		{
 			if (node->rank == first_slave)
 			{
-				for (int other_slave = first_slave + nr_halfsets; other_slave < node->size; other_slave+= nr_halfsets )
+				for (int other_slave = first_slave + nr_subsets; other_slave < node->size; other_slave+= nr_subsets )
 				{
 					fn_pack.compose(fn_out+"_rank", other_slave, "tmp");
 					Mpack.readBinaryAndSum(fn_pack);
@@ -1553,7 +1555,7 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 
 		// D. All other slaves read the summed Mpack from their first_slave
 		// Again, do this SEQUENTIALLY to prevent heavy load on disc I/O
-		for (int this_slave = nr_halfsets + 1; this_slave < node->size; this_slave++ )
+		for (int this_slave = nr_subsets + 1; this_slave < node->size; this_slave++ )
 		{
 			if (this_slave == node->rank)
 			{
@@ -1592,7 +1594,7 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 		if (!node->isMaster())
 			wsum_model.unpack(Mpack);
 
-	} // end if ((node->size - 1)/nr_halfsets > 1)
+	} // end if ((node->size - 1)/nr_subsets > 1)
 #ifdef TIMING
     timer.toc(TIMING_MPICOMBINEDISC);
 #endif
@@ -1613,10 +1615,10 @@ void MlOptimiserMpi::combineAllWeightedSums()
 	// First slave manually sums over all other slaves of it's subset
 	// And then sends results back to all those slaves
 	// When splitting the data into two random halves, perform two passes: one for each subset
-	int nr_halfsets = (do_split_random_halves) ? 2 : 1;
+	int nr_subsets = (do_split_random_halves) ? 2 : 1;
 
 	// Only combine weighted sums if there are more than one slaves per subset!
-	if ((node->size - 1)/nr_halfsets > 1)
+	if ((node->size - 1)/nr_subsets > 1)
 	{
 		// Loop over possibly multiple instances of Mpack of maximum size
 		int piece = 0;
@@ -1632,7 +1634,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 			{
 				wsum_model.pack(Mpack, piece, nr_pieces);
 				// The first slave(s) set Msum equal to Mpack, the others initialise to zero
-				if (node->rank <= nr_halfsets)
+				if (node->rank <= nr_subsets)
 					Msum = Mpack;
 				else
 					Msum.initZeros(Mpack);
@@ -1652,7 +1654,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 					first_slave = (this_slave % 2 == 1) ? 1 : 2;
 
 				// Find out who is the next slave in this subset
-				int other_slave = this_slave + nr_halfsets;
+				int other_slave = this_slave + nr_subsets;
 
 				if (other_slave < node->size)
 				{
@@ -1701,10 +1703,10 @@ void MlOptimiserMpi::combineAllWeightedSums()
 			for (int this_slave = 1; this_slave < node->size; this_slave++ )
 			{
 				// Find out who is the next slave in this subset
-				int other_slave = this_slave + nr_halfsets;
+				int other_slave = this_slave + nr_subsets;
 
-				// Do not send to the last slave, because it already had its Msum from the cycle above, therefore subtract nr_halfsets from node->size
-				if (other_slave < node->size - nr_halfsets)
+				// Do not send to the last slave, because it already had its Msum from the cycle above, therefore subtract nr_subsets from node->size
+				if (other_slave < node->size - nr_subsets)
 				{
 					if (node->rank == this_slave)
 					{
@@ -1904,7 +1906,7 @@ void MlOptimiserMpi::maximization()
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
 
-			if (wsum_model.pdf_class[iclass] > 0.)
+			if (mymodel.pdf_class[iclass] > 0.)
 			{
 				// Parallelise: each MPI-node has a different reference
 				int reconstruct_rank1;
@@ -1997,53 +1999,10 @@ void MlOptimiserMpi::maximization()
 					{
 						// Rank 2 does not need to do the joined reconstruction
 						if (!do_join_random_halves)
-						{
-							if (do_sgd)
-							{
-
-								MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
-
-								// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
-								// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-								long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
-								RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-								int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
-								RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
-								number_of_effective_particles *= (1. - total_mu_fraction);
-								RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-
-								// This worked for several 3D cases, but cannot be right....
-								//long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
-								//RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-								//RFLOAT number_of_effective_particles = mydata.particles.size() * (1. - total_mu_fraction);
-								//RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-
-								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-										sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-										mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-										do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
-
-								// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
-								// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
-									DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) +
-											(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n);
-
-								// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
-								{
-									DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n);
-								}
-
-							}
-							else
-							{
-								wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+							wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
-							}
-						}
 
 						// But rank 2 always does the unfiltered reconstruction
 						if (do_auto_refine && has_converged)
@@ -2104,12 +2063,7 @@ void MlOptimiserMpi::maximization()
 			} // endif pdf_class[iclass] > 0.
 			else
 			{
-				// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
-				if (!do_sgd)
-					mymodel.Iref[ith_recons].initZeros();
-				// When doing SGD also re-initialise the gradient to zero
-				if (do_sgd)
-					mymodel.Igrad[ith_recons].initZeros();
+				mymodel.Iref[ith_recons].initZeros();
 			}
 			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
@@ -2142,20 +2096,20 @@ void MlOptimiserMpi::maximization()
 				MPI_Status status;
 				// Make sure I am sending from the rank where the reconstruction was done (see above) to all other slaves of this subset
 				// Loop twice through this, as each class was reconstructed by two different slaves!!
-				int nr_halfsets = 2;
-				for (int ihalfset = 1; ihalfset <= nr_halfsets; ihalfset++)
+				int nr_subsets = 2;
+				for (int isubset = 1; isubset <= nr_subsets; isubset++)
 				{
-					if (node->myRandomSubset() == ihalfset)
+					if (node->myRandomSubset() == isubset)
 					{
-						int reconstruct_rank = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + ihalfset; // first pass halfset1, second pass halfset2
+						int reconstruct_rank = 2 * (ith_recons % ( (node->size - 1)/2 ) ) + isubset; // first pass subset1, second pass subset2
 						int my_first_recv = node->myRandomSubset();
 
-						for (int recv_node = my_first_recv; recv_node < node->size; recv_node += nr_halfsets)
+						for (int recv_node = my_first_recv; recv_node < node->size; recv_node += nr_subsets)
 						{
 							if (node->rank == reconstruct_rank && recv_node != node->rank)
 							{
 #ifdef DEBUG
-								std::cerr << "ihalfset= "<<ihalfset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
+								std::cerr << "isubset= "<<isubset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
 #endif
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -2164,13 +2118,13 @@ void MlOptimiserMpi::maximization()
 							}
 							else if (node->rank != reconstruct_rank && node->rank == recv_node)
 							{
-								//std::cerr << "ihalfset= "<<ihalfset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
+								//std::cerr << "isubset= "<<isubset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
 #ifdef DEBUG
-								std::cerr << "ihalfset= "<<ihalfset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
+								std::cerr << "isubset= "<<isubset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 #endif
 							}
 						}
@@ -2189,9 +2143,6 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the reconstructed references to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]),
 						MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				if (do_sgd)
-					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad[ith_recons]),
-						MULTIDIM_SIZE(mymodel.Igrad[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]),
 						MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
@@ -2208,8 +2159,6 @@ void MlOptimiserMpi::maximization()
 
 			// Re-set the origin (this may be lost in some cases??)
 			mymodel.Iref[ith_recons].setXmippOrigin();
-			if (do_sgd)
-				mymodel.Igrad[ith_recons].setXmippOrigin();
 
 			// Aug05,2015 - Shaoda, helical symmetry refinement, broadcast refined helical parameters
 			if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
@@ -2385,9 +2334,6 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
 {
-
-	if (do_sgd)
-		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and SGD!");
 
 	if (fn_mask == "")
 		return;
@@ -2659,49 +2605,39 @@ void MlOptimiserMpi::compareTwoHalves()
 	// The first two slaves calculate the sum of the downsampled average of all bodies
 	if (node->rank == 1 || node->rank == 2)
 	{
+		// Sum over all bodies
 		MultidimArray<Complex > avg1;
-
-		if (do_sgd)
+		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++ )
 		{
-			FourierTransformer transformer;
-			transformer.FourierTransform(mymodel.Iref[iclass], avg1);
-		}
-		else
-		{
+			MultidimArray<Complex > tmp1;
+			wsum_model.BPref[ibody].getDownsampledAverage(tmp1);
 
-			// Sum over all bodies
-			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++ )
+			if (mymodel.nr_bodies > 1)
 			{
-				MultidimArray<Complex > tmp1;
-				wsum_model.BPref[ibody].getDownsampledAverage(tmp1);
-
-				if (mymodel.nr_bodies > 1)
+				// 19may2015 Shift each downsampled avg in the FourierTransform to its original COM!!
+				// shiftImageInFourierTransform, but tmp1 is already centered (ie not in FFTW-arrangement)
+				RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
+				RFLOAT xshift = -XX(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
+				RFLOAT yshift = -YY(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
+				RFLOAT zshift = -ZZ(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
+				FOR_ALL_ELEMENTS_IN_ARRAY3D(tmp1)
 				{
-					// 19may2015 Shift each downsampled avg in the FourierTransform to its original COM!!
-					// shiftImageInFourierTransform, but tmp1 is already centered (ie not in FFTW-arrangement)
-					RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
-					RFLOAT xshift = -XX(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
-					RFLOAT yshift = -YY(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
-					RFLOAT zshift = -ZZ(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
-					FOR_ALL_ELEMENTS_IN_ARRAY3D(tmp1)
-					{
-						dotp = 2 * PI * (j * xshift + i * yshift + k * zshift);
-						a = cos(dotp);
-						b = sin(dotp);
-						c = A3D_ELEM(tmp1, k, i, j).real;
-						d = A3D_ELEM(tmp1, k, i, j).imag;
-						ac = a * c;
-						bd = b * d;
-						ab_cd = (a + b) * (c + d);
-						A3D_ELEM(tmp1, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
-					}
+					dotp = 2 * PI * (j * xshift + i * yshift + k * zshift);
+					a = cos(dotp);
+					b = sin(dotp);
+					c = A3D_ELEM(tmp1, k, i, j).real;
+					d = A3D_ELEM(tmp1, k, i, j).imag;
+					ac = a * c;
+					bd = b * d;
+					ab_cd = (a + b) * (c + d);
+					A3D_ELEM(tmp1, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
 				}
-
-				if (ibody == 0)
-					avg1 = tmp1;
-				else
-					avg1 += tmp1;
 			}
+
+			if (ibody == 0)
+				avg1 = tmp1;
+			else
+				avg1 += tmp1;
 		}
 
 //#define DEBUG_FSC
@@ -2740,14 +2676,7 @@ void MlOptimiserMpi::compareTwoHalves()
 			MultidimArray<Complex > avg2;
 			avg2.resize(avg1);
 			node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-			if (do_sgd)
-			{
-				getFSC(avg1, avg2, mymodel.fsc_halves_class);
-			}
-			else
-			{
-				wsum_model.BPref[iclass].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class);
-			}
+			wsum_model.BPref[iclass].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class);
 		}
 
 	}
