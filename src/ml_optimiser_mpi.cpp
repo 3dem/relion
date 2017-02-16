@@ -92,103 +92,6 @@ void MlOptimiserMpi::initialise()
     if (!do_movies_in_batches)
     	printMpiNodesMachineNames(*node, nr_threads);
 
-    MlOptimiser::initialiseGeneral(node->rank);
-
-    initialiseWorkLoad();
-
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-
-	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
-	{
-		MultidimArray<RFLOAT> Mavg;
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		// This is done in parallel
-		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		if (!node->isMaster())
-			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-	}
-
-
-	MlOptimiser::initialLowPassFilterReferences();
-
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-	// Only master writes out initial mymodel (do not gather metadata yet)
-	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
-	if (node->isMaster() && !do_movies_in_batches)
-		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-	else if (node->rank <= my_nr_subsets)
-	{
-		//Only the first_slave of each subset writes model to disc
-		if (!do_movies_in_batches)
-			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
-
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			if (mymodel.nr_particles_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
-			{
-				if (my_nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
-				do_warn = true;
-			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
-            std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
-		}
-	}
-
-	// Do this after writing out the model, so that still the random halves are written in separate files.
-	if (do_realign_movies)
-	{
-		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
-		has_converged = true;
-		// Then use join random halves
-		do_join_random_halves = true;
-
-		// If we skip the maximization step, then there is no use in using all data
-		if (!do_skip_maximization)
-		{
-			// Use all data out to Nyquist because resolution gains may be substantial
-			do_use_all_data = true;
-		}
-	}
-
-
 #ifdef CUDA
     /************************************************************************/
 	//Setup GPU related resources
@@ -833,24 +736,6 @@ void MlOptimiserMpi::expectation()
 	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
 	// The master only holds metadata, it does not set up the wsum_model (to save memory)
 #ifdef TIMING
-		timer.tic(TIMING_EXP_1a);
-#endif
-	if (!node->isMaster())
-	{
-		MlOptimiser::expectationSetup();
-
-		// All slaves no longer need mydata.MD tables
-		mydata.MDimg.clear();
-		mydata.MDmic.clear();
-
-		// Many small new's are not returned to the OS upon free-ing them. To force this, use the following call
-		// from http://stackoverflow.com/questions/10943907/linux-allocator-does-not-release-small-chunks-of-memory
-#if !defined(__APPLE__)
-		malloc_trim(0);
-#endif
-
-	MPI_Barrier(MPI_COMM_WORLD);
-#ifdef TIMING
 		timer.toc(TIMING_EXP_1a);
 #endif
 
@@ -1082,13 +967,13 @@ void MlOptimiserMpi::expectation()
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
+	/************************************************************************/
 #endif // CUDA
 #ifdef TIMING
 		timer.toc(TIMING_EXP_4);
 #endif
-
-	/************************************************************************/
-
+	double ss_frac(1.0);
+	long int nr_particles_todo;
     if (node->isMaster())
     {
 #ifdef TIMING
@@ -2210,19 +2095,6 @@ void MlOptimiserMpi::maximization()
 				if (do_sgd)
 					mymodel.Igrad[ith_recons].initZeros();
 			}
-//#define DEBUG_SGD_MPI
-#ifdef DEBUG_SGD_MPI
-			if (do_sgd)
-			{
-				FileName fn_tmp="grad_class"+integerToString(iclass)+".spi";
-				Image<RFLOAT> It;
-				It()=mymodel.Igrad[iclass];
-				It.write(fn_tmp);
-				fn_tmp="ref_class"+integerToString(iclass)+".spi";
-				It()=mymodel.Iref[iclass];
-				It.write(fn_tmp);
-			}
-#endif
 			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
@@ -2898,263 +2770,238 @@ void MlOptimiserMpi::iterate()
 		timer.tic(TIMING_EXP);
 #endif
 
-		for (subset = 0; subset < nr_subsets; subset++)
+		// Nobody can start the next iteration until everyone has finished
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		// Only first slave checks for convergence and prints stats to the stdout
+		if (do_auto_refine)
+			checkConvergence(node->rank == 1);
+
+		expectation();
+
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (do_skip_maximization)
 		{
-			// Nobody can start the next iteration until everyone has finished
-			MPI_Barrier(MPI_COMM_WORLD);
-
-			// Only first slave checks for convergence and prints stats to the stdout
-			if (do_auto_refine)
-				checkConvergence(node->rank == 1);
-
-			expectation();
-
-			int old_verb = verb;
-			if (do_sgd) // be quiet
-				verb = 0;
-
-			MPI_Barrier(MPI_COMM_WORLD);
-
-			if (do_skip_maximization)
-			{
-				// Only write data.star file and break from the iteration loop
-				if (node->isMaster())
-				{
-					// The master only writes the data file (he's the only one who has and manages these data!)
-					iter = -1; // write output file without iteration number
-					MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-					if (verb > 0)
-						std::cout << " Auto-refine: Skipping maximization step, so stopping now... " << std::endl;
-				}
-				break;
-			}
-
-			// Now combine all weighted sums
-			// Leave the option ot both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
-			if (combine_weights_thru_disc)
-				combineAllWeightedSumsViaFile();
-			else
-				combineAllWeightedSums();
-
-			MPI_Barrier(MPI_COMM_WORLD);
-
-			// Sjors & Shaoda Apr 2015
-			// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
-			// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
-			// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
-			// Finally it applies point group symmetry (such as Cn, ...).
-			// DEBUG
-			if ( (verb > 0) && (node->isMaster()) )
-			{
-				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				{
-					if (mymodel.helical_nr_asu > 1)
-						std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
-					if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
-					{
-						std::cout << " Refining helical symmetry in real space..." << std::endl;
-						std::cout << " Applying refined helical symmetry in real space..." << std::endl;
-					}
-					else
-						std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
-				}
-			}
-			symmetriseReconstructions();
-
-			// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
-#ifndef DEBUG_RECONSTRUCTION
-			if (do_auto_refine && has_converged)
-#endif
-				writeTemporaryDataAndWeightArrays();
-
-			// Inside iterative refinement: do FSC-calculation BEFORE the solvent flattening, otherwise over-estimation of resolution
-			// anyway, now that this is done inside BPref, there would be no other way...
-			if (do_split_random_halves)
-			{
-
-				// For asymmetric molecules, join 2 half-reconstructions at the lowest resolutions to prevent them from diverging orientations
-				if (low_resol_join_halves > 0.)
-					joinTwoHalvesAtLowResolution();
-
-				// Sjors 27-oct-2015
-				// Calculate gold-standard FSC curve
-				if (do_phase_random_fsc && fn_mask != "None")
-					reconstructUnregularisedMapAndCalculateSolventCorrectedFSC();
-				else
-					compareTwoHalves();
-
-				// For automated sampling procedure
-				if (!node->isMaster()) // the master does not have the correct mymodel.current_size, it only handles metadata!
-				{
-					// Check that incr_size is at least the number of shells as between FSC=0.5 and FSC=0.143
-					int fsc05   = -1;
-					int fsc0143 = -1;
-					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class)
-					{
-						if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.5 && fsc05 < 0)
-							fsc05 = i;
-						if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.143 && fsc0143 < 0)
-							fsc0143 = i;
-					}
-					// At least fsc05 - fsc0143 + 5 shells as incr_size
-					incr_size = XMIPP_MAX(incr_size, fsc0143 - fsc05 + 5);
-					has_high_fsc_at_limit = (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, mymodel.current_size/2 - 1) > 0.2);
-				}
-
-				// Upon convergence join the two random halves
-				if (do_join_random_halves || do_always_join_random_halves)
-				{
-					if (combine_weights_thru_disc)
-						combineWeightedSumsTwoRandomHalvesViaFile();
-					else
-						combineWeightedSumsTwoRandomHalves();
-
-				}
-			}
-
-#ifdef TIMING
-			timer.toc(TIMING_EXP);
-			timer.tic(TIMING_MAX);
-#endif
-
-			maximization();
-
-			// Make sure all nodes have the same resolution, set the data_vs_prior array from half1 also for half2
-			// Because there is an if-statement on ave_Pmax to set the image size, also make sure this one is the same for both halves
-			if (do_split_random_halves)
-			{
-				node->relion_MPI_Bcast(&mymodel.ave_Pmax, 1, MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-				for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-			}
-
-#ifdef TIMING
-			timer.toc(TIMING_MAX);
-#endif
-
-			MPI_Barrier(MPI_COMM_WORLD);
-
+			// Only write data.star file and break from the iteration loop
 			if (node->isMaster())
 			{
-				if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
-				{
-					int nr_same_polarity = 0, nr_opposite_polarity = 0;
-					RFLOAT opposite_percentage = 0.;
-					bool do_local_angular_searches = false;
-					if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
-						do_local_angular_searches = true;
-					else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
-						do_local_angular_searches = true;
-
-					if (helical_sigma_distance < 0.)
-						updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-					else
-					{
-						updatePriorsForHelicalReconstruction(
-								mydata.MDimg,
-								nr_opposite_polarity,
-								helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
-								(mymodel.data_dim == 3),
-								do_auto_refine,
-								do_local_angular_searches,
-								mymodel.sigma2_rot,
-								mymodel.sigma2_tilt,
-								mymodel.sigma2_psi,
-								mymodel.sigma2_offset,
-								helical_keep_tilt_prior_fixed);
-
-						nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-						opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-						if ( (verb > 0) && (!do_local_angular_searches) )
-						{
-							//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
-							//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
-							std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						}
-					}
-				}
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-
-			// Mask the reconstructions to get rid of noisy solvent areas
-			// Skip masking upon convergence (for validation purposes)
-			if (do_solvent && !has_converged)
-				solventFlatten();
-
-			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
-			updateCurrentResolution();
-
-			// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
-			bool do_write_optimiser = !do_join_random_halves;
-			// Write out final map without iteration number in the filename
-			if (do_join_random_halves)
-				iter = -1;
-
-			if (node->rank == 1 || (do_split_random_halves && !do_join_random_halves && node->rank == 2))
-				//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
-				MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, do_write_optimiser, DO_WRITE_MODEL, node->rank);
-			else if (node->isMaster())
 				// The master only writes the data file (he's the only one who has and manages these data!)
+				iter = -1; // write output file without iteration number
 				MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-
-			if (do_auto_refine && has_converged)
-			{
 				if (verb > 0)
-				{
-					std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
-					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
-					std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
-					std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
-					std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
-					if (acc_rot < 10.)
-						std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
-					else
-					{
-						std::cout << " Auto-refine: + WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
-						std::cout << " Auto-refine: + WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
-						std::cout << " Auto-refine: + WARNING: You most probably do NOT want to publish these results!" << std::endl;
-						std::cout << " Auto-refine: + WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
-					}
-					if (do_use_reconstruct_images)
-						std::cout << " Auto-refine: + Used rlnReconstructImageName images for final reconstruction. Ignore filtered map, and only assess the unfiltered half-reconstructions!" << std::endl;
-				}
-				break;
+					std::cout << " Auto-refine: Skipping maximization step, so stopping now... " << std::endl;
 			}
+			break;
+		}
 
-			verb = old_verb;
+		// Now combine all weighted sums
+		// Leave the option ot both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
+		if (combine_weights_thru_disc)
+			combineAllWeightedSumsViaFile();
+		else
+			combineAllWeightedSums();
 
-			if (do_sgd && sgd_max_subsets > 0)
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		// Sjors & Shaoda Apr 2015
+		// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
+		// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
+		// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
+		// Finally it applies point group symmetry (such as Cn, ...).
+		// DEBUG
+		if ( (verb > 0) && (node->isMaster()) )
+		{
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 			{
-				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
-				if (total_nr_subsets > sgd_max_subsets)
+				if (mymodel.helical_nr_asu > 1)
+					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
+				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
 				{
-					do_sgd = false;
-					mymodel.do_sgd = false;
-					strict_highres_exp = -1.;
-					nr_subsets = 1;
-					if (node->rank == 1)
-						//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
-						MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, do_write_optimiser, DO_WRITE_MODEL, node->rank);
-					else if (node->isMaster())
-						// The master only writes the data file (he's the only one who has and manages these data!)
-						MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-
-
-					break; // break out of loop over the subsets, and start next iteration
+					std::cout << " Refining helical symmetry in real space..." << std::endl;
+					std::cout << " Applying refined helical symmetry in real space..." << std::endl;
 				}
+				else
+					std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
 			}
+		}
+		symmetriseReconstructions();
+
+		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
+#ifndef DEBUG_RECONSTRUCTION
+		if (do_auto_refine && has_converged)
+#endif
+			writeTemporaryDataAndWeightArrays();
+
+		// Inside iterative refinement: do FSC-calculation BEFORE the solvent flattening, otherwise over-estimation of resolution
+		// anyway, now that this is done inside BPref, there would be no other way...
+		if (do_split_random_halves)
+		{
+
+			// For asymmetric molecules, join 2 half-reconstructions at the lowest resolutions to prevent them from diverging orientations
+			if (low_resol_join_halves > 0.)
+				joinTwoHalvesAtLowResolution();
+
+			// Sjors 27-oct-2015
+			// Calculate gold-standard FSC curve
+			if (do_phase_random_fsc && fn_mask != "None")
+				reconstructUnregularisedMapAndCalculateSolventCorrectedFSC();
+			else
+				compareTwoHalves();
+
+			// For automated sampling procedure
+			if (!node->isMaster()) // the master does not have the correct mymodel.current_size, it only handles metadata!
+			{
+				// Check that incr_size is at least the number of shells as between FSC=0.5 and FSC=0.143
+				int fsc05   = -1;
+				int fsc0143 = -1;
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class)
+				{
+					if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.5 && fsc05 < 0)
+						fsc05 = i;
+					if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.143 && fsc0143 < 0)
+						fsc0143 = i;
+				}
+				// At least fsc05 - fsc0143 + 5 shells as incr_size
+				incr_size = XMIPP_MAX(incr_size, fsc0143 - fsc05 + 5);
+				has_high_fsc_at_limit = (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, mymodel.current_size/2 - 1) > 0.2);
+			}
+
+			// Upon convergence join the two random halves
+			if (do_join_random_halves || do_always_join_random_halves)
+			{
+				if (combine_weights_thru_disc)
+					combineWeightedSumsTwoRandomHalvesViaFile();
+				else
+					combineWeightedSumsTwoRandomHalves();
+
+			}
+		}
 
 #ifdef TIMING
-			// Only first slave prints it timing information
-			if (node->rank == 1)
-				timer.printTimes(false);
+		timer.toc(TIMING_EXP);
+		timer.tic(TIMING_MAX);
 #endif
-		} // end loop subsets
+
+		maximization();
+
+		// Make sure all nodes have the same resolution, set the data_vs_prior array from half1 also for half2
+		// Because there is an if-statement on ave_Pmax to set the image size, also make sure this one is the same for both halves
+		if (do_split_random_halves)
+		{
+			node->relion_MPI_Bcast(&mymodel.ave_Pmax, 1, MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+		}
+
+#ifdef TIMING
+		timer.toc(TIMING_MAX);
+#endif
+
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (node->isMaster())
+		{
+			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
+			{
+				int nr_same_polarity = 0, nr_opposite_polarity = 0;
+				RFLOAT opposite_percentage = 0.;
+				bool do_local_angular_searches = false;
+				if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
+					do_local_angular_searches = true;
+				else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
+					do_local_angular_searches = true;
+
+				if (helical_sigma_distance < 0.)
+					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
+				else
+				{
+					updatePriorsForHelicalReconstruction(
+							mydata.MDimg,
+							nr_opposite_polarity,
+							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+							(mymodel.data_dim == 3),
+							do_auto_refine,
+							do_local_angular_searches,
+							mymodel.sigma2_rot,
+							mymodel.sigma2_tilt,
+							mymodel.sigma2_psi,
+							mymodel.sigma2_offset,
+							helical_keep_tilt_prior_fixed);
+
+					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+					if ( (verb > 0) && (!do_local_angular_searches) )
+					{
+						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
+						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+					}
+				}
+			}
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		// Mask the reconstructions to get rid of noisy solvent areas
+		// Skip masking upon convergence (for validation purposes)
+#ifdef TIMING
+		timer.tic(TIMING_SOLVFLAT);
+#endif
+		if (do_solvent && !has_converged)
+			solventFlatten();
+#ifdef TIMING
+		timer.toc(TIMING_SOLVFLAT);
+		timer.tic(TIMING_UPDATERES);
+#endif
+		// Re-calculate the current resolution, do this before writing to get the correct values in the output files
+		updateCurrentResolution();
+#ifdef TIMING
+		timer.toc(TIMING_UPDATERES);
+#endif
+		// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
+		bool do_write_optimiser = !do_join_random_halves;
+		// Write out final map without iteration number in the filename
+		if (do_join_random_halves)
+			iter = -1;
+
+		if (node->rank == 1 || (do_split_random_halves && !do_join_random_halves && node->rank == 2) )
+			//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
+			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, do_write_optimiser, DO_WRITE_MODEL, node->rank);
+		else if (node->isMaster())
+			// The master only writes the data file (he's the only one who has and manages these data!)
+			MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
 
 		if (do_auto_refine && has_converged)
+		{
+			if (verb > 0)
+			{
+				std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
+				std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+				std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
+				std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
+				std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
+				if (acc_rot < 10.)
+					std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
+				else
+				{
+					std::cout << " Auto-refine: + WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
+					std::cout << " Auto-refine: + WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
+					std::cout << " Auto-refine: + WARNING: You most probably do NOT want to publish these results!" << std::endl;
+					std::cout << " Auto-refine: + WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
+				}
+				if (do_use_reconstruct_images)
+					std::cout << " Auto-refine: + Used rlnReconstructImageName images for final reconstruction. Ignore filtered map, and only assess the unfiltered half-reconstructions!" << std::endl;
+			}
 			break;
+		}
 
-    } // end loop iters
+#ifdef TIMING
+		// Only first slave prints it timing information
+		if (node->rank == 1)
+			timer.printTimes(false);
+#endif
+
+    }
 
 	// Hopefully this barrier will prevent some bus errors
 	MPI_Barrier(MPI_COMM_WORLD);
