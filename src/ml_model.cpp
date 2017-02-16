@@ -29,7 +29,7 @@
 #define TIMING_TOC(id)
 #endif
 
-void MlModel::initialise(bool _do_sgd)
+void MlModel::initialise()
 {
 
 	// Auxiliary vector with relevant size in Fourier space
