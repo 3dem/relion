@@ -29,7 +29,7 @@
 #define TIMING_TOC(id)
 #endif
 
-void MlModel::initialise()
+void MlModel::initialise(bool _do_sgd)
 {
 
 	// Auxiliary vector with relevant size in Fourier space
@@ -837,6 +837,7 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 	}
 
 }
+
 
 
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
