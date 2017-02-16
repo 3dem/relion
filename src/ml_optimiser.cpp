@@ -2528,6 +2528,7 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
+    // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// TMP for helices of Anthiony 12 july 2016
@@ -3312,6 +3313,7 @@ void MlOptimiser::maximization()
 		std::cout << " Maximization ..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
+
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
@@ -3320,10 +3322,66 @@ void MlOptimiser::maximization()
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
 
-			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-					mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-					mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-					false, false, nr_threads, minres_map, (iclass==0));
+			if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+			{
+
+				MultidimArray<RFLOAT> Iref_old = mymodel.Iref[iclass];
+
+				// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
+				// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
+				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+				int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
+				RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
+				number_of_effective_particles *= (1. - total_mu_fraction);
+				RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+
+				// This worked for several 3D cases, but cannot be right....
+				//long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				//RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+				//RFLOAT number_of_effective_particles = mydata.particles.size() * (1. - total_mu_fraction);
+				//RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+
+				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+						sgd_tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+						mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+                                                                       false, false, nr_threads, minres_map, (iclass==0));
+
+				// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
+				// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[iclass])
+					DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) +
+							(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
+
+				// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+				{
+					DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n);
+				}
+
+//#define DEBUG_SGD
+#ifdef DEBUG_SGD
+				FileName fn_tmp="grad_class"+integerToString(iclass)+".spi";
+				Image<RFLOAT> It;
+				It()=mymodel.Igrad[iclass];
+				It.write(fn_tmp);
+				fn_tmp="ref_class"+integerToString(iclass)+".spi";
+				It()=mymodel.Iref[iclass];
+				It.write(fn_tmp);
+#endif
+				// Enforce positivity?
+				// Low-pass filter according to current resolution??
+				// Some sort of regularisation may be necessary....?
+
+
+			}
+			else
+			{
+                            (wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+                                                                   mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+                                                                   mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+                                                                   false, false, nr_threads, minres_map, (iclass==0));
+                        }
 		}
 		else
 		{
@@ -7654,14 +7712,8 @@ void MlOptimiser::checkConvergence(bool myverb)
 
             if (has_converged)
             {
-            	std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-            	std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-            	if(anticipate_oom)
-            	{
-            		std::cout << " You were warned at the beginning of the run that memory on the GPU might run out, and this final iteration\n\
-is where this is likely to happen. If you should encounter an out-of-memory error, you can then continue \n\
-from the last completed iteration by continuing from the gui and specifying the optimiser.star-file from iteration " << iter << "." << std::endl;
-            	}
+		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
             }
         }
 
