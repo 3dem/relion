@@ -841,10 +841,13 @@ void MlOptimiserMpi::expectation()
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
 #endif // CUDA
+#ifdef TIMING
+		timer.toc(TIMING_EXP_4);
+#endif
 
 	/************************************************************************/
 
-	if (node->isMaster())
+    if (node->isMaster())
     {
         try
         {
@@ -1992,7 +1995,7 @@ void MlOptimiserMpi::maximization()
 				It.write(fn_tmp);
 			}
 #endif
-
+			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
 			MPI_Barrier( MPI_COMM_WORLD);
