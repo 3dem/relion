@@ -736,6 +736,22 @@ void MlOptimiserMpi::expectation()
 	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
 	// The master only holds metadata, it does not set up the wsum_model (to save memory)
 #ifdef TIMING
+		timer.tic(TIMING_EXP_1a);
+#endif
+	if (!node->isMaster())
+	{
+		MlOptimiser::expectationSetup();
+
+		mydata.MDimg.clear();
+		mydata.MDmic.clear();
+
+#if !defined(__APPLE__)
+		malloc_trim(0);
+#endif
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+#ifdef TIMING
 		timer.toc(TIMING_EXP_1a);
 #endif
 
