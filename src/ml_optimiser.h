@@ -526,6 +526,10 @@ public:
 	//Maximum number of significant weights in coarse pass of expectation
 	unsigned maximum_significants;
 
+	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
+	TabSine tab_sin;
+	TabCosine tab_cos;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;

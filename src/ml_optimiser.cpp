@@ -1388,7 +1388,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
 	{
-
 		if (mymodel.ref_dim != 3)
 			REPORT_ERROR("ERROR: cannot do 2D helical refinement!");
 
@@ -1398,9 +1397,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (mymodel.nr_bodies != 1)
 			REPORT_ERROR("ERROR: cannot do multi-body refinement for helices!");
 
-		// TODO: check this!!!
-		if (do_shifts_onthefly)
-			REPORT_ERROR("ERROR: cannot calculate phase-shift AB matrices on-the-fly for helices!");
+		if ( (!do_gpu) && (do_shifts_onthefly) && (!ignore_helical_symmetry) && (verb > 0) )
+		{
+			std::cerr << " WARNING: On-the-fly shifts slow down helical reconstructions with CPUs considerably. "
+					<< "Enable this option only if limited RAM causes trouble (e.g. too large segment boxes used or in 3D sub-tomogram averaging). "
+					<< std::endl;
+		}
 
 		if ( (helical_keep_tilt_prior_fixed) && (!(helical_sigma_distance < 0.)) )
 			REPORT_ERROR("ERROR: cannot keep tilt priors fixed while doing local averaging of helical segments along the same filaments!");
@@ -1586,11 +1588,20 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// TODO: later do norm correction?!
 		// Don't do norm correction for volume averaging at this stage....
 		do_norm_correction = false;
-		do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
+
+		if (!((do_helical_refine) && (!ignore_helical_symmetry))) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
+			do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
+
 		if (do_skip_align)
 			do_shifts_onthefly = false; // on-the-fly shifts are incompatible with do_skip_align!
 		// getMetaAndImageData is not made for passing multiple volumes!
 		do_parallel_disc_io = true;
+	}
+	// Tabulated sine and cosine values (for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts)
+	if ( (!do_gpu) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_shifts_onthefly) )
+	{
+		tab_sin.initialise(100000);
+		tab_cos.initialise(100000);
 	}
 
 	// Skip scale correction if there are no groups
@@ -2145,11 +2156,10 @@ void MlOptimiser::iterate()
 				{
 					int nr_same_polarity = 0, nr_opposite_polarity = 0;
 					RFLOAT opposite_percentage = 0.;
-					bool do_local_angular_searches = false;
-					if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
-						do_local_angular_searches = true;
-					else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
-						do_local_angular_searches = true;
+					bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+					bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+							&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+					bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 
 					if (helical_sigma_distance < 0.)
 						updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
@@ -2280,7 +2290,8 @@ void MlOptimiser::expectation()
 		expectationSetupCheckMemory(verb);
 
 	// F. Precalculate AB-matrices for on-the-fly shifts
-	if (do_shifts_onthefly && subset == 0)
+	// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
+	if ( (do_shifts_onthefly) && (subset == 0) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
 		precalculateABMatrices();
 
 
@@ -2581,10 +2592,13 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		if (do_helical_refine)
 		{
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+					&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 			sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(ran_rot, ran_tilt, ran_psi,
 									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 									pointer_dir_nonzeroprior, directions_prior, pointer_psi_nonzeroprior, psi_prior,
-									do_auto_refine_local_searches);
+									do_local_angular_searches);
 		}
 		else
 		{
@@ -2638,7 +2652,8 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		}
 		// Estimate the rest of the program at 0.1 Gb?
 		RFLOAT mem_rest = 0.1; // This one does NOT scale with nr_pool
-		if (do_shifts_onthefly)
+		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
+		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
 		{
 			// E. Store all AB-matrices
 			mem_rest += Gb * nr_pix * sampling.NrTranslationalSamplings(adaptive_oversampling);
@@ -2679,7 +2694,7 @@ void MlOptimiser::precalculateABMatrices()
 	for (long int itrans = 0; itrans < exp_nr_trans; itrans++)
 	{
 		// First get the non-oversampled translations as defined by the sampling object
-		// Jun01,2015 - Shaoda & Sjors, Helical refinement
+		// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
 		sampling.getTranslations(itrans, 0, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 				(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial); // need getTranslations to add random_perturbation
 
@@ -2697,7 +2712,7 @@ void MlOptimiser::precalculateABMatrices()
 		{
 			// Then also loop over all its oversampled relatives
 			// Then loop over all its oversampled relatives
-			// Jun01,2015 - Shaoda & Sjors, Helical refinement
+			// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
 			sampling.getTranslations(itrans, adaptive_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 					(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
@@ -2779,7 +2794,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 			// set the unique translation in the sampling object to the fractional difference
 			RFLOAT my_old_offset_x, my_old_offset_y, my_old_offset_z;
 			RFLOAT rounded_offset_x, rounded_offset_y, rounded_offset_z;
-			RFLOAT psi_deg, tilt_deg;
+			RFLOAT rot_deg, tilt_deg, psi_deg;
 			my_old_offset_x = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_XOFF);
 			my_old_offset_y = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_YOFF);
 			rounded_offset_x = my_old_offset_x - ROUND(my_old_offset_x);
@@ -2791,10 +2806,11 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 			}
 			if (do_helical_refine)
 			{
+				rot_deg = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_ROT);
 				tilt_deg = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_TILT);
 				psi_deg = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_PSI);
 			}
-			sampling.addOneTranslation(rounded_offset_x, rounded_offset_y, rounded_offset_z, do_clear, (do_helical_refine) && (!ignore_helical_symmetry), psi_deg, tilt_deg); // clear for first ori_particle
+			sampling.addOneTranslation(rounded_offset_x, rounded_offset_y, rounded_offset_z, do_clear, (do_helical_refine) && (!ignore_helical_symmetry), rot_deg, tilt_deg, psi_deg); // clear for first ori_particle
 		}
 
 		// Store total number of particle images in this bunch of SomeParticles
@@ -4076,13 +4092,16 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			RFLOAT prior_psi_flip_ratio =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+					&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-			if ( (do_helical_refine) && (helical_keep_tilt_prior_fixed) && (do_auto_refine_local_searches) )
+			if ( (do_helical_refine) && (helical_keep_tilt_prior_fixed) && (do_local_angular_searches) )
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
@@ -4097,7 +4116,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 										exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior,
-										do_auto_refine_local_searches, prior_psi_flip_ratio);
+										do_local_angular_searches, prior_psi_flip_ratio);
 			}
 			else
 			{
@@ -4270,16 +4289,16 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			img() *= mymodel.avg_norm_correction / normcorr;
 		}
 
-		// Helical TODO: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
-		// Helical TODO: For helices do NOT apply old_offset along the direction of the helix!!
-		// iF DO HELICAL REFINE ???!!!
+		// Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
+		// For helices do NOT apply old_offset along the direction of the helix!!
 		Matrix1D<RFLOAT> my_old_offset_helix_coords;
-		RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+		RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 		RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+		RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
 		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
-			// TODO: calculate my_old_offset_helix_coords from my_old_offset and psi angle
-			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
+			// Calculate my_old_offset_helix_coords from my_old_offset and psi angle
+			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			// May 18, 2015 - Shaoda & Sjors - Helical refinement (orientational searches)
 			std::cerr << "MlOptimiser::getFourierTransformsAndCtfs()" << std::endl;
@@ -4294,7 +4313,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			{
 				std::cerr << "  psi_deg = " << psi_deg << " degrees, tilt_deg = " << tilt_deg << " degrees"<< std::endl;
 				std::cerr << "  old_offset(x, y, z) = (" << XX(my_old_offset) << ", " << YY(my_old_offset) << ", " << ZZ(my_old_offset) << ")" << std::endl;
-				std::cerr << "  old_offset_helix(r, p1, p2) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
+				std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
 			}
 #endif
 			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
@@ -4302,18 +4321,28 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			// Do NOT accumulate offsets in 3D classification of helices
 			if ( (mymodel.ref_dim == 3) && (!do_skip_align) && (!do_skip_rotate) )
 			{
-				if ( (do_auto_refine) && (sampling.healpix_order < autosampling_hporder_local_searches) )
-					XX(my_old_offset_helix_coords) = 0.;
+				// TODO: check whether the following lines make sense
+				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
+				if (!do_local_angular_searches)
+				{
+					if (mymodel.data_dim == 2)
+						XX(my_old_offset_helix_coords) = 0.;
+					else if (mymodel.data_dim == 3)
+						ZZ(my_old_offset_helix_coords) = 0.;
+				}
 			}
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			std::cerr << " Set r (translation along helical axis) to zero..." << std::endl;
 			if(my_old_offset.size() == 2)
 				std::cerr << "  old_offset_helix(r, p) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << ")" << std::endl;
 			else
-				std::cerr << "  old_offset_helix(r, p1, p2) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
+				std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
 #endif
-			// TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
-			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, psi_deg, tilt_deg, HELICAL_TO_CART_COORDS);
+			// Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
+			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, rot_deg, tilt_deg, psi_deg, HELICAL_TO_CART_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			std::cerr << " Transform helical offsets back to Cartesian ones..." << std::endl;
 			if(my_old_offset.size() == 2)
@@ -4351,7 +4380,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
 			// Transform rounded Cartesian offsets to corresponding helical ones
-			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
+			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
 			exp_old_offset[ipart] = my_old_offset_helix_coords;
 		}
 		else
@@ -4844,23 +4873,33 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		if (do_shifts_onthefly && !do_gpu)
 		{
 			// Store a single, down-sized version of exp_Fimgs[ipart] in exp_local_Fimgs_shifted
+#ifdef DEBUG_CHECKSIZES
+			if (ipart >= exp_local_Fimgs_shifted.size())
+			{
+				std::cerr<< "ipart= "<<ipart<<" exp_local_Fimgs_shifted.size()= "<< exp_local_Fimgs_shifted.size() <<std::endl;
+				REPORT_ERROR("ipart >= exp_local_Fimgs_shifted.size()");
+			}
+#endif
 			if (do_masked_shifts)
 				exp_local_Fimgs_shifted[ipart] = Fimg;
 			if (do_also_unmasked)
 				exp_local_Fimgs_shifted_nomask[ipart] = Fimg_nomask;
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+			std::cerr << " MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): do_shifts_onthefly && !do_gpu" << std::endl;
+#endif
 		}
 		else if(!do_gpu)
 		{
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			Image<RFLOAT> img_save_ori, img_save_mask, img_save_nomask;
 			img_save_ori.clear();
-			img_save_ori().resize(mymodel.ori_size, mymodel.ori_size);
+			img_save_ori().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 			img_save_ori().initZeros();
 			img_save_mask.clear();
-			img_save_mask().resize(mymodel.ori_size, mymodel.ori_size);
+			img_save_mask().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 			img_save_mask().initZeros();
 			img_save_nomask.clear();
-			img_save_nomask().resize(mymodel.ori_size, mymodel.ori_size);
+			img_save_nomask().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 			img_save_nomask().initZeros();
 #endif
 			// Store all translated variants of Fimg
@@ -4872,12 +4911,14 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				// Jun01,2014 - Shaoda & Sjors, Helical refinement
 				sampling.getTranslations(itrans, exp_current_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 						(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+				std::cerr << "MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): Store all translated variants of Fimg" << std::endl;
+#endif
 				// Then loop over all its oversampled relatives
 				for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++, my_trans_image++)
 				{
-					// HELICAL TODO: rotate oversampled_translations_x[iover_trans] and oversampled_translations_y[iover_trans] according to rlnAnglePsi of this particle!
-					RFLOAT xshift, yshift, zshift;
-					zshift = 0.;
+					// Helical reconstruction: rotate oversampled_translations_x[iover_trans] and oversampled_translations_y[iover_trans] according to rlnAnglePsi of this particle!
+					RFLOAT xshift = 0., yshift = 0., zshift = 0.;
 
 					xshift = oversampled_translations_x[iover_trans];
 					yshift = oversampled_translations_y[iover_trans];
@@ -4886,13 +4927,13 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 					{
-						RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+						RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+						RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
-						std::cerr << "MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s()" << std::endl;
 						std::cerr << "Helical xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
-						transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, psi_deg, tilt_deg, mymodel.data_dim, HELICAL_TO_CART_COORDS);
+						transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, HELICAL_TO_CART_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 						std::cerr << "Cartesian xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
@@ -4915,7 +4956,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 							MultidimArray<Complex> Faux, Fo;
 							Image<RFLOAT> tt;
 							FourierTransformer transformer;
-							tt().resize(mymodel.ori_size, mymodel.ori_size);
+							tt().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 							Faux = exp_local_Fimgs_shifted[my_trans_image];
 							windowFourierTransform(Faux, Fo, mymodel.ori_size);
 							transformer.inverseFourierTransform(Fo, tt());
@@ -4943,7 +4984,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 							MultidimArray<Complex> Faux, Fo;
 							Image<RFLOAT> tt;
 							FourierTransformer transformer;
-							tt().resize(mymodel.ori_size, mymodel.ori_size);
+							tt().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 							Faux = exp_local_Fimgs_shifted_nomask[my_trans_image];
 							windowFourierTransform(Faux, Fo, mymodel.ori_size);
 							transformer.inverseFourierTransform(Fo, tt());
@@ -5273,39 +5314,71 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 											}
 											else
 											{
-
 												// Calculate shifted image on-the-fly to save replicating memory in multi-threaded jobs.
-												Complex *myAB;
-												if (exp_current_oversampling == 0)
+												// Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
+												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 												{
-													#ifdef DEBUG_CHECKSIZES
-													if (YSIZE(Frefctf) == coarse_size && itrans >= global_fftshifts_ab_coarse.size())
-													{
-														std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_coarse.size()= "<< global_fftshifts_ab_coarse.size() <<std::endl;
-														REPORT_ERROR("itrans >= global_fftshifts_ab_coarse.size()");
-													}
-													if (YSIZE(Frefctf) != coarse_size && itrans >= global_fftshifts_ab_current.size())
-													{
-														std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_current.size()= "<< global_fftshifts_ab_current.size() <<std::endl;
-														REPORT_ERROR("itrans >= global_fftshifts_ab_current.size()");
-													}
-													#endif
-													myAB = (YSIZE(Frefctf) == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
-													        : global_fftshifts_ab_current[itrans].data;
+													bool use_coarse_size = false;
+													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
+
+													xshift = (exp_current_oversampling == 0) ? (oversampled_translations_x[0]) : (oversampled_translations_x[iover_trans]);
+													yshift = (exp_current_oversampling == 0) ? (oversampled_translations_y[0]) : (oversampled_translations_y[iover_trans]);
+													if (mymodel.data_dim == 3)
+														zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
+
+													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
+													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+													transformCartesianAndHelicalCoords(
+																xshift, yshift, zshift,
+																xshift, yshift, zshift,
+																rot_deg, tilt_deg, psi_deg,
+																mymodel.data_dim,
+																HELICAL_TO_CART_COORDS);
+
+													use_coarse_size = ((exp_current_oversampling == 0) && (YSIZE(Frefctf) == coarse_size)) || ((exp_current_oversampling > 0) && (strict_highres_exp > 0.));
+													shiftImageInFourierTransformWithTabSincos(
+															exp_local_Fimgs_shifted[ipart],
+															Fimg_otfshift,
+															(RFLOAT)mymodel.ori_size,
+															(use_coarse_size) ? (coarse_size) : (mymodel.current_size),
+															tab_sin, tab_cos,
+															xshift, yshift, zshift);
 												}
 												else
 												{
-													int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
-													myAB = (strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.)) ? global_fftshifts_ab2_coarse[iitrans].data
-															: global_fftshifts_ab2_current[iitrans].data;
-												}
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
-												{
-													RFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
-															- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
-													RFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
-															+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													Complex *myAB;
+													if (exp_current_oversampling == 0)
+													{
+														#ifdef DEBUG_CHECKSIZES
+														if (YSIZE(Frefctf) == coarse_size && itrans >= global_fftshifts_ab_coarse.size())
+														{
+															std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_coarse.size()= "<< global_fftshifts_ab_coarse.size() <<std::endl;
+															REPORT_ERROR("itrans >= global_fftshifts_ab_coarse.size()");
+														}
+														if (YSIZE(Frefctf) != coarse_size && itrans >= global_fftshifts_ab_current.size())
+														{
+															std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_current.size()= "<< global_fftshifts_ab_current.size() <<std::endl;
+															REPORT_ERROR("itrans >= global_fftshifts_ab_current.size()");
+														}
+														#endif
+														myAB = (YSIZE(Frefctf) == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
+														        : global_fftshifts_ab_current[itrans].data;
+													}
+													else
+													{
+														int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
+														myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
+																: global_fftshifts_ab2_current[iitrans].data;
+													}
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+													{
+														RFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
+																- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
+														RFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
+																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													}
 												}
 												Fimg_shift = Fimg_otfshift.data;
 											}
@@ -5651,13 +5724,14 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 					RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
 					RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
 					RFLOAT tdiff2 = 0.;
-					if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+					if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
 						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
 					if (mymodel.data_dim == 3)
 					{
 						RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
-						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+						if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+							tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 					}
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
@@ -5737,9 +5811,10 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
 							if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 							{
-								RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+								RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 								RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-								transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
+								RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+								transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
 							}
 							// (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
 
@@ -5748,13 +5823,14 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
 							RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
 							RFLOAT tdiff2 = 0.;
-							if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+							if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
 								tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 							tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
 							if (mymodel.data_dim == 3)
 							{
 								RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
-								tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+								if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+									tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 							}
 							// P(offset|sigma2_offset)
 							// This is the probability of the offset, given the model offset and variance.
@@ -6425,24 +6501,64 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											}
 											else
 											{
-												Complex* myAB;
-												myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[iitrans].data : global_fftshifts_ab2_current[iitrans].data;
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+												// Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
+												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 												{
-													RFLOAT a = (*(myAB + n)).real;
-													RFLOAT b = (*(myAB + n)).imag;
+													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
+
+													xshift = oversampled_translations_x[iover_trans];
+													yshift = oversampled_translations_y[iover_trans];
+													if (mymodel.data_dim == 3)
+														zshift = oversampled_translations_z[iover_trans];
+
+													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
+													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+													transformCartesianAndHelicalCoords(
+																xshift, yshift, zshift,
+																xshift, yshift, zshift,
+																rot_deg, tilt_deg, psi_deg,
+																mymodel.data_dim,
+																HELICAL_TO_CART_COORDS);
+
 													// Fimg_shift
-													RFLOAT real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
-															- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
-													RFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
-															+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													shiftImageInFourierTransformWithTabSincos(
+															exp_local_Fimgs_shifted[ipart],
+															Fimg_otfshift,
+															(RFLOAT)mymodel.ori_size,
+															mymodel.current_size,
+															tab_sin, tab_cos,
+															xshift, yshift, zshift);
 													// Fimg_shift_nomask
-													real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real
-															- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag;
-													imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag
-															+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift_nomask, n) = Complex(real, imag);
+													shiftImageInFourierTransformWithTabSincos(
+															exp_local_Fimgs_shifted_nomask[ipart],
+															Fimg_otfshift_nomask,
+															(RFLOAT)mymodel.ori_size,
+															mymodel.current_size,
+															tab_sin, tab_cos,
+															xshift, yshift, zshift);
+												}
+												else
+												{
+													Complex* myAB;
+													myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[iitrans].data : global_fftshifts_ab2_current[iitrans].data;
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+													{
+														RFLOAT a = (*(myAB + n)).real;
+														RFLOAT b = (*(myAB + n)).imag;
+														// Fimg_shift
+														RFLOAT real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
+																- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
+														RFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
+																+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+														// Fimg_shift_nomask
+														real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real
+																- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag;
+														imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag
+																+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift_nomask, n) = Complex(real, imag);
+													}
 												}
 												Fimg_shift = Fimg_otfshift.data;
 												Fimg_shift_nomask = Fimg_otfshift_nomask.data;
@@ -6511,12 +6627,13 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
 											if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 											{
-												RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+												RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 												RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-												transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
+												RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+												transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
 											}
 
-											if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+											if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
 											{
 												RFLOAT diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
 												thr_wsum_sigma2_offset += weight * diffx * diffx;
@@ -6526,7 +6643,8 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											if (mymodel.data_dim == 3)
 											{
 												RFLOAT diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
-												thr_wsum_sigma2_offset += weight * diffz * diffz;
+												if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+													thr_wsum_sigma2_offset += weight * diffz * diffz;
 											}
 
 											// Store weight for this direction of this class
@@ -6647,6 +6765,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											int icol_yoff = (mymodel.nr_bodies == 1) ? METADATA_YOFF : 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 											int icol_zoff = (mymodel.nr_bodies == 1) ? METADATA_ZOFF : 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 
+											RFLOAT old_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_rot);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_rot) = rot;
 											RFLOAT old_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt) = tilt;
@@ -6691,10 +6810,10 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											}
 #endif
 
-											// HELICAL TODO! Use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
+											// Helical reconstruction: use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
 											if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 											{
-												// TODO: bring xshift, yshift and zshift back to cartesian coords for outputting in the STAR file
+												// Bring xshift, yshift and zshift back to cartesian coords for outputting in the STAR file
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 												std::cerr << "MlOptimiser::storeWeightedSums()" << std::endl;
 												std::cerr << "Bring xy(z) shifts back to Cartesian coordinates for output in the STAR file" << std::endl;
@@ -6707,10 +6826,10 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												else
 												{
 													std::cerr << "  old_psi = " << old_psi << " degrees, old_tilt = " << old_tilt << " degrees" << std::endl;
-													std::cerr << "  Helical offsets (r, p1, p2) = (" << XX(shifts) << ", " << YY(shifts) << ", " << ZZ(shifts) << ")" << std::endl;
+													std::cerr << "  Helical offsets (p1, p2, r) = (" << XX(shifts) << ", " << YY(shifts) << ", " << ZZ(shifts) << ")" << std::endl;
 												}
 #endif
-												transformCartesianAndHelicalCoords(shifts, shifts, old_psi, old_tilt, HELICAL_TO_CART_COORDS);
+												transformCartesianAndHelicalCoords(shifts, shifts, old_rot, old_tilt, old_psi, HELICAL_TO_CART_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 												if(shifts.size() == 2)
 													std::cerr << "  Cartesian offsets (x, y) = (" << XX(shifts) << ", " << YY(shifts) << ")" << std::endl;

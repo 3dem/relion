@@ -870,7 +870,8 @@ void MlOptimiserMpi::expectation()
 			MlOptimiser::expectationSetupCheckMemory(myverb);
 
 		// F. Precalculate AB-matrices for on-the-fly shifts
-		if (do_shifts_onthefly && subset == 0)
+		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
+		if ( (do_shifts_onthefly) && (subset == 0) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
 			precalculateABMatrices();
 	}
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
@@ -2969,11 +2970,10 @@ void MlOptimiserMpi::iterate()
 				{
 					int nr_same_polarity = 0, nr_opposite_polarity = 0;
 					RFLOAT opposite_percentage = 0.;
-					bool do_local_angular_searches = false;
-					if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
-						do_local_angular_searches = true;
-					else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
-						do_local_angular_searches = true;
+					bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+					bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+							&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+					bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 
 					if (helical_sigma_distance < 0.)
 						updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);

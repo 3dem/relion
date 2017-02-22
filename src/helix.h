@@ -199,8 +199,9 @@ void createCylindricalReferenceWithPolarity(
 void transformCartesianAndHelicalCoords(
 		Matrix1D<RFLOAT>& in,
 		Matrix1D<RFLOAT>& out,
-		RFLOAT psi_deg,
+		RFLOAT rot_deg,
 		RFLOAT tilt_deg,
+		RFLOAT psi_deg,
 		bool direction);
 
 void transformCartesianAndHelicalCoords(
@@ -210,8 +211,9 @@ void transformCartesianAndHelicalCoords(
 		RFLOAT& xout,
 		RFLOAT& yout,
 		RFLOAT& zout,
-		RFLOAT psi_deg,
+		RFLOAT rot_deg,
 		RFLOAT tilt_deg,
+		RFLOAT psi_deg,
 		int dim,
 		bool direction);
 
@@ -321,8 +323,10 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
 		int& total_segments,
+		bool is_3D,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
+		RFLOAT Zdim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors = true);
 
@@ -443,6 +447,7 @@ void simulateHelicalSegments(
 		int nr_asu,
 		int nr_tubes,
 		bool do_bimodal_searches,
+		RFLOAT cyl_outer_diameter_A,
 		RFLOAT angpix,
 		RFLOAT rise_A,
 		RFLOAT twist_deg,
@@ -490,7 +495,7 @@ class HelicalSegmentPriorInfoEntry
 public:
 	std::string helical_tube_name;
 	long int MDobjectID;
-	RFLOAT psi_deg, tilt_deg;
+	RFLOAT rot_deg, psi_deg, tilt_deg;
 	RFLOAT dx_pix, dy_pix, dz_pix;
 	RFLOAT track_pos_pix;
 	bool has_wrong_polarity;
@@ -570,5 +575,69 @@ void grabParticleCoordinates_Multiple(
 		std::string& suffix_fout);
 
 void calculateRadialAvg(MultidimArray<RFLOAT> &v, RFLOAT angpix);
+
+void transformCartesianToHelicalCoordsForStarFiles(
+		MetaDataTable& MD_in,
+		MetaDataTable& MD_out);
+
+void normaliseHelicalSegments(
+		FileName& fn_in,
+		FileName& fn_out_root,
+		RFLOAT helical_outer_diameter_A,
+		RFLOAT pixel_size_A);
+
+// Copied online from http://paulbourke.net/miscellaneous/interpolation/
+// Author: Paul Bourke, December 1999
+/*
+   Tension: 1 is high, 0 normal, -1 is low
+   Bias: 0 is even,
+         positive is towards first segment,
+         negative towards the other
+*/
+// mu is the percentage between y1 and y2
+RFLOAT HermiteInterpolate1D(
+		RFLOAT y0, RFLOAT y1, RFLOAT y2, RFLOAT y3,
+		RFLOAT mu,
+		RFLOAT tension = 0.,
+		RFLOAT bias = 0.);
+
+void HermiteInterpolateOne3DHelicalFilament(
+		MetaDataTable& MD_in,
+		MetaDataTable& MD_out,
+		int& total_segments,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT box_size_pix,
+		int helical_tube_id,
+		RFLOAT Xdim = 999999.,
+		RFLOAT Ydim = 999999.,
+		RFLOAT Zdim = 999999.,
+		bool bimodal_angular_priors = true);
+
+void Interpolate3DCurves(
+		FileName& fn_in_root,
+		FileName& fn_out_root,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT box_size_pix,
+		int binning_factor = 1,
+		bool bimodal_angular_priors = true);
+
+void estimateTiltPsiPriors(
+		Matrix1D<RFLOAT>& dr,
+		RFLOAT& tilt_deg,
+		RFLOAT& psi_deg);
+
+void readFileHeader(
+		FileName& fn_in,
+		FileName& fn_out,
+		int nr_bytes = 100);
+
+void select3DsubtomoFrom2Dproj(
+		MetaDataTable& MD_2d,
+		MetaDataTable& MD_3d,
+		MetaDataTable& MD_out);
 
 #endif /* HELIX_H_ */
