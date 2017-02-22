@@ -292,6 +292,9 @@ public:
 	// Maximum number of subsets to process using SGD (possibly more than 1 iteration)
 	long int sgd_max_subsets;
 
+	// Strict high-res limit in SGD
+	RFLOAT strict_highres_sgd;
+
 	// Available memory (in Gigabyte)
 	size_t available_gpu_memory;
 	size_t requested_free_gpu_memory;

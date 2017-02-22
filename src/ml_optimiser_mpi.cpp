@@ -91,7 +91,6 @@ void MlOptimiserMpi::initialise()
 	// Print information about MPI nodes:
     if (!do_movies_in_batches)
     	printMpiNodesMachineNames(*node, nr_threads);
-
 #ifdef CUDA
     /************************************************************************/
 	//Setup GPU related resources
@@ -394,59 +393,58 @@ void MlOptimiserMpi::initialise()
 	        }
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
-	}
 
-	MPI_Status status;
-	if(do_auto_refine)
-	{
-		if (do_gpu && !node->isMaster())
+		if(do_auto_refine)
 		{
-			size_t boxLim (10000);
-			for (int i = 0; i < cudaDevices.size(); i ++)
+			if (!node->isMaster())
 			{
-				MlDeviceBundle *b = new MlDeviceBundle(this);
-				b->setDevice(cudaDevices[i]);
-				size_t t = b->checkFixedSizedObjects(cudaDeviceShares[i]);
-				boxLim = ((t < boxLim) ? t : boxLim );
+				size_t boxLim (10000);
+				for (int i = 0; i < cudaDevices.size(); i ++)
+				{
+					MlDeviceBundle *b = new MlDeviceBundle(this);
+					b->setDevice(cudaDevices[i]);
+					size_t t = b->checkFixedSizedObjects(cudaDeviceShares[i]);
+					boxLim = ((t < boxLim) ? t : boxLim );
+				}
+				node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 			}
-			node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-		}
-		else
-		{
-			size_t boxLim, LowBoxLim(10000);
-			for(int slave = 1; slave < node->size; slave++)
+			else
 			{
-				node->relion_MPI_Recv(&boxLim, sizeof(size_t), MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
-				LowBoxLim = (boxLim < LowBoxLim ? boxLim : LowBoxLim );
-			}
+				size_t boxLim, LowBoxLim(10000);
+				for(int slave = 1; slave < node->size; slave++)
+				{
+					node->relion_MPI_Recv(&boxLim, sizeof(size_t), MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
+					LowBoxLim = (boxLim < LowBoxLim ? boxLim : LowBoxLim );
+				}
 
-			Experiment temp;
-			temp.read(fn_data);
-			int t_ori_size = -1;
-			temp.MDexp.getValue(EMDL_IMAGE_SIZE, t_ori_size);
+				Experiment temp;
+				temp.read(fn_data);
+				int t_ori_size = -1;
+				temp.MDexp.getValue(EMDL_IMAGE_SIZE, t_ori_size);
 
-			if(LowBoxLim < t_ori_size)
-			{
-				anticipate_oom = true;
-				std::cerr << "\n\n                         ***WARNING***\n\nWith the current settings and hardware, you will be able to \n\
+				if(LowBoxLim < t_ori_size)
+				{
+					anticipate_oom = true;
+					std::cerr << "\n\n                         ***WARNING***\n\nWith the current settings and hardware, you will be able to \n\
 use an estimated image-size of " << LowBoxLim << " pixels during the last iteration...\n\n\
 ...but your input box-size (image_size) is however " << t_ori_size << ". This means that \n\
 you will likely run out of memory on the GPU(s), and will have to then re-start \n\
 from the last completed iteration (i.e. continue from it) with the use of GPUs.\n " << std::endl;
 
-				if(is_split)
-				{
-					std::cerr << "You are also splitting at least one GPU between two or more mpi-slaves, which \n\
+					if(is_split)
+					{
+						std::cerr << "You are also splitting at least one GPU between two or more mpi-slaves, which \n\
 might be the limiting factor, since each mpi-slave that shares a GPU increases the \n\
 use of memory. In this case we recommend running a single mpi-slave per GPU, which \n\
 will still yield good performance and possibly a more stable execution. \n" << std::endl;
-				}
+					}
 #ifdef CUDA_DOUBLE_PRECISION
-				int sLowBoxLim = (int)((float)LowBoxLim*pow(2,1.0/3.0));
-				std::cerr << "You are also using double precison on the GPU. If you were using single precision\n\
+					int sLowBoxLim = (int)((float)LowBoxLim*pow(2,1.0/3.0));
+					std::cerr << "You are also using double precison on the GPU. If you were using single precision\n\
 (which in all tested cases is perfectly fine), then you could use an box-size of ~"  << sLowBoxLim << "." << std::endl;
 #endif
-				std::cerr << std::endl << std::endl;
+					std::cerr << std::endl << std::endl;
+				}
 			}
 		}
 	}
@@ -997,11 +995,12 @@ void MlOptimiserMpi::expectation()
         	long int my_subset_first_ori_particle, my_subset_last_ori_particle, nr_particles_todo;
         	long int my_subset_first_ori_particle_halfset1, my_subset_last_ori_particle_halfset1;
         	long int my_subset_first_ori_particle_halfset2, my_subset_last_ori_particle_halfset2;
-        	if (do_sgd)
+        	if (nr_subsets > 1)
         	{
          		if (do_split_random_halves)
          		{
-         			REPORT_ERROR("For now disable split_random_halves and SGD, although code below should work!");
+         			std::cerr << " subset_size= " << subset_size << " nr_subsets= " << nr_subsets << std::endl;
+         			REPORT_ERROR("For now disable split_random_halves and subset usage, although code below should work!");
          		}
         		/*
 				{
@@ -1035,7 +1034,10 @@ void MlOptimiserMpi::expectation()
         		{
         			if (subset == 0)
         			{
-        				std::cout << " Stochastic Gradient Descent iteration " << iter;
+        				if (do_sgd)
+        					std::cout << " Stochastic Gradient Descent iteration " << iter;
+        				else
+        					std::cout << " Incomplete expectation iteration " << iter;
         				if (!do_auto_refine)
         					std::cout << " of " << nr_iter;
         				std::cout << std::endl;
@@ -1081,7 +1083,7 @@ void MlOptimiserMpi::expectation()
 			//std::cerr << " nr_ori_particles_done= " << nr_ori_particles_done << " nr_ori_particles_done_halfset1= " << nr_ori_particles_done_halfset1 << " nr_ori_particles_done_halfset2= " << nr_ori_particles_done_halfset2 << std::endl;
 			long int prev_step_done = nr_ori_particles_done;
 			long int progress_bar_step_size = ROUND(mydata.numberOfOriginalParticles() / 60);
-			if (do_sgd)
+			if (nr_subsets > 1)
 				progress_bar_step_size = XMIPP_MIN(progress_bar_step_size, subset_size);
 			long int nr_subset_particles_done = 0;
 			long int nr_subset_particles_done_halfset1 = 0;
@@ -1462,7 +1464,7 @@ void MlOptimiserMpi::expectation()
 	exp_imagedata.clear();
 	exp_metadata.clear();
 
-	if (!do_sgd && verb > 0)
+	if (subset_size < 0 && verb > 0)
 		progress_bar(mydata.numberOfOriginalParticles());
 
 #ifdef TIMING
@@ -2425,8 +2427,8 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
 {
 
-	if (do_sgd)
-		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and SGD!");
+	if (do_sgd || nr_subsets > 1)
+		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and subsets!");
 
 	if (fn_mask == "")
 		return;
@@ -2837,7 +2839,7 @@ void MlOptimiserMpi::iterate()
 			expectation();
 
 			int old_verb = verb;
-			if (do_sgd) // be quiet
+			if (nr_subsets > 1) // be quiet
 				verb = 0;
 
 			MPI_Barrier(MPI_COMM_WORLD);
@@ -3059,14 +3061,14 @@ void MlOptimiserMpi::iterate()
 
 			verb = old_verb;
 
-			if (do_sgd && sgd_max_subsets > 0)
+			if (nr_subsets > 1 && sgd_max_subsets > 0)
 			{
 				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
 				if (total_nr_subsets > sgd_max_subsets)
 				{
+					subset_size = -1;
 					do_sgd = false;
 					mymodel.do_sgd = false;
-					strict_highres_exp = -1.;
 					nr_subsets = 1;
 					if (node->rank == 1)
 						//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)

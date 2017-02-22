@@ -583,7 +583,7 @@ public:
 	// Reference
 	BooleanEntry do_denovo_ref3d;
 	SliderEntry sgd_subset_size;
-	SliderEntry sgd_max_effective;
+	SliderEntry sgd_highres_limit;
 	SliderEntry sgd_write_subsets;
 
 	BooleanEntry ref_correct_greyscale;

@@ -163,10 +163,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		particle_diameter = textToFloat(fnt);
 
 	// SGD stuff
-	if (parser.checkOption("--stop_sgd", "Swith from stochastic gradient descent to expectation maximisation for the remainder of iterations."))
+	if (parser.checkOption("--stop_sgd", "Switch from stochastic gradient descent to expectation maximisation for the remainder of iterations."))
 		do_sgd = false;
 
-	fnt = parser.getOption("--sgd_max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "OLD");
+	fnt = parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "OLD");
 	if (fnt != "OLD")
 		sgd_max_subsets = textToInteger(fnt);
 
@@ -335,6 +335,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--strict_highres_exp", "Resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "OLD");
 	if (fnt != "OLD")
 		strict_highres_exp = textToFloat(fnt);
+
+	fnt = parser.getOption("--strict_highres_sgd", "Resolution limit (in Angstrom) to restrict probability calculations in SGD", "OLD");
+	if (fnt != "OLD")
+		strict_highres_sgd = textToFloat(fnt);
 
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
@@ -509,11 +513,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
 	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	subset_size = textToInteger(parser.getOption("--subset_size", "Size of the subsets for SGD", "200"));
+	subset_size = textToInteger(parser.getOption("--subset_size", "Size of the subsets for SGD", "-1"));
 	sgd_stepsize = textToFloat(parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "0.5"));
-	sgd_max_subsets = textToInteger(parser.getOption("--sgd_max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "-1"));
-	write_every_subset = textToInteger(parser.getOption("--sgd_write_subsets", "Write out model every so many subsets (default is not writing any)", "-1"));
-	sgd_max_effective  = textToInteger(parser.getOption("--sgd_max_effective", "Maximum number of effective particles for regularisation control (higher value: higher resolution, negative no limit)", "-1"));
+	sgd_max_subsets = textToInteger(parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "-1"));
+	write_every_subset = textToInteger(parser.getOption("--write_subsets", "Write out model every so many subsets (default is not writing any)", "-1"));
+	strict_highres_sgd = textToFloat(parser.getOption("--strict_highres_sgd", "Resolution limit (in Angstrom) to restrict probability calculations in SGD", "20"));
+
 	// Computation stuff
 	// The number of threads is always read from the command line
 	int computation_section = parser.addSection("Computation");
@@ -725,6 +730,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
     	helical_keep_tilt_prior_fixed = false;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
+	if (!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd))
+		strict_highres_sgd = -1.;
+
 
     if (do_split_random_halves &&
     		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -870,6 +878,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset);
 		MD.setValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets);
+		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 	    MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
@@ -1217,7 +1226,7 @@ void MlOptimiser::initialiseGeneral(int rank)
     // Check if output directory exists
     FileName fn_dir = fn_out.beforeLastOf("/");
     if (!exists(fn_dir))
-	REPORT_ERROR("ERROR: output directory does not exist!");
+    	REPORT_ERROR("ERROR: output directory does not exist!");
 
     // Just die if trying to use GPUs and skipping alignments
     if (do_skip_align && do_gpu)
@@ -1602,8 +1611,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (XSIZE(mymodel.Iref[0]) != data_image_size)
 		REPORT_ERROR("ERROR: reference and data image sizes are not the same!");
 
+	// Make subsets?
 	nr_subsets = 1;
-	if (do_sgd)
+	if (subset_size > 0)
 	{
     	//do_norm_correction = false;
 	    //do_scale_correction = false;
@@ -2081,7 +2091,7 @@ void MlOptimiser::iterate()
 			expectation();
 
 			int old_verb = verb;
-			if (do_sgd) // be quiet
+			if (nr_subsets > 1) // be quiet
 				verb = 0;
 
 			// Sjors & Shaoda Apr 2015
@@ -2092,15 +2102,18 @@ void MlOptimiser::iterate()
 			// DEBUG
 			if (verb > 0)
 			{
-				if (mymodel.helical_nr_asu > 1)
-					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
-				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
+				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				{
-					std::cout << " Refining helical symmetry in real space..." << std::endl;
-					std::cout << " Applying refined helical symmetry in real space..." << std::endl;
+					if (mymodel.helical_nr_asu > 1)
+						std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
+					if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
+					{
+						std::cout << " Refining helical symmetry in real space..." << std::endl;
+						std::cout << " Applying refined helical symmetry in real space..." << std::endl;
+					}
+					else
+						std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
 				}
-				else
-					std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
 			}
 			symmetriseReconstructions();
 
@@ -2202,14 +2215,14 @@ void MlOptimiser::iterate()
 
 			verb = old_verb;
 
-			if (do_sgd && sgd_max_subsets > 0)
+			if (nr_subsets > 1 && sgd_max_subsets > 0)
 			{
 				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
 				if (total_nr_subsets > sgd_max_subsets)
 				{
+					subset_size = -1;
 					do_sgd = false;
 					mymodel.do_sgd = false;
-					strict_highres_exp = -1.;
 					nr_subsets = 1;
 					write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 					break; // break out of loop over the subsets, and start next iteration
@@ -2348,11 +2361,11 @@ void MlOptimiser::expectation()
 	int old_verb = verb;
 	long int prev_barstep = 0;
 	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
-	if (do_sgd)
+	if (nr_subsets > 1)
 		barstep = XMIPP_MIN(barstep, subset_size);
 
 	long int my_subset_first_ori_particle, my_subset_last_ori_particle, nr_particles_todo;
-	if (do_sgd)
+	if (nr_subsets > 1)
 	{
 		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset, my_subset_first_ori_particle, my_subset_last_ori_particle);
 		subset_size = nr_particles_todo = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
@@ -2361,7 +2374,10 @@ void MlOptimiser::expectation()
 			// SGD: progress bar over entire iteration
 			if (subset == 0)
 			{
-				std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter << std::endl;
+				if (do_sgd)
+					std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter << std::endl;
+				else
+					std::cout << " Incomplete expectation iteration " << iter << " of " << nr_iter << std::endl;
 				long int barsize = (sgd_max_subsets > 0) ? sgd_max_subsets * subset_size : mydata.numberOfOriginalParticles();
 				barsize = XMIPP_MIN(barsize, mydata.numberOfOriginalParticles());
 				init_progress_bar(barsize);
@@ -2434,7 +2450,7 @@ void MlOptimiser::expectation()
 		}
 	}
 
-	if (!do_sgd && verb > 0)
+	if (subset_size < 0 && verb > 0)
 		progress_bar(nr_particles_todo);
 
 #ifdef CUDA
@@ -2693,7 +2709,7 @@ void MlOptimiser::precalculateABMatrices()
 				getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)mymodel.ori_size, oversampled_translations_x[iover_trans], oversampled_translations_y[iover_trans], tmp_zoff);
 
 				global_fftshifts_ab2_current.push_back(Fab_current);
-				if (strict_highres_exp > 0.)
+				if (strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.))
 				{
 					windowFourierTransform(Fab_current, Fab_coarse, coarse_size);
 					global_fftshifts_ab2_coarse.push_back(Fab_coarse);
@@ -3034,7 +3050,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		for (int exp_ipass = 0; exp_ipass < nr_sampling_passes; exp_ipass++)
 		{
 
-			if (strict_highres_exp > 0.)
+			if (strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.))
 				// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
 				exp_current_image_size = coarse_size;
 			else if (adaptive_oversampling > 0)
@@ -3377,11 +3393,11 @@ void MlOptimiser::maximization()
 			}
 			else
 			{
-                            (wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-                                                                   mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-                                                                   mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-                                                                   false, false, nr_threads, minres_map, (iclass==0));
-                        }
+				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+						mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+						mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+						false, false, nr_threads, minres_map, (iclass==0));
+            }
 		}
 		else
 		{
@@ -3779,9 +3795,9 @@ void MlOptimiser::updateCurrentResolution()
     if (newres > best_resol_thus_far)
     	best_resol_thus_far = newres;
 
-    // For SGD: never go beyond strict_highres_exp
-    if (do_sgd && strict_highres_exp > 0. && 1./newres < strict_highres_exp)
-    	newres = 1./strict_highres_exp;
+    // For SGD: never go beyond strict_highres_sgd
+    if (do_sgd && strict_highres_sgd > 0. && 1./newres < strict_highres_sgd)
+    	newres = 1./strict_highres_sgd;
 
     mymodel.current_resolution = newres;
 
@@ -3808,9 +3824,9 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 		maxres += incr_size;
 	}
 
-	if (do_sgd && strict_highres_exp > 0.)
+	if (do_sgd && strict_highres_sgd > 0.)
 	{
-		maxres = XMIPP_MIN(maxres, mymodel.getPixelFromResolution(1./strict_highres_exp) );
+		maxres = XMIPP_MIN(maxres, mymodel.getPixelFromResolution(1./strict_highres_sgd) );
 	}
     // Go back from resolution shells (i.e. radius) to image size, which are BTW always even...
 	mymodel.current_size = maxres * 2;
@@ -3818,8 +3834,8 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 	// If realigning movies: go all the way because resolution increase may be substantial
 	if (do_use_all_data)
 		mymodel.current_size = mymodel.ori_size;
-	if (do_sgd  && strict_highres_exp > 0. && 1./mymodel.current_resolution < strict_highres_exp)
-		mymodel.current_size = 2 * mymodel.getPixelFromResolution(1./strict_highres_exp);
+	if (do_sgd  && strict_highres_sgd > 0. && 1./mymodel.current_resolution < strict_highres_sgd)
+		mymodel.current_size = 2 * mymodel.getPixelFromResolution(1./strict_highres_sgd);
 
 	// current_size can never be larger than ori_size:
 	mymodel.current_size = XMIPP_MIN(mymodel.current_size, mymodel.ori_size);
@@ -5280,7 +5296,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												else
 												{
 													int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
-													myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
+													myAB = (strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.)) ? global_fftshifts_ab2_coarse[iitrans].data
 															: global_fftshifts_ab2_current[iitrans].data;
 												}
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
@@ -7081,7 +7097,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 	//int current_image_size = (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp) ? coarse_size : mymodel.current_size;
 	// Set current_image_size to the coarse_size to calculate exepcted angular errors
 	int current_image_size;
-	if (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp)
+	if ((strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.) ) && !do_acc_currentsize_despite_highres_exp)
 	{
 		// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
 		current_image_size = coarse_size;

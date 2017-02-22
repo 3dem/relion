@@ -3155,7 +3155,9 @@ of several thousand (downscaled) particles; preread all of those into RAM; use a
 
 	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
 
-	sgd_max_effective.place(current_y, "SGD max effective parts:", 2000, -1, 100000, 1000, "This number controls the regularisation of the SGD map. Higher values (maximum is number of particles in the data set) give higher-resolution maps. Often values around 3000 work well.");
+	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
+This is essential in SGD, as there is no regularisation at all, i.e. overfitting will start to happen very quickly.\
+Values in the range of 15-30 Angstroms have proven useful.");
 
 	sgd_write_subsets.place(current_y, "SGD write subsets:", -1, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
 
@@ -3451,7 +3453,7 @@ void Class3DJobWindow::write(std::string fn)
 	// Reference
 	do_denovo_ref3d.writeValue(fh);
 	sgd_subset_size.writeValue(fh);
-	sgd_max_effective.writeValue(fh);
+	sgd_highres_limit.writeValue(fh);
 	sgd_write_subsets.writeValue(fh);
 	fn_ref.writeValue(fh);
 	ref_correct_greyscale.writeValue(fh);
@@ -3531,7 +3533,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		// Reference
 		do_denovo_ref3d.readValue(fh);
 		sgd_subset_size.readValue(fh);
-		sgd_max_effective.readValue(fh);
+		sgd_highres_limit.readValue(fh);
 		sgd_write_subsets.readValue(fh);
 		fn_ref.readValue(fh);
 		ref_correct_greyscale.readValue(fh);
@@ -3606,7 +3608,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	// Reference
 	do_denovo_ref3d.deactivate(is_continue);
 	sgd_subset_size.deactivate(is_continue);
-	sgd_max_effective.deactivate(is_continue);
+	sgd_highres_limit.deactivate(is_continue);
 	sgd_write_subsets.deactivate(is_continue);
 	fn_ref.deactivate(is_continue);
 	ref_correct_greyscale.deactivate(is_continue);
@@ -3697,8 +3699,8 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		{
 			command += " --denovo_3dref --sgd ";
 			command += " --subset_size " + floatToString(sgd_subset_size.getValue());
-			command += " --sgd_max_effective " + floatToString(sgd_max_effective.getValue());
-			command += " --sgd_write_subsets " + floatToString(sgd_write_subsets.getValue());
+			command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
+			command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
 		}
 		else
 		{
