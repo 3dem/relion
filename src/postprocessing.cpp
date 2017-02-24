@@ -1134,7 +1134,7 @@ void Postprocessing::run()
 			getFSC(I1(), I2(), fsc_random_masked);
 		}
 		else
-			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.  You may want to check your mask.");
+			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.");
 
 		// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
 		// FSC_true = FSC_t - FSC_n / ( )
