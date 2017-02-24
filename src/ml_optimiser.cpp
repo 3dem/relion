@@ -1933,7 +1933,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, false,
 					1., dummy, dummy, dummy, dummy);
 			// 2D projection data were CTF-corrected, subtomograms were not
-			refs_are_ctf_corrected = (mymodel.data_dim == 3) false : true;
+			refs_are_ctf_corrected = (mymodel.data_dim == 3) ? false : true;
 		}
 	}
 
