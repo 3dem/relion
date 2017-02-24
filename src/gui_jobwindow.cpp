@@ -1097,6 +1097,8 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 			command += " --angpix " +  floatToString(angpix.getValue());
 			command += " --patch_x " + patch_x.getValue();
 			command += " --patch_y " + patch_y.getValue();
+			if (group_frames.getValue() > 1.)
+				command += " --group_frames " + floatToString(group_frames.getValue());
 			if ((fn_gain_ref.getValue()).length() > 0)
 				command += " --gainref " + fn_gain_ref.getValue();
 		}
