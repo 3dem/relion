@@ -1374,7 +1374,7 @@ void MlOptimiserMpi::expectation()
 
 			}
 
-			MPI_Barrier(node->MPI_COMM_SLAVES);
+//		TODO: define MPI_COMM_SLAVES!!!!	MPI_Barrier(node->MPI_COMM_SLAVES);
 
 #ifdef CUDA
 			if (do_gpu)
