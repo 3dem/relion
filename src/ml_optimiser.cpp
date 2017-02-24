@@ -1859,8 +1859,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	   			windowFourierTransform(Faux, Fimg, wsum_model.current_size);
 				Fctf.resize(Fimg);
 				Fctf.initConstant(1.);
-				// Apply CTF if necessary
-				if (do_ctf_correction)
+				// Apply CTF if necessary (skip this for subtomograms!)
+				if (do_ctf_correction && mymodel.data_dim != 3)
 				{
 					CTF ctf;
 					ctf.read(MDimg, MDimg);
@@ -1932,7 +1932,8 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 			MultidimArray<RFLOAT> dummy;
 			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, false,
 					1., dummy, dummy, dummy, dummy);
-			refs_are_ctf_corrected = true;
+			// 2D projection data were CTF-corrected, subtomograms were not
+			refs_are_ctf_corrected = (mymodel.data_dim == 3) false : true;
 		}
 	}
 
