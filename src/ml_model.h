@@ -61,6 +61,9 @@ public:
 	// Number of image groups with separate sigma2_noise spectra
 	int nr_groups;
 
+	// Perform SGD instead of expectation maximization?
+	bool do_sgd;
+
 	// Number of particles in each group
 	std::vector<long int> nr_particles_group;
 
@@ -93,6 +96,9 @@ public:
 
 	// Vector with all reference images
 	std::vector<MultidimArray<RFLOAT> > Iref;
+
+	// Vector with all SGD gradients
+	std::vector<MultidimArray<RFLOAT> > Igrad;
 
 	// Vector with masks for all bodies in multi-body refinement
 	std::vector<MultidimArray<RFLOAT> > masks_bodies;
@@ -237,6 +243,7 @@ public:
     		nr_classes = MD.nr_classes;
     		nr_bodies = MD.nr_bodies;
     		nr_groups = MD.nr_groups;
+    		do_sgd = MD.do_sgd;
     		nr_directions = MD.nr_directions;
     		LL = MD.LL;
     		padding_factor = MD.padding_factor;
@@ -259,6 +266,7 @@ public:
     		helical_rise_max = MD.helical_rise_max;
     		helical_rise_inistep= MD.helical_rise_inistep;
     		Iref = MD.Iref;
+    		Igrad = MD.Igrad;
     		masks_bodies = MD.masks_bodies;
     		com_bodies = MD.com_bodies;
     		PPref = MD.PPref;
@@ -289,6 +297,7 @@ public:
 	void clear()
 	{
 		Iref.clear();
+		Igrad.clear();
 		masks_bodies.clear();
 		com_bodies.clear();
 		PPref.clear();
@@ -314,10 +323,11 @@ public:
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
+		do_sgd=false;
 	}
 
 	// Initialise vectors with the right size
-	void initialise();
+	void initialise(bool _do_sgd = false);
 
 	//Read a model from a file
 	void read(FileName fn_in);
@@ -330,8 +340,8 @@ public:
 
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
-	void readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected);
+	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false);
 
 	// The group numbering in mydata may be different from the one in this model.
 	// Readjust all group_ids in the Experiment based on their group names

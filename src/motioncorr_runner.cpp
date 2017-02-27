@@ -50,6 +50,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_gain_reference = parser.getOption("--gainref","Location of MRC file with the gain reference to be applied","");
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
+	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
 
 	int unblur_section = parser.addSection("UNBLUR/SUMMOVIE options");
 	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCORR.");
@@ -450,6 +451,9 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -OutStack 1";
 
 	command += " -Patch " + integerToString(patch_x) + " " + integerToString(patch_y);
+
+	if (group > 1)
+		command += " -Group " + integerToString(group);
 
 	if (fn_gain_reference != "")
 		command += " -Gain " + fn_gain_reference;

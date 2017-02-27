@@ -412,4 +412,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 // Join 2 metadata tables. Only include labels that are present in both of them.
 MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin);
 
+// Feb14,2017 - Shaoda, Check whether the two MetaDataTables contain the same set of activeLabels
+bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2);
+
 #endif

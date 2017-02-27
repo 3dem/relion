@@ -203,8 +203,9 @@ public:
     		RFLOAT offset_z,
     		bool do_clear = false,
     		bool do_helical_refine = false,
-    		RFLOAT psi_deg = 0.,
-    		RFLOAT tilt_deg = 0.);
+    		RFLOAT rot_deg = 0.,
+    		RFLOAT tilt_deg = 0.,
+    		RFLOAT psi_deg = 0.);
 
     /* Set the non-oversampled lists of directions and in-plane rotations */
     void setOrientations(int _order = -1, RFLOAT _psi_step = -1.);

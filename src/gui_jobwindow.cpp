@@ -1097,6 +1097,8 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 			command += " --angpix " +  floatToString(angpix.getValue());
 			command += " --patch_x " + patch_x.getValue();
 			command += " --patch_y " + patch_y.getValue();
+			if (group_frames.getValue() > 1.)
+				command += " --group_frames " + floatToString(group_frames.getValue());
 			if ((fn_gain_ref.getValue()).length() > 0)
 				command += " --gainref " + fn_gain_ref.getValue();
 		}
@@ -2683,8 +2685,18 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	tab3->label("Optimisation");
 	resetHeight();
 
+	//set up groups
+	subset_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	subset_group->end();
+
 	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
 These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
+	tau_fudge.place(current_y, "Regularisation parameter T:", 2 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
+the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
+the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
+weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
+Too small values yield too-low resolution structures; too high values result in over-estimated resolutions, mostly notable by the apparition of high-frequency noise in the references.");
+
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2696,11 +2708,20 @@ Also note that upon restarting, the iteration number continues to be increased, 
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
 
-	tau_fudge.place(current_y, "Regularisation parameter T:", 2 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
-the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
-the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
-weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
-Too small values yield too-low resolution structures; too high values result in over-estimated resolutions, mostly notable by the apparition of high-frequency noise in the references.");
+	do_subsets.place(current_y, "Use subsets for initial updates?", false, "If set to True, multiple maximization updates (as many as defined by the 'Number of subset updates') will be performed during the first iteration(s): each time after the number of particles in a subset has been processed. \
+By using subsets with much fewer particles than the entire data set, the initial updates will be much faster, while the very low resolution class averages will not be notably worse than with the entire data set. \n\n \
+This will greatly speed up 2D classifications with very many (hundreds of thousands or more) particles. A useful subset size is probably in the order of ten thousand particles. If the data set only comprises (tens of) thousands of particles, this option may be less useful.", subset_group);
+
+	subset_group->begin();
+
+	subset_size.place(current_y, "Initial subset size:", 10000, 1000, 50000, 1000, "Number of individual particles after which one will perform a maximization update in the first iteration(s). \
+A useful subset size is probably in the order of ten thousand particles.");
+
+	max_subsets.place(current_y, "Number of subset updates:", 3, 1, 10, 1, "This option is only used when a positive number is given for the 'Initial subset size'. In that case, in the first iteration, maximization updates are performed over a smaller subset of the particles to speed up calculations.\
+Useful values are probably in the range of 2-5 subset updates. Using more might speed up further, but with the risk of affecting the results. If the number of subsets times the subset size is larger than the number of particles in the data set, then more than 1 iteration will be split into subsets.");
+
+	subset_group->end();
+	do_subsets.cb_menu_i(); // to make default effective
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2858,6 +2879,9 @@ void Class2DJobWindow::write(std::string fn)
 
 	// Optimisation
 	nr_iter.writeValue(fh);
+	do_subsets.writeValue(fh);
+	subset_size.writeValue(fh);
+	max_subsets.writeValue(fh);
 	tau_fudge.writeValue(fh);
 	particle_diameter.writeValue(fh);
 	do_zero_mask.writeValue(fh);
@@ -2911,6 +2935,9 @@ void Class2DJobWindow::read(std::string fn, bool &_is_continue)
 
 		// Optimisation
 		nr_iter.readValue(fh);
+		do_subsets.readValue(fh);
+		subset_size.readValue(fh);
+		max_subsets.readValue(fh);
 		tau_fudge.readValue(fh);
 		particle_diameter.readValue(fh);
 		do_zero_mask.readValue(fh);
@@ -2949,6 +2976,9 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	fn_cont.deactivate(!is_continue);
 	if (!is_continue)
 		fn_cont.setValue("");
+	do_subsets.deactivate(is_continue);
+	subset_size.deactivate(is_continue);
+	max_subsets.deactivate(is_continue);
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
@@ -3034,6 +3064,12 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	// Optimisation
 	command += " --iter " + floatToString(nr_iter.getValue());
+	if (do_subsets.getValue())
+	{
+		command += " --write_subsets 1 --subset_size " + floatToString(subset_size.getValue());
+		command += " --max_subsets " + floatToString(max_subsets.getValue());
+	}
+
 	command += " --tau2_fudge " + floatToString(tau_fudge.getValue());
     command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 	if (!is_continue)
@@ -3143,6 +3179,29 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	tab2->label("Reference");
 	resetHeight();
 
+	denovo_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	denovo_group->end();
+
+	resetHeight();
+	do_denovo_ref3d.place(current_y, "Do de-novo reference?", false, "If set to Yes, A Stochastic Gradient Descent optimisaion will be run, started from random angles for each particle. \
+This may refine towards a suitable model, provided enough different views are present in the data. You may want to run this with a subset \
+of several thousand (downscaled) particles; preread all of those into RAM; use a coarse angular sampling (e.g. 15 degrees); a limited offset range (3 pixels?) and run for approximately 3-5 iterations.", denovo_group);
+
+	denovo_group->begin();
+
+	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
+
+	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
+This is essential in SGD, as there is no regularisation at all, i.e. overfitting will start to happen very quickly.\
+Values in the range of 15-30 Angstroms have proven useful.");
+
+	sgd_write_subsets.place(current_y, "SGD write subsets:", -1, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
+
+	denovo_group-> end();
+	do_denovo_ref3d.cb_menu_i(); // To make default effective
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	ref_correct_greyscale.place(current_y, "Ref. map is on absolute greyscale?", false, "Probabilities are calculated based on a Gaussian noise model, \
 which contains a squared difference term between the reference and the experimental image. This has a consequence that the \
@@ -3428,6 +3487,10 @@ void Class3DJobWindow::write(std::string fn)
 	nr_classes.writeValue(fh);
 
 	// Reference
+	do_denovo_ref3d.writeValue(fh);
+	sgd_subset_size.writeValue(fh);
+	sgd_highres_limit.writeValue(fh);
+	sgd_write_subsets.writeValue(fh);
 	fn_ref.writeValue(fh);
 	ref_correct_greyscale.writeValue(fh);
 	ini_high.writeValue(fh);
@@ -3504,6 +3567,10 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		nr_classes.readValue(fh);
 
 		// Reference
+		do_denovo_ref3d.readValue(fh);
+		sgd_subset_size.readValue(fh);
+		sgd_highres_limit.readValue(fh);
+		sgd_write_subsets.readValue(fh);
 		fn_ref.readValue(fh);
 		ref_correct_greyscale.readValue(fh);
 		ini_high.readValue(fh);
@@ -3575,6 +3642,10 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	nr_classes.deactivate(is_continue);
 
 	// Reference
+	do_denovo_ref3d.deactivate(is_continue);
+	sgd_subset_size.deactivate(is_continue);
+	sgd_highres_limit.deactivate(is_continue);
+	sgd_write_subsets.deactivate(is_continue);
 	fn_ref.deactivate(is_continue);
 	ref_correct_greyscale.deactivate(is_continue);
 	ini_high.deactivate(is_continue);
@@ -3658,22 +3729,34 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		command += " --i " + fn_img.getValue();
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
-		if (fn_ref.getValue() != "None")
-		{
-			if (fn_ref.getValue() == "")
-			{
-				fl_message("ERROR: empty field for reference...");
-				return false;
-			}
-			command += " --ref " + fn_ref.getValue();
-			Node node(fn_ref.getValue(), fn_ref.type);
-			pipelineInputNodes.push_back(node);
-		}
-		if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
-			command += " --firstiter_cc";
-		if (ini_high.getValue() > 0.)
-			command += " --ini_high " + floatToString(ini_high.getValue());
 
+
+		if (do_denovo_ref3d.getValue())
+		{
+			command += " --denovo_3dref --sgd ";
+			command += " --subset_size " + floatToString(sgd_subset_size.getValue());
+			command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
+			command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
+		}
+		else
+		{
+			if (fn_ref.getValue() != "None")
+			{
+				if (fn_ref.getValue() == "")
+				{
+					fl_message("ERROR: empty field for reference...");
+					return false;
+				}
+				command += " --ref " + fn_ref.getValue();
+				Node node(fn_ref.getValue(), fn_ref.type);
+				pipelineInputNodes.push_back(node);
+			}
+			if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
+				command += " --firstiter_cc";
+
+			if (ini_high.getValue() > 0.)
+				command += " --ini_high " + floatToString(ini_high.getValue());
+		}
 	}
 
 	// Always do compute stuff

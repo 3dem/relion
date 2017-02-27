@@ -172,7 +172,7 @@ public:
     		Euler_rotation3DMatrix(rot, tilt, psi, A3D);
     		F2D.initZeros();
     		projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
-            if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001)
+            if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001 || (do_3d_rot && ABS(zoff) > 0.001) )
             {
             	Matrix1D<RFLOAT> shift(2);
             	XX(shift) = -xoff;
@@ -185,8 +185,24 @@ public:
             	}
             	else
             		shiftImageInFourierTransform(F2D, F2D, XSIZE(vol()), XX(shift), YY(shift));
-
             }
+
+            // Feb 01,2017 - Shaoda, add white noise to 2D / 3D single images
+            if (do_add_noise)
+            {
+            	if ( (!(stddev_white_noise > 0.)) || (fn_model != "") )
+            		REPORT_ERROR("ERROR: Only add --white_noise to a single image!");
+            	// fftw normalization and factor sqrt(2) for two-dimensionality of complex plane
+            	// TODO: sqrt(2) ??? Why ???
+            	stddev_white_noise /= (data_dim == 3) ? (XSIZE(vol()) * XSIZE(vol())) : (XSIZE(vol()) * sqrt(2));
+                // Add white noise
+                FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
+                {
+                    DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., stddev_white_noise);
+                    DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., stddev_white_noise);
+                }
+            }
+
         	transformer.inverseFourierTransform();
         	// Shift the image back to the center...
         	CenterFFT(img(), false);
@@ -200,6 +216,7 @@ public:
             rot = tilt = psi = xoff = yoff = zoff = 0.;
 
             // Can only add noise to multiple images
+            // Feb 01,2017 - Shaoda, now we can add white noise to 2D / 3D single images
             if (do_add_noise)
             {
             	if (fn_model != "")

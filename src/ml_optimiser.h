@@ -120,6 +120,9 @@ public:
 	// Filename for input reference images (stack, star or image)
 	FileName fn_ref;
 
+	// Generate a 3D model from 2D particles de novo?
+	bool is_3d_model;
+
 	// Filename for input tau2-spectrum
 	FileName fn_tau;
 
@@ -137,6 +140,9 @@ public:
 
 	// Total number iterations and current iteration
 	int iter, nr_iter;
+
+	// Total number of subsets and current subset;
+	int subset, nr_subsets, write_every_subset, sgd_max_effective;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
@@ -270,6 +276,24 @@ public:
 
 	// Number of particles to be processed simultaneously
 	int nr_pool;
+
+	//////////////// Stochastic gradient descent
+	bool do_sgd;
+
+	// Momentum update parameter
+	RFLOAT mu;
+
+	// Step size of the gradient updates
+	RFLOAT sgd_stepsize;
+
+	// Size of the random subsets
+	long int subset_size;
+
+	// Maximum number of subsets to process using SGD (possibly more than 1 iteration)
+	long int sgd_max_subsets;
+
+	// Strict high-res limit in SGD
+	RFLOAT strict_highres_sgd;
 
 	// Available memory (in Gigabyte)
 	size_t available_gpu_memory;
@@ -424,10 +448,6 @@ public:
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
-	// Number of iterations for data subset and subset fraction of data
-	int   subset_iter;
-	float subset_frac;
-
 	// Skip gridding in reconstruction
 	bool skip_gridding;
 
@@ -506,6 +526,10 @@ public:
 	//Maximum number of significant weights in coarse pass of expectation
 	unsigned maximum_significants;
 
+	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
+	TabSine tab_sin;
+	TabCosine tab_cos;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -547,8 +571,6 @@ public:
 		has_converged(0),
 		only_flip_phases(0),
 		gridding_nr_iter(0),
-		subset_iter(0),
-		subset_frac(1),
 		do_use_reconstruct_images(0),
 		fix_sigma_noise(0),
 		current_changes_optimal_offsets(0),
@@ -805,7 +827,7 @@ public:
 	void getAllSquaredDifferences(long int my_ori_particle, int ibody, int exp_current_image_size,
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
+			int exp_itrans_min, int exp_itrans_max,
 			std::vector<RFLOAT> &exp_min_diff2,
 			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,
@@ -824,7 +846,7 @@ public:
 	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int exp_ipass,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
+			int exp_itrans_min, int exp_itrans_max,
 			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
 			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior,
@@ -836,7 +858,7 @@ public:
 	void storeWeightedSums(long int my_ori_particle, int ibody, int exp_current_image_size,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
+			int exp_itrans_min, int exp_itrans_max,
 			std::vector<RFLOAT> &exp_min_diff2,
 			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 			std::vector<MultidimArray<Complex > > &exp_Fimgs,

@@ -1158,4 +1158,45 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 	return MDc;
 }
 
+bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2)
+{
+	std::vector<EMDLabel> labels1, labels2;
 
+	labels1 = MD1.getActiveLabels();
+	labels2 = MD2.getActiveLabels();
+
+	// DEBUG
+	//std::cout << " label1.size() & label2.size() = " << labels1.size() << ", " << labels2.size() << std::endl;
+	if (labels1.size() != labels2.size())
+		return false;
+
+	// DEBUG
+	//std::cout << " before_stable_sort: labels1[]: " << std::flush;
+	//for (size_t id = 0; id < labels1.size(); id++)
+	//	std::cout << labels1[id] << ", " << std::flush;
+	//std::cout << std::endl;
+	//std::cout << " before_stable_sort: labels2[]: " << std::flush;
+	//for (size_t id = 0; id < labels2.size(); id++)
+	//	std::cout << labels2[id] << ", " << std::flush;
+	//std::cout << std::endl;
+
+	std::stable_sort(labels1.begin(), labels1.end());
+	std::stable_sort(labels2.begin(), labels2.end());
+
+	// DEBUG
+	//std::cout << "  after_stable_sort: labels1[]: " << std::flush;
+	//for (size_t id = 0; id < labels1.size(); id++)
+	//	std::cout << labels1[id] << ", " << std::flush;
+	//std::cout << std::endl;
+	//std::cout << "  after_stable_sort: labels2[]: " << std::flush;
+	//for (size_t id = 0; id < labels2.size(); id++)
+	//	std::cout << labels2[id] << ", " << std::flush;
+	//std::cout << std::endl;
+
+	for (size_t id = 0; id < labels1.size(); id++)
+	{
+		if (labels1[id] != labels2[id])
+			return false;
+	}
+	return true;
+};
