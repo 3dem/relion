@@ -2519,12 +2519,12 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 				break;
 			}
 		}
-		if (verb > 0)
-		{
-			std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
-		}
 		if (randomize_at > 0)
 		{
+			if (verb > 0)
+			{
+				std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
+			}
 			randomizePhasesBeyond(Iunreg1(), randomize_at);
 			randomizePhasesBeyond(Iunreg2(), randomize_at);
 			// Mask randomized phases maps and calculated fsc_random_masked
