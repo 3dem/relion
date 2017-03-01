@@ -2938,6 +2938,36 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		timer.tic(TIMING_ESP_INI);
 #endif
 
+	// In the first iteration, multiple seeds will be generated
+	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
+	// The optimal orientation is based on signal-product (rather than the signal-intensity sensitive Gaussian)
+    // If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
+
+    // Decide which classes to integrate over (for random class assignment in 1st iteration)
+    int exp_iclass_min = 0;
+    int exp_iclass_max = mymodel.nr_classes - 1;
+    // low-pass filter again and generate the seeds
+    if (do_generate_seeds)
+    {
+    	if (do_firstiter_cc && iter == 1)
+    	{
+    		// In first (CC) iter, use a single reference (and CC)
+    		exp_iclass_min = exp_iclass_max = 0;
+    	}
+    	else if ( (do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1))
+		{
+			// In second CC iter, or first iter without CC: generate the seeds
+    		// Now select a single random class
+    		// exp_part_id is already in randomized order (controlled by -seed)
+    		// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
+    		long int idx = my_ori_particle - exp_my_first_ori_particle;
+    		if (idx >= exp_random_class_some_particles.size())
+    			REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
+    		exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
+		}
+    }
+
+
 // This debug is a good one to step through the separate steps of the expectation to see where trouble lies....
 //#define DEBUG_ESP_MEM
 #ifdef DEBUG_ESP_MEM
@@ -3096,7 +3126,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 			// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
 			getAllSquaredDifferences(my_ori_particle, ibody, exp_current_image_size, exp_ipass, exp_current_oversampling,
 					metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-					exp_itrans_min, exp_itrans_max, exp_min_diff2, exp_highres_Xi2_imgs,
+					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_imgs,
 					exp_Fimgs, exp_Fctfs, exp_Mweight, exp_Mcoarse_significant,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
@@ -3116,7 +3146,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 			// also calculate exp_sum_weight, and in case of adaptive oversampling also exp_significant_weight
 			convertAllSquaredDifferencesToWeights(my_ori_particle, exp_ipass, exp_current_oversampling, metadata_offset,
 					exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-					exp_itrans_min, exp_itrans_max,
+					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
 					exp_Mweight, exp_Mcoarse_significant, exp_significant_weight,
 					exp_sum_weight, exp_old_offset, exp_prior, exp_min_diff2,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
@@ -3204,7 +3234,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 
 		storeWeightedSums(my_ori_particle, ibody, exp_current_image_size, exp_current_oversampling, metadata_offset,
 				exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
-				exp_itrans_min, exp_itrans_max,
+				exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
 				exp_min_diff2, exp_highres_Xi2_imgs, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
 				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
@@ -5046,7 +5076,7 @@ bool MlOptimiser::isSignificantAnyParticleAnyTranslation(long int iorient, int e
 void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody,  int exp_current_image_size,
 		int exp_ipass, int exp_current_oversampling, int metadata_offset,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-		int exp_itrans_min, int exp_itrans_max,
+		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
 		std::vector<RFLOAT> &exp_min_diff2,
 		std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs,
@@ -5101,7 +5131,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 			exp_itrans_min, exp_itrans_max, exp_Fimgs, dummy, exp_Fctfs, exp_local_Fimgs_shifted, dummy,
 			exp_local_Fctfs, exp_local_sqrtXi2, exp_local_Minvsigma2s);
 
-	for (int exp_iclass = 0; exp_iclass < mymodel.nr_classes; exp_iclass++)
+	// Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
+	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 	{
 		if (mymodel.pdf_class[exp_iclass] > 0.)
 		{
@@ -5611,7 +5642,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle, int exp_ipass,
 		int exp_current_oversampling, int metadata_offset,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-		int exp_itrans_min, int exp_itrans_max,
+		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
 		MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
 		std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
 		std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior,
@@ -5696,7 +5727,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			// Extra normalization
 			RFLOAT pdf_orientation_mean(0),pdf_offset_mean(0);
 			unsigned long pdf_orientation_count(0), pdf_offset_count(0);
-			for (int exp_iclass = 0; exp_iclass < mymodel.nr_classes; exp_iclass++)
+			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 			{
 				for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 					for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
@@ -6151,7 +6182,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp_current_image_size,
 		int exp_current_oversampling, int metadata_offset,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
-		int exp_itrans_min, int exp_itrans_max,
+		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
 		std::vector<RFLOAT> &exp_min_diff2,
 		std::vector<RFLOAT> &exp_highres_Xi2_imgs,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs,
@@ -6284,7 +6315,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 	thr_wsum_sigma2_offset = 0.;
 
 	// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
-	for (int exp_iclass = 0; exp_iclass < mymodel.nr_classes; exp_iclass++)
+	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 	{
 		for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
 		{
