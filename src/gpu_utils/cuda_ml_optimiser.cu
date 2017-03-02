@@ -980,8 +980,6 @@ void getAllSquaredDifferencesCoarse(
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
 
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-
 		CTOC(cudaMLO->timer,"translation_1");
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
@@ -993,6 +991,8 @@ void getAllSquaredDifferencesCoarse(
 
 		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 		allWeights_pos = 0;
+
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));  // NEEDED FOR NON-BLOCKING CLASS STREAMS (finish (legacy) default stream work before launching on classStreams)
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1046,6 +1046,7 @@ void getAllSquaredDifferencesCoarse(
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
@@ -1194,6 +1195,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		cudaStager<XFLOAT> AllEulers(cudaMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
 		unsigned long newDataSize(0);
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			FPCMasks[ipart][exp_iclass].weightNum=0;
@@ -1790,6 +1792,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 			else
 			{
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0)); // NEEDED FOR NON-BLOCKING STREAMS (finish (legacy) default stream work before launching on classStreams)
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
 					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -2103,6 +2106,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		p_thr_wsum_sigma2_offset.device_alloc();
 		CTOC(cudaMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
+
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
@@ -2957,7 +2962,7 @@ void MlOptimiserCuda::resetData()
 
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)
-		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
+		HANDLE_ERROR(cudaStreamCreate(&classStreams[i])); //HANDLE_ERROR(cudaStreamCreateWithFlags(&classStreams[i],cudaStreamNonBlocking));
 
 	transformer1.clear();
 	transformer2.clear();
