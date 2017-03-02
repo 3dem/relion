@@ -825,7 +825,7 @@ public:
 	inline
 	CudaGlobalPtr(CudaCustomAllocator *allocator):
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -837,7 +837,7 @@ public:
 	inline
 	CudaGlobalPtr(size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -849,19 +849,19 @@ public:
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -877,7 +877,7 @@ public:
 	inline
 	CudaGlobalPtr():
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -889,7 +889,7 @@ public:
 	inline
 	CudaGlobalPtr(size_t size):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -907,13 +907,13 @@ public:
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
