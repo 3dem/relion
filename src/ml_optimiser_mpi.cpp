@@ -2537,7 +2537,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			fsc_true.resize(fsc_masked);
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
 			{
-						// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
+				// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
 				if (i < randomize_at + 2)
 				{
 					DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
@@ -2558,9 +2558,11 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 		{
 			std::cerr << " WARNING: FSC curve between unmasked maps never drops below 0.8. Using unmasked FSC as FSC_true... "<<std::endl;
 			std::cerr << " WARNING: This message should go away during the later stages of refinement!" << std::endl;
+
+			for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(fsc_unmasked); idx++)
+				DIRECT_A1D_ELEM(fsc_unmasked, idx) = 0.;
 			mymodel.fsc_halves_class = fsc_unmasked;
 		}
-
 	}
 
 	// Now the master sends the fsc curve to everyone else
