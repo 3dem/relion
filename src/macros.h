@@ -45,6 +45,11 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+#define RELION_VERSION "v2.0.4"
+
+#include <math.h>
+#include "src/error.h"
+
 #ifndef _CYGWIN
 #ifdef __APPLE__
 #include <limits.h>
@@ -63,14 +68,20 @@
 #ifdef RELION_SINGLE_PRECISION
 #define RFLOAT float
 #define LARGE_NUMBER 99e36
-#define MY_MPI_DOUBLE MPI_FLOAT
+#define MY_MPI_DOUBLE  MPI_FLOAT
+#define MY_MPI_COMPLEX MPI_COMPLEX
 #else
 #define RFLOAT double
 #define LARGE_NUMBER 99e99
-#define MY_MPI_DOUBLE MPI_DOUBLE
+#define MY_MPI_DOUBLE  MPI_DOUBLE
+#define MY_MPI_COMPLEX MPI_DOUBLE_COMPLEX
 #endif
 
-
+#ifdef DEBUG_CUDA
+#define CRITICAL(string) raise(SIGSEGV);
+#else
+#define CRITICAL(string) REPORT_ERROR(string);
+#endif
 
 //#define DEBUG
 //#define DEBUG_CHECKSIZES

@@ -425,11 +425,14 @@ public:
 
 	int rank_shared_count;
 
+	bool haveWarnedRefinementMem;
+
 	MlDeviceBundle(MlOptimiser *baseMLOptimiser):
 			baseMLO(baseMLOptimiser),
 			generateProjectionPlanOnTheFly(false),
 			rank_shared_count(1),
 			device_id(-1),
+			haveWarnedRefinementMem(false),
 			allocator(NULL)
 	{};
 
@@ -438,12 +441,13 @@ public:
 		device_id = did;
 	}
 
+	size_t checkFixedSizedObjects(int shares);
 	void setupFixedSizedObjects();
 	void setupTunableSizedObjects(size_t allocationSize);
 
 	void syncAllBackprojects()
 	{
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 	}
 
 
@@ -490,8 +494,8 @@ public:
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle, const char * timing_fnm) :
 			baseMLO(baseMLOptimiser),
-			transformer1(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
-			transformer2(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
+			transformer1(cudaStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
+			transformer2(cudaStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			dataIs3D(baseMLO->mymodel.data_dim == 3),
 			devBundle(bundle),

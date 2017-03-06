@@ -24,6 +24,14 @@
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
 
+#ifdef TIMING
+		#define RCTIC(timer,label) (timer.tic(label))
+		#define RCTOC(timer,label) (timer.toc(label))
+#else
+		#define RCTIC(timer,label)
+    	#define RCTOC(timer,label)
+#endif
+
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
@@ -32,6 +40,8 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include "src/macros.h"
+#include "src/error.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
 #include "src/gpu_utils/cuda_ml_optimiser.h"
@@ -112,6 +122,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	int general_section = parser.addSection("General options");
 	// Not all parameters are accessible here...
 	FileName fn_out_new = parser.getOption("--o", "Output rootname", "OLD_ctX");
+
 	if (fn_out_new == "OLD_ctX" || fn_out_new == fn_out )
 		fn_out += "_ct" + integerToString(iter);
 	else
@@ -902,91 +913,6 @@ void MlOptimiser::initialise()
     std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
 
-    initialiseGeneral();
-
-    initialiseWorkLoad();
-
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-
-	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
-	{
-		MultidimArray<RFLOAT> Mavg;
-
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-	}
-
-	// First low-pass filter the initial references
-	if (iter == 0)
-		initialLowPassFilterReferences();
-
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	// Check minimum group size of 10 particles
-	if (verb > 0)
-	{
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			if (mymodel.nr_particles_group[igroup] < 10)
-			{
-				std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				do_warn = true;
-			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName label for particles from multiple different micrographs in the input STAR file. " << std::endl;
-		}
-	}
-
-	// Write out initial mymodel
-	if (!do_movies_in_batches)
-		write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
-	// Do this after writing out the model, so that still the random halves are written in separate files.
-	if (do_realign_movies)
-	{
-		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
-		has_converged = true;
-		// Then use join random halves
-		do_join_random_halves = true;
-
-		// If we skip the maximization step, then there is no use in using all data
-		if (!do_skip_maximization)
-		{
-			// Use all data out to Nyquist because resolution gains may be substantial
-			do_use_all_data = true;
-		}
-	}
-
 	if (do_gpu)
 	{
 #ifdef CUDA
@@ -1081,6 +1007,91 @@ void MlOptimiser::initialise()
 #endif
 	}
 
+    initialiseGeneral();
+
+    initialiseWorkLoad();
+
+	if (fn_sigma != "")
+	{
+		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
+		MetaDataTable MDsigma;
+		RFLOAT val;
+		int idx;
+		MDsigma.read(fn_sigma);
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+		{
+			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
+			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
+			if (idx < XSIZE(mymodel.sigma2_noise[0]))
+				mymodel.sigma2_noise[0](idx) = val;
+		}
+		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
+		{
+			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
+		}
+		// Use the same spectrum for all classes
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+
+	}
+	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	{
+		MultidimArray<RFLOAT> Mavg;
+
+		// Calculate initial sigma noise model from power_class spectra of the individual images
+		calculateSumOfPowerSpectraAndAverageImage(Mavg);
+
+		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
+		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
+	}
+
+	// First low-pass filter the initial references
+	if (iter == 0)
+		initialLowPassFilterReferences();
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (iter == 0)
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
+	// Check minimum group size of 10 particles
+	if (verb > 0)
+	{
+		bool do_warn = false;
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		{
+			if (mymodel.nr_particles_group[igroup] < 10)
+			{
+				std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
+				do_warn = true;
+			}
+		}
+		if (do_warn)
+		{
+			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
+			std:: cout << "         You can do so by using the same rlnMicrographName label for particles from multiple different micrographs in the input STAR file. " << std::endl;
+		}
+	}
+
+	// Write out initial mymodel
+	if (!do_movies_in_batches)
+		write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+
+	// Do this after writing out the model, so that still the random halves are written in separate files.
+	if (do_realign_movies)
+	{
+		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
+		has_converged = true;
+		// Then use join random halves
+		do_join_random_halves = true;
+
+		// If we skip the maximization step, then there is no use in using all data
+		if (!do_skip_maximization)
+		{
+			// Use all data out to Nyquist because resolution gains may be substantial
+			do_use_all_data = true;
+		}
+	}
+
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Done"<<std::endl;
@@ -1097,9 +1108,26 @@ void MlOptimiser::initialiseGeneral(int rank)
 #ifdef TIMING
 	//DIFFF = timer.setNew("difff");
 	TIMING_EXP =           timer.setNew("expectation");
+	TIMING_EXP_1 =           timer.setNew("expectation_1");
+	TIMING_EXP_1a =           timer.setNew("expectation_1a");
+	TIMING_EXP_2 =           timer.setNew("expectation_2");
+	TIMING_EXP_3 =           timer.setNew("expectation_3");
+	TIMING_EXP_4 =           timer.setNew("expectation_4");
+	TIMING_EXP_4a =           timer.setNew("expectation_4a");
+	TIMING_EXP_4b =           timer.setNew("expectation_4b");
+	TIMING_EXP_4c =           timer.setNew("expectation_4c");
+	TIMING_EXP_4d =           timer.setNew("expectation_4d");
+	TIMING_EXP_5 =           timer.setNew("expectation_5");
+	TIMING_EXP_6 =           timer.setNew("expectation_6");
+	TIMING_EXP_7 =           timer.setNew("expectation_7");
+	TIMING_EXP_8 =           timer.setNew("expectation_8");
+	TIMING_EXP_9 =           timer.setNew("expectation_9");
+
 	TIMING_EXP_METADATA =  timer.setNew(" - EXP: metadata shuffling");
 	TIMING_EXP_CHANGES =   timer.setNew(" - EXP: monitor changes hidden variables");
 	TIMING_MAX =           timer.setNew("maximization");
+	TIMING_SOLVFLAT =      timer.setNew("flatten solvent");
+	TIMING_UPDATERES =     timer.setNew("update resolution");
 	TIMING_RECONS =        timer.setNew("reconstruction");
 	TIMING_ESP =           timer.setNew("expectationSomeParticles");
 	TIMING_ESP_THR =       timer.setNew("doThreadExpectationSomeParticles");
@@ -1136,6 +1164,16 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_EXTRA1= timer.setNew(" -extra1");
 	TIMING_EXTRA2= timer.setNew(" -extra2");
 	TIMING_EXTRA3= timer.setNew(" -extra3");
+
+	RCT_1 = timer.setNew(" RcT1_BPrefRecon ");
+	RCT_2 = timer.setNew(" RcT2_BroadCast ");
+	RCT_3 = timer.setNew(" RcT3_maxiOthers ");
+	RCT_4 = timer.setNew(" RcT4_monitorHidden ");
+	RCT_5 = timer.setNew(" RcT5_sums ");
+	RCT_6 = timer.setNew(" RcT6_updatePdf ");
+	RCT_7 = timer.setNew(" RcT7_updateNoise ");
+	RCT_8 = timer.setNew(" RcT8_initials ");
+
 #endif
 
 #ifdef RELION_SINGLE_PRECISION
@@ -2128,8 +2166,8 @@ void MlOptimiser::expectation()
 		{
 			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
 			{
-				std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
-				raise(SIGSEGV);
+				//std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
+				CRITICAL(ERR_GPUID);
 			}
 			else
 				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
@@ -2269,7 +2307,7 @@ void MlOptimiser::expectation()
 				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
 				((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
 				fflush(stdout);
-				raise(SIGSEGV);
+				CRITICAL(ERR_CANZ);
 			}
 
 #endif
@@ -2305,7 +2343,6 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
-    // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// TMP for helices of Anthiony 12 july 2016
@@ -2458,7 +2495,7 @@ void MlOptimiser::precalculateABMatrices()
 			// Then also loop over all its oversampled relatives
 			// Then loop over all its oversampled relatives
 			// Jun01,2015 - Shaoda & Sjors, Helical refinement
-			sampling.getTranslations(itrans, 1, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+			sampling.getTranslations(itrans, adaptive_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 					(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
@@ -3134,33 +3171,36 @@ void MlOptimiser::maximization()
 		std::cout << " Maximization ..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
-
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
+		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
+
 			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 					mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 					mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-					false, false, nr_threads, minres_map);
+					false, false, nr_threads, minres_map, (iclass==0));
 		}
 		else
 		{
 			mymodel.Iref[iclass].initZeros();
 		}
-
+		RCTOC(timer,RCT_1);
 		if (verb > 0)
 			progress_bar(iclass);
 	}
 
+	RCTIC(timer,RCT_3);
 	// Then perform the update of all other model parameters
 	maximizationOtherParameters();
-
+	RCTOC(timer,RCT_3);
+	RCTIC(timer,RCT_4);
 	// Keep track of changes in hidden variables
 	updateOverallChangesInHiddenVariables();
-
+	RCTOC(timer,RCT_4);
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
@@ -3173,6 +3213,7 @@ void MlOptimiser::maximizationOtherParameters()
 	std::cerr << "Entering maximizationOtherParameters" << std::endl;
 #endif
 
+	RCTIC(timer,RCT_5);
 	// Calculate total sum of weights, and average CTF for each class (for SSNR estimation)
 	RFLOAT sum_weight = 0.;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3237,7 +3278,8 @@ void MlOptimiser::maximizationOtherParameters()
 		}
 
 	}
-
+	RCTOC(timer,RCT_5);
+	RCTIC(timer,RCT_6);
 	// Update model.pdf_class vector (for each k)
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
@@ -3283,7 +3325,8 @@ void MlOptimiser::maximizationOtherParameters()
 	}
 
 	// TODO: update estimates for sigma2_rot, sigma2_tilt and sigma2_psi!
-
+	RCTOC(timer,RCT_6);
+	RCTIC(timer,RCT_7);
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
 	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc))
 	{
@@ -3311,7 +3354,8 @@ void MlOptimiser::maximizationOtherParameters()
 			}
 		}
 	}
-
+	RCTIC(timer,RCT_7);
+	RCTOC(timer,RCT_8);
 	// After the first iteration the references are always CTF-corrected
     if (do_ctf_correction)
     	refs_are_ctf_corrected = true;
@@ -3372,7 +3416,7 @@ void MlOptimiser::maximizationOtherParameters()
 		}
 
 	}
-
+	RCTOC(timer,RCT_8);
 #ifdef DEBUG
 	std::cerr << "Leaving maximizationOtherParameters" << std::endl;
 #endif
@@ -7398,8 +7442,14 @@ void MlOptimiser::checkConvergence(bool myverb)
 
             if (has_converged)
             {
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            	std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+            	std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+            	if(anticipate_oom)
+            	{
+            		std::cout << " You were warned at the beginning of the run that memory on the GPU might run out, and this final iteration\n\
+is where this is likely to happen. If you should encounter an out-of-memory error, you can then continue \n\
+from the last completed iteration by continuing from the gui and specifying the optimiser.star-file from iteration " << iter << "." << std::endl;
+            	}
             }
         }
 

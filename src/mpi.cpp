@@ -54,6 +54,17 @@ MpiNode::MpiNode(int &argc, char ** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     // Handle errors
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+    // Set up Slave communicator -----------------------------------------
+    MPI_Comm_group(MPI_COMM_WORLD, &worldG);
+    int mstr[1]  = {0};
+    MPI_Group_excl( worldG, 1, mstr, &slaveG ); // exclude master
+    MPI_Comm_create(MPI_COMM_WORLD, slaveG, &slaveC);
+    if(rank!=0)
+    	MPI_Group_rank(slaveG, &slaveRank);
+    else
+    	slaveRank = -1;
+    // -------------------------------------------------------------------
 }
 
 MpiNode::~MpiNode()

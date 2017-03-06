@@ -54,12 +54,12 @@ void CudaBackprojector::initMdl()
 	if (mdlXYZ == 0)
 	{
         printf("Model dimensions must be set with setMdlDim before call to setupMdl.");
-		raise(SIGSEGV);
+        CRITICAL(ERR_MDLDIM);
 	}
 	if (voxelCount != 0)
 	{
         printf("DEBUG_ERROR: Duplicated call to model setup");
-		raise(SIGSEGV);
+        CRITICAL(ERR_MDLSET);
 	}
 #endif
 

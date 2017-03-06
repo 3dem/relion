@@ -49,7 +49,7 @@
 // Object Constructor
 RelionError::RelionError(const std::string &what, const std::string &fileArg, const long lineArg)
 {
-    msg = what;
+    msg = "ERROR: \n" + what;
     file= fileArg;
     line=lineArg;
 }

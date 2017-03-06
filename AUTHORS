@@ -1,20 +1,8 @@
-This program is developed in the groups of
+This program is developed in the group of Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology.
 
-Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology
-
-- Sjors H.W. Scheres
-- Shaoda He
-
-and Erik Lindahl at Stockholm University
-
-- Erik Lindahl
-- Björn O. Forsberg
-- Dari Kimanius
-
-RELION also contain pieces of code from the following packages:
+However, it does also contain pieces of code from the following packages:
 XMIPP: http:/xmipp.cnb.csic.es
 BSOFT: http://lsbr.niams.nih.gov/bsoft/
 HEALPIX: http://healpix.jpl.nasa.gov/
-CUB: https://nvlabs.github.io/cub/
 
 Original disclaimers in the code of these external packages have been maintained as much as possible. Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly. 
