@@ -2760,7 +2760,20 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	exp_my_first_ori_particle = my_first_ori_particle;
     exp_my_last_ori_particle = my_last_ori_particle;
 
-	// Only open/close stacks once
+	// Make sure random division is always the same with the same seed
+    if (do_generate_seeds && ((do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1)) )
+	{
+    	// calculate the random class for these SomeParticles
+    	exp_random_class_some_particles.clear();
+    	for (long int ori_part_id = my_first_ori_particle; ori_part_id <= my_last_ori_particle; ori_part_id++)
+    	{
+        	init_random_generator(random_seed + ori_part_id);
+    		int random_class = rand() % mymodel.nr_classes;
+    		exp_random_class_some_particles.push_back(random_class);
+    	}
+	}
+
+    // Only open/close stacks once
     fImageHandler hFile;
 	long int dump;
 	FileName fn_img, fn_stack, fn_open_stack="";
