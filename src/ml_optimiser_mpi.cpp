@@ -2579,7 +2579,7 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 		Image<RFLOAT> It;
 //#define DEBUG_RECONSTRUCTION
 #ifdef DEBUG_RECONSTRUCTION
-		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);
 #else
 		FileName fn_root = fn_out + "_half" + integerToString(node->rank);;
 #endif
