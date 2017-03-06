@@ -716,7 +716,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 	{
 		// If no -ref is given, calculate average of all unaligned images later on.
 		do_average_unaligned = true;
-		do_generate_seeds = true;
+		do_generate_seeds = false; // after SGD introduction, this is now done in the estimation of initial sigma2 step!
 		refs_are_ctf_corrected = true;
 		if (_is_3d_model || data_dim == 3)
 		{

@@ -2519,12 +2519,12 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 				break;
 			}
 		}
-		if (verb > 0)
-		{
-			std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
-		}
 		if (randomize_at > 0)
 		{
+			if (verb > 0)
+			{
+				std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
+			}
 			randomizePhasesBeyond(Iunreg1(), randomize_at);
 			randomizePhasesBeyond(Iunreg2(), randomize_at);
 			// Mask randomized phases maps and calculated fsc_random_masked
@@ -2532,32 +2532,37 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			Iunreg2() *= Imask();
 			getFSC(Iunreg1(), Iunreg2(), fsc_random_masked);
 
+			// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
+			// FSC_true = FSC_t - FSC_n / ( )
+			fsc_true.resize(fsc_masked);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+			{
+				// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
+				if (i < randomize_at + 2)
+				{
+					DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
+				}
+				else
+				{
+					RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
+					RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
+					if (fscn > fsct)
+						DIRECT_A1D_ELEM(fsc_true, i) = 0.;
+					else
+						DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+				}
+			}
+			mymodel.fsc_halves_class = fsc_true;
 		}
 		else
-			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.  You may want to check your mask.");
-
-		// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
-		// FSC_true = FSC_t - FSC_n / ( )
-		fsc_true.resize(fsc_masked);
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
 		{
-					// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
-			if (i < randomize_at + 2)
-			{
-				DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
-			}
-			else
-			{
-				RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
-				RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
-				if (fscn > fsct)
-					DIRECT_A1D_ELEM(fsc_true, i) = 0.;
-				else
-					DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
-			}
-		}
-		mymodel.fsc_halves_class = fsc_true;
+			std::cerr << " WARNING: FSC curve between unmasked maps never drops below 0.8. Using unmasked FSC as FSC_true... "<<std::endl;
+			std::cerr << " WARNING: This message should go away during the later stages of refinement!" << std::endl;
 
+			for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(fsc_unmasked); idx++)
+				DIRECT_A1D_ELEM(fsc_unmasked, idx) = 0.;
+			mymodel.fsc_halves_class = fsc_unmasked;
+		}
 	}
 
 	// Now the master sends the fsc curve to everyone else
@@ -2574,7 +2579,7 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 		Image<RFLOAT> It;
 //#define DEBUG_RECONSTRUCTION
 #ifdef DEBUG_RECONSTRUCTION
-		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);
 #else
 		FileName fn_root = fn_out + "_half" + integerToString(node->rank);;
 #endif
