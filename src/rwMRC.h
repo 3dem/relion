@@ -32,6 +32,8 @@
 #include "config.h"
 #endif
 
+#define SAFESET(var, value) ( var = (std::isfinite(value)) ? value : var )
+
 #define MRCSIZE    1024 // Minimum size of the MRC header (when nsymbt = 0)
 
 ///@defgroup MRC MRC File format
@@ -366,30 +368,30 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
         	header->arms  = (float)data.computeStddev();
 
         if(MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_X, aux))
-            header->nxStart = (int)(aux-0.5);
+        	SAFESET(header->nxStart,(int)(aux-0.5));
 
         if (MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X,aux2))//header is init to zero
         {
-        	header->xOrigin = (float)(aux*aux2);
-        	header->a = (float)aux2*header->nx;
+        	SAFESET(header->xOrigin,(float)(aux*aux2));
+        	SAFESET(header->a,(float)aux2*header->nx);
         }
 
         if (MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_Y, aux))
-            header->nyStart = (int)(aux-0.5);
+        	SAFESET(header->nyStart,(int)(aux-0.5));
 
         if (MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Y,aux2))//header is init to zero
         {
-         	header->yOrigin = (float)(aux*aux2);
-         	header->b = (float)aux2*header->ny;
+        	SAFESET(header->yOrigin,(float)(aux*aux2));
+        	SAFESET(header->b,(float)aux2*header->ny);
         }
 
         if (MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_Z, aux))
-            header->nzStart = (int)(aux-0.5);
+        	SAFESET(header->nzStart,(int)(aux-0.5));
 
         if (MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Z,aux2))//header is init to zero
         {
-        	header->zOrigin = (float)(aux*aux2);
-        	header->c = (float)aux2*header->nz;
+        	SAFESET(header->zOrigin,(float)(aux*aux2));
+        	SAFESET(header->c,(float)aux2*header->nz);
         }
 
     }
