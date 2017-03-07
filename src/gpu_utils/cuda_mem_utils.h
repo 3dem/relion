@@ -17,6 +17,7 @@
 
 #include "src/macros.h"
 #include "src/error.h"
+#include "src/parallel.h"
 
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 #include <execinfo.h>
@@ -615,20 +616,17 @@ public:
 
 	void resize(size_t size)
 	{
-		pthread_mutex_lock(&mutex);
-
+		Lock ml(&mutex);
 		_clear();
 		totalSize = size;
 		_setup();
-
-		pthread_mutex_unlock(&mutex);
 	}
 
 
 	inline
 	Alloc* alloc(size_t requestedSize)
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 
 		_freeReadyAllocs();
 
@@ -684,7 +682,6 @@ public:
 							(unsigned long) size, (unsigned long) _getLargestContinuousFreeSpace(), (unsigned long) _getTotalFreeSpace());
 
 					_printState();
-					pthread_mutex_unlock(&mutex);
 
 					fflush(stdout);
 					CRITICAL(ERRCUDACAOOM);
@@ -732,8 +729,6 @@ public:
 			first = newAlloc;
 		}
 
-		pthread_mutex_unlock(&mutex);
-
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 		newAlloc->backtraceSize = backtrace(newAlloc->backtrace, 20);
 		newAlloc->guardPtr = newAlloc->ptr + requestedSize;
@@ -747,12 +742,10 @@ public:
 
 	~CudaCustomAllocator()
 	{
-
-		pthread_mutex_lock(&mutex);
-
-		_clear();
-
-		pthread_mutex_unlock(&mutex);
+		{
+			Lock ml(&mutex);
+			_clear();
+		}
 		pthread_mutex_destroy(&mutex);
 	}
 
@@ -761,64 +754,56 @@ public:
 	inline
 	void free(Alloc* a)
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		_free(a);
-		pthread_mutex_unlock(&mutex);
 	}
 
 	inline
 	void syncReadyEvents()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		_syncReadyEvents();
-		pthread_mutex_unlock(&mutex);
 	}
 
 	inline
 	void freeReadyAllocs()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		_freeReadyAllocs();
-		pthread_mutex_unlock(&mutex);
 	}
 
 	size_t getTotalFreeSpace()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		size_t size = _getTotalFreeSpace();
-		pthread_mutex_unlock(&mutex);
 		return size;
 	}
 
 	size_t getTotalUsedSpace()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		size_t size = _getTotalUsedSpace();
-		pthread_mutex_unlock(&mutex);
 		return size;
 	}
 
 	size_t getNumberOfAllocs()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		size_t size = _getNumberOfAllocs();
-		pthread_mutex_unlock(&mutex);
 		return size;
 	}
 
 	size_t getLargestContinuousFreeSpace()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		size_t size = _getLargestContinuousFreeSpace();
-		pthread_mutex_unlock(&mutex);
 		return size;
 	}
 
 	void printState()
 	{
-		pthread_mutex_lock(&mutex);
+		Lock ml(&mutex);
 		_printState();
-		pthread_mutex_unlock(&mutex);
 	}
 };
 
@@ -840,7 +825,7 @@ public:
 	inline
 	CudaGlobalPtr(CudaCustomAllocator *allocator):
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -852,7 +837,7 @@ public:
 	inline
 	CudaGlobalPtr(size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -864,19 +849,19 @@ public:
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size, CudaCustomAllocator *allocator):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(0), stream(0)
+		d_do_free(false), allocator(allocator), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -892,7 +877,7 @@ public:
 	inline
 	CudaGlobalPtr():
 		size(0), h_ptr(0), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -904,7 +889,7 @@ public:
 	inline
 	CudaGlobalPtr(size_t size):
 		size(size), h_ptr(new T[size]), d_ptr(0), h_do_free(true),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
@@ -922,13 +907,13 @@ public:
 	inline
 	CudaGlobalPtr(T * h_start, size_t size, cudaStream_t stream):
 		size(size), h_ptr(h_start), d_ptr(0), h_do_free(false),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline
 	CudaGlobalPtr(T * h_start, T * d_start, size_t size):
 		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(0), alloc(0), stream(0)
+		d_do_free(false), allocator(0), alloc(0), stream(cudaStreamPerThread)
 	{};
 
 	inline

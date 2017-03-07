@@ -630,7 +630,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 //			d_img.streamSync();
 //			d_img.cp_to_host();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 //			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 //			{
@@ -993,8 +993,6 @@ void getAllSquaredDifferencesCoarse(
 		Fimg_real.put_on_device();
 		Fimg_imag.put_on_device();
 
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-
 		CTOC(cudaMLO->timer,"translation_1");
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
@@ -1006,6 +1004,10 @@ void getAllSquaredDifferencesCoarse(
 
 		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 		allWeights_pos = 0;
+
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1059,6 +1061,7 @@ void getAllSquaredDifferencesCoarse(
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
 		op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
@@ -1207,6 +1210,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		cudaStager<XFLOAT> AllEulers(cudaMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
 		unsigned long newDataSize(0);
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			FPCMasks[ipart][exp_iclass].weightNum=0;
@@ -1289,10 +1293,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			}
 		}
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-
 		// copy stagers to device
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
@@ -1300,7 +1300,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		FinePassWeights[ipart].rot_id.cp_to_device(); //FIXME this is not used
 		FinePassWeights[ipart].rot_idx.cp_to_device();
 		FinePassWeights[ipart].trans_idx.cp_to_device();
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1357,14 +1360,15 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						cudaMLO->dataIs3D
 						);
 
-//				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+//				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				CTOC(cudaMLO->timer,"Diff2CALL");
 
 			} // end if class significant
 		} // end loop iclass
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
@@ -1488,7 +1492,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			std::pair<int, XFLOAT> min_pair=getArgMinOnDevice(PassWeights[ipart].weights);
 			PassWeights[ipart].weights.cp_to_host();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 			//Set all device-located weights to zero, and only the smallest one to 1.
 			DEBUG_HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[ipart].weights), 0.f, PassWeights[ipart].weights.getSize()*sizeof(XFLOAT),0));
@@ -1497,7 +1501,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights[ipart].weights(min_pair.first) ), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
 
 			PassWeights[ipart].weights.cp_to_host();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 			my_significant_weight = 0.999;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) 1.;
@@ -1667,7 +1671,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 
 				CTIC(cudaMLO->timer,"sort");
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 				long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
 
@@ -1791,10 +1795,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
 					Mcoarse_significant.device_alloc();
 
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 					arrayOverThreshold<weights_t>(unsorted_ipart, Mcoarse_significant, significant_weight);
 					Mcoarse_significant.cp_to_host();
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				}
 				else if (ipart_length == 1)
 				{
@@ -1805,6 +1809,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 			else
 			{
+
+				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
 					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -1837,13 +1846,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 				PassWeights[ipart].weights.cp_to_host(); // note that the host-pointer is shared: we're copying to Mweight.
 
 
 				CTIC(cudaMLO->timer,"sort");
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				size_t weightSize = PassWeights[ipart].weights.getSize();
 
 				CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
@@ -2113,7 +2122,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		oo_otrans_z.put_on_device();
 
 		myp_oo_otrans_x2y2z2.cp_to_device();
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		CudaGlobalPtr<XFLOAT>                      p_weights(sumBlockNum, cudaMLO->devBundle->allocator);
 		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetx_class(sumBlockNum, cudaMLO->devBundle->allocator);
@@ -2132,6 +2141,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		p_thr_wsum_sigma2_offset.device_alloc();
 		CTOC(cudaMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
+
+
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
@@ -2182,7 +2193,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if (cudaMLO->dataIs3D)
 			p_thr_wsum_prior_offsetz_class.cp_to_host();
 
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		int iorient = 0;
 		partial_pos=0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2495,6 +2506,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int classPos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+
+		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
 				continue;
@@ -2556,7 +2571,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		classPos = 0;
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2651,12 +2666,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// its absence in other parts of the code has caused issues. It is also very low-cost.
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		wdiff2s_AA.cp_to_host();
 		wdiff2s_XA.cp_to_host();
 		wdiff2s_sum.cp_to_host();
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		AAXA_pos=0;
 
@@ -2987,7 +3002,7 @@ void MlOptimiserCuda::resetData()
 
 	classStreams.resize(nr_classes, 0);
 	for (int i = 0; i < nr_classes; i++)
-		HANDLE_ERROR(cudaStreamCreate(&classStreams[i]));
+		HANDLE_ERROR(cudaStreamCreate(&classStreams[i])); //HANDLE_ERROR(cudaStreamCreateWithFlags(&classStreams[i],cudaStreamNonBlocking));
 
 	transformer1.clear();
 	transformer2.clear();
