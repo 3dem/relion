@@ -138,8 +138,10 @@ void softMaskOutsideMapForHelix(
 	A.clear();
 	A.resize(3, 3);
 
-	// Rotate the particle (so that the helical cylinder spans X axis)
-	Euler_angles2matrix(0., -tilt_deg, -psi_deg, A, false);  // Beware - negative sign!
+	// Rotate the particle (helical axes are X and Z for 2D and 3D segments respectively)
+	Euler_angles2matrix(0., tilt_deg, psi_deg, A, false);
+	// Don't put negative signs before tilt and psi values, use 'transpose' instead
+	A = A.transpose();
 
 	// Calculate noise weights for all voxels
 	sum_bg = sum = 0.;
@@ -159,7 +161,7 @@ void softMaskOutsideMapForHelix(
 
 			// Distance from the point to helical axis (perpendicular to X axis)
 			if (dim == 3)
-				d = sqrt(YY(coords) * YY(coords) + ZZ(coords) * ZZ(coords));
+				d = sqrt(YY(coords) * YY(coords) + XX(coords) * XX(coords));
 			else
 				d = ABS(YY(coords));
 			if (d > D2) // Noise areas (get values for noise estimations)
@@ -197,7 +199,7 @@ void softMaskOutsideMapForHelix(
 
 		// Distance from the point to helical axis (perpendicular to X axis)
 		if (dim == 3)
-			d = sqrt(YY(coords) * YY(coords) + ZZ(coords) * ZZ(coords));
+			d = sqrt(YY(coords) * YY(coords) + XX(coords) * XX(coords));
 		else
 			d = ABS(YY(coords));
 

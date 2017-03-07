@@ -225,8 +225,9 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 				if ( ((ori_particles[i]).particles_id.size() != 1) || ((ori_particles[i]).particles_order.size() != 1) )
 					REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: cannot divide helical segments into random halves with tilt series or movie frames!");
 			}
-			if (!MDimg.containsLabel(EMDL_IMAGE_NAME))
-				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Input MetadataTable should contain rlnImageName!");
+
+			if ( (!MDimg.containsLabel(EMDL_IMAGE_NAME)) || (!MDimg.containsLabel(EMDL_MICROGRAPH_NAME)) )
+				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Input MetadataTable should contain rlnImageName and rlnMicrographName!");
 
 			divide_according_to_helical_tube_id = false;
 			if (MDimg.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
@@ -236,8 +237,13 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 			map_mics.clear();
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 			{
-				MDimg.getValue(EMDL_IMAGE_NAME, img_name);
-				mic_name = img_name.substr(img_name.find("@") + 1);
+				// == OLD ==
+				//MDimg.getValue(EMDL_IMAGE_NAME, img_name);
+				//mic_name = img_name.substr(img_name.find("@") + 1);
+				// == NEW == compatible with 3D subtomograms
+				MDimg.getValue(EMDL_MICROGRAPH_NAME, img_name);
+				mic_name = img_name;
+
 				if (divide_according_to_helical_tube_id)
 				{
 					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
@@ -316,8 +322,9 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 			{
-				MDimg.getValue(EMDL_IMAGE_NAME, img_name);
-				mic_name = img_name.substr(img_name.find("@") + 1);
+				MDimg.getValue(EMDL_MICROGRAPH_NAME, img_name);
+				mic_name = img_name;
+
 				if (divide_according_to_helical_tube_id)
 				{
 					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
@@ -1136,6 +1143,8 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 	bool have_psi  = MDimg.containsLabel(EMDL_ORIENT_PSI);
 	bool have_xoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X);
 	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y);
+	bool have_zoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z);
+	bool have_zcoord = MDimg.containsLabel(EMDL_IMAGE_COORD_Z);
 	bool have_clas = MDimg.containsLabel(EMDL_PARTICLE_CLASS);
 	bool have_norm = MDimg.containsLabel(EMDL_IMAGE_NORM_CORRECTION);
 
@@ -1166,6 +1175,8 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 			MDimg.setValue(EMDL_ORIENT_ORIGIN_X, dzero);
 		if (!have_yoff)
 			MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, dzero);
+		if ( (!have_zoff) && (have_zcoord) )
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_Z, dzero);
 		if (!have_clas)
 			MDimg.setValue(EMDL_PARTICLE_CLASS, izero);
 		if (!have_norm)

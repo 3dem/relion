@@ -42,9 +42,9 @@ int main(int argc, char **argv)
 
     catch (RelionError XE)
     {
-        //optimiser.usage();
+        optimiser.usage();
         std::cerr << XE;
-	
+
         return EXIT_FAILURE;
     }
 

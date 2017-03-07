@@ -165,7 +165,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		particle_diameter = textToFloat(fnt);
 
-	// Check whether to join the random halves again
+	// SGD stuff
+	if (parser.checkOption("--stop_sgd", "Switch from stochastic gradient descent to expectation maximisation for the remainder of iterations."))
+		do_sgd = false;
+
+	fnt = parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "OLD");
+	if (fnt != "OLD")
+		sgd_max_subsets = textToInteger(fnt);
+
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
 	// Re-align movie frames
@@ -332,6 +339,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		strict_highres_exp = textToFloat(fnt);
 
+	fnt = parser.getOption("--strict_highres_sgd", "Resolution limit (in Angstrom) to restrict probability calculations in SGD", "OLD");
+	if (fnt != "OLD")
+		strict_highres_sgd = textToFloat(fnt);
+
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
 	minres_map = textToInteger(getParameter(argc, argv, "--minres_map", "5"));
@@ -353,12 +364,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
-
-	// Trial feature subset
-	subset_iter = 		textToInteger(parser.getOption("--subset_iter", "", "0", true));
-	subset_frac = 		textToFloat(parser.getOption("--subset_frac", "", "1", true));
-	if(subset_frac<=0 || subset_frac>1)
-		subset_frac=1;
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -408,6 +413,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// Initialisation
 	int init_section = parser.addSection("Initialisation");
 	fn_ref = parser.getOption("--ref", "Image, stack or star-file with the reference(s). (Compulsory for 3D refinement!)", "None");
+	is_3d_model = parser.checkOption("--denovo_3dref", "Make an initial 3D model from randomly oriented 2D particles");
 	mymodel.sigma2_offset = textToFloat(parser.getOption("--offset", "Initial estimated stddev for the origin offsets", "3"));
 	mymodel.sigma2_offset *= mymodel.sigma2_offset;
 
@@ -505,6 +511,16 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Only perform CTF phase-flipping? (default is full amplitude-correction)");
 	do_norm_correction = parser.checkOption("--norm", "Perform normalisation-error correction?");
 	do_scale_correction = parser.checkOption("--scale", "Perform intensity-scale corrections on image groups?");
+
+	// SGD stuff
+	int sgd_section = parser.addSection("Stochastic Gradient Descent");
+	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
+	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
+	subset_size = textToInteger(parser.getOption("--subset_size", "Size of the subsets for SGD", "-1"));
+	sgd_stepsize = textToFloat(parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "0.5"));
+	sgd_max_subsets = textToInteger(parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "-1"));
+	write_every_subset = textToInteger(parser.getOption("--write_subsets", "Write out model every so many subsets (default is not writing any)", "-1"));
+	strict_highres_sgd = textToFloat(parser.getOption("--strict_highres_sgd", "Resolution limit (in Angstrom) to restrict probability calculations in SGD", "20"));
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -610,12 +626,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
 
-	// Trial feature subset
-	subset_iter = 		textToInteger(parser.getOption("--subset_iter", "", "0", true));
-	subset_frac = 		textToFloat(parser.getOption("--subset_frac", "", "1", true));
-	if(subset_frac<=0 || subset_frac>1)
-		subset_frac=1;
-
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
 #endif
@@ -664,6 +674,11 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp) ||
 		!MD.getValue(EMDL_OPTIMISER_INCR_SIZE, incr_size) ||
 		!MD.getValue(EMDL_OPTIMISER_DO_MAP, do_map) ||
+		!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd) ||
+		!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu) ||
+		!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size) ||
+		!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset) ||
+		!MD.getValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets) ||
 		!MD.getValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine) ||
 		!MD.getValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches) ||
 	    !MD.getValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain) ||
@@ -718,6 +733,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
     	helical_keep_tilt_prior_fixed = false;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
+	if (!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd))
+		strict_highres_sgd = -1.;
+
 
     if (do_split_random_halves &&
     		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -781,6 +799,22 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	else
 		fn_root = fn_out;
 
+
+	if (iter > 0 && nr_subsets > 1 && subset != nr_subsets - 1)
+	{
+		do_write_sampling = false;
+		do_write_data = false;
+		do_write_optimiser = false;
+		if (do_write_model && ((subset + 1) % write_every_subset) == 0)
+		{
+			fn_root.compose(fn_root+"_sub", subset+1, "", 4);
+		}
+		else
+		{
+			do_write_model = false;
+		}
+	}
+
 	// First write "main" STAR file with all information from this run
 	// Do this for random_subset==0 and random_subset==1
 	if (do_write_optimiser && random_subset < 2)
@@ -842,6 +876,12 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp);
 		MD.setValue(EMDL_OPTIMISER_INCR_SIZE, incr_size);
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
+		MD.setValue(EMDL_OPTIMISER_DO_SGD, do_sgd);
+		MD.setValue(EMDL_OPTIMISER_SGD_MU, mu);
+		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
+		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset);
+		MD.setValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets);
+		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 	    MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
@@ -1186,13 +1226,20 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::cout << " Running CPU instructions in double precision. " << std::endl;
 #endif
 
-	// Check if output directory exists
-	FileName fn_dir = fn_out.beforeLastOf("/");
-	if (!exists(fn_dir))
-		REPORT_ERROR("ERROR: output directory does not exist!");
+    // Check if output directory exists
+    FileName fn_dir = fn_out.beforeLastOf("/");
+    if (!exists(fn_dir))
+    	REPORT_ERROR("ERROR: output directory does not exist!");
 
-    if (do_skip_align)
-		do_gpu = false;
+    // Just die if trying to use GPUs and skipping alignments
+    if (do_skip_align && do_gpu)
+    	REPORT_ERROR("ERROR: you cannot use GPUs when skipping alignments");
+
+    if (do_gpu && do_sgd)
+    	REPORT_ERROR("ERROR: SGD has not been implemented on the GPU yet... If you use a few thousand, downscaled particles it will be very quick anyway.");
+
+	if (do_always_cc)
+		do_calculate_initial_sigma_noise = false;
 
     if (do_print_metadata_labels)
 	{
@@ -1252,8 +1299,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 			REPORT_ERROR("This program only works with even values for the image dimensions!");
 
 		// Read in the reference(s) and initialise mymodel
-		mymodel.readImages(fn_ref, ori_size, mydata,
-				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected);
+		int refdim = (fn_ref == "denovo") ? 3 : 2;
+		mymodel.readImages(fn_ref, is_3d_model, ori_size, mydata,
+				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, do_sgd);
 
     	// Check consistency of EMDL_CTF_MAGNIFICATION and MEBL_CTF_DETECTOR_PIXEL_SIZE with mymodel.pixel_size
     	RFLOAT mag, dstep, first_angpix, my_angpix;
@@ -1346,7 +1394,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
 	{
-
 		if (mymodel.ref_dim != 3)
 			REPORT_ERROR("ERROR: cannot do 2D helical refinement!");
 
@@ -1356,9 +1403,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (mymodel.nr_bodies != 1)
 			REPORT_ERROR("ERROR: cannot do multi-body refinement for helices!");
 
-		// TODO: check this!!!
-		if (do_shifts_onthefly)
-			REPORT_ERROR("ERROR: cannot calculate phase-shift AB matrices on-the-fly for helices!");
+		if ( (!do_gpu) && (do_shifts_onthefly) && (!ignore_helical_symmetry) && (verb > 0) )
+		{
+			std::cerr << " WARNING: On-the-fly shifts slow down helical reconstructions with CPUs considerably. "
+					<< "Enable this option only if limited RAM causes trouble (e.g. too large segment boxes used or in 3D sub-tomogram averaging). "
+					<< std::endl;
+		}
 
 		if ( (helical_keep_tilt_prior_fixed) && (!(helical_sigma_distance < 0.)) )
 			REPORT_ERROR("ERROR: cannot keep tilt priors fixed while doing local averaging of helical segments along the same filaments!");
@@ -1544,11 +1594,20 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// TODO: later do norm correction?!
 		// Don't do norm correction for volume averaging at this stage....
 		do_norm_correction = false;
-		do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
+
+		if (!((do_helical_refine) && (!ignore_helical_symmetry))) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
+			do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
+
 		if (do_skip_align)
 			do_shifts_onthefly = false; // on-the-fly shifts are incompatible with do_skip_align!
 		// getMetaAndImageData is not made for passing multiple volumes!
 		do_parallel_disc_io = true;
+	}
+	// Tabulated sine and cosine values (for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts)
+	if ( (!do_gpu) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_shifts_onthefly) )
+	{
+		tab_sin.initialise(100000);
+		tab_cos.initialise(100000);
 	}
 
 	// Skip scale correction if there are no groups
@@ -1568,6 +1627,23 @@ void MlOptimiser::initialiseGeneral(int rank)
 	mydata.MDexp.getValue(EMDL_IMAGE_SIZE, data_image_size);
 	if (XSIZE(mymodel.Iref[0]) != data_image_size)
 		REPORT_ERROR("ERROR: reference and data image sizes are not the same!");
+
+	// Make subsets?
+	nr_subsets = 1;
+	if (subset_size > 0)
+	{
+    	//do_norm_correction = false;
+	    //do_scale_correction = false;
+	    if (random_seed != 0)
+    		mydata.randomiseOriginalParticlesOrder(random_seed);
+	    nr_subsets = mydata.numberOfOriginalParticles() / subset_size;
+	    if (write_every_subset < 0)
+	    	write_every_subset = nr_subsets;
+    }
+	else
+	{
+	    mu = 0.;
+	}
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -1605,7 +1681,19 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 #endif
 
     int barstep, my_nr_ori_particles = my_last_ori_particle_id - my_first_ori_particle_id + 1;
-	if (myverb > 0)
+    if (my_nr_ori_particles < 1)
+    {
+    	// Master doesn't do anything here...
+    	// But still set Mavg the right size for AllReduce later on
+    	FileName fn_img;
+    	mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, 0);
+    	Image<RFLOAT> img;
+    	img.read(fn_img, false); // don't read data
+    	Mavg.initZeros(img());
+    	return;
+    }
+
+    if (myverb > 0)
 	{
 		std::cout << " Estimating initial noise spectra " << std::endl;
 		init_progress_bar(my_nr_ori_particles);
@@ -1620,11 +1708,17 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	// Note the loop over the particles (part_id) is MPI-parallelized
 	int nr_ori_particles_done = 0;
 	FileName fn_img, fn_stack;
-	MultidimArray<RFLOAT> ind_spectrum, sum_spectrum, count;
 	// For spectrum calculation: recycle the transformer (so do not call getSpectrum all the time)
 	MultidimArray<Complex > Faux;
     FourierTransformer transformer;
 	MetaDataTable MDimg;
+
+	// Start reconstructions at ini_high or 0.07 digital frequencies....
+	if (ini_high <= 0.)
+		wsum_model.current_size = 1./mymodel.getResolution(ROUND(0.07 * mymodel.ori_size));
+	else
+		wsum_model.current_size  = mymodel.getPixelFromResolution(1./ini_high);
+	wsum_model.initZeros();
 
 	for (long int ori_part_id = my_first_ori_particle_id; ori_part_id <= my_last_ori_particle_id; ori_part_id++, nr_ori_particles_done++)
 	{
@@ -1723,24 +1817,17 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), width_mask_edge);
 			}
 
-			// Randomize the initial orientations for volume refinements
-			if (mymodel.data_dim == 3)
-			{
-				RFLOAT rot, tilt, psi;
-				Matrix2D<RFLOAT> A;
-				rot = rnd_unif()*360.;
-				tilt = rnd_unif()*180.;
-				psi = rnd_unif()*360.;
-				Euler_angles2matrix(rot, tilt, psi, A, true);
-				RFLOAT stddev1 = img().computeStddev();
-				selfApplyGeometry(img(), A, IS_INV, WRAP);
-				RFLOAT stddev2 = img().computeStddev();
-				// Correct for interpolation errors that drive down the average density...
-				img() *= stddev1 / stddev2;
-			}
+			// Keep track of the average image (only to correct power spectra, no longer for initial references!)
+			if (part_id == mydata.ori_particles[my_first_ori_particle_id].particles_id[0])
+				Mavg = img();
+			else
+				Mavg += img();
 
-			// Calculate this image's power spectrum in: ind_spectrum
-			ind_spectrum.initZeros(XSIZE(img()));
+			// Calculate the power spectrum of this particle
+			CenterFFT(img(), true);
+   			transformer.FourierTransform(img(), Faux);
+   			MultidimArray<RFLOAT> ind_spectrum, count;
+   			ind_spectrum.initZeros(XSIZE(img()));
 			count.initZeros(XSIZE(img()));
 			// recycle the same transformer for all images
 			transformer.FourierTransform(img(), Faux, false);
@@ -1754,16 +1841,57 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			// Resize the power_class spectrum to the correct size and keep sum
 			ind_spectrum.resize(wsum_model.sigma2_noise[0]); // Store sum of all groups in group 0
-			wsum_model.sigma2_noise[0] += ind_spectrum;
-			wsum_model.sumw_group[0] += 1.;
-			mymodel.nr_particles_group[group_id] += 1;
+			wsum_model.sigma2_noise[group_id] += ind_spectrum;
+			wsum_model.sumw_group[group_id] += 1.;
 
+			if (fn_ref == "None")
+			{
 
-			// Also calculate average image
-			if (part_id == mydata.ori_particles[my_first_ori_particle_id].particles_id[0])
-				Mavg = img();
-			else
-				Mavg += img();
+				MultidimArray<RFLOAT> Fctf, Fweight;
+				MultidimArray<Complex > Fimg;
+
+				// Make sure MPI and sequentialo behave exactly the same
+				init_random_generator(random_seed + part_id);
+				// Randomize the initial orientations for initial reference generation at this step....
+				// TODO: this is not an even angular distribution....
+				RFLOAT rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
+				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. :rnd_unif() * 180.;
+				RFLOAT psi  = rnd_unif() * 360.;
+				int iclass  = rnd_unif() * mymodel.nr_classes;
+				Matrix2D<RFLOAT> A;
+				Euler_angles2matrix(rot, tilt, psi, A, true);
+
+				// Construct initial references from random subsets
+	   			windowFourierTransform(Faux, Fimg, wsum_model.current_size);
+				Fctf.resize(Fimg);
+				Fctf.initConstant(1.);
+				// Apply CTF if necessary (skip this for subtomograms!)
+				if (do_ctf_correction && mymodel.data_dim != 3)
+				{
+					CTF ctf;
+					ctf.read(MDimg, MDimg);
+					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
+						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+					{
+						DIRECT_MULTIDIM_ELEM(Fimg, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
+				}
+				(wsum_model.BPref[iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fctf);
+			}
+
+			// For sub-tomogram averaging: take effect of rotations on stddev of images into account here
+			// TODO: CHECK THAT NOW THAT WE USE BPref TO CALCULATE AVERAGE: THIS IS NO LONGER NECESSARY?!!!
+			//if (mymodel.data_dim == 3)
+			//{
+			//	RFLOAT stddev1 = img().computeStddev();
+			//	selfApplyGeometry(img(), A, IS_INV, WRAP);
+			//	RFLOAT stddev2 = img().computeStddev();
+			//	// Correct for interpolation errors that drive down the average density...
+			//	img() *= stddev1 / stddev2;
+			//}
+
 
 		} // end loop part_id (i)
 
@@ -1794,33 +1922,77 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 #endif
 
 	// First calculate average image
-	Mavg /= wsum_model.sumw_group[0];
+	RFLOAT total_sum = 0.;
+    for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
+    {
+    	mymodel.nr_particles_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
+    	total_sum += wsum_model.sumw_group[igroup];
+    }
+    Mavg /= total_sum;
 
-	// for 2D refinements set 2D average to all references
-	if (do_average_unaligned)
+	if (fn_ref == "None")
 	{
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-			mymodel.Iref[iclass] = Mavg;
+		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+		{
+
+			MultidimArray<RFLOAT> dummy;
+			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, false,
+					1., dummy, dummy, dummy, dummy);
+			// 2D projection data were CTF-corrected, subtomograms were not
+			refs_are_ctf_corrected = (mymodel.data_dim == 3) ? false : true;
+		}
 	}
 
 	// Calculate sigma2_noise estimates as average of power class spectra, and subtract power spectrum of the average image from that
 	if (do_calculate_initial_sigma_noise)
 	{
-		// Factor 2 because of 2-dimensionality of the complex plane
-		mymodel.sigma2_noise[0] = wsum_model.sigma2_noise[0] / ( 2. * wsum_model.sumw_group[0] );
-
 		// Calculate power spectrum of the average image
 		MultidimArray<RFLOAT> spect;
 		getSpectrum(Mavg, spect, POWER_SPECTRUM);
 		spect /= 2.; // because of 2-dimensionality of the complex plane
-
-		// Now subtract power spectrum of the average image from the average power spectrum of the individual images
 		spect.resize(mymodel.sigma2_noise[0]);
-		mymodel.sigma2_noise[0] -= spect;
 
-		// Set the same spectrum for all groups
-		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] = mymodel.sigma2_noise[0];
+		for (int igroup = 0; igroup < wsum_model.nr_groups; igroup++)
+		{
+			// Factor 2 because of 2-dimensionality of the complex plane
+			mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
+
+			// Now subtract power spectrum of the average image from the average power spectrum of the individual images
+			mymodel.sigma2_noise[igroup] -= spect;
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(spect)
+			{
+				// Remove any negative sigma2_noise values: replace by positive neighbouring value
+				if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) < 0. )
+				{
+					// First try the previous value
+					if (n - 1 >= 0 && DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n - 1) > 0.)
+					{
+						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n - 1);
+					}
+					else
+					{
+						bool is_positive = false;
+						int nn = n;
+						while (!is_positive)
+						{
+							nn++;
+							if (nn > XSIZE(mymodel.sigma2_noise[igroup]))
+							{
+								std::cerr << " igroup= " << igroup << " n= " << n << " mymodel.sigma2_noise[igroup]= " << mymodel.sigma2_noise[igroup] << std::endl;
+								REPORT_ERROR("BUG! cannot find positive values in sigma2_noise spectrum");
+							}
+							if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], nn) > 0.)
+							{
+								is_positive = true;
+								DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], nn);
+							}
+						}
+					}
+				}
+			}
+
+		}
 	}
 
 #ifdef DEBUG_INI
@@ -1921,143 +2093,166 @@ void MlOptimiser::iterate()
 		std::cerr << std::endl;
 #endif
 
+		for (subset = 0; subset < nr_subsets; subset++)
+		{
 #ifdef TIMING
-		timer.tic(TIMING_EXP);
+			timer.tic(TIMING_EXP);
 #endif
 
-		if (do_auto_refine)
-		{
-			// Check whether we have converged by now
-			// If we have, set do_join_random_halves and do_use_all_data for the next iteration
-			checkConvergence();
-		}
-
-		expectation();
-
-		// Sjors & Shaoda Apr 2015
-		// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
-		// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
-		// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
-		// Finally it applies point group symmetry (such as Cn, ...).
-		// DEBUG
-		if (verb > 0)
-		{
-			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+			if (do_auto_refine)
 			{
-				if (mymodel.helical_nr_asu > 1)
-					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
-				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
-				{
-					std::cout << " Refining helical symmetry in real space..." << std::endl;
-					std::cout << " Applying refined helical symmetry in real space..." << std::endl;
-				}
-				else
-					std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
+				// Check whether we have converged by now
+				// If we have, set do_join_random_halves and do_use_all_data for the next iteration
+				checkConvergence();
 			}
-		}
-		symmetriseReconstructions();
 
-#ifdef TIMING
-		timer.toc(TIMING_EXP);
-		timer.tic(TIMING_MAX);
-#endif
+			expectation();
 
-		if (do_skip_maximization)
-		{
-			// Only write data.star file and break from the iteration loop
-			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
-			break;
-		}
+			int old_verb = verb;
+			if (nr_subsets > 1) // be quiet
+				verb = 0;
 
-		maximization();
-
-#ifdef TIMING
-		timer.toc(TIMING_MAX);
-#endif
-
-		// Shaoda Jul26,2015
-		// Helical symmetry refinement and imposition of real space helical symmetry.
-		if (do_helical_refine)
-		{
-			if (!ignore_helical_symmetry)
-				makeGoodHelixForEachRef();
-			if ( (!do_skip_align) && (!do_skip_rotate) )
+			// Sjors & Shaoda Apr 2015
+			// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
+			// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
+			// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
+			// Finally it applies point group symmetry (such as Cn, ...).
+			// DEBUG
+			if (verb > 0)
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				RFLOAT opposite_percentage = 0.;
-				bool do_local_angular_searches = false;
-				if ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches))
-					do_local_angular_searches = true;
-				else if ((!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI) && (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.))
-					do_local_angular_searches = true;
-
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
+				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				{
-					updatePriorsForHelicalReconstruction(
-							mydata.MDimg,
-							nr_opposite_polarity,
-							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
-							(mymodel.data_dim == 3),
-							do_auto_refine,
-							do_local_angular_searches,
-							mymodel.sigma2_rot,
-							mymodel.sigma2_tilt,
-							mymodel.sigma2_psi,
-							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					if ( (verb > 0) && (!do_local_angular_searches) )
+					if (mymodel.helical_nr_asu > 1)
+						std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
+					if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
 					{
-						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
-						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+						std::cout << " Refining helical symmetry in real space..." << std::endl;
+						std::cout << " Applying refined helical symmetry in real space..." << std::endl;
+					}
+					else
+						std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
+				}
+			}
+			symmetriseReconstructions();
+
+#ifdef TIMING
+			timer.toc(TIMING_EXP);
+			timer.tic(TIMING_MAX);
+#endif
+
+			if (do_skip_maximization)
+			{
+				// Only write data.star file and break from the iteration loop
+				write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
+				break;
+			}
+
+			maximization();
+
+#ifdef TIMING
+			timer.toc(TIMING_MAX);
+#endif
+
+			// Shaoda Jul26,2015
+			// Helical symmetry refinement and imposition of real space helical symmetry.
+			if (do_helical_refine)
+			{
+				if (!ignore_helical_symmetry)
+					makeGoodHelixForEachRef();
+				if ( (!do_skip_align) && (!do_skip_rotate) )
+				{
+					int nr_same_polarity = 0, nr_opposite_polarity = 0;
+					RFLOAT opposite_percentage = 0.;
+					bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+					bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+							&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+					bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
+
+					if (helical_sigma_distance < 0.)
+						updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
+					else
+					{
+						updatePriorsForHelicalReconstruction(
+								mydata.MDimg,
+								nr_opposite_polarity,
+								helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+								(mymodel.data_dim == 3),
+								do_auto_refine,
+								do_local_angular_searches,
+								mymodel.sigma2_rot,
+								mymodel.sigma2_tilt,
+								mymodel.sigma2_psi,
+								mymodel.sigma2_offset,
+								helical_keep_tilt_prior_fixed);
+
+						nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+						opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+						if ( (verb > 0) && (!do_local_angular_searches) )
+						{
+							//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
+							//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
+							std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+						}
 					}
 				}
 			}
-		}
 
-		// Apply masks to the reference images
-		// At the last iteration, do not mask the map for validation purposes
-		if (do_solvent && !has_converged)
-			solventFlatten();
+			// Apply masks to the reference images
+			// At the last iteration, do not mask the map for validation purposes
+			if (do_solvent && !has_converged)
+				solventFlatten();
 
-		// Re-calculate the current resolution, do this before writing to get the correct values in the output files
-		updateCurrentResolution();
+			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
+			updateCurrentResolution();
 
-		// Write output files
-		write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+			// Write output files
+			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 
-		if (do_auto_refine && has_converged)
-		{
-			if (verb > 0)
+			if (do_auto_refine && has_converged)
 			{
-				std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
-				std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
-				std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
-				std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
-				std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
-				if (acc_rot < 10.)
-					std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
-				else
+				if (verb > 0)
 				{
-					std::cout << " Auto-refine: + WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
-					std::cout << " Auto-refine: + WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
-					std::cout << " Auto-refine: + WARNING: You most probably do NOT want to publish these results!" << std::endl;
-					std::cout << " Auto-refine: + WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
+					std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
+					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+					std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
+					std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
+					std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
+					if (acc_rot < 10.)
+						std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
+					else
+					{
+						std::cout << " Auto-refine: + WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
+						std::cout << " Auto-refine: + WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
+						std::cout << " Auto-refine: + WARNING: You most probably do NOT want to publish these results!" << std::endl;
+						std::cout << " Auto-refine: + WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
+					}
+				}
+				break;
+			}
+
+			verb = old_verb;
+
+			if (nr_subsets > 1 && sgd_max_subsets > 0)
+			{
+				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				if (total_nr_subsets > sgd_max_subsets)
+				{
+					subset_size = -1;
+					do_sgd = false;
+					mymodel.do_sgd = false;
+					nr_subsets = 1;
+					write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+					break; // break out of loop over the subsets, and start next iteration
 				}
 			}
-			break;
-		}
 
 #ifdef TIMING
-    	if (verb > 0)
-    		timer.printTimes(false);
+			if (verb > 0)
+				timer.printTimes(false);
 #endif
-    }
+		} // end loop subsets
+
+    } // end loop iters
 
 	// delete threads etc
 	iterateWrapUp();
@@ -2084,8 +2279,7 @@ void MlOptimiser::expectation()
 
 	// C. Calculate expected minimum angular errors (only for 3D refinements)
 	// And possibly update orientational sampling automatically
-	// TODO: also implement estimate angular sampling for 3D refinements
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt))
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && subset == 0)
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -2095,45 +2289,22 @@ void MlOptimiser::expectation()
 	}
 
 	// D. Update the angular sampling (all nodes except master)
-	if ( iter > 1 && (do_auto_refine) )
+	if ( (do_auto_refine) && iter > 1 )
 		updateAngularSampling();
 
 	// E. Check whether everything fits into memory
-	expectationSetupCheckMemory(verb);
+	if (subset == 0)
+		expectationSetupCheckMemory(verb);
 
 	// F. Precalculate AB-matrices for on-the-fly shifts
-	if (do_shifts_onthefly)
+	// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
+	if ( (do_shifts_onthefly) && (subset == 0) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
 		precalculateABMatrices();
 
-	long int my_first_ori_particle, my_last_ori_particle;
-	long int nr_particles_todo;
-
-	if( iter<=subset_iter)
-	{
-		//if(random_seed!=0)
-		//	mydata.randomiseOriginalParticlesOrder(random_seed);
-		nr_particles_todo = (double)(mydata.numberOfOriginalParticles())*subset_frac;
-	}
-	else
-	{
-		nr_particles_todo = mydata.numberOfOriginalParticles();
-	}
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
 #endif
-	if (verb > 0)
-	{
-		std::cout << " Expectation iteration " << iter;
-		if (!do_auto_refine)
-			std::cout << " of " << nr_iter;
-		std::cout << std::endl;
-		init_progress_bar(nr_particles_todo);
-	}
-
-	int barstep = XMIPP_MAX(1, nr_particles_todo / 60);
-	long int prev_barstep = 0, nr_ori_particles_done = 0;
-
 
 #ifdef CUDA
 	/************************************************************************/
@@ -2202,19 +2373,61 @@ void MlOptimiser::expectation()
 
 	/************************************************************************/
 
-
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
 
-	while (nr_ori_particles_done < nr_particles_todo)
+	int old_verb = verb;
+	long int prev_barstep = 0;
+	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
+	if (nr_subsets > 1)
+		barstep = XMIPP_MIN(barstep, subset_size);
+
+	long int my_subset_first_ori_particle, my_subset_last_ori_particle, nr_particles_todo;
+	if (nr_subsets > 1)
+	{
+		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset, my_subset_first_ori_particle, my_subset_last_ori_particle);
+		subset_size = nr_particles_todo = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
+		if (verb > 0)
+		{
+			// SGD: progress bar over entire iteration
+			if (subset == 0)
+			{
+				if (do_sgd)
+					std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter << std::endl;
+				else
+					std::cout << " Incomplete expectation iteration " << iter << " of " << nr_iter << std::endl;
+				long int barsize = (sgd_max_subsets > 0) ? sgd_max_subsets * subset_size : mydata.numberOfOriginalParticles();
+				barsize = XMIPP_MIN(barsize, mydata.numberOfOriginalParticles());
+				init_progress_bar(barsize);
+			}
+		}
+	}
+	else
+	{
+		my_subset_first_ori_particle = 0.;
+		my_subset_last_ori_particle = mydata.numberOfOriginalParticles() - 1;
+		subset_size = nr_particles_todo = mydata.numberOfOriginalParticles();
+		if (verb > 0)
+		{
+			std::cout << " Expectation iteration " << iter;
+			if (!do_auto_refine)
+				std::cout << " of " << nr_iter;
+			std::cout << std::endl;
+			init_progress_bar(nr_particles_todo);
+		}
+	}
+	long int nr_ori_particles_done = my_subset_first_ori_particle;
+
+	long int nr_subset_particles_done = 0;
+	while (nr_subset_particles_done < subset_size)
 	{
 
 #ifdef TIMING
 		timer.tic(TIMING_EXP_METADATA);
 #endif
 
-		my_first_ori_particle = nr_ori_particles_done;
-		my_last_ori_particle = XMIPP_MIN(mydata.numberOfOriginalParticles() - 1, my_first_ori_particle + nr_pool - 1);
+		long int my_first_ori_particle = my_subset_first_ori_particle + nr_subset_particles_done;
+		long int my_last_ori_particle = XMIPP_MIN(my_subset_last_ori_particle, my_first_ori_particle + nr_pool - 1);
 
 		// Get the metadata for these particles
 		getMetaAndImageDataSubset(my_first_ori_particle, my_last_ori_particle, !do_parallel_disc_io);
@@ -2245,6 +2458,7 @@ void MlOptimiser::expectation()
 		timer.toc(TIMING_EXP_METADATA);
 #endif
 
+		nr_subset_particles_done += my_last_ori_particle - my_first_ori_particle + 1;
 		nr_ori_particles_done += my_last_ori_particle - my_first_ori_particle + 1;
 
 		if (verb > 0 && nr_ori_particles_done - prev_barstep > barstep)
@@ -2254,7 +2468,7 @@ void MlOptimiser::expectation()
 		}
 	}
 
-	if (verb > 0)
+	if (subset_size < 0 && verb > 0)
 		progress_bar(nr_particles_todo);
 
 #ifdef CUDA
@@ -2322,6 +2536,9 @@ void MlOptimiser::expectation()
 	}
 #endif
 
+	// Set back verb
+	verb = old_verb;
+
 	// Clean up some memory
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		mymodel.PPref[iclass].data.clear();
@@ -2345,6 +2562,7 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
+    // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
 	// TMP for helices of Anthiony 12 july 2016
@@ -2381,10 +2599,13 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		if (do_helical_refine)
 		{
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+					&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 			sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(ran_rot, ran_tilt, ran_psi,
 									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 									pointer_dir_nonzeroprior, directions_prior, pointer_psi_nonzeroprior, psi_prior,
-									do_auto_refine_local_searches);
+									do_local_angular_searches);
 		}
 		else
 		{
@@ -2395,36 +2616,6 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		}
 	}
 
-	// Check whether things will fit into memory
-	// Each RFLOAT takes 8 bytes, and their are mymodel.nr_classes references, express in Gb
-	RFLOAT Gb = sizeof(RFLOAT) / (1024. * 1024. * 1024.);
-	// A. Calculate approximate size of the reference maps
-	// Forward projector has complex data, backprojector has complex data and real weight
-	RFLOAT mem_references = Gb * mymodel.nr_classes * (2 * MULTIDIM_SIZE((mymodel.PPref[0]).data) + 3 * MULTIDIM_SIZE((wsum_model.BPref[0]).data));
-	// B. Weight vectors
-	RFLOAT mem_pool = Gb * mymodel.nr_classes * sampling.NrSamplingPoints(adaptive_oversampling,
-			&pointer_dir_nonzeroprior, &pointer_psi_nonzeroprior);
-	// C. The original image data
-	int nr_pix = (mymodel.data_dim == 2) ? mymodel.current_size * mymodel.current_size : mymodel.current_size * mymodel.current_size * mymodel.current_size;
-	mem_pool += Gb * nr_pix;
-	if (!do_shifts_onthefly)
-	{
-		// D. All precalculated shifted images as well (both masked and unmasked)
-		mem_pool += Gb * nr_pix * 2 * sampling.NrTranslationalSamplings(adaptive_oversampling);
-	}
-	// Estimate the rest of the program at 0.1 Gb?
-	RFLOAT mem_rest = 0.1; // This one does NOT scale with nr_pool
-	if (do_shifts_onthefly)
-	{
-		// E. Store all AB-matrices
-		mem_rest += Gb * nr_pix * sampling.NrTranslationalSamplings(adaptive_oversampling);
-	}
-
-	RFLOAT total_mem_Gb_exp = mem_references + nr_pool * mem_pool + mem_rest;
-	// Each reconstruction has to store 1 extra complex array (Fconv) and 4 extra RFLOAT arrays (Fweight, Fnewweight. vol_out and Mconv in convoluteBlobRealSpace),
-	// in adddition to the RFLOAT weight-array and the complex data-array of the BPref
-	// That makes a total of 2*2 + 5 = 9 * a RFLOAT array of size BPref
-	RFLOAT total_mem_Gb_max = Gb * 9 * MULTIDIM_SIZE((wsum_model.BPref[0]).data);
 
 	if (myverb > 0)
 	{
@@ -2449,6 +2640,38 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 
 	if (myverb > 1)
 	{
+		// Check whether things will fit into memory
+		// Each RFLOAT takes 8 bytes, and their are mymodel.nr_classes references, express in Gb
+		RFLOAT Gb = sizeof(RFLOAT) / (1024. * 1024. * 1024.);
+		// A. Calculate approximate size of the reference maps
+		// Forward projector has complex data, backprojector has complex data and real weight
+		RFLOAT mem_references = Gb * mymodel.nr_classes * (2 * MULTIDIM_SIZE((mymodel.PPref[0]).data) + 3 * MULTIDIM_SIZE((wsum_model.BPref[0]).data));
+		// B. Weight vectors
+		RFLOAT mem_pool = Gb * mymodel.nr_classes * sampling.NrSamplingPoints(adaptive_oversampling,
+				&pointer_dir_nonzeroprior, &pointer_psi_nonzeroprior);
+		// C. The original image data
+		int nr_pix = (mymodel.data_dim == 2) ? mymodel.current_size * mymodel.current_size : mymodel.current_size * mymodel.current_size * mymodel.current_size;
+		mem_pool += Gb * nr_pix;
+		if (!do_shifts_onthefly)
+		{
+			// D. All precalculated shifted images as well (both masked and unmasked)
+			mem_pool += Gb * nr_pix * 2 * sampling.NrTranslationalSamplings(adaptive_oversampling);
+		}
+		// Estimate the rest of the program at 0.1 Gb?
+		RFLOAT mem_rest = 0.1; // This one does NOT scale with nr_pool
+		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
+		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
+		{
+			// E. Store all AB-matrices
+			mem_rest += Gb * nr_pix * sampling.NrTranslationalSamplings(adaptive_oversampling);
+		}
+
+		RFLOAT total_mem_Gb_exp = mem_references + nr_pool * mem_pool + mem_rest;
+		// Each reconstruction has to store 1 extra complex array (Fconv) and 4 extra RFLOAT arrays (Fweight, Fnewweight. vol_out and Mconv in convoluteBlobRealSpace),
+		// in adddition to the RFLOAT weight-array and the complex data-array of the BPref
+		// That makes a total of 2*2 + 5 = 9 * a RFLOAT array of size BPref
+		RFLOAT total_mem_Gb_max = Gb * 9 * MULTIDIM_SIZE((wsum_model.BPref[0]).data);
+
 		std::cout << " Estimated memory for expectation  step > " << total_mem_Gb_exp << " Gb."<<std::endl;
 		std::cout << " Estimated memory for maximization step > " << total_mem_Gb_max << " Gb."<<std::endl;
 	}
@@ -2478,7 +2701,7 @@ void MlOptimiser::precalculateABMatrices()
 	for (long int itrans = 0; itrans < exp_nr_trans; itrans++)
 	{
 		// First get the non-oversampled translations as defined by the sampling object
-		// Jun01,2015 - Shaoda & Sjors, Helical refinement
+		// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
 		sampling.getTranslations(itrans, 0, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 				(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial); // need getTranslations to add random_perturbation
 
@@ -2496,7 +2719,7 @@ void MlOptimiser::precalculateABMatrices()
 		{
 			// Then also loop over all its oversampled relatives
 			// Then loop over all its oversampled relatives
-			// Jun01,2015 - Shaoda & Sjors, Helical refinement
+			// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
 			sampling.getTranslations(itrans, adaptive_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 					(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
@@ -2508,7 +2731,7 @@ void MlOptimiser::precalculateABMatrices()
 				getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)mymodel.ori_size, oversampled_translations_x[iover_trans], oversampled_translations_y[iover_trans], tmp_zoff);
 
 				global_fftshifts_ab2_current.push_back(Fab_current);
-				if (strict_highres_exp > 0.)
+				if (strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.))
 				{
 					windowFourierTransform(Fab_current, Fab_coarse, coarse_size);
 					global_fftshifts_ab2_coarse.push_back(Fab_coarse);
@@ -2553,7 +2776,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
     	}
 	}
 
-	// Only open/close stacks once
+    // Only open/close stacks once
     fImageHandler hFile;
 	long int dump;
 	FileName fn_img, fn_stack, fn_open_stack="";
@@ -2591,7 +2814,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 			// set the unique translation in the sampling object to the fractional difference
 			RFLOAT my_old_offset_x, my_old_offset_y, my_old_offset_z;
 			RFLOAT rounded_offset_x, rounded_offset_y, rounded_offset_z;
-			RFLOAT psi_deg, tilt_deg;
+			RFLOAT rot_deg, tilt_deg, psi_deg;
 			my_old_offset_x = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_XOFF);
 			my_old_offset_y = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_YOFF);
 			rounded_offset_x = my_old_offset_x - ROUND(my_old_offset_x);
@@ -2603,10 +2826,11 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 			}
 			if (do_helical_refine)
 			{
+				rot_deg = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_ROT);
 				tilt_deg = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_TILT);
 				psi_deg = DIRECT_A2D_ELEM(exp_metadata, exp_nr_images, METADATA_PSI);
 			}
-			sampling.addOneTranslation(rounded_offset_x, rounded_offset_y, rounded_offset_z, do_clear, (do_helical_refine) && (!ignore_helical_symmetry), psi_deg, tilt_deg); // clear for first ori_particle
+			sampling.addOneTranslation(rounded_offset_x, rounded_offset_y, rounded_offset_z, do_clear, (do_helical_refine) && (!ignore_helical_symmetry), rot_deg, tilt_deg, psi_deg); // clear for first ori_particle
 		}
 
 		// Store total number of particle images in this bunch of SomeParticles
@@ -2729,7 +2953,8 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 	if (my_ori_particle == exp_my_first_ori_particle)
 		timer.tic(TIMING_ESP_INI);
 #endif
-    // In the first iteration, multiple seeds will be generated
+
+	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
 	// The optimal orientation is based on signal-product (rather than the signal-intensity sensitive Gaussian)
     // If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
@@ -2758,16 +2983,13 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		}
     }
 
+
 // This debug is a good one to step through the separate steps of the expectation to see where trouble lies....
 //#define DEBUG_ESP_MEM
 #ifdef DEBUG_ESP_MEM
 
 	std::cerr << "Entering MlOptimiser::expectationOneParticle" << std::endl;
     std::cerr << " my_ori_particle= " << my_ori_particle << std::endl;
-    std::cerr << " exp_iclass_min= " << exp_iclass_min << " exp_iclass_max= " << exp_iclass_max << std::endl;
-    std::cerr << " exp_idir_min= " << exp_idir_min << " exp_idir_max= " << exp_idir_max << std::endl;
-    std::cerr << " exp_ipsi_min= " << exp_ipsi_min << " exp_ipsi_max= " << exp_ipsi_max << std::endl;
-    std::cerr << " exp_itrans_min= " << exp_itrans_min << " exp_itrans_max= " << exp_itrans_max << std::endl;
     if (thread_id==0)
 	{
 		char c;
@@ -2894,7 +3116,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 		for (int exp_ipass = 0; exp_ipass < nr_sampling_passes; exp_ipass++)
 		{
 
-			if (strict_highres_exp > 0.)
+			if (strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.))
 				// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
 				exp_current_image_size = coarse_size;
 			else if (adaptive_oversampling > 0)
@@ -3173,6 +3395,7 @@ void MlOptimiser::maximization()
 		std::cout << " Maximization ..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
+
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
@@ -3181,14 +3404,75 @@ void MlOptimiser::maximization()
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
 
-			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-					mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-					mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
-					false, false, nr_threads, minres_map, (iclass==0));
+			if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+			{
+
+				MultidimArray<RFLOAT> Iref_old = mymodel.Iref[iclass];
+
+				// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
+				// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
+				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+				int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
+				RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
+				number_of_effective_particles *= (1. - total_mu_fraction);
+				RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+
+				// This worked for several 3D cases, but cannot be right....
+				//long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				//RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+				//RFLOAT number_of_effective_particles = mydata.particles.size() * (1. - total_mu_fraction);
+				//RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+
+				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+						sgd_tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+						mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+                                                                       false, false, nr_threads, minres_map, (iclass==0));
+
+				// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
+				// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[iclass])
+					DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) +
+							(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
+
+				// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+				{
+					DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n);
+				}
+
+//#define DEBUG_SGD
+#ifdef DEBUG_SGD
+				FileName fn_tmp="grad_class"+integerToString(iclass)+".spi";
+				Image<RFLOAT> It;
+				It()=mymodel.Igrad[iclass];
+				It.write(fn_tmp);
+				fn_tmp="ref_class"+integerToString(iclass)+".spi";
+				It()=mymodel.Iref[iclass];
+				It.write(fn_tmp);
+#endif
+				// Enforce positivity?
+				// Low-pass filter according to current resolution??
+				// Some sort of regularisation may be necessary....?
+
+
+			}
+			else
+			{
+				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+						mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+						mymodel.data_vs_prior_class[iclass], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+						false, false, nr_threads, minres_map, (iclass==0));
+            }
 		}
 		else
 		{
-			mymodel.Iref[iclass].initZeros();
+			// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
+			if (!do_sgd)
+				mymodel.Iref[iclass].initZeros();
+			// When doing SGD also re-initialise the gradient to zero
+			if (do_sgd)
+				mymodel.Igrad[iclass].initZeros();
 		}
 		RCTOC(timer,RCT_1);
 		if (verb > 0)
@@ -3224,19 +3508,21 @@ void MlOptimiser::maximizationOtherParameters()
 	// Update average norm_correction
 	if (do_norm_correction)
 	{
-		mymodel.avg_norm_correction = wsum_model.avg_norm_correction / sum_weight;
+		mymodel.avg_norm_correction *= mu;
+		mymodel.avg_norm_correction += (1. - mu) * wsum_model.avg_norm_correction / sum_weight;
 	}
 
-	if (do_scale_correction && !((iter==1 && do_firstiter_cc) || do_always_cc ))
+	if (do_scale_correction && !((iter==1 && do_firstiter_cc) || do_always_cc) )
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
+			mymodel.scale_correction[igroup] *= mu;
 			RFLOAT sumXA = wsum_model.wsum_signal_product_spectra[igroup].sum();
 			RFLOAT sumAA = wsum_model.wsum_reference_power_spectra[igroup].sum();
 			if (sumAA > 0.)
-				mymodel.scale_correction[igroup] = sumXA / sumAA;
+				mymodel.scale_correction[igroup] += (1. - mu) * sumXA / sumAA;
 			else
-				mymodel.scale_correction[igroup] = 1.;
+				mymodel.scale_correction[igroup] += (1. - mu);
 		}
 
 		// TODO! Avoid extremities in scale estimates, because they lead to catastrophic events and instabilities in refinement
@@ -3285,13 +3571,19 @@ void MlOptimiser::maximizationOtherParameters()
 	// Update model.pdf_class vector (for each k)
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
-		mymodel.pdf_class[iclass] = wsum_model.pdf_class[iclass] / sum_weight;
+
+		// Update pdf_class (for SGD: update with taking mu into account! For non-SGD: mu equals zero)
+		mymodel.pdf_class[iclass] *= mu;
+		mymodel.pdf_class[iclass] += (1. - mu) * wsum_model.pdf_class[iclass] / sum_weight;
 
 		// for 2D also update priors of translations for each class!
 		if (mymodel.ref_dim == 2)
 		{
 			if (wsum_model.pdf_class[iclass] > 0.)
-				mymodel.prior_offset_class[iclass] = wsum_model.prior_offset_class[iclass] / wsum_model.pdf_class[iclass];
+			{
+				mymodel.prior_offset_class[iclass] *= mu;
+				mymodel.prior_offset_class[iclass] += (1. - mu) * wsum_model.prior_offset_class[iclass] / sum_weight;
+			}
 			else
 				mymodel.prior_offset_class[iclass].initZeros();
 		}
@@ -3301,7 +3593,8 @@ void MlOptimiser::maximizationOtherParameters()
 		{
 			for (int idir = 0; idir < sampling.NrDirections(); idir++)
 			{
-				mymodel.pdf_direction[iclass](idir) = wsum_model.pdf_direction[iclass](idir) / sum_weight;
+				mymodel.pdf_direction[iclass](idir) *= mu;
+				mymodel.pdf_direction[iclass](idir) += (1. - mu) * wsum_model.pdf_direction[iclass](idir) / sum_weight;
 			}
 		}
 	}
@@ -3310,19 +3603,20 @@ void MlOptimiser::maximizationOtherParameters()
 	// Factor 2 because of the 2-dimensionality of the xy-plane
 	if (!fix_sigma_offset)
 	{
+		mymodel.sigma2_offset *= mu;
 		if (mymodel.data_dim == 3)
 		{
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (2. * sum_weight);
+				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
 			else
-				mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (3. * sum_weight);
+				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (3. * sum_weight);
 		}
 		else
 		{
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (1. * sum_weight);
+				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (1. * sum_weight);
 			else
-				mymodel.sigma2_offset = (wsum_model.sigma2_offset) / (2. * sum_weight);
+				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
 		}
 	}
 
@@ -3330,7 +3624,7 @@ void MlOptimiser::maximizationOtherParameters()
 	RCTOC(timer,RCT_6);
 	RCTIC(timer,RCT_7);
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
-	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc))
+	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc) )
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
@@ -3345,8 +3639,9 @@ void MlOptimiser::maximizationOtherParameters()
 				// Factor 2 because of the 2-dimensionality of the complex-plane
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
 				{
-					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) =
-							DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
+					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= mu;
+					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
+							(1. - mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
 								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
 					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
 					if (ctf_premultiplied)
@@ -3363,7 +3658,7 @@ void MlOptimiser::maximizationOtherParameters()
     	refs_are_ctf_corrected = true;
 
 	// Some statistics to output
-	mymodel.LL = 	wsum_model.LL;
+    mymodel.LL = 	wsum_model.LL;
 	if ((iter==1 && do_firstiter_cc) || do_always_cc)
 		mymodel.LL /= sum_weight; // this now stores the average ccf
 	mymodel.ave_Pmax = wsum_model.ave_Pmax / sum_weight;
@@ -3519,8 +3814,8 @@ void MlOptimiser::updateCurrentResolution()
 #endif
 
 
-    int maxres = 0;
-	if (do_map )
+	int maxres = 0;
+	if (do_map)
 	{
 		// Set current resolution
 		if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
@@ -3555,7 +3850,6 @@ void MlOptimiser::updateCurrentResolution()
 	}
     RFLOAT newres = mymodel.getResolution(maxres);
 
-
     // Check whether resolution improved, if not increase nr_iter_wo_resol_gain
     //if (newres <= best_resol_thus_far)
     if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
@@ -3567,7 +3861,13 @@ void MlOptimiser::updateCurrentResolution()
     if (newres > best_resol_thus_far)
     	best_resol_thus_far = newres;
 
+    // For SGD: never go beyond strict_highres_sgd
+    if (do_sgd && strict_highres_sgd > 0. && 1./newres < strict_highres_sgd)
+    	newres = 1./strict_highres_sgd;
+
     mymodel.current_resolution = newres;
+
+
 
 }
 
@@ -3579,7 +3879,7 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
     // Do this whenever the FSC at the current_size is larger than 0.2, but NOT when this is in combination with very low Pmax values,
     // in the latter case, over-marginalisation may lead to spuriously high FSCs (2 smoothed maps may look very similar at high-res: all zero!)
     //
-    int maxres = mymodel.getPixelFromResolution(mymodel.current_resolution);
+	int maxres = mymodel.getPixelFromResolution(mymodel.current_resolution);
 	if (mymodel.ave_Pmax > 0.1 && has_high_fsc_at_limit)
     {
 		maxres += ROUND(0.25 * mymodel.ori_size / 2);
@@ -3590,12 +3890,18 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 		maxres += incr_size;
 	}
 
+	if (do_sgd && strict_highres_sgd > 0.)
+	{
+		maxres = XMIPP_MIN(maxres, mymodel.getPixelFromResolution(1./strict_highres_sgd) );
+	}
     // Go back from resolution shells (i.e. radius) to image size, which are BTW always even...
 	mymodel.current_size = maxres * 2;
 
 	// If realigning movies: go all the way because resolution increase may be substantial
 	if (do_use_all_data)
 		mymodel.current_size = mymodel.ori_size;
+	if (do_sgd  && strict_highres_sgd > 0. && 1./mymodel.current_resolution < strict_highres_sgd)
+		mymodel.current_size = 2 * mymodel.getPixelFromResolution(1./strict_highres_sgd);
 
 	// current_size can never be larger than ori_size:
 	mymodel.current_size = XMIPP_MIN(mymodel.current_size, mymodel.ori_size);
@@ -3836,13 +4142,16 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			RFLOAT prior_psi_flip_ratio =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+					&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 
 			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
 			if (prior_rot > 998.99 && prior_rot < 999.01)
 				prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-			if ( (do_helical_refine) && (helical_keep_tilt_prior_fixed) && (do_auto_refine_local_searches) )
+			if ( (do_helical_refine) && (helical_keep_tilt_prior_fixed) && (do_local_angular_searches) )
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
@@ -3857,7 +4166,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 										exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior,
-										do_auto_refine_local_searches, prior_psi_flip_ratio);
+										do_local_angular_searches, prior_psi_flip_ratio);
 			}
 			else
 			{
@@ -4030,16 +4339,16 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			img() *= mymodel.avg_norm_correction / normcorr;
 		}
 
-		// Helical TODO: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
-		// Helical TODO: For helices do NOT apply old_offset along the direction of the helix!!
-		// iF DO HELICAL REFINE ???!!!
+		// Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
+		// For helices do NOT apply old_offset along the direction of the helix!!
 		Matrix1D<RFLOAT> my_old_offset_helix_coords;
-		RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+		RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 		RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+		RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
 		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
-			// TODO: calculate my_old_offset_helix_coords from my_old_offset and psi angle
-			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
+			// Calculate my_old_offset_helix_coords from my_old_offset and psi angle
+			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			// May 18, 2015 - Shaoda & Sjors - Helical refinement (orientational searches)
 			std::cerr << "MlOptimiser::getFourierTransformsAndCtfs()" << std::endl;
@@ -4054,7 +4363,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			{
 				std::cerr << "  psi_deg = " << psi_deg << " degrees, tilt_deg = " << tilt_deg << " degrees"<< std::endl;
 				std::cerr << "  old_offset(x, y, z) = (" << XX(my_old_offset) << ", " << YY(my_old_offset) << ", " << ZZ(my_old_offset) << ")" << std::endl;
-				std::cerr << "  old_offset_helix(r, p1, p2) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
+				std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
 			}
 #endif
 			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
@@ -4062,18 +4371,28 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			// Do NOT accumulate offsets in 3D classification of helices
 			if ( (mymodel.ref_dim == 3) && (!do_skip_align) && (!do_skip_rotate) )
 			{
-				if ( (do_auto_refine) && (sampling.healpix_order < autosampling_hporder_local_searches) )
-					XX(my_old_offset_helix_coords) = 0.;
+				// TODO: check whether the following lines make sense
+				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
+				if (!do_local_angular_searches)
+				{
+					if (mymodel.data_dim == 2)
+						XX(my_old_offset_helix_coords) = 0.;
+					else if (mymodel.data_dim == 3)
+						ZZ(my_old_offset_helix_coords) = 0.;
+				}
 			}
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			std::cerr << " Set r (translation along helical axis) to zero..." << std::endl;
 			if(my_old_offset.size() == 2)
 				std::cerr << "  old_offset_helix(r, p) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << ")" << std::endl;
 			else
-				std::cerr << "  old_offset_helix(r, p1, p2) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
+				std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
 #endif
-			// TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
-			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, psi_deg, tilt_deg, HELICAL_TO_CART_COORDS);
+			// Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
+			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, rot_deg, tilt_deg, psi_deg, HELICAL_TO_CART_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			std::cerr << " Transform helical offsets back to Cartesian ones..." << std::endl;
 			if(my_old_offset.size() == 2)
@@ -4111,7 +4430,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
 			// Transform rounded Cartesian offsets to corresponding helical ones
-			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, psi_deg, tilt_deg, CART_TO_HELICAL_COORDS);
+			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
 			exp_old_offset[ipart] = my_old_offset_helix_coords;
 		}
 		else
@@ -4615,19 +4934,22 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				exp_local_Fimgs_shifted[ipart] = Fimg;
 			if (do_also_unmasked)
 				exp_local_Fimgs_shifted_nomask[ipart] = Fimg_nomask;
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+			std::cerr << " MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): do_shifts_onthefly && !do_gpu" << std::endl;
+#endif
 		}
 		else if(!do_gpu)
 		{
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			Image<RFLOAT> img_save_ori, img_save_mask, img_save_nomask;
 			img_save_ori.clear();
-			img_save_ori().resize(mymodel.ori_size, mymodel.ori_size);
+			img_save_ori().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 			img_save_ori().initZeros();
 			img_save_mask.clear();
-			img_save_mask().resize(mymodel.ori_size, mymodel.ori_size);
+			img_save_mask().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 			img_save_mask().initZeros();
 			img_save_nomask.clear();
-			img_save_nomask().resize(mymodel.ori_size, mymodel.ori_size);
+			img_save_nomask().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 			img_save_nomask().initZeros();
 #endif
 			// Store all translated variants of Fimg
@@ -4639,12 +4961,14 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				// Jun01,2014 - Shaoda & Sjors, Helical refinement
 				sampling.getTranslations(itrans, exp_current_oversampling, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 						(do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
+#ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+				std::cerr << "MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): Store all translated variants of Fimg" << std::endl;
+#endif
 				// Then loop over all its oversampled relatives
 				for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++, my_trans_image++)
 				{
-					// HELICAL TODO: rotate oversampled_translations_x[iover_trans] and oversampled_translations_y[iover_trans] according to rlnAnglePsi of this particle!
-					RFLOAT xshift, yshift, zshift;
-					zshift = 0.;
+					// Helical reconstruction: rotate oversampled_translations_x[iover_trans] and oversampled_translations_y[iover_trans] according to rlnAnglePsi of this particle!
+					RFLOAT xshift = 0., yshift = 0., zshift = 0.;
 
 					xshift = oversampled_translations_x[iover_trans];
 					yshift = oversampled_translations_y[iover_trans];
@@ -4653,13 +4977,13 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 					{
-						RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+						RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+						RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
-						std::cerr << "MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s()" << std::endl;
 						std::cerr << "Helical xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
-						transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, psi_deg, tilt_deg, mymodel.data_dim, HELICAL_TO_CART_COORDS);
+						transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, HELICAL_TO_CART_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 						std::cerr << "Cartesian xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
@@ -4682,7 +5006,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 							MultidimArray<Complex> Faux, Fo;
 							Image<RFLOAT> tt;
 							FourierTransformer transformer;
-							tt().resize(mymodel.ori_size, mymodel.ori_size);
+							tt().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 							Faux = exp_local_Fimgs_shifted[my_trans_image];
 							windowFourierTransform(Faux, Fo, mymodel.ori_size);
 							transformer.inverseFourierTransform(Fo, tt());
@@ -4710,7 +5034,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 							MultidimArray<Complex> Faux, Fo;
 							Image<RFLOAT> tt;
 							FourierTransformer transformer;
-							tt().resize(mymodel.ori_size, mymodel.ori_size);
+							tt().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
 							Faux = exp_local_Fimgs_shifted_nomask[my_trans_image];
 							windowFourierTransform(Faux, Fo, mymodel.ori_size);
 							transformer.inverseFourierTransform(Fo, tt());
@@ -5041,39 +5365,71 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 											}
 											else
 											{
-
 												// Calculate shifted image on-the-fly to save replicating memory in multi-threaded jobs.
-												Complex *myAB;
-												if (exp_current_oversampling == 0)
+												// Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
+												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 												{
-													#ifdef DEBUG_CHECKSIZES
-													if (YSIZE(Frefctf) == coarse_size && itrans >= global_fftshifts_ab_coarse.size())
-													{
-														std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_coarse.size()= "<< global_fftshifts_ab_coarse.size() <<std::endl;
-														REPORT_ERROR("itrans >= global_fftshifts_ab_coarse.size()");
-													}
-													if (YSIZE(Frefctf) != coarse_size && itrans >= global_fftshifts_ab_current.size())
-													{
-														std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_current.size()= "<< global_fftshifts_ab_current.size() <<std::endl;
-														REPORT_ERROR("itrans >= global_fftshifts_ab_current.size()");
-													}
-													#endif
-													myAB = (YSIZE(Frefctf) == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
-													        : global_fftshifts_ab_current[itrans].data;
+													bool use_coarse_size = false;
+													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
+
+													xshift = (exp_current_oversampling == 0) ? (oversampled_translations_x[0]) : (oversampled_translations_x[iover_trans]);
+													yshift = (exp_current_oversampling == 0) ? (oversampled_translations_y[0]) : (oversampled_translations_y[iover_trans]);
+													if (mymodel.data_dim == 3)
+														zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
+
+													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
+													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+													transformCartesianAndHelicalCoords(
+																xshift, yshift, zshift,
+																xshift, yshift, zshift,
+																rot_deg, tilt_deg, psi_deg,
+																mymodel.data_dim,
+																HELICAL_TO_CART_COORDS);
+
+													use_coarse_size = ((exp_current_oversampling == 0) && (YSIZE(Frefctf) == coarse_size)) || ((exp_current_oversampling > 0) && (strict_highres_exp > 0.));
+													shiftImageInFourierTransformWithTabSincos(
+															exp_local_Fimgs_shifted[ipart],
+															Fimg_otfshift,
+															(RFLOAT)mymodel.ori_size,
+															(use_coarse_size) ? (coarse_size) : (mymodel.current_size),
+															tab_sin, tab_cos,
+															xshift, yshift, zshift);
 												}
 												else
 												{
-													int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
-													myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
-															: global_fftshifts_ab2_current[iitrans].data;
-												}
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
-												{
-													RFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
-															- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
-													RFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
-															+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													Complex *myAB;
+													if (exp_current_oversampling == 0)
+													{
+														#ifdef DEBUG_CHECKSIZES
+														if (YSIZE(Frefctf) == coarse_size && itrans >= global_fftshifts_ab_coarse.size())
+														{
+															std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_coarse.size()= "<< global_fftshifts_ab_coarse.size() <<std::endl;
+															REPORT_ERROR("itrans >= global_fftshifts_ab_coarse.size()");
+														}
+														if (YSIZE(Frefctf) != coarse_size && itrans >= global_fftshifts_ab_current.size())
+														{
+															std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_current.size()= "<< global_fftshifts_ab_current.size() <<std::endl;
+															REPORT_ERROR("itrans >= global_fftshifts_ab_current.size()");
+														}
+														#endif
+														myAB = (YSIZE(Frefctf) == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
+														        : global_fftshifts_ab_current[itrans].data;
+													}
+													else
+													{
+														int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
+														myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
+																: global_fftshifts_ab2_current[iitrans].data;
+													}
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+													{
+														RFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
+																- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
+														RFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
+																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													}
 												}
 												Fimg_shift = Fimg_otfshift.data;
 											}
@@ -5258,7 +5614,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												std::cerr << " exp_itrans_max= " << exp_itrans_max << " iorientclass= " << iorientclass << " itrans= " << itrans << std::endl;
 												std::cerr << " exp_nr_dir= " << exp_nr_dir << " exp_idir_min= " << exp_idir_min << " exp_idir_max= " << exp_idir_max << std::endl;
 												std::cerr << " exp_nr_psi= " << exp_nr_psi << " exp_ipsi_min= " << exp_ipsi_min << " exp_ipsi_max= " << exp_ipsi_max << std::endl;
-												std::cerr << " exp_iclass= " << exp_iclass << " exp_iclass_min= " << exp_iclass_min << " exp_iclass_max= " << exp_iclass_max << std::endl;
+												std::cerr << " exp_iclass= " << exp_iclass << std::endl;
 												std::cerr << " iorient= " << iorient << std::endl;
 												std::cerr << " ihidden_over= " << ihidden_over << " XSIZE(Mweight)= " << XSIZE(exp_Mweight) << std::endl;
 												REPORT_ERROR("ihidden_over >= XSIZE(Mweight)");
@@ -5419,13 +5775,14 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 					RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
 					RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
 					RFLOAT tdiff2 = 0.;
-					if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+					if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
 						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
 					if (mymodel.data_dim == 3)
 					{
 						RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
-						tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+						if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+							tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 					}
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
@@ -5441,7 +5798,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
 
 			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
-			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
+			for (int exp_iclass = 0; exp_iclass < mymodel.nr_classes; exp_iclass++)
 			{
 
 				// Make PdfOffset calculation much faster...
@@ -5505,9 +5862,10 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
 							if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 							{
-								RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+								RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 								RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-								transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
+								RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+								transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
 							}
 							// (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
 
@@ -5516,13 +5874,14 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
 							RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
 							RFLOAT tdiff2 = 0.;
-							if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+							if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
 								tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 							tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
 							if (mymodel.data_dim == 3)
 							{
 								RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
-								tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+								if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+									tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 							}
 							// P(offset|sigma2_offset)
 							// This is the probability of the offset, given the model offset and variance.
@@ -5912,7 +6271,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
 	std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	Matrix2D<RFLOAT> A, Abody, Aori;
-	MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift, Fimg_otfshift_nomask;
+	MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift, Fimg_otfshift_nomask, Fimg_store_sgd;
 	MultidimArray<RFLOAT> Minvsigma2, Mctf, Fweight;
 	RFLOAT rot, tilt, psi;
 	bool have_warned_small_scale = false;
@@ -5932,6 +6291,11 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 		Fimg_otfshift.resize(Frefctf);
 		Fimg_otfshift_nomask.resize(Frefctf);
 	}
+	if (do_sgd)
+	{
+		Fimg_store_sgd.resize(Frefctf);
+	}
+
 
 	if (mymodel.nr_bodies > 1)
 	{
@@ -6167,6 +6531,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 									{
 										// Normalise the weight (do this after the comparison with exp_significant_weight!)
 										weight /= exp_sum_weight[ipart];
+
 										if (!do_skip_maximization)
 										{
 
@@ -6187,24 +6552,64 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											}
 											else
 											{
-												Complex* myAB;
-												myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[iitrans].data : global_fftshifts_ab2_current[iitrans].data;
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+												// Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
+												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 												{
-													RFLOAT a = (*(myAB + n)).real;
-													RFLOAT b = (*(myAB + n)).imag;
+													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
+
+													xshift = oversampled_translations_x[iover_trans];
+													yshift = oversampled_translations_y[iover_trans];
+													if (mymodel.data_dim == 3)
+														zshift = oversampled_translations_z[iover_trans];
+
+													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
+													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
+													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+													transformCartesianAndHelicalCoords(
+																xshift, yshift, zshift,
+																xshift, yshift, zshift,
+																rot_deg, tilt_deg, psi_deg,
+																mymodel.data_dim,
+																HELICAL_TO_CART_COORDS);
+
 													// Fimg_shift
-													RFLOAT real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
-															- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
-													RFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
-															+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+													shiftImageInFourierTransformWithTabSincos(
+															exp_local_Fimgs_shifted[ipart],
+															Fimg_otfshift,
+															(RFLOAT)mymodel.ori_size,
+															mymodel.current_size,
+															tab_sin, tab_cos,
+															xshift, yshift, zshift);
 													// Fimg_shift_nomask
-													real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real
-															- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag;
-													imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag
-															+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real;
-													DIRECT_MULTIDIM_ELEM(Fimg_otfshift_nomask, n) = Complex(real, imag);
+													shiftImageInFourierTransformWithTabSincos(
+															exp_local_Fimgs_shifted_nomask[ipart],
+															Fimg_otfshift_nomask,
+															(RFLOAT)mymodel.ori_size,
+															mymodel.current_size,
+															tab_sin, tab_cos,
+															xshift, yshift, zshift);
+												}
+												else
+												{
+													Complex* myAB;
+													myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[iitrans].data : global_fftshifts_ab2_current[iitrans].data;
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[ipart])
+													{
+														RFLOAT a = (*(myAB + n)).real;
+														RFLOAT b = (*(myAB + n)).imag;
+														// Fimg_shift
+														RFLOAT real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real
+																- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag;
+														RFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).imag
+																+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
+														// Fimg_shift_nomask
+														real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real
+																- b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag;
+														imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).imag
+																+ b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[ipart], n)).real;
+														DIRECT_MULTIDIM_ELEM(Fimg_otfshift_nomask, n) = Complex(real, imag);
+													}
 												}
 												Fimg_shift = Fimg_otfshift.data;
 												Fimg_shift_nomask = Fimg_otfshift_nomask.data;
@@ -6273,12 +6678,13 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
 											if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 											{
-												RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+												RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT);
 												RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT);
-												transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, psi_deg, tilt_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
+												RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI);
+												transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
 											}
 
-											if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+											if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
 											{
 												RFLOAT diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
 												thr_wsum_sigma2_offset += weight * diffx * diffx;
@@ -6288,7 +6694,8 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											if (mymodel.data_dim == 3)
 											{
 												RFLOAT diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
-												thr_wsum_sigma2_offset += weight * diffz * diffz;
+												if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+													thr_wsum_sigma2_offset += weight * diffz * diffz;
 											}
 
 											// Store weight for this direction of this class
@@ -6322,6 +6729,40 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												timer.tic(TIMING_WSUM_SUMSHIFT);
 											}
 #endif
+
+											Complex *Fimg_store;
+											if (do_sgd)
+											{
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+												{
+													(DIRECT_MULTIDIM_ELEM(Fimg_store_sgd, n)).real = (*(Fimg_shift_nomask + n)).real - (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
+													(DIRECT_MULTIDIM_ELEM(Fimg_store_sgd, n)).imag = (*(Fimg_shift_nomask + n)).imag - (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
+												}
+												Fimg_store = Fimg_store_sgd.data;
+											}
+											else
+											{
+												Fimg_store = Fimg_shift_nomask;
+											}
+//#define DEBUG_SGD3
+#ifdef DEBUG_SGD3
+											FourierTransformer transformer;
+											MultidimArray<Complex> Ftt(Frefctf);
+											FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ftt)
+												DIRECT_MULTIDIM_ELEM(Ftt, n) = *(Fimg_store + n);
+
+											Image<RFLOAT> tt;
+											tt().resize(exp_current_image_size, exp_current_image_size);
+											transformer.inverseFourierTransform(Ftt, tt());
+											CenterFFT(tt(),false);
+											tt.write("BPimg.spi");
+											std::cerr << " rot= " << rot << " tilt= " << tilt << " psi= " << psi << std::endl;
+											std::cerr << " itrans= " << itrans << " iover_trans= " << iover_trans << std::endl;
+											std::cerr << "written BPimg.spi, press any key to continue" << std::endl;
+											char c;
+											std::cin >> c;
+#endif
+
 											// Store sum of weight*SSNR*Fimg in data and sum of weight*SSNR in weight
 											// Use the FT of the unmasked image to back-project in order to prevent reconstruction artefacts! SS 25oct11
 											if (ctf_premultiplied)
@@ -6331,8 +6772,8 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 													RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
 													RFLOAT weightxinvsigma2 = weight * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
 													// now Fimg stores sum of all shifted w*Fimg
-													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_shift_nomask + n)).real * weightxinvsigma2;
-													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_shift_nomask + n)).imag * weightxinvsigma2;
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
 													// now Fweight stores sum of all w and multiply by CTF^2
 													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf * myctf;
 												}
@@ -6344,8 +6785,8 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 													RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
 													RFLOAT weightxinvsigma2 = weight * myctf * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
 													// now Fimg stores sum of all shifted w*Fimg
-													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_shift_nomask + n)).real * weightxinvsigma2;
-													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_shift_nomask + n)).imag * weightxinvsigma2;
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
 													// now Fweight stores sum of all w
 													// Note that CTF needs to be squared in Fweight, weightxinvsigma2 already contained one copy
 													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
@@ -6375,6 +6816,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											int icol_yoff = (mymodel.nr_bodies == 1) ? METADATA_YOFF : 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 											int icol_zoff = (mymodel.nr_bodies == 1) ? METADATA_ZOFF : 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 
+											RFLOAT old_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_rot);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_rot) = rot;
 											RFLOAT old_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt) = tilt;
@@ -6419,10 +6861,10 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											}
 #endif
 
-											// HELICAL TODO! Use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
+											// Helical reconstruction: use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
 											if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 											{
-												// TODO: bring xshift, yshift and zshift back to cartesian coords for outputting in the STAR file
+												// Bring xshift, yshift and zshift back to cartesian coords for outputting in the STAR file
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 												std::cerr << "MlOptimiser::storeWeightedSums()" << std::endl;
 												std::cerr << "Bring xy(z) shifts back to Cartesian coordinates for output in the STAR file" << std::endl;
@@ -6435,10 +6877,10 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												else
 												{
 													std::cerr << "  old_psi = " << old_psi << " degrees, old_tilt = " << old_tilt << " degrees" << std::endl;
-													std::cerr << "  Helical offsets (r, p1, p2) = (" << XX(shifts) << ", " << YY(shifts) << ", " << ZZ(shifts) << ")" << std::endl;
+													std::cerr << "  Helical offsets (p1, p2, r) = (" << XX(shifts) << ", " << YY(shifts) << ", " << ZZ(shifts) << ")" << std::endl;
 												}
 #endif
-												transformCartesianAndHelicalCoords(shifts, shifts, old_psi, old_tilt, HELICAL_TO_CART_COORDS);
+												transformCartesianAndHelicalCoords(shifts, shifts, old_rot, old_tilt, old_psi, HELICAL_TO_CART_COORDS);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 												if(shifts.size() == 2)
 													std::cerr << "  Cartesian offsets (x, y) = (" << XX(shifts) << ", " << YY(shifts) << ")" << std::endl;
@@ -6491,6 +6933,17 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 		fclose(stdout);
 #endif
 
+#ifdef DEBUG_SGD3
+					FourierTransformer transformer;
+					Image<RFLOAT> tt;
+					tt().resize(exp_current_image_size, exp_current_image_size);
+					transformer.inverseFourierTransform(Fimg, tt());
+					CenterFFT(tt(),false);
+					tt.write("BPimg_sig2.spi");
+					std::cerr << "written BPimg_sig2.spi, press any key to continue" << std::endl;
+					char c;
+					std::cin >> c;
+#endif
 						if (!do_skip_maximization)
 						{
 #ifdef TIMING
@@ -6811,17 +7264,18 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 		n_trials +=  mydata.ori_particles[ori_part_id].particles_id.size();
     }
 
-	int exp_current_image_size;
-	// Set exp_current_image_size to the coarse_size to calculate exepcted angular errors
-	if (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp)
+	//int current_image_size = (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp) ? coarse_size : mymodel.current_size;
+	// Set current_image_size to the coarse_size to calculate exepcted angular errors
+	int current_image_size;
+	if ((strict_highres_exp > 0. || (do_sgd && strict_highres_sgd > 0.) ) && !do_acc_currentsize_despite_highres_exp)
 	{
 		// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
-		exp_current_image_size = coarse_size;
+		current_image_size = coarse_size;
 	}
 	else
 	{
 		// Use smaller images in the first pass, but larger ones in the second pass
-		exp_current_image_size = mymodel.current_size;
+		current_image_size = mymodel.current_size;
 	}
 
 	// Separate angular error estimate for each of the classes
@@ -6887,7 +7341,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 
 						// Set the CTF-image in Fctf
 						Ictf().setXmippOrigin();
-						Fctf.resize(exp_current_image_size, exp_current_image_size, exp_current_image_size/ 2 + 1);
+						Fctf.resize(current_image_size, current_image_size, current_image_size/ 2 + 1);
 						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
 						{
 							// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
@@ -6907,7 +7361,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 									  1.,
 									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
 
-						Fctf.resize(exp_current_image_size, exp_current_image_size/ 2 + 1);
+						Fctf.resize(current_image_size, current_image_size/ 2 + 1);
 						ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 					}
 				}
@@ -6984,9 +7438,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						RFLOAT zoff1 = 0.;
 
 						if (mymodel.data_dim == 2)
-							F1.initZeros(exp_current_image_size, exp_current_image_size/ 2 + 1);
+							F1.initZeros(current_image_size, current_image_size/ 2 + 1);
 						else
-							F1.initZeros(exp_current_image_size, exp_current_image_size, exp_current_image_size/ 2 + 1);
+							F1.initZeros(current_image_size, current_image_size, current_image_size/ 2 + 1);
 
 						// Get the FT of the first image
 						Euler_angles2matrix(rot1, tilt1, psi1, A1, false);
@@ -7042,9 +7496,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						}
 						// Get the FT of the second image
 						if (mymodel.data_dim == 2)
-							F2.initZeros(exp_current_image_size, exp_current_image_size/ 2 + 1);
+							F2.initZeros(current_image_size, current_image_size/ 2 + 1);
 						else
-							F2.initZeros(exp_current_image_size, exp_current_image_size, exp_current_image_size/ 2 + 1);
+							F2.initZeros(current_image_size, current_image_size, current_image_size/ 2 + 1);
 
 						if (imode == 0)
 						{
@@ -7444,14 +7898,8 @@ void MlOptimiser::checkConvergence(bool myverb)
 
             if (has_converged)
             {
-            	std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-            	std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-            	if(anticipate_oom)
-            	{
-            		std::cout << " You were warned at the beginning of the run that memory on the GPU might run out, and this final iteration\n\
-is where this is likely to happen. If you should encounter an out-of-memory error, you can then continue \n\
-from the last completed iteration by continuing from the gui and specifying the optimiser.star-file from iteration " << iter << "." << std::endl;
-            	}
+		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
             }
         }
 

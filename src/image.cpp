@@ -165,8 +165,11 @@ void calculateBackgroundAvgStddev(
     	A.clear();
     	A.resize(3, 3);
 
-    	// Rotate the particle (so that the helical cylinder spans X axis)
-    	Euler_angles2matrix(0., -tilt_deg, -psi_deg, A, false);  // Beware - negative sign!
+    	// Rotate the particle (helical axes are X and Z for 2D and 3D segments respectively)
+    	Euler_angles2matrix(0., tilt_deg, psi_deg, A, false);
+    	// Don't put negative signs before tilt and psi values, use 'transpose' instead
+    	A = A.transpose();
+    	// Refer to the code in calculateBackgroundAvgStddev() for 3D implementation
 
 #ifdef DEBUG_REGULARISE_HELICAL_SEGMENTS
     	FileName fn_test;
@@ -197,7 +200,7 @@ void calculateBackgroundAvgStddev(
 
 			// Distance from the point to helical axis (perpendicular to X axis)
 			if (dim == 3)
-				d = sqrt(YY(coords) * YY(coords) + ZZ(coords) * ZZ(coords));
+				d = sqrt(YY(coords) * YY(coords) + XX(coords) * XX(coords));
 			else
 				d = ABS(YY(coords));
 
@@ -284,9 +287,11 @@ void subtractBackgroundRamp(
     	A.clear();
     	A.resize(3, 3);
 
-    	// Rotate the particle (so that the helical cylinder spans X axis)
+    	// Rotate the particle (helical axes are X and Z for 2D and 3D segments respectively)
     	// Since Z = 0, tilt_deg does not matter
-    	Euler_angles2matrix(0., -tilt_deg, -psi_deg, A, false);  // Beware - negative sign!
+    	Euler_angles2matrix(0., tilt_deg, psi_deg, A, false);
+    	// Don't put negative signs before tilt and psi values, use 'transpose' instead
+    	A = A.transpose();
 
     	FOR_ALL_ELEMENTS_IN_ARRAY2D(I())  // not implemented for 3D data
     	{

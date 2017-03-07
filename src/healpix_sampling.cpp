@@ -373,9 +373,18 @@ void HealpixSampling::setTranslations(
 					zoff = iz * offset_step;
 					if ((max2 + zoff * zoff) <= (offset_range * offset_range))
 					{
-						translations_x.push_back(xoff);
 						translations_y.push_back(yoff);
-						translations_z.push_back(zoff);
+						if (do_helical_refine) // Z axis corresponds to the helical axis in 3D subtomogram averaging !!!
+						{
+							translations_x.push_back(zoff);
+							translations_z.push_back(xoff);
+						}
+						else
+						{
+							translations_x.push_back(xoff);
+							translations_z.push_back(zoff);
+						}
+
 					}
 				}
 			}
@@ -404,8 +413,9 @@ void HealpixSampling::addOneTranslation(
 		RFLOAT offset_z,
 		bool do_clear,
 		bool do_helical_refine,
-		RFLOAT psi_deg,
-		RFLOAT tilt_deg)
+		RFLOAT rot_deg,
+		RFLOAT tilt_deg,
+		RFLOAT psi_deg)
 {
 	if (do_clear)
 	{
@@ -414,12 +424,7 @@ void HealpixSampling::addOneTranslation(
 		translations_z.clear();
 	}
 	if (do_helical_refine)
-	{
-		if (is_3d_trans)
-			transformCartesianAndHelicalCoords(offset_x, offset_y, offset_z, offset_x, offset_y, offset_z, psi_deg, tilt_deg, 3, CART_TO_HELICAL_COORDS);
-		else
-			transformCartesianAndHelicalCoords(offset_x, offset_y, offset_z, offset_x, offset_y, offset_z, psi_deg, tilt_deg, 2, CART_TO_HELICAL_COORDS);
-	}
+		transformCartesianAndHelicalCoords(offset_x, offset_y, offset_z, offset_x, offset_y, offset_z, rot_deg, tilt_deg, psi_deg, ((is_3d_trans) ? (3) : (2)), CART_TO_HELICAL_COORDS);
 	translations_x.push_back(offset_x);
 	translations_y.push_back(offset_y);
 	if (is_3d_trans)
@@ -1475,17 +1480,25 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 			REPORT_ERROR("HealpixSampling::getTranslations BUG %% 'helical_offset_step (h_step)' should be positive!");
 		}
 
+		RFLOAT over_xoff = 0., over_yoff = 0., over_zoff = 0.;
 		for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
 		{
-			RFLOAT over_xoff = translations_x[itrans] - 0.5 * h_step + (0.5 + itrans_overx) * h_step / nr_oversamples;
+			if ( (do_helical_refine) && (!is_3d_trans) ) // Helical reconstruction with 2D segments
+				over_xoff = translations_x[itrans] - 0.5 * h_step + (0.5 + itrans_overx) * h_step / nr_oversamples;
+			else
+				over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
 			for (int itrans_overy = 0; itrans_overy < nr_oversamples; itrans_overy++)
 			{
-				RFLOAT over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
+				over_yoff = translations_y[itrans] - 0.5 * offset_step + (0.5 + itrans_overy) * offset_step / nr_oversamples;
 				if (is_3d_trans)
 				{
 					for (int itrans_overz = 0; itrans_overz < nr_oversamples; itrans_overz++)
 					{
-						RFLOAT over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
+						if (do_helical_refine) // Helical reconstruction in 3D subtomogram averaging
+							over_zoff = translations_z[itrans] - 0.5 * h_step + (0.5 + itrans_overz) * h_step / nr_oversamples;
+						else
+							over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
+
 						my_translations_x.push_back(over_xoff);
 						my_translations_y.push_back(over_yoff);
 						my_translations_z.push_back(over_zoff);
@@ -1518,13 +1531,18 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 		for (int iover = 0; iover < my_translations_x.size(); iover++)
 		{
 			// If doing helical refinement, DONT put perturbation onto translations along helical axis???
-			if (do_helical_refine)
+			if ( (do_helical_refine) && (!is_3d_trans) ) // Helical reconstruction with 2D segments
 				my_translations_x[iover] += myperturb_helical;
 			else
 				my_translations_x[iover] += myperturb;
 			my_translations_y[iover] += myperturb;
 			if (is_3d_trans)
-				my_translations_z[iover] += myperturb;
+			{
+				if (do_helical_refine)
+					my_translations_z[iover] += myperturb_helical; // Helical reconstruction in 3D subtomogram averaging
+				else
+					my_translations_z[iover] += myperturb;
+			}
 		}
 	}
 
