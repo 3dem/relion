@@ -393,12 +393,10 @@ void MlOptimiserMpi::initialise()
 	        }
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
-	}
 
-	MPI_Status status;
 	if(do_auto_refine)
 	{
-		if (do_gpu && !node->isMaster())
+		if (!node->isMaster())
 		{
 			size_t boxLim (10000);
 			for (int i = 0; i < cudaDevices.size(); i ++)
@@ -448,6 +446,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 				std::cerr << std::endl << std::endl;
 			}
 		}
+	}
 	}
 	/************************************************************************/
 #endif // CUDA
