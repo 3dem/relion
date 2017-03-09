@@ -821,36 +821,32 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Motioncorr");
+	tab2->label("Motioncor2");
 	resetHeight();
 
-	// Check for environment variable RELION_MOTIONCORR_EXECUTABLE
-	char * default_location = getenv ("RELION_MOTIONCORR_EXECUTABLE");
+	// Check for environment variable RELION_MOTIONCOR2_EXECUTABLE
+	char * default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
 	if (default_location == NULL)
 	{
-		char mydefault[]=DEFAULTMOTIONCORRLOCATION;
+		char mydefault[]=DEFAULTMOTIONCOR2LOCATION;
 		default_location=mydefault;
 	}
 
-	fn_motioncorr_exe.place(current_y, "MOTIONCORR executable:", default_location, "*.*", NULL, "Location of the MOTIONCORR executable. You can control the default of this field by setting environment variable RELION_MOTIONCORR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	motioncor2_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	motioncor2_group->end();
-	do_motioncor2.place(current_y, "Is this MOTIONCOR2?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of MOTIONCORR. Only default settings in UNBLUR are allowed in this wrapper. Note that all options from the MOTIONCORR tab will be ignored.", motioncor2_group);
+
+	do_motioncor2.place(current_y, "Use MOTIONCOR2?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of UNBLUR.", motioncor2_group);
 
 	motioncor2_group->begin();
+
+	fn_motioncor2_exe.place(current_y, "MOTIONCOR2 executable:", default_location, "*.*", NULL, "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	fn_gain_ref.place(current_y, "Gain-reference image:", "", "*.mrc", NULL, "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
 	patch_x.placeOnSameYPosition(current_y, "Number of patches X, Y:", "Number of patches X:", "1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	patch_y.placeOnSameYPosition(current_y, "", "Number of patches Y:", "1", "Number of patches (in X and Y direction) to apply motioncor2.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
 	group_frames.place(current_y, "Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
-	motioncor2_group->end();
-	do_motioncor2.cb_menu_i(); // make default active
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	bin_factor.place(current_y, "Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Only integer values are allowed for MOTIONCORR, but float-values may be used for MOTIONCOR2. Do make sure though that the resulting micrograph size is even.");
-	bfactor.place(current_y, "Bfactor:", 150, 0, 1500, 50, "The B-factor (in pixel^2) that MOTIONCORR will apply to the micrographs. The MOTIONCORR Readme.txt says: A bfactor 150 or 200pix^2 is good for most cryoEM image with 2x binned super-resolution image. For unbined image, a larger bfactor is needed.");
+	bin_factor.place(current_y, "Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used for MOTIONCOR2. Do make sure though that the resulting micrograph size is even.");
+	bfactor.place(current_y, "Bfactor:", 150, 0, 1500, 50, "The B-factor (-bft) that MOTIONCOR2 will apply to the micrographs.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -858,7 +854,10 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 
 	// Add a little spacer
 	current_y += STEPY/2;
-	other_motioncorr_args.place(current_y, "Other MOTIONCORR arguments", "", "Additional arguments that need to be passed to MOTIONCORR.");
+	other_motioncor2_args.place(current_y, "Other MOTIONCOR2 arguments", "", "Additional arguments that need to be passed to MOTIONCOR2.");
+
+	motioncor2_group->end();
+	do_motioncor2.cb_menu_i(); // make default active
 
 	tab2->end();
 	tab3->begin();
@@ -934,7 +933,7 @@ void MotioncorrJobWindow::write(std::string fn)
 	last_frame_sum.writeValue(fh);
 	angpix.writeValue(fh);
 
-	fn_motioncorr_exe.writeValue(fh);
+	fn_motioncor2_exe.writeValue(fh);
 	do_motioncor2.writeValue(fh);
 	fn_gain_ref.writeValue(fh);
 	patch_x.writeValue(fh);
@@ -943,7 +942,7 @@ void MotioncorrJobWindow::write(std::string fn)
 	bin_factor.writeValue(fh);
 	bfactor.writeValue(fh);
 	gpu_ids.writeValue(fh);
-	other_motioncorr_args.writeValue(fh);
+	other_motioncor2_args.writeValue(fh);
 
 	do_unblur.writeValue(fh);
 	fn_unblur_exe.writeValue(fh);
@@ -975,7 +974,7 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		last_frame_sum.readValue(fh);
 		angpix.readValue(fh);
 
-		fn_motioncorr_exe.readValue(fh);
+		fn_motioncor2_exe.readValue(fh);
 		do_motioncor2.readValue(fh);
 		fn_gain_ref.readValue(fh);
 		patch_x.readValue(fh);
@@ -984,7 +983,7 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		bin_factor.readValue(fh);
 		bfactor.readValue(fh);
 		gpu_ids.readValue(fh);
-		other_motioncorr_args.readValue(fh);
+		other_motioncor2_args.readValue(fh);
 
 		do_unblur.readValue(fh);
 		fn_unblur_exe.readValue(fh);
@@ -1011,7 +1010,7 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	last_frame_sum.deactivate(is_continue);
 	angpix.deactivate(is_continue);
 
-	fn_motioncorr_exe.deactivate(is_continue);
+	fn_motioncor2_exe.deactivate(is_continue);
 	do_motioncor2.deactivate(is_continue);
 	fn_gain_ref.deactivate(is_continue);
 	patch_x.deactivate(is_continue);
@@ -1019,7 +1018,7 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	group_frames.deactivate(is_continue);
 	bin_factor.deactivate(is_continue);
 	bfactor.deactivate(is_continue);
-	other_motioncorr_args.deactivate(is_continue);
+	other_motioncor2_args.deactivate(is_continue);
 
 	do_unblur.deactivate(is_continue);
 	fn_unblur_exe.deactivate(is_continue);
@@ -1077,38 +1076,39 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 
 	if (do_unblur.getValue())
 	{
+		// Unblur-specific stuff
 		command += " --use_unblur";
 		command += " --j " + floatToString(nr_threads.getValue());
 		command += " --unblur_exe " + fn_unblur_exe.getValue();
 		command += " --summovie_exe " + fn_summovie_exe.getValue();
 		command += " --angpix " +  floatToString(angpix.getValue());
 	}
-	else
+	else if (do_motioncor2.getValue())
 	{
-		// Motioncorr-specific stuff
-		command += " --bin_factor " + floatToString(bin_factor.getValue());
-		command += " --motioncorr_exe " + fn_motioncorr_exe.getValue();
-		command += " --bfactor " + floatToString(bfactor.getValue());
-
 		// Motioncor2-specific stuff
-		if (do_motioncor2.getValue())
-		{
-			command += " --use_motioncor2";
-			command += " --angpix " +  floatToString(angpix.getValue());
-			command += " --patch_x " + patch_x.getValue();
-			command += " --patch_y " + patch_y.getValue();
-			if (group_frames.getValue() > 1.)
-				command += " --group_frames " + floatToString(group_frames.getValue());
-			if ((fn_gain_ref.getValue()).length() > 0)
-				command += " --gainref " + fn_gain_ref.getValue();
-		}
+		command += " --use_motioncor2";
+		command += " --bin_factor " + floatToString(bin_factor.getValue());
+		command += " --motioncor2_exe " + fn_motioncor2_exe.getValue();
+		command += " --bfactor " + floatToString(bfactor.getValue());
+		command += " --angpix " +  floatToString(angpix.getValue());
+		command += " --patch_x " + patch_x.getValue();
+		command += " --patch_y " + patch_y.getValue();
+		if (group_frames.getValue() > 1.)
+			command += " --group_frames " + floatToString(group_frames.getValue());
+		if ((fn_gain_ref.getValue()).length() > 0)
+			command += " --gainref " + fn_gain_ref.getValue();
 
-		if ((other_motioncorr_args.getValue()).length() > 0)
-			command += " --other_motioncorr_args \" " + other_motioncorr_args.getValue() + " \"";
+		if ((other_motioncor2_args.getValue()).length() > 0)
+			command += " --other_motioncor2_args \" " + other_motioncor2_args.getValue() + " \"";
 
 		// Which GPUs to use?
 		command += " --gpu \"" + gpu_ids.getValue() + "\"";
 
+	}
+	else
+	{
+		fl_message("ERROR: specify the use of MotionCor2 or Unblur...");
+		return false;
 	}
 
 	if (do_dose_weighting.getValue())
@@ -1133,7 +1133,7 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 }
 
 
-CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREAD)
+CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_NOT_THREAD)
 {
 	type = PROC_CTFFIND;
 
@@ -1145,13 +1145,10 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 
 
 	input_star_mics.place(current_y, "Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
+	use_noDW.place(current_y, "Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used. Note this option will not work for motion-correction with UNBLUR.");
 
-	tab1->end();
-
-
-	tab2->begin();
-	tab2->label("Microscopy");
-	resetHeight();
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	cs.place(current_y, "Spherical aberration (mm):", 2, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm)");
 
@@ -1161,23 +1158,16 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 
 	angpix.place(current_y, "Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
 
-	tab2->end();
-
-	tab3->begin();
-	tab3->label("CTFFIND");
-	resetHeight();
-
-	// Check for environment variable RELION_CTFFIND_EXECUTABLE
-	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
-	if (default_location == NULL)
-	{
-		char mydefault[]=DEFAULTCTFFINDLOCATION;
-		default_location=mydefault;
-	}
-	fn_ctffind_exe.place(current_y, "CTFFIND executable:", default_location, "*.exe", NULL, "Location of the CTFFIND executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-
 	// Add a little spacer
 	current_y += STEPY/2;
+
+	dast.place(current_y, "Amount of astigmatism (A):", 100, 0, 2000, 100,"CTFFIND's dAst parameter, GCTFs -astm parameter");
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("Searches");
+	resetHeight();
 
 	box.place(current_y, "FFT box size (pix):", 512, 64, 1024, 8, "CTFFIND's Box parameter");
 
@@ -1191,36 +1181,8 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 
 	dfstep.place(current_y, "Defocus step size (A):", 500, 200, 2000, 100,"CTFFIND's FStep parameter");
 
-	dast.place(current_y, "Amount of astigmatism (A):", 100, 0, 2000, 100,"CTFFIND's dAst parameter");
-
 	// Add a little spacer
 	current_y += STEPY/2;
-
-	ctf_win.place(current_y, "Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
-
-	tab3->end();
-
-
-	tab4->begin();
-	tab4->label("CTFFIND4");
-	resetHeight();
-
-	ctffind4_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	ctffind4_group->end();
-
-	is_ctffind4.place(current_y, "Is this a CTFFIND 4.1+ executable?", false, "If set to Yes, the wrapper will use the extended functionaility of CTFFIND4 (version 4.1 or newer). This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.", ctffind4_group);
-	ctffind4_group->begin();
-
-	movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	movie_group->end();
-
-	do_movie_thon_rings.place(current_y, "Estimate Thon rings from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access", movie_group);
-
-	movie_group->begin();
-	movie_rootname.place(current_y, "Movie rootname plus extension", "_movie.mrcs", "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");
-	avg_movie_frames.place(current_y, "Nr of movie frames to average:", 4, 1, 20, 1,"Calculate averages over so many movie frames to calculate power spectra. Often values corresponding to an accumulated dose of ~ 4 electrons per squared Angstrom work well.");
-	movie_group->end();
-	do_movie_thon_rings.cb_menu_i(); // make default active
 
 	phaseshift_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	phaseshift_group->end();
@@ -1231,21 +1193,62 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 	phase_min.placeOnSameYPosition(current_y, "Phase shift - Min, Max, Step (deg):", "Phase shift search (deg) - Min:", "0", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	phase_max.placeOnSameYPosition(current_y, "", "Phase shift search (deg) - Max:", "180", NULL, XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	phase_step.placeOnSameYPosition(current_y, "", "Phase shift search (deg) - Step:", "10", "Minimum, maximum and step size (in degrees) for the search of the phase shift", XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+
 	phaseshift_group->end();
 	do_phaseshift.cb_menu_i(); // make default active
 
-	ctffind4_group->end();
-	is_ctffind4.cb_menu_i(); // make default active
+	tab2->end();
 
-	tab4->end();
-	tab5->begin();
-	tab5->label("Gctf");
+
+	tab3->begin();
+	tab3->label("CTFFIND-4.1");
+	resetHeight();
+
+	ctffind4_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	ctffind4_group->end();
+
+	use_ctffind4.place(current_y, "Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.", ctffind4_group);
+	ctffind4_group->begin();
+
+	// Check for environment variable RELION_CTFFIND_EXECUTABLE
+	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
+	if (default_location == NULL)
+	{
+		char mydefault[]=DEFAULTCTFFINDLOCATION;
+		default_location=mydefault;
+	}
+	fn_ctffind_exe.place(current_y, "CTFFIND-4.1 executable:", default_location, "*.exe", NULL, "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+	movie_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	movie_group->end();
+
+	do_movie_thon_rings.place(current_y, "Estimate Thon rings from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access", movie_group);
+
+	movie_group->begin();
+	movie_rootname.place(current_y, "Movie rootname plus extension", "_movie.mrcs", "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");
+	avg_movie_frames.place(current_y, "Nr of movie frames to average:", 4, 1, 20, 1,"Calculate averages over so many movie frames to calculate power spectra. Often values corresponding to an accumulated dose of ~ 4 electrons per squared Angstrom work well.");
+
+	movie_group->end();
+	do_movie_thon_rings.cb_menu_i(); // make default active
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	ctf_win.place(current_y, "Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
+
+	ctffind4_group->end();
+	use_ctffind4.cb_menu_i(); // make default active
+
+	tab3->end();
+
+	tab4->begin();
+	tab4->label("Gctf");
 	resetHeight();
 
 	gctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	gctf_group->end();
 
-	use_gctf.place(current_y, "Use Gctf instead of CTFFIND?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND.", gctf_group);
+	use_gctf.place(current_y, "Use Gctf instead?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND4.", gctf_group);
 
 	gctf_group->begin();
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
@@ -1257,7 +1260,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 	}
 	fn_gctf_exe.place(current_y, "Gctf executable:", default_location, "*", NULL, "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
-	do_ignore_ctffind_params.place(current_y, "Ignore CTFFIND parameters?", true, "If set to Yes, all parameters on the CTFFIND tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
+	do_ignore_ctffind_params.place(current_y, "Ignore 'Searches' parameters?", true, "If set to Yes, all parameters on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
 \n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 
 	do_EPA.place(current_y, "Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
@@ -1274,7 +1277,7 @@ CtffindJobWindow::CtffindJobWindow() : RelionJobWindow(5, HAS_MPI, HAS_NOT_THREA
 	gctf_group->end();
 	use_gctf.cb_menu_i(); // make default active
 
-	tab5->end();
+	tab4->end();
 
 	// read settings if hidden file exists
 	read(".gui_ctffind", is_continue);
@@ -1290,11 +1293,12 @@ void CtffindJobWindow::write(std::string fn)
 	openWriteFile(fn, fh);
 
 	input_star_mics.writeValue(fh);
-
+	use_noDW.writeValue(fh);
 	cs.writeValue(fh);
 	kv.writeValue(fh);
 	q0.writeValue(fh);
 	angpix.writeValue(fh);
+	dast.writeValue(fh);
 
 	box.writeValue(fh);
 	resmin.writeValue(fh);
@@ -1302,18 +1306,17 @@ void CtffindJobWindow::write(std::string fn)
 	dfmin.writeValue(fh);
 	dfmax.writeValue(fh);
 	dfstep.writeValue(fh);
-	dast.writeValue(fh);
-	fn_ctffind_exe.writeValue(fh);
-	ctf_win.writeValue(fh);
-
-	is_ctffind4.writeValue(fh);
-	do_movie_thon_rings.writeValue(fh);
-	movie_rootname.writeValue(fh);
-	avg_movie_frames.writeValue(fh);
 	do_phaseshift.writeValue(fh);
 	phase_min.writeValue(fh);
 	phase_max.writeValue(fh);
 	phase_step.writeValue(fh);
+
+	use_ctffind4.writeValue(fh);
+	fn_ctffind_exe.writeValue(fh);
+	do_movie_thon_rings.writeValue(fh);
+	movie_rootname.writeValue(fh);
+	avg_movie_frames.writeValue(fh);
+	ctf_win.writeValue(fh);
 
 	use_gctf.writeValue(fh);
 	fn_gctf_exe.writeValue(fh);
@@ -1338,11 +1341,12 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 	if (openReadFile(fn, fh))
 	{
 		input_star_mics.readValue(fh);
-
+		use_noDW.readValue(fh);
 		cs.readValue(fh);
 		kv.readValue(fh);
 		q0.readValue(fh);
 		angpix.readValue(fh);
+		dast.readValue(fh);
 
 		box.readValue(fh);
 		resmin.readValue(fh);
@@ -1350,19 +1354,18 @@ void CtffindJobWindow::read(std::string fn, bool &_is_continue)
 		dfmin.readValue(fh);
 		dfmax.readValue(fh);
 		dfstep.readValue(fh);
-		dast.readValue(fh);
-		fn_ctffind_exe.readValue(fh);
-
-		is_ctffind4.readValue(fh);
-		do_movie_thon_rings.readValue(fh);
-		movie_rootname.readValue(fh);
-		avg_movie_frames.readValue(fh);
 		do_phaseshift.readValue(fh);
 		phase_min.readValue(fh);
 		phase_max.readValue(fh);
 		phase_step.readValue(fh);
 
+		use_ctffind4.readValue(fh);
+		fn_ctffind_exe.readValue(fh);
+		do_movie_thon_rings.readValue(fh);
+		movie_rootname.readValue(fh);
+		avg_movie_frames.readValue(fh);
 		ctf_win.readValue(fh);
+
 		use_gctf.readValue(fh);
 		fn_gctf_exe.readValue(fh);
 		do_ignore_ctffind_params.readValue(fh);
@@ -1380,11 +1383,12 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	is_continue = _is_continue;
 
 	input_star_mics.deactivate(is_continue);
-
+	use_noDW.deactivate(is_continue);
 	cs.deactivate(is_continue);
 	kv.deactivate(is_continue);
 	q0.deactivate(is_continue);
 	angpix.deactivate(is_continue);
+	dast.deactivate(is_continue);
 
 	box.deactivate(is_continue);
 	resmin.deactivate(is_continue);
@@ -1392,18 +1396,18 @@ void CtffindJobWindow::toggle_new_continue(bool _is_continue)
 	dfmin.deactivate(is_continue);
 	dfmax.deactivate(is_continue);
 	dfstep.deactivate(is_continue);
-	dast.deactivate(is_continue);
-	fn_ctffind_exe.deactivate(is_continue);
-	ctf_win.deactivate(is_continue);
-
-	is_ctffind4.deactivate(is_continue);
-	do_movie_thon_rings.deactivate(is_continue);
-	movie_rootname.deactivate(is_continue);
-	avg_movie_frames.deactivate(is_continue);
 	do_phaseshift.deactivate(is_continue);
 	phase_min.deactivate(is_continue);
 	phase_max.deactivate(is_continue);
 	phase_step.deactivate(is_continue);
+
+	use_ctffind4.deactivate(is_continue);
+	fn_ctffind_exe.deactivate(is_continue);
+	ctf_win.deactivate(is_continue);
+	do_movie_thon_rings.deactivate(is_continue);
+	movie_rootname.deactivate(is_continue);
+	avg_movie_frames.deactivate(is_continue);
+
 	use_gctf.deactivate(is_continue);
 	fn_gctf_exe.deactivate(is_continue);
 	do_ignore_ctffind_params.deactivate(is_continue);
@@ -1455,6 +1459,18 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 	command += " --dFMax " + floatToString(dfmax.getValue());
 	command += " --FStep " + floatToString(dfstep.getValue());
 	command += " --dAst " + floatToString(dast.getValue());
+
+	if (use_noDW.getValue())
+		command += " --use_noDW ";
+
+	if (do_phaseshift.getValue())
+	{
+		command += " --do_phaseshift ";
+		command += " --phase_min " + floatToString(textToFloat(phase_min.getValue()));
+		command += " --phase_max " + floatToString(textToFloat(phase_max.getValue()));
+		command += " --phase_step " + floatToString(textToFloat(phase_step.getValue()));
+	}
+
 	if (use_gctf.getValue())
 	{
 		command += " --use_gctf --gctf_exe " + fn_gctf_exe.getValue();
@@ -1471,26 +1487,21 @@ bool CtffindJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --extra_gctf_options \" " + other_gctf_args.getValue() + " \"";
 
 	}
-	else
+	else if (use_ctffind4.getValue())
 	{
 		command += " --ctffind_exe " + fn_ctffind_exe.getValue();
 		command += " --ctfWin " + floatToString(ctf_win.getValue());
-		if (is_ctffind4.getValue())
+		command += " --is_ctffind4 ";
+		if (do_movie_thon_rings.getValue())
 		{
-			command += " --is_ctffind4 ";
-			if (do_movie_thon_rings.getValue())
-			{
-				command += " --do_movie_thon_rings --avg_movie_frames " + floatToString(avg_movie_frames.getValue());
-				command += " --movie_rootname " + movie_rootname.getValue();
-			}
-			if (do_phaseshift.getValue())
-			{
-				command += " --do_phaseshift ";
-				command += " --phase_min " + floatToString(textToFloat(phase_min.getValue()));
-				command += " --phase_max " + floatToString(textToFloat(phase_max.getValue()));
-				command += " --phase_step " + floatToString(textToFloat(phase_step.getValue()));
-			}
+			command += " --do_movie_thon_rings --avg_movie_frames " + floatToString(avg_movie_frames.getValue());
+			command += " --movie_rootname " + movie_rootname.getValue();
 		}
+	}
+	else
+	{
+		fl_message("ERROR: Please select use of CTFFIND4.1 or Gctf...");
+		return false;
 	}
 
 
@@ -3185,17 +3196,21 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	resetHeight();
 	do_denovo_ref3d.place(current_y, "Do de-novo reference?", false, "If set to Yes, A Stochastic Gradient Descent optimisaion will be run, started from random angles for each particle. \
 This may refine towards a suitable model, provided enough different views are present in the data. You may want to run this with a subset \
-of several thousand (downscaled) particles; preread all of those into RAM; use a coarse angular sampling (e.g. 15 degrees); a limited offset range (3 pixels?) and run for approximately 3-5 iterations.", denovo_group);
+of several thousand (downscaled) particles; preread all of those into RAM; use a coarse angular sampling (e.g. 15 degrees); a limited offset range (3 pixels?) and run for approximately 3-5 iterations.\n\n\
+Alternatively, a bit less quick but easier and probably not worse, you could use the STAR file with all input particles, perform a single iteration, but limit the maximum number of subsets to correspond to ~10k particles.", denovo_group);
 
 	denovo_group->begin();
 
 	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
 
-	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
-This is essential in SGD, as there is no regularisation at all, i.e. overfitting will start to happen very quickly.\
-Values in the range of 15-30 Angstroms have proven useful.");
+	sgd_max_subsets.place(current_y, "Maximum number of subsets:", 50, -1, 200, 10, "Stop the SGD optimisation after this many subsets have been processed. \
+The total number of particles processed will then be equal to the subset size times this number. Often, processing 10k particles is enough to get a decent low-resolution model. If you have fewer particles, you can perform more than one iteration instead.");
 
-	sgd_write_subsets.place(current_y, "SGD write subsets:", -1, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
+	sgd_write_subsets.place(current_y, "Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
+
+	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
+This is essential in SGD, as there is very little regularisation, i.e. overfitting will start to happen very quickly. \
+Values in the range of 15-30 Angstroms have proven useful.");
 
 	denovo_group-> end();
 	do_denovo_ref3d.cb_menu_i(); // To make default effective
@@ -3490,6 +3505,7 @@ void Class3DJobWindow::write(std::string fn)
 	do_denovo_ref3d.writeValue(fh);
 	sgd_subset_size.writeValue(fh);
 	sgd_highres_limit.writeValue(fh);
+	sgd_max_subsets.writeValue(fh);
 	sgd_write_subsets.writeValue(fh);
 	fn_ref.writeValue(fh);
 	ref_correct_greyscale.writeValue(fh);
@@ -3570,6 +3586,7 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		do_denovo_ref3d.readValue(fh);
 		sgd_subset_size.readValue(fh);
 		sgd_highres_limit.readValue(fh);
+		sgd_max_subsets.readValue(fh);
 		sgd_write_subsets.readValue(fh);
 		fn_ref.readValue(fh);
 		ref_correct_greyscale.readValue(fh);
@@ -3645,6 +3662,7 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	do_denovo_ref3d.deactivate(is_continue);
 	sgd_subset_size.deactivate(is_continue);
 	sgd_highres_limit.deactivate(is_continue);
+	sgd_max_subsets.deactivate(is_continue);
 	sgd_write_subsets.deactivate(is_continue);
 	fn_ref.deactivate(is_continue);
 	ref_correct_greyscale.deactivate(is_continue);
@@ -3736,6 +3754,7 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 			command += " --denovo_3dref --sgd ";
 			command += " --subset_size " + floatToString(sgd_subset_size.getValue());
 			command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
+			command += " --max_subsets " + floatToString(sgd_max_subsets.getValue());
 			command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
 		}
 		else
