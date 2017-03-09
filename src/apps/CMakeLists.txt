@@ -115,6 +115,7 @@ if(GUI)
     ADD_CUSTOM_COMMAND(TARGET maingui
               POST_BUILD
               COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
+	      COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_qsub.csh ${PROJECT_BINARY_DIR}/bin/qsub.csh
     )
 endif(GUI)
 

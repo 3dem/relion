@@ -34,7 +34,7 @@
 #include "src/pipeliner.h"
 
 // Our own defaults at LMB are the hard-coded ones
-#define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
+#define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
 #define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
