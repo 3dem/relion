@@ -226,6 +226,10 @@ endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
+if(FORCE_OWN_FFTW)
+    install(DIRECTORY external/fftw/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
+endif()
+
 list(APPEND RELION_SCRIPT_FILES star_printtable 
                                 star_plottable
                                 star_loopheader

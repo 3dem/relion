@@ -447,7 +447,7 @@ public:
 
 	void syncAllBackprojects()
 	{
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
+		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 	}
 
 
@@ -494,8 +494,8 @@ public:
 
 	MlOptimiserCuda(MlOptimiser *baseMLOptimiser, MlDeviceBundle* bundle, const char * timing_fnm) :
 			baseMLO(baseMLOptimiser),
-			transformer1(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
-			transformer2(0, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
+			transformer1(cudaStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
+			transformer2(cudaStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			dataIs3D(baseMLO->mymodel.data_dim == 3),
 			devBundle(bundle),

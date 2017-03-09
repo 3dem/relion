@@ -397,5 +397,23 @@ long int divide_equally(long int N, int size, int rank, long int &first, long in
  */
 int divide_equally_which_group(long int N, int size, long int myself);
 
+// Class which use local scope locks on higher-scope mutexes,
+// resulting in zero risk of leaving locks on. Effectively,
+// a mutex is treated like an container capable of holding a
+// single Lock. We create a Lock and put it inside the mutex,
+// and as soon as the Lock goes out out scope, the mutex is
+// emptied (unlocked).
+class Lock
+{
+public:
+    explicit Lock(pthread_mutex_t *pm)
+    : mutexPtr(pm)
+    { pthread_mutex_lock(mutexPtr); }
+
+    ~Lock() { pthread_mutex_unlock(mutexPtr); }
+
+private:
+    pthread_mutex_t *mutexPtr;
+};
 
 #endif
