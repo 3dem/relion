@@ -2987,9 +2987,9 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	fn_cont.deactivate(!is_continue);
 	if (!is_continue)
 		fn_cont.setValue("");
-	do_subsets.deactivate(is_continue);
-	subset_size.deactivate(is_continue);
-	max_subsets.deactivate(is_continue);
+	//do_subsets.deactivate(is_continue);
+	//subset_size.deactivate(is_continue);
+	//max_subsets.deactivate(is_continue);
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
@@ -3197,7 +3197,8 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	do_denovo_ref3d.place(current_y, "Do de-novo reference?", false, "If set to Yes, A Stochastic Gradient Descent optimisaion will be run, started from random angles for each particle. \
 This may refine towards a suitable model, provided enough different views are present in the data. You may want to run this with a subset \
 of several thousand (downscaled) particles; preread all of those into RAM; use a coarse angular sampling (e.g. 15 degrees); a limited offset range (3 pixels?) and run for approximately 3-5 iterations.\n\n\
-Alternatively, a bit less quick but easier and probably not worse, you could use the STAR file with all input particles, perform a single iteration, but limit the maximum number of subsets to correspond to ~10k particles.", denovo_group);
+Alternatively, a bit less quick but easier and probably not worse, you could use the STAR file with all input particles, perform a single iteration, but limit the maximum number of subsets to correspond to ~10k particles.\n\n\
+Note that SGD optimisation has not yet been GPU-accelerated, so you can only run this option on CPUs!", denovo_group);
 
 	denovo_group->begin();
 
@@ -3660,10 +3661,10 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 
 	// Reference
 	do_denovo_ref3d.deactivate(is_continue);
-	sgd_subset_size.deactivate(is_continue);
-	sgd_highres_limit.deactivate(is_continue);
-	sgd_max_subsets.deactivate(is_continue);
-	sgd_write_subsets.deactivate(is_continue);
+	//sgd_subset_size.deactivate(is_continue);
+	//sgd_highres_limit.deactivate(is_continue);
+	//sgd_max_subsets.deactivate(is_continue);
+	//sgd_write_subsets.deactivate(is_continue);
 	fn_ref.deactivate(is_continue);
 	ref_correct_greyscale.deactivate(is_continue);
 	ini_high.deactivate(is_continue);
@@ -3737,6 +3738,16 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
     command += " --o " + outputname + fn_run;
 	pipelineOutputNodes = getOutputNodesRefine(outputname + fn_run, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
 
+	// You can also do sgd upon continuation
+	if (do_denovo_ref3d.getValue())
+	{
+		command += " --sgd ";
+		command += " --subset_size " + floatToString(sgd_subset_size.getValue());
+		command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
+		command += " --max_subsets " + floatToString(sgd_max_subsets.getValue());
+		command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
+	}
+
 	if (!is_continue)
 	{
 		if (fn_img.getValue() == "")
@@ -3748,14 +3759,9 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 
-
 		if (do_denovo_ref3d.getValue())
 		{
-			command += " --denovo_3dref --sgd ";
-			command += " --subset_size " + floatToString(sgd_subset_size.getValue());
-			command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
-			command += " --max_subsets " + floatToString(sgd_max_subsets.getValue());
-			command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
+			command += " --denovo_3dref ";
 		}
 		else
 		{

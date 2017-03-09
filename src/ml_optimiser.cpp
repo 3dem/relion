@@ -110,7 +110,6 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 		// Start a new run from scratch
 		parseInitial(argc, argv);
 	}
-
 }
 
 void MlOptimiser::parseContinue(int argc, char **argv)
@@ -163,12 +162,31 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		particle_diameter = textToFloat(fnt);
 
 	// SGD stuff
+	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
+
 	if (parser.checkOption("--stop_sgd", "Switch from stochastic gradient descent to expectation maximisation for the remainder of iterations."))
 		do_sgd = false;
 
 	fnt = parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "OLD");
 	if (fnt != "OLD")
 		sgd_max_subsets = textToInteger(fnt);
+
+	fnt = parser.getOption("--subset_size", "Size of the subsets for SGD", "OLD");
+	if (fnt != "OLD")
+		subset_size = textToInteger(fnt);
+
+	fnt = parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "OLD");
+	if (fnt != "OLD")
+		sgd_stepsize = textToInteger(fnt);
+
+	fnt = parser.getOption("--write_subsets", "Write out model every so many subsets", "OLD");
+	if (fnt != "OLD")
+		write_every_subset = textToInteger(fnt);
+
+	fnt = parser.getOption("--mu", "Momentum parameter for SGD updates", "OLD");
+	if (fnt != "OLD")
+		mu = textToFloat(fnt);
+
 
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
@@ -570,8 +588,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
-	// When reading from the CL: always start at iteration 1
+	// When reading from the CL: always start at iteration 1 and subset 1
 	iter = 0;
+	subset = 0;
+	subset_start = 1;
     // When starting from CL: always calculate initial sigma_noise
     do_calculate_initial_sigma_noise = true;
     // Start average norm correction at 1!
@@ -632,6 +652,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 void MlOptimiser::read(FileName fn_in, int rank)
 {
+//#define DEBUG_READ
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
@@ -671,11 +692,6 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp) ||
 		!MD.getValue(EMDL_OPTIMISER_INCR_SIZE, incr_size) ||
 		!MD.getValue(EMDL_OPTIMISER_DO_MAP, do_map) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd) ||
-		!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu) ||
-		!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size) ||
-		!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset) ||
-		!MD.getValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets) ||
 		!MD.getValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine) ||
 		!MD.getValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches) ||
 	    !MD.getValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain) ||
@@ -732,7 +748,20 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		ctf_premultiplied = false;
 	if (!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd))
 		strict_highres_sgd = -1.;
-
+	if (!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd))
+		do_sgd = false;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
+		mu = 0.9;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
+		subset_size = -1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_START, subset_start))
+		subset_start = 1;
+	// The following line is only to avoid strange filenames when writing optimiser.star upon restarting
+	subset = subset_start - 1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset))
+		write_every_subset = -1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets))
+		sgd_max_subsets = -1;
 
     if (do_split_random_halves &&
     		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -789,25 +818,31 @@ void MlOptimiser::read(FileName fn_in, int rank)
 void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset)
 {
 
-	FileName fn_root, fn_tmp, fn_model, fn_model2, fn_data, fn_sampling;
+	FileName fn_root, fn_tmp, fn_model, fn_model2, fn_data, fn_sampling, fn_root2;
 	std::ofstream  fh;
 	if (iter > -1)
 		fn_root.compose(fn_out+"_it", iter, "", 3);
 	else
 		fn_root = fn_out;
+	// fn_root2 is used to write out the model and optimiser, and adds a subset number in SGD
+	fn_root2 = fn_root;
+	bool do_write_bild = !(do_skip_align || do_skip_rotate);
+	int writeout_subset_start = 1;
 
-
-	if (iter > 0 && nr_subsets > 1 && subset != nr_subsets - 1)
+	if (iter > 0 && nr_subsets > 1 && subset != nr_subsets)
 	{
-		do_write_sampling = false;
-		do_write_data = false;
-		do_write_optimiser = false;
-		if (do_write_model && ((subset + 1) % write_every_subset) == 0)
+		if ((subset % write_every_subset) == 0)
 		{
-			fn_root.compose(fn_root+"_sub", subset+1, "", 4);
+			fn_root2.compose(fn_root+"_sub", subset, "", 4);
+			fn_root += "_sub";
+			do_write_bild = false;
+			writeout_subset_start = subset + 1;
 		}
 		else
 		{
+			do_write_sampling = false;
+			do_write_data = false;
+			do_write_optimiser = false;
 			do_write_model = false;
 		}
 	}
@@ -816,7 +851,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	// Do this for random_subset==0 and random_subset==1
 	if (do_write_optimiser && random_subset < 2)
 	{
-		fn_tmp = fn_root+"_optimiser.star";
+		fn_tmp = fn_root2+"_optimiser.star";
 		fh.open((fn_tmp).c_str(), std::ios::out);
 		if (!fh)
 			REPORT_ERROR( (std::string)"MlOptimiser::write: Cannot write file: " + fn_tmp);
@@ -828,12 +863,12 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
 		if (do_split_random_halves && !do_join_random_halves)
 		{
-			fn_model  = fn_root + "_half1_model.star";
-			fn_model2 = fn_root + "_half2_model.star";
+			fn_model  = fn_root2 + "_half1_model.star";
+			fn_model2 = fn_root2 + "_half2_model.star";
 		}
 		else
 		{
-			fn_model = fn_root + "_model.star";
+			fn_model = fn_root2 + "_model.star";
 		}
 		fn_data = fn_root + "_data.star";
 		fn_sampling = fn_root + "_sampling.star";
@@ -875,6 +910,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_DO_SGD, do_sgd);
 		MD.setValue(EMDL_OPTIMISER_SGD_MU, mu);
+		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_START, writeout_subset_start);
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset);
 		MD.setValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets);
@@ -927,11 +963,10 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	// Then write the mymodel to file
 	if (do_write_model)
 	{
-		bool do_write_bild = !(do_skip_align || do_skip_rotate);
 		if (do_split_random_halves && !do_join_random_halves)
-			mymodel.write(fn_root + "_half" + integerToString(random_subset), sampling, do_write_bild);
+			mymodel.write(fn_root2 + "_half" + integerToString(random_subset), sampling, do_write_bild);
 		else
-			mymodel.write(fn_root, sampling, do_write_bild);
+			mymodel.write(fn_root2, sampling, do_write_bild);
 	}
 
 	// And write the mydata to file
@@ -2075,6 +2110,10 @@ void MlOptimiser::iterate()
 	// so that current resolution is in the output files of the current iteration
 	updateCurrentResolution();
 
+	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
+	if (subset > 0)
+		iter--;
+
 	bool has_already_reached_convergence = false;
 	for (iter = iter + 1; iter <= nr_iter; iter++)
     {
@@ -2090,7 +2129,7 @@ void MlOptimiser::iterate()
 		std::cerr << std::endl;
 #endif
 
-		for (subset = 0; subset < nr_subsets; subset++)
+		for (subset = subset_start; subset <= nr_subsets; subset++)
 		{
 #ifdef TIMING
 			timer.tic(TIMING_EXP);
@@ -2231,13 +2270,14 @@ void MlOptimiser::iterate()
 
 			if (nr_subsets > 1 && sgd_max_subsets > 0)
 			{
-				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
 				if (total_nr_subsets > sgd_max_subsets)
 				{
 					subset_size = -1;
-					do_sgd = false;
-					mymodel.do_sgd = false;
 					nr_subsets = 1;
+					subset_start = 1;
+					//do_sgd = false;
+					//mymodel.do_sgd = false;
 					write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 					break; // break out of loop over the subsets, and start next iteration
 				}
@@ -2248,6 +2288,9 @@ void MlOptimiser::iterate()
 				timer.printTimes(false);
 #endif
 		} // end loop subsets
+
+		// In the next iteration, start again from the first subset
+		subset_start = 1;
 
     } // end loop iters
 
@@ -2276,7 +2319,7 @@ void MlOptimiser::expectation()
 
 	// C. Calculate expected minimum angular errors (only for 3D refinements)
 	// And possibly update orientational sampling automatically
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && subset == 0)
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && subset == 1)
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -2290,12 +2333,12 @@ void MlOptimiser::expectation()
 		updateAngularSampling();
 
 	// E. Check whether everything fits into memory
-	if (subset == 0)
+	if (subset == 1)
 		expectationSetupCheckMemory(verb);
 
 	// F. Precalculate AB-matrices for on-the-fly shifts
 	// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-	if ( (do_shifts_onthefly) && (subset == 0) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
+	if ( (do_shifts_onthefly) && (subset == 1) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
 		precalculateABMatrices();
 
 
@@ -2382,12 +2425,12 @@ void MlOptimiser::expectation()
 	long int my_subset_first_ori_particle, my_subset_last_ori_particle, nr_particles_todo;
 	if (nr_subsets > 1)
 	{
-		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset, my_subset_first_ori_particle, my_subset_last_ori_particle);
+		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset-1, my_subset_first_ori_particle, my_subset_last_ori_particle);
 		subset_size = nr_particles_todo = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
 		if (verb > 0)
 		{
 			// SGD: progress bar over entire iteration
-			if (subset == 0)
+			if (subset == subset_start)
 			{
 				if (do_sgd)
 					std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter << std::endl;

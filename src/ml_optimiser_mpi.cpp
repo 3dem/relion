@@ -794,7 +794,7 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && subset == 0)
+	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && subset == 1)
 	{
 		int my_nr_images, length_fn_ctf;
 		if (node->isMaster())
@@ -837,7 +837,7 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && do_auto_refine && iter > 1 && subset == 0)
+	if (!node->isMaster() && do_auto_refine && iter > 1 && subset == 1)
 	{
 		updateAngularSampling(node->rank == 1);
 	}
@@ -866,12 +866,12 @@ void MlOptimiserMpi::expectation()
 	{
 		// Check whether everything fits into memory
 		int myverb = (node->rank == first_slave) ? 1 : 0;
-		if (subset == 0)
+		if (subset == 1)
 			MlOptimiser::expectationSetupCheckMemory(myverb);
 
 		// F. Precalculate AB-matrices for on-the-fly shifts
 		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-		if ( (do_shifts_onthefly) && (subset == 0) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
+		if ( (do_shifts_onthefly) && (subset == 1) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
 			precalculateABMatrices();
 	}
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
@@ -1026,14 +1026,14 @@ void MlOptimiserMpi::expectation()
         		*/
         		else
         		{
-               		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset, my_subset_first_ori_particle, my_subset_last_ori_particle);
+               		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset-1, my_subset_first_ori_particle, my_subset_last_ori_particle);
                		//std::cerr << " my_subset_first_ori_particle= " << my_subset_first_ori_particle << " my_subset_last_ori_particle= " << my_subset_last_ori_particle << std::endl;
                		subset_size = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
         		}
 
         		if (verb > 0)
         		{
-        			if (subset == 0)
+        			if (subset == subset_start)
         			{
         				if (do_sgd)
         					std::cout << " Stochastic Gradient Descent iteration " << iter;
@@ -2829,13 +2829,17 @@ void MlOptimiserMpi::iterate()
 	// Initialize the current resolution
 	updateCurrentResolution();
 
+	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
+	if (subset > 0)
+		iter--;
+
 	for (iter = iter + 1; iter <= nr_iter; iter++)
     {
 #ifdef TIMING
 		timer.tic(TIMING_EXP);
 #endif
 
-		for (subset = 0; subset < nr_subsets; subset++)
+		for (subset = subset_start; subset <= nr_subsets; subset++)
 		{
 			// Nobody can start the next iteration until everyone has finished
 			MPI_Barrier(MPI_COMM_WORLD);
@@ -3070,13 +3074,14 @@ void MlOptimiserMpi::iterate()
 
 			if (nr_subsets > 1 && sgd_max_subsets > 0)
 			{
-				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
 				if (total_nr_subsets > sgd_max_subsets)
 				{
 					subset_size = -1;
-					do_sgd = false;
-					mymodel.do_sgd = false;
 					nr_subsets = 1;
+					subset_start = 1;
+					//do_sgd = false;
+					//mymodel.do_sgd = false;
 					if (node->rank == 1)
 						//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
 						MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, do_write_optimiser, DO_WRITE_MODEL, node->rank);
@@ -3095,6 +3100,9 @@ void MlOptimiserMpi::iterate()
 				timer.printTimes(false);
 #endif
 		} // end loop subsets
+
+		// In the next iteration, start again from the first subset
+		subset_start = 1;
 
 		if (do_auto_refine && has_converged)
 			break;

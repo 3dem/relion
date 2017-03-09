@@ -142,7 +142,7 @@ public:
 	int iter, nr_iter;
 
 	// Total number of subsets and current subset;
-	int subset, nr_subsets, write_every_subset, sgd_max_effective;
+	int subset, subset_start, nr_subsets, write_every_subset, sgd_max_effective;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
