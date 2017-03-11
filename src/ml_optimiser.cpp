@@ -111,6 +111,12 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 		parseInitial(argc, argv);
 	}
 
+	if(argc==1 || checkParameter(argc, argv, "--help") || checkParameter(argc, argv, "-h"))
+	{
+		usage();
+		exit(0);
+	}
+
 }
 
 void MlOptimiser::parseContinue(int argc, char **argv)
