@@ -4094,16 +4094,6 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
     command += " --o " + outputname + fn_run;
 	pipelineOutputNodes = getOutputNodesRefine(outputname + fn_run, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
 
-	// You can also do sgd upon continuation
-	if (do_denovo_ref3d.getValue())
-	{
-		command += " --sgd ";
-		command += " --subset_size " + floatToString(sgd_subset_size.getValue());
-		command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
-		command += " --max_subsets " + floatToString(sgd_max_subsets.getValue());
-		command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
-	}
-
 	if (!is_continue)
 	{
 		if (fn_img.getValue() == "")
@@ -4115,29 +4105,23 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 
-		if (do_denovo_ref3d.getValue())
+		if (fn_ref.getValue() != "None")
 		{
-			command += " --denovo_3dref ";
-		}
-		else
-		{
-			if (fn_ref.getValue() != "None")
+			if (fn_ref.getValue() == "")
 			{
-				if (fn_ref.getValue() == "")
-				{
-					fl_message("ERROR: empty field for reference...");
-					return false;
-				}
-				command += " --ref " + fn_ref.getValue();
-				Node node(fn_ref.getValue(), fn_ref.type);
-				pipelineInputNodes.push_back(node);
+				fl_message("ERROR: empty field for reference...");
+				return false;
 			}
-			if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
-				command += " --firstiter_cc";
+			command += " --ref " + fn_ref.getValue();
+			Node node(fn_ref.getValue(), fn_ref.type);
+			pipelineInputNodes.push_back(node);
 
-			if (ini_high.getValue() > 0.)
-				command += " --ini_high " + floatToString(ini_high.getValue());
+			if (!ref_correct_greyscale.getValue()) // dont do firstiter_cc when giving None
+				command += " --firstiter_cc";
 		}
+
+		if (ini_high.getValue() > 0.)
+			command += " --ini_high " + floatToString(ini_high.getValue());
 	}
 
 	// Always do compute stuff
