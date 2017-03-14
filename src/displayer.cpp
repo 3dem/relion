@@ -993,7 +993,7 @@ void multiViewerCanvas::saveSelectedParticles(bool save_selected)
 		return;
 	}
 
-//#define RELION_DEVEL_ASKTRAINING
+#define RELION_DEVEL_ASKTRAINING
 #ifdef RELION_DEVEL_ASKTRAINING
 	bool do_training = false;
 	std::string ask = "Is this a selection of good classes, so it can be used for Sjors' training set for automated class selection?\n \

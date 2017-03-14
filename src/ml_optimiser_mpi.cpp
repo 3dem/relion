@@ -1924,18 +1924,11 @@ void MlOptimiserMpi::maximization()
 
 						// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
 						// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-						long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+						long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
 						RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-						int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
-						RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
+						RFLOAT number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
 						number_of_effective_particles *= (1. - total_mu_fraction);
 						RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-
-						// This worked for several 3D cases, but cannot be right....
-						//long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
-						//RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-						//RFLOAT number_of_effective_particles = mydata.particles.size() * (1. - total_mu_fraction);
-						//RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
 
 						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
@@ -2049,18 +2042,11 @@ void MlOptimiserMpi::maximization()
 
 								// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
 								// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-								long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
+								long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
 								RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-								int my_eff_max = (sgd_max_effective > 0) ? sgd_max_effective : nr_subsets * subset_size;
-								RFLOAT number_of_effective_particles = (iter == 1) ? (subset + 1) * subset_size : my_eff_max;
+								RFLOAT number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
 								number_of_effective_particles *= (1. - total_mu_fraction);
 								RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-
-								// This worked for several 3D cases, but cannot be right....
-								//long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset + 1;
-								//RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-								//RFLOAT number_of_effective_particles = mydata.particles.size() * (1. - total_mu_fraction);
-								//RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
 
 								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 										sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
@@ -3076,23 +3062,9 @@ void MlOptimiserMpi::iterate()
 			{
 				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
 				if (total_nr_subsets > sgd_max_subsets)
-				{
-					subset_size = -1;
-					nr_subsets = 1;
-					subset_start = 1;
-					//do_sgd = false;
-					//mymodel.do_sgd = false;
-					if (node->rank == 1)
-						//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
-						MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, do_write_optimiser, DO_WRITE_MODEL, node->rank);
-					else if (node->isMaster())
-						// The master only writes the data file (he's the only one who has and manages these data!)
-						MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-
-
 					break; // break out of loop over the subsets, and start next iteration
-				}
 			}
+
 
 #ifdef TIMING
 			// Only first slave prints it timing information
@@ -3101,11 +3073,41 @@ void MlOptimiserMpi::iterate()
 #endif
 		} // end loop subsets
 
-		// In the next iteration, start again from the first subset
-		subset_start = 1;
 
 		if (do_auto_refine && has_converged)
 			break;
+
+		// In the next iteration, start again from the first subset
+		subset_start = 1;
+
+		// Stop subsets after sgd_max_subsets has been reached
+		if (nr_subsets > 1 && sgd_max_subsets > 0)
+		{
+			long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
+			if (total_nr_subsets > sgd_max_subsets)
+			{
+				// Write out without a _sub in the name
+				nr_subsets = 1;
+				if (node->rank == 1)
+					//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
+					MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
+				else if (node->isMaster())
+					// The master only writes the data file (he's the only one who has and manages these data!)
+					MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+
+				if (do_sgd)
+				{
+					// For initial model generation, just stop after the sgd_max_subsets has been reached
+					break;
+				}
+				else
+				{
+					// For subsets in 2D classification, now continue rest of iterations without subsets in the next iteration
+					subset_size = -1;
+				}
+
+			}
+		}
 
     } // end loop iters
 

@@ -142,7 +142,7 @@ public:
 	int iter, nr_iter;
 
 	// Total number of subsets and current subset;
-	int subset, subset_start, nr_subsets, write_every_subset, sgd_max_effective;
+	int subset, subset_start, nr_subsets, write_every_subset;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
@@ -291,6 +291,12 @@ public:
 
 	// Maximum number of subsets to process using SGD (possibly more than 1 iteration)
 	long int sgd_max_subsets;
+
+	// Number of particles at which initial sigma2_fudge is reduced by 50%
+	long int sgd_sigma2fudge_halflife;
+
+	// Initial sigma2fudge for SGD
+	RFLOAT sgd_sigma2fudge_ini;
 
 	// Strict high-res limit in SGD
 	RFLOAT strict_highres_sgd;
