@@ -237,8 +237,10 @@ public:
 	SliderEntry bin_factor;
 	SliderEntry bfactor;
 	FileNameEntry fn_gain_ref;
+	FileNameEntry fn_defect;
 	AnyEntry patch_x, patch_y;
 	SliderEntry group_frames;
+	FileNameEntry fn_archive;
 	AnyEntry other_motioncor2_args;
     AnyEntry gpu_ids;
 

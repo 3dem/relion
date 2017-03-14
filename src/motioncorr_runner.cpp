@@ -47,6 +47,9 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
+	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file","");
+	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
+
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
@@ -331,6 +334,12 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -PixSize " + floatToString(angpix);
 		command += " -InitDose " + floatToString(pre_exposure);
 	}
+
+	if (fn_defect != "")
+		command += " -DefectFile " + fn_defect;
+
+	if (fn_archive != "")
+		command += " -ArcDir " + fn_archive;
 
 	if (fn_other_motioncor2_args.length() > 0)
 		command += " " + fn_other_motioncor2_args;

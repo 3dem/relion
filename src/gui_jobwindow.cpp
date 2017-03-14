@@ -810,7 +810,6 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 
 	input_star_mics.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions and write out the averages.");
-
 	// Add a little spacer
 	current_y += STEPY/2;
 
@@ -841,6 +840,11 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 
 	fn_motioncor2_exe.place(current_y, "MOTIONCOR2 executable:", default_location, "*.*", NULL, "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	fn_gain_ref.place(current_y, "Gain-reference image:", "", "*.mrc", NULL, "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
+	fn_defect.place(current_y, "Defect file:", "", "*", NULL, "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
+	fn_archive.place(current_y, "Archive directory:", "", "*", NULL, "Location of the directory to which movies will be archived in 4-byte MRC format (using MOTIONCOR2's -ArcDir option). Leave empty if you don't want to archive your movies at this point.");
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	patch_x.placeOnSameYPosition(current_y, "Number of patches X, Y:", "Number of patches X:", "1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	patch_y.placeOnSameYPosition(current_y, "", "Number of patches Y:", "1", "Number of patches (in X and Y direction) to apply motioncor2.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
@@ -936,9 +940,11 @@ void MotioncorrJobWindow::write(std::string fn)
 	fn_motioncor2_exe.writeValue(fh);
 	do_motioncor2.writeValue(fh);
 	fn_gain_ref.writeValue(fh);
+	fn_defect.writeValue(fh);
 	patch_x.writeValue(fh);
 	patch_y.writeValue(fh);
 	group_frames.writeValue(fh);
+	fn_archive.writeValue(fh);
 	bin_factor.writeValue(fh);
 	bfactor.writeValue(fh);
 	gpu_ids.writeValue(fh);
@@ -977,9 +983,11 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		fn_motioncor2_exe.readValue(fh);
 		do_motioncor2.readValue(fh);
 		fn_gain_ref.readValue(fh);
+		fn_defect.readValue(fh);
 		patch_x.readValue(fh);
 		patch_y.readValue(fh);
 		group_frames.readValue(fh);
+		fn_archive.readValue(fh);
 		bin_factor.readValue(fh);
 		bfactor.readValue(fh);
 		gpu_ids.readValue(fh);
@@ -1013,9 +1021,11 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	fn_motioncor2_exe.deactivate(is_continue);
 	do_motioncor2.deactivate(is_continue);
 	fn_gain_ref.deactivate(is_continue);
+	fn_defect.deactivate(is_continue);
 	patch_x.deactivate(is_continue);
 	patch_y.deactivate(is_continue);
 	group_frames.deactivate(is_continue);
+	fn_archive.deactivate(is_continue);
 	bin_factor.deactivate(is_continue);
 	bfactor.deactivate(is_continue);
 	other_motioncor2_args.deactivate(is_continue);
@@ -1097,6 +1107,11 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 			command += " --group_frames " + floatToString(group_frames.getValue());
 		if ((fn_gain_ref.getValue()).length() > 0)
 			command += " --gainref " + fn_gain_ref.getValue();
+		if ((fn_defect.getValue()).length() > 0)
+			command += " --defect_file " + fn_defect.getValue();
+		if ((fn_archive.getValue()).length() > 0)
+			command += " --archive " + fn_archive.getValue();
+
 
 		if ((other_motioncor2_args.getValue()).length() > 0)
 			command += " --other_motioncor2_args \" " + other_motioncor2_args.getValue() + " \"";
