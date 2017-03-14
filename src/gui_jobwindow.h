@@ -237,8 +237,10 @@ public:
 	SliderEntry bin_factor;
 	SliderEntry bfactor;
 	FileNameEntry fn_gain_ref;
+	FileNameEntry fn_defect;
 	AnyEntry patch_x, patch_y;
 	SliderEntry group_frames;
+	FileNameEntry fn_archive;
 	AnyEntry other_motioncor2_args;
     AnyEntry gpu_ids;
 
@@ -579,6 +581,70 @@ public:
 };
 
 
+class InitialModelJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	FileNameEntry fn_cont;
+	InputNodeEntry fn_img;
+
+
+	// Reference
+	SliderEntry nr_iter;
+	SliderEntry sgd_subset_size;
+	SliderEntry sgd_max_subsets;
+	SliderEntry sgd_write_subsets;
+	SliderEntry sgd_sigma2fudge_halflife;
+	SliderEntry sgd_highres_limit;
+
+	// CTF
+	BooleanEntry do_ctf_correction;
+	BooleanEntry ctf_phase_flipped;
+	BooleanEntry ctf_intact_first_peak;
+
+	// Optimisation
+	SliderEntry nr_classes;
+	AnyEntry sym_name;
+	SliderEntry particle_diameter;
+	BooleanEntry do_zero_mask;
+
+	// Sampling
+	RadioEntry sampling;
+	SliderEntry offset_range;
+	SliderEntry offset_step;
+
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
+    AnyEntry scratch_dir;
+
+    Fl_Group *ctf_group;
+
+public:
+
+	// Constructor
+    InitialModelJobWindow();
+
+	// Destructor
+	~InitialModelJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter);
+
+};
+
+
 class Class3DJobWindow : public RelionJobWindow
 {
 public:
@@ -591,12 +657,6 @@ public:
 	SliderEntry nr_classes;
 
 	// Reference
-	BooleanEntry do_denovo_ref3d;
-	SliderEntry sgd_subset_size;
-	SliderEntry sgd_highres_limit;
-	SliderEntry sgd_max_subsets;
-	SliderEntry sgd_write_subsets;
-
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -650,7 +710,7 @@ public:
     AnyEntry gpu_ids;
     AnyEntry scratch_dir;
 
-	Fl_Group *denovo_group, *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
+	Fl_Group *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 
 public:
 

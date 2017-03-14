@@ -432,58 +432,64 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     browse_grp[8]->end();
 
     browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[9] = PROC_3DCLASS;
-	browser->add("3D classification");
-	job_class3d = new Class3DJobWindow();
+    browse_jobtype[9] = PROC_INIMODEL;
+	browser->add("3D initial model");
+	job_inimodel = new InitialModelJobWindow();
     browse_grp[9]->end();
 
     browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[10] = PROC_3DAUTO;
-	browser->add("3D auto-refine");
-	job_auto3d = new Auto3DJobWindow();
+    browse_jobtype[10] = PROC_3DCLASS;
+	browser->add("3D classification");
+	job_class3d = new Class3DJobWindow();
     browse_grp[10]->end();
 
     browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[11] = PROC_MOVIEREFINE;
-	browser->add("Movie refinement");
-	job_movierefine = new MovieRefineJobWindow();
+    browse_jobtype[11] = PROC_3DAUTO;
+	browser->add("3D auto-refine");
+	job_auto3d = new Auto3DJobWindow();
     browse_grp[11]->end();
 
     browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[12] = PROC_POLISH;
-	browser->add("Particle polishing");
-	job_polish = new PolishJobWindow();
+    browse_jobtype[12] = PROC_MOVIEREFINE;
+	browser->add("Movie refinement");
+	job_movierefine = new MovieRefineJobWindow();
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[13] = PROC_MASKCREATE;
-	browser->add("Mask creation");
-	job_maskcreate = new MaskCreateJobWindow();
+    browse_jobtype[13] = PROC_POLISH;
+	browser->add("Particle polishing");
+	job_polish = new PolishJobWindow();
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[14] = PROC_JOINSTAR;
-	browser->add("Join star files");
-	job_joinstar = new JoinStarJobWindow();
+    browse_jobtype[14] = PROC_MASKCREATE;
+	browser->add("Mask creation");
+	job_maskcreate = new MaskCreateJobWindow();
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[15] = PROC_SUBTRACT;
-	browser->add("Particle subtraction");
-	job_subtract = new SubtractJobWindow();
+    browse_jobtype[15] = PROC_JOINSTAR;
+	browser->add("Join star files");
+	job_joinstar = new JoinStarJobWindow();
     browse_grp[15]->end();
 
     browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[16] = PROC_POST;
-	browser->add("Post-processing");
-	job_post = new PostJobWindow();
+    browse_jobtype[16] = PROC_SUBTRACT;
+	browser->add("Particle subtraction");
+	job_subtract = new SubtractJobWindow();
     browse_grp[16]->end();
 
     browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[17] = PROC_RESMAP;
+    browse_jobtype[17] = PROC_POST;
+	browser->add("Post-processing");
+	job_post = new PostJobWindow();
+    browse_grp[17]->end();
+
+    browse_grp[18] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_jobtype[18] = PROC_RESMAP;
 	browser->add("Local resolution");
 	job_resmap = new ResmapJobWindow();
-    browse_grp[17]->end();
+    browse_grp[18]->end();
 
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
@@ -572,8 +578,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     textbuff_stdout = new Fl_Text_Buffer();
     textbuff_stderr = new Fl_Text_Buffer();
     // Disable warning message about UTF-8 transcoding
-	disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y, w-20, 110);
-    disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y, w-20, 60);
+	disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y-5, w-20, 105);
+    disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y-5, w-20, 50);
     disp_stdout->fn_file = "run.out";
     disp_stderr->fn_file = "run.err";
     textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
@@ -581,8 +587,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     disp_stdout->buffer(textbuff_stdout);
     disp_stderr->buffer(textbuff_stderr);
     disp_stderr->textcolor(FL_RED);
-    disp_stdout->textsize(RLN_FONTSIZE);
-    disp_stderr->textsize(RLN_FONTSIZE);
+    disp_stdout->textsize(RLN_FONTSIZE-1);
+    disp_stderr->textsize(RLN_FONTSIZE-1);
     disp_stdout->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stderr->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stdout->scrollbar_width(0);
@@ -930,6 +936,14 @@ long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int t
 		oname = job_class2d->pipelineOutputName;
 		break;
 	}
+	case PROC_INIMODEL:
+	{
+
+		inputnodes = job_inimodel->pipelineInputNodes;
+		outputnodes= job_inimodel->pipelineOutputNodes;
+		oname = job_inimodel->pipelineOutputName;
+		break;
+	}
 	case PROC_3DCLASS:
 	{
 
@@ -1159,6 +1173,18 @@ bool RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggl
 			job_class2d->toggle_new_continue(is_main_continue);
 		if (do_commandline)
 			result = job_class2d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
+		break;
+	}
+	case PROC_INIMODEL:
+	{
+		if (do_write)
+			job_inimodel->write(fn_settings);
+		if (do_read)
+			job_inimodel->read(fn_settings, is_main_continue);
+		if (do_toggle_continue)
+			job_inimodel->toggle_new_continue(is_main_continue);
+		if (do_commandline)
+			result = job_inimodel->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
 		break;
 	}
 	case PROC_3DCLASS:

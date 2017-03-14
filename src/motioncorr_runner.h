@@ -65,7 +65,6 @@ public:
 	// Additional arguments that need to be passed to MOTIONCORR
 	FileName fn_other_motioncor2_args;
 
-
 	// MOTIONCOR2 executable
 	FileName fn_motioncor2_exe;
 
@@ -77,6 +76,12 @@ public:
 
 	// Gain reference file
 	FileName fn_gain_reference;
+
+	// Defect file
+	FileName fn_defect;
+
+	// Archive directory
+	FileName fn_archive;
 
 	// Number of patches in X, Y direction for MOTIONCOR2
 	int patch_x, patch_y;

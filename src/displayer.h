@@ -246,6 +246,7 @@ private:
 	void makeStarFileSelectedParticles(bool save_selected, MetaDataTable &MDpart);
 	void saveSelectedParticles(bool save_selected);
 	void showSelectedParticles(bool save_selected);
+	void saveTrainingSet();
 	void saveSelected(bool save_selected);
 	void saveBackupSelection();
 	// Allow re-loading of existing backup selection

@@ -810,7 +810,6 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 
 	input_star_mics.place(current_y, "Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	do_save_movies.place(current_y, "Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions and write out the averages.");
-
 	// Add a little spacer
 	current_y += STEPY/2;
 
@@ -841,6 +840,11 @@ MotioncorrJobWindow::MotioncorrJobWindow() : RelionJobWindow(4, HAS_MPI, HAS_THR
 
 	fn_motioncor2_exe.place(current_y, "MOTIONCOR2 executable:", default_location, "*.*", NULL, "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	fn_gain_ref.place(current_y, "Gain-reference image:", "", "*.mrc", NULL, "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
+	fn_defect.place(current_y, "Defect file:", "", "*", NULL, "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
+	fn_archive.place(current_y, "Archive directory:", "", "*", NULL, "Location of the directory to which movies will be archived in 4-byte MRC format (using MOTIONCOR2's -ArcDir option). Leave empty if you don't want to archive your movies at this point.");
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	patch_x.placeOnSameYPosition(current_y, "Number of patches X, Y:", "Number of patches X:", "1", NULL, XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	patch_y.placeOnSameYPosition(current_y, "", "Number of patches Y:", "1", "Number of patches (in X and Y direction) to apply motioncor2.", XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y += STEPY + 2;
@@ -936,9 +940,11 @@ void MotioncorrJobWindow::write(std::string fn)
 	fn_motioncor2_exe.writeValue(fh);
 	do_motioncor2.writeValue(fh);
 	fn_gain_ref.writeValue(fh);
+	fn_defect.writeValue(fh);
 	patch_x.writeValue(fh);
 	patch_y.writeValue(fh);
 	group_frames.writeValue(fh);
+	fn_archive.writeValue(fh);
 	bin_factor.writeValue(fh);
 	bfactor.writeValue(fh);
 	gpu_ids.writeValue(fh);
@@ -977,9 +983,11 @@ void MotioncorrJobWindow::read(std::string fn, bool &_is_continue)
 		fn_motioncor2_exe.readValue(fh);
 		do_motioncor2.readValue(fh);
 		fn_gain_ref.readValue(fh);
+		fn_defect.readValue(fh);
 		patch_x.readValue(fh);
 		patch_y.readValue(fh);
 		group_frames.readValue(fh);
+		fn_archive.readValue(fh);
 		bin_factor.readValue(fh);
 		bfactor.readValue(fh);
 		gpu_ids.readValue(fh);
@@ -1013,9 +1021,11 @@ void MotioncorrJobWindow::toggle_new_continue(bool _is_continue)
 	fn_motioncor2_exe.deactivate(is_continue);
 	do_motioncor2.deactivate(is_continue);
 	fn_gain_ref.deactivate(is_continue);
+	fn_defect.deactivate(is_continue);
 	patch_x.deactivate(is_continue);
 	patch_y.deactivate(is_continue);
 	group_frames.deactivate(is_continue);
+	fn_archive.deactivate(is_continue);
 	bin_factor.deactivate(is_continue);
 	bfactor.deactivate(is_continue);
 	other_motioncor2_args.deactivate(is_continue);
@@ -1097,6 +1107,11 @@ bool MotioncorrJobWindow::getCommands(std::string &outputname, std::vector<std::
 			command += " --group_frames " + floatToString(group_frames.getValue());
 		if ((fn_gain_ref.getValue()).length() > 0)
 			command += " --gainref " + fn_gain_ref.getValue();
+		if ((fn_defect.getValue()).length() > 0)
+			command += " --defect_file " + fn_defect.getValue();
+		if ((fn_archive.getValue()).length() > 0)
+			command += " --archive " + fn_archive.getValue();
+
 
 		if ((other_motioncor2_args.getValue()).length() > 0)
 			command += " --other_motioncor2_args \" " + other_motioncor2_args.getValue() + " \"";
@@ -2987,9 +3002,9 @@ void Class2DJobWindow::toggle_new_continue(bool _is_continue)
 	fn_cont.deactivate(!is_continue);
 	if (!is_continue)
 		fn_cont.setValue("");
-	do_subsets.deactivate(is_continue);
-	subset_size.deactivate(is_continue);
-	max_subsets.deactivate(is_continue);
+	//do_subsets.deactivate(is_continue);
+	//subset_size.deactivate(is_continue);
+	//max_subsets.deactivate(is_continue);
 	fn_img.deactivate(is_continue);
 	nr_classes.deactivate(is_continue);
 	do_zero_mask.deactivate(is_continue);
@@ -3151,6 +3166,406 @@ bool Class2DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 }
 
+InitialModelJobWindow::InitialModelJobWindow() : RelionJobWindow(6, HAS_MPI, HAS_THREAD)
+{
+
+	type = PROC_INIMODEL;
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	fn_img.place(current_y, "Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
+nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
+
+	fn_cont.place(current_y, "Continue from here: ", "", "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
+from which you want to continue a previous run. \
+Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
+If they are the same, the program will automatically add a '_ctX' to the output rootname, \
+with X being the iteration from which one continues the previous run.");
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("SGD");
+	resetHeight();
+
+	nr_iter.place(current_y, "Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed. ");
+
+	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
+
+	sgd_max_subsets.place(current_y, "Maximum number of subsets:", 50, -1, 200, 10, "Stop the SGD optimisation after this many subsets have been processed. \
+The total number of particles processed will then be equal to the subset size times this number. Often, processing 10k particles is enough to get a decent low-resolution model. If you have fewer particles, you can perform more than one iteration instead.");
+
+	sgd_write_subsets.place(current_y, "Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
+
+	sgd_sigma2fudge_halflife.place(current_y, "SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
+having 50% after this many particles have been processed. Switch increased noise variance off by setting this value to a negative number. Some difficult cases require switching this on or off, easier cases are successful with both options. When switched on, values around 1000 have been found useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
+
+
+	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
+This is essential in SGD, as there is very little regularisation, i.e. overfitting will start to happen very quickly. \
+Values in the range of 15-30 Angstroms have proven useful.");
+
+
+	tab2->end();
+	tab3->begin();
+	tab3->label("CTF");
+
+	ctf_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	ctf_group->end();
+
+	resetHeight();
+	do_ctf_correction.place(current_y, "Do CTF-correction?", true, "If set to Yes, CTFs will be corrected inside the MAP refinement. \
+The resulting algorithm intrinsically implements the optimal linear, or Wiener filter. \
+Note that CTF parameters for all images need to be given in the input STAR file. \
+The command 'relion_refine --print_metadata_labels' will print a list of all possible metadata labels for that STAR file. \
+See the RELION Wiki for more details.\n\n Also make sure that the correct pixel size (in Angstrom) is given above!)", ctf_group);
+
+	ctf_group->begin();
+
+	ctf_phase_flipped.place(current_y, "Have data been phase-flipped?", false, "Set this to Yes if the images have been \
+ctf-phase corrected during the pre-processing steps. \
+Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
+as this can be done inside the internal CTF-correction. \
+However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
+
+	ctf_intact_first_peak.place(current_y, "Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
+only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
+Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
+Therefore, this option is not generally recommended: try increasing amplitude contrast (in your input STAR file) first!");
+
+	ctf_group->end();
+
+	do_ctf_correction.cb_menu_i(); // To make default effective
+
+	tab3->end();
+	tab4->begin();
+	tab4->label("Optimisation");
+	resetHeight();
+
+	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
+These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	sym_name.place(current_y, "Symmetry:", "C1", "If the molecule is asymmetric, \
+set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
+* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
+* I2: Crowther 222 \n \
+* I3: 52-setting (as used in SPIDER?)\n \
+* I4: A different 52 setting \n \
+The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
+RELION uses XMIPP's libraries for symmetry operations. \
+Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	particle_diameter.place(current_y, "Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
+circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
+If set to a value larger than the image size no masking will be performed.\n\n\
+The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
+
+	do_zero_mask.place(current_y, "Mask individual particles with zeros?", true, "If set to Yes, then in the individual particles, \
+the area outside a circle with the radius of the particle will be set to zeros prior to taking the Fourier transform. \
+This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
+between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
+High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
+
+	tab4->end();
+
+	tab5->begin();
+	tab5->label("Sampling");
+
+	resetHeight();
+
+	sampling.place(current_y, "Angular sampling interval:", sampling_options, &sampling_options[1], "There are only a few discrete \
+angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
+The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can be used than in normal 3D classifications/refinements");
+
+	offset_range.place(current_y, "Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
+in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
+for each image in the previous iteration.\n\n");
+
+	offset_step.place(current_y, "Offset search step (pix):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+Translational sampling is also done using the adaptive approach. \
+Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
+
+	tab5->end();
+
+	tab6->begin();
+	tab6->label("Compute");
+	resetHeight();
+
+	do_parallel_discio.place(current_y, "Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+
+	nr_pool.place(current_y, "Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
+This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
+
+	do_preread_images.place(current_y, "Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
+Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+
+	scratch_dir.place(current_y, "Copy particles to scratch directory:", "", "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
+Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
+
+	do_combine_thru_disc.place(current_y, "Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	tab6->end();
+
+
+	// read settings if hidden file exists
+	read(".gui_inimodel", is_continue);
+
+}
+
+void InitialModelJobWindow::write(std::string fn)
+{
+	// Write hidden file if no name is given
+	if (fn=="")
+		fn=".gui_inimodel";
+
+	std::ofstream fh;
+	openWriteFile(fn, fh);
+
+	// I/O
+	fn_img.writeValue(fh);
+	fn_cont.writeValue(fh);
+
+	// Reference
+	nr_iter.writeValue(fh);
+	sgd_subset_size.writeValue(fh);
+	sgd_max_subsets.writeValue(fh);
+	sgd_write_subsets.writeValue(fh);
+	sgd_sigma2fudge_halflife.writeValue(fh);
+	sgd_highres_limit.writeValue(fh);
+
+	// CTF
+	do_ctf_correction.writeValue(fh);
+	ctf_phase_flipped.writeValue(fh);
+	ctf_intact_first_peak.writeValue(fh);
+
+	// Optimisation
+	nr_classes.writeValue(fh);
+	sym_name.writeValue(fh);
+	particle_diameter.writeValue(fh);
+	do_zero_mask.writeValue(fh);
+
+	// Sampling
+	sampling.writeValue(fh);
+	offset_range.writeValue(fh);
+	offset_step.writeValue(fh);
+
+	// Compute
+	do_combine_thru_disc.writeValue(fh);
+	do_parallel_discio.writeValue(fh);
+	nr_pool.writeValue(fh);
+	do_preread_images.writeValue(fh);
+	scratch_dir.writeValue(fh);
+
+	closeWriteFile(fh, fn);
+}
+
+void InitialModelJobWindow::read(std::string fn, bool &_is_continue)
+{
+
+	std::ifstream fh;
+
+	// Read hidden file if no name is given
+	if (fn=="")
+		fn=".gui_inimodel";
+
+	if (openReadFile(fn, fh))
+	{
+
+		// I/O
+		fn_img.readValue(fh);
+		fn_cont.readValue(fh);
+
+		// Reference
+		nr_iter.readValue(fh);
+		sgd_subset_size.readValue(fh);
+		sgd_max_subsets.readValue(fh);
+		sgd_write_subsets.readValue(fh);
+		sgd_sigma2fudge_halflife.readValue(fh);
+		sgd_highres_limit.readValue(fh);
+
+		// CTF
+		do_ctf_correction.readValue(fh);
+		ctf_phase_flipped.readValue(fh);
+		ctf_intact_first_peak.readValue(fh);
+
+		// Optimisation
+		nr_classes.readValue(fh);
+		sym_name.readValue(fh);
+		particle_diameter.readValue(fh);
+		do_zero_mask.readValue(fh);
+
+		// Sampling
+		sampling.readValue(fh);
+		offset_range.readValue(fh);
+		offset_step.readValue(fh);
+
+		// Compute
+		do_combine_thru_disc.readValue(fh);
+		do_parallel_discio.readValue(fh);
+		nr_pool.readValue(fh);
+		do_preread_images.readValue(fh);
+		scratch_dir.readValue(fh);
+
+		closeReadFile(fh);
+		_is_continue = is_continue;
+	}
+}
+
+void InitialModelJobWindow::toggle_new_continue(bool _is_continue)
+{
+	is_continue = _is_continue;
+
+	fn_cont.deactivate(!is_continue);
+	if (!is_continue)
+		fn_cont.setValue("");
+	fn_img.deactivate(is_continue);
+	nr_classes.deactivate(is_continue);
+
+	// Reference
+	//sgd_subset_size.deactivate(is_continue);
+	//sgd_sigma2fudge_halflife.deactivate(is_continue);
+	//sgd_highres_limit.deactivate(is_continue);
+	//sgd_max_subsets.deactivate(is_continue);
+	//sgd_write_subsets.deactivate(is_continue);
+	sym_name.deactivate(is_continue);
+
+	//CTF
+	do_ctf_correction.deactivate(is_continue);
+	ctf_phase_flipped.deactivate(is_continue);
+	ctf_intact_first_peak.deactivate(is_continue);
+
+	//Optimisation
+	do_zero_mask.deactivate(is_continue);
+
+
+}
+
+bool InitialModelJobWindow::getCommands(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter)
+{
+
+	commands.clear();
+	std::string command;
+
+	initialisePipeline(outputname, "InitialModel", job_counter);
+
+	if (nr_mpi.getValue() > 1)
+		command="`which relion_refine_mpi`";
+	else
+		command="`which relion_refine`";
+
+    FileName fn_run = "run";
+	if (is_continue)
+    {
+		if (fn_cont.getValue() == "")
+		{
+			fl_message("ERROR: empty field for continuation STAR file...");
+			return false;
+		}
+		int pos_it = fn_cont.getValue().rfind("_it");
+		int pos_op = fn_cont.getValue().rfind("_optimiser");
+		if (pos_it < 0 || pos_op < 0)
+			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << fn_cont.getValue() << std::endl;
+		int it = (int)textToFloat((fn_cont.getValue().substr(pos_it+3, 6)).c_str());
+		fn_run += "_ct" + floatToString(it);
+		command += " --continue " + fn_cont.getValue();
+    }
+
+    command += " --o " + outputname + fn_run;
+	pipelineOutputNodes = getOutputNodesRefine(outputname + fn_run, nr_iter.getValue(), nr_classes.getValue(), 3, 1);
+
+	command += " --sgd --denovo_3dref ";
+	command += " --subset_size " + floatToString(sgd_subset_size.getValue());
+	command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
+	command += " --max_subsets " + floatToString(sgd_max_subsets.getValue());
+	command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
+
+	if (!is_continue)
+	{
+		if (fn_img.getValue() == "")
+		{
+			fl_message("ERROR: empty field for input STAR file...");
+			return false;
+		}
+		command += " --i " + fn_img.getValue();
+		Node node(fn_img.getValue(), fn_img.type);
+		pipelineInputNodes.push_back(node);
+
+		// CTF stuff
+		if (do_ctf_correction.getValue())
+		{
+			command += " --ctf";
+			if (ctf_phase_flipped.getValue())
+				command += " --ctf_phase_flipped";
+			if (ctf_intact_first_peak.getValue())
+				command += " --ctf_intact_first_peak";
+		}
+
+		command += " --K " + floatToString(nr_classes.getValue());
+		command += " --sym " + sym_name.getValue();
+
+		if (do_zero_mask.getValue())
+			command += " --zero_mask";
+	}
+
+	// Always do compute stuff
+	if (!do_combine_thru_disc.getValue())
+		command += " --dont_combine_weights_via_disc";
+	if (!do_parallel_discio.getValue())
+		command += " --no_parallel_disc_io";
+	if (do_preread_images.getValue())
+            command += " --preread_images " ;
+	else if (scratch_dir.getValue() != "")
+            command += " --scratch_dir " +  scratch_dir.getValue();
+        command += " --pool " + floatToString(nr_pool.getValue());
+
+	// Optimisation
+	command += " --iter " + floatToString(nr_iter.getValue());
+    command += " --particle_diameter " + floatToString(particle_diameter.getValue());
+
+    // Sampling
+    int iover = 1;
+	command += " --oversampling " + floatToString((float)iover);
+	for (int i = 0; i < 10; i++)
+	{
+		if (strcmp((sampling.getValue()).c_str(), sampling_options[i].label()) == 0)
+		{
+			// The sampling given in the GUI will be the oversampled one!
+			command += " --healpix_order " + floatToString((float)i + 1 - iover);
+			break;
+		}
+	}
+	// Offset range
+	command += " --offset_range " + floatToString(offset_range.getValue());
+	// The sampling given in the GUI will be the oversampled one!
+	command += " --offset_step " + floatToString(offset_step.getValue() * pow(2., iover));
+
+	// Running stuff
+	command += " --j " + floatToString(nr_threads.getValue());
+
+	// Other arguments
+	command += " " + other_args.getValue();
+
+	commands.push_back(command);
+
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir);
+
+}
+
+
 Class3DJobWindow::Class3DJobWindow() : RelionJobWindow(7, HAS_MPI, HAS_THREAD)
 {
 
@@ -3189,34 +3604,6 @@ To use a second mask, use the additional option --solvent_mask2, which may given
 	tab2->begin();
 	tab2->label("Reference");
 	resetHeight();
-
-	denovo_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	denovo_group->end();
-
-	resetHeight();
-	do_denovo_ref3d.place(current_y, "Do de-novo reference?", false, "If set to Yes, A Stochastic Gradient Descent optimisaion will be run, started from random angles for each particle. \
-This may refine towards a suitable model, provided enough different views are present in the data. You may want to run this with a subset \
-of several thousand (downscaled) particles; preread all of those into RAM; use a coarse angular sampling (e.g. 15 degrees); a limited offset range (3 pixels?) and run for approximately 3-5 iterations.\n\n\
-Alternatively, a bit less quick but easier and probably not worse, you could use the STAR file with all input particles, perform a single iteration, but limit the maximum number of subsets to correspond to ~10k particles.", denovo_group);
-
-	denovo_group->begin();
-
-	sgd_subset_size.place(current_y, "SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
-
-	sgd_max_subsets.place(current_y, "Maximum number of subsets:", 50, -1, 200, 10, "Stop the SGD optimisation after this many subsets have been processed. \
-The total number of particles processed will then be equal to the subset size times this number. Often, processing 10k particles is enough to get a decent low-resolution model. If you have fewer particles, you can perform more than one iteration instead.");
-
-	sgd_write_subsets.place(current_y, "Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
-
-	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
-This is essential in SGD, as there is very little regularisation, i.e. overfitting will start to happen very quickly. \
-Values in the range of 15-30 Angstroms have proven useful.");
-
-	denovo_group-> end();
-	do_denovo_ref3d.cb_menu_i(); // To make default effective
-
-	// Add a little spacer
-	current_y += STEPY/2;
 
 	ref_correct_greyscale.place(current_y, "Ref. map is on absolute greyscale?", false, "Probabilities are calculated based on a Gaussian noise model, \
 which contains a squared difference term between the reference and the experimental image. This has a consequence that the \
@@ -3502,11 +3889,6 @@ void Class3DJobWindow::write(std::string fn)
 	nr_classes.writeValue(fh);
 
 	// Reference
-	do_denovo_ref3d.writeValue(fh);
-	sgd_subset_size.writeValue(fh);
-	sgd_highres_limit.writeValue(fh);
-	sgd_max_subsets.writeValue(fh);
-	sgd_write_subsets.writeValue(fh);
 	fn_ref.writeValue(fh);
 	ref_correct_greyscale.writeValue(fh);
 	ini_high.writeValue(fh);
@@ -3583,11 +3965,6 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 		nr_classes.readValue(fh);
 
 		// Reference
-		do_denovo_ref3d.readValue(fh);
-		sgd_subset_size.readValue(fh);
-		sgd_highres_limit.readValue(fh);
-		sgd_max_subsets.readValue(fh);
-		sgd_write_subsets.readValue(fh);
 		fn_ref.readValue(fh);
 		ref_correct_greyscale.readValue(fh);
 		ini_high.readValue(fh);
@@ -3659,11 +4036,6 @@ void Class3DJobWindow::toggle_new_continue(bool _is_continue)
 	nr_classes.deactivate(is_continue);
 
 	// Reference
-	do_denovo_ref3d.deactivate(is_continue);
-	sgd_subset_size.deactivate(is_continue);
-	sgd_highres_limit.deactivate(is_continue);
-	sgd_max_subsets.deactivate(is_continue);
-	sgd_write_subsets.deactivate(is_continue);
 	fn_ref.deactivate(is_continue);
 	ref_correct_greyscale.deactivate(is_continue);
 	ini_high.deactivate(is_continue);
@@ -3748,34 +4120,23 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 		Node node(fn_img.getValue(), fn_img.type);
 		pipelineInputNodes.push_back(node);
 
-
-		if (do_denovo_ref3d.getValue())
+		if (fn_ref.getValue() != "None")
 		{
-			command += " --denovo_3dref --sgd ";
-			command += " --subset_size " + floatToString(sgd_subset_size.getValue());
-			command += " --strict_highres_sgd " + floatToString(sgd_highres_limit.getValue());
-			command += " --max_subsets " + floatToString(sgd_max_subsets.getValue());
-			command += " --write_subsets " + floatToString(sgd_write_subsets.getValue());
-		}
-		else
-		{
-			if (fn_ref.getValue() != "None")
+			if (fn_ref.getValue() == "")
 			{
-				if (fn_ref.getValue() == "")
-				{
-					fl_message("ERROR: empty field for reference...");
-					return false;
-				}
-				command += " --ref " + fn_ref.getValue();
-				Node node(fn_ref.getValue(), fn_ref.type);
-				pipelineInputNodes.push_back(node);
+				fl_message("ERROR: empty field for reference...");
+				return false;
 			}
-			if (!ref_correct_greyscale.getValue() && fn_ref.getValue() != "None") // dont do firstiter_cc when giving None
-				command += " --firstiter_cc";
+			command += " --ref " + fn_ref.getValue();
+			Node node(fn_ref.getValue(), fn_ref.type);
+			pipelineInputNodes.push_back(node);
 
-			if (ini_high.getValue() > 0.)
-				command += " --ini_high " + floatToString(ini_high.getValue());
+			if (!ref_correct_greyscale.getValue()) // dont do firstiter_cc when giving None
+				command += " --firstiter_cc";
 		}
+
+		if (ini_high.getValue() > 0.)
+			command += " --ini_high " + floatToString(ini_high.getValue());
 	}
 
 	// Always do compute stuff
