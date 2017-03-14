@@ -3184,8 +3184,8 @@ The total number of particles processed will then be equal to the subset size ti
 
 	sgd_write_subsets.place(current_y, "Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
 
-	sgd_sigma2fudge_halflife.place(current_y, "SGD increased noise variance half-life:", 1000, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
-having 50% after this many particles have been processed. Switch increased noise variance off by setting this value to a negative number. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
+	sgd_sigma2fudge_halflife.place(current_y, "SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
+having 50% after this many particles have been processed. Switch increased noise variance off by setting this value to a negative number. Some difficult cases require switching this on or off, easier cases are successful with both options. When switched on, values around 1000 have been found useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
 
 
 	sgd_highres_limit.place(current_y, "Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
