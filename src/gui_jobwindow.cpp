@@ -3673,8 +3673,18 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	tab4->label("Optimisation");
 	resetHeight();
 
+	//set up groups
+	subset_group = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	subset_group->end();
+
 	nr_classes.place(current_y, "Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
 These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
+
+	tau_fudge.place(current_y, "Regularisation parameter T:", 4 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
+the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
+the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
+weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
+Too small values yield too-low resolution structures; too high values result in over-estimated resolutions, mostly notable by the apparition of high-frequency noise in the references.");
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -3686,13 +3696,24 @@ Also note that upon restarting, the iteration number continues to be increased, 
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
 
-	tau_fudge.place(current_y, "Regularisation parameter T:", 4 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
-the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
-the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
-weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
-Too small values yield too-low resolution structures; too high values result in over-estimated resolutions, mostly notable by the apparition of high-frequency noise in the references.");
+	do_subsets.place(current_y, "Use subsets for initial updates?", false, "If set to True, multiple maximization updates (as many as defined by the 'Number of subset updates') will be performed during the first iteration(s): each time after the number of particles in a subset has been processed. \
+By using subsets with much fewer particles than the entire data set, the initial updates will be much faster, while the very low resolution class averages will not be notably worse than with the entire data set. \n\n \
+This will greatly speed up classifications with very many (hundreds of thousands or more) particles. A useful subset size is probably in the order of ten thousand particles. If the data set only comprises (tens of) thousands of particles, this option may be less useful.", subset_group);
+
+	subset_group->begin();
+
+	subset_size.place(current_y, "Initial subset size:", 10000, 1000, 50000, 1000, "Number of individual particles after which one will perform a maximization update in the first iteration(s). \
+A useful subset size is probably in the order of ten thousand particles.");
+
+	max_subsets.place(current_y, "Number of subset updates:", 3, 1, 10, 1, "This option is only used when a positive number is given for the 'Initial subset size'. In that case, in the first iteration, maximization updates are performed over a smaller subset of the particles to speed up calculations.\
+Useful values are probably in the range of 2-5 subset updates. Using more might speed up further, but with the risk of affecting the results. If the number of subsets times the subset size is larger than the number of particles in the data set, then more than 1 iteration will be split into subsets.");
+
+	subset_group->end();
+	do_subsets.cb_menu_i(); // to make default effective
+
 	// Add a little spacer
 	current_y += STEPY/2;
+
 
 	particle_diameter.place(current_y, "Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
@@ -3903,6 +3924,9 @@ void Class3DJobWindow::write(std::string fn)
 	// Optimisation
 	nr_iter.writeValue(fh);
 	tau_fudge.writeValue(fh);
+	do_subsets.writeValue(fh);
+	subset_size.writeValue(fh);
+	max_subsets.writeValue(fh);
 	particle_diameter.writeValue(fh);
 	do_zero_mask.writeValue(fh);
 	fn_mask.writeValue(fh);
@@ -3978,6 +4002,9 @@ void Class3DJobWindow::read(std::string fn, bool &_is_continue)
 
 		// Optimisation
 		nr_iter.readValue(fh);
+		do_subsets.readValue(fh);
+		subset_size.readValue(fh);
+		max_subsets.readValue(fh);
 		tau_fudge.readValue(fh);
 		particle_diameter.readValue(fh);
 		do_zero_mask.readValue(fh);
@@ -4168,6 +4195,11 @@ bool Class3DJobWindow::getCommands(std::string &outputname, std::vector<std::str
 
 	// Optimisation
 	command += " --iter " + floatToString(nr_iter.getValue());
+	if (do_subsets.getValue())
+	{
+		command += " --write_subsets 1 --subset_size " + floatToString(subset_size.getValue());
+		command += " --max_subsets " + floatToString(max_subsets.getValue());
+	}
 	command += " --tau2_fudge " + floatToString(tau_fudge.getValue());
     command += " --particle_diameter " + floatToString(particle_diameter.getValue());
 	if (!is_continue)
