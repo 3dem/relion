@@ -3293,6 +3293,8 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
  * v.2.0 GPU capability and autopicking acceleration : \n \
      Kimanius et al. (2016) eLife (PMID: 27845625) \n \n \
+ * Helical reconstruction : \n \
+     He & Scheres (2016) J, Struct. Biol. (PMID: 28193500) \n \n \
 Please also cite the following EXTERNAL programs: \n \n \
 * MOTIONCORR for beam-induced motion correction: \n \
     Li et al (2013) Nat. Methods (PMID: 23644547) \n \n\
