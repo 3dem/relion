@@ -249,6 +249,11 @@ void IOParser::writeCommandLine(std::ostream &out)
 bool IOParser::checkForErrors(int verb)
 {
 
+	if(argc==1 || checkParameter(argc, argv, "--help") || checkParameter(argc, argv, "-h"))
+	{
+		writeUsage(std::cout);
+	 	exit(0);
+	}
 	// First check the command line for unknown arguments
 	checkForUnknownArguments();
 
