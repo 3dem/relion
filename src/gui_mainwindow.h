@@ -18,10 +18,10 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef SRC_NEWGUI_MAINWINDOW_H_
-#define SRC_NEWGUI_MAINWINDOW_H_
+#ifndef SRC_GUI_MAINWINDOW_H_
+#define SRC_GUI_MAINWINDOW_H_
 #include <FL/Fl_Scroll.H>
-#include "src/newgui_jobwindow.h"
+#include "src/gui_jobwindow.h"
 #include "src/pipeliner.h"
 
 #include <time.h>

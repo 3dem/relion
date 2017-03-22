@@ -18,8 +18,8 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef SRC_NEWGUI_ENTRIES_H_
-#define SRC_NEWGUI_ENTRIES_H_
+#ifndef SRC_GUI_ENTRIES_H_
+#define SRC_GUI_ENTRIES_H_
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>

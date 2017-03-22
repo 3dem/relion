@@ -22,7 +22,7 @@
 #include <string.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
-#include "src/newgui_mainwindow.h"
+#include "src/gui_mainwindow.h"
 #include <src/args.h>
 
 #ifdef HAVE_CONFIG_H

@@ -18,10 +18,10 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef SRC_NEWGUI_JOBWINDOW_H_
-#define SRC_NEWGUI_JOBWINDOW_H_
+#ifndef SRC_GUI_JOBWINDOW_H_
+#define SRC_GUI_JOBWINDOW_H_
 #include "src/pipeline_jobs.h"
-#include "src/newgui_entries.h"
+#include "src/gui_entries.h"
 
 
 class JobWindow : public Fl_Box

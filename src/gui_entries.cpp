@@ -19,7 +19,7 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include "src/newgui_entries.h"
+#include "src/gui_entries.h"
 
 float fltkTextToFloat(const char* str)
 {

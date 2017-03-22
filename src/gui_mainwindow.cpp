@@ -19,7 +19,7 @@
  ***************************************************************************/
 
 
-#include "src/newgui_mainwindow.h"
+#include "src/gui_mainwindow.h"
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
