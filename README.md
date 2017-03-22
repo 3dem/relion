@@ -1,6 +1,5 @@
-
-
-#RELION
+RELION
+======
 
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer 
@@ -14,7 +13,7 @@ The underlying theory of MAP refinement is given in a [scientific publication](h
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
 
-##Installation
+## Installation
 
 
 More extensive options and configurations are available 
@@ -52,7 +51,7 @@ then configure and build relion, and lastely install it to be generally
 available on the system.
 
 
-##Updating 
+## Updating 
 
 
 RELION is intermittently updated, with both minor and major features.
