@@ -2557,7 +2557,6 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 		}
 
 		// Set fsc_halves_class explicitly to zero beyond the current_size
-		std::cerr << " mymodel.current_size= " << mymodel.current_size << std::endl;
 		for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(mymodel.fsc_halves_class); idx++)
 			DIRECT_A1D_ELEM(mymodel.fsc_halves_class, idx) = 0.;
 
