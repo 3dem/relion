@@ -20,7 +20,7 @@
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
-#include "src/gui_mainwindow.h"
+#include "src/newgui_mainwindow.h"
 #include <src/args.h>
 
 #ifdef HAVE_CONFIG_H
@@ -35,13 +35,17 @@ int main(int argc, char *argv[])
 	{
 		// Fill the window, but don't show it!
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
-		RelionMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, "", fn_pipe, 0, INT_MAX);
-
 		FileName fn_sched = getParameter(argc, argv, "--schedule");
 		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "1"));
 		long int minutes_wait =  textToInteger(getParameter(argc, argv, "--min_wait", "10"));
 		FileName fn_jobids  = getParameter(argc, argv, "--jobids", "");
-		window.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait);
+
+
+		PipeLine pipeline;
+		pipeline.name = fn_pipe;
+		pipeline.read(DO_LOCK);
+		pipeline.write(DO_LOCK);
+		pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait);
 
 	}
 
