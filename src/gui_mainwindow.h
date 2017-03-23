@@ -85,8 +85,6 @@ static Fl_Text_Buffer *textbuff_stderr;
 
 static void Gui_Timer_CB(void *userdata);
 
-// Initial screen
-static bool show_initial_screen;
 // Read-only GUI?
 static bool maingui_do_read_only;
 
@@ -235,7 +233,7 @@ private:
      */
 
     static void cb_select_browsegroup(Fl_Widget*, void*);
-    inline void cb_select_browsegroup_i();
+    inline void cb_select_browsegroup_i(bool is_initial = false);
 
     static void cb_select_finished_job(Fl_Widget*, void*);
     inline void cb_select_finished_job_i();

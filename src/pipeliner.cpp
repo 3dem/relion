@@ -452,6 +452,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	{
 		do_move_output_nodes_to_old = !(processList[current_job].type == PROC_2DCLASS ||
 				processList[current_job].type == PROC_3DCLASS ||
+				processList[current_job].type == PROC_INIMODEL ||
 				processList[current_job].type == PROC_3DAUTO ||
 				processList[current_job].type == PROC_MANUALPICK ||
 				processList[current_job].type == PROC_CLASSSELECT ||

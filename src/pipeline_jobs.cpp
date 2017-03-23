@@ -2383,7 +2383,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
     command += " --o " + outputname + fn_run;
 	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), (int)joboptions["nr_classes"].getNumber(), 3, 1);
 
-	command += " --sgd --denovo_3dref ";
+	command += " --sgd ";
 	command += " --subset_size " + joboptions["sgd_subset_size"].getString();
 	command += " --strict_highres_sgd " + joboptions["sgd_highres_limit"].getString();
 	command += " --max_subsets " + joboptions["sgd_max_subsets"].getString();
@@ -2396,7 +2396,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
 		}
-		command += " --i " + joboptions["fn_img"].getString();
+		command += " --denovo_3dref --i " + joboptions["fn_img"].getString();
 		Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
 		inputNodes.push_back(node);
 

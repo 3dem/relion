@@ -24,7 +24,7 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define INSTD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
-#define SRCD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
+#define SRCD_BG 	STR(SOURCE_DIR) "gui_background.xpm"
 
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
@@ -254,8 +254,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	maingui_do_read_only = _do_read_only;
 	pipeline.do_read_only = _do_read_only;
 
-	//show_initial_screen = true;
-	show_initial_screen = false;
 	do_order_alphabetically = false;
 
 	FileName fn_lock=".gui_projectdir";
@@ -284,10 +282,12 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
     FileName fn_bg = std::string(INSTD_BG);
 
+    std::cerr << " fn_bg= " << fn_bg << " exists= "<< exists(fn_bg) << std::endl;
     if(!exists(fn_bg))
     {
         fn_bg = std::string(SRCD_BG);
     }
+    std::cerr << " fn_bg= " << fn_bg << " exists= "<< exists(fn_bg) << std::endl;
 
 	if (exists(fn_bg))
 	{
@@ -595,7 +595,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     disp_stderr->scrollbar_width(0);
 
     // Set and activate current selection from side-browser
-    cb_select_browsegroup_i(); // make default active
+    cb_select_browsegroup_i(true); // make default active; true is used to show_initial_screen
     is_main_continue = false; // default is a new run
 
     // Mechanism to update stdout and stderr continuously and also update the JobLists
@@ -951,7 +951,7 @@ void GuiMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 
 }
 
-void GuiMainWindow::cb_select_browsegroup_i()
+void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 {
 
 	// Update timer
@@ -968,7 +968,7 @@ void GuiMainWindow::cb_select_browsegroup_i()
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
     {
     	// During the initial screen: show a nice picture with some explanations
-    	if ( t == iwin && !show_initial_screen ) // browser starts counting at 1...
+    	if ( t == iwin && !show_initial_screen) // browser starts counting at 1...
         {
     		browse_grp[t]->show();
         }
@@ -1860,8 +1860,7 @@ void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_show_initial_screen_i()
 {
-	show_initial_screen = true;
-	cb_select_browsegroup_i();
+	cb_select_browsegroup_i(true);
 }
 
 void GuiMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
