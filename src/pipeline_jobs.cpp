@@ -2817,7 +2817,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		command += " --helix";
 		if (textToFloat(joboptions["helical_tube_inner_diameter"].getString()) > 0.)
 			command += " --helical_inner_diameter " + joboptions["textToFloat(helical_tube_inner_diameter"].getString();
-		command += " --helical_outer_diameter " + joboptions["textToFloat(helical_tube_outer_diameter"].getString();
+		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 		command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
 		command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
 		command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
@@ -3187,7 +3187,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			command += " --helix";
 			if (textToFloat(joboptions["helical_tube_inner_diameter"].getString()) > 0.)
 				command += " --helical_inner_diameter " + joboptions["textToFloat(helical_tube_inner_diameter"].getString();
-			command += " --helical_outer_diameter " + joboptions["textToFloat(helical_tube_outer_diameter"].getString();
+			command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 			command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
 			command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
 			command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
