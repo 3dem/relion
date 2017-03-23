@@ -23,7 +23,7 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define INSTD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
-#define SRCD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
+#define SRCD_BG 	STR(SOURCE_DIR) "gui_background.xpm"
 
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
