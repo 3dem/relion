@@ -282,12 +282,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
     FileName fn_bg = std::string(INSTD_BG);
 
-    std::cerr << " fn_bg= " << fn_bg << " exists= "<< exists(fn_bg) << std::endl;
     if(!exists(fn_bg))
-    {
         fn_bg = std::string(SRCD_BG);
-    }
-    std::cerr << " fn_bg= " << fn_bg << " exists= "<< exists(fn_bg) << std::endl;
 
 	if (exists(fn_bg))
 	{
