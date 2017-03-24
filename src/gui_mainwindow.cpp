@@ -988,8 +988,8 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 
     is_main_continue = false;
 
-	// Just in case, also update the current GUI
-	gui_jobwindows[iwin]->updateMyGui();
+	// If the GUI got changed, put that change into the joboption now
+    gui_jobwindows[iwin]->updateMyJob();
 
 	// toggle the continue status of this job
     cb_toggle_continue_i();
@@ -1330,6 +1330,9 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		}
 	}
 
+	// Select this job now
+	loadJobFromPipeline(current_job);
+
 }
 
 
@@ -1640,7 +1643,6 @@ void GuiMainWindow::cb_save_i()
 		gui_jobwindows[iwin]->myjob.write(pipeline.processList[current_job].name);
 	}
 	// Write the hidden file
-	std::cerr << " iwin= " << iwin << " gui_jobwindows[iwin]->myjob.type= " << gui_jobwindows[iwin]->myjob.type << " PROC_CLASS3D= " << PROC_3DCLASS << std::endl;
 	gui_jobwindows[iwin]->myjob.write("");
 
 }
