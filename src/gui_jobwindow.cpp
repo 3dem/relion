@@ -1293,21 +1293,8 @@ void JobWindow::initialiseInimodelWindow()
 	place("fn_cont", TOGGLE_REACTIVATE);
 
 	tab1->end();
-
 	tab2->begin();
-	tab2->label("SGD");
-	resetHeight();
-
-	place("nr_iter");
-	place("sgd_subset_size");
-	place("sgd_max_subsets");
-	place("sgd_write_subsets");
-	place("sgd_sigma2fudge_halflife");
-	place("sgd_highres_limit");
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("CTF");
+	tab2->label("CTF");
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
@@ -1321,6 +1308,19 @@ void JobWindow::initialiseInimodelWindow()
 	group1->end();
 
 	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
+
+	tab2->end();
+
+	tab3->begin();
+	tab3->label("SGD");
+	resetHeight();
+
+	place("nr_iter");
+	place("sgd_subset_size");
+	place("sgd_max_subsets");
+	place("sgd_write_subsets");
+	place("sgd_sigma2fudge_halflife");
+	place("sgd_highres_limit");
 
 	tab3->end();
 	tab4->begin();

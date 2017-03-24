@@ -823,10 +823,16 @@ void GuiMainWindow::fillToAndFromJobLists()
 void GuiMainWindow::fillStdOutAndErr()
 {
 
-	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
-	FileName fn_err = (current_job >= 0) ? pipeline.processList[current_job].name + "run.err" : "";
-	FileName fn_outtail = fn_out + ".tail";
-	FileName fn_errtail = fn_err + ".tail";
+	FileName fn_out = "";
+	FileName fn_err = "";
+	FileName fn_outtail, fn_errtail;
+	if (current_job >= 0)
+	{
+		fn_out = pipeline.processList[current_job].name + "run.out";
+		fn_err = pipeline.processList[current_job].name + "run.err";
+		fn_outtail = pipeline.processList[current_job].name + ".run.out.tail";
+		fn_errtail = pipeline.processList[current_job].name + ".run.err.tail";
+	}
 
 	if (exists(fn_out))
 	{
@@ -884,11 +890,10 @@ void GuiMainWindow::tickTimeLastChanged()
 
 void GuiMainWindow::updateJobLists()
 {
-	if (pipeline.checkProcessCompletion())
-	{
-		fillRunningJobLists();
-		fillToAndFromJobLists();
-	}
+	// If any processes has finished, update the running job list
+	pipeline.checkProcessCompletion();
+	fillRunningJobLists();
+	fillToAndFromJobLists();
 }
 
 
@@ -931,8 +936,12 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
     else
     	alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
+	// Update all job lists in the main GUI
+	updateJobLists();
+
 	// File the out and err windows
 	fillStdOutAndErr();
+
 }
 
 void GuiMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
@@ -1525,9 +1534,6 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 		else
 			fl_message(error_message.c_str());
 	}
-
-	// Update the name in the lists
-	updateJobLists();
 
 }
 

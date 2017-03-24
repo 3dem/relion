@@ -244,9 +244,6 @@ public:
 	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL,
 			int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
 
-	void placeOnSameYPosition(JobOption &joboption, std::string display_text, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE,
-				int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
-
     // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
     void setValue(std::string _value);
 
