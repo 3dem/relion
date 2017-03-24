@@ -377,7 +377,7 @@ void JobWindow::updateMyGui()
 		if (myjob.joboptions.find(it->first) == myjob.joboptions.end())
 			std::cerr << "WARNING: cannot find " << it->first << " in the defined joboptions!" <<std::endl;
 
-		((it->second).inp)->value((myjob.joboptions[it->first]).value.c_str());
+		(it->second).setValue((myjob.joboptions[it->first]).value);
 	}
 
 }

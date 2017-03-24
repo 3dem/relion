@@ -35,6 +35,7 @@ int StdOutDisplay::handle(int ev)
 		// double-click
 		if (Fl::event_clicks())
 		{
+			current_browse_directory = pipeline.processList[current_job].name;
 			FileName fn = current_browse_directory + fn_file;
 			std::string command;
 			if (exists(fn))
@@ -310,9 +311,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	{
 		pipeline.write();
 	}
-
-	// Check which jobs have finished
-	pipeline.checkProcessCompletion();
 
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
@@ -623,7 +621,7 @@ static void Gui_Timer_CB(void *userdata)
     	o->fillStdOutAndErr();
 
     // Always check for job completion
-    o->updateJobLists();
+	o->updateJobLists();
 
     // Refresh every so many seconds
     Fl::repeat_timeout(o->update_every_sec, Gui_Timer_CB, userdata);
@@ -886,9 +884,11 @@ void GuiMainWindow::tickTimeLastChanged()
 
 void GuiMainWindow::updateJobLists()
 {
-	pipeline.checkProcessCompletion();
-	fillRunningJobLists();
-	fillToAndFromJobLists();
+	if (pipeline.checkProcessCompletion())
+	{
+		fillRunningJobLists();
+		fillToAndFromJobLists();
+	}
 }
 
 
@@ -979,8 +979,10 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 
     is_main_continue = false;
 
-    // toggle the continue status of this job
-    //gui_jobwindows[iwin]->updateMyJob();
+	// Just in case, also update the current GUI
+	gui_jobwindows[iwin]->updateMyGui();
+
+	// toggle the continue status of this job
     cb_toggle_continue_i();
 
     // Reset stdout and stderr windows, and line to give alias

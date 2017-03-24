@@ -198,7 +198,6 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int he
 
 
 }
-
 void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, int x, int h, int wcol2, int wcol3 )
 {
 
@@ -219,9 +218,23 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 }
 
 // Set the value back from the Fl_Input into the JobOption.value
-void GuiEntry::setValue()
+void GuiEntry::setValue(std::string _value)
 {
-	joboption.value = (std::string)inp->value();
+	joboption.value = _value;
+	inp->value(_value.c_str());
+	// Also update menu or slider if necessary
+	if (menu != NULL)
+	{
+		const Fl_Menu_Item *p = menu->find_item(inp->value());
+		if ( p )
+			menu->picked(p);
+		else
+			REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
+	}
+	if (slider != NULL)
+	{
+		slider->value(fltkTextToFloat(inp->value()));
+	}
 }
 
 

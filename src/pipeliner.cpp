@@ -320,14 +320,12 @@ void PipeLine::remakeNodeDirectory()
 }
 
 
-void PipeLine::checkProcessCompletion()
+bool PipeLine::checkProcessCompletion()
 {
 	if (do_read_only)
-		return;
+		return false;
 
-	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-	read(DO_LOCK);
-
+	std::vector<long int> finished_processes;
 	for (long int i=0; i < processList.size(); i++)
 	{
 		// Only check running processes for file existence
@@ -347,14 +345,29 @@ void PipeLine::checkProcessCompletion()
 			}
 			if (all_exist)
 			{
-				processList[i].status = PROC_FINISHED;
+				// Store this one to be set below during the read/write cycle
+				finished_processes.push_back(i);
 			}
 		}
 	}
 
-	// Always couple read/write with DO_LOCK
-	// This is to make sure two different windows do not get out-of-sync
-	write(DO_LOCK);
+	// Only do read/write cycle in case a process was finished, otherwise the GUI slows down too much
+	if (finished_processes.size() > 0)
+	{
+		// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
+		read(DO_LOCK);
+
+		// Set the new status of all the finished processes
+		for (int i=0; i < finished_processes.size(); i++)
+			processList[finished_processes[i]].status = PROC_FINISHED;
+
+		// Always couple read/write with DO_LOCK
+		// This is to make sure two different windows do not get out-of-sync
+		write(DO_LOCK);
+		return true;
+	}
+
+	return false;
 
 }
 

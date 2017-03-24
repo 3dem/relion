@@ -133,8 +133,9 @@ class PipeLine
 	// Re-make entries of all NodeNames in the hidden .Nodes directory (for file browsing for InputNode I/O)
 	void remakeNodeDirectory();
 
-	// Check for process completion by cheking for the presence of all outputNode filenames
-	void checkProcessCompletion();
+	// Check for process completion by checking for the presence of all outputNode filenames
+	// Returns true if any of the running processes has completed, false otherwise
+	bool checkProcessCompletion();
 
 	// Get the command line arguments for thisjob
 	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool do_makedir, std::vector<std::string> &commands,

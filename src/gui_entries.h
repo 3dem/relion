@@ -247,8 +247,8 @@ public:
 	void placeOnSameYPosition(JobOption &joboption, std::string display_text, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE,
 				int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
 
-    // Set the value back from the Fl_Input into the JobOption.value
-    void setValue();
+    // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
+    void setValue(std::string _value);
 
     // Deactivate this entry if the input boolean is true
     void deactivate(bool do_deactivate = true);
