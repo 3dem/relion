@@ -161,7 +161,7 @@ std::string JobOption::getString()
 float JobOption::getNumber()
 {
 	if (joboption_type != JOBOPTION_SLIDER)
-		REPORT_ERROR("ERROR: this jobOption does not return a number.");
+		REPORT_ERROR("ERROR: this jobOption does not return a number: " + label);
 	else
 	    return textToFloat(value);
 }
@@ -170,7 +170,7 @@ float JobOption::getNumber()
 bool JobOption::getBoolean()
 {
 	if (joboption_type != JOBOPTION_BOOLEAN)
-		REPORT_ERROR("ERROR: this jobOption does not return a boolean.");
+		REPORT_ERROR("ERROR: this jobOption does not return a boolean: " + label);
 	else
 		return (value == "Yes");
 }
@@ -1910,7 +1910,10 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
     	FileName fn_job = ".gui_manualpickrun.job";
 		bool iscont=false;
 		if (exists(fn_job))
+		{
+			global_manualpickjob.initialise(PROC_MANUALPICK);
 			global_manualpickjob.read(fn_job.c_str(), iscont);
+		}
 		else
 		{
 			error_message = "You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.";
@@ -1964,6 +1967,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		command += " --ctf_scale " + global_manualpickjob.joboptions["ctfscale"].getString();
 
 		command += " --particle_diameter " + global_manualpickjob.joboptions["diameter"].getString();
+
 
 		if (global_manualpickjob.joboptions["do_color"].getBoolean())
 		{
