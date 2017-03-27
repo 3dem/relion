@@ -214,7 +214,13 @@ public:
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
 
     /// Generate a centered image (with hermitian symmetry)
+    /// The dimensions of the result array should have been set correctly already
     void getCenteredImage(MultidimArray < RFLOAT > &result, RFLOAT angpix,
+    		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
+
+    /// Generate a 1D profile along defocusAngle
+    /// The dimensions of the result array should have been set correctly already, i.e. at the image size!
+    void get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT angpix,
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
 
 

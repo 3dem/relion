@@ -219,4 +219,19 @@ void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
 	}
 
 }
+void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm,
+		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
+{
+
+	result.setXmippOrigin();
+	RFLOAT xs = (RFLOAT)XSIZE(result) * Tm; // assuming result is at the image size!
+
+	FOR_ALL_ELEMENTS_IN_ARRAY1D(result)
+	{
+		RFLOAT x = (COSD(angle) * (RFLOAT)i) / xs;
+		RFLOAT y = (SIND(angle) * (RFLOAT)i) / xs;
+		A1D_ELEM(result, i) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
+	}
+
+}
 
