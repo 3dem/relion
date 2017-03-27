@@ -31,6 +31,47 @@ JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Bo
 
 void JobWindow::clear()
 {
+	/* This only gives segfaults....
+	if (group1 != NULL)
+	{
+		delete group1;
+		group1 = NULL;
+	}
+	if (group2 != NULL)
+	{
+		delete group2;
+		group2 = NULL;
+	}
+	if (group3 != NULL)
+	{
+		delete group3;
+		group3 = NULL;
+	}
+	if (group4 != NULL)
+	{
+		delete group4;
+		group4 = NULL;
+	}
+	if (group5 != NULL)
+	{
+		delete group5;
+		group5 = NULL;
+	}
+	if (group6 != NULL)
+	{
+		delete group6;
+		group6 = NULL;
+	}
+	if (group7 != NULL)
+	{
+		delete group7;
+		group7 = NULL;
+	}
+	if (queue_group != NULL)
+	{
+		delete queue_group;
+		queue_group = NULL;
+	}
 	if (tab1 != NULL)
 	{
 		delete tab1;
@@ -76,49 +117,7 @@ void JobWindow::clear()
 		delete tabs;
 		tabs = NULL;
 	}
-
-	if (group1 != NULL)
-	{
-		delete group1;
-		group1 = NULL;
-	}
-	if (group2 != NULL)
-	{
-		delete group2;
-		group2 = NULL;
-	}
-	if (group3 != NULL)
-	{
-		delete group3;
-		group3 = NULL;
-	}
-	if (group4 != NULL)
-	{
-		delete group4;
-		group4 = NULL;
-	}
-	if (group5 != NULL)
-	{
-		delete group5;
-		group5 = NULL;
-	}
-	if (group6 != NULL)
-	{
-		delete group6;
-		group6 = NULL;
-	}
-	if (group7 != NULL)
-	{
-		delete group7;
-		group7 = NULL;
-	}
-	if (queue_group != NULL)
-	{
-		delete queue_group;
-		queue_group = NULL;
-	}
-
-
+	*/
 }
 
 void JobWindow::setupTabs(int nr_tabs)

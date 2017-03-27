@@ -55,6 +55,7 @@ void GuiEntry::clear()
 {
 	deactivate_option = -1;
 	joboption.clear();
+	/* This only gives segfaults....
 	if (inp != NULL)
 	{
 		delete inp;
@@ -90,7 +91,7 @@ void GuiEntry::clear()
 		delete slider;
 		slider = NULL;
 	}
-
+	*/
 
 }
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int height, int wcol2, int wcol3)
