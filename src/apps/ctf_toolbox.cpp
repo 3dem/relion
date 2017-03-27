@@ -30,7 +30,7 @@ class ctf_toolbox_parameters
 {
 	public:
    	FileName fn_in, fn_out;
-   	bool do_ctf_phaseflip, do_ctf_multiply, do_1dprofile, do_2dimage, do_image_name;
+   	bool do_ctf_phaseflip, do_ctf_multiply, do_1dprofile, do_2dimage, do_image_name, do_intact_ctf_first_peak;
 	RFLOAT profile_angle, angpix;
    	int verb, my_size_x, my_size_y;
 
@@ -67,6 +67,7 @@ class ctf_toolbox_parameters
 	    do_2dimage  = parser.checkOption("--write_ctf_image", "Write out images with the 2D CTFs?");
 	    do_1dprofile  = parser.checkOption("--write_ctf_profile", "Write out a STAR file with the 1D CTF profiles?");
 	    profile_angle = textToFloat(parser.getOption("--1dprofile_angle", "Angle along which to calculate 1D CTF profiles (0=X, 90=Y)", "0"));
+	    do_intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 
 	    // Check for errors in the command-line option
     	if (parser.checkForErrors())
@@ -94,7 +95,7 @@ class ctf_toolbox_parameters
 			RFLOAT x = (RFLOAT)jp / xs;
 			RFLOAT y = (RFLOAT)ip / ys;
 			//bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true) const
-			DIRECT_A2D_ELEM(Fimg, i, j) *= ctf.getCTF(x, y, false, do_ctf_phaseflip, false, false);
+			DIRECT_A2D_ELEM(Fimg, i, j) *= ctf.getCTF(x, y, false, do_ctf_phaseflip, do_intact_ctf_first_peak, false);
 		}
 
 		transformer.inverseFourierTransform(Fimg, img());
@@ -127,7 +128,7 @@ class ctf_toolbox_parameters
 		{
 			Image<RFLOAT> tmp;
 			tmp().resize(my_size_y, my_size_x);
-			ctf.getCenteredImage(tmp(), angpix, do_ctf_phaseflip, false, false, true);
+			ctf.getCenteredImage(tmp(), angpix, do_ctf_phaseflip, false, do_intact_ctf_first_peak, true);
 			tmp.write(my_fn_out);
 		}
 		else if (do_1dprofile)
@@ -135,7 +136,7 @@ class ctf_toolbox_parameters
 			int mysize = XMIPP_MIN(my_size_y, my_size_x);
 			MultidimArray<RFLOAT> ctf_profile;
 			ctf_profile.resize(mysize);
-			ctf.get1DProfile(ctf_profile, profile_angle, angpix, do_ctf_phaseflip, false, false, true);
+			ctf.get1DProfile(ctf_profile, profile_angle, angpix, do_ctf_phaseflip, false, do_intact_ctf_first_peak, false);
 
 			// Now save as a STAR file....
 			MetaDataTable MDctf;
