@@ -1466,7 +1466,7 @@ void JobWindow::initialiseClass3DWindow()
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
 
-	place("do_local_ang_searches", TOGGLE_DEACTIVATE, group4);
+	place("do_local_ang_searches", TOGGLE_LEAVE_ACTIVE, group4);
 
 	group4->begin();
 	place("sigma_angles");
@@ -1827,7 +1827,7 @@ void JobWindow::initialisePolishWindow()
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
 
-	place("do_helix");
+	place("do_helix", TOGGLE_DEACTIVATE, group4);
 	group4->begin();
 
 	place("helical_nr_asu");
