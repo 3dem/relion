@@ -161,7 +161,10 @@ std::string JobOption::getString()
 float JobOption::getNumber()
 {
 	if (joboption_type != JOBOPTION_SLIDER)
+	{
+		std::cerr << " joboption_type= " << joboption_type << " label= " << label << " value= " << value << std::endl;
 		REPORT_ERROR("ERROR: this jobOption does not return a number: " + label);
+	}
 	else
 	    return textToFloat(value);
 }
@@ -170,7 +173,10 @@ float JobOption::getNumber()
 bool JobOption::getBoolean()
 {
 	if (joboption_type != JOBOPTION_BOOLEAN)
+	{
+		std::cerr << " joboption_type= " << joboption_type << " label= " << label << " value= " << value << std::endl;
 		REPORT_ERROR("ERROR: this jobOption does not return a boolean: " + label);
+	}
 	else
 		return (value == "Yes");
 }

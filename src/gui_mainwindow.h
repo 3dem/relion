@@ -88,9 +88,6 @@ static void Gui_Timer_CB(void *userdata);
 // Read-only GUI?
 static bool maingui_do_read_only;
 
-// A manualpicker jobwindow for display of micrographs....
-static RelionJob global_manualpickjob;
-
 // Store all the history
 static PipeLine pipeline;
 // Which is the current job being displayed?
