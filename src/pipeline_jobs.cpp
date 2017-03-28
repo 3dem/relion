@@ -1911,14 +1911,14 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	else if  (joboptions["fn_coords"].getString() != "")
 	{
 
-    	RelionJob global_manualpickjob;
+    	RelionJob manualpickjob;
 
     	FileName fn_job = ".gui_manualpickrun.job";
 		bool iscont=false;
 		if (exists(fn_job))
 		{
-			global_manualpickjob.initialise(PROC_MANUALPICK);
-			global_manualpickjob.read(fn_job.c_str(), iscont);
+			manualpickjob.initialise(PROC_MANUALPICK);
+			manualpickjob.read(fn_job.c_str(), iscont);
 		}
 		else
 		{
@@ -1957,35 +1957,35 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		outputNodes.push_back(node3);
 		command += " --allow_save  --selection " + fn_outstar;
 
-		// All the stuff from the saved global_manualpickjob
-		command += " --scale " + global_manualpickjob.joboptions["micscale"].getString();
-		command += " --sigma_contrast " + global_manualpickjob.joboptions["sigma_contrast"].getString();
-		command += " --black " + global_manualpickjob.joboptions["black_val"].getString();
-		command += " --white " + global_manualpickjob.joboptions["white_val"].getString();
+		// All the stuff from the saved manualpickjob
+		command += " --scale " + manualpickjob.joboptions["micscale"].getString();
+		command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
+		command += " --black " + manualpickjob.joboptions["black_val"].getString();
+		command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
-		if (global_manualpickjob.joboptions["lowpass"].getNumber() > 0.)
-			command += " --lowpass " + global_manualpickjob.joboptions["lowpass"].getString();
-		if (global_manualpickjob.joboptions["highpass"].getNumber() > 0.)
-			command += " --highpass " + global_manualpickjob.joboptions["highpass"].getString();
-		if (global_manualpickjob.joboptions["angpix"].getNumber() > 0.)
-			command += " --angpix " + global_manualpickjob.joboptions["angpix"].getString();
+		if (manualpickjob.joboptions["lowpass"].getNumber() > 0.)
+			command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+		if (manualpickjob.joboptions["highpass"].getNumber() > 0.)
+			command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+		if (manualpickjob.joboptions["angpix"].getNumber() > 0.)
+			command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 
-		command += " --ctf_scale " + global_manualpickjob.joboptions["ctfscale"].getString();
+		command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
 
-		command += " --particle_diameter " + global_manualpickjob.joboptions["diameter"].getString();
+		command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
 
 
-		if (global_manualpickjob.joboptions["do_color"].getBoolean())
+		if (manualpickjob.joboptions["do_color"].getBoolean())
 		{
-			command += " --color_label " + global_manualpickjob.joboptions["color_label"].getString();
-			command += " --blue " + global_manualpickjob.joboptions["blue_value"].getString();
-			command += " --red " + global_manualpickjob.joboptions["red_value"].getString();
-			if (global_manualpickjob.joboptions["fn_color"].getString().length() > 0)
-				command += " --color_star " + global_manualpickjob.joboptions["fn_color"].getString();
+			command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
+			command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
+			command += " --red " + manualpickjob.joboptions["red_value"].getString();
+			if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
+				command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
 		}
 
 		// Other arguments for extraction
-		command += " " + global_manualpickjob.joboptions["other_args"].getString() + " &";
+		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
 	else
 	{
