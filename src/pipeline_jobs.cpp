@@ -1882,7 +1882,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			if (joboptions["do_recenter"].getBoolean())
 			{
-				command += " --recenter";
+				command += " --recenter ";
 			}
 		}
 	}
@@ -1917,8 +1917,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		bool iscont=false;
 		if (exists(fn_job))
 		{
-			manualpickjob.initialise(PROC_MANUALPICK);
-			manualpickjob.read(fn_job.c_str(), iscont);
+			manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
 		}
 		else
 		{

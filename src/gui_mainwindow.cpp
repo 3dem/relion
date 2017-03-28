@@ -1118,8 +1118,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		bool iscont=false;
 		if (exists(fn_job))
 		{
-			manualpickjob.initialise(PROC_MANUALPICK);
-			manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont);
+			manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont, true); // true means do initialise
 		}
 		else
 		{
