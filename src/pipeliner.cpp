@@ -375,8 +375,9 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 			std::string &final_command, std::string &error_message)
 {
 
-	bool is_scheduled = (processList[current_job].status == PROC_SCHEDULED_CONT
-			|| processList[current_job].status == PROC_SCHEDULED_NEW);
+	bool is_scheduled = false;
+	if (current_job > 0)
+		is_scheduled = (processList[current_job].status == PROC_SCHEDULED_CONT || processList[current_job].status == PROC_SCHEDULED_NEW);
 
 	// Except for continuation or scheduled jobs, all jobs get a new unique directory
 	std::string my_outputname;
