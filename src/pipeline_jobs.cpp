@@ -662,7 +662,7 @@ Any occurrences of XXXextra2XXX will be changed by this value.");
 		default_location=mydefault;
 	}
 
-    joboptions["qsubscript"] = JobOption("Standard submission script:", std::string(default_location), "Script Files (*.{csh,sh,bash,script})", "",
+    joboptions["qsubscript"] = JobOption("Standard submission script:", std::string(default_location), "Script Files (*.{csh,sh,bash,script})", ".",
 "The template for your standard queue job submission script. \
 Its default location may be changed by setting the environment variable RELION_QSUB_TEMPLATE. \
 In the template script a number of variables will be replaced: \n \
@@ -812,7 +812,7 @@ void RelionJob::initialiseImportJob()
 
 	hidden_name = ".gui_import";
 
-	joboptions["fn_in"] = JobOption("Input files:", "Micrographs/*.mrcs", "Input file (*.*)", "", "Select any file(s), possibly using Linux wildcards for 2D micrographs or 3D tomograms that you want to import into a STAR file, which will also be saved as a data Node. \n \n \
+	joboptions["fn_in"] = JobOption("Input files:", "Micrographs/*.mrcs", "Input file (*.*)", ".", "Select any file(s), possibly using Linux wildcards for 2D micrographs or 3D tomograms that you want to import into a STAR file, which will also be saved as a data Node. \n \n \
 Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
 Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
 Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
@@ -989,10 +989,10 @@ void RelionJob::initialiseMotioncorrJob()
 	}
 
 	joboptions["do_motioncor2"] = JobOption("Use MOTIONCOR2?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of UNBLUR.");
-	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", "", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", "", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
-	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", "", "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
-	joboptions["fn_archive"] = JobOption("Archive directory:", "", "*", "", "Location of the directory to which movies will be archived in 4-byte MRC format (using MOTIONCOR2's -ArcDir option). Leave empty if you don't want to archive your movies at this point.");
+	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", ".", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
+	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
+	joboptions["fn_archive"] = JobOption("Archive directory:", "", "*", ".", "Location of the directory to which movies will be archived in 4-byte MRC format (using MOTIONCOR2's -ArcDir option). Leave empty if you don't want to archive your movies at this point.");
 	joboptions["patch_x"] = JobOption("Number of patches X:", std::string("1"), "Number of patches (in X and Y direction) to apply motioncor2.");
 	joboptions["patch_y"] = JobOption("Number of patches Y:", std::string("1"), "Number of patches (in X and Y direction) to apply motioncor2.");
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
@@ -1012,7 +1012,7 @@ void RelionJob::initialiseMotioncorrJob()
 		char mydefault2[]=DEFAULTUNBLURLOCATION;
 		default_location2=mydefault2;
 	}
-	joboptions["fn_unblur_exe"] = JobOption("UNBLUR executable:", std::string(default_location2), "*.*", "", "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with unblur version 1.0.2.");
+	joboptions["fn_unblur_exe"] = JobOption("UNBLUR executable:", std::string(default_location2), "*.*", ".", "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with unblur version 1.0.2.");
 
 	// Check for environment variable RELION_SUMMOVIE_EXECUTABL
 	char * default_location3 = getenv ("RELION_SUMMOVIE_EXECUTABLE");
@@ -1021,7 +1021,7 @@ void RelionJob::initialiseMotioncorrJob()
 		char mydefault3[]=DEFAULTSUMMOVIELOCATION;
 		default_location3=mydefault3;
 	}
-	joboptions["fn_summovie_exe"] = JobOption("SUMMOVIE executable:", std::string(default_location3), "*.*", "", "Location of the SUMMOVIE executable. You can control the default of this field by setting environment variable RELION_SUMMOVIE_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with summovie version 1.0.2.");
+	joboptions["fn_summovie_exe"] = JobOption("SUMMOVIE executable:", std::string(default_location3), "*.*", ".", "Location of the SUMMOVIE executable. You can control the default of this field by setting environment variable RELION_SUMMOVIE_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with summovie version 1.0.2.");
 
 	// Dose-weight
 
@@ -1177,7 +1177,7 @@ void RelionJob::initialiseCtffindJob()
 		char mydefault[]=DEFAULTCTFFINDLOCATION;
 		default_location=mydefault;
 	}
-	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*.exe", "", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*.exe", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["do_movie_thon_rings"] = JobOption("Estimate Thon rings from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access");
 	joboptions["movie_rootname"] = JobOption("Movie rootname plus extension", std::string("_movie.mrcs"), "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");
 	joboptions["avg_movie_frames"] = JobOption("Nr of movie frames to average:", 4, 1, 20, 1,"Calculate averages over so many movie frames to calculate power spectra. Often values corresponding to an accumulated dose of ~ 4 electrons per squared Angstrom work well.");
@@ -1192,7 +1192,7 @@ void RelionJob::initialiseCtffindJob()
 		char mydefault[]=DEFAULTGCTFLOCATION;
 		default_location=mydefault;
 	}
-	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", "", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", ".", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
 \n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 	joboptions["do_EPA"] = JobOption("Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
@@ -1324,7 +1324,7 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 (basically only the rlnAutopickFigureOfMerit or rlnClassNumber) would be useful values there, then you may provide an additional STAR file (e.g. after classification/refinement below. Particles with values -999, or that are not in the additional STAR file will be coloured the default color: green");
 	joboptions["color_label"] = JobOption("MetaDataLabel for color:", std::string("rlnParticleSelectZScore"), "The Metadata label of the value to plot from red<>blue. Useful examples might be: \n \
 rlnParticleSelectZScore \n rlnClassNumber \n rlnAutopickFigureOfMerit \n rlnAngleTilt \n rlnLogLikeliContribution \n rlnMaxValueProbDistribution \n rlnNrOfSignificantSamples\n");
-	joboptions["fn_color"] = JobOption("STAR file with color label: ", "", "STAR file (*.star)", "", "The program will figure out which particles in this STAR file are on the current micrograph and color their circles according to the value in the corresponding column. \
+	joboptions["fn_color"] = JobOption("STAR file with color label: ", "", "STAR file (*.star)", ".", "The program will figure out which particles in this STAR file are on the current micrograph and color their circles according to the value in the corresponding column. \
 Particles that are not in this STAR file, but present in the picked coordinates file will be colored green. If this field is left empty, then the color label (e.g. rlnAutopickFigureOfMerit) should be present in the coordinates STAR file.");
 	joboptions["blue_value"] = JobOption("Blue value: ", 0., 0., 4., 0.1, "The value of this entry will be blue. There will be a linear scale from blue to red, according to this value and the one given below.");
 	joboptions["red_value"] = JobOption("Red value: ", 2., 0., 4., 0.1, "The value of this entry will be red. There will be a linear scale from blue to red, according to this value and the one given above.");
@@ -3925,7 +3925,7 @@ void RelionJob::initialisePostprocessJob()
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
-	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", "", "The MTF of the detector is used in the (later) post-processing and particle polishing stages of refinement.  \
+	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", ".", "The MTF of the detector is used in the (later) post-processing and particle polishing stages of refinement.  \
 If you know the MTF of your detector, provide it here. Curves for some well-known detectors may be downloaded from the RELION Wiki. Also see there for the exact format \
 \n If you do not know the MTF of your detector and do not want to measure it, then by leaving this entry empty, you include the MTF of your detector in your overall estimated B-factor upon sharpening the map.\
 Although that is probably slightly less accurate, the overall quality of your map will probably not suffer very much.");
@@ -4042,7 +4042,7 @@ void RelionJob::initialiseLocalresJob()
 	}
 
 	joboptions["do_resmap_locres"] = JobOption("Use ResMap for local-resolution estimation?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");
-	joboptions["fn_resmap"] = JobOption("ResMap executable:", std::string(default_location), "ResMap*", "", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
+	joboptions["fn_resmap"] = JobOption("ResMap executable:", std::string(default_location), "ResMap*", ".", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
 	joboptions["fn_mask"] = JobOption("User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 	joboptions["pval"] = JobOption("P-value:", 0.05, 0., 1., 0.01, "This value is typically left at 0.05. If you change it, report the modified value in your paper!");
 	joboptions["minres"] = JobOption("Highest resolution (A): ", 0., 0., 10., 0.1, "ResMaps minRes parameter. By default (0), the program will start at just above 2x the pixel size");
@@ -4056,7 +4056,7 @@ This is a developmental feature in need of further testing, but initial results 
 	//joboptions["locres_sampling"] = JobOption("Sampling rate (A):", 25, 5, 50, 5, "The local-resolution map will be calculated every so many Angstroms, by placing soft spherical masks on a cubic grid with this spacing. Very fine samplings (e.g. < 15A?) may take a long time to compute and give spurious estimates!");
 	//joboptions["randomize_at"] = JobOption("Frequency for phase-randomisation (A): ", 10., 5, 20., 1, "From this frequency onwards, the phases for the mask-corrected FSC-calculation will be randomized. Make sure this is a lower resolution (i.e. a higher number) than the local resolutions you are after in your map.");
 	joboptions["adhoc_bfac"] = JobOption("User-provided B-factor:", -100, -500, 0, -25, "Probably, the overall B-factor as was estimated in the postprocess is a useful value for here. Use negative values for sharpening. Be careful: if you over-sharpen your map, you may end up interpreting noise for signal!");
-	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", "", "The MTF of the detector is used to complement the user-provided B-factor in the sharpening. If you don't have this curve, you can leave this field empty.");
+	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", ".", "The MTF of the detector is used to complement the user-provided B-factor in the sharpening. If you don't have this curve, you can leave this field empty.");
 
 }
 
