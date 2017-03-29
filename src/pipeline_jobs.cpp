@@ -837,6 +837,8 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	commands.clear();
 	initialisePipeline(outputname, "Import", job_counter);
 
+	commands.push_back("echo importing...");
+
 	std::string command;
 	FileName outputstar;
 
@@ -2296,6 +2298,27 @@ having 50% after this many particles have been processed. Switch increased noise
 This is essential in SGD, as there is very little regularisation, i.e. overfitting will start to happen very quickly. \
 Values in the range of 15-30 Angstroms have proven useful.");
 
+	//joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
+These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
+	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
+set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
+* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
+* I2: Crowther 222 \n \
+* I3: 52-setting (as used in SPIDER?)\n \
+* I4: A different 52 setting \n \
+The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
+RELION uses XMIPP's libraries for symmetry operations. \
+Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
+	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
+circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
+If set to a value larger than the image size no masking will be performed.\n\n\
+The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
+	//joboptions["do_zero_mask"] = JobOption("Mask individual particles with zeros?", true, "If set to Yes, then in the individual particles, \
+the area outside a circle with the radius of the particle will be set to zeros prior to taking the Fourier transform. \
+This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
+between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
+High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
+
 	joboptions["do_ctf_correction"] = JobOption("Do CTF-correction?", true, "If set to Yes, CTFs will be corrected inside the MAP refinement. \
 The resulting algorithm intrinsically implements the optimal linear, or Wiener filter. \
 Note that CTF parameters for all images need to be given in the input STAR file. \
@@ -2311,26 +2334,6 @@ only be performed from the first peak of each CTF onward. This can be useful if 
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
 Therefore, this option is not generally recommended: try increasing amplitude contrast (in your input STAR file) first!");
 
-	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
-These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
-	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
-set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
-* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
-* I2: Crowther 222 \n \
-* I3: 52-setting (as used in SPIDER?)\n \
-* I4: A different 52 setting \n \
-The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
-RELION uses XMIPP's libraries for symmetry operations. \
-Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
-	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
-circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
-If set to a value larger than the image size no masking will be performed.\n\n\
-The same diameter will also be used for a spherical mask of the reference structures if no user-provided mask is specified.");
-	joboptions["do_zero_mask"] = JobOption("Mask individual particles with zeros?", true, "If set to Yes, then in the individual particles, \
-the area outside a circle with the radius of the particle will be set to zeros prior to taking the Fourier transform. \
-This will remove noise and therefore increase sensitivity in the alignment and classification. However, it will also introduce correlations \
-between the Fourier components that are not modelled. When set to No, then the solvent area is filled with random noise, which prevents introducing correlations.\
-High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-refine) tend to work better when filling the solvent area with random noise (i.e. setting this option to No), refinements of smaller complexes and most classifications go better when using zeros (i.e. setting this option to Yes).");
 
 	joboptions["sampling"] = JobOption("Angular sampling interval:", RADIO_SAMPLING, 1, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
@@ -2390,7 +2393,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
     }
 
     command += " --o " + outputname + fn_run;
-	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), (int)joboptions["nr_classes"].getNumber(), 3, 1);
+	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), 1, 3, 1);
 
 	command += " --sgd ";
 	command += " --subset_size " + joboptions["sgd_subset_size"].getString();
@@ -2419,10 +2422,10 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 				command += " --ctf_intact_first_peak";
 		}
 
-		command += " --K " + joboptions["nr_classes"].getString();
+		//command += " --K " + joboptions["nr_classes"].getString();
 		command += " --sym " + joboptions["sym_name"].getString();
 
-		if (joboptions["do_zero_mask"].getBoolean())
+		//if (joboptions["do_zero_mask"].getBoolean())
 			command += " --zero_mask";
 	}
 

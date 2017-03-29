@@ -620,8 +620,9 @@ static void Gui_Timer_CB(void *userdata)
 	if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
     	o->fillStdOutAndErr();
 
-    // Always check for job completion
-	o->updateJobLists();
+    // Check for job completion if the pipeline has been changed
+	if (exists(PIPELINE_HAS_CHANGED))
+		o->updateJobLists();
 
     // Refresh every so many seconds
     Fl::repeat_timeout(o->update_every_sec, Gui_Timer_CB, userdata);
@@ -890,7 +891,6 @@ void GuiMainWindow::tickTimeLastChanged()
 
 void GuiMainWindow::updateJobLists()
 {
-	// If any processes has finished, update the running job list
 	pipeline.checkProcessCompletion();
 	fillRunningJobLists();
 	fillToAndFromJobLists();

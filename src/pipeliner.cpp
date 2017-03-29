@@ -352,7 +352,7 @@ bool PipeLine::checkProcessCompletion()
 	}
 
 	// Only do read/write cycle in case a process was finished, otherwise the GUI slows down too much
-	if (finished_processes.size() > 0)
+	if (finished_processes.size() > 0 || exists(PIPELINE_HAS_CHANGED))
 	{
 		// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
 		read(DO_LOCK);
@@ -364,6 +364,8 @@ bool PipeLine::checkProcessCompletion()
 		// Always couple read/write with DO_LOCK
 		// This is to make sure two different windows do not get out-of-sync
 		write(DO_LOCK);
+		if (exists(PIPELINE_HAS_CHANGED))
+			std::remove(PIPELINE_HAS_CHANGED);
 		return true;
 	}
 
@@ -376,7 +378,7 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 {
 
 	bool is_scheduled = false;
-	if (current_job > 0)
+	if (current_job >= 0)
 		is_scheduled = (processList[current_job].status == PROC_SCHEDULED_CONT || processList[current_job].status == PROC_SCHEDULED_NEW);
 
 	// Except for continuation or scheduled jobs, all jobs get a new unique directory
@@ -390,6 +392,9 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 	}
 	else
 		my_outputname = "";
+
+	// Set is_continue flag inside the job
+	thisjob.is_continue = is_main_continue;
 
 	bool result = thisjob.getCommands(my_outputname, commands, final_command, do_makedir, job_counter, error_message);
 
@@ -1902,6 +1907,9 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it is no longer there.");
 		std::remove(fn_lock.c_str());
 	}
+
+	// Touch a file to indicate to the GUI that the pipeline has just changed
+	touch(PIPELINE_HAS_CHANGED);
 
 }
 

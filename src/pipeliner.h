@@ -63,6 +63,7 @@ class Process
 // Forward definition
 class PipeLineFlowChart;
 
+#define PIPELINE_HAS_CHANGED ".pipeline_has_changed"
 class PipeLine
 {
 
