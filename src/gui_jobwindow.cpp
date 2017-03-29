@@ -1282,7 +1282,7 @@ void JobWindow::initialiseClass2DWindow()
 }
 void JobWindow::initialiseInimodelWindow()
 {
-	setupTabs(6);
+	setupTabs(5);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1314,6 +1314,12 @@ void JobWindow::initialiseInimodelWindow()
 	tab3->label("SGD");
 	resetHeight();
 
+	place("particle_diameter");
+	place("sym_name", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("nr_iter");
 	place("sgd_subset_size");
 	place("sgd_max_subsets");
@@ -1323,26 +1329,7 @@ void JobWindow::initialiseInimodelWindow()
 
 	tab3->end();
 	tab4->begin();
-	tab4->label("Optimisation");
-	resetHeight();
-
-	place("nr_classes", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sym_name", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("particle_diameter");
-	place("do_zero_mask", TOGGLE_DEACTIVATE);
-
-	tab4->end();
-
-	tab5->begin();
-	tab5->label("Sampling");
+	tab4->label("Sampling");
 
 	resetHeight();
 
@@ -1350,10 +1337,10 @@ void JobWindow::initialiseInimodelWindow()
 	place("offset_range");
 	place("offset_step");
 
-	tab5->end();
+	tab4->end();
 
-	tab6->begin();
-	tab6->label("Compute");
+	tab5->begin();
+	tab5->label("Compute");
 	resetHeight();
 
 	place("do_parallel_discio");
@@ -1362,7 +1349,7 @@ void JobWindow::initialiseInimodelWindow()
 	place("scratch_dir");
 	place("do_combine_thru_disc");
 
-	tab6->end();
+	tab5->end();
 
 }
 void JobWindow::initialiseClass3DWindow()
