@@ -139,14 +139,14 @@ class PipeLine
 	bool checkProcessCompletion();
 
 	// Get the command line arguments for thisjob
-	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool do_makedir, std::vector<std::string> &commands,
+	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
 			std::string &final_command, std::string &error_message);
 
 	// Adds _job to the pipeline and return the id of the newprocess
 	long int addJob(RelionJob &_job, int as_status, bool do_overwrite);
 
 	// Runs a job and adds it to the pipeline
-	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, std::string &error_message);
+	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
 
 	// Runs a series of scheduled jobs, possibly in a loop
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);

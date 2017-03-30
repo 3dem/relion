@@ -713,8 +713,7 @@ void GuiMainWindow::fillRunningJobLists()
 			else
 				running_job_browser->add(pipeline.processList[i].name.c_str());
 		}
-		else if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
-				 pipeline.processList[i].status == PROC_SCHEDULED_CONT)
+		else if (pipeline.processList[i].status == PROC_SCHEDULED)
 		{
 			scheduled_processes.push_back(i);
 			if (pipeline.processList[i].alias != "None")
@@ -923,11 +922,14 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 	gui_jobwindows[iwin]->updateMyGui();
 
 	// If a finished or running job was loaded from the pipeline: set this to be a continuation job
-	// If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED_NEW
-    if (pipeline.processList[current_job].status != PROC_SCHEDULED_NEW)
-    	is_main_continue = true;
-    else
-    	is_main_continue = false;
+	// If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED
+    //if (pipeline.processList[current_job].status == PROC_SCHEDULED && !gui_jobwindows[iwin]->myjob.is_continue)
+    //	is_main_continue = false;
+    //else
+    //	is_main_continue = true;
+
+    // Any job loaded from the pipeline will initially be set as a continuation job
+    is_main_continue = true;
     cb_toggle_continue_i();
 
     // Set the alias in the window
@@ -1254,7 +1256,7 @@ void GuiMainWindow::cb_print_cl_i()
 	gui_jobwindows[iwin]->updateMyJob();
 
 	std::string error_message;
-	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, DONT_MKDIR, commands, final_command, error_message))
+	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false, DONT_MKDIR, commands, final_command, error_message))
 	{
 		fl_message(error_message.c_str());
 	}
@@ -1286,14 +1288,14 @@ void GuiMainWindow::cb_run(Fl_Widget* o, void* v) {
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
 	// Run the job
-	T->cb_run_i(false, true); // false means dont only_schedule, true means open the note editor window
+	T->cb_run_i(false, false); // 1st false means dont only_schedule, 2nd false means dont open the note editor window
 }
 
 // Run button call-back functions
 void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 
     GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_run_i(true, true); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
+    T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
 }
 
 void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
@@ -1308,7 +1310,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	tickTimeLastChanged();
 
 	std::string error_message;
-	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, error_message))
+	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
 		fl_message(error_message.c_str());
 		return;
@@ -1639,8 +1641,7 @@ void GuiMainWindow::cb_save_i()
 	gui_jobwindows[iwin]->updateMyJob();
 
 	// For scheduled jobs, also allow saving the .job file in the output directory
-	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
-			                pipeline.processList[current_job].status == PROC_SCHEDULED_CONT))
+	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED))
 	{
 		gui_jobwindows[iwin]->myjob.write(pipeline.processList[current_job].name);
 	}

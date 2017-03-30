@@ -117,7 +117,7 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 
 	// 1. Check whether Node with that name already exists in the Node list
 	// Touch .Nodes entries even if they don't exist for scheduled jobs
-	bool touch_if_not_exist = (processList[myProcess].status == PROC_SCHEDULED_CONT || processList[myProcess].status == PROC_SCHEDULED_NEW);
+	bool touch_if_not_exist = (processList[myProcess].status == PROC_SCHEDULED);
 
 	// 2. Set the output_from_process of this Node
 	_Node.outputFromProcess = myProcess;
@@ -239,7 +239,7 @@ void PipeLine::touchTemporaryNodeFiles(Process &process)
 	if (do_read_only)
 		return;
 
-	bool touch_if_not_exist = (process.status == PROC_SCHEDULED_CONT || process.status == PROC_SCHEDULED_NEW);
+	bool touch_if_not_exist = (process.status == PROC_SCHEDULED);
 
 	for (int j = 0; j < process.outputNodeList.size(); j++)
 	{
@@ -311,8 +311,7 @@ void PipeLine::remakeNodeDirectory()
 	for (long int i = 0; i < nodeList.size(); i++)
 	{
 		int myproc = nodeList[i].outputFromProcess;
-		bool touch_if_not_exist = (myproc < 0) ? false : (processList[myproc].status == PROC_SCHEDULED_CONT ||
-								   	   	   	   	   	   	  processList[myproc].status == PROC_SCHEDULED_NEW);
+		bool touch_if_not_exist = (myproc < 0) ? false : (processList[myproc].status == PROC_SCHEDULED);
 		touchTemporaryNodeFile(nodeList[i], touch_if_not_exist);
 	}
 	command = "chmod 777 -R " + fn_dir;
@@ -373,13 +372,9 @@ bool PipeLine::checkProcessCompletion()
 
 }
 
-bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool do_makedir, std::vector<std::string> &commands,
+bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
 			std::string &final_command, std::string &error_message)
 {
-
-	bool is_scheduled = false;
-	if (current_job >= 0)
-		is_scheduled = (processList[current_job].status == PROC_SCHEDULED_CONT || processList[current_job].status == PROC_SCHEDULED_NEW);
 
 	// Except for continuation or scheduled jobs, all jobs get a new unique directory
 	std::string my_outputname;
@@ -443,14 +438,14 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
 
 }
 
-bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, std::string &error_message)
+bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message)
 {
 
 	std::vector<std::string> commands;
 	std::string final_command;
 
 	// true means makedir
-	if (!getCommandLineJob(_job, current_job, is_main_continue, true, commands, final_command, error_message))
+	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, commands, final_command, error_message))
 	{
 		return false;
 	}
@@ -505,8 +500,8 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 		}
 	} // end if !only_schedule && is_main_continue
 
-	// If a job is executed with PROC_SCHEDULED_NEW, then also move away any existing output node files
-	if (current_job >= 0 && processList[current_job].status == PROC_SCHEDULED_NEW)
+	// If a job is executed with a non-continue scheduled job, then also move away any existing output node files
+	if (current_job >= 0 && is_scheduled && !is_main_continue)
 		do_move_output_nodes_to_old = true;
 
 	// Move away existing output nodes
@@ -528,13 +523,10 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Now save the job (and its status) to the PipeLine
 	int mynewstatus;
 	if (only_schedule)
-		mynewstatus = (is_main_continue) ? PROC_SCHEDULED_CONT : PROC_SCHEDULED_NEW;
+		mynewstatus = PROC_SCHEDULED;
 	else
 		mynewstatus = PROC_RUNNING;
-	bool allow_overwrite = is_main_continue; // continuation jobs always allow overwriting into the existing directory
-	if (current_job >= 0 && !allow_overwrite) // and so do scheduled jobs
-		allow_overwrite = (processList[current_job].status == PROC_SCHEDULED_NEW ||
-				 processList[current_job].status == PROC_SCHEDULED_CONT) ;
+	bool allow_overwrite = is_main_continue || is_scheduled; // continuation and scheduled jobs always allow overwriting into the existing directory
 
 	// Add the job to the pipeline, and set current_job to the new one
 	current_job = addJob(_job, mynewstatus, allow_overwrite);
@@ -623,16 +615,9 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 		{
 			int current_job = my_scheduled_processes[i];
 			RelionJob myjob;
-			bool is_main_continue;
-			if (!myjob.read(processList[current_job].name, is_main_continue, true)) // true means also initialise the job
+			bool is_continue;
+			if (!myjob.read(processList[current_job].name, is_continue, true)) // true means also initialise the job
 				REPORT_ERROR("There was an error reading job: " + processList[current_job].name);
-
-			if (processList[current_job].status == PROC_SCHEDULED_NEW)
-		    	is_main_continue = false;
-			else if (processList[current_job].status == PROC_SCHEDULED_CONT)
-		    	is_main_continue = true;
-		    else
-		    	REPORT_ERROR("BUG: status should be PROC_SCHEDULED_NEW or PROC_SCHEDULED_CONT by now...");
 
 			// Check whether the input nodes are there, before executing the job
 			for (long int inode = 0; inode < processList[current_job].inputNodeList.size(); inode++)
@@ -648,7 +633,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 			fh << " + " << ctime(&now) << " ---- Executing " << processList[current_job].name  << std::endl;
 			std::string error_message;
 
-			if (!runJob(myjob, current_job, false, is_main_continue, error_message))
+			if (!runJob(myjob, current_job, false, is_continue, true, error_message)) // true means is_scheduled!
 				REPORT_ERROR(error_message);
 
 			// Now wait until that job is done!
@@ -666,9 +651,26 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				{
 					// Read in existing pipeline, in case some other window had changed something else
 					read(DO_LOCK);
-					// Re-set set status of current_job to finished
-					processList[current_job].status = PROC_FINISHED;
-					// Write out the modified pipeline with the status of current_job to finished
+
+					// Will we do another repeat?
+					if (repeat + 1 != nr_repeat)
+					{
+						int mytype = processList[current_job].type;
+						// The following jobtypes have functionality to only do the unfinished part of the job
+						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
+						{
+							myjob.is_continue = true;
+							// Write the job again, now with the updated is_continue status
+							myjob.write(processList[current_job].name);
+						}
+						processList[current_job].status = PROC_SCHEDULED;
+					}
+					else
+					{
+						processList[current_job].status = PROC_FINISHED;
+					}
+
+					// Write out the modified pipeline with the new status of current_job
 					write(DO_LOCK);
 					break;
 				}
@@ -677,25 +679,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 			if (!fn_check_exists)
 				break;
 
-			if (repeat + 1 != nr_repeat)
-			{
-
-				// Read in existing pipeline, in case some other window had changed it
-				read(DO_LOCK);
-
-				// Set the current job back into the job list of the repeating cycle
-				// Do we want to run this as NEW or CONTINUED NEXT TIME?
-				int mytype = processList[current_job].type;
-				// The following jobtypes have functionality to only do the unfinished part of the job
-				if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
-					processList[current_job].status = PROC_SCHEDULED_CONT;
-				else
-					processList[current_job].status = PROC_SCHEDULED_NEW;
-
-				// Write the pipeline to an updated STAR file
-				write(DO_LOCK);
-			}
-		} //end loop my_scheudled_processes
+		} //end loop my_scheduled_processes
 
 
 		if (!fn_check_exists)
@@ -1418,7 +1402,7 @@ bool PipeLine::exportAllScheduledJobs(std::string mydir, std::string &error_mess
 	std::vector<std::string> find_pattern, replace_pattern;
 	for (long int i = 0; i < processList.size(); i++)
 	{
-		if (processList[i].status == PROC_SCHEDULED_NEW || processList[i].status == PROC_SCHEDULED_CONT)
+		if (processList[i].status == PROC_SCHEDULED)
 		{
 			iexp++;
 			if (processList[i].alias != "None")
