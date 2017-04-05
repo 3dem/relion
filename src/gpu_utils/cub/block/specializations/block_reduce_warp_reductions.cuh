@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -94,9 +94,9 @@ struct BlockReduceWarpReductions
 
     // Thread fields
     _TempStorage &temp_storage;
-    int linear_tid;
-    int warp_id;
-    int lane_id;
+    unsigned int linear_tid;
+    unsigned int warp_id;
+    unsigned int lane_id;
 
 
     /// Constructor
@@ -115,7 +115,7 @@ struct BlockReduceWarpReductions
         ReductionOp                 reduction_op,       ///< [in] Binary scan operator
         T                           warp_aggregate,     ///< [in] <b>[<em>lane</em><sub>0</sub> only]</b> Warp-wide aggregate reduction of input items
         int                         num_valid,          ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
-        Int2Type<SUCCESSOR_WARP>    successor_warp)
+        Int2Type<SUCCESSOR_WARP>    /*successor_warp*/)
     {
         if (FULL_TILE || (SUCCESSOR_WARP * LOGICAL_WARP_SIZE < num_valid))
         {
@@ -127,10 +127,10 @@ struct BlockReduceWarpReductions
 
     template <bool FULL_TILE, typename ReductionOp>
     __device__ __forceinline__ T ApplyWarpAggregates(
-        ReductionOp         reduction_op,       ///< [in] Binary scan operator
+        ReductionOp         /*reduction_op*/,   ///< [in] Binary scan operator
         T                   warp_aggregate,     ///< [in] <b>[<em>lane</em><sub>0</sub> only]</b> Warp-wide aggregate reduction of input items
-        int                 num_valid,          ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
-        Int2Type<WARPS>     successor_warp)
+        int                 /*num_valid*/,      ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
+        Int2Type<WARPS>     /*successor_warp*/)
     {
         return warp_aggregate;
     }
@@ -200,7 +200,7 @@ struct BlockReduceWarpReductions
         unsigned int    warp_offset = warp_id * LOGICAL_WARP_SIZE;
         unsigned int    warp_num_valid = (FULL_TILE && EVEN_WARP_MULTIPLE) ?
                             LOGICAL_WARP_SIZE :
-                            (warp_offset < num_valid) ?
+                            (warp_offset < static_cast<unsigned int>(num_valid)) ?
                                 num_valid - warp_offset :
                                 0;
 
