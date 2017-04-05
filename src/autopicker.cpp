@@ -212,12 +212,12 @@ void AutoPicker::initialise()
 			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;
 			if (verb > 0)
-				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+				std::cout << " + Using (micrograph) pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
         }
-        else if (verb > 0)
+        else if (verb > 0 )
         {
-        	std::cout << " + Warning: input STAR file does not contain information about pixel size!" << std::endl;
-        	std::cout << " + Warning: use --angpix to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
+        	std::cout << " + Warning: input (micrograph) STAR file does not contain information about pixel size!" << std::endl;
+        	std::cout << " + Warning: use --angpix_ref to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
         }
 	}
 	else
@@ -287,6 +287,9 @@ void AutoPicker::initialise()
 	{
 		if (verb > 0)
 			std::cout << " + Will use Gaussian blob as reference, with peak value of " << gauss_max_value << std::endl;
+
+		if(particle_diameter<=0)
+			CRITICAL(ERR_GAUSSBLOBSIZE);
 
 		// Set particle boxsize to be 1.5x bigger than circle with particle_diameter
 		particle_size =  1.5 * ROUND(particle_diameter/angpix);
