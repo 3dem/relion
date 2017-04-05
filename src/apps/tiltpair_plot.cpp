@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
     catch (RelionError XE)
     {
         std::cerr << XE;
-        prm.usage();
+        //prm.usage();
         exit(1);
     }
     return 0;
