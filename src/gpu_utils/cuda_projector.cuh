@@ -1,10 +1,10 @@
 #ifndef CUDA_PROJECTOR_CUH_
 #define CUDA_PROJECTOR_CUH_
 
-#include "src/gpu_utils/cuda_settings.h"
+#include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_projector.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
-#include <cuda_runtime.h>
+
 
 
 #ifndef CUDA_NO_TEXTURES

@@ -1,15 +1,9 @@
+#include <signal.h>
+#include <cuda_runtime.h>
+#include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_backprojector.h"
 #include "src/gpu_utils/cuda_device_utils.cuh"
-#include <signal.h>
 #include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_kernels/helper.cuh"
-
-#define BACKPROJECTION4_BLOCK_SIZE 64
-#define BACKPROJECTION4_GROUP_SIZE 16
-#define BACKPROJECTION4_PREFETCH_COUNT 3
-#define BP_2D_BLOCK_SIZE 128
-#define BP_REF3D_BLOCK_SIZE 128
-#define BP_DATA3D_BLOCK_SIZE 640
 
 size_t CudaBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
