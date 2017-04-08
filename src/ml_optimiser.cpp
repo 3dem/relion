@@ -6162,8 +6162,13 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			if (exp_ipass==0) my_nr_significant_coarse_samples++;
 			my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
 			frac_weight += my_significant_weight;
-			if ((frac_weight > adaptive_fraction * exp_sum_weight[ipart]) || (my_nr_significant_coarse_samples == maximum_significants))
+			if (frac_weight > adaptive_fraction * exp_sum_weight[ipart]) 
 				break;
+		}
+		if(exp_ipass==0)
+		{
+			if(my_nr_significant_coarse_samples == maximum_significants)
+				my_nr_significant_coarse_samples = maximum_significants;
 		}
 
 #ifdef DEBUG_SORT
