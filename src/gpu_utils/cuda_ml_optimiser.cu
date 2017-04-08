@@ -3055,6 +3055,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 			// If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
 
 			// Decide which classes to integrate over (for random class assignment in 1st iteration)
+			sp.iclass_min = 0;
+			sp.iclass_max = baseMLO->mymodel.nr_classes - 1;
 			// low-pass filter again and generate the seeds
 			if (baseMLO->do_generate_seeds)
 			{

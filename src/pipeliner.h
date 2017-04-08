@@ -107,7 +107,8 @@ class Node
 #define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
 #define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
-#define NR_BROWSE_TABS      18
+#define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
+#define NR_BROWSE_TABS      19
 
 // Status a Process may have
 #define PROC_RUNNING   0

@@ -993,6 +993,17 @@ void multiViewerCanvas::saveSelectedParticles(bool save_selected)
 		return;
 	}
 
+//#define RELION_DEVEL_ASKTRAINING
+#ifdef RELION_DEVEL_ASKTRAINING
+	bool do_training = false;
+	std::string ask = "Is this a selection of good classes, so it can be used for Sjors' training set for automated class selection?\n \
+			More info here: /public/EM/RELION/training.txt\n";
+	do_training =  fl_choice("%s", "Don't use", "Use for training", NULL, ask.c_str());
+
+	if (do_training)
+		saveTrainingSet();
+#endif
+
 	MetaDataTable MDpart;
 	makeStarFileSelectedParticles(save_selected, MDpart);
 	if (nr_regroups > 0)
@@ -1087,6 +1098,77 @@ void multiViewerCanvas::showSelectedParticles(bool save_selected)
 
 }
 
+void multiViewerCanvas::saveTrainingSet()
+{
+	FileName fn_rootdir = "/net/dstore1/teraraid3/scheres/trainingset/";
+
+	// Make the output job directory
+	char my_dir[200];
+	FileName fn_projdir = std::string(getcwd(my_dir, 200));
+	std::replace( fn_projdir.begin(), fn_projdir.end(), '/', '_');
+	fn_projdir += "/" + (fn_selected_parts.afterFirstOf("/")).beforeLastOf("/");
+	FileName fn_odir = fn_rootdir + fn_projdir;
+	std::string command = "mkdir -p " + fn_odir + " ; chmod 777 " + fn_odir;
+	int res = system(command.c_str());
+
+	// Now save the selected images in a MetaData file.
+	MetaDataTable MDout;
+	int nsel = 0;
+	for (long int ipos = 0; ipos < boxes.size(); ipos++)
+	{
+		MDout.addObject(boxes[ipos]->MDimg.getObject());
+		if (boxes[ipos]->selected)
+			MDout.setValue(EMDL_SELECTED, true);
+		else
+			MDout.setValue(EMDL_SELECTED, false);
+	}
+
+	// Maintain the original image ordering
+	if (MDout.containsLabel(EMDL_SORTED_IDX))
+		MDout.sort(EMDL_SORTED_IDX);
+
+	// Copy all images
+	long int nr;
+	FileName fn_img, fn_new_img, fn_iroot, fn_old="";
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+	{
+		MDout.getValue(display_label, fn_img);
+		fn_img.decompose(nr, fn_img);
+		fn_new_img.compose(nr, fn_img.afterLastOf("/"));
+		MDout.setValue(display_label, fn_new_img);
+		if (fn_img != fn_old) // prevent multiple copies of single stack from Class2D
+			copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+		fn_old = fn_img;
+	}
+	fn_iroot = fn_img.beforeFirstOf("_class");
+
+	// Copy rest of metadata
+	fn_img = fn_iroot + "_model.star";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+	fn_img = fn_iroot + "_optimiser.star";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+	fn_img = fn_iroot + "_data.star";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+	fn_img = fn_iroot + "_sampling.star";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+	fn_iroot = fn_iroot.beforeLastOf("/");
+	fn_img = fn_iroot + "/note.txt";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+	fn_img = fn_iroot + "/default_pipeline.star";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+
+	// Save the actual selection selection
+	MDout.write(fn_odir + "/selected.star");
+
+	// Give everyone permissions to this directory and its files
+	command = " chmod 777 -R " + fn_odir.beforeLastOf("/");
+	if (system(command.c_str()))
+		REPORT_ERROR("ERROR in executing: " + command);
+
+	std::cout << "Saved selection to Sjors' training directory. Thanks for helping out!" << std::endl;
+
+}
+
 void multiViewerCanvas::saveSelected(bool save_selected)
 {
 	if (fn_selected_imgs == "")
@@ -1105,6 +1187,7 @@ void multiViewerCanvas::saveSelected(bool save_selected)
 	}
 	if (nsel > 0)
 	{
+
 		// Maintain the original image ordering
 		if (MDout.containsLabel(EMDL_SORTED_IDX))
 			MDout.sort(EMDL_SORTED_IDX);

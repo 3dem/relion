@@ -53,7 +53,7 @@ void MotioncorrRunnerMpi::run()
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
-			std::cout << " Correcting beam-induced motions using Xueming Li's MOTIONCORR ..." << std::endl;
+			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
@@ -72,7 +72,7 @@ void MotioncorrRunnerMpi::run()
 		else if (do_motioncor2)
 			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts, node->rank);
 		else
-			result = executeMotioncorr(fn_micrographs[imic], xshifts, yshifts, node->rank);
+			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result)
 			plotShifts(fn_micrographs[imic], xshifts, yshifts);

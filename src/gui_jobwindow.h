@@ -34,9 +34,9 @@
 #include "src/pipeliner.h"
 
 // Our own defaults at LMB are the hard-coded ones
-#define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/qsub.csh"
-#define DEFAULTCTFFINDLOCATION "\"/public/EM/ctffind/ctffind.exe  --omp-num-threads 1 --old-school-input\""
-#define DEFAULTMOTIONCORRLOCATION "/public/EM/MOTIONCOR2/MotionCor2"
+#define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
+#define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
+#define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
 #define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
@@ -224,25 +224,30 @@ class MotioncorrJobWindow : public RelionJobWindow
 {
 public:
 
+	// I/O
 	InputNodeEntry input_star_mics;
-	SliderEntry angpix;
+	BooleanEntry do_save_movies;
 	SliderEntry first_frame_sum;
 	SliderEntry last_frame_sum;
+	SliderEntry angpix;
 
-	FileNameEntry fn_motioncorr_exe;
-	FileNameEntry fn_summovie_exe;
+	// Motioncor2
+	BooleanEntry do_motioncor2;
+	FileNameEntry fn_motioncor2_exe;
 	SliderEntry bin_factor;
 	SliderEntry bfactor;
-	AnyEntry other_motioncorr_args;
-	BooleanEntry do_save_movies;
-
-	BooleanEntry do_motioncor2;
 	FileNameEntry fn_gain_ref;
+	FileNameEntry fn_defect;
 	AnyEntry patch_x, patch_y;
 	SliderEntry group_frames;
+	FileNameEntry fn_archive;
+	AnyEntry other_motioncor2_args;
+    AnyEntry gpu_ids;
 
-	BooleanEntry do_unblur;
+	// Unblur
+    BooleanEntry do_unblur;
 	FileNameEntry fn_unblur_exe;
+	FileNameEntry fn_summovie_exe;
 
 	// Dose-weighting
 	BooleanEntry do_dose_weighting;
@@ -250,7 +255,6 @@ public:
 	SliderEntry dose_per_frame;
 	SliderEntry pre_exposure;
 
-    AnyEntry gpu_ids;
 
     Fl_Group *unblur_group, *motioncor2_group, *dose_weight_group;
 
@@ -279,18 +283,23 @@ class CtffindJobWindow : public RelionJobWindow
 public:
 
 	InputNodeEntry input_star_mics;
-	FileNameEntry fn_ctffind_exe, fn_gctf_exe;
+	BooleanEntry use_noDW;
+
+	BooleanEntry use_ctffind4;
+	FileNameEntry fn_ctffind_exe;
 	SliderEntry ctf_win;
 	SliderEntry cs, kv, q0, angpix, dast;
 	SliderEntry box, resmin, resmax, dfmin, dfmax, dfstep;
-	BooleanEntry is_ctffind4, do_movie_thon_rings, do_phaseshift;
+	BooleanEntry do_movie_thon_rings, do_phaseshift;
 	SliderEntry avg_movie_frames;
 	AnyEntry phase_min, phase_max, phase_step;
 	AnyEntry movie_rootname;
+
 	BooleanEntry use_gctf, do_ignore_ctffind_params, do_EPA;
+	FileNameEntry fn_gctf_exe;
+	AnyEntry other_gctf_args;
     AnyEntry gpu_ids;
 
-	AnyEntry other_gctf_args;
 
 	Fl_Group *gctf_group, *ctffind4_group, *movie_group, *phaseshift_group;
 
@@ -572,6 +581,70 @@ public:
 };
 
 
+class InitialModelJobWindow : public RelionJobWindow
+{
+public:
+
+	// I/O
+	FileNameEntry fn_cont;
+	InputNodeEntry fn_img;
+
+
+	// Reference
+	SliderEntry nr_iter;
+	SliderEntry sgd_subset_size;
+	SliderEntry sgd_max_subsets;
+	SliderEntry sgd_write_subsets;
+	SliderEntry sgd_sigma2fudge_halflife;
+	SliderEntry sgd_highres_limit;
+
+	// CTF
+	BooleanEntry do_ctf_correction;
+	BooleanEntry ctf_phase_flipped;
+	BooleanEntry ctf_intact_first_peak;
+
+	// Optimisation
+	SliderEntry nr_classes;
+	AnyEntry sym_name;
+	SliderEntry particle_diameter;
+	BooleanEntry do_zero_mask;
+
+	// Sampling
+	RadioEntry sampling;
+	SliderEntry offset_range;
+	SliderEntry offset_step;
+
+	// Compute
+	BooleanEntry do_combine_thru_disc;
+	BooleanEntry do_parallel_discio;
+	SliderEntry nr_pool;
+	BooleanEntry do_preread_images;
+    AnyEntry scratch_dir;
+
+    Fl_Group *ctf_group;
+
+public:
+
+	// Constructor
+    InitialModelJobWindow();
+
+	// Destructor
+	~InitialModelJobWindow(){};
+
+	// write/read settings to disc
+	void write(std::string fn);
+	void read(std::string fn, bool &_is_continue);
+
+	// what happens if you change continue old run radiobutton
+	void toggle_new_continue(bool is_continue);
+
+	// Generate the correct commands
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter);
+
+};
+
+
 class Class3DJobWindow : public RelionJobWindow
 {
 public:
@@ -584,11 +657,6 @@ public:
 	SliderEntry nr_classes;
 
 	// Reference
-	BooleanEntry do_denovo_ref3d;
-	SliderEntry sgd_subset_size;
-	SliderEntry sgd_highres_limit;
-	SliderEntry sgd_write_subsets;
-
 	BooleanEntry ref_correct_greyscale;
 	SliderEntry ini_high;
 	AnyEntry sym_name;
@@ -601,6 +669,9 @@ public:
 
 	// Optimisation
 	SliderEntry nr_iter;
+	SliderEntry subset_size;
+	BooleanEntry do_subsets;
+	SliderEntry max_subsets;
 	SliderEntry tau_fudge;
 	SliderEntry particle_diameter;
 	BooleanEntry do_zero_mask;
@@ -642,7 +713,7 @@ public:
     AnyEntry gpu_ids;
     AnyEntry scratch_dir;
 
-	Fl_Group *denovo_group, *ctf_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
+	Fl_Group *ctf_group, *subset_group, *dont_skip_align_group, *localsearch_group, *helix_group, *helix_symmetry_search_group, *gpu_group;
 
 public:
 

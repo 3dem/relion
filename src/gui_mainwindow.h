@@ -79,6 +79,7 @@ static AutopickJobWindow *job_autopick;
 static ExtractJobWindow *job_extract;
 static SortJobWindow *job_sort;
 static Class2DJobWindow *job_class2d;
+static InitialModelJobWindow *job_inimodel;
 static Class3DJobWindow *job_class3d;
 static Auto3DJobWindow *job_auto3d;
 static MovieRefineJobWindow *job_movierefine;

@@ -71,8 +71,8 @@ extern std::string current_browse_directory;
 #define MENUHEIGHT 30
 #define TABHEIGHT 25
 #define GUIWIDTH 800
-#define GUIHEIGHT_OLD 400
-#define GUIHEIGHT_EXT_START 350
+#define GUIHEIGHT_OLD 420
+#define GUIHEIGHT_EXT_START 370
 #define GUIHEIGHT_EXT_START2 (GUIHEIGHT_EXT_START+MENUHEIGHT+10)
 #define GUIHEIGHT_EXT 800
 #define XCOL0 200
