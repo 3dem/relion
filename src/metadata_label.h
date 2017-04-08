@@ -136,6 +136,7 @@ enum EMDLabel
 
     EMDL_MICROGRAPH_ID,
     EMDL_MICROGRAPH_NAME,
+    EMDL_MICROGRAPH_NAME_WODOSE,
     EMDL_MICROGRAPH_MOVIE_NAME,
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
@@ -218,6 +219,9 @@ enum EMDLabel
     EMDL_OPTIMISER_DO_MAP,
     EMDL_OPTIMISER_DO_SGD,
     EMDL_OPTIMISER_SGD_MU,
+	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI,
+	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE,
+    EMDL_OPTIMISER_SGD_SUBSET_START,
     EMDL_OPTIMISER_SGD_SUBSET_SIZE,
     EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
     EMDL_OPTIMISER_SGD_MAX_SUBSETS,
@@ -519,6 +523,7 @@ private:
 
         EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_LONG, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
@@ -599,6 +604,9 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_MU, EMDL_DOUBLE, "rlnSgdMuFactor", "The mu-parameter that controls the momentum of the SGD gradients");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, EMDL_DOUBLE, "rlnSgdSigma2FudgeInitial", "The variance of the noise will initially be multiplied with this value (larger than 1)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_LONG, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_START, EMDL_INT, "rlnSgdNextSubset", "Number of the next subset to restart this run with");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_LONG, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many subsets the model is written to disk");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_LONG, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");

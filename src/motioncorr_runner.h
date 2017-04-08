@@ -47,26 +47,23 @@ public:
 	// Filenames of all the micrographs to run Motioncorr on
 	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
+	// Use MOTIONCOR2 instead of UNBLUR?
+	bool do_motioncor2;
+
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
 	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;
 
 	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
 	double bin_factor;
 
-	// MOTIONCORR executable
-	FileName fn_motioncorr_exe;
-
-	// B-factor for MOTIONCORR/MOTIONCOR2
+	// B-factor for MOTIONCOR2
 	double bfactor;
 
 	// Also save the aligned movies?
 	bool do_save_movies;
 
 	// Additional arguments that need to be passed to MOTIONCORR
-	FileName fn_other_motioncorr_args;
-
-	// Use MOTIONCOR2 instead of MOTIONCORR?
-	bool do_motioncor2;
+	FileName fn_other_motioncor2_args;
 
 	// MOTIONCOR2 executable
 	FileName fn_motioncor2_exe;
@@ -79,6 +76,12 @@ public:
 
 	// Gain reference file
 	FileName fn_gain_reference;
+
+	// Defect file
+	FileName fn_defect;
+
+	// Archive directory
+	FileName fn_archive;
 
 	// Number of patches in X, Y direction for MOTIONCOR2
 	int patch_x, patch_y;
@@ -124,12 +127,6 @@ public:
 
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
-
-	// Execute MOTIONCORR for a single micrograph
-    bool executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
-
-    // Get the shifts from MOTIONCORR
-    void getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
     // Execute MOTIONCOR2 for a single micrograph
     bool executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
