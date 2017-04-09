@@ -1275,9 +1275,6 @@ void MlOptimiser::initialiseGeneral(int rank)
     if (do_skip_align && do_gpu)
     	REPORT_ERROR("ERROR: you cannot use GPUs when skipping alignments");
 
-    if (do_gpu && do_sgd)
-    	REPORT_ERROR("ERROR: SGD has not been implemented on the GPU yet... If you use several thousands, downscaled particles it will be very quick anyway.");
-
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
 

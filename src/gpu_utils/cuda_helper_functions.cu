@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include "src/gpu_utils/cuda_settings.h"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
+#include "src/gpu_utils/cuda_kernels/BP.cuh"
 #include "src/macros.h"
 #include "src/error.h"
 
@@ -436,6 +437,185 @@ void runWavgKernel(
 	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
+
+void runBackProjectKernel(
+		CudaBackprojector &BP,
+		CudaProjectorKernel &projector,
+		XFLOAT *d_img_real,
+		XFLOAT *d_img_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
+		XFLOAT *trans_z,
+		XFLOAT* d_weights,
+		XFLOAT* d_Minvsigma2s,
+		XFLOAT* d_ctfs,
+		unsigned long translation_num,
+		XFLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT *d_eulers,
+		int imgX,
+		int imgY,
+		int imgZ,
+		unsigned long imageCount,
+		bool data_is_3D,
+		bool do_sgd,
+		cudaStream_t optStream)
+{
+
+	if(BP.mdlZ==1)
+	{
+		cuda_kernel_backproject2D<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+				d_img_real,
+				d_img_imag,
+				trans_x,
+				trans_y,
+				d_weights,
+				d_Minvsigma2s,
+				d_ctfs,
+				translation_num,
+				significant_weight,
+				weight_norm,
+				d_eulers,
+				BP.d_mdlReal,
+				BP.d_mdlImag,
+				BP.d_mdlWeight,
+				BP.maxR,
+				BP.maxR2,
+				BP.padding_factor,
+				imgX,
+				imgY,
+				imgX*imgY,
+				BP.mdlX,
+				BP.mdlInitY);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+	}
+	else
+	{
+		if(do_sgd)
+		{
+			if(data_is_3D)
+				cuda_kernel_backprojectSGD<true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
+					projector,
+					d_img_real,
+					d_img_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					d_weights,
+					d_Minvsigma2s,
+					d_ctfs,
+					translation_num,
+					significant_weight,
+					weight_norm,
+					d_eulers,
+					BP.d_mdlReal,
+					BP.d_mdlImag,
+					BP.d_mdlWeight,
+					BP.maxR,
+					BP.maxR2,
+					BP.padding_factor,
+					imgX,
+					imgY,
+					imgZ,
+					imgX*imgY*imgZ,
+					BP.mdlX,
+					BP.mdlY,
+					BP.mdlInitY,
+					BP.mdlInitZ);
+			else
+				cuda_kernel_backprojectSGD<false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
+					projector,
+					d_img_real,
+					d_img_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					d_weights,
+					d_Minvsigma2s,
+					d_ctfs,
+					translation_num,
+					significant_weight,
+					weight_norm,
+					d_eulers,
+					BP.d_mdlReal,
+					BP.d_mdlImag,
+					BP.d_mdlWeight,
+					BP.maxR,
+					BP.maxR2,
+					BP.padding_factor,
+					imgX,
+					imgY,
+					imgZ,
+					imgX*imgY*imgZ,
+					BP.mdlX,
+					BP.mdlY,
+					BP.mdlInitY,
+					BP.mdlInitZ);
+		}
+		else
+		{
+			if(data_is_3D)
+				cuda_kernel_backproject3D<true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
+					d_img_real,
+					d_img_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					d_weights,
+					d_Minvsigma2s,
+					d_ctfs,
+					translation_num,
+					significant_weight,
+					weight_norm,
+					d_eulers,
+					BP.d_mdlReal,
+					BP.d_mdlImag,
+					BP.d_mdlWeight,
+					BP.maxR,
+					BP.maxR2,
+					BP.padding_factor,
+					imgX,
+					imgY,
+					imgZ,
+					imgX*imgY*imgZ,
+					BP.mdlX,
+					BP.mdlY,
+					BP.mdlInitY,
+					BP.mdlInitZ);
+			else
+				cuda_kernel_backproject3D<false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
+					d_img_real,
+					d_img_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					d_weights,
+					d_Minvsigma2s,
+					d_ctfs,
+					translation_num,
+					significant_weight,
+					weight_norm,
+					d_eulers,
+					BP.d_mdlReal,
+					BP.d_mdlImag,
+					BP.d_mdlWeight,
+					BP.maxR,
+					BP.maxR2,
+					BP.padding_factor,
+					imgX,
+					imgY,
+					imgZ,
+					imgX*imgY*imgZ,
+					BP.mdlX,
+					BP.mdlY,
+					BP.mdlInitY,
+					BP.mdlInitZ);
+		}
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+	}
+}
+
+
 
 __global__ void cuda_kernel_allweights_to_mweights(
 		unsigned long * d_iorient,

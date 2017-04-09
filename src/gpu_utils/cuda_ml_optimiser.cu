@@ -2627,7 +2627,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CTIC(cudaMLO->timer,"backproject");
 
-			cudaMLO->devBundle->cudaBackprojectors[exp_iclass].backproject(
+			runBackProjectKernel(
+				cudaMLO->devBundle->cudaBackprojectors[exp_iclass],
+				projKernel,
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
 				~trans_x,
@@ -2645,6 +2647,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2s[0].zdim,
 				orientation_num,
 				cudaMLO->dataIs3D,
+				baseMLO->do_sgd,
 				cudaMLO->classStreams[exp_iclass]);
 
 			CTOC(cudaMLO->timer,"backproject");
