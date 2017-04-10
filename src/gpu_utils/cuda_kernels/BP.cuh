@@ -509,6 +509,8 @@ __global__ void cuda_kernel_backprojectSGD(
 		Fweight = (XFLOAT) 0.0;
 		real = (XFLOAT) 0.0;
 		imag = (XFLOAT) 0.0;
+		ref_real *= ctf;
+		ref_imag *= ctf;
 
 		XFLOAT temp_real, temp_imag;
 
