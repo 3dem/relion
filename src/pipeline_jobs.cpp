@@ -1915,9 +1915,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
     	RelionJob manualpickjob;
 
-    	FileName fn_job = ".gui_manualpickrun.job";
+    	FileName fn_job = ".gui_manualpick";
 		bool iscont=false;
-		if (exists(fn_job))
+		if (exists(fn_job+"run.job"))
 		{
 			manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
 		}
