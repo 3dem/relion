@@ -594,7 +594,7 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	// Add a little spacer
 	current_y += STEPY/2;
-	place("gpu_ids", TOGGLE_DEACTIVATE);
+	place("gpu_ids");
 
 	// Add a little spacer
 	current_y += STEPY/2;
