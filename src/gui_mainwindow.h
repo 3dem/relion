@@ -18,16 +18,15 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef GUI_MAINWINDOW_H_
-#define GUI_MAINWINDOW_H_
+#ifndef SRC_GUI_MAINWINDOW_H_
+#define SRC_GUI_MAINWINDOW_H_
 #include <FL/Fl_Scroll.H>
 #include "src/gui_jobwindow.h"
-#include "src/gui_entries.h"
 #include "src/pipeliner.h"
+
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <algorithm>
 #include <iostream>
@@ -54,16 +53,15 @@
 #define DONT_MKDIR false
 // font size of browser windows on the main GUI
 #define RLN_FONTSIZE 13
-#define DEFAULTPDFVIEWER "evince"
 
 // Maximum number of jobs in the job-browsers in the pipeline-part of the GUI
 #define MAX_JOBS_BROWSER 50
 
-// This class organises the main winfow of the relion GUI
+
+// This class organises the main window of the relion GUI
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
 static Fl_Group *background_grp;
-static int browse_jobtype[NR_BROWSE_TABS]; // this allow non-consecutive numbering of jobtypes in the job browser
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
@@ -71,25 +69,10 @@ static Fl_XPM_Image *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
-static ImportJobWindow *job_import;
-static MotioncorrJobWindow *job_motioncorr;
-static CtffindJobWindow *job_ctffind;
-static ManualpickJobWindow *job_manualpick;
-static AutopickJobWindow *job_autopick;
-static ExtractJobWindow *job_extract;
-static SortJobWindow *job_sort;
-static Class2DJobWindow *job_class2d;
-static InitialModelJobWindow *job_inimodel;
-static Class3DJobWindow *job_class3d;
-static Auto3DJobWindow *job_auto3d;
-static MovieRefineJobWindow *job_movierefine;
-static ClassSelectJobWindow *job_classselect;
-static MaskCreateJobWindow *job_maskcreate;
-static JoinStarJobWindow *job_joinstar;
-static SubtractJobWindow *job_subtract;
-static PostJobWindow *job_post;
-static PolishJobWindow *job_polish;
-static ResmapJobWindow *job_resmap;
+
+#define GUI_NR_BROWSE_TABS  19
+static JobWindow *gui_jobwindows[GUI_NR_BROWSE_TABS];
+
 // Run button
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
@@ -100,14 +83,10 @@ static Fl_Input *alias_current_job;
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
 
-static FileName fn_settings;
-// Initial screen
-static bool show_initial_screen;
+static void Gui_Timer_CB(void *userdata);
+
 // Read-only GUI?
 static bool maingui_do_read_only;
-
-// A manualpicker jobwindow for display of micrographs....
-static ManualpickJobWindow global_manualpickjob;
 
 // Store all the history
 static PipeLine pipeline;
@@ -183,21 +162,13 @@ private:
 
 };
 
-// Helper function for import/export of scheduled jobs
-void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir,
-		std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern);
-
-static void Timer_CB(void *userdata);
-
-class RelionMainWindow : public Fl_Window
+class GuiMainWindow : public Fl_Window
 {
 
 public:
 
 	// For Tabs
 	Fl_Menu_Bar *menubar, *menubar2;
-	Fl_Tabs *tabs;
-	Fl_Group *tab0, *tab1, *tab2, *tab3, *tab4, *tab5;
 
 	// For clicking in stdout/err windows
 	StdOutDisplay *stdoutbox, *stderrbox;
@@ -213,19 +184,13 @@ public:
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
+	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
 
     // Destructor
-    ~RelionMainWindow(){};
+    ~GuiMainWindow(){ clear(); };
 
-    // Handle events
-    //int handle(int ev);
-
-    // Communicate with the different jobtype objects
-    bool jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job = 0);
-
-    // Add a process to the PipeLine, return the number of the process
-    long int addToPipeLine(int as_status, bool do_overwrite = false, int this_job = 0);
+    // Clear stuff
+    void clear();
 
     // Update the content of the finished, running and scheduled job lists
     void fillRunningJobLists();
@@ -233,21 +198,21 @@ public:
     // Update the content of the input and output job lists for the current job
     void fillToAndFromJobLists();
 
-    // Update all job lists (running, scheduled, finished, as well as to/from)
-    void updateJobLists();
-
-    // When a job is selected from the job browsers at the bottom: set current_job there, load that one in the current window
-    // and update all job lists at the bottom
-    void loadJobFromPipeline();
-
-    // Run scheduled jobs from the pipeliner
-    void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
-
     // Need public access for auto-updating the GUI
     void fillStdOutAndErr();
 
     // Touch the TimeStamp of the last change
     void tickTimeLastChanged();
+
+    // Update all job lists (running, scheduled, finished, as well as to/from)
+    void updateJobLists();
+
+    // When a job is selected from the job browsers at the bottom: set current_job there, load that one in the current window
+    // and update all job lists at the bottom
+    void loadJobFromPipeline(int this_job);
+
+    // Run scheduled jobs from the pipeliner
+    void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
 
 private:
 
@@ -265,7 +230,7 @@ private:
      */
 
     static void cb_select_browsegroup(Fl_Widget*, void*);
-    inline void cb_select_browsegroup_i();
+    inline void cb_select_browsegroup_i(bool is_initial = false);
 
     static void cb_select_finished_job(Fl_Widget*, void*);
     inline void cb_select_finished_job_i();
@@ -375,4 +340,7 @@ private:
     inline void cb_quit_i();
 };
 
-#endif /* GUI_MAINWINDOW_H_ */
+
+
+
+#endif /* SRC_NEWGUI_MAINWINDOW_CPP_ */

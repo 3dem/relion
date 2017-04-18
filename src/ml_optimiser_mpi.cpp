@@ -2452,7 +2452,15 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
 		// And write the resulting model to disc
 		Iunreg.write(fn_root+"_unfil.mrc");
+
 	}
+
+	// rank1 also sends the current_size to the master, so that it knows where to cut the FSC to zero
+	MPI_Status status;
+	if (node->rank == 1)
+		node->relion_MPI_Send(&mymodel.current_size, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+	if (node->rank == 0)
+		node->relion_MPI_Recv(&mymodel.current_size, 1, MPI_INT, 1, MPITAG_INT, MPI_COMM_WORLD, status);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
@@ -2545,10 +2553,13 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			std::cerr << " WARNING: FSC curve between unmasked maps never drops below 0.8. Using unmasked FSC as FSC_true... "<<std::endl;
 			std::cerr << " WARNING: This message should go away during the later stages of refinement!" << std::endl;
 
-			for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(fsc_unmasked); idx++)
-				DIRECT_A1D_ELEM(fsc_unmasked, idx) = 0.;
 			mymodel.fsc_halves_class = fsc_unmasked;
 		}
+
+		// Set fsc_halves_class explicitly to zero beyond the current_size
+		for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(mymodel.fsc_halves_class); idx++)
+			DIRECT_A1D_ELEM(mymodel.fsc_halves_class, idx) = 0.;
+
 	}
 
 	// Now the master sends the fsc curve to everyone else
