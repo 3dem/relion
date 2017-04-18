@@ -1324,14 +1324,14 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	{
 		// Open the note editor window
 		cb_edit_note_i();
+	}
 
-		// Also set alias from the alias_current_job input
-		if (!is_main_continue)
-		{
-			std::string alias= (std::string)alias_current_job->value();
-			if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
-				cb_set_alias_i(alias);
-		}
+	// Also set alias from the alias_current_job input
+	if (!is_main_continue)
+	{
+		std::string alias= (std::string)alias_current_job->value();
+		if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
+			cb_set_alias_i(alias);
 	}
 
 	// Select this job now
@@ -1539,7 +1539,10 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 		if (pipeline.setAliasJob(current_job, alias, error_message))
 			is_done = true;
 		else
+		{
+			alias = "";
 			fl_message(error_message.c_str());
+		}
 	}
 
 }
