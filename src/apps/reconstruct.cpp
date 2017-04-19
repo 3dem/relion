@@ -33,7 +33,7 @@ class reconstruct_parameters
 	MetaDataTable DF;
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y, helical_rise, helical_twist;
-	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, skip_gridding;
+	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, skip_gridding, do_reconstruct_ctf2;
 	float padding_factor;
 	// I/O Parser
 	IOParser parser;
@@ -93,6 +93,7 @@ class reconstruct_parameters
     	fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
     	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
     	ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
+    	do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
     	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
     	do_reconstruct_ctf = (ctf_dim > 0);
     	if (do_reconstruct_ctf)
@@ -347,6 +348,7 @@ class reconstruct_parameters
 						DF.getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y);
 					selfApplyBeamTilt(F2D, beamtilt_x, beamtilt_y, ctf.lambda, ctf.Cs, angpix, mysize);
 				}
+
 			}
 
 			// Subtract reference projection
@@ -379,6 +381,8 @@ class reconstruct_parameters
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 					{
 						DIRECT_MULTIDIM_ELEM(F2D, n)  = DIRECT_MULTIDIM_ELEM(Fctf, n);
+						if (do_reconstruct_ctf2)
+							DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 						DIRECT_MULTIDIM_ELEM(Fctf, n) = 1.;
 					}
 				}
@@ -485,6 +489,19 @@ class reconstruct_parameters
    				A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
    			}
    			vol() *= (RFLOAT)ctf_dim;
+
+   			// Take sqrt(CTF^2)
+   			if (do_reconstruct_ctf2)
+   			{
+   				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(vol())
+				{
+   					if (DIRECT_MULTIDIM_ELEM(vol(), n) > 0.)
+   						DIRECT_MULTIDIM_ELEM(vol(), n) = sqrt(DIRECT_MULTIDIM_ELEM(vol(), n));
+   					else
+   						DIRECT_MULTIDIM_ELEM(vol(), n) = 0.;
+				}
+   			}
+
    		}
 
    		vol.write(fn_out);

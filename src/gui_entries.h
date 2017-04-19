@@ -17,8 +17,10 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#ifndef GUI_ENTRIES_H_
-#define GUI_ENTRIES_H_
+
+#ifndef SRC_GUI_ENTRIES_H_
+#define SRC_GUI_ENTRIES_H_
+
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Text_Display.H>
@@ -47,6 +49,7 @@
 #include "src/macros.h"
 #include "src/strings.h"
 #include "src/filename.h"
+#include "src/pipeline_jobs.h"
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -55,12 +58,15 @@
 #include <cstdio>
 #include <vector>
 #include <iostream>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#define GUI_MAX_RADIO_ELEMENTS 15
 
- // forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
+// forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
 extern std::string current_browse_directory;
+
 
 // Gui layout
 //#define XCOL1 10
@@ -110,16 +116,48 @@ extern std::string current_browse_directory;
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //devel-version
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))
-#
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
 #define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
 
-// Replace a single instance of text in a buffer. Return true if replaced, false otherwise
-bool replaceStringOnce(Fl_Text_Buffer *textbuf, std::string replacethis, std::string replaceby);
-// General utility to replace strings in a text buffer.
-void replaceStringAll(Fl_Text_Buffer *textbuf, std::string replacethis, std::string replaceby);
-void appendLineString(Fl_Text_Buffer *textbuf, std::string copylinewiththis, int times);
+#define TOGGLE_DEACTIVATE 0
+#define TOGGLE_REACTIVATE 1
+#define TOGGLE_ALWAYS_DEACTIVATE 2
+#define TOGGLE_LEAVE_ACTIVE 3
+
+static Fl_Menu_Item fl_sampling_options[] = {
+		      {job_sampling_options[0]},
+		      {job_sampling_options[1]},
+		      {job_sampling_options[2]},
+		      {job_sampling_options[3]},
+		      {job_sampling_options[4]},
+		      {job_sampling_options[5]},
+		      {job_sampling_options[6]},
+		      {job_sampling_options[7]},
+		      {job_sampling_options[8]},
+		      {0} // this should be the last entry
+};
+
+static Fl_Menu_Item fl_node_type_options[] = {
+			  {job_nodetype_options[0]},
+			  {job_nodetype_options[1]},
+			  {job_nodetype_options[2]},
+			  {job_nodetype_options[3]},
+			  {job_nodetype_options[4]},
+			  {job_nodetype_options[5]},
+			  {job_nodetype_options[6]},
+			  {job_nodetype_options[7]},
+			  {job_nodetype_options[8]},
+			  {job_nodetype_options[9]},
+		      {0} // this should be the last entry
+};
+
+static Fl_Menu_Item bool_options[] = {
+			      {"Yes"},
+			      {"No"},
+			      {0} // this should be the last entry
+			      };
+
 
 // A text to Float converter that raises an error window.
 float fltkTextToFloat(const char* str);
@@ -137,268 +175,28 @@ public:
 };
 
 
-static Fl_Menu_Item bool_options[] = {
-			      {"Yes"},
-			      {"No"},
-			      {0} // this should be the last entry
-			      };
-
-class textOnlyEntry{
+class GuiEntry{
 
 public:
-	Fl_Text_Display* mydisp;
-	Fl_Text_Buffer *textbuff;
-	bool has_been_set;
 
-	textOnlyEntry()
-	{
-		has_been_set=false;
-	}
-	~textOnlyEntry(){};
+	// What to do upon toggle of continue button
+	int deactivate_option;
 
-	void initialise(int x, int y, int width, int height, const char* text)
-	{
-		mydisp = new Fl_Text_Display(XCOL1, y, width, height);
-		textbuff = new Fl_Text_Buffer();
-		textbuff->text(text);
-		mydisp->buffer(textbuff);
-		mydisp->color(GUI_BACKGROUND_COLOR);
-		has_been_set=true;
-	}
-
-	void place(int &y,
-			const char* text,
-			int width= WCOL1 + WCOL2 + WCOL3, int height = STEPY + 6, int x = XCOL1)
-	{
-	    // Clear if existing
-		clear();
-
-		// Add the entry to the window
-		// Add 3 to step_y, otherwise the text may not fit...
-		initialise(x, y, width, height, text);
-
-	    // Update the Y-coordinate
-	    y += height + 2;
-
-
-	}
-
-	void clear()
-	{
-		if (has_been_set)
-		{
-			delete mydisp;
-			delete textbuff;
-			has_been_set = false;
-		}
-	}
-};
-
-/** This is the main class to generate input entry-lines in the Gui windows.
- *  It implements three columns to be displayed:
- *  1. box with the label
- *  2. Input field with the input value
- *  3. Help button that pops up a window with additional help text
- *
- *  All specific entries (e.g. to get FileName, Boolean, etc. inherit from this class)
- *
- *
- */
-class AnyEntry{
-
-public:
-    // Input value storage
+	// Input value storage
 	Fl_Input* inp;
 
-	// Label
-	std::string label;
-
-	std::string label_full;
+	// JobOption
+	JobOption joboption;
 
     // Button to show additional help text
 	Fl_Button* help;
 
-	// The additional help text
-    const char *myhelptext;
+	////////////// FileName entry
 
-    /** Constructor with x,y-position from top left
-	 *  wcol1, wcol2 and wcol3 are the widths of the three columns described above
-	 *  title is the value displayed in the first column
-	 *  defaultvalue is what will appear by default in the input value
-	 *  help is the additional help text. If it is set to NULL, no help button will be displayed
-	 */
-	AnyEntry()
-    {
-		inp = NULL;
-		help = NULL;
-		myhelptext = NULL;
-		label = "";
-		label_full = "";
-    };
-
-    /** Empty destructor
-     */
-	~AnyEntry()
-	{
-		if (inp)
-		{
-			delete inp;
-			inp = NULL;
-		}
-		if (help)
-		{
-			delete help;
-			help = NULL;
-		}
-	};
-
-	/** Here really start the entry
-	 */
-	void initialise(int x, int y, int height, int wcol2, int wcol3, const char* title, const char* defaultvalue = NULL, const char* help = NULL);
-
-	/** Place an entry on a window
-	 */
-	void place(int &y,
-				const char * title,
-				const char* defaultvalue = NULL,
-				const char* helptext = NULL,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
-
-	void placeOnSameYPosition(int y,
-				const char * title,
-				const char * title_full,
-				const char* defaultvalue = NULL,
-				const char* helptext = NULL,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
-
-	// Get the value
-    std::string getValue();
-
-    // Set the value
-    void setValue(const char* inp);
-
-    // Clear this entry
-	void clear();
-
-    // Deactivate this entry if the input boolean is true
-    void deactivate(bool do_deactivate = true);
-
-    // Save the value to a file
-    void writeValue(std::ostream& out);
-
-    // Read the value from a file
-    void readValue(std::ifstream& in);
-
-    /** Call-back functions for the help button
-     *  The method of using two functions of static void and inline void was copied from:
-     *  http://www3.telus.net/public/robark/
-     */
-    static void cb_help(Fl_Widget*, void*);
-    void cb_help_i();
-};
-
-
-// Get a FileName value from the user (with browse button).
-class FileNameEntry: public AnyEntry
-{
-
-public:
 	// Browse button
     Fl_Button* browse;
 
-    const char* pattern;
-    const char* directory;
-
-    // Constructor (with 4 column widths)
-	FileNameEntry() {};
-
-    // Destructor
-	~FileNameEntry(){};
-
-	void initialise(int x, int y, int height,
-    		int wcol2, int wcol3, int wcol4,
-    		const char* title,
-    		const char* defaultvalue,
-    		const char* _pattern = "",
-    		const char* _directory = NULL,
-    		const char* help = NULL);
-
-	// places on one the window
-	void place(int &y,
-				const char * title,
-				const char* defaultvalue,
-				const char* pattern,
-	    		const char* _directory,
-				const char* helptext,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
-
-    // Clear this entry
-	void clear();
-
-	// Deactivate this entry if the input boolean is true
-    void deactivate(bool do_deactivate = true);
-
-
-private:
-    // Call-back functions for the browse button
-    static void cb_browse(Fl_Widget*, void*);
-    void cb_browse_i();
-
-};
-
-class InputNodeEntry: public FileNameEntry
-{
-
-public:
-    // Type of this node
-    int type;
-
-    //Output from which process?
-    std::string output_from;
-
-    // Constructor (with 4 column widths)
-	InputNodeEntry() {};
-
-    // Destructor
-	~InputNodeEntry(){};
-
-	void initialise(int x, int y, int height,
-    		int wcol2, int wcol3, int wcol4,
-    		const char* title,
-    		int _type,
-    		const char* defaultvalue,
-    		const char* _pattern = "",
-    		const char* help = NULL);
-
-	// places on one the window
-	void place(int &y,
-				const char * title,
-				int _type,
-				const char* defaultvalue = NULL,
-				const char* pattern = "",
-				const char* helptext = NULL,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
-
-    // Clear this entry
-	void clear();
-
-	// Deactivate this entry if the input boolean is true
-    void deactivate(bool do_deactivate = true);
-
-
-private:
-    // Call-back functions for the browse button
-    static void cb_browse_node(Fl_Widget*, void*);
-    void cb_browse_node_i();
-
-};
-
-
-
-// Get an entry from a list of possible values from the user.
-class RadioEntry: public AnyEntry
-{
-public:
+    ////////////// Radio entry
 
     // The choices
     Fl_Choice * choice;
@@ -407,131 +205,80 @@ public:
     // Deactivate this group
     Fl_Group * my_deactivate_group;
 
-    // Constructor
-    RadioEntry(){};
+    ////////////// Slider entry
 
-    // Destructor
-    ~RadioEntry(){};
-
-    void initialise(int x, int y, int height,
-				 int wcol2, int wcol3, int wcol4,
-				 const char* title,
-				 Fl_Menu_Item *options,
-				 Fl_Menu_Item* defaultvalue,
-				 const char* help = NULL,
-				 Fl_Group * deactivate_this_group = NULL);
-
-    void place(int &y,
-				const char * title,
-				Fl_Menu_Item *options,
-				Fl_Menu_Item* defaultvalue,
-				const char* helptext = NULL,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
-
-    // Clear this entry
-	void clear();
-
-	// Deactivate this entry if the input boolean is true
-    void deactivate(bool do_deactivate = true);
-
-    // Get the value
-    std::string getValue();
-
-    // Read the value from a file
-    void readValue(std::ifstream& in);
-
-	void call_menu_i()
-    {
-        cb_menu_i();
-    }
-
-public: // this one is public so that it can be called in mainwindow to deactivate default groups
-    static void cb_menu(Fl_Widget*, void*);
-    void cb_menu_i();
-};
-
-class BooleanEntry: public RadioEntry
-{
-public:
-	// Constructor
-	BooleanEntry(){};
-
-	// Destructor
-    ~BooleanEntry(){};
-
-    void initialise(int x, int y, int height,
-				 int wcol2, int wcol3, int wcol4,
-				 const char* title,
-				 bool defaultvalue,
-				 const char* help = NULL,
-				 Fl_Group * deactivate_this_group = NULL);
-
-    void place(int &y,
-				const char * title,
-				bool defaultvalue = true,
-				const char* help = NULL,
-				Fl_Group * deactivate_this_group = NULL,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
-
-    // Get the value
-    bool getValue();
-
-
-};
-
-class SliderEntry:  public RadioEntry
-{
-
-public:
     // The slider
     Fl_Slider * slider;
 
-    // Constructor
-	SliderEntry(){};
+    /** Constructor with x,y-position from top left
+	 *  wcol1, wcol2 and wcol3 are the widths of the three columns described above
+	 *  title is the value displayed in the first column
+	 *  defaultvalue is what will appear by default in the input value
+	 *  help is the additional help text. If it is set to NULL, no help button will be displayed
+	 */
+    GuiEntry()
+    {
+    	deactivate_option = -1;
+    	inp = NULL;
+		help = NULL;
+		browse = NULL;
+		choice = NULL;
+		menu = NULL;
+		my_deactivate_group = NULL;
+		slider = NULL;
+    };
 
-	// Destructor
-    ~SliderEntry(){};
-
-    void initialise(int x, int y, int height,
-				 int wcol2, int wcol3, int wcol4,
-				 const char* title,
-				 float defaultvalue,
-                 float minvalue,
-                 float maxvalue,
-                 float valuestep,
-				 const char* help = NULL);
-
-    void place(int &y,
-				const char* title,
-				float defaultvalue,
-				float minvalue,
-				float maxvalue,
-				float valuestep,
-				const char* help,
-				int x = XCOL1, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3, int wcol4 = WCOL4 );
+    /** Empty destructor
+     */
+	~GuiEntry() { clear(); }
 
     // Clear this entry
 	void clear();
 
-	// Deactivate this entry if the input boolean is true
+	/** Here really start the entry
+	 */
+	void initialise(int x, int y, Fl_Group * deactivate_this_group, int height, int wcol2, int wcol3);
+
+	/** Place an entry on a window
+	 */
+	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL,
+			int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
+
+    // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
+    void setValue(std::string _value);
+
+    // Deactivate this entry if the input boolean is true
     void deactivate(bool do_deactivate = true);
 
-    // Get the value
-    float getValue();
+    /** Call-back functions for the help button
+     *  The method of using two functions of static void and inline void was copied from:
+     *  http://www3.telus.net/public/robark/
+     */
+    static void cb_help(Fl_Widget*, void*);
+    void cb_help_i();
 
-    // Read the value from a file
-    void readValue(std::ifstream& in);
+    // Call-back functions for the browse button
+    static void cb_browse(Fl_Widget*, void*);
+    void cb_browse_i();
 
+    // Call-back functions for the browse button
+    static void cb_browse_node(Fl_Widget*, void*);
+    void cb_browse_node_i();
 
-private:
+    // Call-back functions for the menu
+    static void cb_menu(Fl_Widget*, void*);
+    void cb_menu_i();
+
+    // Call-back functions for the slider
     static void cb_slider(Fl_Widget*, void*);
     void cb_slider_i();
 
     static void cb_input(Fl_Widget*, void*);
     void cb_input_i();
 
-
 };
 
 
-#endif /* GUI_ENTRIES_H_ */
+
+
+#endif /* SRC_NEWGUI_ENTRIES_H_ */

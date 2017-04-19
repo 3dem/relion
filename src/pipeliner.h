@@ -22,100 +22,12 @@
 #define PIPELINER_H_
 #include <iostream>
 #include <sstream>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include "src/metadata_table.h"
-
-
-//forward declaration
-class Process;
-
-/*
- * The Node class represents data and metadata that are either input to or output from Processes
- * Nodes are connected to each by Edges:
- * - the fromEdgeList are connections with Nodes earlier (higher up) in the pipeline
- * - the toEdgeList are connections with Nodes later (lower down) in the pipeline
- *
- * Nodes could be of the following types:
- */
-
-#define NODE_MOVIES			0 // 2D micrograph movie(s), e.g. Falcon001_movie.mrcs or micrograph_movies.star
-#define NODE_MICS			1 // 2D micrograph(s), possibly with CTF information as well, e.g. Falcon001.mrc or micrographs.star
-#define NODE_MIC_COORDS		2 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)
-#define NODE_PART_DATA		3 // A metadata (STAR) file with particles (e.g. particles.star or run1_data.star)
-#define NODE_MOVIE_DATA		4 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
-#define NODE_2DREFS       	5 // A STAR file with one or multiple 2D references, e.g. autopick_references.star
-#define NODE_3DREF       	6 // A single 3D-reference, e.g. map.mrc
-#define NODE_MASK			7 // 3D mask, e.g. mask.mrc or masks.star
-#define NODE_MODEL		    8 // A model STAR-file for class selection
-#define NODE_OPTIMISER		9 // An optimiser STAR-file for job continuation
-#define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
-#define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
-#define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
-#define NODE_PDF_LOGFILE    13//PDF logfile
-
-class Node
-{
-	public:
-	std::string name; // what's my name?
-	int type; // which type of node am I?
-	std::vector<long int> inputForProcessList; 	  //list of processes that use this Node as input
-	long int outputFromProcess;   //Which process made this Node
-
-	// Constructor
-	Node(std::string _name, int _type)
-	{
-		name = _name;
-		type = _type;
-		outputFromProcess = -1;
-	}
-
-	// Destructor
-	// Do not delete the adjacent nodes here... They will be deleted by graph destructor
-	~Node()
-	{
-		inputForProcessList.clear();
-	}
-
-};
-
-/*
- * The Process class represents tasks/jobs
- * A Process converts input Nodes into output Nodes, thereby generating an Edge between them (so each Edge has an associated Process)
- * A Process connects one or more input Nodes to one or more output Nodes
- * An Edge is added from each input Node to each Output node
- *
- * Processes could be of the following types:
- */
-
-
-// This order defines the order of the process browser in the GUI!
-// TODO:#define PROC_IMPORT      	1 // Import any node into the pipeline (by reading them from external files)
-#define PROC_IMPORT         0 // Import any file as a Node of a given type
-#define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
-#define PROC_CTFFIND	    2 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK		3 // Manually pick particle coordinates from micrographs
-#define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
-#define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_SORT           6 // Sort particles based on their Z-scores
-#define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
-#define PROC_2DCLASS		8 // 2D classification (from input particles)
-#define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO	        10 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			11// Particle-polishing (from movie-particles)
-#define PROC_MASKCREATE     12// Process to create masks from input maps
-#define PROC_JOINSTAR       13// Process to create masks from input maps
-#define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
-#define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
-#define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
-#define NR_BROWSE_TABS      19
-
-// Status a Process may have
-#define PROC_RUNNING   0
-#define PROC_SCHEDULED_NEW 1
-#define PROC_FINISHED  2
-#define PROC_SCHEDULED_CONT 3
-
+#include "src/pipeline_jobs.h"
+#define DEFAULTPDFVIEWER "evince"
 
 class Process
 {
@@ -148,7 +60,10 @@ class Process
 
 #define DO_LOCK true
 #define DONT_LOCK false
+// Forward definition
+class PipeLineFlowChart;
 
+#define PIPELINE_HAS_CHANGED ".pipeline_has_changed"
 class PipeLine
 {
 
@@ -219,8 +134,55 @@ class PipeLine
 	// Re-make entries of all NodeNames in the hidden .Nodes directory (for file browsing for InputNode I/O)
 	void remakeNodeDirectory();
 
-	// Check for process completion by cheking for the presence of all outputNode filenames
-	void checkProcessCompletion();
+	// Check for process completion by checking for the presence of all outputNode filenames
+	// Returns true if any of the running processes has completed, false otherwise
+	bool checkProcessCompletion();
+
+	// Get the command line arguments for thisjob
+	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
+			std::string &final_command, std::string &error_message);
+
+	// Adds _job to the pipeline and return the id of the newprocess
+	long int addJob(RelionJob &_job, int as_status, bool do_overwrite);
+
+	// Runs a job and adds it to the pipeline
+	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
+
+	// Runs a series of scheduled jobs, possibly in a loop
+	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
+
+	// If I'm deleting this_job from the pipeline, which Nodes and which Processes need to be deleted?
+	void deleteJobGetNodesAndProcesses(int this_job, bool do_recursive, std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);
+
+	// Given the lists of which Nodes and Processes to delete, now do the actual deleting
+	void deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);
+
+	// Changes the status of this_job to finished in the pipeline, returns false is job hadn't started yet
+	bool markAsFinishedJob(int this_job, std::string &error_message);
+
+	// Set the alias for a job, return true for success, false otherwise
+	bool setAliasJob(int this_job, std::string alias, std::string &error_message);
+
+	// Make the flowchart for this job
+	bool makeFlowChart(long int current_job, bool do_display_pdf, std::string &error_message);
+
+	// Undelete a JOb from the pipeline
+	void undeleteJob(FileName fn_undel);
+
+	// Clean up intermediate files from this_job
+	bool cleanupJob(int this_job, bool do_harsh, std::string &error_message);
+
+	// Clean upintermediate files from all jobs in the pipeline
+	bool cleanupAllJobs(bool do_harsh, std::string &error_message);
+
+	void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir,
+			std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern);
+
+	// Export all scheduled jobs
+	bool exportAllScheduledJobs(std::string mydir, std::string &error_message);
+
+	// Import previously exported jobs
+	void importJobs(FileName fn_export);
 
 	// Import a job into the pipeline
 	// Return true if at least one process is imported correctly
@@ -231,9 +193,6 @@ class PipeLine
 
 	// Read in the pipeline from a STAR file
 	void read(bool do_lock = false);
-
-	// Make LaTeX and TikZ-based flowcharts
-	void makeUpwardsFlowChart(long int from_process);
 
 };
 
@@ -251,6 +210,8 @@ public:
 
 	// All the processes for which a upwardFlowChart will be made
 	std::vector<long int> todo_list;
+
+public:
 
 	PipeLineFlowChart()
 	{
@@ -286,6 +247,5 @@ public:
 
 
 };
-
 
 #endif /* PIPELINER_H_ */
