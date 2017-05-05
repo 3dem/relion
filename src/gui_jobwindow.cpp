@@ -895,7 +895,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group3->end();
-    place("use_gpu", TOGGLE_DEACTIVATE, group3);
+    place("use_gpu", TOGGLE_LEAVE_ACTIVE, group3);
 
     group3->begin();
 	place("gpu_ids");
