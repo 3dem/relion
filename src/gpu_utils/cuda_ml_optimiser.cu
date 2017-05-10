@@ -15,6 +15,8 @@
 #include "src/gpu_utils/cuda_kernels/wavg.cuh"
 #include "src/gpu_utils/cuda_helper_functions.cuh"
 #include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/utilities.h"
+#include "src/acc/acc_ptr.h"
 #include "src/complex.h"
 #include "src/helix.h"
 #include "src/error.h"
@@ -268,32 +270,62 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		my_old_offset.selfROUND();
 
 		int img_size = img.data.nzyxdim;
-		CudaGlobalPtr<XFLOAT> d_img(img_size,0,cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> temp(img_size,0,cudaMLO->devBundle->allocator);
-		d_img.device_alloc();
-		temp.device_alloc();
-		d_img.device_init(0);
+
+
+
+
+		/*
+		 * Example usage of AccPtr and AccUtilities library function
+		 */
+
+
+		AccPtr<XFLOAT,ACC_CUDA> d_img_(img_size,cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT,ACC_CUDA> temp_(img_size,cudaMLO->devBundle->allocator);
+
+		d_img_.acc_alloc();
+		d_img_.acc_init(0);
+		temp_.host_alloc();
+		temp_.device_alloc();
 
 		for (int i=0; i<img_size; i++)
-			temp[i] = img.data.data[i];
+			temp_[i] = img.data.data[i];
 
-		temp.cp_to_device();
-		temp.streamSync();
+		temp_.cp_to_device();
+		temp_.streamSync();
+//		temp_.free_host();
 
-		int STBsize = ( (int) ceilf(( float)img_size /(float)BLOCK_SIZE));
 		// Apply the norm_correction term
 		if (baseMLO->do_norm_correction)
 		{
 			CTIC(cudaMLO->timer,"norm_corr");
-			cuda_kernel_multi<<<STBsize,BLOCK_SIZE>>>(
-									~temp,
-									(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr),
-									img_size);
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-			temp.streamSync();
+			AccUtilities::multiply(temp_,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
+			temp_.streamSync();
 			CTOC(cudaMLO->timer,"norm_corr");
 		}
 
+
+		/*
+		 * Setup continueation in ordinary GPU pipeline
+		 */
+
+
+		CudaGlobalPtr<XFLOAT> d_img(img_size,0,cudaMLO->devBundle->allocator);
+		CudaGlobalPtr<XFLOAT> temp(img_size,0,cudaMLO->devBundle->allocator);
+		d_img.device_alloc();
+		temp.device_alloc();
+		d_img_.cp_on_device(~d_img);
+		temp_.cp_on_device(~temp);
+		d_img.streamSync();
+
+
+
+		/*
+		 * Continue ordinary pipeline
+		 */
+
+
+
+		int STBsize = ( (int) ceilf(( float)img_size /(float)BLOCK_SIZE));
 
 		// Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
 		// For helices do NOT apply old_offset along the direction of the helix!!
