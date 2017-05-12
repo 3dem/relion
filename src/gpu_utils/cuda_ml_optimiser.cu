@@ -34,6 +34,7 @@
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+template <int accType>
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
@@ -269,64 +270,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Apply (rounded) old offsets first
 		my_old_offset.selfROUND();
 
-		int img_size = img.data.nzyxdim;
-
-
-
-
-		/*
-		 * Example usage of AccPtr and AccUtilities library function
-		 */
-
-
-		AccPtr<XFLOAT,ACC_CUDA> d_img_(img_size,cudaMLO->devBundle->allocator);
-		AccPtr<XFLOAT,ACC_CUDA> temp_(img_size,cudaMLO->devBundle->allocator);
-
-		d_img_.acc_alloc();
-		d_img_.acc_init(0);
-		temp_.host_alloc();
-		temp_.device_alloc();
-
-		for (int i=0; i<img_size; i++)
-			temp_[i] = img.data.data[i];
-
-		temp_.cp_to_device();
-		temp_.streamSync();
-//		temp_.free_host();
-
-		// Apply the norm_correction term
-		if (baseMLO->do_norm_correction)
-		{
-			CTIC(cudaMLO->timer,"norm_corr");
-			AccUtilities::multiply(temp_,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
-			temp_.streamSync();
-			CTOC(cudaMLO->timer,"norm_corr");
-		}
-
-
-		/*
-		 * Setup continueation in ordinary GPU pipeline
-		 */
-
-
-		CudaGlobalPtr<XFLOAT> d_img(img_size,0,cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> temp(img_size,0,cudaMLO->devBundle->allocator);
-		d_img.device_alloc();
-		temp.device_alloc();
-		d_img_.cp_on_device(~d_img);
-		temp_.cp_on_device(~temp);
-		d_img.streamSync();
-
-
-
-		/*
-		 * Continue ordinary pipeline
-		 */
-
-
-
-		int STBsize = ( (int) ceilf(( float)img_size /(float)BLOCK_SIZE));
-
 		// Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
 		// For helices do NOT apply old_offset along the direction of the helix!!
 		Matrix1D<RFLOAT> my_old_offset_helix_coords;
@@ -359,60 +302,92 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, rot_deg, tilt_deg, psi_deg, HELICAL_TO_CART_COORDS);
 		}
 
-
 		my_old_offset.selfROUND();
-		CTIC(cudaMLO->timer,"kernel_translate");
-		if(cudaMLO->dataIs3D)
-			cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
-								~temp,  // translate from temp...
-								~d_img, // ... into d_img
-								img_size,
-								img.data.xdim,
-								img.data.ydim,
-								img.data.zdim,
-								XX(my_old_offset),
-								YY(my_old_offset),
-								ZZ(my_old_offset));
-		else
-			cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
-								~temp,  // translate from temp...
-								~d_img, // ... into d_img
-								img_size,
-								img.data.xdim,
-								img.data.ydim,
-								XX(my_old_offset),
-								YY(my_old_offset));
-		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
-		CTOC(cudaMLO->timer,"kernel_translate");
 
-		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images) //rec_img is NOT norm_corrected in the CPU-code, so nor do we.
+		int img_size = img.data.nzyxdim;
+
+
+
+
+
+
+		/*
+		 * Example usage of AccPtr and AccUtilities library function
+		 */
+
+		AccPtr<XFLOAT,accType> temp(img.data, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT,accType> d_img_(img.data,cudaMLO->devBundle->allocator);
+
+		d_img_.acc_alloc();
+		d_img_.acc_init(0);
+
+		temp.host_alloc();
+
+		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 		{
 			for (int i=0; i<img_size; i++)
 				temp[i] = rec_img.data.data[i];
-			temp.cp_to_device();
-			temp.streamSync();
-			if(cudaMLO->dataIs3D)
-				cuda_kernel_translate3D<<<STBsize,BLOCK_SIZE>>>(
-									~temp,  // translate from temp...
-									~d_img, // ... into d_img
-									img_size,
-									img.data.xdim,
-									img.data.ydim,
-									img.data.zdim,
-									XX(my_old_offset),
-									YY(my_old_offset),
-									ZZ(my_old_offset));
-			else
-				cuda_kernel_translate2D<<<STBsize,BLOCK_SIZE>>>(
-									~temp,  // translate from temp...
-									~d_img, // ... into d_img
-									img_size,
-									img.data.xdim,
-									img.data.ydim,
-									XX(my_old_offset),
-									YY(my_old_offset));
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+
+			temp.put_on_device();
+
+			// rec_img is NOT norm_corrected in the non-accelerated-code, so nor do we. TODO Dari: Sure, but should we?
 		}
+		else
+		{
+			for (int i=0; i<img_size; i++)
+				temp[i] = img.data.data[i];
+
+			temp.put_on_device();
+
+			// Apply the norm_correction term
+			if (baseMLO->do_norm_correction)
+				AccUtilities::multiply(temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
+		}
+
+		if(cudaMLO->dataIs3D)
+			AccUtilities::translate3D(
+				temp,  // translate from temp...
+				d_img_, // ... into d_img
+				img.data.xdim,
+				img.data.ydim,
+				img.data.zdim,
+				XX(my_old_offset),
+				YY(my_old_offset),
+				ZZ(my_old_offset));
+		else
+			AccUtilities::translate2D(
+				temp,  // translate from temp...
+				d_img_, // ... into d_img
+				img.data.xdim,
+				img.data.ydim,
+				XX(my_old_offset),
+				YY(my_old_offset));
+
+
+		/*
+		 * Setup continuation into ordinary GPU pipeline
+		 */
+
+
+		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
+		CudaGlobalPtr<XFLOAT> d_img(img_size,cudaMLO->devBundle->allocator);
+		d_img.device_alloc();
+
+		if (accType == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
+			d_img_.cp_on_device(~d_img);
+		else
+			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.get_h_ptr(), ~d_img, img_size, d_img.getStream());
+
+		d_img.streamSync();
+
+
+		/*
+		 * Continue ordinary pipeline
+		 */
+
+
+
+
 
 		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 		{
@@ -3128,7 +3103,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
 			CTIC(timer,"getFourierTransformsAndCtfs");
-			getFourierTransformsAndCtfs(my_ori_particle, op, sp, baseMLO, this);
+			getFourierTransformsAndCtfs<ACC_CUDA>(my_ori_particle, op, sp, baseMLO, this);
 			CTOC(timer,"getFourierTransformsAndCtfs");
 
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
