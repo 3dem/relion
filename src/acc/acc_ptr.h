@@ -38,7 +38,7 @@ static void HandleAccPtrDebugFatal( const char *err, const char *file, int line 
 		raise(SIGSEGV);
 }
 
-template <typename T, int accType = ACC_CPU, bool CustomAlloc = true>
+template <typename T, int AccT = ACC_CPU>
 class AccPtr
 {
 	CudaCustomAllocator *allocator;
@@ -181,7 +181,7 @@ public:
 
 	void setStream(cudaStream_t s)
 	{
-		if (accType == ACC_CPU)
+		if (AccT == ACC_CPU)
 			stream = s;
 	};
 
@@ -196,7 +196,7 @@ public:
 
 	void setAllocator(CudaCustomAllocator *a)
 	{
-		if (accType == ACC_CPU)
+		if (AccT == ACC_CPU)
 		{
 			free_device_if_set();
 			allocator = a;
@@ -205,7 +205,7 @@ public:
 
 	void markReadyEvent()
 	{
-		if (accType == ACC_CPU)
+		if (AccT == ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (alloc == NULL)
@@ -217,7 +217,7 @@ public:
 
 	void setDevPtr(T *ptr)
 	{
-		if (accType == ACC_CPU)
+		if (AccT == ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_do_free)
@@ -229,7 +229,7 @@ public:
 
 	void setDevPtr(const AccPtr<T> &ptr)
 	{
-		if (accType == ACC_CPU)
+		if (AccT == ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (ptr.d_ptr == NULL)
@@ -263,7 +263,7 @@ public:
 	inline
 	void device_alloc()
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if(size==0)
@@ -272,13 +272,11 @@ public:
 				ACC_PTR_DEBUG_FATAL("Device double allocation.\n");
 #endif
 			d_do_free = true;
-			if (CustomAlloc)
-			{
-				alloc = allocator->alloc(size * sizeof(T));
-				d_ptr = (T*) alloc->getPtr();
-			}
-			else
-				DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
+
+			alloc = allocator->alloc(size * sizeof(T));
+			d_ptr = (T*) alloc->getPtr();
+
+//			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
 		}
 	}
 
@@ -336,7 +334,7 @@ public:
 	inline
 	void acc_alloc()
 	{
-		if (accType == ACC_CUDA)
+		if (AccT == ACC_CUDA)
 			device_alloc();
 		else
 			host_alloc();
@@ -346,7 +344,7 @@ public:
 	void acc_alloc(size_t newSize)
 	{
 		size = newSize;
-		if (accType == ACC_CUDA)
+		if (AccT == ACC_CUDA)
 			device_alloc(newSize);
 		else
 			host_alloc(newSize);
@@ -377,7 +375,7 @@ public:
 	inline
 	void device_init(int value)
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -402,7 +400,7 @@ public:
 	inline
 	void acc_init(int value)
 	{
-		if (accType == ACC_CUDA)
+		if (AccT == ACC_CUDA)
 			device_init(value);
 		else
 			host_init(value);
@@ -414,7 +412,7 @@ public:
 	inline
 	void cp_to_device()
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -432,7 +430,7 @@ public:
 	inline
 	void cp_to_device(T * hostPtr)
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (hostPtr == NULL)
@@ -471,7 +469,7 @@ public:
 	inline
 	void cp_to_host()
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -489,7 +487,7 @@ public:
 	inline
 	void cp_to_host(size_t thisSize)
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -507,7 +505,7 @@ public:
 	inline
 	void cp_to_host(T* hstPtr, size_t thisSize)
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -525,7 +523,7 @@ public:
 	inline
 	void cp_to_host_on_stream(cudaStream_t s)
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -566,7 +564,7 @@ public:
 	inline
 	void cp_on_acc(T * dstDevPtr)
 	{
-		if (accType == ACC_CUDA)
+		if (AccT == ACC_CUDA)
 			cp_on_device(dstDevPtr);
 		else
 			cp_on_host(dstDevPtr);
@@ -575,7 +573,7 @@ public:
 	inline
 	void cp_on_acc(AccPtr<T> &devPtr)
 	{
-		if (accType == ACC_CUDA)
+		if (AccT == ACC_CUDA)
 			cp_on_device(devPtr.d_ptr);
 		else
 			cp_on_host(devPtr.h_ptr);
@@ -641,7 +639,7 @@ public:
 	inline
 	T* operator~()
 	{
-		if (accType == ACC_CUDA)
+		if (AccT == ACC_CUDA)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
@@ -662,14 +660,14 @@ public:
 	inline
 	void streamSync()
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
 	}
 
 	inline
 	T getAccValueAt(size_t idx)
 	{
-		if (accType == ACC_CPU)
+		if (AccT == ACC_CPU)
 			return h_ptr[idx];
 		else
 		{
@@ -710,23 +708,21 @@ public:
 	inline
 	void free_device()
 	{
-		if (accType != ACC_CPU)
+		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (d_ptr == NULL)
 				ACC_PTR_DEBUG_FATAL("Free device memory was called on NULL pointer in free_device().\n");
 #endif
 			d_do_free = false;
-			if (CustomAlloc)
-			{
-				if (alloc->getReadyEvent() == 0)
-					alloc->markReadyEvent(stream);
-				alloc->doFreeWhenReady();
 
-				alloc = NULL;
-			}
-			else
-				DEBUG_HANDLE_ERROR(cudaFree(d_ptr));
+			if (alloc->getReadyEvent() == 0)
+				alloc->markReadyEvent(stream);
+			alloc->doFreeWhenReady();
+			alloc = NULL;
+
+//			DEBUG_HANDLE_ERROR(cudaFree(d_ptr));
+
 			d_ptr = NULL;
 		}
 	}

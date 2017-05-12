@@ -16,6 +16,7 @@
 #include "src/gpu_utils/cuda_helper_functions.cuh"
 #include "src/gpu_utils/cuda_mem_utils.h"
 #include "src/acc/utilities.h"
+#include "src/acc/data_types.h"
 #include "src/acc/acc_ptr.h"
 #include "src/complex.h"
 #include "src/helix.h"
@@ -34,7 +35,7 @@
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-template <int accType>
+template <int AccT>
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
@@ -315,8 +316,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		 * Example usage of AccPtr and AccUtilities library function
 		 */
 
-		AccPtr<XFLOAT,accType> temp(img.data, cudaMLO->devBundle->allocator);
-		AccPtr<XFLOAT,accType> d_img_(img.data,cudaMLO->devBundle->allocator);
+		AccDataTypes::Image<XFLOAT,AccT> temp(img.data, cudaMLO->devBundle->allocator);
+		AccDataTypes::Image<XFLOAT,AccT> d_img_(img.data,cudaMLO->devBundle->allocator);
 
 		d_img_.acc_alloc();
 		d_img_.acc_init(0);
@@ -325,18 +326,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 		{
-			for (int i=0; i<img_size; i++)
-				temp[i] = rec_img.data.data[i];
-
+			temp.setHost(rec_img.data);
 			temp.put_on_device();
 
-			// rec_img is NOT norm_corrected in the non-accelerated-code, so nor do we. TODO Dari: Sure, but should we?
+			// rec_img is NOT norm_corrected in the non-accelerated-code, so nor do we. TODO Dari: But should we?
 		}
 		else
 		{
-			for (int i=0; i<img_size; i++)
-				temp[i] = img.data.data[i];
-
+			temp.setHost(img.data);
 			temp.put_on_device();
 
 			// Apply the norm_correction term
@@ -344,24 +341,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				AccUtilities::multiply(temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
 		}
 
-		if(cudaMLO->dataIs3D)
-			AccUtilities::translate3D(
-				temp,  // translate from temp...
-				d_img_, // ... into d_img
-				img.data.xdim,
-				img.data.ydim,
-				img.data.zdim,
-				XX(my_old_offset),
-				YY(my_old_offset),
-				ZZ(my_old_offset));
-		else
-			AccUtilities::translate2D(
-				temp,  // translate from temp...
-				d_img_, // ... into d_img
-				img.data.xdim,
-				img.data.ydim,
-				XX(my_old_offset),
-				YY(my_old_offset));
+		AccUtilities::translate(
+			temp,  // translate from temp...
+			d_img_, // ... into d_img
+			XX(my_old_offset),
+			YY(my_old_offset),
+			ZZ(my_old_offset));
 
 
 		/*
@@ -373,7 +358,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CudaGlobalPtr<XFLOAT> d_img(img_size,cudaMLO->devBundle->allocator);
 		d_img.device_alloc();
 
-		if (accType == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
+		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
 			d_img_.cp_on_device(~d_img);
 		else
 			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.get_h_ptr(), ~d_img, img_size, d_img.getStream());
@@ -3103,7 +3088,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
 			CTIC(timer,"getFourierTransformsAndCtfs");
-			getFourierTransformsAndCtfs<ACC_CUDA>(my_ori_particle, op, sp, baseMLO, this);
+			getFourierTransformsAndCtfs<ACC_CPU>(my_ori_particle, op, sp, baseMLO, this);
 			CTOC(timer,"getFourierTransformsAndCtfs");
 
 			if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
