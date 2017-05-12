@@ -153,7 +153,7 @@ class reconstruct_parameters
 			}
 
 			MultidimArray<RFLOAT> dummy;
-			backprojector.reconstruct(It(), iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+			backprojector.reconstruct(It(), iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 	    	It.write(fn_out);
 	    	std::cerr<<" Done writing map in "<<fn_out<<std::endl;
                 exit(1);
@@ -210,7 +210,7 @@ class reconstruct_parameters
 		}
 		backprojectort.weight = Iw();
   		std::cerr << "Starting the reconstruction ..." << std::endl;
-   		backprojectort.reconstruct(tvol(), iter, false, 1., dummy, dummy, dummy, dummy, 1., false, false, nr_threads, -1);
+   		backprojectort.reconstruct(tvol(), iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, false, nr_threads, -1);
     	tvol.write(fn_out);
     	std::cerr<<" Done writing TMPPPPPPPPPPPPPPPPP debugging!!!c map in "<<fn_out<<std::endl;
 		exit(0);
@@ -464,7 +464,7 @@ class reconstruct_parameters
    		}
    		std::cerr << "Starting the reconstruction ..." << std::endl;
    		backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise);
-   		backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
+   		backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
 
    		if (do_reconstruct_ctf)
    		{
