@@ -1682,6 +1682,35 @@ void MlOptimiser::initialiseGeneral(int rank)
 	    mu = 0.;
 	}
 
+	// Check first mask [0,1] compliance right away.
+	Image<RFLOAT> Isolvent;
+	Isolvent().resize(mymodel.Iref[0]);
+	bool mask1(false),mask2(false);
+	if(!fn_mask.contains("None"))
+	{
+			Isolvent.read(fn_mask);
+			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
+				mask1=true;
+	}
+
+	// Check second mask [0,1] compliance right away.
+	if(!fn_mask2.contains("None"))
+	{
+			Isolvent.read(fn_mask2);
+			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
+				mask2=true;
+	}
+
+	std::string errstr = "MlOptimiser::initialiseGeneral: ERROR a solvent mask should contain values between 0 and 1 only. Fix the input for \n ";
+	if(mask1)
+		errstr += " \n\t --solvent_mask ";
+	if(mask2)
+		errstr += " \n\t --solvent_mask2 ";
+	errstr += " \n";
+
+	if(mask1 || mask2)
+		REPORT_ERROR(errstr);
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
