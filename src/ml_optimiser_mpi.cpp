@@ -1932,7 +1932,8 @@ void MlOptimiserMpi::maximization()
 
 						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-								mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
+								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 
 						// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
@@ -1953,12 +1954,14 @@ void MlOptimiserMpi::maximization()
 #ifdef TIMING
 						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-								mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
+								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
 #else
 						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-								mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
+								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 #endif
 					}
@@ -2050,7 +2053,8 @@ void MlOptimiserMpi::maximization()
 
 								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 										sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-										mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+										mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
+										mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 										do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 
 								// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
@@ -2070,7 +2074,8 @@ void MlOptimiserMpi::maximization()
 							{
 								wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-									mymodel.data_vs_prior_class[ith_recons], mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
+									mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
 							}
 						}
@@ -2437,7 +2442,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 		// This only works for do_auto_refine, so iclass=0
 		BackProjector BPextra(wsum_model.BPref[0]);
 
-		BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+		BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 
 		// Update header information
 		RFLOAT avg, stddev, minval, maxval;
@@ -2663,7 +2668,7 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	}
 
 	// Now perform the unregularized reconstruction
-	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 
 	// Update header information
 	RFLOAT avg, stddev, minval, maxval;
