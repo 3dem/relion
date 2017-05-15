@@ -254,6 +254,7 @@ enum EMDLabel
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
     EMDL_OPTIMISER_ITERATION_NO,
+    EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME,
     EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES,
     EMDL_OPTIMISER_MAGNIFICATION_RANGE,
     EMDL_OPTIMISER_MAGNIFICATION_STEP,
@@ -644,6 +645,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");
         EMDL::addLabel(EMDL_OPTIMISER_ITERATION_NO, EMDL_INT, "rlnCurrentIteration", "The number of the current iteration");
+        EMDL::addLabel(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, EMDL_STRING, "rlnLocalSymmetryFile", "Local symmetry description file containing list of masks and their operators");
         EMDL::addLabel(EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES, EMDL_DOUBLE, "rlnJoinHalvesUntilThisResolution", "Resolution (in Angstrom) to join the two random half-reconstructions to prevent their diverging orientations (for C-symmetries)");
         EMDL::addLabel(EMDL_OPTIMISER_MAGNIFICATION_RANGE, EMDL_DOUBLE, "rlnMagnificationSearchRange", "Search range for magnification correction");
         EMDL::addLabel(EMDL_OPTIMISER_MAGNIFICATION_STEP, EMDL_DOUBLE, "rlnMagnificationSearchStep", "Step size  for magnification correction");

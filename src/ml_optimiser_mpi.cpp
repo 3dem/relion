@@ -1986,6 +1986,10 @@ void MlOptimiserMpi::maximization()
 						mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
 					}
 
+					// Apply local symmetry according to a list of masks and their operators
+					if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
 					if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 					{
@@ -2099,6 +2103,10 @@ void MlOptimiserMpi::maximization()
 							mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
 						}
 
+						// Apply local symmetry according to a list of masks and their operators
+						if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+							applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+
 						// Shaoda Jul26,2015 - Helical symmetry local refinement
 						if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 						{
@@ -2132,7 +2140,6 @@ void MlOptimiserMpi::maximization()
 									helical_twist_half2,
 									width_mask_edge);
 						}
-
 					}
 				}
 
@@ -2194,6 +2201,7 @@ void MlOptimiserMpi::maximization()
 #endif
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[iclass]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
 							}
@@ -2202,6 +2210,7 @@ void MlOptimiserMpi::maximization()
 								//std::cerr << "ihalfset= "<<ihalfset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[iclass]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
 #ifdef DEBUG
@@ -2230,6 +2239,9 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]),
 						MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				// Broadcast the fourier_coverage spectra to all other MPI nodes
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[iclass]),
+						MULTIDIM_SIZE(mymodel.fourier_coverage_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the sigma2_class spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
 						MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
@@ -2903,6 +2915,9 @@ void MlOptimiserMpi::iterate()
 				}
 			}
 			symmetriseReconstructions();
+
+			if ( (verb > 0) && (node->isMaster()) && (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) )
+				std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
 
 			// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
 #ifndef DEBUG_RECONSTRUCTION
