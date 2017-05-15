@@ -1986,6 +1986,10 @@ void MlOptimiserMpi::maximization()
 						mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
 					}
 
+					// Apply local symmetry according to a list of masks and their operators
+					if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
 					if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 					{
@@ -2099,6 +2103,10 @@ void MlOptimiserMpi::maximization()
 							mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
 						}
 
+						// Apply local symmetry according to a list of masks and their operators
+						if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+							applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+
 						// Shaoda Jul26,2015 - Helical symmetry local refinement
 						if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
 						{
@@ -2132,7 +2140,6 @@ void MlOptimiserMpi::maximization()
 									helical_twist_half2,
 									width_mask_edge);
 						}
-
 					}
 				}
 
@@ -2908,6 +2915,9 @@ void MlOptimiserMpi::iterate()
 				}
 			}
 			symmetriseReconstructions();
+
+			if ( (verb > 0) && (node->isMaster()) && (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) )
+				std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
 
 			// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
 #ifndef DEBUG_RECONSTRUCTION

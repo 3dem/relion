@@ -422,7 +422,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_mask2 = parser.getOption("--solvent_mask2", "User-provided secondary mask (with its own average density)", "None");
     fn_body_masks = parser.getOption("--multibody_masks", "STAR file with binary masks for multi-body refinement", "");
     fn_tau = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "None");
-	do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
+	fn_local_symmetry = parser.getOption("--local_symmetry", "Local symmetry description file containing list of masks and their operators", "None");
+    do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
 	low_resol_join_halves = textToFloat(parser.getOption("--low_resol_join_halves", "Resolution (in Angstrom) up to which the two random half-reconstructions will not be independent to prevent diverging orientations","-1"));
 
 	// Initialisation
@@ -726,6 +727,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
     	REPORT_ERROR("MlOptimiser::readStar: incorrect optimiser_general table");
 
     // Backward compatibility with RELION-1.4
+    if (!MD.getValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry))
+    	fn_local_symmetry = "None";
     if (!MD.getValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine))
     	do_helical_refine = false;
     if (!MD.getValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry))
@@ -938,6 +941,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations);
 	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_OFFSETS, smallest_changes_optimal_offsets);
 	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_CLASSES, smallest_changes_optimal_classes);
+	    MD.setValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry);
 	    MD.setValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine);
 	    MD.setValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry);
 	    MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
@@ -1430,6 +1434,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (do_join_random_halves && !do_split_random_halves)
 		REPORT_ERROR("ERROR: cannot join random halves because they were not split in the previous run");
+
+	// Local symmetry operators
+	fn_local_symmetry_masks.clear();
+	fn_local_symmetry_operators.clear();
+	if (fn_local_symmetry != "None")
+		readRelionFormatMasksAndOperators(fn_local_symmetry, fn_local_symmetry_masks, fn_local_symmetry_operators, mymodel.pixel_size, false);
 
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
@@ -2197,6 +2207,9 @@ void MlOptimiser::iterate()
 #ifdef TIMING
 			timer.toc(TIMING_MAX);
 #endif
+
+			// Apply local symmetry according to a list of masks and their operators
+			applyLocalSymmetryForEachRef();
 
 			// Shaoda Jul26,2015
 			// Helical symmetry refinement and imposition of real space helical symmetry.
@@ -3396,6 +3409,25 @@ void MlOptimiser::symmetriseReconstructions()
 		}
 	}
 	return;
+}
+
+void MlOptimiser::applyLocalSymmetryForEachRef()
+{
+	if ( (fn_local_symmetry_masks.size() < 1) || (fn_local_symmetry_operators.size() < 1) )
+		return;
+
+	if (verb > 0)
+		std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
+
+	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			// either ibody or iclass can be larger than 0, never 2 at the same time!
+			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
+			applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+		}
+	}
 }
 
 void MlOptimiser::makeGoodHelixForEachRef()
