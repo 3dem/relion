@@ -770,7 +770,6 @@ void MlOptimiserMpi::expectation()
 		}
 
 	MPI_Barrier(MPI_COMM_WORLD);
-
 #ifdef DEBUG
 	if(node->rank==2)
 	{
@@ -1249,7 +1248,17 @@ void MlOptimiserMpi::expectation()
 #endif
     	try
     	{
-			// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
+
+//#define DEBUG_SEQUENTIAL
+#ifdef DEBUG_SEQUENTIAL
+    		// Let all slaves except the first one sleep forever
+    		if (node->rank != first_slave)
+    			while (true)
+    				sleep(1000);
+#endif
+
+
+    		// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
     		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -1964,6 +1973,7 @@ void MlOptimiserMpi::maximization()
 								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 #endif
+
 					}
 
 					// Also perform the unregularized reconstruction
@@ -1974,16 +1984,17 @@ void MlOptimiserMpi::maximization()
 					if (mymodel.nr_bodies > 1)
 					{
 						// 19may2015 translate the reconstruction back to its C.O.M.
-						selfTranslate(mymodel.Iref[ith_recons], mymodel.com_bodies[ibody], DONT_WRAP);
+						mymodel.Iref[ibody].write("test.spi");
+						selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
-						// Also write out unmasked body recontruction
+						// Also write out unmasked body reconstruction
 						FileName fn_tmp;
-						fn_tmp.compose(fn_out + "_unmasked_half1_body", ibody+1,"mrc");
+						fn_tmp.compose(fn_out + "_unmasked_half1_body", ibody+1,"spi");
 						Image<RFLOAT> Itmp;
-						Itmp()=mymodel.Iref[ith_recons];
+						Itmp()=mymodel.Iref[ibody];
 						Itmp.write(fn_tmp);
-						mymodel.Iref[ith_recons].setXmippOrigin();
-						mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
+						mymodel.Iref[ibody].setXmippOrigin();
+						mymodel.Iref[ibody] *= mymodel.masks_bodies[ibody];
 					}
 
 					// Apply local symmetry according to a list of masks and their operators
@@ -2092,15 +2103,15 @@ void MlOptimiserMpi::maximization()
 						if (mymodel.nr_bodies > 1)
 						{
 							// 19may2015 translate the reconstruction back to its C.O.M.
-							selfTranslate(mymodel.Iref[ith_recons], mymodel.com_bodies[ibody], DONT_WRAP);
+							selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
 							FileName fn_tmp;
-							fn_tmp.compose(fn_out + "_unmasked_half2_body", ibody+1,"mrc");
+							fn_tmp.compose(fn_out + "_unmasked_half2_body", ibody+1,"spi");
 							Image<RFLOAT> Itmp;
-							Itmp()=mymodel.Iref[ith_recons];
+							Itmp()=mymodel.Iref[ibody];
 							Itmp.write(fn_tmp);
-							mymodel.Iref[ith_recons].setXmippOrigin();
-							mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
+							mymodel.Iref[ibody].setXmippOrigin();
+							mymodel.Iref[ibody] *= mymodel.masks_bodies[ibody];
 						}
 
 						// Apply local symmetry according to a list of masks and their operators
@@ -2681,6 +2692,12 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 
 	// Now perform the unregularized reconstruction
 	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+
+	if (mymodel.nr_bodies > 1)
+	{
+		// 19may2015 translate the reconstruction back to its C.O.M.
+		selfTranslate(Iunreg(), mymodel.com_bodies[iclass], DONT_WRAP);
+	}
 
 	// Update header information
 	RFLOAT avg, stddev, minval, maxval;
