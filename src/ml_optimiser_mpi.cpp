@@ -27,9 +27,9 @@
 
 
 //#define PRINT_GPU_MEM_INFO
-
 //#define DEBUG
 //#define DEBUG_MPIEXP2
+//#define DEBUG_SEQUENTIAL
 
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
@@ -1249,7 +1249,6 @@ void MlOptimiserMpi::expectation()
     	try
     	{
 
-//#define DEBUG_SEQUENTIAL
 #ifdef DEBUG_SEQUENTIAL
     		// Let all slaves except the first one sleep forever
     		if (node->rank != first_slave)
@@ -1984,7 +1983,6 @@ void MlOptimiserMpi::maximization()
 					if (mymodel.nr_bodies > 1)
 					{
 						// 19may2015 translate the reconstruction back to its C.O.M.
-						mymodel.Iref[ibody].write("test.spi");
 						selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
 						// Also write out unmasked body reconstruction

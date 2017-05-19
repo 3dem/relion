@@ -20,9 +20,10 @@
 
 //#define DEBUG
 //#define DEBUG_CHECKSIZES
-//#define DEBUG_BODIES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
+
+//#define DEBUG_BODIES
 
 #ifdef TIMING
 		#define RCTIC(timer,label) (timer.tic(label))
@@ -2653,13 +2654,6 @@ void MlOptimiser::expectationSetup()
     // Initialise Projectors and fill vector with power_spectra for all classes
 	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
 
-	// TMP for helices of Anthiony 12 july 2016
-	if (debug1 > 0.)
-	{
-		for (int iclass = 0; iclass < mymodel.nr_classes*mymodel.nr_bodies; iclass++)
-			mymodel.PPref[iclass].applyFourierMask((int)debug1, (int)debug2, debug3);
-	}
-
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
 
@@ -2686,10 +2680,17 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		// First select one random direction and psi-angle for selectOrientationsWithNonZeroPriorProbability
 		// This is to get an idea how many non-zero probabilities there will be
 		RFLOAT ran_rot, ran_tilt, ran_psi;
-		int randir = (int)(rnd_unif() * sampling.NrDirections() );
-		int ranpsi = (int)(rnd_unif() * sampling.NrPsiSamplings() );
-		sampling.getDirection(randir, ran_rot, ran_tilt);
-		sampling.getPsiAngle(ranpsi, ran_psi);
+		if (mymodel.nr_bodies > 1)
+		{
+			ran_rot = ran_tilt = ran_psi = 0.;
+		}
+		else
+		{
+			int randir = (int)(rnd_unif() * sampling.NrDirections() );
+			int ranpsi = (int)(rnd_unif() * sampling.NrPsiSamplings() );
+			sampling.getDirection(randir, ran_rot, ran_tilt);
+			sampling.getPsiAngle(ranpsi, ran_psi);
+		}
 		// Calculate local searches for these angles
 		// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
 		if (do_helical_refine)
@@ -2959,7 +2960,11 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 					fn_open_stack = fn_stack;
 				}
 			    Image<RFLOAT> img;
-				img.readFromOpenFile(fn_img, hFile, -1, false);
+//#define DEBUG_BODIES
+#ifdef DEBUG_BODIES
+			    std::cerr << " fn_img= " << fn_img << std::endl;
+#endif
+			    img.readFromOpenFile(fn_img, hFile, -1, false);
 				img().setXmippOrigin();
 				exp_imgs.push_back(img());
 
@@ -3391,10 +3396,11 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 
     } // end for ibody
 
-//#define DEBUG_BODIES
 #ifdef DEBUG_BODIES
-	if (my_ori_particle > 3)
+	if (my_ori_particle == ROUND(debug1))
 		exit(1);
+	else
+		sleep(1); // wait a bit between particles
 #endif
 
 #ifdef DEBUG_EXPSINGLE
@@ -4216,7 +4222,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			ZZ(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ZOFF);
 			ZZ(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ZOFF_PRIOR);
 		}
-
 		if (mymodel.nr_bodies > 1)
 		{
 
@@ -4240,7 +4245,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				ZZ(my_old_body_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_zoff);
 
 			// Add the refined offset for this body
+			// TODO: check whether this is add/subtract?!
 			my_old_offset += my_old_body_offset;
+			//my_old_offset -= my_old_body_offset;
 
 			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
 			my_prior.initZeros();
@@ -4820,7 +4827,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 										DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_tilt),
 										DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi), Aresi, false);
 					// The real orientation to be applied is the obody transformation applied and the original one
-					Abody = Aori * Aresi;
+					Abody = Aresi * Aori;
 
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
@@ -4828,19 +4835,18 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					mymodel.PPref[obody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
 
 #ifdef DEBUG_BODIES
-					std::cerr << " obody= " << obody << "ocol_psi= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi)
+					std::cerr << " obody= " << obody << "ocol_rot= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_rot)
+							<< " obody= " << obody << "ocol_tilt= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_tilt)
+							<< " obody= " << obody << "ocol_psi= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi)
 							<< " ocol_xoff= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff)
 							<< " ocol_yoff= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
-					//if (my_ori_particle == 0)
-					{
-						windowFourierTransform(FTo, Faux, mymodel.ori_size);
-						transformer.inverseFourierTransform(Faux, img());
-						CenterFFT(img(), false);
-						FileName fn_img = "unshifted.spi";
-						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-						img.write(fn_img);
-						std::cerr << "written " << fn_img << std::endl;
-					}
+					windowFourierTransform(FTo, Faux, mymodel.ori_size);
+					transformer.inverseFourierTransform(Faux, img());
+					CenterFFT(img(), false);
+					FileName fn_img = "unshifted.spi";
+					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
+					img.write(fn_img);
+					std::cerr << "written " << fn_img << std::endl;
 #endif
 
 					// 17May2017: Body is centered at its own COM
@@ -4849,6 +4855,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (mymodel.com_bodies[obody]);
+#ifdef DEBUG_BODIES
+					std::cerr << " other_projected_com= " << other_projected_com << std::endl;
+#endif
+
 
 					// Subtract Refined obody-displacement
 					// TODO: check whether this is add/subtract!!! I think subtract, as offsets are opposite sign to COMs...
@@ -4856,13 +4866,25 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
 					if (mymodel.data_dim == 3)
 						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_zoff);
+					//XX(other_projected_com) += DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff);
+					//YY(other_projected_com) += DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
+					//if (mymodel.data_dim == 3)
+					//	ZZ(other_projected_com) += DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_zoff);
 
 					// Subtract the projected COM already applied to this image for ibody
 					other_projected_com -= my_projected_com;
 					// And add the refined displacement to this image for ibody
 					// TODO: check add/subtract. Again think add because of opposite signs COMs and offsets...
+
 					other_projected_com += my_old_body_offset;
 
+#ifdef DEBUG_BODIES
+					std::cerr << " refined << " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff) << " "
+							<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
+					std::cerr << " my_projected_com= " << my_projected_com << std::endl;
+					std::cerr << " my_old_body_offset= " << my_old_body_offset << std::endl;
+					std::cerr << " APPLIED translation= " << other_projected_com << std::endl;
+#endif
 					shiftImageInFourierTransform(FTo, Faux, (RFLOAT)mymodel.ori_size,
 							XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
 
@@ -4885,24 +4907,18 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					CenterFFT(img(), false);
 
 #ifdef DEBUG_BODIES
-					//if (my_ori_particle == 0)
-					{
-						FileName fn_img = "shifted_beforemask.spi";
-						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-						img.write(fn_img);
-						std::cerr << "Written::: " << fn_img << std::endl;
-					}
+					fn_img = "shifted_beforemask.spi";
+					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
+					img.write(fn_img);
+					std::cerr << "Written::: " << fn_img << std::endl;
 #endif
 					softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
 
 #ifdef DEBUG_BODIES
-					//if (my_ori_particle == 0)
-					{
-						FileName fn_img = "shifted_aftermask.spi";
-						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-						img.write(fn_img);
-						std::cerr << "Written::: " << fn_img << std::endl;
-					}
+					fn_img = "shifted_aftermask.spi";
+					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
+					img.write(fn_img);
+					std::cerr << "Written::: " << fn_img << std::endl;
 #endif
 					// And back to Fourier space now
 					CenterFFT(img(), true);
@@ -4913,24 +4929,20 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					exp_Fimgs.at(ipart) -= Faux;
 
 #ifdef DEBUG_BODIES
-					//if (my_ori_particle == 0)
-					{
-						windowFourierTransform(exp_Fimgs[ipart], Faux, mymodel.ori_size);
-						transformer.inverseFourierTransform(Faux, img());
-						CenterFFT(img(), false);
-						FileName fn_img = "exp_Fimgs_subtracted.spi";
-						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-						img.write(fn_img);
-						std::cerr << "written " << fn_img << std::endl;
-						windowFourierTransform(exp_Fimgs_nomask[ipart], Faux, mymodel.ori_size);
-						transformer.inverseFourierTransform(Faux, img());
-						CenterFFT(img(), false);
-						fn_img = "exp_Fimgs_nomask_subtracted.spi";
-						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-						img.write(fn_img);
-						std::cerr << "written " << fn_img << std::endl;
-					}
-
+					windowFourierTransform(exp_Fimgs[ipart], Faux, mymodel.ori_size);
+					transformer.inverseFourierTransform(Faux, img());
+					CenterFFT(img(), false);
+					fn_img = "exp_Fimgs_subtracted.spi";
+					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
+					img.write(fn_img);
+					std::cerr << "written " << fn_img << std::endl;
+					windowFourierTransform(exp_Fimgs_nomask[ipart], Faux, mymodel.ori_size);
+					transformer.inverseFourierTransform(Faux, img());
+					CenterFFT(img(), false);
+					fn_img = "exp_Fimgs_nomask_subtracted.spi";
+					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
+					img.write(fn_img);
+					std::cerr << "written " << fn_img << std::endl;
 #endif
 				}
 			}
@@ -6925,7 +6937,8 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											// Store optimal image parameters
 											exp_max_weight[ipart] = weight;
 
-											Euler_matrix2angles(A, rot, tilt, psi);
+											//This is not necessary as rot, tilt and psi remain unchanged?
+											//Euler_matrix2angles(A, rot, tilt, psi);
 
 											int icol_rot  = (mymodel.nr_bodies == 1) ? METADATA_ROT  : 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 											int icol_tilt = (mymodel.nr_bodies == 1) ? METADATA_TILT : 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
