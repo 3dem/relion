@@ -16,7 +16,7 @@ namespace AccUtilities
 		if (Acc == ACC_CPU)
 		{
 			CpuKernels::multiply(
-				~ptr,
+				ptr(),
 				value,
 				ptr.getSize());
 		}
@@ -24,7 +24,7 @@ namespace AccUtilities
 		{
 			int BSZ = ( (int) ceilf(( float)ptr.getSize() /(float)BLOCK_SIZE));
 			CudaKernels::multiply<<<BSZ,BLOCK_SIZE,0,ptr.getStream()>>>(
-				~ptr,
+				ptr(),
 				value,
 				ptr.getSize());
 		}
@@ -34,11 +34,11 @@ namespace AccUtilities
 	static
 	void
 	translate(
-			AccDataTypes::Image<T,Acc> &in,
-			AccDataTypes::Image<T,Acc> &out,
-			int dx,
-			int dy,
-			int dz=0)
+		AccDataTypes::Image<T,Acc> &in,
+		AccDataTypes::Image<T,Acc> &out,
+		int dx,
+		int dy,
+		int dz=0)
 	{
 
 		if (Acc == ACC_CPU)
@@ -46,8 +46,8 @@ namespace AccUtilities
 			if (in.is3D())
 			{
 				CpuKernels::translate3D(
-					~in,
-					~out,
+					in(),
+					out(),
 					in.getxyz(),
 					in.getx(),
 					in.gety(),
@@ -59,8 +59,8 @@ namespace AccUtilities
 			else
 			{
 				CpuKernels::translate2D(
-					~in,
-					~out,
+					in(),
+					out(),
 					in.getxyz(),
 					in.getx(),
 					in.gety(),
@@ -75,8 +75,8 @@ namespace AccUtilities
 			if (in.is3D())
 			{
 				CudaKernels::translate3D<<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
-					~in,
-					~out,
+					in(),
+					out(),
 					in.getxyz(),
 					in.getx(),
 					in.gety(),
@@ -88,8 +88,8 @@ namespace AccUtilities
 			else
 			{
 				CudaKernels::translate2D<<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
-					~in,
-					~out,
+					in(),
+					out(),
 					in.getxyz(),
 					in.getx(),
 					in.gety(),

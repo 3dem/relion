@@ -46,8 +46,8 @@ class AccPtr
 	cudaStream_t stream;
 
 	size_t size; //Size used when copying data from and to device
-	T *h_ptr, *d_ptr; //Host and device pointers
-	bool h_do_free, d_do_free; //True if host or device needs to be freed
+	T *hPtr, *dPtr; //Host and device pointers
+	bool doFreeHost, doFreeDevice; //True if host or device needs to be freed
 
 public:
 
@@ -57,50 +57,50 @@ public:
 
 	inline
 	AccPtr(CudaCustomAllocator *allocator):
-		size(0), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
+		size(0), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(0), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(stream)
+		size(0), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream)
 	{}
 
 	inline
 	AccPtr(size_t size, CudaCustomAllocator *allocator):
-		size(size), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(size), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(stream)
+		size(size), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream)
 	{}
 
 	inline
 	AccPtr(T * h_start, size_t size, CudaCustomAllocator *allocator):
-		size(size), h_ptr(h_start), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(T * h_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(size), h_ptr(h_start), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(T * h_start, T * d_start, size_t size, CudaCustomAllocator *allocator):
-		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(h_start), dPtr(d_start), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(T * h_start, T * d_start, size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(allocator), alloc(NULL), stream(stream)
+		size(size), hPtr(h_start), dPtr(d_start), doFreeHost(false),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream)
 	{}
 
 	/*======================================================
@@ -109,50 +109,50 @@ public:
 
 	inline
 	AccPtr():
-		size(0), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
+		size(0), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(cudaStream_t stream):
-		size(0), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(stream)
+		size(0), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream)
 	{}
 
 	inline
 	AccPtr(size_t size):
-		size(size), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream):
-		size(size), h_ptr(NULL), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(stream)
+		size(size), hPtr(NULL), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream)
 	{}
 
 	inline
 	AccPtr(T * h_start, size_t size):
-		size(size), h_ptr(h_start), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(0)
+		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(0)
 	{}
 
 	inline
 	AccPtr(T * h_start, size_t size, cudaStream_t stream):
-		size(size), h_ptr(h_start), d_ptr(NULL), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(T * h_start, T * d_start, size_t size):
-		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
+		size(size), hPtr(h_start), dPtr(d_start), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(T * h_start, T * d_start, size_t size, cudaStream_t stream):
-		size(size), h_ptr(h_start), d_ptr(d_start), h_do_free(false),
-		d_do_free(false), allocator(NULL), alloc(NULL), stream(stream)
+		size(size), hPtr(h_start), dPtr(d_start), doFreeHost(false),
+		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream)
 	{}
 
 	/*======================================================
@@ -161,47 +161,20 @@ public:
 
 	inline
 	AccPtr(const AccPtr &ptr):
-		size(ptr.size), h_ptr(ptr.h_ptr), d_ptr(ptr.d_ptr), h_do_free(false),
-		d_do_free(false), allocator(ptr.allocator), alloc(NULL), stream(ptr.stream)
+		size(ptr.size), hPtr(ptr.hPtr), dPtr(ptr.dPtr), doFreeHost(false),
+		doFreeDevice(false), allocator(ptr.allocator), alloc(NULL), stream(ptr.stream)
 	{}
 
 	inline
 	AccPtr(const AccPtr<T> &ptr, size_t start_idx, size_t size):
-		size(size), h_ptr(&ptr.h_ptr[start_idx]), d_ptr(&ptr.d_ptr[start_idx]), h_do_free(false),
-		d_do_free(false), allocator(ptr.allocator), alloc(NULL), stream(ptr.stream)
+		size(size), hPtr(&ptr.h_ptr[start_idx]), dPtr(&ptr.dPtr[start_idx]), doFreeHost(false),
+		doFreeDevice(false), allocator(ptr.allocator), alloc(NULL), stream(ptr.stream)
 	{}
 
 
 	/*======================================================
-	                    OTHER STUFF
+	                     METHOD BODY
 	======================================================*/
-
-	CudaCustomAllocator *getAllocator() {return allocator; };
-	cudaStream_t &getStream() {return stream; };
-
-	void setStream(cudaStream_t s)
-	{
-		if (AccT == ACC_CPU)
-			stream = s;
-	};
-
-	void setSize(size_t s) { size = s; };
-	size_t getSize() { return size; };
-
-	T *get_h_ptr() { return h_ptr; };
-	bool get_h_do_free() { return h_do_free; };
-
-	T *get_d_ptr() { return d_ptr; };
-	bool get_d_do_free() { return d_do_free; };
-
-	void setAllocator(CudaCustomAllocator *a)
-	{
-		if (AccT == ACC_CPU)
-		{
-			free_device_if_set();
-			allocator = a;
-		}
-	};
 
 	void markReadyEvent()
 	{
@@ -215,68 +188,26 @@ public:
 		}
 	}
 
-	void setDevPtr(T *ptr)
-	{
-		if (AccT == ACC_CPU)
-		{
-#ifdef DEBUG_CUDA
-			if (d_do_free)
-				ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
-#endif
-			d_ptr = ptr;
-		}
-	};
-
-	void setDevPtr(const AccPtr<T> &ptr)
-	{
-		if (AccT == ACC_CPU)
-		{
-#ifdef DEBUG_CUDA
-			if (ptr.d_ptr == NULL)
-				ACC_PTR_DEBUG_FATAL("Device pointer is not set.\n");
-#endif
-			setHstPtr(ptr.d_ptr);
-		}
-	};
-
-	void setHstPtr(T *ptr)
-	{
-#ifdef DEBUG_CUDA
-		if (h_do_free)
-			ACC_PTR_DEBUG_FATAL("Host pointer set without freeing the old one.\n");
-#endif
-		h_ptr = ptr;
-	};
-
-	void setHstPtr(const AccPtr<T> &ptr)
-	{
-#ifdef DEBUG_CUDA
-		if (ptr.h_ptr == NULL)
-			ACC_PTR_DEBUG_FATAL("Host pointer is not set.\n");
-#endif
-		setHstPtr(ptr.h_ptr);
-	};
-
 	/**
 	 * Allocate memory on device
 	 */
 	inline
-	void device_alloc()
+	void deviceAlloc()
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if(size==0)
-				ACC_PTR_DEBUG_FATAL("device_alloc called with size == 0");
+				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
 			if (d_do_free)
 				ACC_PTR_DEBUG_FATAL("Device double allocation.\n");
 #endif
-			d_do_free = true;
+			doFreeDevice = true;
 
 			alloc = allocator->alloc(size * sizeof(T));
-			d_ptr = (T*) alloc->getPtr();
+			dPtr = (T*) alloc->getPtr();
 
-//			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &d_ptr, size * sizeof(T)));
+//			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &dPtr, size * sizeof(T)));
 		}
 	}
 
@@ -284,104 +215,104 @@ public:
 	 * Allocate memory on device with given size
 	 */
 	inline
-	void device_alloc(size_t newSize)
+	void deviceAlloc(size_t newSize)
 	{
 		size = newSize;
-		device_alloc();
+		deviceAlloc();
 	}
 
 	/**
 	 * Allocate memory on host
 	 */
 	inline
-	void host_alloc()
+	void hostAlloc()
 	{
 #ifdef DEBUG_CUDA
 		if(size==0)
-			ACC_PTR_DEBUG_FATAL("device_alloc called with size == 0");
-		if (h_do_free)
+			ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
+		if (doFreeHost)
 			ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
 #endif
-		h_do_free = true;
-		h_ptr = new T[size];
+		doFreeHost = true;
+		hPtr = new T[size];
 	}
 
 	/**
 	 * Allocate memory on host with given size
 	 */
 	inline
-	void host_alloc(size_t newSize)
+	void hostAlloc(size_t newSize)
 	{
 		size = newSize;
-		host_alloc();
+		hostAlloc();
 	}
 
 	inline
-	void all_alloc()
+	void allAlloc()
 	{
-		device_alloc();
-		host_alloc();
+		deviceAlloc();
+		hostAlloc();
 	}
 
 	inline
-	void all_alloc(size_t newSize)
+	void allAlloc(size_t newSize)
 	{
 		size = newSize;
-		device_alloc();
-		host_alloc();
+		deviceAlloc();
+		hostAlloc();
 	}
 
 	inline
-	void acc_alloc()
+	void accAlloc()
 	{
 		if (AccT == ACC_CUDA)
-			device_alloc();
+			deviceAlloc();
 		else
-			host_alloc();
+			hostAlloc();
 	}
 
 	inline
-	void acc_alloc(size_t newSize)
+	void accAlloc(size_t newSize)
 	{
 		size = newSize;
 		if (AccT == ACC_CUDA)
-			device_alloc(newSize);
+			deviceAlloc(newSize);
 		else
-			host_alloc(newSize);
+			hostAlloc(newSize);
 	}
 
-	void resize_host(size_t newSize)
+	void resizeHost(size_t newSize)
 	{
 #ifdef DEBUG_CUDA
 		if (size==0)
 			ACC_PTR_DEBUG_FATAL("Resizing from size zero (permitted).\n");
 #endif
 	    T* newArr = new T[newSize];
-	    memcpy( newArr, h_ptr, newSize * sizeof(T) );
+	    memcpy( newArr, hPtr, newSize * sizeof(T) );
 
 	    size = newSize;
 #ifdef DEBUG_CUDA
-		if (d_ptr!=NULL)
+		if (dPtr!=NULL)
 			ACC_PTR_DEBUG_FATAL("Resizing host with present device allocation.\n");
 #endif
-	    free_host();
+	    freeHost();
 	    setHstPtr(newArr);
-	    h_do_free=true;
+	    doFreeHost=true;
 	}
 
 	/**
 	 * Initiate device memory with provided value
 	 */
 	inline
-	void device_init(int value)
+	void deviceInit(int value)
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
-				ACC_PTR_DEBUG_FATAL("Memset requested before allocation in device_init().\n");
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("Memset requested before allocation in deviceInit().\n");
 #endif
-			cudaMemInit<T>( d_ptr, value, size, stream);
+			cudaMemInit<T>( dPtr, value, size, stream);
 		}
 	}
 
@@ -389,38 +320,38 @@ public:
 	 * Initiate host memory with provided value
 	 */
 	inline
-	void host_init(int value)
+	void hostInit(int value)
 	{
-		memset(h_ptr, value, size * sizeof(T));
+		memset(hPtr, value, size * sizeof(T));
 	}
 
 	/**
 	 * Initiate accelerator memory with provided value
 	 */
 	inline
-	void acc_init(int value)
+	void accInit(int value)
 	{
 		if (AccT == ACC_CUDA)
-			device_init(value);
+			deviceInit(value);
 		else
-			host_init(value);
+			hostInit(value);
 	}
 
 	/**
 	 * Copy a number (size) of bytes to device stored in the host pointer
 	 */
 	inline
-	void cp_to_device()
+	void cpToDevice()
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
-				ACC_PTR_DEBUG_FATAL("cp_to_device() called before allocation.\n");
-			if (h_ptr == NULL)
-				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_device().\n");
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("cpToDevice() called before allocation.\n");
+			if (hPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL host pointer in cpToDevice().\n");
 #endif
-			CudaShortcuts::cpyHostToDevice<T>(h_ptr, d_ptr, size, stream);
+			CudaShortcuts::cpyHostToDevice<T>(hPtr, dPtr, size, stream);
 		}
 	}
 
@@ -428,16 +359,16 @@ public:
 	 * Copy a number (size) of bytes to device stored in the provided host pointer
 	 */
 	inline
-	void cp_to_device(T * hostPtr)
+	void cpToDevice(T * hostPtr)
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
 			if (hostPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("Null-pointer given in cp_to_device(hostPtr).\n");
+				ACC_PTR_DEBUG_FATAL("Null-pointer given in cpToDevice(hostPtr).\n");
 #endif
-			h_ptr = hostPtr;
-			cp_to_device();
+			hPtr = hostPtr;
+			cpToDevice();
 		}
 	}
 
@@ -445,21 +376,21 @@ public:
 	 * alloc and copy
 	 */
 	inline
-	void put_on_device()
+	void putOnDevice()
 	{
-		device_alloc();
-		cp_to_device();
+		deviceAlloc();
+		cpToDevice();
 	}
 
 	/**
 	 * alloc size and copy
 	 */
 	inline
-	void put_on_device(size_t newSize)
+	void putOnDevice(size_t newSize)
 	{
 		size=newSize;
-		device_alloc();
-		cp_to_device();
+		deviceAlloc();
+		cpToDevice();
 	}
 
 
@@ -467,17 +398,17 @@ public:
 	 * Copy a number (size) of bytes from device to the host pointer
 	 */
 	inline
-	void cp_to_host()
+	void cpToHost()
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
+			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host() called before device allocation.\n");
 			if (h_ptr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host().\n");
 #endif
-			cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size, stream);
+			cudaCpyDeviceToHost<T>(dPtr, hPtr, size, stream);
 		}
 	}
 
@@ -485,17 +416,17 @@ public:
 	 * Copy a number (thisSize) of bytes from device to the host pointer
 	 */
 	inline
-	void cp_to_host(size_t thisSize)
+	void cpToHost(size_t thisSize)
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
+			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host(thisSize) called before device allocation.\n");
 			if (h_ptr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(thisSize).\n");
 #endif
-			cudaCpyDeviceToHost<T>(d_ptr, h_ptr, thisSize, stream);
+			cudaCpyDeviceToHost<T>(dPtr, hPtr, thisSize, stream);
 		}
 	}
 
@@ -503,17 +434,17 @@ public:
 	 * Copy a number (thisSize) of bytes from device to a specific host pointer
 	 */
 	inline
-	void cp_to_host(T* hstPtr, size_t thisSize)
+	void cpToHost(T* hstPtr, size_t thisSize)
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
+			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host(hstPtr, thisSize) called before device allocation.\n");
 			if (hstPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(hstPtr, thisSize).\n");
 #endif
-			cudaCpyDeviceToHost<T>(d_ptr, hstPtr, thisSize, stream);
+			cudaCpyDeviceToHost<T>(dPtr, hstPtr, thisSize, stream);
 		}
 	}
 
@@ -521,17 +452,17 @@ public:
 	 * Copy a number (size) of bytes from device to the host pointer
 	 */
 	inline
-	void cp_to_host_on_stream(cudaStream_t s)
+	void cpToHostOnStream(cudaStream_t s)
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
+			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host_on_stream(s) called before device allocation.\n");
 			if (h_ptr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host_on_stream(s).\n");
 #endif
-			cudaCpyDeviceToHost<T>(d_ptr, h_ptr, size, s);
+			cudaCpyDeviceToHost<T>(dPtr, hPtr, size, s);
 		}
 	}
 
@@ -539,59 +470,45 @@ public:
 	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
 	 */
 	inline
-	void cp_on_device(T * dstDevPtr)
+	void cpOnDevice(T * dstDevPtr)
 	{
 #ifdef DEBUG_CUDA
 		if (dstDevPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_device(dstDevPtr).\n");
 #endif
-		CudaShortcuts::cpyDeviceToDevice(d_ptr, dstDevPtr, size, stream);
+		CudaShortcuts::cpyDeviceToDevice(dPtr, dstDevPtr, size, stream);
 	}
 
 	/**
 	 * Copy a number (size) of bytes from host pointer to the provided new host pointer
 	 */
 	inline
-	void cp_on_host(T * dstDevPtr)
+	void cpOnHost(T * dstDevPtr)
 	{
 #ifdef DEBUG_CUDA
 		if (dstDevPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_host(dstDevPtr).\n");
 #endif
-		memcpy ( dstDevPtr, h_ptr, size );
+		memcpy ( dstDevPtr, hPtr, size );
 	}
 
 	inline
-	void cp_on_acc(T * dstDevPtr)
+	void cpOnAcc(T * dstDevPtr)
 	{
 		if (AccT == ACC_CUDA)
-			cp_on_device(dstDevPtr);
+			cpOnDevice(dstDevPtr);
 		else
-			cp_on_host(dstDevPtr);
+			cpOnHost(dstDevPtr);
 	}
 
 	inline
-	void cp_on_acc(AccPtr<T> &devPtr)
+	void cpOnAcc(AccPtr<T> &devPtr)
 	{
 		if (AccT == ACC_CUDA)
-			cp_on_device(devPtr.d_ptr);
+			cpOnDevice(devPtr.dPtr);
 		else
-			cp_on_host(devPtr.h_ptr);
+			cpOnHost(devPtr.hPtr);
 	}
-
-	/**
-	 * Host data quick access
-	 */
-	inline
-	T& operator[](size_t idx)
-	{
-#ifdef DEBUG_CUDA
-		if (h_ptr == NULL)
-			ACC_PTR_DEBUG_FATAL("operator[] called with NULL host pointer.\n");
-#endif
-		return h_ptr[idx];
-	};
-
 
 	/**
 	 * Host data quick access
@@ -600,60 +517,46 @@ public:
 	const T& operator[](size_t idx) const
 	{
 #ifdef DEBUG_CUDA
-		if (h_ptr == NULL)
+		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("const operator[] called with NULL host pointer.\n");
 #endif
-		return h_ptr[idx];
+		return hPtr[idx];
 	};
 
 	/**
-	 * Device data quick access
+	 * Host data quick access
 	 */
 	inline
-	T& operator()(size_t idx)
+	T& operator[](size_t idx)
 	{
 #ifdef DEBUG_CUDA
-		if (d_ptr == NULL)
-			ACC_PTR_DEBUG_FATAL("operator() called with NULL device pointer.\n");
+		if (hPtr == NULL)
+			ACC_PTR_DEBUG_FATAL("operator[] called with NULL host pointer.\n");
 #endif
-		return d_ptr[idx];
-	};
-
-
-	/**
-	 * Device data quick access
-	 */
-	inline
-	const T& operator()(size_t idx) const
-	{
-#ifdef DEBUG_CUDA
-		if (d_ptr == NULL)
-			ACC_PTR_DEBUG_FATAL("const operator() called with NULL device pointer.\n");
-#endif
-		return d_ptr[idx];
+		return hPtr[idx];
 	};
 
 	/**
-	 * Device pointer quick access
+	 * Acc pointer quick access
 	 */
 	inline
-	T* operator~()
+	T* operator()()
 	{
 		if (AccT == ACC_CUDA)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
+			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("operator~ called with NULL acc pointer.\n");
 #endif
-			return d_ptr;
+			return dPtr;
 		}
 		else
 		{
 #ifdef DEBUG_CUDA
-			if (h_ptr == NULL)
+			if (hPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("operator~ called with NULL acc pointer.\n");
 #endif
-			return h_ptr;
+			return hPtr;
 		}
 	};
 
@@ -668,21 +571,21 @@ public:
 	T getAccValueAt(size_t idx)
 	{
 		if (AccT == ACC_CPU)
-			return h_ptr[idx];
+			return hPtr[idx];
 		else
 		{
 			T value;
-			cudaCpyDeviceToHost<T>(&d_ptr[idx], &value, 1, stream);
+			cudaCpyDeviceToHost<T>(&dPtr[idx], &value, 1, stream);
 			streamSync();
 			return value;
 		}
 	}
 
 
-	void dump_device_to_file(std::string fileName)
+	void dumpDeviceToFile(std::string fileName)
 	{
 		T *tmp = new T[size];
-		cudaCpyDeviceToHost<T>(d_ptr, tmp, size, stream);
+		cudaCpyDeviceToHost<T>(dPtr, tmp, size, stream);
 
 		std::ofstream f;
 		f.open(fileName.c_str());
@@ -693,12 +596,12 @@ public:
 		delete [] tmp;
 	}
 
-	void dump_host_to_file(std::string fileName)
+	void dumpHostToFile(std::string fileName)
 	{
 		std::ofstream f;
 		f.open(fileName.c_str());
 		for (unsigned i = 0; i < size; i ++)
-			f << h_ptr[i] << std::endl;
+			f << hPtr[i] << std::endl;
 		f.close();
 	}
 
@@ -706,24 +609,24 @@ public:
 	 * Delete device data
 	 */
 	inline
-	void free_device()
+	void freeDevice()
 	{
 		if (AccT != ACC_CPU)
 		{
 #ifdef DEBUG_CUDA
-			if (d_ptr == NULL)
+			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("Free device memory was called on NULL pointer in free_device().\n");
 #endif
-			d_do_free = false;
+			doFreeDevice = false;
 
 			if (alloc->getReadyEvent() == 0)
 				alloc->markReadyEvent(stream);
 			alloc->doFreeWhenReady();
 			alloc = NULL;
 
-//			DEBUG_HANDLE_ERROR(cudaFree(d_ptr));
+//			DEBUG_HANDLE_ERROR(cudaFree(dPtr));
 
-			d_ptr = NULL;
+			dPtr = NULL;
 		}
 	}
 
@@ -731,29 +634,29 @@ public:
 	 * Delete host data
 	 */
 	inline
-	void free_host()
+	void freeHost()
 	{
 #ifdef DEBUG_CUDA
-		if (h_ptr == NULL)
+		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("free_host() called on NULL pointer.\n");
 #endif
-		h_do_free = false;
-		delete [] h_ptr;
-		h_ptr = NULL;
+		doFreeHost = false;
+		delete [] hPtr;
+		hPtr = NULL;
 	}
 
 	inline
-	void free_host_if_set()
+	void freeHostIfSet()
 	{
-		if (h_do_free)
-			free_host();
+		if (doFreeHost)
+			freeHost();
 	}
 
 	inline
-	void free_device_if_set()
+	void freeDeviceIfSet()
 	{
-		if (d_do_free)
-			free_device();
+		if (doFreeDevice)
+			freeDevice();
 	}
 
 	/**
@@ -762,22 +665,115 @@ public:
 	inline
 	void free()
 	{
-		free_device();
-		free_host();
+		freeDevice();
+		freeHost();
 	}
 
 	inline
-	void free_if_set()
+	void freeIfSet()
 	{
-		free_host_if_set();
-		free_device_if_set();
+		freeHostIfSet();
+		freeDeviceIfSet();
 	}
 
 	inline
 	~AccPtr()
 	{
-		free_if_set();
+		freeIfSet();
 	}
+
+
+	/*======================================================
+	                   GETTERS AND SETTERS
+	======================================================*/
+
+
+	bool willFreeHost()
+	{
+		return doFreeHost;
+	}
+
+	bool willFreeDevice()
+	{
+		return doFreeDevice;
+	}
+
+	void setStream(cudaStream_t s)
+	{
+		stream = s;
+	}
+
+	cudaStream_t getStream()
+	{
+		return stream;
+	}
+
+	void setSize(size_t s)
+	{
+		size = s;
+	}
+	size_t getSize()
+	{
+		return size;
+	}
+
+	T *getHostPtr()
+	{
+		return hPtr;
+	}
+
+	void setAllocator(CudaCustomAllocator *a)
+	{
+		freeDeviceIfSet();
+		allocator = a;
+	};
+
+	CudaCustomAllocator *getAllocator()
+	{
+		return allocator;
+	}
+
+	void setDevicePtr(T *ptr)
+	{
+#ifdef DEBUG_CUDA
+			if (d_do_free)
+				ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
+#endif
+		dPtr = ptr;
+	}
+
+	T *getDevicePtr()
+	{
+		return dPtr;
+	}
+
+	void setDevicePtr(const AccPtr<T> &ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (ptr.dPtr == NULL)
+			ACC_PTR_DEBUG_FATAL("Device pointer is not set.\n");
+#endif
+		setDevicePtr(ptr.dPtr);
+	};
+
+	void setHostPtr(T *ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (doFreeHost)
+			ACC_PTR_DEBUG_FATAL("Host pointer set without freeing the old one.\n");
+#endif
+		hPtr = ptr;
+	};
+
+	void setHostPtr(const AccPtr<T> &ptr)
+	{
+#ifdef DEBUG_CUDA
+		if (ptr.hPtr == NULL)
+			ACC_PTR_DEBUG_FATAL("Host pointer is not set.\n");
+#endif
+		setHstPtr(ptr.h_ptr);
+	};
+
 };
 
 #endif

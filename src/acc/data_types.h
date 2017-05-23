@@ -143,15 +143,15 @@ public:
 		{
 			if (img.nzyxdim > AccPtr<T,AccT>::getSize())
 			{
-				AccPtr<T,AccT>::free_if_set();
+				AccPtr<T,AccT>::freeIfSet();
 				setSize(img);
-				AccPtr<T,AccT>::host_alloc();
+				AccPtr<T,AccT>::hostAlloc();
 			}
 			else
 				setSize(img);
 		}
 
-		T *ptr = AccPtr<T,AccT>::get_h_ptr();
+		T *ptr = AccPtr<T,AccT>::getHostPtr();
 
 		if (sizeof(T) == sizeof(T1))
 			memcpy(ptr, img.data, sizeof(T)*img.nzyxdim);

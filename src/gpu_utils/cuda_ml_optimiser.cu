@@ -319,22 +319,22 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		AccDataTypes::Image<XFLOAT,AccT> temp(img.data, cudaMLO->devBundle->allocator);
 		AccDataTypes::Image<XFLOAT,AccT> d_img_(img.data,cudaMLO->devBundle->allocator);
 
-		d_img_.acc_alloc();
-		d_img_.acc_init(0);
+		d_img_.accAlloc();
+		d_img_.accInit(0);
 
-		temp.host_alloc();
+		temp.hostAlloc();
 
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 		{
 			temp.setHost(rec_img.data);
-			temp.put_on_device();
+			temp.putOnDevice();
 
 			// rec_img is NOT norm_corrected in the non-accelerated-code, so nor do we. TODO Dari: But should we?
 		}
 		else
 		{
 			temp.setHost(img.data);
-			temp.put_on_device();
+			temp.putOnDevice();
 
 			// Apply the norm_correction term
 			if (baseMLO->do_norm_correction)
@@ -359,9 +359,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		d_img.device_alloc();
 
 		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
-			d_img_.cp_on_device(~d_img);
+			d_img_.cpOnDevice(~d_img);
 		else
-			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.get_h_ptr(), ~d_img, img_size, d_img.getStream());
+			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.getHostPtr(), ~d_img, img_size, d_img.getStream());
 
 		d_img.streamSync();
 
