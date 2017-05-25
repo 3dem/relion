@@ -48,7 +48,6 @@ make install
 ```
 (NOTES: "/where/to/install/ .." is typically "/usr/local/relion".
  Make sure you create this directory beforehand.
- You can do this using "sudo mkdir /usr/local/relion".
  Installing to that location requires sudo, so in this case be sure to use
  "sudo make install" instead of "make install" in the last step.)
 
