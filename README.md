@@ -52,7 +52,7 @@ make install
  "sudo make install" instead of "make install" in the last step.)
 
 These steps will download the source-code, create a build-directory,
-then configure and build relion, and lastely install it to be generally
+then configure and build relion, and lastly install it to be generally
 available on the system.
 
 
