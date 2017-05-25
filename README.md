@@ -46,10 +46,11 @@ cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ ..
 make -j4
 make install
 ```
-(NOTE: "/where/to/install/ .." is typically "/usr/local/relion"
+(NOTES: "/where/to/install/ .." is typically "/usr/local/relion".
  Make sure you create this directory beforehand.
- You can do this using "sudo mkdir /usr/local/relion".  In that case, be sure
- to use "sudo make install" instead of "make install" in the last step.)
+ You can do this using "sudo mkdir /usr/local/relion".
+ Installing to that location requires sudo, so in this case be sure to use
+ "sudo make install" instead of "make install" in the last step.)
 
 These steps will download the source-code, create a build-directory,
 then configure and build relion, and lastely install it to be generally
@@ -67,6 +68,6 @@ cd relion
 git pull
 cd build
 make -j4
-make
+make install  # or "sudo make install"
 
 ```
