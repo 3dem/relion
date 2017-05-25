@@ -128,8 +128,8 @@ public:
 	// Radial average of the estimated variance in the reconstruction (inverse of left-hand side in Wiener-filter-like update formula)
 	std::vector<MultidimArray<RFLOAT > > sigma2_class;
 
-	// FSC spectra between random halves of the data
-	MultidimArray<RFLOAT > fsc_halves_class;
+	// FSC spectra between random halves of the data (multiple ones for each body in multibody-refinement)
+	std::vector< MultidimArray<RFLOAT > > fsc_halves_class;
 
 	// One likelihood vs prior ratio spectrum for each class
 	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;

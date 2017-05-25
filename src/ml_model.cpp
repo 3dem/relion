@@ -46,7 +46,7 @@ void MlModel::initialise(bool _do_sgd)
     sigma2_noise.resize(nr_groups, aux);
     nr_particles_group.resize(nr_groups);
     tau2_class.resize(nr_classes * nr_bodies, aux);
-    fsc_halves_class.resize(aux);
+    fsc_halves_class.resize(nr_bodies, aux);
     sigma2_class.resize(nr_classes * nr_bodies, aux);
     data_vs_prior_class.resize(nr_classes * nr_bodies, aux);
     fourier_coverage_class.resize(nr_classes * nr_bodies, aux);
@@ -256,7 +256,7 @@ void MlModel::read(FileName fn_in)
 				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
 			if (!MDsigma.getValue(EMDL_MLMODEL_DATA_VS_PRIOR_REF, data_vs_prior_class[iclass](idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_TAU2_REF, tau2_class[iclass](idx)) ||
-			    !MDsigma.getValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class(idx)) ||
+			    !MDsigma.getValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class[iclass](idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](idx)))
 				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
 			// backwards compatible with STAR files without Fourier coverage
@@ -546,7 +546,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
 			MDsigma.setValue(EMDL_RESOLUTION_ANGSTROM, getResolutionAngstrom(ii));
 			MDsigma.setValue(EMDL_MLMODEL_DATA_VS_PRIOR_REF, data_vs_prior_class[iclass](ii));
-			MDsigma.setValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class(ii));
+			MDsigma.setValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_REF, fourier_coverage_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_TAU2_REF, tau2_class[iclass](ii));
@@ -913,7 +913,8 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
     // And spectrum is squared, so ori_size*ori_size in the 3D case!
 	RFLOAT normfft = (ref_dim == 3 && data_dim == 2) ? (RFLOAT)(ori_size * ori_size) : 1.;
 
-    for (int iclass = 0; iclass < nr_classes; iclass++)
+	int nr_classes_bodies = nr_classes * nr_bodies; // also set multiple bodies!
+    for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 	{
 		// Initialise output arrays to correct size
 		tau2_class[iclass].resize(sigma2_noise[0]);
@@ -938,7 +939,7 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 
 		// Calculate data_vs_prior_class as spectral_nr_observations_per_class/sigma2_noise vs 1/tau2_class
 		data_vs_prior_class[iclass].resize(sigma2_noise[0]);
-		fsc_halves_class.initZeros(sigma2_noise[0]);
+		fsc_halves_class[iclass].initZeros(sigma2_noise[0]);
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
 		{
 			RFLOAT evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);

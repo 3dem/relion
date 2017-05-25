@@ -1331,9 +1331,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Multi-body refinement
 		if (mymodel.nr_bodies > 1)
 		{
-			// TODO: fix this!
-			do_norm_correction = false;
-
 			// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
 			mydata.initialiseBodies(mymodel.nr_bodies);
 		}
@@ -3545,7 +3542,7 @@ void MlOptimiser::maximization()
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 						sgd_tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 						mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-						mymodel.fsc_halves_class, wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
+						mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
 
 				// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
 				// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
@@ -3580,7 +3577,7 @@ void MlOptimiser::maximization()
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 						mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 						mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-						mymodel.fsc_halves_class, wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
+						mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
 
 				// For multi-body refinements: place each body back at its COM
 				if (mymodel.nr_bodies > 1)
@@ -3634,7 +3631,7 @@ void MlOptimiser::maximizationOtherParameters()
 		mymodel.avg_norm_correction += (1. - mu) * wsum_model.avg_norm_correction / sum_weight;
 	}
 
-	if (do_scale_correction && !((iter==1 && do_firstiter_cc) || do_always_cc) )
+	if (do_scale_correction && !( (iter==1 && do_firstiter_cc) || do_always_cc ) )
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
@@ -4206,9 +4203,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		// Which group do I belong?
 		int group_id = mydata.getGroupId(part_id);
 
-		// Get the norm_correction
-		int icol_norm = (mymodel.nr_bodies == 1) ? METADATA_NORM : 6 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-		RFLOAT normcorr = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_norm);
+		// Get the norm_correction (for multi-body refinement: still use the one from the consensus refinement!)
+		RFLOAT normcorr = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM);
 
 		// Get the old offsets and the priors on the offsets
 		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3);
@@ -7118,7 +7114,8 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 
 		// Store norm_correction
 		// Multiply by old value because the old norm_correction term was already applied to the image
-		if (do_norm_correction)
+		// Don't do this for multi-body refinement, where one always uses the normcorrection from the consensus refinement
+		if (do_norm_correction && mymodel.nr_bodies == 1)
 		{
 			RFLOAT old_norm_correction = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM);
 			old_norm_correction /= mymodel.avg_norm_correction;
@@ -7407,7 +7404,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 
 	std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
 	init_progress_bar(n_trials * mymodel.nr_classes);
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
 
 		// Don't do this for (almost) empty classes
