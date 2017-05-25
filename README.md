@@ -3,13 +3,13 @@
 #RELION
 
 
-RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer 
-program for Maximum A Posteriori refinement of (multiple) 3D reconstructions 
-or 2D class averages in cryo-electron microscopy. It is developed in the 
-research group of Sjors Scheres at the MRC Laboratory of Molecular Biology. 
+RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
+program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
+or 2D class averages in cryo-electron microscopy. It is developed in the
+research group of Sjors Scheres at the MRC Laboratory of Molecular Biology.
 
 The underlying theory of MAP refinement is given in a [scientific publication](https://www.ncbi.nlm.nih.gov/pubmed/22100448)
-. If RELION is useful in your work, please cite this paper. 
+. If RELION is useful in your work, please cite this paper.
 
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
@@ -17,15 +17,15 @@ The more comprehensive documentation of RELION is stored on the [Wiki](http://ww
 ##Installation
 
 
-More extensive options and configurations are available 
+More extensive options and configurations are available
 [here](http://www2.mrc-lmb.cam.ac.uk/relion/index.php/Download_%26_install),
-but the outlines to clone and install relion for typical use are made easy 
+but the outlines to clone and install relion for typical use are made easy
 through [cmake](https://en.wikipedia.org/wiki/CMake).
 
-On ubuntu machines, installing cmake is as easy as 
+On ubuntu machines, installing cmake is as easy as
 
 ```
-sudo apt install cmake
+sudo apt install cmake build-essential mpi-default-bin mpi-default-dev libfftw3-dev
 ```
 
 On other systems it is typically just as easy, you simply have to modify "apt" to
@@ -47,12 +47,12 @@ make -j4
 make install
 ```
 
-These steps will download the source-code, create a build-directory, 
+These steps will download the source-code, create a build-directory,
 then configure and build relion, and lastely install it to be generally
 available on the system.
 
 
-##Updating 
+##Updating
 
 
 RELION is intermittently updated, with both minor and major features.
