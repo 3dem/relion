@@ -68,6 +68,6 @@ cd relion
 git pull
 cd build
 make -j4
-make install  # or "sudo make install"
+make install    # (or "sudo make install")
 
 ```
