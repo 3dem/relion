@@ -22,7 +22,7 @@ More extensive options and configurations are available
 but the outlines to clone and install relion for typical use are made easy
 through [cmake](https://en.wikipedia.org/wiki/CMake).
 
-On ubuntu machines, installing cmake is as easy as
+On ubuntu machines, installing cmake, the compiler, and additional dependencies (mpi, fftw) is as easy as:
 
 ```
 sudo apt install cmake build-essential mpi-default-bin mpi-default-dev libfftw3-dev
