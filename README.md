@@ -42,11 +42,11 @@ git clone https://github.com/3dem/relion.git
 cd relion
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ ..
+cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/..
 make -j4
 make install
 ```
-(NOTES: "/where/to/install/ .." is typically "/usr/local/relion".
+(NOTES: "/where/to/install/.." is typically "/usr/local/relion".
  Make sure you create this directory beforehand.
  Installing to that location requires sudo, so in this case be sure to use
  "sudo make install" instead of "make install" in the last step.)
