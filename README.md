@@ -1,6 +1,6 @@
 
 
-#RELION
+# RELION
 
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
@@ -14,7 +14,7 @@ The underlying theory of MAP refinement is given in a [scientific publication](h
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
 
-##Installation
+## Installation
 
 
 More extensive options and configurations are available
@@ -46,21 +46,26 @@ cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ ..
 make -j4
 make install
 ```
+(NOTE: "/where/to/install/ .." is typically "/usr/local/relion"
+ Make sure you create this directory beforehand.
+ You can do this using "sudo mkdir /usr/local/relion".  In that case, be sure
+ to use "sudo make install" instead of "make install" in the last step.)
 
 These steps will download the source-code, create a build-directory,
 then configure and build relion, and lastely install it to be generally
 available on the system.
 
 
-##Updating
+## Updating
 
 
 RELION is intermittently updated, with both minor and major features.
 To update an existing installation, simply use the following commands
 
 ```
-cd relion/build
+cd relion
 git pull
+cd build
 make -j4
 make
 
