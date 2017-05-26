@@ -67,7 +67,7 @@
 #define METADATA_BEAMTILT_X 26
 #define METADATA_BEAMTILT_Y 27
 #define METADATA_LINE_LENGTH_BEFORE_BODIES 28
-#define METADATA_NR_BODY_PARAMS 7
+#define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
 #define DONT_WRITE_DATA false
@@ -129,6 +129,9 @@ public:
 
 	// Filename for input masks for multi-body refinement
 	FileName fn_body_masks;
+
+	// Initialise bodies for a new multi-body refinement
+	bool do_initialise_bodies;
 
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;

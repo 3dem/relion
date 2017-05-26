@@ -65,6 +65,14 @@ enum EMDLabel
     EMDL_AREA_NAME, ///< Name for the area (or field of view). If one does not use (tilt) series, area would be the same as micrograph...
     EMDL_COMMENT, // The EMDL_COMMENT is handled specially as well
 
+    EMDL_BODY_MASK_NAME, ///< For multi-body refinements
+    EMDL_BODY_ROTATE_RELATIVE_TO,
+    EMDL_BODY_SIGMA_ANG,
+    EMDL_BODY_SIGMA_ROT,
+    EMDL_BODY_SIGMA_TILT,
+    EMDL_BODY_SIGMA_PSI,
+	EMDL_BODY_STAR_FILE,
+
     EMDL_CTF_BFACTOR, ///< B-factor
     EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
     EMDL_CTF_VALIDATIONSCORE, ///< Gctf-based validation score for CTF fit
@@ -122,8 +130,6 @@ enum EMDLabel
     EMDL_IMAGE_STATS_KURT,
     EMDL_IMAGE_WEIGHT,
 
-    EMDL_MASK_NAME,
-
     EMDL_MATRIX_1_1,
     EMDL_MATRIX_1_2,
     EMDL_MATRIX_1_3,
@@ -141,6 +147,8 @@ enum EMDLabel
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
+
+	EMDL_MASK_NAME,
 
     EMDL_MLMODEL_ACCURACY_ROT,
     EMDL_MLMODEL_ACCURACY_TRANS,
@@ -457,6 +465,14 @@ private:
 
         EMDL::addLabel(EMDL_AREA_ID, EMDL_LONG, "rlnAreaId", "ID (i.e. a unique number) of an area (i.e. field-of-view)");
         EMDL::addLabel(EMDL_AREA_NAME, EMDL_STRING, "rlnAreaName", "Name of an area (i.e. field-of-view)");
+
+        EMDL::addLabel(EMDL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a [0,1] body mask for multi-body refinement");
+        EMDL::addLabel(EMDL_BODY_ROTATE_RELATIVE_TO, EMDL_INT, "rlnBodyRotateRelativeTo", "Number of the body relative to which this body rotates (or is connected to)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_ANG, EMDL_DOUBLE, "rlnBodySigmaAngles", "Width of prior on all three Euler angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_ROT, EMDL_DOUBLE, "rlnBodySigmaRot", "Width of prior on rot angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_TILT, EMDL_DOUBLE, "rlnBodySigmaTilt", "Width of prior on tilt angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_PSI, EMDL_DOUBLE, "rlnBodySigmaPsi", "Width of prior on psi angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_STAR_FILE, EMDL_STRING, "rlnBodyStarFile", "Name of STAR file with body masks and metadata");
 
     	EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
     	EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");

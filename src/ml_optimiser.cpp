@@ -129,7 +129,22 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_force_converge =  parser.checkOption("--force_converge", "Force an auto-refinement run to converge immediately upon continuation.");
 
+	// For multi-body refinement
+	bool fn_body_masks_was_empty = (fn_body_masks == "");
 	std::string fnt;
+	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
+	if (fnt != "OLD")
+		fn_body_masks = fnt;
+
+	// Is this a new multi-body refinement?
+	if (fn_body_masks_was_empty && fn_body_masks != "")
+		do_initialise_bodies = true;
+	else
+		do_initialise_bodies = false;
+
+	if (do_initialise_bodies)
+		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
+
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
 	if (fnt != "OLD")
 		nr_iter = textToInteger(fnt);
@@ -214,8 +229,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		adaptive_oversampling = textToInteger(fnt);
 
 	// Check whether angular sampling has changed
-	// Do not do this for auto_refine, but make sure to do this when realigning movies!
-	if (!do_auto_refine || fn_data_movie != "")
+	// Do not do this for auto_refine, but make sure to do this when realigning movies and when initialising multi-body refinement!
+	if (!do_auto_refine || fn_data_movie != ""|| do_initialise_bodies)
 	{
 		directions_have_changed = false;
 		fnt = parser.getOption("--healpix_order", "Healpix order for the angular sampling rate on the sphere (before oversampling): hp2=15deg, hp3=7.5deg, etc", "OLD");
@@ -380,7 +395,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
-    fn_body_masks = parser.getOption("--multibody_masks", "STAR file with binary masks for multi-body refinement", "");
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -422,7 +436,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_solvent = parser.checkOption("--flatten_solvent", "Perform masking on the references as well?");
 	fn_mask = parser.getOption("--solvent_mask", "User-provided mask for the references (default is to use spherical mask with particle_diameter)", "None");
 	fn_mask2 = parser.getOption("--solvent_mask2", "User-provided secondary mask (with its own average density)", "None");
-    fn_body_masks = parser.getOption("--multibody_masks", "STAR file with binary masks for multi-body refinement", "");
     fn_tau = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "None");
 	fn_local_symmetry = parser.getOption("--local_symmetry", "Local symmetry description file containing list of masks and their operators", "None");
     do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
@@ -625,6 +638,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
     // Never realign movies from the start
     do_realign_movies = false;
+    do_initialise_bodies = false;
 
     // Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
@@ -773,6 +787,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		write_every_subset = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets))
 		sgd_max_subsets = -1;
+	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
+		fn_body_masks = "";
 
     if (do_split_random_halves &&
     		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -814,6 +830,16 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	{
 		mymodel.read(fn_model);
 	}
+
+    if (fn_body_masks != "")
+    {
+    	// Set up the bodies in the model
+    	mymodel.initialiseBodies(fn_body_masks, fn_out);
+
+    	if (mymodel.nr_bodies != mydata.nr_bodies)
+    		REPORT_ERROR("ERROR: Unequal number of bodies in model.star and data.star files!");
+    }
+
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::readStar before sampling."<<std::endl;
 #endif
@@ -913,6 +939,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, do_solvent);
 		MD.setValue(EMDL_OPTIMISER_SOLVENT_MASK_NAME, fn_mask);
 		MD.setValue(EMDL_OPTIMISER_SOLVENT_MASK2_NAME, fn_mask2);
+		MD.setValue(EMDL_BODY_STAR_FILE, fn_body_masks);
 		MD.setValue(EMDL_OPTIMISER_TAU_SPECTRUM_NAME, fn_tau);
 		MD.setValue(EMDL_OPTIMISER_COARSE_SIZE, coarse_size);
 		MD.setValue(EMDL_OPTIMISER_MAX_COARSE_SIZE, max_coarse_size);
@@ -1139,7 +1166,7 @@ void MlOptimiser::initialise()
 		initialLowPassFilterReferences();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
+	if (iter == 0 && !do_initialise_bodies)
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Check minimum group size of 10 particles
@@ -1189,7 +1216,6 @@ void MlOptimiser::initialise()
 
 void MlOptimiser::initialiseGeneral(int rank)
 {
-
 #ifdef DEBUG
 	std::cerr << "Entering initialiseGeneral" << std::endl;
 #endif
@@ -1310,12 +1336,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (parser.checkForErrors(verb))
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-	// For multi-body refinement: Read in the masks in the input STAR file, add a soft-edge to them, and write them to disc with the standard name
-	if (fn_body_masks != "")
-		mymodel.initialiseBodyMasks(fn_body_masks, fn_out);
-	else
-		mymodel.nr_bodies = 1;
-
 	// If we are not continuing an old run, now read in the data and the reference images
 	if (iter == 0)
 	{
@@ -1327,13 +1347,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 			do_preread = false; // as we will overwrite mydata.read with the movies anyway....
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 		mydata.read(fn_data, true, false, do_preread, is_helical_segment); // true means ignore original particle name
-
-		// Multi-body refinement
-		if (mymodel.nr_bodies > 1)
-		{
-			// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
-			mydata.initialiseBodies(mymodel.nr_bodies);
-		}
 
 		// Also get original size of the images to pass to mymodel.read()
 		int ori_size = -1;
@@ -1425,19 +1438,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	}
 
-	if (mymodel.nr_bodies > 1)
-	{
-		if (mymodel.nr_classes > 1)
-			REPORT_ERROR("ERROR: One cannot use multiple classes with multi-body refinement!");
-		if (do_sgd)
-			REPORT_ERROR("ERROR: One cannot use SGD with multi-body refinement!");
-		if (do_helical_refine)
-			REPORT_ERROR("ERROR: One cannot use helical symmetry with multi-body refinement!");
-		if (!do_split_random_halves)
-			REPORT_ERROR("ERROR: One has to use split random halves with multi-body refinement!");
-
-	}
-
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
 		REPORT_ERROR("ERROR: One cannot use --split_random_halves with more than 1 reference... You could first classify, and then refine each class separately using --random_halves.");
 
@@ -1449,6 +1449,55 @@ void MlOptimiser::initialiseGeneral(int rank)
 	fn_local_symmetry_operators.clear();
 	if (fn_local_symmetry != "None")
 		readRelionFormatMasksAndOperators(fn_local_symmetry, fn_local_symmetry_masks, fn_local_symmetry_operators, mymodel.pixel_size, false);
+
+	// For multi-body refinement: Read in the masks in the input STAR file, add a soft-edge to them, and write them to disc with the standard name
+	if (do_initialise_bodies)
+	{
+
+		if (verb > 0)
+			std::cout << " + Initialising multi-body refinement ..." << std::endl;
+
+		if (mymodel.nr_classes > 1)
+			REPORT_ERROR("ERROR: One cannot use multiple classes with multi-body refinement!");
+		if (do_sgd)
+			REPORT_ERROR("ERROR: One cannot use SGD with multi-body refinement!");
+		if (do_helical_refine)
+			REPORT_ERROR("ERROR: One cannot use helical symmetry with multi-body refinement!");
+		if (!do_split_random_halves)
+			REPORT_ERROR("ERROR: One has to use split random halves with multi-body refinement!");
+
+		// This reads the masks, calculates com_bodies and orient_bodies
+		mymodel.initialiseBodies(fn_body_masks, fn_out, true);
+
+		// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
+		mydata.initialiseBodies(mymodel.nr_bodies);
+
+		// Always perform local searches in auto-refinement with multiple bodies!
+		autosampling_hporder_local_searches = sampling.healpix_order;
+
+		nr_iter_wo_resol_gain = 0;
+	    nr_iter_wo_large_hidden_variable_changes = 0;
+	    current_changes_optimal_classes = 9999999;
+	    current_changes_optimal_offsets = 999.;
+	    current_changes_optimal_orientations = 999.;
+	    smallest_changes_optimal_classes = 9999999;
+	    smallest_changes_optimal_offsets = 999.;
+	    smallest_changes_optimal_orientations = 999.;
+
+	    // We're not using pdf_directions anyway (only in wsum for bild file), so reset the sizes of the vectors just in case
+	    directions_have_changed = true;
+
+		// TMP?
+		do_norm_correction = false;
+
+		// Start at iteration 1 again
+		iter = 0;
+
+	}
+	else if (fn_body_masks == "")
+	{
+		mymodel.nr_bodies = 1;
+	}
 
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
@@ -1539,6 +1588,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		{
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
 
@@ -1631,7 +1681,7 @@ void MlOptimiser::initialiseGeneral(int rank)
     	std::cout << " Using bimodal priors on the psi angle..." << std::endl;
 
 	// Resize the pdf_direction arrays to the correct size and fill with an even distribution
-	if (directions_have_changed)
+    if (directions_have_changed)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
@@ -3631,7 +3681,8 @@ void MlOptimiser::maximizationOtherParameters()
 		mymodel.avg_norm_correction += (1. - mu) * wsum_model.avg_norm_correction / sum_weight;
 	}
 
-	if (do_scale_correction && !( (iter==1 && do_firstiter_cc) || do_always_cc ) )
+	// Don't update scales in maxCC or in multi-body refinement
+	if (do_scale_correction && !( (iter==1 && do_firstiter_cc) || do_always_cc || mymodel.nr_bodies > 1 ) )
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
@@ -3706,7 +3757,10 @@ void MlOptimiser::maximizationOtherParameters()
 			else
 				mymodel.prior_offset_class[iclass].initZeros();
 		}
+	}
 
+	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+	{
 		// Use sampling.NrDirections() to include all directions (also those with zero prior probability for any given image)
 		if (!(do_skip_align || do_skip_rotate))
 		{
@@ -4208,7 +4262,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 		// Get the old offsets and the priors on the offsets
 		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3);
-		int icol_xoff, icol_yoff, icol_zoff;
+		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF);
 		XX(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF_PRIOR);
 		YY(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_YOFF);
@@ -4258,14 +4312,32 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		if (mymodel.data_dim == 3 && ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
 			ZZ(my_prior) = 0.;
 
-		if (mymodel.orientational_prior_mode != NOPRIOR && !(do_skip_align || do_skip_rotate || do_only_sample_tilt))
+		// Orientational priors
+		if (mymodel.nr_bodies > 1 )
+		{
+
+			// Second, centre local searches around the orientation from the previous iteration, this one goes with overall sigma2_ang
+			icol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			icol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			icol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			RFLOAT prior_rot  = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_rot);
+			RFLOAT prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt);
+			RFLOAT prior_psi =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_psi);
+			sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
+									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
+									exp_pointer_dir_nonzeroprior, exp_directions_prior,
+									exp_pointer_psi_nonzeroprior, exp_psi_prior, false, 3.,
+									mymodel.sigma_tilt_bodies[ibody], mymodel.sigma_psi_bodies[ibody]);
+
+		}
+		else if (mymodel.orientational_prior_mode != NOPRIOR && !(do_skip_align || do_skip_rotate || do_only_sample_tilt))
 		{
 			// First try if there are some fixed prior angles
-			// For multi-body refinements, have the prior angles set to zero
-			RFLOAT prior_rot =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
-			RFLOAT prior_tilt = (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
-			RFLOAT prior_psi =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
-			RFLOAT prior_psi_flip_ratio =  (mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
+			// For multi-body refinements, ignore the original priors and get the refined residual angles from the previous iteration
+			RFLOAT prior_rot =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_ROT_PRIOR);
+			RFLOAT prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_TILT_PRIOR);
+			RFLOAT prior_psi =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR);
+			RFLOAT prior_psi_flip_ratio = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
@@ -4284,7 +4356,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
 				prior_psi_flip_ratio = 0.5;
 
-			////////// How does this work now: each particle has a different sampling object?!!!
 			// Select only those orientations that have non-zero prior probability
 			// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
 			if (do_helical_refine)
@@ -4823,7 +4894,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 										DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_tilt),
 										DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi), Aresi, false);
 					// The real orientation to be applied is the obody transformation applied and the original one
-					Abody = Aresi * Aori;
+					Abody = (mymodel.orient_bodies[obody]).transpose() * Aresi * mymodel.orient_bodies[obody] * Aori;
 
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
@@ -4855,9 +4926,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					std::cerr << " other_projected_com= " << other_projected_com << std::endl;
 #endif
 
-
-					// Subtract Refined obody-displacement
-					// TODO: check whether this is add/subtract!!! I think subtract, as offsets are opposite sign to COMs...
+					// Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
 					if (mymodel.data_dim == 3)
@@ -4870,8 +4939,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					// Subtract the projected COM already applied to this image for ibody
 					other_projected_com -= my_projected_com;
 					// And add the refined displacement to this image for ibody
-					// TODO: check add/subtract. Again think add because of opposite signs COMs and offsets...
-
 					other_projected_com += my_old_body_offset;
 
 #ifdef DEBUG_BODIES
@@ -5371,7 +5438,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 							// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
 							if (mymodel.nr_bodies > 1)
 							{
-								Abody = A * Aori;
+								Abody =  (mymodel.orient_bodies[ibody]).transpose() * A * mymodel.orient_bodies[ibody] * Aori;
 								(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
 							}
 							else
@@ -6448,7 +6515,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 	thr_wsum_sigma2_noise.resize(mymodel.nr_groups, zeroArray);
 	// wsum_pdf_direction is a 1D-array (of length sampling.NrDirections()) for each class
 	zeroArray.initZeros(sampling.NrDirections());
-	thr_wsum_pdf_direction.resize(mymodel.nr_classes, zeroArray);
+	thr_wsum_pdf_direction.resize(mymodel.nr_classes * mymodel.nr_bodies, zeroArray);
 	// sumw_group is a RFLOAT for each group
 	thr_sumw_group.resize(mymodel.nr_groups, 0.);
 	// wsum_pdf_class is a RFLOAT for each class
@@ -6488,7 +6555,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 
 						// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
 						if (mymodel.nr_bodies > 1)
-							Abody = A * Aori;
+							Abody = (mymodel.orient_bodies[ibody]).transpose() * A * mymodel.orient_bodies[ibody] * Aori;
 
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
@@ -6844,7 +6911,10 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											{
 												// In the case of orientational priors, get the original number of the direction back
 												long int mydir = exp_pointer_dir_nonzeroprior[idir];
-												DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
+												if (mymodel.nr_bodies > 1)
+													DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ibody], mydir) += weight;
+												else
+													DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += weight;
 											}
 
 #ifdef TIMING
@@ -7114,7 +7184,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 
 		// Store norm_correction
 		// Multiply by old value because the old norm_correction term was already applied to the image
-		// Don't do this for multi-body refinement, where one always uses the normcorrection from the consensus refinement
+		// Don't do this for multi-body refinement, where one always uses the norm_correction from the consensus refinement
 		if (do_norm_correction && mymodel.nr_bodies == 1)
 		{
 			RFLOAT old_norm_correction = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM);
@@ -7241,6 +7311,10 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 				REPORT_ERROR("XSIZE(wsum_model.pdf_direction[n]) != XSIZE(thr_wsum_pdf_direction[n])");
 			}
 #endif
+		}
+
+		for (int n = 0; n < mymodel.nr_classes * mymodel.nr_bodies; n++)
+		{
 			if (!(do_skip_align || do_skip_rotate) )
 				wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
 		}
@@ -7297,35 +7371,69 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 			}
 #endif
 
-			// Old optimal parameters
-			RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
-			int old_iclass;
-			mydata.MDimg.getValue(EMDL_ORIENT_ROT,  old_rot, part_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_TILT, old_tilt, part_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, old_xoff, part_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, old_yoff, part_id);
-			if (mymodel.data_dim == 3)
-				mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z, old_zoff, part_id);
-			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, old_iclass, part_id);
+			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+			{
 
-			// New optimal parameters
-			RFLOAT rot = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ROT);
-			RFLOAT tilt = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_TILT);
-			RFLOAT psi = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_PSI);
-			RFLOAT xoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_XOFF);
-			RFLOAT yoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_YOFF);
-			RFLOAT zoff = 0.;
-			if (mymodel.data_dim == 3)
-				zoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ZOFF);
-			int iclass = (int)DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CLASS);
+				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
+				RFLOAT rot, tilt, psi, xoff, yoff, zoff = 0.;
+				int old_iclass, iclass;
 
-			// Some orientational distance....
-			sum_changes_optimal_orientations += sampling.calculateAngularDistance(rot, tilt, psi, old_rot, old_tilt, old_psi);
-			sum_changes_optimal_offsets += (xoff-old_xoff)*(xoff-old_xoff) + (yoff-old_yoff)*(yoff-old_yoff) + (zoff-old_zoff)*(zoff-old_zoff);
-			if (iclass != old_iclass)
-				sum_changes_optimal_classes += 1.;
-			sum_changes_count += 1.;
+				if (mymodel.nr_bodies > 1)
+				{
+
+					// Old optimal parameters
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT,  old_rot, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, old_tilt, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X, old_xoff, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y, old_yoff, part_id);
+					if (mymodel.data_dim == 3)
+						mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z, old_zoff, part_id);
+					old_iclass = 0;
+
+					// New optimal parameters
+					rot = DIRECT_A2D_ELEM(exp_metadata, my_image_no, 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+					tilt = DIRECT_A2D_ELEM(exp_metadata, my_image_no, 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+					psi = DIRECT_A2D_ELEM(exp_metadata, my_image_no, 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+					xoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS );
+					yoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+					if (mymodel.data_dim == 3)
+						zoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+					iclass = 0;
+
+				}
+				else
+				{
+
+					// Old optimal parameters
+					mydata.MDimg.getValue(EMDL_ORIENT_ROT,  old_rot, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_TILT, old_tilt, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, old_xoff, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, old_yoff, part_id);
+					if (mymodel.data_dim == 3)
+						mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z, old_zoff, part_id);
+					mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, old_iclass, part_id);
+
+					// New optimal parameters
+					rot = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ROT);
+					tilt = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_TILT);
+					psi = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_PSI);
+					xoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_XOFF);
+					yoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_YOFF);
+					if (mymodel.data_dim == 3)
+						zoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ZOFF);
+					iclass = (int)DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CLASS);
+
+				}
+
+				// Some orientational distance....
+				sum_changes_optimal_orientations += sampling.calculateAngularDistance(rot, tilt, psi, old_rot, old_tilt, old_psi);
+				sum_changes_optimal_offsets += (xoff-old_xoff)*(xoff-old_xoff) + (yoff-old_yoff)*(yoff-old_yoff) + (zoff-old_zoff)*(zoff-old_zoff);
+				if (iclass != old_iclass)
+					sum_changes_optimal_classes += 1.;
+				sum_changes_count += 1.;
+			}
 		} // end loop part_id (i)
 	} //end loop ori_part_id
 
@@ -7403,12 +7511,12 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 	//	pvalue *= 2.;
 
 	std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
-	init_progress_bar(n_trials * mymodel.nr_classes);
+	init_progress_bar(n_trials * mymodel.nr_classes * mymodel.nr_bodies);
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
 
-		// Don't do this for (almost) empty classes
-		if (mymodel.pdf_class[iclass] < 0.01)
+		// Don't do this for (almost) empty classes, but always for multi-body refinement
+		if (mymodel.nr_bodies == 1 && mymodel.pdf_class[iclass] < 0.01)
 		{
 			mymodel.acc_rot[iclass]   = 999.;
 			mymodel.acc_trans[iclass] = 999.;
@@ -7754,7 +7862,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 		//		<< 8 * PI * PI * mymodel.pixel_size * mymodel.pixel_size * acc_trans_class * acc_trans_class << std::endl;
 
 	} // end loop iclass
-	progress_bar(n_trials * mymodel.nr_classes);
+	progress_bar(n_trials * mymodel.nr_classes * mymodel.nr_bodies);
 
 
 	std::cout << " Auto-refine: Estimated accuracy angles= " << acc_rot<< " degrees; offsets= " << acc_trans << " pixels" << std::endl;
@@ -8092,14 +8200,12 @@ void MlOptimiser::setMetaDataSubset(int first_ori_particle_id, int last_ori_part
 					int icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_norm = 6 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					RFLOAT rot =  DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_rot);
 					RFLOAT tilt = DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_tilt);
 					RFLOAT psi =  DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_psi);
 					RFLOAT xoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_xoff);
 					RFLOAT yoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_yoff);
 					RFLOAT zoff = DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_zoff);
-					RFLOAT norm = DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_norm);
 					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ROT, rot, part_id);
 					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_TILT, tilt, part_id);
 					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_PSI,  psi, part_id);
@@ -8107,7 +8213,6 @@ void MlOptimiser::setMetaDataSubset(int first_ori_particle_id, int last_ori_part
 					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Y, yoff, part_id);
 					if (mymodel.data_dim == 3)
 						mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Z, zoff, part_id);
-					mydata.MDbodies[ibody].setValue(EMDL_IMAGE_NORM_CORRECTION, norm, part_id);
 				}
 			}
 
@@ -8404,8 +8509,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 					int icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_norm = 6 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					RFLOAT rot, tilt, psi, xoff, yoff, zoff, norm;
+					RFLOAT rot, tilt, psi, xoff, yoff, zoff;
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT, rot, part_id);
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, tilt, part_id);
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  psi, part_id);
@@ -8413,14 +8517,12 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y, yoff, part_id);
 					if (mymodel.data_dim == 3)
 						mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z, zoff, part_id);
-					mydata.MDbodies[ibody].getValue(EMDL_IMAGE_NORM_CORRECTION, norm, part_id);
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_rot)  = rot;
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_tilt) = tilt;
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_psi)  = psi;
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_xoff) = xoff;
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_yoff) = yoff;
 					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_zoff) = zoff;
-					DIRECT_A2D_ELEM(exp_metadata, my_image_no, icol_norm) = norm;
 				}
 			}
 		}

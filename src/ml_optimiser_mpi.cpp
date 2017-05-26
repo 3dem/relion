@@ -497,7 +497,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	MlOptimiser::initialLowPassFilterReferences();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
+	if (iter == 0 && !do_initialise_bodies)
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
@@ -531,6 +531,8 @@ will still yield good performance and possibly a more stable execution. \n" << s
             std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
 		}
 	}
+	/// tmp
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	// Do this after writing out the model, so that still the random halves are written in separate files.
 	if (do_realign_movies)
@@ -2467,11 +2469,15 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			else
 				fn_root.compose(fn_root+"_class", 1, "", 3);
 
-			// This only works for do_auto_refine, so iclass=0
-			// TODO: introduce multi-bodies here!!!!
 			BackProjector BPextra(wsum_model.BPref[ibody]);
 
 			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+
+			if (mymodel.nr_bodies > 1)
+			{
+				// 19may2015 translate the reconstruction back to its C.O.M.
+				selfTranslate(Iunreg(), mymodel.com_bodies[ibody], DONT_WRAP);
+			}
 
 			// Update header information
 			RFLOAT avg, stddev, minval, maxval;
@@ -2546,6 +2552,10 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			Imask().setXmippOrigin();
 			Iunreg1() *= Imask();
 			Iunreg2() *= Imask();
+
+			Iunreg1.write("test1.spi");
+			Iunreg1.write("test2.spi");
+
 			getFSC(Iunreg1(), Iunreg2(), fsc_masked);
 
 			// To save memory re-read the same input maps again and randomize phases before masking

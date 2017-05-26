@@ -40,8 +40,11 @@ void MlModel::initialise(bool _do_sgd)
     Iref.resize(nr_classes * nr_bodies);
     masks_bodies.resize(nr_bodies);
     com_bodies.resize(nr_bodies);
-    pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
-    pdf_direction.resize(nr_classes);
+    orient_bodies.resize(nr_bodies);
+	sigma_tilt_bodies.resize(nr_bodies);
+	sigma_psi_bodies.resize(nr_bodies);
+	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
+    pdf_direction.resize(nr_classes * nr_bodies);
     group_names.resize(nr_groups, "");
     sigma2_noise.resize(nr_groups, aux);
     nr_particles_group.resize(nr_groups);
@@ -190,21 +193,8 @@ void MlModel::read(FileName fn_in)
 			if (!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(prior_offset_class[iclass])) ||
 				!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(prior_offset_class[iclass])) )
 				REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no offset priors for 2D classes");
-		if (nr_bodies == 1)
-		{
-			if (!MDclass.getValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass]) )
-				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no pdf_class");
-		}
-		else
-		{
-			// Read in mask for this body
-			if (!MDclass.getValue(EMDL_MASK_NAME, fn_tmp2) )
-				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no body mask name");
-			Image<RFLOAT> It;
-			It.read(fn_tmp2);
-			It().setXmippOrigin();
-			masks_bodies[iclass] = It();
-		}
+		if (!MDclass.getValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass]) )
+			REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no pdf_class");
 		if (is_helix)
 		{
 			if (!MDclass.getValue(EMDL_MLMODEL_HELICAL_RISE, helical_rise[iclass]) ||
@@ -401,15 +391,27 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			// Also write out bild files with the orientational distribution of each class
 			// Also write out angular distributions
     		// Don't do this for bodies, only for classes!
-			for (int iclass = 0; iclass < nr_classes; iclass++)
+			for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 			{
 				FileName fn_bild;
-				fn_bild.compose(fn_out+"_class",iclass+1,"", 3);
+		  		if (nr_bodies > 1)
+		  			fn_bild.compose(fn_out+"_body",iclass+1,"", 3);
+		  		else
+		  			fn_bild.compose(fn_out+"_class",iclass+1,"", 3);
 				fn_bild += "_angdist.bild";
 				RFLOAT offset = ori_size * pixel_size / 2.;
-				sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset, offset);
+				if (nr_bodies > 1)
+				{
+					sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset/2, offset,
+							&orient_bodies[iclass], &com_bodies[iclass]);
+				}
+				else
+				{
+					sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset, offset);
+				}
 			}
     	}
+
 	}
 
     // B. Write STAR file with metadata
@@ -504,10 +506,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				fn_tmp.compose(fn_out+"_grad",iclass+1,"mrc", 3);
 			MDclass.setValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp);
 		}
-
-		// Also set he maskname for multi-body refinement
-		if (nr_bodies > 1)
-			MDclass.setValue(EMDL_MASK_NAME, fn_tmp2);
 
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
@@ -801,7 +799,7 @@ void MlModel::initialisePdfDirection(int newsize)
 
 	// If the pdf_direction were already filled (size!=0), and newsize=oldsize then leave them as they were
 	// If they were still empty, or if the size changes, then initialise them with an even distribution
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
 	{
 		int oldsize = MULTIDIM_SIZE(pdf_direction[iclass]);
 		if (oldsize == 0 || oldsize != newsize)
@@ -814,21 +812,25 @@ void MlModel::initialisePdfDirection(int newsize)
 
 }
 
-void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
+void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest)
 {
 	MetaDataTable MD;
 	MD.read(fn_masks);
-	if (!MD.containsLabel(EMDL_MASK_NAME))
+	if (!MD.containsLabel(EMDL_BODY_MASK_NAME))
 		REPORT_ERROR("ERROR MlModel::initialiseBodyMasks: body-mask STAR file does not contain rlnBodyMaskName label.");
 
 	nr_bodies = 0;
 	masks_bodies.resize(MD.numberOfObjects());
 	com_bodies.resize(MD.numberOfObjects());
+	orient_bodies.resize(MD.numberOfObjects());
+	sigma_tilt_bodies.resize(MD.numberOfObjects());
+	sigma_psi_bodies.resize(MD.numberOfObjects());
 	FileName fn_mask;
 	Image<RFLOAT> Imask;
+	std::vector<int> relatives_to;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		MD.getValue(EMDL_MASK_NAME, fn_mask);
+		MD.getValue(EMDL_BODY_MASK_NAME, fn_mask);
 		Imask.read(fn_mask);
 		Imask().setXmippOrigin();
 		masks_bodies[nr_bodies] = Imask();
@@ -843,14 +845,89 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 			ZZ(com_bodies[nr_bodies]) = ROUND(ZZ(com));
 		else
 			ZZ(com_bodies[nr_bodies]) = 0.;
-		// Also write the mask with the standard name to disk
 
+		// Get which body to rotate relative to
+		int relative_to = -1;
+		if (MD.containsLabel(EMDL_BODY_ROTATE_RELATIVE_TO))
+		{
+			MD.getValue(EMDL_BODY_ROTATE_RELATIVE_TO, relative_to);
+			relative_to--;// numbering in STAR file starts with 1
+		}
+		relatives_to.push_back(relative_to);
+
+		RFLOAT val;
+		if (MD.containsLabel(EMDL_BODY_SIGMA_ANG))
+		{
+			MD.getValue(EMDL_BODY_SIGMA_ANG, val);
+			sigma_tilt_bodies[nr_bodies] = val;
+			sigma_psi_bodies[nr_bodies] = val;
+		}
+		else
+		{
+			if (!(MD.containsLabel(EMDL_BODY_SIGMA_TILT) && MD.containsLabel(EMDL_BODY_SIGMA_PSI)) )
+				REPORT_ERROR("ERROR: either provide rlnBodySigmaAngles OR provide rlnBodySigmaTilt and rlnBodySigmaPsi in the body STAR file.");
+			MD.getValue(EMDL_BODY_SIGMA_TILT, val);
+			sigma_tilt_bodies[nr_bodies] = val;
+			MD.getValue(EMDL_BODY_SIGMA_PSI, val);
+			sigma_psi_bodies[nr_bodies] = val;
+		}
+
+		// Also write the mask with the standard name to disk
 		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
 		fn_mask += "_mask.mrc";
 
 		Imask.write(fn_mask);
+
 		// update counter at the end!
 		nr_bodies++;
+	}
+
+	// Now that we have the COMs, also get the orientation matrix for each body
+	int relative_to = -1;
+	for (int ibody = 0; ibody < nr_bodies; ibody++)
+	{
+		int relative_to = relatives_to[ibody];
+		Matrix1D<RFLOAT> vec_relative_to(3);
+		if (relative_to >= 0)
+			vec_relative_to = com_bodies[relative_to];
+		else
+			vec_relative_to.initZeros(); // if no relative-bodies are specified in the STAR file, then rotate relative to (0,0,0)
+
+		vec_relative_to -= com_bodies[ibody];
+		std::cerr << " ibody= " << ibody << " vec_relative_to= " << vec_relative_to << " relative_to= "<< relative_to<< std::endl;
+		alignWithZ(-vec_relative_to, orient_bodies[ibody], false);
+	}
+
+
+	if (also_initialise_rest)
+	{
+		if (Iref.size() != 1)
+			REPORT_ERROR("BIG: at this point, there should only be a single reference!");
+
+		for (int ibody = 1; ibody < nr_bodies; ibody++)
+		{
+			Iref.push_back(Iref[0]);
+			tau2_class.push_back(tau2_class[0]);
+			fsc_halves_class.push_back(fsc_halves_class[0]);
+			sigma2_class.push_back(sigma2_class[0]);
+			data_vs_prior_class.push_back(data_vs_prior_class[0]);
+			fourier_coverage_class.push_back(fourier_coverage_class[0]);
+			acc_rot.push_back(acc_rot[0]);
+			acc_trans.push_back(acc_trans[0]);
+			estimated_resolution.push_back(estimated_resolution[0]);
+			total_fourier_coverage.push_back(total_fourier_coverage[0]);
+			if (ref_dim==2)
+				prior_offset_class.push_back(prior_offset_class[0]);
+			orientability_contrib.push_back(orientability_contrib[0]);
+			PPref.push_back(PPref[0]);
+			pdf_direction.push_back(pdf_direction[0]);
+		}
+		// Also apply all bodymasks to the initial reference, which is now stored everywhere in Iref
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
+		{
+			Iref[ibody].setXmippOrigin();
+			Iref[ibody] *= masks_bodies[ibody];
+		}
 	}
 
 }

@@ -619,7 +619,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
     	std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     	std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 		bool do_bimodal_search_psi,
-		RFLOAT sigma_cutoff)
+		RFLOAT sigma_cutoff, RFLOAT sigma_tilt_from_zero, RFLOAT sigma_psi_from_zero)
 {
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
@@ -628,11 +628,13 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	{
 		// Loop over all directions
 		RFLOAT sumprior = 0.;
+		RFLOAT sumprior_withsigmafromzero = 0.;
 		// Keep track of the closest distance to prevent 0 orientations
 		RFLOAT best_ang = 9999.;
 		long int best_idir = -999;
 		for (long int idir = 0; idir < rot_angles.size(); idir++)
 		{
+			bool is_nonzero_pdf = false;
 			// Any prior involving BOTH rot and tilt.
 			if ( (sigma_rot > 0.) && (sigma_tilt > 0.) )
 			{
@@ -673,6 +675,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					pointer_dir_nonzeroprior.push_back(idir);
 					directions_prior.push_back(prior);
 					sumprior += prior;
+					is_nonzero_pdf = true;
 				}
 
 				// Keep track of the nearest direction
@@ -707,6 +710,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					pointer_dir_nonzeroprior.push_back(idir);
 					directions_prior.push_back(prior);
 					sumprior += prior;
+					is_nonzero_pdf = true;
 				}
 
 				// Keep track of the nearest direction
@@ -747,6 +751,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					pointer_dir_nonzeroprior.push_back(idir);
 					directions_prior.push_back(prior);
 					sumprior += prior;
+					is_nonzero_pdf = true;
 				}
 
 				// Keep track of the nearest direction
@@ -762,13 +767,39 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				pointer_dir_nonzeroprior.push_back(idir);
 				directions_prior.push_back(1.);
 				sumprior += 1.;
+				is_nonzero_pdf = true;
 			}
+
+			// For priors on deviations from 0 tilt angles in multi-body refinement
+			if (sigma_tilt_from_zero > 0. && is_nonzero_pdf)
+			{
+				long int mypos = pointer_dir_nonzeroprior.size() - 1;
+				// Check tilt angle is within 3*sigma_tilt_from_zero
+				RFLOAT abs_tilt = ABS(tilt_angles[idir]);
+				if (abs_tilt > sigma_cutoff * sigma_tilt_from_zero)
+				{
+					pointer_dir_nonzeroprior.pop_back();
+					directions_prior.pop_back();
+				}
+				else
+				{
+					RFLOAT prior = gaussian1D(abs_tilt, sigma_tilt_from_zero, 0.);
+					directions_prior[mypos] *= prior;
+					sumprior_withsigmafromzero += directions_prior[mypos];
+				}
+			}
+
 
 		} // end for idir
 
 		//Normalise the prior probability distribution to have sum 1 over all psi-angles
 		for (long int idir = 0; idir < directions_prior.size(); idir++)
-			directions_prior[idir] /= sumprior;
+		{
+			if (sigma_tilt_from_zero > 0.)
+				directions_prior[idir] /= sumprior_withsigmafromzero;
+			else
+				directions_prior[idir] /= sumprior;
+		}
 
 		// If there were no directions at all, just select the single nearest one:
 		if (directions_prior.size() == 0)
@@ -800,10 +831,12 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	psi_prior.clear();
 
 	RFLOAT sumprior = 0.;
+	RFLOAT sumprior_withsigmafromzero = 0.;
 	RFLOAT best_diff = 9999.;
 	long int best_ipsi = -999;
 	for (long int ipsi = 0; ipsi < psi_angles.size(); ipsi++)
 	{
+		bool is_nonzero_pdf = false;
 		if (sigma_psi > 0.)
 		{
 			RFLOAT diffpsi = ABS(psi_angles[ipsi] - prior_psi);
@@ -819,6 +852,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				pointer_psi_nonzeroprior.push_back(ipsi);
 				psi_prior.push_back(prior);
 				sumprior += prior;
+				is_nonzero_pdf = true;
 
 				// TMP DEBUGGING
 				if (prior == 0.)
@@ -842,11 +876,39 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			pointer_psi_nonzeroprior.push_back(ipsi);
 			psi_prior.push_back(1.);
 			sumprior += 1.;
+			is_nonzero_pdf = true;
 		}
-	}
+
+		// For priors on deviations from 0 psi angles in multi-body refinement
+		if (sigma_psi_from_zero > 0. && is_nonzero_pdf)
+		{
+			long int mypos = pointer_psi_nonzeroprior.size() - 1;
+			// Check psi angle is within 3*sigma_psi_from_zero
+			RFLOAT abs_psi = ABS(psi_angles[ipsi]);
+			if (abs_psi > sigma_cutoff * sigma_psi_from_zero)
+			{
+				pointer_psi_nonzeroprior.pop_back();
+				psi_prior.pop_back();
+			}
+			else
+			{
+				RFLOAT prior = gaussian1D(abs_psi, sigma_psi_from_zero, 0.);
+				psi_prior[mypos] *= prior;
+				sumprior_withsigmafromzero += psi_prior[mypos];
+			}
+		}
+
+
+
+	} // end for ipsi
 	// Normalise the prior probability distribution to have sum 1 over all psi-angles
 	for (long int ipsi = 0; ipsi < psi_prior.size(); ipsi++)
-		psi_prior[ipsi] /= sumprior;
+	{
+		if (sigma_psi_from_zero > 0.)
+			psi_prior[ipsi] /= sumprior_withsigmafromzero;
+		else
+			psi_prior[ipsi] /= sumprior;
+	}
 
 	// If there were no directions at all, just select the single nearest one:
 	if (psi_prior.size() == 0)
@@ -1742,13 +1804,18 @@ RFLOAT HealpixSampling::calculateAngularDistance(RFLOAT rot1, RFLOAT tilt1, RFLO
 }
 
 void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOAT> &pdf_direction,
-		FileName &fn_bild, RFLOAT R, RFLOAT offset, RFLOAT Rmax_frac, RFLOAT width_frac)
+		FileName &fn_bild, RFLOAT R, RFLOAT offset,
+		const Matrix2D<RFLOAT> *Aorient, const Matrix1D<RFLOAT> *Acom,
+		RFLOAT Rmax_frac, RFLOAT width_frac)
 {
 	if (!is_3D)
 		return;
 
 	if (XSIZE(pdf_direction) != rot_angles.size())
+	{
+		std::cerr << " XSIZE(pdf_direction)= " << XSIZE(pdf_direction) << " rot_angles.size()= " << rot_angles.size() << std::endl;
 		REPORT_ERROR("HealpixSampling::writeBildFileOrientationalDistribution XSIZE(pdf_direction) != rot_angles.size()!");
+	}
 
 
 	RFLOAT pdfmax, pdfmin, pdfmean, pdfsigma;
@@ -1782,6 +1849,21 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 
 			Euler_angles2direction(rot_angles[iang], tilt_angles[iang], v);
 
+			if (Aorient != NULL)
+			{
+				v = *Aorient * v;
+				//Matrix2D<RFLOAT> A = *Aorient;
+				//Matrix1D<RFLOAT> vp(3);
+				//vp = A * v;
+				//v = vp;
+			}
+			Matrix1D<RFLOAT> offsetp(3);
+			if (Acom != NULL)
+				offsetp = *Acom;
+			else
+				offsetp.initZeros();
+
+
 			// Don't include cylinders with zero length, as chimera will complain about that....
 			if (ABS((R - Rp) * XX(v)) > 0.01 ||
 					ABS((R - Rp) * YY(v)) > 0.01 ||
@@ -1790,12 +1872,12 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 				// The width of the cylinders will be determined by the sampling:
 				fh_bild << ".color " << colscale << " 0 " << 1. - colscale << std::endl;
 				fh_bild << ".cylinder "
-						<< R  * XX(v) + offset << " "
-						<< R  * YY(v) + offset << " "
-						<< R  * ZZ(v) + offset << " "
-						<< Rp * XX(v) + offset << " "
-						<< Rp * YY(v) + offset << " "
-						<< Rp * ZZ(v) + offset << " "
+						<< R  * XX(v) + offset + XX(offsetp) << " "
+						<< R  * YY(v) + offset + YY(offsetp) << " "
+						<< R  * ZZ(v) + offset + ZZ(offsetp) << " "
+						<< Rp * XX(v) + offset + XX(offsetp) << " "
+						<< Rp * YY(v) + offset + YY(offsetp) << " "
+						<< Rp * ZZ(v) + offset + ZZ(offsetp) << " "
 						<< width
 						<<"\n";
 			}
