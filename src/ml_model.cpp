@@ -41,15 +41,17 @@ void MlModel::initialise(bool _do_sgd)
     masks_bodies.resize(nr_bodies);
     com_bodies.resize(nr_bodies);
     orient_bodies.resize(nr_bodies);
-	sigma_tilt_bodies.resize(nr_bodies);
-	sigma_psi_bodies.resize(nr_bodies);
+	sigma_tilt_bodies.resize(nr_bodies, 0.);
+	sigma_psi_bodies.resize(nr_bodies, 0.);
+	sigma_offset_bodies.resize(nr_bodies, 0.);
+	keep_fixed_bodies.resize(nr_bodies, false);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes * nr_bodies);
     group_names.resize(nr_groups, "");
     sigma2_noise.resize(nr_groups, aux);
     nr_particles_group.resize(nr_groups);
     tau2_class.resize(nr_classes * nr_bodies, aux);
-    fsc_halves_class.resize(nr_bodies, aux);
+    fsc_halves_class.resize(nr_classes * nr_bodies, aux);
     sigma2_class.resize(nr_classes * nr_bodies, aux);
     data_vs_prior_class.resize(nr_classes * nr_bodies, aux);
     fourier_coverage_class.resize(nr_classes * nr_bodies, aux);
@@ -282,9 +284,12 @@ void MlModel::read(FileName fn_in)
 	// Read pdf_direction models for each class
 	if (ref_dim == 3)
 	{
-		for (int iclass = 0; iclass < nr_classes; iclass++)
+		for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 		{
-			MDclass.readStar(in, "model_pdf_orient_class_" + integerToString(iclass + 1));
+			if (nr_bodies > 1)
+				MDclass.readStar(in, "model_pdf_orient_body_" + integerToString(iclass + 1));
+			else
+				MDclass.readStar(in, "model_pdf_orient_class_" + integerToString(iclass + 1));
 			pdf_direction[iclass].clear();
 			RFLOAT aux;
 			std::vector<RFLOAT> vaux;
@@ -292,7 +297,7 @@ void MlModel::read(FileName fn_in)
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 			{
 				if (!MDclass.getValue(EMDL_MLMODEL_PDF_ORIENT, aux))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_pdf_orient_class"+integerToString(iclass));
+					REPORT_ERROR("MlModel::readStar: incorrect table model_pdf_orient_class_"+integerToString(iclass+1));
 				vaux.push_back(aux);
 			}
 			pdf_direction[iclass].resize(vaux.size());
@@ -306,7 +311,7 @@ void MlModel::read(FileName fn_in)
 	else
 	{
 		// For 2D case, just fill pdf_direction with ones.
-		for (int iclass = 0; iclass < nr_classes; iclass++)
+		for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 		{
 			pdf_direction[iclass].clear();
 			pdf_direction[iclass].resize(1);
@@ -402,7 +407,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				RFLOAT offset = ori_size * pixel_size / 2.;
 				if (nr_bodies > 1)
 				{
-					sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset/2, offset,
+					sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset, offset,
 							&orient_bodies[iclass], &com_bodies[iclass]);
 				}
 				else
@@ -591,10 +596,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	// Write pdf_direction models for each class
 	if (ref_dim == 3)
 	{
-		for (int iclass = 0; iclass < nr_classes; iclass++)
+		for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 		{
 			MDclass.clear();
-			MDclass.setName("model_pdf_orient_class_"+integerToString(iclass+1));
+			if (nr_bodies > 1)
+				MDclass.setName("model_pdf_orient_body_"+integerToString(iclass+1));
+			else
+				MDclass.setName("model_pdf_orient_class_"+integerToString(iclass+1));
 			for (int ii=0; ii < XSIZE(pdf_direction[iclass]); ii++)
 			{
 				MDclass.addObject();
@@ -825,6 +833,8 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	orient_bodies.resize(MD.numberOfObjects());
 	sigma_tilt_bodies.resize(MD.numberOfObjects());
 	sigma_psi_bodies.resize(MD.numberOfObjects());
+	sigma_offset_bodies.resize(MD.numberOfObjects());
+	keep_fixed_bodies.resize(MD.numberOfObjects());
 	FileName fn_mask;
 	Image<RFLOAT> Imask;
 	std::vector<int> relatives_to;
@@ -872,6 +882,19 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			sigma_psi_bodies[nr_bodies] = val;
 		}
 
+		if (!MD.containsLabel(EMDL_BODY_SIGMA_OFFSET))
+			REPORT_ERROR("ERROR: the body STAR file should contain a rlnBodySigmaOffset column for the prior on the offsets for each body");
+		else
+		{
+			MD.getValue(EMDL_BODY_SIGMA_OFFSET, val);
+			sigma_offset_bodies[nr_bodies] = val;
+		}
+
+		// If all sigmas are zero, ignore this body in the refinement
+		keep_fixed_bodies[nr_bodies] = (sigma_tilt_bodies[nr_bodies] < 0.001 &&
+				                        sigma_psi_bodies[nr_bodies] < 0.001 &&
+										sigma_offset_bodies[nr_bodies] < 0.001);
+
 		// Also write the mask with the standard name to disk
 		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
 		fn_mask += "_mask.mrc";
@@ -894,7 +917,6 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			vec_relative_to.initZeros(); // if no relative-bodies are specified in the STAR file, then rotate relative to (0,0,0)
 
 		vec_relative_to -= com_bodies[ibody];
-		std::cerr << " ibody= " << ibody << " vec_relative_to= " << vec_relative_to << " relative_to= "<< relative_to<< std::endl;
 		alignWithZ(-vec_relative_to, orient_bodies[ibody], false);
 	}
 
@@ -1016,7 +1038,8 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 
 		// Calculate data_vs_prior_class as spectral_nr_observations_per_class/sigma2_noise vs 1/tau2_class
 		data_vs_prior_class[iclass].resize(sigma2_noise[0]);
-		fsc_halves_class[iclass].initZeros(sigma2_noise[0]);
+		if (nr_bodies > 1)
+			fsc_halves_class[iclass].initZeros(sigma2_noise[0]);
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
 		{
 			RFLOAT evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);

@@ -167,6 +167,12 @@ public:
 	// Stddev in psi angle for the orientational pdf of each body
 	std::vector<RFLOAT> sigma_psi_bodies;
 
+	// Stddev in offsets for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_offset_bodies;
+
+	// Is this body kept fixed in refinement?
+	std::vector<bool> keep_fixed_bodies;
+
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
 
@@ -290,6 +296,8 @@ public:
     		orient_bodies = MD.orient_bodies;
     		sigma_tilt_bodies = MD.sigma_tilt_bodies;
     		sigma_psi_bodies = MD.sigma_psi_bodies;
+    		sigma_offset_bodies = MD.sigma_offset_bodies;
+    		keep_fixed_bodies = MD.keep_fixed_bodies;
     		PPref = MD.PPref;
     		PPrefRank = MD.PPrefRank;
     		group_names = MD.group_names;
@@ -327,6 +335,8 @@ public:
 		orient_bodies.clear();
 		sigma_tilt_bodies.clear();
 		sigma_psi_bodies.clear();
+		sigma_offset_bodies.clear();
+		keep_fixed_bodies.clear();
 		PPref.clear();
 		PPrefRank.clear();
 		group_names.clear();

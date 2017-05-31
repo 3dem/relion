@@ -133,6 +133,9 @@ public:
 	// Initialise bodies for a new multi-body refinement
 	bool do_initialise_bodies;
 
+	// Use subtracted images for reconstructions in multi-body refinement?
+	bool do_reconstruct_subtracted_bodies;
+
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;
 
@@ -866,7 +869,7 @@ public:
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
-	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int exp_ipass,
+	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int ibody, int exp_ipass,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,

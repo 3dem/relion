@@ -145,6 +145,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (do_initialise_bodies)
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
+	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
+
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
 	if (fnt != "OLD")
 		nr_iter = textToInteger(fnt);
@@ -640,6 +642,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_realign_movies = false;
     do_initialise_bodies = false;
 
+    // By default, start with nr_bodies to 1
+    mymodel.nr_bodies = 1;
+
     // Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
 	minres_map = textToInteger(getParameter(argc, argv, "--minres_map", "5"));
@@ -789,6 +794,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		sgd_max_subsets = -1;
 	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
 		fn_body_masks = "";
+	if (!MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FSC, do_phase_random_fsc))
+		do_phase_random_fsc = false;
 
     if (do_split_random_halves &&
     		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -937,6 +944,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_WIDTH_MASK_EDGE, width_mask_edge);
 		MD.setValue(EMDL_OPTIMISER_DO_ZERO_MASK, do_zero_mask);
 		MD.setValue(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, do_solvent);
+		MD.setValue(EMDL_OPTIMISER_DO_SOLVENT_FSC, do_phase_random_fsc);
 		MD.setValue(EMDL_OPTIMISER_SOLVENT_MASK_NAME, fn_mask);
 		MD.setValue(EMDL_OPTIMISER_SOLVENT_MASK2_NAME, fn_mask2);
 		MD.setValue(EMDL_BODY_STAR_FILE, fn_body_masks);
@@ -3095,7 +3103,6 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 
 void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id)
 {
-
 #ifdef TIMING
 	if (my_ori_particle == exp_my_first_ori_particle)
 		timer.tic(TIMING_ESP_INI);
@@ -3152,7 +3159,10 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
 
-		// Here define all kind of local arrays that will be needed
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
+    	// Here define all kind of local arrays that will be needed
 		std::vector<MultidimArray<Complex > > exp_Fimgs, exp_Fimgs_nomask, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
 		std::vector<MultidimArray<RFLOAT> > exp_Fctfs, exp_local_Fctfs, exp_local_Minvsigma2s;
 		std::vector<int> exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior;
@@ -3195,10 +3205,11 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 			timer.tic(TIMING_ESP_FT);
 		}
 #endif
-
+		//std::cerr << "before getFour" << std::endl;
 		getFourierTransformsAndCtfs(my_ori_particle, ibody, metadata_offset, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
 				exp_old_offset, exp_prior, exp_power_imgs, exp_highres_Xi2_imgs,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
+		//std::cerr << "after getFour" << std::endl;
 
 #ifdef TIMING
 		if (my_ori_particle == exp_my_first_ori_particle)
@@ -3294,6 +3305,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
+			//std::cerr << "after getDelta2" << std::endl;
 
 #ifdef DEBUG_ESP_MEM
 			if (thread_id==0)
@@ -3307,12 +3319,13 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 
 			// Now convert the squared difference terms to weights,
 			// also calculate exp_sum_weight, and in case of adaptive oversampling also exp_significant_weight
-			convertAllSquaredDifferencesToWeights(my_ori_particle, exp_ipass, exp_current_oversampling, metadata_offset,
+			convertAllSquaredDifferencesToWeights(my_ori_particle, ibody, exp_ipass, exp_current_oversampling, metadata_offset,
 					exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
 					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max,
 					exp_Mweight, exp_Mcoarse_significant, exp_significant_weight,
 					exp_sum_weight, exp_old_offset, exp_prior, exp_min_diff2,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
+			//std::cerr << "after convW" << std::endl;
 
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
@@ -3325,6 +3338,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 #endif
 
 		}// end loop over 2 exp_ipass iterations
+		//std::cerr << "after exp_ipass loop" << std::endl;
 
 #ifdef RELION_TESTING
 		std::string mode;
@@ -3403,6 +3417,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
+		//std::cerr << "after storeWsums" << std::endl;
 
 #ifdef RELION_TESTING
 //		std::string mode;
@@ -3453,6 +3468,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 #ifdef DEBUG_EXPSINGLE
 		std::cerr << "Leaving expectationOneParticle..." << std::endl;
 #endif
+		//std::cerr << "after expOnePart" << std::endl;
 
 }
 
@@ -3460,6 +3476,9 @@ void MlOptimiser::symmetriseReconstructions()
 {
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
@@ -3486,6 +3505,9 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
@@ -3502,6 +3524,9 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
@@ -3774,7 +3799,7 @@ void MlOptimiser::maximizationOtherParameters()
 
 	// Update sigma2_offset
 	// Factor 2 because of the 2-dimensionality of the xy-plane
-	if (!fix_sigma_offset)
+	if (!fix_sigma_offset && mymodel.nr_bodies == 1)
 	{
 		mymodel.sigma2_offset *= mu;
 		if (mymodel.data_dim == 3)
@@ -4875,6 +4900,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		// If we're doing multibody refinement, now subtract projections of the other bodies from both the masked and the unmasked particle
 		if (mymodel.nr_bodies > 1)
 		{
+			MultidimArray<Complex> Fsum_obody;
+			Fsum_obody.initZeros(Fimg);
+
 			for (int obody = 0; obody < mymodel.nr_bodies; obody++)
 			{
 				if (obody != ibody) // Only subtract if other body is not this body....
@@ -4951,65 +4979,68 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					shiftImageInFourierTransform(FTo, Faux, (RFLOAT)mymodel.ori_size,
 							XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
 
-					// Apply the CTF to this reference projection
-					if (do_ctf_correction)
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FTo)
-						{
-							DIRECT_MULTIDIM_ELEM(Faux, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-						}
-					}
+					// Sum the Fourier transforms of all the obodies
+					Fsum_obody += Faux;
 
-					// Subtract the other-body FT from the current image FT
-					// First the unmasked one
-					exp_Fimgs_nomask.at(ipart)  -= Faux;
+				} // end if obody != ibody
+			} // end for obody
 
-					// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
-					windowFourierTransform(Faux, FTo, mymodel.ori_size);
-					transformer.inverseFourierTransform(FTo, img());
-					CenterFFT(img(), false);
-
-#ifdef DEBUG_BODIES
-					fn_img = "shifted_beforemask.spi";
-					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-					img.write(fn_img);
-					std::cerr << "Written::: " << fn_img << std::endl;
-#endif
-					softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
-
-#ifdef DEBUG_BODIES
-					fn_img = "shifted_aftermask.spi";
-					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-					img.write(fn_img);
-					std::cerr << "Written::: " << fn_img << std::endl;
-#endif
-					// And back to Fourier space now
-					CenterFFT(img(), true);
-					transformer.FourierTransform(img(), FTo);
-					windowFourierTransform(FTo, Faux, mymodel.current_size);
-
-					// Subtract the other-body FT from the masked exp_Fimgs
-					exp_Fimgs.at(ipart) -= Faux;
-
-#ifdef DEBUG_BODIES
-					windowFourierTransform(exp_Fimgs[ipart], Faux, mymodel.ori_size);
-					transformer.inverseFourierTransform(Faux, img());
-					CenterFFT(img(), false);
-					fn_img = "exp_Fimgs_subtracted.spi";
-					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-					img.write(fn_img);
-					std::cerr << "written " << fn_img << std::endl;
-					windowFourierTransform(exp_Fimgs_nomask[ipart], Faux, mymodel.ori_size);
-					transformer.inverseFourierTransform(Faux, img());
-					CenterFFT(img(), false);
-					fn_img = "exp_Fimgs_nomask_subtracted.spi";
-					fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
-					img.write(fn_img);
-					std::cerr << "written " << fn_img << std::endl;
-#endif
+			// Now that we have all the summed projections of the obodies, apply CTF, masks etc
+			// Apply the CTF to this reference projection
+			if (do_ctf_correction)
+			{
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsum_obody)
+				{
+					DIRECT_MULTIDIM_ELEM(Fsum_obody, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 				}
 			}
-		}
+
+			// Subtract the other-body FT from the current image FT
+			// First the unmasked one, which will be used for reconstruction
+			// Only do this if the flag below is true. Otherwise, use the original particles for reconstruction
+			if (do_reconstruct_subtracted_bodies)
+				exp_Fimgs_nomask.at(ipart)  -= Fsum_obody;
+
+			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			windowFourierTransform(Fsum_obody, Faux, mymodel.ori_size);
+			transformer.inverseFourierTransform(Faux, img());
+			CenterFFT(img(), false);
+
+#ifdef DEBUG_BODIES
+			fn_img = "shifted_beforemask.spi";
+			img.write(fn_img);
+			std::cerr << "Written::: " << fn_img << std::endl;
+#endif
+			softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
+
+#ifdef DEBUG_BODIES
+			fn_img = "shifted_aftermask.spi";
+			img.write(fn_img);
+			std::cerr << "Written::: " << fn_img << std::endl;
+#endif
+			// And back to Fourier space now
+			CenterFFT(img(), true);
+			transformer.FourierTransform(img(), Faux);
+			windowFourierTransform(Faux, Fsum_obody, mymodel.current_size);
+
+			// Subtract the other-body FT from the masked exp_Fimgs
+			exp_Fimgs.at(ipart) -= Fsum_obody;
+
+#ifdef DEBUG_BODIES
+			windowFourierTransform(exp_Fimgs[ipart], Faux, mymodel.ori_size);
+			transformer.inverseFourierTransform(Faux, img());
+			CenterFFT(img(), false);
+			fn_img = "exp_Fimgs_subtracted.spi";
+			img.write(fn_img);
+			std::cerr << "written " << fn_img << std::endl;
+			windowFourierTransform(exp_Fimgs_nomask[ipart], Faux, mymodel.ori_size);
+			transformer.inverseFourierTransform(Faux, img());
+			CenterFFT(img(), false);
+			fn_img = "exp_Fimgs_nomask_subtracted.spi";
+			img.write(fn_img);
+			std::cerr << "written " << fn_img << std::endl;
+#endif
+		} // end if mymodel.nr_bodies > 1
 
 	} // end loop ipart
 	transformer.clear();
@@ -5853,7 +5884,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 }
 
 
-void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle, int exp_ipass,
+void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle, int ibody, int exp_ipass,
 		int exp_current_oversampling, int metadata_offset,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
@@ -5887,6 +5918,9 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 	exp_sum_weight.clear();
 	exp_sum_weight.resize(exp_nr_particles, 0.);
 
+	RFLOAT my_sigma2_offset = (mymodel.nr_bodies > 1) ?
+			mymodel.sigma_offset_bodies[ibody]*mymodel.sigma_offset_bodies[ibody] : mymodel.sigma2_offset;
+
 //#define DEBUG_CONVERTDIFF2W
 #ifdef DEBUG_CONVERTDIFF2W
 	RFLOAT max_weight = -1.;
@@ -5901,11 +5935,18 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 		long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
 		RFLOAT exp_thisparticle_sumweight = 0.;
 
-		RFLOAT old_offset_z;
-		RFLOAT old_offset_x = XX(exp_old_offset[ipart]);
-		RFLOAT old_offset_y = YY(exp_old_offset[ipart]);
-		if (mymodel.data_dim == 3)
-			old_offset_z = ZZ(exp_old_offset[ipart]);
+		RFLOAT old_offset_x, old_offset_y, old_offset_z;
+		if (mymodel.nr_bodies > 1)
+		{
+			old_offset_x = old_offset_y = old_offset_z = 0.;
+		}
+		else
+		{
+			old_offset_x = XX(exp_old_offset[ipart]);
+			old_offset_y = YY(exp_old_offset[ipart]);
+			if (mymodel.data_dim == 3)
+				old_offset_z = ZZ(exp_old_offset[ipart]);
+		}
 
 		if ((iter == 1 && do_firstiter_cc) || do_always_cc)
 		{
@@ -5956,7 +5997,11 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 					}
 
 				RFLOAT myprior_x, myprior_y, myprior_z;
-				if (mymodel.ref_dim == 2)
+				if (mymodel.nr_bodies > 1)
+				{
+					myprior_x = myprior_y = myprior_z = 0.;
+				}
+				else if (mymodel.ref_dim == 2)
 				{
 					myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
 					myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
@@ -5985,23 +6030,26 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
 					RFLOAT pdf_offset;
-					if (mymodel.sigma2_offset < 0.0001)
+					if (my_sigma2_offset < 0.0001)
 						pdf_offset_mean += ( tdiff2 > 0.) ? 0. : 1.;
 					else
-						pdf_offset_mean += exp ( tdiff2 / (-2. * mymodel.sigma2_offset) ) / ( 2. * PI * mymodel.sigma2_offset );
+						pdf_offset_mean += exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
 					pdf_offset_count ++;
 				}
 			}
 			pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
 			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
-
 			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
-			for (int exp_iclass = 0; exp_iclass < mymodel.nr_classes; exp_iclass++)
+			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
 			{
 
 				// Make PdfOffset calculation much faster...
 				RFLOAT myprior_x, myprior_y, myprior_z;
-				if (mymodel.ref_dim == 2)
+				if (mymodel.nr_bodies > 1)
+				{
+					myprior_x = myprior_y = myprior_z = 0.;
+				}
+				else if (mymodel.ref_dim == 2)
 				{
 					myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
 					myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
@@ -6084,12 +6132,12 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 							// P(offset|sigma2_offset)
 							// This is the probability of the offset, given the model offset and variance.
 							RFLOAT pdf_offset;
-							if (mymodel.sigma2_offset < 0.0001)
+							if (my_sigma2_offset < 0.0001)
 								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
 							else
-								pdf_offset = exp ( tdiff2 / (-2. * mymodel.sigma2_offset) ) / ( 2. * PI * mymodel.sigma2_offset );
+								pdf_offset = exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
 
-							if (pdf_offset_mean != 0.)
+							if (pdf_offset_mean > 0.)
 								pdf_offset /= pdf_offset_mean;
 
 							/*
@@ -6418,7 +6466,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
 		std::vector<RFLOAT> &exp_local_sqrtXi2)
 {
-
 #ifdef TIMING
 	if (my_ori_particle == exp_my_first_ori_particle)
 		timer.tic(TIMING_ESP_WSUM);
@@ -7163,7 +7210,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 		} // end loop idir
 	} // end loop iclass
 
-
 	// Extend norm_correction and sigma2_noise estimation to higher resolutions for all particles
 	// Also calculate dLL for each particle and store in metadata
 	// loop over all particles inside this ori_particle
@@ -7312,7 +7358,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 			}
 #endif
 		}
-
 		for (int n = 0; n < mymodel.nr_classes * mymodel.nr_bodies; n++)
 		{
 			if (!(do_skip_align || do_skip_rotate) )
@@ -7335,7 +7380,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 	if (my_ori_particle == exp_my_first_ori_particle)
 		timer.toc(TIMING_ESP_WSUM);
 #endif
-
 }
 
 /** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
@@ -7373,6 +7417,9 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
+
+				if (mymodel.keep_fixed_bodies[ibody])
+					continue;
 
 				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
 				RFLOAT rot, tilt, psi, xoff, yoff, zoff = 0.;
@@ -8024,7 +8071,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					wsum_model.nr_directions = mymodel.nr_directions;
 
 					// Also resize and initialise wsum_model.pdf_direction for each class!
-					for (int iclass=0; iclass < mymodel.nr_classes; iclass++)
+					for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 						wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
 
 				}

@@ -497,7 +497,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	MlOptimiser::initialLowPassFilterReferences();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0 && !do_initialise_bodies)
+	if (iter == 0 && !do_initialise_bodies && !node->isMaster())
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
@@ -1909,6 +1909,10 @@ void MlOptimiserMpi::maximization()
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			RCTIC(timer,RCT_1);
@@ -2185,6 +2189,10 @@ void MlOptimiserMpi::maximization()
 	// This cannot be done in the reconstruction loop itself because then it will be executed sequentially
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
@@ -2370,6 +2378,10 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > lowres_data;
@@ -2453,6 +2465,9 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 	// TODO: Rank 0 and 1 reconstruct all bodies sequentially here... That parallelisation could be improved...
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
 
 		if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 		{
@@ -2781,6 +2796,10 @@ void MlOptimiserMpi::compareTwoHalves()
 	// TODO: Rank 0 and 1 do all bodies sequentially here... That parallelisation could be improved...
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		// The first two slaves calculate the sum of the downsampled average of all bodies
 		if (node->rank == 1 || node->rank == 2)
 		{
@@ -2966,6 +2985,10 @@ void MlOptimiserMpi::iterate()
 					// Check that incr_size is at least the number of shells as between FSC=0.5 and FSC=0.143
 					for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++)
 					{
+
+						if (mymodel.keep_fixed_bodies[ibody])
+							continue;
+
 						int fsc05   = -1;
 						int fsc0143 = -1;
 						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[ibody])
