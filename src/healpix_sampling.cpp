@@ -1850,13 +1850,8 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 			Euler_angles2direction(rot_angles[iang], tilt_angles[iang], v);
 
 			if (Aorient != NULL)
-			{
-				v = *Aorient * v;
-				//Matrix2D<RFLOAT> A = *Aorient;
-				//Matrix1D<RFLOAT> vp(3);
-				//vp = A * v;
-				//v = vp;
-			}
+				v = (*Aorient).transpose() * v;
+
 			Matrix1D<RFLOAT> offsetp(3);
 			if (Acom != NULL)
 				offsetp = *Acom;
