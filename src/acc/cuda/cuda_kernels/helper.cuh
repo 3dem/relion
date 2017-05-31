@@ -5,10 +5,10 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/gpu_utils/cuda_settings.h"
-#include "src/gpu_utils/cuda_device_utils.cuh"
-#include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_projector.h"
+#include "src/acc/cuda/cuda_settings.h"
+#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_projector.cuh"
+#include "src/acc/cuda/cuda_projector.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define FAILSAFE_PRIOR_MIN_LIM 1e-300

@@ -44,7 +44,7 @@
 #include "src/error.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
-#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
 #endif
 
 #define NR_CLASS_MUTEXES 5

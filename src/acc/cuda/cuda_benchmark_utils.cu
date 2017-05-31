@@ -1,6 +1,6 @@
 
 
-#include "src/gpu_utils/cuda_benchmark_utils.h"
+#include "src/acc/cuda/cuda_benchmark_utils.h"
 
 //Non-concurrent benchmarking tools (only for Linux)
 #include <vector>

@@ -3,7 +3,7 @@
 /* This is where custom allocator should be. Commented out for now, to avoid double declaration.
 
 #ifdef CUDA
-#include "src/gpu_utils/cuda_settings.h"
+#include "src/acc/cuda/cuda_settings.h"
 #include <cuda_runtime.h>
 #endif
 

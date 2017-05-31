@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_projector_plan.h"
+#include "src/acc/cuda/cuda_projector_plan.h"
 #include "src/time.h"
 #include <cuda_runtime.h>
 

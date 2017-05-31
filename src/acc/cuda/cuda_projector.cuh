@@ -2,8 +2,8 @@
 #define CUDA_PROJECTOR_CUH_
 
 #include <cuda_runtime.h>
-#include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_projector.h"
+#include "src/acc/cuda/cuda_device_utils.cuh"
 
 
 

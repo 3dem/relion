@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_settings.h"
+#include "src/acc/cuda/cuda_settings.h"
 
 
 namespace CpuKernels

@@ -2,14 +2,14 @@
 #define CUDA_UTILS_STL_CUH_
 
 #include <cuda_runtime.h>
-#include "src/gpu_utils/cuda_settings.h"
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_settings.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
 #include <stdio.h>
 #include <signal.h>
 #include <vector>
 #include <algorithm>
-#include "src/gpu_utils/cub/device/device_radix_sort.cuh"
-#include "src/gpu_utils/cub/device/device_reduce.cuh"
+#include "src/acc/cuda/cub/device/device_radix_sort.cuh"
+#include "src/acc/cuda/cub/device/device_reduce.cuh"
 
 template <typename T>
 static T getMaxOnDevice(CudaGlobalPtr<T> &ptr)

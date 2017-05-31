@@ -5,16 +5,16 @@
 #include <ctime>
 #include <vector>
 #include <iostream>
-#include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_projector_plan.h"
-#include "src/gpu_utils/cuda_benchmark_utils.h"
-#include "src/gpu_utils/cuda_ml_optimiser.h"
-#include "src/gpu_utils/cuda_kernels/helper.cuh"
-#include "src/gpu_utils/cuda_kernels/diff2.cuh"
-#include "src/gpu_utils/cuda_kernels/wavg.cuh"
-#include "src/gpu_utils/cuda_helper_functions.cuh"
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_projector.h"
+#include "src/acc/cuda/cuda_projector.cuh"
+#include "src/acc/cuda/cuda_projector_plan.h"
+#include "src/acc/cuda/cuda_benchmark_utils.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_kernels/helper.cuh"
+#include "src/acc/cuda/cuda_kernels/diff2.cuh"
+#include "src/acc/cuda/cuda_kernels/wavg.cuh"
+#include "src/acc/cuda/cuda_helper_functions.cuh"
+#include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/utilities.h"
 #include "src/acc/data_types.h"
 #include "src/acc/acc_ptr.h"
@@ -28,9 +28,9 @@
 #include <map>
 
 #ifdef CUDA_FORCESTL
-#include "src/gpu_utils/cuda_utils_stl.cuh"
+#include "src/acc/cuda/cuda_utils_stl.cuh"
 #else
-#include "src/gpu_utils/cuda_utils_cub.cuh"
+#include "src/acc/cuda/cuda_utils_cub.cuh"
 #endif
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;

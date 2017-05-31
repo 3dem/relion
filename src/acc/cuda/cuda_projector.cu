@@ -1,4 +1,4 @@
-#include "src/gpu_utils/cuda_projector.h"
+#include "src/acc/cuda/cuda_projector.h"
 #include <signal.h>
 
 

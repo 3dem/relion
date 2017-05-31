@@ -1,6 +1,6 @@
-#include "src/gpu_utils/cuda_device_utils.cuh"
-#include "src/gpu_utils/cuda_kernels/helper.cuh"
-#include "src/gpu_utils/cuda_settings.h"
+#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_kernels/helper.cuh"
+#include "src/acc/cuda/cuda_settings.h"
 
 /*
  * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.

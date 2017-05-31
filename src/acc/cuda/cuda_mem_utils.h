@@ -2,7 +2,7 @@
 #define CUDA_DEVICE_MEM_UTILS_H_
 
 #ifdef CUDA
-#include "src/gpu_utils/cuda_settings.h"
+#include "src/acc/cuda/cuda_settings.h"
 #include <cuda_runtime.h>
 #endif
 

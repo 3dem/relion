@@ -20,7 +20,7 @@
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
-#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
 #endif
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,14 +1,14 @@
 #ifndef CUDA_HELPER_FUNCTIONS_CUH_
 #define CUDA_HELPER_FUNCTIONS_CUH_
 
-#include "src/gpu_utils/cuda_ml_optimiser.h"
-#include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_projector.cuh"
-#include "src/gpu_utils/cuda_benchmark_utils.h"
-#include "src/gpu_utils/cuda_mem_utils.h"
-#include "src/gpu_utils/cuda_kernels/helper.cuh"
-#include "src/gpu_utils/cuda_kernels/diff2.cuh"
-#include "src/gpu_utils/cuda_kernels/wavg.cuh"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_projector.h"
+#include "src/acc/cuda/cuda_projector.cuh"
+#include "src/acc/cuda/cuda_benchmark_utils.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_kernels/helper.cuh"
+#include "src/acc/cuda/cuda_kernels/diff2.cuh"
+#include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>

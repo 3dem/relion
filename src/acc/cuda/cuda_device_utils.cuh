@@ -2,7 +2,7 @@
 #define CUDA_DEVICE_UTILS_CUH_
 
 #include <cuda_runtime.h>
-#include "src/gpu_utils/cuda_settings.h"
+#include "src/acc/cuda/cuda_settings.h"
 
 #ifdef CUDA_DOUBLE_PRECISION
 __device__ inline double cuda_atomic_add(double* address, double val)

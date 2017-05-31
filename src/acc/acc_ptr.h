@@ -2,11 +2,11 @@
 #define ACC_PTR_H_
 
 #ifdef CUDA
-#include "src/gpu_utils/cuda_settings.h"
+#include "src/acc/cuda/cuda_settings.h"
 #include <cuda_runtime.h>
 #include "src/acc/cuda/shortcuts.cuh"
 #include "src/acc/cuda/custom_allocator.cuh"
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 
 #include <signal.h>

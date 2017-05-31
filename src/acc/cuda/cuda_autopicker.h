@@ -8,11 +8,11 @@
 #include "src/complex.h"
 #include "src/image.h"
 
-#include "src/gpu_utils/cuda_mem_utils.h"
-#include "src/gpu_utils/cuda_projector.h"
-#include "src/gpu_utils/cuda_settings.h"
-#include "src/gpu_utils/cuda_fft.h"
-#include "src/gpu_utils/cuda_benchmark_utils.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_projector.h"
+#include "src/acc/cuda/cuda_settings.h"
+#include "src/acc/cuda/cuda_fft.h"
+#include "src/acc/cuda/cuda_benchmark_utils.h"
 
 #include <stack>
 
