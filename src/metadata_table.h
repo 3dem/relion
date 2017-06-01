@@ -243,17 +243,25 @@ public:
 
     // Sort the order of the elements based on the values in the input label (only numbers, no strings/bools!)
     // Have to pass dummy T parameter to get the template thing running?
-    void sort(EMDLabel name, bool do_reverse = false, bool only_set_index = false)
+    void sort(EMDLabel name, bool do_reverse = false, bool only_set_index = false, bool do_random = false)
     {
-    	if ( !(EMDL::isInt(name) || EMDL::isLong(name) || EMDL::isDouble(name)) )
+
+    	if (do_random)
+    		srand (time(NULL));    		  /* initialize random seed: */
+    	else if (!(EMDL::isInt(name) || EMDL::isLong(name) || EMDL::isDouble(name)) )
     		REPORT_ERROR("MetadataTable::sort%% ERROR: can only sorted numbers");
+
     	std::vector<std::pair<RFLOAT,long int> > vp;
     	vp.reserve(objects.size());
     	long int i = 0;
     	FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
     	{
     		RFLOAT dval;
-    		if (EMDL::isInt(name))
+    		if (do_random)
+    		{
+    			dval = (RFLOAT)rand();
+    		}
+    		else if (EMDL::isInt(name))
     		{
     			int val;
     			getValue(name, val);
@@ -275,7 +283,7 @@ public:
     	}
 
     	std::sort(vp.begin(), vp.end());
-    	if (do_reverse)
+    	if (do_reverse && !do_random)
     		std::reverse(vp.begin(), vp.end());
 
     	if (only_set_index)
