@@ -1640,6 +1640,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 	if (joboptions["do_reextract"].getBoolean())
 	{
+		if (joboptions["fndata_reextract"].getString() == "")
+		{
+			error_message = "ERROR: empty field for refined particles STAR file...";
+			return false;
+		}
 		command += " --reextract_data_star " + joboptions["fndata_reextract"].getString();
 		Node node2(joboptions["fndata_reextract"].getString(), joboptions["fndata_reextract"].node_type);
 		inputNodes.push_back(node2);
