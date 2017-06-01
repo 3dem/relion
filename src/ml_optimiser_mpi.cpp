@@ -3089,13 +3089,14 @@ void MlOptimiserMpi::iterate()
 
 			verb = old_verb;
 
-			if (nr_subsets > 1 && sgd_max_subsets > 0)
+			if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
 			{
-				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-				if (total_nr_subsets > sgd_max_subsets)
-					break; // break out of loop over the subsets, and start next iteration
+				if (verb > 0)
+				{
+					std::cout << " SGD has reached the maximum number of subsets, so stopping now..." << std::endl;
+				}
+				break; // break out of loop over the subsets
 			}
-
 
 #ifdef TIMING
 			// Only first slave prints it timing information
