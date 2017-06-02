@@ -1982,11 +1982,13 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --allow_save ";
 		if (fn_parts != "")
+		{
 			cl += " --fn_parts " + fn_parts;
+			if ( textToInteger(max_parts_per_class_input->value()) > 0)
+				cl += " --max_nr_parts_per_class " + (std::string)max_parts_per_class_input->value();
+		}
 		if (fn_imgs != "")
 			cl += " --fn_imgs " + fn_imgs;
-		if ( textToInteger(max_parts_per_class_input->value()) > 0)
-			cl += " --max_nr_parts_per_class " + (std::string)max_parts_per_class_input->value();
 	}
 
 	if (nr_regroups > 0)
@@ -1998,6 +2000,7 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --recenter";
 	}
+
 
 	// send job in the background
 	cl += " &";
