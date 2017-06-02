@@ -1322,10 +1322,9 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("nr_iter");
 	place("sgd_subset_size");
-	place("sgd_max_subsets");
 	place("sgd_write_subsets");
-	place("sgd_sigma2fudge_halflife");
 	place("sgd_highres_limit");
+	place("sgd_sigma2fudge_halflife");
 
 	tab3->end();
 	tab4->begin();

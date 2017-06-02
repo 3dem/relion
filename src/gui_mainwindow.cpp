@@ -286,7 +286,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     if(!exists(fn_bg))
         fn_bg = std::string(SRCD_BG);
 
-    std::cerr << fn_bg << " " << exists(fn_bg) << std::endl;
 	if (exists(fn_bg))
 	{
 		// Initial screen picture with some explanation on how to use the GUI
