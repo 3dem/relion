@@ -286,16 +286,18 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     if(!exists(fn_bg))
         fn_bg = std::string(SRCD_BG);
 
+    std::cerr << fn_bg << " " << exists(fn_bg) << std::endl;
 	if (exists(fn_bg))
 	{
 		// Initial screen picture with some explanation on how to use the GUI
-		image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
+            //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
+		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
 		image_box->image(xpm_image); // attach xpm image to box
-		forgot_button = new Fl_Button(450, 143, 10, 32, "?");
-		forgot_button->color(GUI_BUTTON_COLOR);
-		forgot_button->labelsize(12);
-		forgot_button->callback( cb_forgot, this);
+		//forgot_button = new Fl_Button(450, 143, 10, 32, "?");
+		//forgot_button->color(GUI_BUTTON_COLOR);
+		//forgot_button->labelsize(12);
+		//forgot_button->callback( cb_forgot, this);
 	 }
 	background_grp->end();
 
