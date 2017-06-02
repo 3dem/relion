@@ -45,7 +45,7 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_VERSION "devel"
+#define RELION_VERSION "2.1-beta"
 
 #include <math.h>
 #include "src/error.h"

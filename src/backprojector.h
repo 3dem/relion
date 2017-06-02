@@ -33,7 +33,6 @@
 #include "src/tabfuncs.h"
 #include "src/symmetries.h"
 
-
 class BackProjector: public Projector
 {
 public:
@@ -265,6 +264,7 @@ public:
                      MultidimArray<RFLOAT> &tau2,
                      MultidimArray<RFLOAT> &sigma2,
                      MultidimArray<RFLOAT> &evidence_vs_prior,
+                     MultidimArray<RFLOAT> &fourier_coverage,
                      MultidimArray<RFLOAT> fsc,
                      RFLOAT normalise = 1.,
                      bool update_tau2_with_fsc = false,
