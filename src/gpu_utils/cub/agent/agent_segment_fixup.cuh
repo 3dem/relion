@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -142,7 +142,7 @@ struct AgentSegmentFixup
 
     // Parameterized BlockLoad type for pairs
     typedef BlockLoad<
-            WrappedPairsInputIteratorT,
+            KeyValuePairT,
             BLOCK_THREADS,
             ITEMS_PER_THREAD,
             AgentSegmentFixupPolicyT::LOAD_ALGORITHM>
@@ -306,7 +306,8 @@ struct AgentSegmentFixup
         {
             // Exclusive scan of values and segment_flags
             TilePrefixCallbackOpT prefix_op(tile_state, temp_storage.prefix, scan_op, tile_idx);
-            BlockScanT(temp_storage.scan).ExclusiveScan(pairs, scatter_pairs, scan_op, tile_aggregate, prefix_op);
+            BlockScanT(temp_storage.scan).ExclusiveScan(pairs, scatter_pairs, scan_op, prefix_op);
+            tile_aggregate = prefix_op.GetBlockAggregate();
         }
 
         // Scatter updated values

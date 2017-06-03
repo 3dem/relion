@@ -244,4 +244,9 @@ the relion developers at \n\n\
 
 #define ERRHIGHSCALE ("rlnMicrographScaleCorrection is very high. Did you normalize your data?")
 
+#define ERR_GAUSSBLOBSIZE ("You tried to use gaussian blobs but did not specify a blob-size.\n\n\
+		  -  through the GUI, use the setting for Mask diameter [A] \n\
+		  -  through the command-line, add --particle_diameter <d> [A] \n\
+		both methods specify a diameter in Angstroms \n\n")
+
 #endif
