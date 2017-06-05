@@ -765,6 +765,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		subset_size = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_START, subset_start))
 		subset_start = 1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize))
+		sgd_stepsize = 0.5;
 	// The following line is only to avoid strange filenames when writing optimiser.star upon restarting
 	subset = subset_start - 1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset))
@@ -925,6 +927,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset);
 		MD.setValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets);
+		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize);
 		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
@@ -2288,13 +2291,7 @@ void MlOptimiser::iterate()
 			verb = old_verb;
 
 			if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
-			{
-				if (verb > 0)
-				{
-					std::cout << " SGD has reached the maximum number of subsets, so stopping now..." << std::endl;
-				}
 				break; // break out of loop over the subsets
-			}
 
 #ifdef TIMING
 			if (verb > 0)
@@ -2306,25 +2303,26 @@ void MlOptimiser::iterate()
 		subset_start = 1;
 
 		// Stop subsets after sgd_max_subsets has been reached
-		if (nr_subsets > 1 && sgd_max_subsets > 0)
+		if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
 		{
-			long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-			if (total_nr_subsets > sgd_max_subsets)
-			{
-				// Write out without a _sub in the name
-				nr_subsets = 1;
-				write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+			// Write out without a _sub in the name
+			nr_subsets = 1;
+			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 
-				if (do_sgd)
-				{
-					// For initial model generation, just stop after the sgd_max_subsets has been reached
-					break;
-				}
-				else
-				{
-					// For subsets in 2D classification, now continue rest of iterations without subsets in the next iteration
-					subset_size = -1;
-				}
+
+			if (do_sgd)
+			{
+				if (verb > 0)
+					std::cout << " SGD has reached the maximum number of subsets, so stopping now..." << std::endl;
+				// For initial model generation, just stop after the sgd_max_subsets has been reached
+				break;
+			}
+			else
+			{
+				if (verb > 0)
+					std::cout << " Run has reached the maximum number of subsets, continuing without subsets now..." << std::endl;
+				// For subsets in 2D classification, now continue rest of iterations without subsets in the next iteration
+				subset_size = -1;
 			}
 		}
 
