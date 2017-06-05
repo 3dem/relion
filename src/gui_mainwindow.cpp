@@ -1977,13 +1977,15 @@ Please also cite the following EXTERNAL programs: \n \n \
 * UNBLUR for beam-induced motion correction: \n \
     Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
 * MOTIONCOR2 for beam-induced motion correction: \n \
-    Zheng et al (2013) bioRxiv 061960 \n \n\
+    Zheng et al (2017) Nat. Meth. (PMID: 28250466) \n \n\
 * CTFFIND for CTF-estimation: \n \
     Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
 * CTFFIND4 for CTF-estimation: \n \
     Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
 * Gctf for CTF-estimation: \n \
     Zhang (2016) J. Struct. Biol. (PMID: 2659270) \n \n\
+* Stochastic Gradient Descent initial model generation:  \n\
+    Punjani et al. (2017) Nat. Meth. (PMID: 28165473) \n \n\
 * ResMap for local-resolution estimation:  \n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
 * Postscript plots are made using CPlot2D from  www.amzsaki.com\n ")
