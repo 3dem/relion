@@ -1262,6 +1262,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #endif
 
+	// Check for errors in the command-line option
+	if (parser.checkForErrors(verb))
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
 #ifdef RELION_SINGLE_PRECISION
         if (verb > 0)
             std::cout << " Running CPU instructions in single precision. Runs might not be exactly reproducible." << std::endl;
@@ -1299,10 +1303,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		}
 		exit(0);
 	}
-
-	// Check for errors in the command-line option
-	if (parser.checkForErrors(verb))
-		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
 	// If we are not continuing an old run, now read in the data and the reference images
 	if (iter == 0)
