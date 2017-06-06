@@ -1,3 +1,4 @@
+#if 0
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
@@ -32,15 +33,16 @@
 #else
 #include "src/acc/cuda/cuda_utils_cub.cuh"
 #endif
+#endif // if 0
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-template <int AccT>
+template <class MlClass, int AccT>
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		MlOptimiserCuda *cudaMLO
+		MlClass *cudaMLO
 		)
 {
 		GTIC(cudaMLO->timer,"getFourierTransformsAndCtfs");
@@ -825,12 +827,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	GATHERGPUTIMINGS(cudaMLO->timer);
 }
 
+template <class MlClass, int AccT>
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		MlOptimiserCuda *cudaMLO,
+		MlClass *cudaMLO,
 	 	CudaGlobalPtr<XFLOAT> &Mweight)
 {
 
@@ -1066,11 +1069,12 @@ void getAllSquaredDifferencesCoarse(
 #endif
 }
 
+template <class MlClass, int AccT>
 void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  OptimisationParamters &op,
 		 	 	 	 	 	 	  SamplingParameters &sp,
 		 	 	 	 	 	 	  MlOptimiser *baseMLO,
-		 	 	 	 	 	 	  MlOptimiserCuda *cudaMLO,
+		 	 	 	 	 	 	  MlClass *cudaMLO,
 		 	 	 	 	 	 	  std::vector<IndexedDataArray> &FinePassWeights,
 		 	 	 	 	 	 	  std::vector<std::vector< IndexedDataArrayMask > > &FPCMasks,
 		 	 	 	 	 	 	  std::vector<ProjectionParams> &FineProjectionData,
@@ -1382,12 +1386,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 }
 
 
-template<typename weights_t>
+template<class MlClass, int AccT, typename weights_t>
 void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
 											MlOptimiser *baseMLO,
-											MlOptimiserCuda *cudaMLO,
+											MlClass *cudaMLO,
 											std::vector< IndexedDataArray> &PassWeights,
 											std::vector< std::vector< IndexedDataArrayMask > > &FPCMasks,
 											CudaGlobalPtr<XFLOAT> &Mweight, // FPCMasks = Fine-Pass Class-Masks
@@ -1908,9 +1912,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 }
 
+template<class MlClass, int AccT>
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlOptimiser *baseMLO,
-						MlOptimiserCuda *cudaMLO,
+						MlClass *cudaMLO,
 						std::vector<IndexedDataArray> &FinePassWeights,
 						std::vector<ProjectionParams> &ProjectionData,
 						std::vector<std::vector<IndexedDataArrayMask> > &FPCMasks,
@@ -2825,6 +2830,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_WSUM);
 #endif
 }
+
+#if 0
+template<class MlClass, int AccT>
 size_t MlDeviceBundle::checkFixedSizedObjects(int shares)
 {
 	int devCount;
@@ -3310,3 +3318,4 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 #endif
 }
 
+#endif // if 0

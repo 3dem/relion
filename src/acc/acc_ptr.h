@@ -23,12 +23,10 @@
 #include "src/error.h"
 #include "src/parallel.h"
 
-#define ACC_CPU 0
-#ifdef CUDA
-#define ACC_CUDA 1
-#else
-#define ACC_CUDA 0
-#endif
+// Flags for accelerated code paths available
+#define ACC_CPU 1
+#define ACC_CUDA 2
+
 
 #define ACC_PTR_DEBUG_FATAL( err ) (HandleAccPtrDebugFatal( err, __FILE__, __LINE__ ))
 static void HandleAccPtrDebugFatal( const char *err, const char *file, int line )

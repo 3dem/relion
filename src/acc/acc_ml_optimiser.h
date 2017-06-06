@@ -1,5 +1,6 @@
-#ifndef CUDA_ML_OPTIMISER_H_
-#define CUDA_ML_OPTIMISER_H_
+#ifndef ACC_ML_OPTIMISER_H_
+#define ACC_ML_OPTIMISER_H_
+#if 0
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
@@ -10,6 +11,7 @@
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include <stack>
 //#include <cufft.h>
+#endif
 
 #ifdef CUDA_DOUBLE_PRECISION
 #define XFLOAT double
@@ -17,20 +19,6 @@
 #define XFLOAT float
 #endif
 
-//#ifdef DEBUG_CUDA
-//#define HANDLE_CUFFT_ERROR( err ) (CufftHandleError( err, __FILE__, __LINE__ ))
-//#else
-//#define HANDLE_CUFFT_ERROR( err ) (err) //Do nothing
-//#endif
-//static void CufftHandleError( cufftResult err, const char *file, int line )
-//{
-//    if (err != CUFFT_SUCCESS)
-//    {
-//        fprintf(stderr, "Cufft error in file '%s' in line %i : %s.\n",
-//                __FILE__, __LINE__, "error" );
-//		raise(SIGSEGV);
-//    }
-//}
 
 class SamplingParameters
 {
@@ -181,7 +169,90 @@ public:
 	};
 };
 
+class ProjectionParams
+{
 
+public:
+	std::vector< size_t > orientation_num; 					// the number of significant orientation for each class
+	size_t orientationNumAllClasses;							// sum of the above
+	std::vector< RFLOAT > rots, tilts, psis;
+	std::vector< size_t > iorientclasses, iover_rots;
+
+	// These are arrays which detial the number of entries in each class, and where each class starts.
+	// NOTE: There is no information about which class each class_idx refers to, there is only
+	// a distinction between different classes.
+	std::vector< size_t > class_entries, class_idx;
+	inline
+	ProjectionParams():
+
+		rots(),
+		tilts(),
+		psis(),
+		iorientclasses(),
+		iover_rots(),
+
+		class_entries(),
+		class_idx(),
+		orientation_num(),
+		orientationNumAllClasses(0)
+
+	{};
+
+	inline
+	ProjectionParams(size_t classes):
+
+		rots(),
+		tilts(),
+		psis(),
+		iorientclasses(),
+		iover_rots(),
+
+		class_entries(classes),
+		class_idx(classes),
+		orientation_num(classes),
+		orientationNumAllClasses(0)
+	{
+		class_idx[0]=0;
+		class_entries[0]=0;
+	};
+
+
+	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
+	inline
+	ProjectionParams(ProjectionParams &parent, size_t start, size_t end):
+		rots(				parent.rots.begin() 			+start,  	parent.rots.begin() 			+end),
+		tilts(				parent.tilts.begin() 			+start, 	parent.tilts.begin() 			+end),
+		psis(				parent.psis.begin() 			+start,  	parent.psis.begin() 			+end),
+		iorientclasses( 	parent.iorientclasses.begin() 	+start,  	parent.iorientclasses.begin() 	+end),
+		iover_rots(			parent.iover_rots.begin() 		+start,  	parent.iover_rots.begin() 		+end),
+		orientation_num(1),
+		orientationNumAllClasses(0),
+		class_entries(1,end-start),
+		class_idx(1,0) // NOTE: this is NOT the class, but rather where in these partial PrjParams to start, which is @ 0.
+	{};
+
+public:
+	// Appends new values into the projection parameters for later use.
+	// class_idx is used as such:
+	// the n:th class (beginning with 0:th)
+	// begins @ element class_idx[n]
+	// ends   @ element class_idx[n]+class_entries[n]
+
+	void pushBackAll(size_t iclass, RFLOAT NEWrot,RFLOAT NEWtilt ,RFLOAT NEWpsi, size_t NEWiorientclasses,size_t NEWiover_rots)
+	{
+		// incremement the counter for this class
+		class_entries[iclass]++;
+		// and push a new entry
+		rots.push_back(NEWrot);
+		tilts.push_back(NEWtilt);
+		psis.push_back(NEWpsi);
+		iorientclasses.push_back(NEWiorientclasses);
+		iover_rots.push_back(NEWiover_rots);
+	}
+};
+
+
+#if 0
 class IndexedDataArrayMask
 {
 public:
@@ -317,87 +388,6 @@ public:
 };
 
 
-class ProjectionParams
-{
-
-public:
-	std::vector< size_t > orientation_num; 					// the number of significant orientation for each class
-	size_t orientationNumAllClasses;							// sum of the above
-	std::vector< RFLOAT > rots, tilts, psis;
-	std::vector< size_t > iorientclasses, iover_rots;
-
-	// These are arrays which detial the number of entries in each class, and where each class starts.
-	// NOTE: There is no information about which class each class_idx refers to, there is only
-	// a distinction between different classes.
-	std::vector< size_t > class_entries, class_idx;
-	inline
-	ProjectionParams():
-
-		rots(),
-		tilts(),
-		psis(),
-		iorientclasses(),
-		iover_rots(),
-
-		class_entries(),
-		class_idx(),
-		orientation_num(),
-		orientationNumAllClasses(0)
-
-	{};
-
-	inline
-	ProjectionParams(size_t classes):
-
-		rots(),
-		tilts(),
-		psis(),
-		iorientclasses(),
-		iover_rots(),
-
-		class_entries(classes),
-		class_idx(classes),
-		orientation_num(classes),
-		orientationNumAllClasses(0)
-	{
-		class_idx[0]=0;
-		class_entries[0]=0;
-	};
-
-
-	// constructor that slices out a part of a parent ProjectionParams, assumed to contain a single (partial or entire) class
-	inline
-	ProjectionParams(ProjectionParams &parent, size_t start, size_t end):
-		rots(				parent.rots.begin() 			+start,  	parent.rots.begin() 			+end),
-		tilts(				parent.tilts.begin() 			+start, 	parent.tilts.begin() 			+end),
-		psis(				parent.psis.begin() 			+start,  	parent.psis.begin() 			+end),
-		iorientclasses( 	parent.iorientclasses.begin() 	+start,  	parent.iorientclasses.begin() 	+end),
-		iover_rots(			parent.iover_rots.begin() 		+start,  	parent.iover_rots.begin() 		+end),
-		orientation_num(1),
-		orientationNumAllClasses(0),
-		class_entries(1,end-start),
-		class_idx(1,0) // NOTE: this is NOT the class, but rather where in these partial PrjParams to start, which is @ 0.
-	{};
-
-public:
-	// Appends new values into the projection parameters for later use.
-	// class_idx is used as such:
-	// the n:th class (beginning with 0:th)
-	// begins @ element class_idx[n]
-	// ends   @ element class_idx[n]+class_entries[n]
-
-	void pushBackAll(size_t iclass, RFLOAT NEWrot,RFLOAT NEWtilt ,RFLOAT NEWpsi, size_t NEWiorientclasses,size_t NEWiover_rots)
-	{
-		// incremement the counter for this class
-		class_entries[iclass]++;
-		// and push a new entry
-		rots.push_back(NEWrot);
-		tilts.push_back(NEWtilt);
-		psis.push_back(NEWpsi);
-		iorientclasses.push_back(NEWiorientclasses);
-		iover_rots.push_back(NEWiover_rots);
-	}
-};
 
 /*
  * Bundle of device-objects
@@ -519,5 +509,5 @@ public:
 	}
 
 };
-
+#endif // if 0
 #endif
