@@ -17,9 +17,10 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+
+
 #include "src/gui_mainwindow.h"
 
-#define DEBUG
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define INSTD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
@@ -34,6 +35,7 @@ int StdOutDisplay::handle(int ev)
 		// double-click
 		if (Fl::event_clicks())
 		{
+			current_browse_directory = pipeline.processList[current_job].name;
 			FileName fn = current_browse_directory + fn_file;
 			std::string command;
 			if (exists(fn))
@@ -170,7 +172,6 @@ void SchedulerWindow::cb_execute_i()
 				jobids += integerToString(my_jobs[ijob]) + " ";
 		}
 		jobids += "\"";
-		std::cerr << " jobids= " << jobids << std::endl;
 
 		std::string myrepeat(repeat->value());
 		std::string mywait(wait->value());
@@ -244,8 +245,7 @@ void NoteEditorWindow::cb_save_i()
 }
 
 
-
-RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only):Fl_Window(w,h,title)
+GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only):Fl_Window(w,h,title)
 {
 
 	// Set initial Timer
@@ -255,7 +255,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	maingui_do_read_only = _do_read_only;
 	pipeline.do_read_only = _do_read_only;
 
-	show_initial_screen = true;
 	do_order_alphabetically = false;
 
 	FileName fn_lock=".gui_projectdir";
@@ -285,20 +284,19 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     FileName fn_bg = std::string(INSTD_BG);
 
     if(!exists(fn_bg))
-    {
         fn_bg = std::string(SRCD_BG);
-    }
 
 	if (exists(fn_bg))
 	{
 		// Initial screen picture with some explanation on how to use the GUI
-		image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
+            //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
+		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
 		image_box->image(xpm_image); // attach xpm image to box
-		forgot_button = new Fl_Button(450, 143, 10, 32, "?");
-		forgot_button->color(GUI_BUTTON_COLOR);
-		forgot_button->labelsize(12);
-		forgot_button->callback( cb_forgot, this);
+		//forgot_button = new Fl_Button(450, 143, 10, 32, "?");
+		//forgot_button->color(GUI_BUTTON_COLOR);
+		//forgot_button->labelsize(12);
+		//forgot_button->callback( cb_forgot, this);
 	 }
 	background_grp->end();
 
@@ -314,9 +312,6 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
 	{
 		pipeline.write();
 	}
-
-	// Check which jobs have finished
-	pipeline.checkProcessCompletion();
 
     color(GUI_BACKGROUND_COLOR);
     menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
@@ -378,112 +373,118 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     current_job = -1;
 
     browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[0] = PROC_IMPORT;
     browser->add("Import");
-    job_import = new ImportJobWindow();
+    gui_jobwindows[0] = new JobWindow();
+    gui_jobwindows[0]->initialise(PROC_IMPORT);
     browse_grp[0]->end();
 
     browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[1] = PROC_MOTIONCORR;
     browser->add("Motion correction");
-	job_motioncorr = new MotioncorrJobWindow();
+	gui_jobwindows[1] = new JobWindow();
+	gui_jobwindows[1]->initialise(PROC_MOTIONCORR);
     browse_grp[1]->end();
 
     browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[2] = PROC_CTFFIND;
     browser->add("CTF estimation");
-    job_ctffind = new CtffindJobWindow();
+	gui_jobwindows[2] = new JobWindow();
+	gui_jobwindows[2]->initialise(PROC_CTFFIND);
     browse_grp[2]->end();
 
     browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[3] = PROC_MANUALPICK;
 	browser->add("Manual picking");
-	job_manualpick = new ManualpickJobWindow();
-    browse_grp[3]->end();
+	gui_jobwindows[3] = new JobWindow();
+	gui_jobwindows[3]->initialise(PROC_MANUALPICK);
+	browse_grp[3]->end();
 
     browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[4] = PROC_AUTOPICK;
 	browser->add("Auto-picking");
-	job_autopick = new AutopickJobWindow();
+	gui_jobwindows[4] = new JobWindow();
+	gui_jobwindows[4]->initialise(PROC_AUTOPICK);
     browse_grp[4]->end();
 
     browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[5] = PROC_EXTRACT;
 	browser->add("Particle extraction");
-	job_extract = new ExtractJobWindow();
+	gui_jobwindows[5] = new JobWindow();
+	gui_jobwindows[5]->initialise(PROC_EXTRACT);
     browse_grp[5]->end();
 
     browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[6] = PROC_SORT;
 	browser->add("Particle sorting");
-	job_sort = new SortJobWindow();
+	gui_jobwindows[6] = new JobWindow();
+	gui_jobwindows[6]->initialise(PROC_SORT);
     browse_grp[6]->end();
 
     browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[7] = PROC_CLASSSELECT;
 	browser->add("Subset selection");
-	job_classselect = new ClassSelectJobWindow();
+	gui_jobwindows[7] = new JobWindow();
+	gui_jobwindows[7]->initialise(PROC_CLASSSELECT);
     browse_grp[7]->end();
 
     browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[8] = PROC_2DCLASS;
 	browser->add("2D classification");
-	job_class2d = new Class2DJobWindow();
+	gui_jobwindows[8] = new JobWindow();
+	gui_jobwindows[8]->initialise(PROC_2DCLASS);
     browse_grp[8]->end();
 
     browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[9] = PROC_3DCLASS;
-	browser->add("3D classification");
-	job_class3d = new Class3DJobWindow();
+	browser->add("3D initial model");
+	gui_jobwindows[9] = new JobWindow();
+	gui_jobwindows[9]->initialise(PROC_INIMODEL);
     browse_grp[9]->end();
 
     browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[10] = PROC_3DAUTO;
-	browser->add("3D auto-refine");
-	job_auto3d = new Auto3DJobWindow();
+	browser->add("3D classification");
+	gui_jobwindows[10] = new JobWindow();
+	gui_jobwindows[10]->initialise(PROC_3DCLASS);
     browse_grp[10]->end();
 
     browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[11] = PROC_MOVIEREFINE;
-	browser->add("Movie refinement");
-	job_movierefine = new MovieRefineJobWindow();
+	browser->add("3D auto-refine");
+	gui_jobwindows[11] = new JobWindow();
+	gui_jobwindows[11]->initialise(PROC_3DAUTO);
     browse_grp[11]->end();
 
     browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[12] = PROC_POLISH;
-	browser->add("Particle polishing");
-	job_polish = new PolishJobWindow();
+	browser->add("Movie refinement");
+	gui_jobwindows[12] = new JobWindow();
+	gui_jobwindows[12]->initialise(PROC_MOVIEREFINE);
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[13] = PROC_MASKCREATE;
-	browser->add("Mask creation");
-	job_maskcreate = new MaskCreateJobWindow();
+	browser->add("Particle polishing");
+	gui_jobwindows[13] = new JobWindow();
+	gui_jobwindows[13]->initialise(PROC_POLISH);
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[14] = PROC_JOINSTAR;
-	browser->add("Join star files");
-	job_joinstar = new JoinStarJobWindow();
+	browser->add("Mask creation");
+	gui_jobwindows[14] = new JobWindow();
+	gui_jobwindows[14]->initialise(PROC_MASKCREATE);
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[15] = PROC_SUBTRACT;
-	browser->add("Particle subtraction");
-	job_subtract = new SubtractJobWindow();
+	browser->add("Join star files");
+	gui_jobwindows[15] = new JobWindow();
+	gui_jobwindows[15]->initialise(PROC_JOINSTAR);
     browse_grp[15]->end();
 
     browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[16] = PROC_POST;
-	browser->add("Post-processing");
-	job_post = new PostJobWindow();
+	browser->add("Particle subtraction");
+	gui_jobwindows[16] = new JobWindow();
+	gui_jobwindows[16]->initialise(PROC_SUBTRACT);
     browse_grp[16]->end();
 
     browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browse_jobtype[17] = PROC_RESMAP;
-	browser->add("Local resolution");
-	job_resmap = new ResmapJobWindow();
+	browser->add("Post-processing");
+	gui_jobwindows[17] = new JobWindow();
+	gui_jobwindows[17]->initialise(PROC_POST);
     browse_grp[17]->end();
+
+    browse_grp[18] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Local resolution");
+	gui_jobwindows[18] = new JobWindow();
+	gui_jobwindows[18]->initialise(PROC_RESMAP);
+    browse_grp[18]->end();
 
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
@@ -572,8 +573,8 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     textbuff_stdout = new Fl_Text_Buffer();
     textbuff_stderr = new Fl_Text_Buffer();
     // Disable warning message about UTF-8 transcoding
-	disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y, w-20, 110);
-    disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y, w-20, 60);
+	disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y-5, w-20, 105);
+    disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y-5, w-20, 50);
     disp_stdout->fn_file = "run.out";
     disp_stderr->fn_file = "run.err";
     textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
@@ -581,15 +582,15 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     disp_stdout->buffer(textbuff_stdout);
     disp_stderr->buffer(textbuff_stderr);
     disp_stderr->textcolor(FL_RED);
-    disp_stdout->textsize(RLN_FONTSIZE);
-    disp_stderr->textsize(RLN_FONTSIZE);
+    disp_stdout->textsize(RLN_FONTSIZE-1);
+    disp_stderr->textsize(RLN_FONTSIZE-1);
     disp_stdout->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stderr->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,0);
     disp_stdout->scrollbar_width(0);
     disp_stderr->scrollbar_width(0);
 
     // Set and activate current selection from side-browser
-    cb_select_browsegroup_i(); // make default active
+    cb_select_browsegroup_i(true); // make default active; true is used to show_initial_screen
     is_main_continue = false; // default is a new run
 
     // Mechanism to update stdout and stderr continuously and also update the JobLists
@@ -597,13 +598,13 @@ RelionMainWindow::RelionMainWindow(int w, int h, const char* title, FileName fn_
     update_every_sec = _update_every_sec;
     exit_after_sec = (float)_exit_after_sec;
     if (update_every_sec > 0)
-    	Fl::add_timeout(update_every_sec, Timer_CB, (void*)this);
+    	Fl::add_timeout(update_every_sec, Gui_Timer_CB, (void*)this);
 
 }
 
-static void Timer_CB(void *userdata)
+static void Gui_Timer_CB(void *userdata)
 {
-	RelionMainWindow *o = (RelionMainWindow*)userdata;
+	GuiMainWindow *o = (GuiMainWindow*)userdata;
 
 	time_t now;
 	time (&now);
@@ -620,15 +621,30 @@ static void Timer_CB(void *userdata)
 	if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
     	o->fillStdOutAndErr();
 
-    // Always check for job completion
-    o->updateJobLists();
+    // Check for job completion if the pipeline has been changed
+	if (exists(PIPELINE_HAS_CHANGED))
+		o->updateJobLists();
 
     // Refresh every so many seconds
-    Fl::repeat_timeout(o->update_every_sec, Timer_CB, userdata);
+    Fl::repeat_timeout(o->update_every_sec, Gui_Timer_CB, userdata);
+}
+
+void GuiMainWindow::clear()
+{
+	if (menubar != NULL)
+	{
+		delete menubar;
+		menubar = NULL;
+	}
+	if (menubar2 != NULL)
+	{
+		delete menubar2;
+		menubar2 = NULL;
+	}
 }
 
 // Update the content of the finished, running and scheduled job lists
-void RelionMainWindow::fillRunningJobLists()
+void GuiMainWindow::fillRunningJobLists()
 {
 	// Go back to the same positions in the vertical scroll bars of the job lists after updating...
 	int mypos_running = running_job_browser->position();
@@ -698,8 +714,7 @@ void RelionMainWindow::fillRunningJobLists()
 			else
 				running_job_browser->add(pipeline.processList[i].name.c_str());
 		}
-		else if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
-				 pipeline.processList[i].status == PROC_SCHEDULED_CONT)
+		else if (pipeline.processList[i].status == PROC_SCHEDULED)
 		{
 			scheduled_processes.push_back(i);
 			if (pipeline.processList[i].alias != "None")
@@ -717,7 +732,7 @@ void RelionMainWindow::fillRunningJobLists()
 	finished_job_browser->hposition(myhpos_finished);
 }
 
-void RelionMainWindow::fillToAndFromJobLists()
+void GuiMainWindow::fillToAndFromJobLists()
 {
 	display_io_node->clear();
 	input_job_browser->clear();
@@ -806,19 +821,88 @@ void RelionMainWindow::fillToAndFromJobLists()
 	}
 }
 
-void RelionMainWindow::updateJobLists()
+void GuiMainWindow::fillStdOutAndErr()
+{
+
+	FileName fn_out = "";
+	FileName fn_err = "";
+	FileName fn_outtail, fn_errtail;
+	if (current_job >= 0)
+	{
+		fn_out = pipeline.processList[current_job].name + "run.out";
+		fn_err = pipeline.processList[current_job].name + "run.err";
+		fn_outtail = pipeline.processList[current_job].name + ".run.out.tail";
+		fn_errtail = pipeline.processList[current_job].name + ".run.err.tail";
+	}
+
+	if (exists(fn_out))
+	{
+		if (maingui_do_read_only)
+		{
+			int err = textbuff_stdout->loadfile(fn_out.c_str());
+		}
+		else
+		{
+			// Remove annoying carriage returns
+			std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > " + fn_outtail;
+			int res = system(command.c_str());
+			std::ifstream in(fn_outtail.c_str(), std::ios_base::in);
+			if (in.fail())
+				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_outtail + " does not exists" );
+			int err = textbuff_stdout->loadfile(fn_outtail.c_str());
+			in.close();
+		}
+		// Scroll to the bottom
+		disp_stdout->insert_position(textbuff_stdout->length()-1);
+		disp_stdout->show_insert_position();
+	}
+	else
+		textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
+
+	if (exists(fn_err))
+	{
+		if (maingui_do_read_only)
+		{
+			int err = textbuff_stderr->loadfile(fn_err.c_str());
+		}
+		else
+		{
+			std::string command = "tail -3 " + fn_err + " > " + fn_errtail;
+			int res = system(command.c_str());
+			std::ifstream in(fn_errtail.c_str(), std::ios_base::in);
+			if (in.fail())
+				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_errtail + " does not exists" );
+			int err = textbuff_stderr->loadfile(fn_errtail.c_str());
+			in.close();
+		}
+		// Scroll to the bottom
+		disp_stderr->insert_position(textbuff_stderr->length()-1);
+		disp_stderr->show_insert_position();
+	}
+	else
+		textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
+
+}
+
+void GuiMainWindow::tickTimeLastChanged()
+{
+	time(&time_last_change);
+}
+
+void GuiMainWindow::updateJobLists()
 {
 	pipeline.checkProcessCompletion();
 	fillRunningJobLists();
 	fillToAndFromJobLists();
 }
 
-void RelionMainWindow::loadJobFromPipeline()
+
+void GuiMainWindow::loadJobFromPipeline(int this_job)
 {
 
-	int this_job = current_job;
+	// Set the "static int" to which job we're currently pointing
+	current_job = this_job;
 	int itype = pipeline.processList[current_job].type;
-	fn_settings = pipeline.processList[current_job].name;
 
 	// The following line allows certain browse buttons to only open the current directory (using CURRENT_ODIR)
 	current_browse_directory = pipeline.processList[current_job].name;
@@ -826,639 +910,47 @@ void RelionMainWindow::loadJobFromPipeline()
 	// What type of job is this?
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
 	{
-		if ( browse_jobtype[t] == itype )
+		if ( gui_jobwindows[t]->myjob.type == itype )
 			browser->value(t+1);
 	}
 
-	// the new job browser has reset current_job to -1....
-	current_job = this_job;
+	// change GUI to the corresponding jobwindow
+	cb_select_browsegroup_i();
 
-	// Re-read the settings for this job
-	cb_select_browsegroup_i(); // change to the corresponding jobwindow
-	jobCommunicate(DONT_WRITE, DO_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
-
-	// Update all job lists in the main GUI
-	updateJobLists();
+	// Re-read the settings for this job and update the values inside the GUI
+	int iwin = (browser->value() - 1);
+	gui_jobwindows[iwin]->myjob.read(pipeline.processList[current_job].name, is_main_continue);
+	gui_jobwindows[iwin]->updateMyGui();
 
 	// If a finished or running job was loaded from the pipeline: set this to be a continuation job
-	// If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED_NEW
-    if (pipeline.processList[current_job].status != PROC_SCHEDULED_NEW)
-    	is_main_continue = true;
-    else
-    	is_main_continue = false;
+	// If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED
+    //if (pipeline.processList[current_job].status == PROC_SCHEDULED && !gui_jobwindows[iwin]->myjob.is_continue)
+    //	is_main_continue = false;
+    //else
+    //	is_main_continue = true;
 
+    // Any job loaded from the pipeline will initially be set as a continuation job
+    is_main_continue = true;
     cb_toggle_continue_i();
 
+    // Set the alias in the window
     if (pipeline.processList[current_job].alias != "None")
     	alias_current_job->value(pipeline.processList[current_job].alias.c_str());
     else
     	alias_current_job->value(pipeline.processList[current_job].name.c_str());
 
+	// Update all job lists in the main GUI
+	updateJobLists();
+
+	// File the out and err windows
 	fillStdOutAndErr();
+
 }
 
-long int RelionMainWindow::addToPipeLine(int as_status, bool do_overwrite, int this_job)
-{
-	int itype = (this_job > 0) ? this_job : (browse_jobtype[browser->value() - 1]); // browser starts counting at 1 ...
-	std::vector<Node> inputnodes;
-	std::vector<Node> outputnodes;
-	std::string oname;
-
-	switch (itype)
-	{
-	case PROC_IMPORT:
-	{
-		inputnodes = job_import->pipelineInputNodes;
-		outputnodes= job_import->pipelineOutputNodes;
-		oname = job_import->pipelineOutputName;
-		break;
-	}
-	case PROC_MOTIONCORR:
-	{
-		inputnodes = job_motioncorr->pipelineInputNodes;
-		outputnodes= job_motioncorr->pipelineOutputNodes;
-		oname = job_motioncorr->pipelineOutputName;
-		break;
-	}
-	case PROC_MANUALPICK:
-	{
-		inputnodes = job_manualpick->pipelineInputNodes;
-		outputnodes= job_manualpick->pipelineOutputNodes;
-		oname = job_manualpick->pipelineOutputName;
-		break;
-	}
-	case PROC_CTFFIND:
-	{
-		inputnodes = job_ctffind->pipelineInputNodes;
-		outputnodes= job_ctffind->pipelineOutputNodes;
-		oname = job_ctffind->pipelineOutputName;
-		break;
-	}
-	case PROC_AUTOPICK:
-	{
-		inputnodes = job_autopick->pipelineInputNodes;
-		outputnodes= job_autopick->pipelineOutputNodes;
-		oname = job_autopick->pipelineOutputName;
-		break;
-	}
-	case PROC_EXTRACT:
-	{
-		inputnodes = job_extract->pipelineInputNodes;
-		outputnodes= job_extract->pipelineOutputNodes;
-		oname = job_extract->pipelineOutputName;
-		break;
-	}
-	case PROC_SORT:
-	{
-		inputnodes = job_sort->pipelineInputNodes;
-		outputnodes= job_sort->pipelineOutputNodes;
-		oname = job_sort->pipelineOutputName;
-		break;
-	}
-	case PROC_CLASSSELECT:
-	{
-		inputnodes = job_classselect->pipelineInputNodes;
-		outputnodes= job_classselect->pipelineOutputNodes;
-		oname = job_classselect->pipelineOutputName;
-		break;
-	}
-	case PROC_2DCLASS:
-	{
-
-		inputnodes = job_class2d->pipelineInputNodes;
-		outputnodes= job_class2d->pipelineOutputNodes;
-		oname = job_class2d->pipelineOutputName;
-		break;
-	}
-	case PROC_3DCLASS:
-	{
-
-		inputnodes = job_class3d->pipelineInputNodes;
-		outputnodes= job_class3d->pipelineOutputNodes;
-		oname = job_class3d->pipelineOutputName;
-		break;
-	}
-	case PROC_3DAUTO:
-	{
-
-		inputnodes = job_auto3d->pipelineInputNodes;
-		outputnodes= job_auto3d->pipelineOutputNodes;
-		oname = job_auto3d->pipelineOutputName;
-		break;
-	}
-	case PROC_MOVIEREFINE:
-	{
-		inputnodes = job_movierefine->pipelineInputNodes;
-		outputnodes= job_movierefine->pipelineOutputNodes;
-		oname = job_movierefine->pipelineOutputName;
-		break;
-	}
-	case PROC_POLISH:
-	{
-		inputnodes = job_polish->pipelineInputNodes;
-		outputnodes= job_polish->pipelineOutputNodes;
-		oname = job_polish->pipelineOutputName;
-		break;
-	}
-	case PROC_MASKCREATE:
-	{
-		inputnodes = job_maskcreate->pipelineInputNodes;
-		outputnodes= job_maskcreate->pipelineOutputNodes;
-		oname = job_maskcreate->pipelineOutputName;
-		break;
-	}
-	case PROC_JOINSTAR:
-	{
-		inputnodes = job_joinstar->pipelineInputNodes;
-		outputnodes= job_joinstar->pipelineOutputNodes;
-		oname = job_joinstar->pipelineOutputName;
-		break;
-	}
-	case PROC_SUBTRACT:
-	{
-		inputnodes = job_subtract->pipelineInputNodes;
-		outputnodes= job_subtract->pipelineOutputNodes;
-		oname = job_subtract->pipelineOutputName;
-		break;
-	}
-	case PROC_POST:
-	{
-		inputnodes = job_post->pipelineInputNodes;
-		outputnodes= job_post->pipelineOutputNodes;
-		oname = job_post->pipelineOutputName;
-		break;
-	}
-	case PROC_RESMAP:
-	{
-
-		inputnodes = job_resmap->pipelineInputNodes;
-		outputnodes= job_resmap->pipelineOutputNodes;
-		oname = job_resmap->pipelineOutputName;
-		break;
-	}
-	default:
-	{
-		REPORT_ERROR("ERROR: unrecognised job-type to add to the pipeline");
-	}
-	}
-
-	// Also write a mini-pipeline in the output directory
-	PipeLine mini_pipeline;
-	mini_pipeline.setName(oname+"job");
-
-	// Add Process to the processList of the pipeline
-	Process process(oname, itype, as_status);
-	long int myProcess = pipeline.addNewProcess(process, do_overwrite);
-	mini_pipeline.addNewProcess(process);
-
-	// Add all input nodes
-	for (int i=0; i < inputnodes.size(); i++)
-	{
-		pipeline.addNewInputEdge(inputnodes[i], myProcess);
-		mini_pipeline.addNewInputEdge(inputnodes[i], 0);
-	}
-	// Add all output nodes
-	for (int i=0; i < outputnodes.size(); i++)
-	{
-		pipeline.addNewOutputEdge(myProcess, outputnodes[i]);
-		mini_pipeline.addNewOutputEdge(0, outputnodes[i]);
-	}
-
-	// Write the mini-pipeline to an updated STAR file
-	mini_pipeline.write();
-	// Writing of the overall pipeline is done in the function calling addToPipeLine
-
-	return myProcess;
-}
-
-bool RelionMainWindow::jobCommunicate(bool do_write, bool do_read, bool do_toggle_continue, bool do_commandline, bool do_makedir, int this_job)
-{
-	int itype = (this_job > 0) ? this_job : (browse_jobtype[browser->value() - 1]); // browser starts counting at 1 ....
-	show_initial_screen = false;
-
-	bool is_scheduled=false;
-	if (current_job >= 0)
-		is_scheduled= (pipeline.processList[current_job].status == PROC_SCHEDULED_CONT || pipeline.processList[current_job].status == PROC_SCHEDULED_NEW);
-
-	if (do_commandline)
-	{
-		// Except for continuation or scheduled jobs, all jobs get a new unique directory
-		if (is_main_continue || is_scheduled)
-			global_outputname = fn_settings.beforeLastOf("/") + "/";
-		else
-			global_outputname = "";
-	}
-
-	bool result = true;
-
-	switch (itype)
-	{
-	case PROC_IMPORT:
-	{
-		if (do_write)
-			job_import->write(fn_settings);
-		if (do_read)
-			job_import->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_import->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_import->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_MOTIONCORR:
-	{
-		if (do_write)
-			job_motioncorr->write(fn_settings);
-		if (do_read)
-			job_motioncorr->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_motioncorr->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_motioncorr->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_MANUALPICK:
-	{
-		if (do_write)
-			job_manualpick->write(fn_settings);
-		if (do_read)
-			job_manualpick->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_manualpick->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_manualpick->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_CTFFIND:
-	{
-		if (do_write)
-			job_ctffind->write(fn_settings);
-		if (do_read)
-			job_ctffind->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_ctffind->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_ctffind->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_AUTOPICK:
-	{
-		if (do_write)
-			job_autopick->write(fn_settings);
-		if (do_read)
-			job_autopick->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_autopick->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_autopick->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_EXTRACT:
-	{
-		if (do_write)
-			job_extract->write(fn_settings);
-		if (do_read)
-			job_extract->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_extract->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_extract->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_SORT:
-	{
-		if (do_write)
-			job_sort->write(fn_settings);
-		if (do_read)
-			job_sort->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_sort->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_sort->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_CLASSSELECT:
-	{
-		if (do_write)
-			job_classselect->write(fn_settings);
-		if (do_read)
-			job_classselect->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_classselect->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_classselect->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_2DCLASS:
-	{
-		if (do_write)
-			job_class2d->write(fn_settings);
-		if (do_read)
-			job_class2d->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_class2d->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_class2d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_3DCLASS:
-	{
-		if (do_write)
-			job_class3d->write(fn_settings);
-		if (do_read)
-			job_class3d->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_class3d->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_class3d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_3DAUTO:
-	{
-		if (do_write)
-			job_auto3d->write(fn_settings);
-		if (do_read)
-			job_auto3d->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_auto3d->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_auto3d->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_MOVIEREFINE:
-	{
-		if (do_write)
-			job_movierefine->write(fn_settings);
-		if (do_read)
-			job_movierefine->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_movierefine->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_movierefine->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_POLISH:
-	{
-		if (do_write)
-			job_polish->write(fn_settings);
-		if (do_read)
-			job_polish->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_polish->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_polish->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_MASKCREATE:
-	{
-		if (do_write)
-			job_maskcreate->write(fn_settings);
-		if (do_read)
-			job_maskcreate->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_maskcreate->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_maskcreate->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_JOINSTAR:
-	{
-		if (do_write)
-			job_joinstar->write(fn_settings);
-		if (do_read)
-			job_joinstar->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_joinstar->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_joinstar->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_SUBTRACT:
-	{
-		if (do_write)
-			job_subtract->write(fn_settings);
-		if (do_read)
-			job_subtract->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_subtract->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_subtract->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_POST:
-	{
-		if (do_write)
-			job_post->write(fn_settings);
-		if (do_read)
-			job_post->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_post->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_post->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	case PROC_RESMAP:
-	{
-		if (do_write)
-			job_resmap->write(fn_settings);
-		if (do_read)
-			job_resmap->read(fn_settings, is_main_continue);
-		if (do_toggle_continue)
-			job_resmap->toggle_new_continue(is_main_continue);
-		if (do_commandline)
-			result = job_resmap->getCommands(global_outputname, commands, final_command, do_makedir, pipeline.job_counter);
-		break;
-	}
-	} // end switch
-
-	// set the continue button correct upon reading of old settings
-	if (do_read)
-	{
-		// Make the choice active
-		cb_toggle_continue_i();
-	}
-
-	// getCommands may be cancelled
-	return result;
-}
-
-void RelionMainWindow::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait)
+void GuiMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 {
 
-	std::vector<long int> my_scheduled_processes;
-	std::vector<std::string> jobids;
-	int njobs = splitString(fn_jobids, " ", jobids);
-	if (njobs == 0)
-		my_scheduled_processes = scheduled_processes;
-	else
-		for (int i = 0; i < njobs; i++)
-			my_scheduled_processes.push_back(textToInteger(jobids[i]));
-
-	FileName fn_log = "pipeline_" + pipeline.name + "_" + fn_sched + ".log";
-	std::ofstream  fh;
-	fh.open((fn_log).c_str(), std::ios::app);
-
-	std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
-
-	// Touch the fn_check file
-	FileName fn_check = "RUNNING_PIPELINER_"+pipeline.name + "_" + fn_sched;
-	touch(fn_check);
-	bool fn_check_exists = true;
-
-	if (my_scheduled_processes.size() < 1)
-		REPORT_ERROR("relion_pipeliner ERROR: there are no scheduled jobs. Exiting...");
-
-	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-	fh << " Starting a new scheduler execution called " << fn_sched << std::endl;
-	fh << " The scheduled jobs are: " << std::endl;
-	for (long int i = 0; i < my_scheduled_processes.size(); i++)
-		fh << " - " << pipeline.processList[my_scheduled_processes[i]].name << std::endl;
-	fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
-	if (nr_repeat > 1)
-		fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
-	fh << " Will be checking for existence of file " << fn_check << "; if it no longer exists, the scheduler will stop." << std::endl;
-	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-
-	int repeat = 0;
-	time_t now = time(0);
-	for (repeat = 0 ; repeat < nr_repeat; repeat++)
-	{
-		fh << " + " << ctime(&now) << " -- Starting the " << repeat+1 << "th repeat" << std::endl;
-
-		// Get starting time of the repeat cycle
-		timeval time_start, time_end;
-		gettimeofday(&time_start, NULL);
-
-		for (long int i = 0; i < my_scheduled_processes.size(); i++)
-		{
-			current_job = my_scheduled_processes[i];
-			loadJobFromPipeline();
-
-			// Check whether the input nodes are there, before executing the job
-			for (long int inode = 0; inode < pipeline.processList[current_job].inputNodeList.size(); inode++)
-			{
-				long int mynode = pipeline.processList[current_job].inputNodeList[inode];
-				while (!exists(pipeline.nodeList[mynode].name))
-				{
-					fh << " + -- Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
-					sleep(10);
-				}
-			}
-			now = time(0);
-			fh << " + " << ctime(&now) << " ---- Executing " << pipeline.processList[current_job].name  << std::endl;
-			cb_run_i(false, false); //dont only schedule and dont open the editor window
-
-			// Now wait until that job is done!
-			while (true)
-			{
-				if (!exists(fn_check))
-				{
-					fn_check_exists = false;
-					break;
-				}
-
-				sleep(10);
-				tickTimeLastChanged(); // This will make sure the pipeline never gets timed-out
-				pipeline.checkProcessCompletion();
-				if (pipeline.processList[current_job].status == PROC_FINISHED)
-				{
-					// Read in existing pipeline, in case some other window had changed something else
-					pipeline.read(DO_LOCK);
-					// Re-set set status of current_job to finished
-					pipeline.processList[current_job].status = PROC_FINISHED;
-					// Write out the modified pipeline with the status of current_job to finished
-					pipeline.write(DO_LOCK);
-					break;
-				}
-			}
-
-			if (!fn_check_exists)
-				break;
-
-			if (repeat + 1 != nr_repeat)
-			{
-
-				// Read in existing pipeline, in case some other window had changed it
-				pipeline.read(DO_LOCK);
-
-				// Set the current job back into the job list of the repeating cycle
-				// Do we want to run this as NEW or CONTINUED NEXT TIME?
-				int mytype = pipeline.processList[current_job].type;
-				// The following jobtypes have functionality to only do the unfinished part of the job
-				if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
-					pipeline.processList[current_job].status = PROC_SCHEDULED_CONT;
-				else
-					pipeline.processList[current_job].status = PROC_SCHEDULED_NEW;
-
-				// Write the pipeline to an updated STAR file
-				pipeline.write(DO_LOCK);
-			}
-		} //end loop my_scheudled_processes
-
-
-		if (!fn_check_exists)
-			break;
-
-		// Wait at least until 'minutes_wait' minutes have passed from the beginning of the repeat cycle
-		gettimeofday(&time_end, NULL);
-		long int passed_minutes = (time_end.tv_sec - time_start.tv_sec)/60;
-		long int still_wait = minutes_wait - passed_minutes;
-		if (still_wait > 0 && repeat+1 != nr_repeat)
-		{
-			fh << " + -- Waiting " << still_wait << " minutes until next repeat .."<< std::endl;
-			sleep(still_wait * 60);
-		}
-
-	}
-
-	if (repeat == nr_repeat)
-	{
-		fh << " + performed all requested repeats in scheduler " << fn_sched << ". Stopping now ..." << std::endl;
-		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline (from the File menu) to update the job lists." << std::endl;
-
-		// Read in existing pipeline, in case some other window had changed it
-		pipeline.read(DO_LOCK);
-
-		// After breaking out of repeat, set status of the jobs to finished
-		for (long int i = 0; i < my_scheduled_processes.size(); i++)
-		{
-			pipeline.processList[my_scheduled_processes[i]].status = PROC_FINISHED;
-		}
-
-		// Write the pipeline to an updated STAR file
-		pipeline.write(DO_LOCK);
-
-		// Remove the temporary file
-		std::remove(fn_check.c_str());
-		exit(0);
-	}
-	else if (!fn_check_exists)
-	{
-		fh << " + File " << fn_check << " was removed. Stopping now .." << std::endl;
-		std::cout << " PIPELINER: the " << fn_check << " file was removed. Stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline (from the File menu) to update the job lists." << std::endl;
-	}
-	else
-	{
-		REPORT_ERROR("PIPELINER BUG: This shouldn't happen, either fn_check should not exist or we should reach end of repeat cycles...");
-	}
-
-	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-	fh.close();
-
-	cb_quit_i();
-}
-
-void RelionMainWindow::tickTimeLastChanged()
-{
-	time(&time_last_change);
-}
-
-void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
-{
-
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 
 	// When clicking the job browser on the left: reset current_job to -1 (i.e. a new job, not yet in the pipeline)
 	current_job = -1;
@@ -1467,7 +959,7 @@ void RelionMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 
 }
 
-void RelionMainWindow::cb_select_browsegroup_i()
+void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 {
 
 	// Update timer
@@ -1479,13 +971,14 @@ void RelionMainWindow::cb_select_browsegroup_i()
 	else
 		background_grp->hide();
 
+	int iwin = (browser->value() - 1);
 	// Show the 'selected' group, hide the others
-    for ( int t=0; t<NR_BROWSE_TABS; t++ )
+	for ( int t=0; t<NR_BROWSE_TABS; t++ )
     {
     	// During the initial screen: show a nice picture with some explanations
-    	if ( t == (browser->value() - 1) && !show_initial_screen ) // browser starts counting at 1...
+    	if ( t == iwin && !show_initial_screen) // browser starts counting at 1...
         {
-        	browse_grp[t]->show();
+    		browse_grp[t]->show();
         }
         else
         {
@@ -1493,32 +986,33 @@ void RelionMainWindow::cb_select_browsegroup_i()
         }
     }
 
-    // Toggle the new tab according to the continue toggle button
-    jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
-
 	// Update all job lists in the main GUI
 	updateJobLists();
 
-	// If an new job was loaded from the job-browser: set the GUI to be a new job
     is_main_continue = false;
-    cb_toggle_continue_i(); // make default active
 
+	// If the GUI got changed, put that change into the joboption now
+    gui_jobwindows[iwin]->updateMyJob();
+
+	// toggle the continue status of this job
+    cb_toggle_continue_i();
+
+    // Reset stdout and stderr windows, and line to give alias
     alias_current_job->value("Give_alias_here");
-	//current_job = -1;
     textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
     textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
 
+
 }
 
-
-void RelionMainWindow::cb_select_finished_job(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_select_finished_job(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_finished_job_i();
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_select_finished_job_i()
+void GuiMainWindow::cb_select_finished_job_i()
 {
 	// Update timer
 	tickTimeLastChanged();
@@ -1526,20 +1020,17 @@ void RelionMainWindow::cb_select_finished_job_i()
 	// Show the 'selected' group, hide the others
     int idx = finished_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
-    {
-    	current_job = finished_processes[idx];
-		loadJobFromPipeline();
-    }
+		loadJobFromPipeline(finished_processes[idx]);
 }
 
-void RelionMainWindow::cb_select_running_job(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_select_running_job(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_running_job_i();
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_select_running_job_i()
+void GuiMainWindow::cb_select_running_job_i()
 {
 	// Update timer
 	tickTimeLastChanged();
@@ -1547,20 +1038,18 @@ void RelionMainWindow::cb_select_running_job_i()
 	// Show the 'selected' group, hide the others
     int idx = running_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
-    {
-    	current_job = running_processes[idx];
-    	loadJobFromPipeline();
-    }
+    	loadJobFromPipeline(running_processes[idx]);
+
 }
 
-void RelionMainWindow::cb_select_scheduled_job(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_select_scheduled_job(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_scheduled_job_i();
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_select_scheduled_job_i()
+void GuiMainWindow::cb_select_scheduled_job_i()
 {
 	// Update timer
 	tickTimeLastChanged();
@@ -1568,20 +1057,17 @@ void RelionMainWindow::cb_select_scheduled_job_i()
 	// Show the 'selected' group, hide the others
     int idx = scheduled_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
-    {
-    	current_job = scheduled_processes[idx];
-		loadJobFromPipeline();
-    }
+		loadJobFromPipeline(scheduled_processes[idx]);
 }
 
-void RelionMainWindow::cb_select_input_job(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_select_input_job(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_input_job_i();
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_select_input_job_i()
+void GuiMainWindow::cb_select_input_job_i()
 {
 	// Update timer
 	tickTimeLastChanged();
@@ -1589,21 +1075,18 @@ void RelionMainWindow::cb_select_input_job_i()
 	// Show the 'selected' group, hide the others
     int idx = input_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
-    {
-    	current_job = input_processes[idx];
-		loadJobFromPipeline();
-    }
+		loadJobFromPipeline(input_processes[idx]);
 
 }
 
-void RelionMainWindow::cb_select_output_job(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_select_output_job(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_output_job_i();
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_select_output_job_i()
+void GuiMainWindow::cb_select_output_job_i()
 {
 	// Update timer
 	tickTimeLastChanged();
@@ -1611,21 +1094,18 @@ void RelionMainWindow::cb_select_output_job_i()
 	// Show the 'selected' group, hide the others
     int idx = output_job_browser->value() - 1;
     if (idx >= 0) // only if a non-empty line was selected
-    {
-    	current_job = output_processes[idx];
-		loadJobFromPipeline();
-    }
+		loadJobFromPipeline(output_processes[idx]);
 
 }
 
-void RelionMainWindow::cb_display_io_node(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_display_io_node(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_display_io_node_i();
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_display_io_node_i()
+void GuiMainWindow::cb_display_io_node_i()
 {
 
 	// Run relion_display on the output node
@@ -1635,11 +1115,13 @@ void RelionMainWindow::cb_display_io_node_i()
 
 	if (pipeline.nodeList[mynode].type == NODE_MIC_COORDS)
 	{
+		// A manualpicker jobwindow for display of micrographs....
+		RelionJob manualpickjob;
 		FileName fn_job = ".gui_manualpickrun.job";
 		bool iscont=false;
 		if (exists(fn_job))
 		{
-			global_manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont);
+			manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont, true); // true means do initialise
 		}
 		else
 		{
@@ -1664,33 +1146,33 @@ void RelionMainWindow::cb_display_io_node_i()
 				command="`which relion_manualpick` --i " + fn_star;
 				command += " --odir " + fn_dirs;
 				command += " --pickname " + fn_suffix;
-				command += " --scale " + floatToString(global_manualpickjob.micscale.getValue());
-				command += " --sigma_contrast " + floatToString(global_manualpickjob.sigma_contrast.getValue());
-				command += " --black " + floatToString(global_manualpickjob.black_val.getValue());
-				command += " --white " + floatToString(global_manualpickjob.white_val.getValue());
+				command += " --scale " + manualpickjob.joboptions["micscale"].getString();
+				command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
+				command += " --black " + manualpickjob.joboptions["black_val"].getString();
+				command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
-				if (global_manualpickjob.lowpass.getValue() > 0.)
-					command += " --lowpass " + floatToString(global_manualpickjob.lowpass.getValue());
-				if (global_manualpickjob.highpass.getValue() > 0.)
-					command += " --highpass " + floatToString(global_manualpickjob.highpass.getValue());
-				if (global_manualpickjob.angpix.getValue() > 0.)
-					command += " --angpix " + floatToString(global_manualpickjob.angpix.getValue());
+				if (manualpickjob.joboptions["lowpass"].getNumber() > 0.)
+					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+				if (manualpickjob.joboptions["highpass"].getNumber() > 0.)
+					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+				if (manualpickjob.joboptions["angpix"].getNumber() > 0.)
+					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 
-				command += " --ctf_scale " + floatToString(global_manualpickjob.ctfscale.getValue());
+				command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
 
-				command += " --particle_diameter " + floatToString(global_manualpickjob.diameter.getValue());
+				command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
 
-				if (global_manualpickjob.do_color.getValue())
+				if (manualpickjob.joboptions["do_color"].getBoolean())
 				{
-					command += " --color_label " + global_manualpickjob.color_label.getValue();
-					command += " --blue " + floatToString(global_manualpickjob.blue_value.getValue());
-					command += " --red " + floatToString(global_manualpickjob.red_value.getValue());
-					if (global_manualpickjob.fn_color.getValue().length() > 0)
-						command += " --color_star " + global_manualpickjob.fn_color.getValue();
+					command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
+					command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
+					command += " --red " + manualpickjob.joboptions["red_value"].getString();
+					if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
+						command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
 				}
 
 				// Other arguments for extraction
-				command += " " + global_manualpickjob.other_args.getValue() + " &";
+				command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 			}
 			else
 			{
@@ -1722,20 +1204,20 @@ void RelionMainWindow::cb_display_io_node_i()
 
 }
 
-void RelionMainWindow::cb_display(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_display(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_display_i();
 }
 
 
-void RelionMainWindow::cb_display_i()
+void GuiMainWindow::cb_display_i()
 {
         std::string command = " relion_display --gui &" ;
         int res = system(command.c_str());
 }
 
-void RelionMainWindow::cb_toggle_continue_i()
+void GuiMainWindow::cb_toggle_continue_i()
 {
 
 	if (is_main_continue)
@@ -1755,275 +1237,118 @@ void RelionMainWindow::cb_toggle_continue_i()
 		alias_current_job->activate();
 	}
 
-	jobCommunicate(DONT_WRITE, DONT_READ, DO_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
+	int my_window = (browser->value() - 1);
+	gui_jobwindows[my_window]->toggle_new_continue(is_main_continue);
 
 }
 
-void RelionMainWindow::fillStdOutAndErr()
-{
 
-	FileName fn_out = (current_job >= 0) ? pipeline.processList[current_job].name + "run.out" : "";
-	FileName fn_err = (current_job >= 0) ? pipeline.processList[current_job].name + "run.err" : "";
-	if (exists(fn_out))
-	{
-		if (maingui_do_read_only)
-		{
-			int err = textbuff_stdout->loadfile(fn_out.c_str());
-		}
-		else
-		{
-			// Remove annoying carriage returns
-			std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > .gui_tmpout";
-			int res = system(command.c_str());
-			std::ifstream in(".gui_tmpout", std::ios_base::in);
-			if (in.fail())
-				REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmpout does not exists" );
-			int err = textbuff_stdout->loadfile(".gui_tmpout");
-			in.close();
-		}
-		// Scroll to the bottom
-		disp_stdout->insert_position(textbuff_stdout->length()-1);
-		disp_stdout->show_insert_position();
-	}
-	else
-		textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
+void GuiMainWindow::cb_print_cl(Fl_Widget* o, void* v) {
 
-	if (exists(fn_err))
-	{
-		if (maingui_do_read_only)
-		{
-			int err = textbuff_stderr->loadfile(fn_err.c_str());
-		}
-		else
-		{
-			std::string command = "tail -3 " + fn_err + " > .gui_tmperr";
-			int res = system(command.c_str());
-			std::ifstream in(".gui_tmperr", std::ios_base::in);
-			if (in.fail())
-				REPORT_ERROR( (std::string) "MetaDataTable::read: File .gui_tmperr does not exists" );
-			int err = textbuff_stderr->loadfile(".gui_tmperr");
-			in.close();
-		}
-		// Scroll to the bottom
-		disp_stderr->insert_position(textbuff_stderr->length()-1);
-		disp_stderr->show_insert_position();
-	}
-	else
-		textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
-
-}
-
-void RelionMainWindow::cb_print_cl(Fl_Widget* o, void* v) {
-
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_print_cl_i();
 }
 
-void RelionMainWindow::cb_print_cl_i()
+void GuiMainWindow::cb_print_cl_i()
 {
-	// Update all job lists in the main GUI
-	updateJobLists();
 
-	jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DONT_MKDIR);
-    std::cout << " *** The command is:" << std::endl;
-    for (int icom = 0; icom < commands.size(); icom++)
-    	std::cout << commands[icom] << std::endl;
+	int iwin = browser->value() - 1;
+	// And update the job inside it
+	gui_jobwindows[iwin]->updateMyJob();
+
+	std::string error_message;
+	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false, DONT_MKDIR, commands, final_command, error_message))
+	{
+		fl_message("%s",error_message.c_str());
+	}
+	else
+	{
+		std::cout << " *** The command is:" << std::endl;
+		for (int icom = 0; icom < commands.size(); icom++)
+			std::cout << commands[icom] << std::endl;
+	}
 
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_forgot(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_forgot(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_forgot_i(); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
 }
 
-void RelionMainWindow::cb_forgot_i()
+void GuiMainWindow::cb_forgot_i()
 {
 	fl_message("Really?! Perhaps you should spend fewer nights at the microscope and try to sleep a bit more...");
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_run(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_run(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
 	// Run the job
-	T->cb_run_i(false, true); // false means dont only_schedule, true means open the note editor window
+	T->cb_run_i(false, false); // 1st false means dont only_schedule, 2nd false means dont open the note editor window
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_schedule(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
-    T->cb_run_i(true, true); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
+    GuiMainWindow* T=(GuiMainWindow*)v;
+    T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
 }
 
-void RelionMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
+void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
+
+	// Get which jobtype the GUI is on now
+	int iwin = browser->value() - 1;
+	// And update the job inside it
+	gui_jobwindows[iwin]->updateMyJob();
 
 	// Update timer
 	tickTimeLastChanged();
 
-	// Make sure that whenever we write out a pipeline, we first read in the existing version on disk
-	// This prevents sync errors with multiple windows acting on the same pipeline
-
-	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-	pipeline.read(DO_LOCK); // true means: only_read if_file_exists
-
-	// Get the command line arguments from the currently active jobwindow,
-	// If the job gets cancelled, just exit this function
-	if (!jobCommunicate(DONT_WRITE, DONT_READ, DONT_TOGGLE_CONT, DO_GET_CL, DO_MKDIR))
+	std::string error_message;
+	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
-		std::cout << " Cancelling job" << std::endl;
-		// Repeat write-out to delete .lock file
-		pipeline.write(DO_LOCK);
+		fl_message("%s",error_message.c_str());
 		return;
 	}
-
-	// Save temporary hidden file with this jobs settings as default for a new job
-	fn_settings = "";
-	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
-
-	// Also save a copy of the GUI settings with the current output name
-	fn_settings = global_outputname;
-	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
-
-	if (commands.size()==0)
-	{
-		std::cout << " Nothing to do..."<< std::endl;
-		return;
-	}
-
-	// If this is a continuation job, check whether output files exist and move away!
-	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
-	bool do_move_output_nodes_to_old = false;
-	if (!only_schedule && is_main_continue)
-	{
-		do_move_output_nodes_to_old = !(pipeline.processList[current_job].type == PROC_2DCLASS ||
-				pipeline.processList[current_job].type == PROC_3DCLASS ||
-				pipeline.processList[current_job].type == PROC_3DAUTO ||
-				pipeline.processList[current_job].type == PROC_MANUALPICK ||
-				pipeline.processList[current_job].type == PROC_CLASSSELECT ||
-				pipeline.processList[current_job].type == PROC_MOVIEREFINE ||
-				pipeline.processList[current_job].type == PROC_POLISH);
-
-		// For continuation of relion_refine jobs, remove the original output nodes from the list
-		if (pipeline.processList[current_job].type == PROC_2DCLASS ||
-				pipeline.processList[current_job].type == PROC_3DCLASS ||
-				pipeline.processList[current_job].type == PROC_3DAUTO)
-		{
-
-			std::vector<bool> deleteNodes, deleteProcesses;
-			deleteNodes.resize(pipeline.nodeList.size(), false);
-			deleteProcesses.resize(pipeline.processList.size(), false);
-
-			for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
-			{
-				long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
-				if(!exists(pipeline.nodeList[mynode].name))
-					deleteNodes[mynode] = true;
-			}
-
-			FileName fn_del = "tmp";
-			pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
-			std::remove("tmpdeleted_pipeline.star");
-
-			// Read the updated pipeline back in again
-			pipeline.read(DO_LOCK);
-
-		}
-	} // end if !only_schedule && is_main_continue
-
-	// If a job is executed with PROC_SCHEDULED_NEW, then also move away any existing output node files
-	if (current_job >= 0 && pipeline.processList[current_job].status == PROC_SCHEDULED_NEW)
-		do_move_output_nodes_to_old = true;
-
-	// Move away existing output nodes
-	if (do_move_output_nodes_to_old)
-	{
-		for (int i = 0; i < pipeline.processList[current_job].outputNodeList.size(); i++)
-		{
-			int j = pipeline.processList[current_job].outputNodeList[i];
-			std::string fn_node = pipeline.nodeList[j].name;
-			if (exists(fn_node))
-			{
-				std::string path2 =  fn_node + ".old";
-				rename(fn_node.c_str(), path2.c_str());
-			}
-		}
-	}
-
-	// Now save the job (and its status) to the PipeLine
-	int mynewstatus;
-	if (only_schedule)
-		mynewstatus = (is_main_continue) ? PROC_SCHEDULED_CONT : PROC_SCHEDULED_NEW;
-	else
-		mynewstatus = PROC_RUNNING;
-	bool allow_overwrite = is_main_continue; // continuation jobs always allow overwriting into the existing directory
-	if (current_job >= 0 && !allow_overwrite) // and so do scheduled jobs
-		allow_overwrite = (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
-				 pipeline.processList[current_job].status == PROC_SCHEDULED_CONT) ;
-	current_job = addToPipeLine(mynewstatus, allow_overwrite);
 
 	// Update all job lists in the main GUI
 	updateJobLists();
-
-	// Write out the new pipeline
-	pipeline.write(DO_LOCK);
-
-	if (!only_schedule)
-	{
-		//std::cout << "Executing: " << final_command << std::endl;
-		int res = system(final_command.c_str());
-
-		// Also print the final_command to the note for future reference
-		FileName fn_note = pipeline.processList[current_job].name + "note.txt";
-		std::ofstream ofs;
-		ofs.open (fn_note.c_str(), std::ofstream::out | std::ofstream::app);
-
-		// current date/time based on current system
-		time_t now = time(0);
-		ofs << std::endl << " ++++ Executing new job on " << ctime(&now);
-		ofs <<  " ++++ with the following command(s): " << std::endl;
-		for (size_t icom = 0; icom < commands.size(); icom++)
-			ofs << commands[icom] << std::endl;
-		ofs <<  " ++++ " << std::endl;
-		ofs.close();
-	}
 
 	// Open the edit note window
 	if (do_open_edit)
 	{
 		// Open the note editor window
 		cb_edit_note_i();
-
-		// Also set alias from the alias_current_job input
-		if (!is_main_continue)
-		{
-			std::string alias= (std::string)alias_current_job->value();
-			if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
-				cb_set_alias_i(alias);
-		}
 	}
 
-	// Copy pipeline star file as backup to the output directory
-	FileName fn_pipe = pipeline.name + "_pipeline.star";
-	if (exists(fn_pipe))
-		copy(fn_pipe, pipeline.processList[current_job].name + fn_pipe);
+	// Also set alias from the alias_current_job input
+	if (!is_main_continue)
+	{
+		std::string alias= (std::string)alias_current_job->value();
+		if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
+			cb_set_alias_i(alias);
+	}
+
+	// Select this job now
+	loadJobFromPipeline(current_job);
 
 }
 
 
 // Run button call-back functions
-void RelionMainWindow::cb_delete(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_delete(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_delete_i();
 }
 
-void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
+void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 {
 
 	if (current_job < 0)
@@ -2033,53 +1358,7 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	}
 
 	std::vector<bool> deleteProcesses, deleteNodes;
-	deleteProcesses.resize(pipeline.processList.size(), false);
-	deleteNodes.resize(pipeline.nodeList.size(), false);
-	FileName fn_del = pipeline.processList[current_job].name;
-
-	std::vector<long int> to_delete_processes;
-	to_delete_processes.push_back(current_job);
-
-	bool is_done = false;
-	size_t istart = 0;
-	while (!is_done)
-	{
-		size_t imax = to_delete_processes.size();
-		for (long int i = istart; i < imax; i++)
-		{
-			// re-set istart for next recursive round
-			istart = imax;
-			long int idel = to_delete_processes[i];
-			deleteProcesses[idel] = true;
-                        is_done = true;
-                        for (size_t inode = 0; inode < (pipeline.processList[idel]).outputNodeList.size(); inode++)
-			{
-				long int mynode = (pipeline.processList[idel]).outputNodeList[inode];
-				deleteNodes[mynode] = true;
-
-				if (do_recursive)
-				{
-					// Check whether this node is being used as input for another process, and if so, delete those as well
-					for (size_t ii = 0; ii < (pipeline.nodeList[mynode]).inputForProcessList.size(); ii++)
-					{
-						long int iproc = (pipeline.nodeList[mynode]).inputForProcessList[ii];
-						// See if this process is not already in the list to be deleted
-						bool already_in = false;
-						for (size_t j = 0; j < to_delete_processes.size(); j++)
-						{
-							if (to_delete_processes[j] == iproc)
-								already_in = true;
-						}
-						if (!already_in)
-						{
-							to_delete_processes.push_back(iproc);
-							is_done = false;
-						}
-					}
-				}
-			}
-		}
-	}
+	pipeline.deleteJobGetNodesAndProcesses(current_job, do_recursive, deleteNodes, deleteProcesses);
 
 	// Before we do anything: confirm this is really what the user wants to do....
 	int proceed;
@@ -2105,68 +1384,34 @@ void RelionMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	if (proceed)
 	{
 
-		// Read in existing pipeline, in case some other window had changed it
-		pipeline.read(DO_LOCK);
-
-		// Write new pipeline without the deleted processes and nodes to disc and read in again
-		pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
-
-		// Delete the output directories for all selected processes from the hard disk
-		// Do this after pipeline.write to get the deleted_pipeline.star still in the correct directory
-		for (int i = 0; i < deleteProcesses.size(); i++)
-		{
-			if (deleteProcesses[i])
-			{
-				FileName alldirs = pipeline.processList[i].name;
-				alldirs = alldirs.beforeLastOf("/");
-				// Move entire output directory (with subdirectory structure) to the Trash folder
-				FileName firstdirs = alldirs.beforeLastOf("/");
-				FileName fn_tree="Trash/" + firstdirs;
-				int res = mktree(fn_tree);
-				std::string command = "mv -f " + alldirs + " " + "Trash/" + firstdirs+"/.";
-				res = system(command.c_str());
-				// Also remove the symlink if it exists
-				FileName fn_alias = (pipeline.processList[i]).alias;
-				if (fn_alias != "None")
-				{
-					int res = unlink((fn_alias.beforeLastOf("/")).c_str());
-				}
-
-				pipeline.deleteTemporaryNodeFiles(pipeline.processList[i]);
-
-			}
-		}
+		pipeline.deleteNodesAndProcesses(deleteNodes, deleteProcesses);
 
 		// Reset current_job
 		current_job = -1;
 		fillStdOutAndErr();
 
-		// Read new pipeline back in again
-		pipeline.read(DO_LOCK);
-
 		// Update all job lists in the main GUI
 		updateJobLists();
 
-		pipeline.write(DO_LOCK);
 	}
 
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_gently_clean_all_jobs(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_gently_clean_all_jobs(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_clean_all_jobs_i(false);
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_harshly_clean_all_jobs(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_harshly_clean_all_jobs(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_clean_all_jobs_i(true);
 }
 
-void RelionMainWindow::cb_clean_all_jobs_i(bool do_harsh)
+void GuiMainWindow::cb_clean_all_jobs_i(bool do_harsh)
 {
 
 
@@ -2205,307 +1450,71 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 	{
 		std::string how = (do_harsh) ? "Harshly" : "Gently";
 		std::cout << how << " cleaning all finished jobs ..." << std::endl;
-		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
-		{
-			if (pipeline.processList[myjob].status == PROC_FINISHED)
-			{
-				if (do_harsh && exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
-					continue;
-				cb_cleanup_i(myjob, false, do_harsh); // false means no verb
-			}
-		}
+
+		std::string error_message;
+		if (!pipeline.cleanupAllJobs(do_harsh, error_message))
+			fl_message("%s",error_message.c_str());
+
 		fl_message("Done cleaning! Don't forget the files are all still in the Trash folder. Use the \"Empty Trash\" option from the File menu to permanently delete them.");
 	}
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_gentle_cleanup(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_gentle_cleanup(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_cleanup_i(-1, true, false);
 }
 
-void RelionMainWindow::cb_harsh_cleanup(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_harsh_cleanup(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_cleanup_i(-1, true, true);
 }
 
-void RelionMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
+void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 {
 	// Allow cleaning the currently selected job from the GUI
 	if (myjob < 0)
 		myjob = current_job;
 
-	if (myjob < 0 || pipeline.processList[myjob].status != PROC_FINISHED)
-	{
-		fl_message(" You can only clean up finished jobs ... ");
-		return;
-	}
-
-	// These job types do not have cleanup:
-	if (pipeline.processList[myjob].type == PROC_IMPORT ||
-		pipeline.processList[myjob].type == PROC_MANUALPICK ||
-		pipeline.processList[myjob].type == PROC_SORT ||
-		pipeline.processList[myjob].type == PROC_CLASSSELECT ||
-		pipeline.processList[myjob].type == PROC_MASKCREATE ||
-		pipeline.processList[myjob].type == PROC_JOINSTAR ||
-		pipeline.processList[myjob].type == PROC_RESMAP)
-		return;
-
 	int proceed = 1;
 	if (do_verb)
 	{
 		std::string ask;
-		ask = "Are you sure you want to clean up intermediate files from " + pipeline.processList[myjob].name + "?";
+		ask = "Are you sure you want to clean up intermediate files from " + pipeline.processList[current_job].name + "?";
 		proceed = fl_choice("%s", "Don't clean up", "Clean up", NULL, ask.c_str());
 	}
 
 	if (proceed)
 	{
-
-		// Find any subdirectories
-		std::vector<FileName> fns_subdir;
-		FileName fn_curr_dir = "";
-		int idir = -1, istop = 0;
-		bool is_first = true;
-		// Recursively find all subdirectories
-		while (idir < istop)
-		{
-			FileName fn_curr_dir = (is_first) ? pipeline.processList[myjob].name : pipeline.processList[myjob].name + fns_subdir[idir];
-			DIR *dir = opendir(fn_curr_dir.c_str());
-			struct dirent *entry = readdir(dir);
-			while (entry != NULL)
-			{
-				// Only want directories, and not '.' or '..'
-				if (entry->d_type == DT_DIR && (entry->d_name[0] != '.'))
-				{
-					FileName fnt = (is_first) ? entry->d_name : fns_subdir[idir] + entry->d_name;
-					fns_subdir.push_back(fnt + "/");
-				}
-				entry = readdir(dir);
-			}
-			closedir(dir);
-			istop = fns_subdir.size();
-			idir++;
-			is_first = false;
-		}
-
-		std::vector<FileName> fns_del;
-		FileName fn_pattern;
-
-		// In all jobs cleanup the .old files (from continuation runs)
-		fn_pattern = pipeline.processList[myjob].name + "*.old";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-
-		////////// Now see which jobs needs cleaning up
-		if (pipeline.processList[myjob].type == PROC_MOTIONCORR)
-		{
-
-			for (int idir = 0; idir < fns_subdir.size(); idir++)
-			{
-				if (do_harsh)
-				{
-					//remove entire directory
-					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
-				}
-				else
-				{
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.com";
-					fn_pattern.globFiles(fns_del, false);
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.err";
-					fn_pattern.globFiles(fns_del, false);
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.out";
-					fn_pattern.globFiles(fns_del, false);
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.log";
-					fn_pattern.globFiles(fns_del, false);
-				}
-			}
-
-		} // end if motioncorr
-		else if (pipeline.processList[myjob].type == PROC_CTFFIND)
-		{
-
-			fn_pattern = pipeline.processList[myjob].name + "gctf*.out";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			fn_pattern = pipeline.processList[myjob].name + "gctf*.err";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			for (int idir = 0; idir < fns_subdir.size(); idir++)
-			{
-				//remove entire Micrographs directory structure
-				fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
-			}
-
-		} // end if ctffind
-		else if (pipeline.processList[myjob].type == PROC_AUTOPICK)
-		{
-
-			for (int idir = 0; idir < fns_subdir.size(); idir++)
-			{
-				// remove the Spider files with the FOM maps
-				fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.spi";
-				fn_pattern.globFiles(fns_del, false);
-			}
-
-		} // end if autopick
-		else if (pipeline.processList[myjob].type == PROC_EXTRACT)
-		{
-
-			for (int idir = 0; idir < fns_subdir.size(); idir++)
-			{
-				if (do_harsh)
-				{
-					//remove entire directory (STAR files and particle stacks!
-					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
-				}
-				else
-				{
-					// only remove the STAR files with the metadata (this will only give moderate file savings)
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*_extract.star";
-					fn_pattern.globFiles(fns_del, false);
-				}
-			}
-
-		} // end if extract
-		else if (pipeline.processList[myjob].type == PROC_2DCLASS ||
-				 pipeline.processList[myjob].type == PROC_3DCLASS ||
-				 pipeline.processList[myjob].type == PROC_3DAUTO)
-	    {
-
-			// First find the _data.star from each iteration
-			std::vector<FileName> fns_iter;
-			fn_pattern = pipeline.processList[myjob].name + "*_it[0-9][0-9][0-9]_data.star";
-			fn_pattern.globFiles(fns_iter);
-			for (int ifile = 0; ifile < fns_iter.size(); ifile++)
-			{
-				FileName fn_file = (fns_iter[ifile]).without("_data.star");
-				// Find the iterations to keep: i.e. those that are part of the pipeline
-				bool is_in_pipeline = false;
-				for (long int inode = 0; inode < pipeline.nodeList.size(); inode++)
-				{
-					FileName fn_node = pipeline.nodeList[inode].name;
-					if (fn_node.contains(fn_file))
-					{
-						is_in_pipeline = true;
-						break;
-					}
-				}
-				// Delete all files from this iteration
-				if (!is_in_pipeline)
-				{
-					fn_pattern = fn_file + "*";
-					fn_pattern.globFiles(fns_del, false);
-				}
-
-			} //end loop over ifile (i.e. the _data.star files from all iterations)
-
-		} // end if refine job
-		else if (pipeline.processList[myjob].type == PROC_MOVIEREFINE)
-		{
-
-			fn_pattern = pipeline.processList[myjob].name + "batch*mics_nr[0-9][0-9][0-9].star";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			fn_pattern = pipeline.processList[myjob].name + "run_it[0-9][0-9][0-9]*";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			for (int idir = 0; idir < fns_subdir.size(); idir++)
-			{
-				if (do_harsh)
-				{
-					//remove entire Micrographs directory (STAR files and particle stacks!)
-					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
-				}
-				else
-				{
-					// only remove the STAR files with the metadata (this will only give moderate file savings)
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*_extract.star";
-					fn_pattern.globFiles(fns_del, false);
-				}
-			}
-
-		} // end if movierefine
-		else if (pipeline.processList[myjob].type == PROC_POLISH)
-		{
-
-			fn_pattern = pipeline.processList[myjob].name + "*.mrc";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			fn_pattern = pipeline.processList[myjob].name + "shiny*xml";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			for (int idir = 0; idir < fns_subdir.size(); idir++)
-			{
-				if (do_harsh)
-				{
-					//remove entire Micrographs directory (STAR files and particle stacks!)
-					fns_del.push_back(pipeline.processList[myjob].name + fns_subdir[idir]);
-				}
-				else
-				{
-					// only remove the STAR files with the metadata (this will only give moderate file savings)
-					fn_pattern = pipeline.processList[myjob].name + fns_subdir[idir] + "*.star";
-					fn_pattern.globFiles(fns_del, false);
-				}
-			}
-
-		} // end if polish
-		else if (pipeline.processList[myjob].type == PROC_SUBTRACT)
-		{
-
-			if (do_harsh)
-			{
-				fn_pattern = pipeline.processList[myjob].name + "subtracted.*";
-				fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-			}
-
-		} // end if subtract
-		else if (pipeline.processList[myjob].type == PROC_POST)
-		{
-
-			fn_pattern = pipeline.processList[myjob].name + "*masked.mrc";
-			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-
-		} // end if postprocess
-
-
-		// Now actually move all the files
-		FileName fn_old_dir = "";
-		for (long int idel = 0; idel < fns_del.size(); idel++)
-		{
-			FileName fn_dest = "Trash/" + fns_del[idel];
-			FileName fn_dir = fn_dest.beforeLastOf("/");
-			if (fn_dir != fn_old_dir && ! exists(fn_dir))
-				int res = mktree(fn_dir);
-			// by removing entire directories, it could be the file is gone already
-			if (exists(fns_del[idel]))
-			{
-				std::string command = "mv -f " + fns_del[idel] + " "+ fn_dir;
-				int res = system(command.c_str());
-			}
-		} // end loop over all files to be deleted
-
-	} // end if proceed
+		std::string error_message;
+		if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
+			fl_message("%s",error_message.c_str());
+	}
 
 }
 
 
 // Run button call-back functions
-void RelionMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_set_alias_i();
 }
 
-void RelionMainWindow::cb_set_alias_i(std::string alias)
+void GuiMainWindow::cb_set_alias_i(std::string alias)
 {
 
 	FileName fn_pre, fn_jobnr, fn_post, fn_dummy, default_ask;
 	if (!decomposePipelineFileName(pipeline.processList[current_job].name, fn_pre, fn_jobnr, fn_post))
-		REPORT_ERROR("RelionMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
+		REPORT_ERROR("GuiMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
 
-	// If alias already exists: remove that symlink
+	// Start the asking window with the current alias
+	std::string error_message;
 	FileName fn_alias = pipeline.processList[current_job].alias;
-	FileName fn_old_alias="";
 	if (fn_alias != "None")
 	{
-		fn_old_alias = fn_alias.beforeLastOf("/");
 		default_ask = fn_alias.without(fn_pre);
 		if (default_ask[default_ask.length()-1] == '/')
 			default_ask = default_ask.beforeLastOf("/");
@@ -2522,108 +1531,33 @@ void RelionMainWindow::cb_set_alias_i(std::string alias)
 		{
 			const char * palias;
 			palias =  fl_input("Rename to: ", default_ask.c_str());
-			// TODO: check for cancel
 			if (palias == NULL)
 				return;
 			std::string al2(palias);
 			alias = al2;
 		}
 
-		if (alias.length() < 2)
-		{
-			 fl_message("Alias cannot be less than 2 characters, please provide another one");
-			 alias="";
-		}
-		else if (alias.length() > 2 && alias[0]=='j' && alias[1]=='o' && alias[2]=='b')
-		{
-			 fl_message("Alias cannot start with 'job', please provide another one");
-			 alias="";
-		}
+		if (pipeline.setAliasJob(current_job, alias, error_message))
+			is_done = true;
 		else
 		{
-
-			//remove spaces from any potential alias
-			for (int i = 0; i < alias.length(); i++)
-			{
-				if (alias[i] == ' ')
-					alias[i] = '_';
-			}
-
-			// Make sure the alias ends with a slash
-			if (alias[alias.length()-1] != '/')
-				alias += "/";
-
-			// Check uniqueness of the alias
-			bool is_unique = true;
-			for (size_t i = 0; i < pipeline.processList.size(); i++)
-			{
-				if ( pipeline.processList[i].alias == fn_pre + alias && alias != "None")
-				{
-					is_unique = false;
-					break;
-				}
-			}
-			if (!is_unique || alias.length() < 1)
-			{
-				 fl_message("Alias is not unique, please provide another one");
-				 alias="";
-			}
-			else
-				is_done = true;
+			alias = "";
+			fl_message("%s",error_message.c_str());
 		}
 	}
-
-	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(DO_LOCK);
-
-	// Remove the original .Nodes entry
-	pipeline.deleteTemporaryNodeFiles(pipeline.processList[current_job]);
-
-	// No alias if the alias contains a unique jobnr string because of continuation of relion_refine jobs
-	// (where alias_current_job contains a different uniq jobnr than the outputname of the job)
-	if (alias == "None" )
-	{
-		pipeline.processList[current_job].alias = "None";
-	}
-	else
-	{
-		// If this was already an alias: remove the old symbolic link
-		if (fn_old_alias != "")
-		{
-			int res2 = unlink(fn_old_alias.c_str());
-		}
-
-		// Set the alias in the pipeline
-		pipeline.processList[current_job].alias = fn_pre + alias;
-
-		//Make the new symbolic link
-		FileName path1 = "../" + pipeline.processList[current_job].name;
-		FileName path2 = pipeline.processList[current_job].alias;
-		int res = symlink(path1.c_str(), path2.beforeLastOf("/").c_str());
-
-	}
-
-	// Remake the new .Nodes entry
-	pipeline.touchTemporaryNodeFiles(pipeline.processList[current_job]);
-
-	// Update the name in the lists
-	updateJobLists();
-
-	// Write new pipeline to disc
-	pipeline.write(DO_LOCK);
 
 }
 
 
 
 // Run button call-back functions
-void RelionMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_mark_as_finished_i();
 }
 
-void RelionMainWindow::cb_mark_as_finished_i()
+void GuiMainWindow::cb_mark_as_finished_i()
 {
 
 	if (current_job < 0)
@@ -2632,151 +1566,46 @@ void RelionMainWindow::cb_mark_as_finished_i()
 		return;
 	}
 
-	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(DO_LOCK);
-
-	pipeline.processList[current_job].status = PROC_FINISHED;
-
-	// For relion_refine jobs, add last iteration optimiser.star, data.star, model.star and class???.mrc to the pipeline
-	if (pipeline.processList[current_job].type == PROC_2DCLASS ||
-		pipeline.processList[current_job].type == PROC_3DCLASS ||
-		pipeline.processList[current_job].type == PROC_3DAUTO)
-	{
-		// Get the last iteration optimiser file
-		FileName fn_opt;
-		FileName fn_root1 = (pipeline.processList[current_job].alias != "None") ? pipeline.processList[current_job].alias : pipeline.processList[current_job].name;
-
-		std::vector<FileName> fn_opts;
-		fn_opt = fn_root1 + "run_it*optimiser.star";
-		fn_opt.globFiles(fn_opts);
-		// It could also be a continuation
-		fn_opt = fn_root1 + "run_ct?_it???_optimiser.star";
-		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
-		// It could also be a continuation
-		fn_opt = fn_root1 + "run_ct??_it???_optimiser.star";
-		fn_opt.globFiles(fn_opts, false); // false means: don't clear fn_opts vector
-		if (fn_opts.size() > 0)
-		{
-
-			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
-
-			// Also get data.star
-			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
-			Node node2(fn_data, NODE_PART_DATA);
-			pipeline.addNewOutputEdge(current_job, node2);
-
-			FileName fn_root = fn_opt.without("_optimiser.star");
-			if (pipeline.processList[current_job].type == PROC_3DAUTO)
-				fn_root += "_half1";
-
-			FileName fn_model = fn_root + "_model.star";
-			Node node3(fn_model, NODE_MODEL);
-			pipeline.addNewOutputEdge(current_job, node3);
-
-
-			FileName fn_map = fn_root + "_class???.mrc";
-			std::vector<FileName> fn_maps;
-			fn_map.globFiles(fn_maps);
-			for (int i = 0; i < fn_maps.size(); i++)
-			{
-				Node node4(fn_maps[i], NODE_3DREF);
-				pipeline.addNewOutputEdge(current_job, node4);
-			}
-		}
-		else
-		{
-			fl_message(" You are trying to mark a relion_refine job as finished that hasn't even started. \n This will be ignored. Perhaps you wanted to delete it instead?");
-			pipeline.processList[current_job].status = PROC_RUNNING;
-		}
-	}
-
-	// Remove any of the expected output nodes from the pipeline if the corresponding file doesn't already exist
-	std::vector<bool> deleteNodes, deleteProcesses;
-	deleteNodes.resize(pipeline.nodeList.size(), false);
-	deleteProcesses.resize(pipeline.processList.size(), false);
-
-	for (long int inode = 0; inode < (pipeline.processList[current_job]).outputNodeList.size(); inode++)
-	{
-		long int mynode = (pipeline.processList[current_job]).outputNodeList[inode];
-		if(!exists(pipeline.nodeList[mynode].name))
-			deleteNodes[mynode] = true;
-	}
-	FileName fn_del = "tmp";
-	pipeline.write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
-	std::remove("tmpdeleted_pipeline.star");
-
-	// Read the updated pipeline back in again
-	pipeline.read(DO_LOCK);
-
-	// Update all job lists in the main GUI
-	updateJobLists();
-
-	// With the locking mechanism, each pipeline.read(bool, DO_LOCK) needs to be followed soon by a pipeline.write(DO_LOCK)!
-	pipeline.write(DO_LOCK);
+	std::string error_message;
+	if (!pipeline.markAsFinishedJob(current_job, error_message))
+		fl_message("%s",error_message.c_str());
+	else
+		updateJobLists();
 
 }
 
 // Run button call-back functions
-void RelionMainWindow::cb_make_flowchart(Fl_Widget* o, void* v) {
+void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v) {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_make_flowchart_i();
 }
 
-void RelionMainWindow::cb_make_flowchart_i()
+void GuiMainWindow::cb_make_flowchart_i()
 {
-	if (current_job < 0)
-	{
-		fl_message(" You can only make flowcharts for existing jobs ... ");
-		return;
-	}
 
-	const char * default_pdf_viewer = getenv ("RELION_CTFFIND_EXECUTABLE");
-	if (default_pdf_viewer == NULL)
-	{
-		char mydefault[]=DEFAULTPDFVIEWER;
-		default_pdf_viewer=mydefault;
-	}
-	std::string myviewer(default_pdf_viewer);
+	std::string error_message;
+	if (!pipeline.makeFlowChart(current_job, true, error_message))
+		fl_message("%s",error_message.c_str());
+	else
+		updateJobLists();
 
-
-	PipeLineFlowChart flowchart;
-	FileName fn_dir = pipeline.processList[current_job].name;
-	FileName fn_out = "flowchart.tex";
-	flowchart.makeAllUpwardsFlowCharts(fn_out, pipeline, current_job);
-	std::string command = "latex flowchart.tex > flowchart.log && dvipdf flowchart >>flowchart.log && mv flowchart* " + fn_dir;
-	std:: cout << " Executing: " << command << std::endl;
-	int res = std::system(command.c_str());
-	command = myviewer + " " + fn_dir + "flowchart.pdf &";
-	res = std::system(command.c_str());
-
-	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(DO_LOCK);
-
-	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
-	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
-	pipeline.addNewOutputEdge(current_job, node);
-	updateJobLists();
-
-	pipeline.write(DO_LOCK);
-
-	return;
 }
 
-void RelionMainWindow::cb_edit_note(Fl_Widget*, void* v)
+void GuiMainWindow::cb_edit_note(Fl_Widget*, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_edit_note_i();
 
 }
 
-void RelionMainWindow::cb_edit_project_note(Fl_Widget*, void* v)
+void GuiMainWindow::cb_edit_project_note(Fl_Widget*, void* v)
 {
-  	RelionMainWindow* T=(RelionMainWindow*)v;
+  	GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_edit_note_i(true); // true means is_project_note
 }
 
-void RelionMainWindow::cb_edit_note_i(bool is_project_note)
+void GuiMainWindow::cb_edit_note_i(bool is_project_note)
 {
 
 	FileName fn_note;
@@ -2803,50 +1632,53 @@ void RelionMainWindow::cb_edit_note_i(bool is_project_note)
 
 
 // Save button call-back function
-void RelionMainWindow::cb_save(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_save(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_save_i();
 }
 
-void RelionMainWindow::cb_save_i()
+void GuiMainWindow::cb_save_i()
 {
-	// For scheduled jobs, also allow saving the .job file in the output directory
-	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED_NEW ||
-			                pipeline.processList[current_job].status == PROC_SCHEDULED_CONT))
-	{
-		fn_settings = pipeline.processList[current_job].name;
-		jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
-	}
+	// Get which job we're dealing with, and update it from the GUI
+	int iwin = browser->value() - 1;
+	gui_jobwindows[iwin]->updateMyJob();
 
-	fn_settings = "";
-	jobCommunicate(DO_WRITE, DONT_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DO_MKDIR);
+	// For scheduled jobs, also allow saving the .job file in the output directory
+	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED))
+	{
+		gui_jobwindows[iwin]->myjob.write(pipeline.processList[current_job].name);
+	}
+	// Write the hidden file
+	gui_jobwindows[iwin]->myjob.write("");
 
 }
 
 // Load button call-back function
-void RelionMainWindow::cb_load(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_load(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_load_i();
 }
 
-void RelionMainWindow::cb_load_i()
+void GuiMainWindow::cb_load_i()
 {
+	int iwin = browser->value() - 1;
+	gui_jobwindows[iwin]->myjob.read("", is_main_continue);
+	gui_jobwindows[iwin]->updateMyGui();
 
-	fn_settings = "";
-	jobCommunicate(DONT_WRITE, DO_READ, DONT_TOGGLE_CONT, DONT_GET_CL, DONT_MKDIR);
-
+	// Make the current continue-setting active
+	cb_toggle_continue_i();
 }
 
 // Load button call-back function
-void RelionMainWindow::cb_undelete_job(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_undelete_job(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_undelete_job_i();
 }
 
-void RelionMainWindow::cb_undelete_job_i()
+void GuiMainWindow::cb_undelete_job_i()
 {
 
 	std::string fn_dir = "./Trash/.";
@@ -2865,143 +1697,39 @@ void RelionMainWindow::cb_undelete_job_i()
     fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
-
-	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(DO_LOCK);
-
-    pipeline.importPipeline(fn_pipe.beforeLastOf("_pipeline.star"));
-
-	// Copy all processes in the STAR file back into the ProjectDirectory
-	MetaDataTable MDproc;
-	MDproc.read(fn_pipe, "pipeline_processes");
-	std::cout <<"  Undeleting from Trash ... " << std::endl;
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
-	{
-		FileName fn_proc;
-		MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, fn_proc);
-
-		// Copy the job back from the Trash folder
-		FileName fn_dest = fn_proc.beforeLastOf("/"); //gets rid of ending "/"
-		FileName fn_dir_dest = fn_dest.beforeLastOf("/"); // Now only get the job-type directory
-		if (!exists(fn_dir_dest))
-		{
-			mktree(fn_dir_dest);
-		}
-		std::string command = "mv Trash/" + fn_dest + " " + fn_dest;
-		std::cout << command << std::endl;
-		int res = system(command.c_str());
-
-		// Also re-make all entries in the .Nodes directory
-		long int myproc = pipeline.findProcessByName(fn_proc);
-		pipeline.touchTemporaryNodeFiles(pipeline.processList[myproc]);
-	}
-	std::cout << " Done undeleting! " << std::endl;
-
-	// Write the new pipeline to disk and reread it back in again
-	pipeline.write(DO_LOCK);
+	pipeline.undeleteJob(fn_pipe);
 
 }
 
-
-void replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir, std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern)
+void GuiMainWindow::cb_export_jobs(Fl_Widget* o, void* v)
 {
-	int res;
-	std::string command;
-	std::vector<std::string> myfiles;
-	myfiles.push_back("run.job");
-	myfiles.push_back("note.txt");
-	myfiles.push_back("job_pipeline.star");
-
-	// Copy the run.job, the note.txt and the job_pipeline.star
-	// Replace all instances of all find_pattern's with the replace_pattern's
-	for (int ifile = 0; ifile < myfiles.size(); ifile++)
-	{
-		for (int ipatt = 0; ipatt < find_pattern.size(); ipatt++)
-		{
-			FileName outfile = fn_out_dir + myfiles[ifile];
-			FileName tmpfile = fn_out_dir + "tmp";
-			FileName infile = (ipatt == 0) ? fn_in_dir + myfiles[ifile] : tmpfile;
-			// Create directory first time round
-			if (ipatt == 0)
-			{
-				FileName dirs = outfile.beforeLastOf("/");
-				command =  "mkdir -p " + dirs;
-				res = system(command.c_str());
-			}
-			command =  "sed 's|" + find_pattern[ipatt] + "|" + replace_pattern[ipatt] + "|g' < " + infile + " > " + outfile;
-			//std::cerr << " Executing: " << command<<std::endl;
-			res = system(command.c_str());
-			if (ipatt+1 < find_pattern.size())
-			{
-				std::rename(outfile.c_str(), tmpfile.c_str());
-				//std::cerr << " Excuting: mv " << outfile<<" "<<tmpfile<<std::endl;
-			}
-		}
-	}
-
-}
-
-void RelionMainWindow::cb_export_jobs(Fl_Widget* o, void* v)
-{
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_export_jobs_i();
 }
 
-void RelionMainWindow::cb_export_jobs_i()
+void GuiMainWindow::cb_export_jobs_i()
 {
+
 	// Get the name of this block of exported jobs and make the corresponding directory
 	const char * answer;
 	std::string default_answer="export1";
 	answer =  fl_input("Name of the exported block of jobs? ", default_answer.c_str());
 	std::string mydir(answer);
-	mydir += "/";
-	std::string command = "mkdir -p ExportJobs/" + mydir;
-	int res = system(command.c_str());
 
-	MetaDataTable MDexported;
-
-	// Loop through all the Scheduled jobs and export them one-by-one
-	int iexp =0;
-	std::vector<std::string> find_pattern, replace_pattern;
-	for (long int i = 0; i < pipeline.processList.size(); i++)
-	{
-		if (pipeline.processList[i].status == PROC_SCHEDULED_NEW ||
-				pipeline.processList[i].status == PROC_SCHEDULED_CONT)
-		{
-			iexp++;
-			if (pipeline.processList[i].alias != "None")
-			{
-				fl_message("ERROR: aliases are not allowed on Scheduled jobs that are to be exported! Make sure all scheduled jobs are made with unaliases names.");
-				return;
-			}
-
-			// A general name for the exported job:
-			FileName expname = pipeline.processList[i].name;
-			expname = expname.beforeFirstOf("/") + "/exp"+integerToString(iexp, 3)+"/";
-			//std::cerr << " pipeline.processList[i].name= " << pipeline.processList[i].name << " expname= " << expname << std::endl;
-			find_pattern.push_back(pipeline.processList[i].name);
-			replace_pattern.push_back(expname);
-
-			MDexported.addObject();
-			MDexported.setValue(EMDL_PIPELINE_PROCESS_NAME, expname);
-
-			// Copy the run.job, the note.txt and the job_pipeline.star and replace patterns
-			replaceFilesForImportExportOfScheduledJobs(pipeline.processList[i].name, "ExportJobs/" + mydir + expname, find_pattern, replace_pattern);
-		}
-	}
-
-	MDexported.write("ExportJobs/" + mydir + "exported.star");
+	std::string error_message;
+	if (!pipeline.exportAllScheduledJobs(mydir, error_message))
+		fl_message("%s",error_message.c_str());
 
 }
 
-void RelionMainWindow::cb_import_jobs(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_import_jobs(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_import_jobs_i();
 }
 
 
-void RelionMainWindow::cb_import_jobs_i()
+void GuiMainWindow::cb_import_jobs_i()
 {
 
 	// Get the directory with the Exported jobs
@@ -3016,63 +1744,38 @@ void RelionMainWindow::cb_import_jobs_i()
 	// User hit cancel?
 	if ( chooser.value() == NULL )
 		return;
-
 	FileName fn_export(chooser.value());
-	FileName fn_export_dir = fn_export.beforeLastOf("/")+"/";
 
-	//FileName fn_dir_export = fn_export.beforeLastOf("/")+"/";
-	MetaDataTable MDexported;
-	MDexported.read(fn_export);
+	pipeline.importJobs(fn_export);
 
-	// Read in existing pipeline, in case some other window had changed it
-	pipeline.read(DO_LOCK);
-
-	std::vector<std::string> find_pattern, replace_pattern;
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDexported)
-	{
-		FileName expname;
-		MDexported.getValue(EMDL_PIPELINE_PROCESS_NAME, expname);
-		find_pattern.push_back(expname);
-		// Make a new name for this job
-		FileName newname = expname.beforeFirstOf("/")+"/job"+integerToString(pipeline.job_counter, 3)+"/";
-		//std::cerr << " expname= " << expname << " newname= " << newname << std::endl;
-		replace_pattern.push_back(newname);
-		replaceFilesForImportExportOfScheduledJobs(fn_export_dir + expname, newname, find_pattern, replace_pattern);
-		// Import the job into the pipeline
-	    pipeline.importPipeline(newname+"job");
-	    pipeline.job_counter++;
-	}
-
-	// Write the new pipeline to disk
-	fillRunningJobLists();
-	pipeline.write(DO_LOCK);
-
+	// refresh the joblists
+	updateJobLists();
 }
 
 // Re-order running and finished job lists
-void RelionMainWindow::cb_order_jobs_alphabetically(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_order_jobs_alphabetically(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     do_order_alphabetically = true;
     T->fillRunningJobLists();
 }
 
 // Re-order running and finished job lists
-void RelionMainWindow::cb_order_jobs_chronologically(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_order_jobs_chronologically(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     do_order_alphabetically = false;
     T->fillRunningJobLists();
 }
 
 // Empty-trash button call-back function
-void RelionMainWindow::cb_empty_trash(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_empty_trash(Fl_Widget* o, void* v)
 {
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_empty_trash_i();
 }
 
-void RelionMainWindow::cb_empty_trash_i()
+void GuiMainWindow::cb_empty_trash_i()
 {
 	std::string ask = "Are you sure you want to remove the entire Trash folder?";
 	int proceed =  fl_choice("%s", "Don't empty trash", "Empty Trash", NULL, ask.c_str());
@@ -3084,13 +1787,13 @@ void RelionMainWindow::cb_empty_trash_i()
 	}
 }
 
-void RelionMainWindow::cb_print_notes(Fl_Widget*, void* v)
+void GuiMainWindow::cb_print_notes(Fl_Widget*, void* v)
 {
-  	 RelionMainWindow* T=(RelionMainWindow*)v;
+  	 GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_print_notes_i();
 }
 
-void RelionMainWindow::cb_print_notes_i()
+void GuiMainWindow::cb_print_notes_i()
 {
 	std::ofstream  fh;
 	FileName fn_tmp = pipeline.name + "_all_notes.txt";
@@ -3124,24 +1827,24 @@ void RelionMainWindow::cb_print_notes_i()
 
 }
 
-void RelionMainWindow::cb_remake_nodesdir(Fl_Widget*, void* v)
+void GuiMainWindow::cb_remake_nodesdir(Fl_Widget*, void* v)
 {
-  	 RelionMainWindow* T=(RelionMainWindow*)v;
+  	 GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_remake_nodesdir_i();
 }
 
-void RelionMainWindow::cb_remake_nodesdir_i()
+void GuiMainWindow::cb_remake_nodesdir_i()
 {
 	pipeline.remakeNodeDirectory();
 }
 
-void RelionMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
+void GuiMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 {
-  	 RelionMainWindow* T=(RelionMainWindow*)v;
+  	 GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_reread_pipeline_i();
 }
 
-void RelionMainWindow::cb_reread_pipeline_i()
+void GuiMainWindow::cb_reread_pipeline_i()
 {
 	pipeline.read(DO_LOCK);
 	// With the locking system, each read needs to be followed soon with a write
@@ -3149,39 +1852,38 @@ void RelionMainWindow::cb_reread_pipeline_i()
 }
 
 
-void RelionMainWindow::cb_reactivate_runbutton(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_reactivate_runbutton(Fl_Widget* o, void* v)
 {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_reactivate_runbutton_i();
 }
 
-void RelionMainWindow::cb_reactivate_runbutton_i()
+void GuiMainWindow::cb_reactivate_runbutton_i()
 {
 	run_button->activate();
 }
 
-void RelionMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_show_initial_screen_i();
 }
 
-void RelionMainWindow::cb_show_initial_screen_i()
+void GuiMainWindow::cb_show_initial_screen_i()
 {
-	show_initial_screen = true;
-	cb_select_browsegroup_i();
+	cb_select_browsegroup_i(true);
 }
 
-void RelionMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
 {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_start_pipeliner_i();
 }
 
-void RelionMainWindow::cb_start_pipeliner_i()
+void GuiMainWindow::cb_start_pipeliner_i()
 {
 
 	std::vector<FileName> job_names;
@@ -3199,14 +1901,14 @@ void RelionMainWindow::cb_start_pipeliner_i()
 
 }
 
-void RelionMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
 {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_stop_pipeliner_i();
 }
 
-void RelionMainWindow::cb_stop_pipeliner_i()
+void GuiMainWindow::cb_stop_pipeliner_i()
 {
 	std::string fn_filter = "Pipeline scheduled file (RUNNING_PIPELINER_" + pipeline.name + "_*)";
 	Fl_File_Chooser chooser(".",  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose which scheduler to stop");
@@ -3224,14 +1926,14 @@ void RelionMainWindow::cb_stop_pipeliner_i()
 	std::remove(fn_del.c_str());
 }
 
-void RelionMainWindow::cb_about(Fl_Widget* o, void* v)
+void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 {
 
-    RelionMainWindow* T=(RelionMainWindow*)v;
+    GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_about_i();
 }
 
-void RelionMainWindow::cb_about_i()
+void GuiMainWindow::cb_about_i()
 {
 
 #define HELPTEXT ("RELION " RELION_VERSION "\n \n \
@@ -3267,19 +1969,23 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
  * v.2.0 GPU capability and autopicking acceleration : \n \
      Kimanius et al. (2016) eLife (PMID: 27845625) \n \n \
+ * Helical reconstruction : \n \
+     He & Scheres (2017) J, Struct. Biol. (PMID: 28193500) \n \n \
 Please also cite the following EXTERNAL programs: \n \n \
 * MOTIONCORR for beam-induced motion correction: \n \
     Li et al (2013) Nat. Methods (PMID: 23644547) \n \n\
 * UNBLUR for beam-induced motion correction: \n \
     Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
 * MOTIONCOR2 for beam-induced motion correction: \n \
-    Zheng et al (2013) bioRxiv 061960 \n \n\
+    Zheng et al (2017) Nat. Meth. (PMID: 28250466) \n \n\
 * CTFFIND for CTF-estimation: \n \
     Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
 * CTFFIND4 for CTF-estimation: \n \
     Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
 * Gctf for CTF-estimation: \n \
     Zhang (2016) J. Struct. Biol. (PMID: 2659270) \n \n\
+* Stochastic Gradient Descent initial model generation:  \n\
+    Punjani et al. (2017) Nat. Meth. (PMID: 28165473) \n \n\
 * ResMap for local-resolution estimation:  \n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
 * Postscript plots are made using CPlot2D from  www.amzsaki.com\n ")
@@ -3288,13 +1994,15 @@ Please also cite the following EXTERNAL programs: \n \n \
 }
 
 
-void RelionMainWindow::cb_quit(Fl_Widget* o, void* v)
+
+void GuiMainWindow::cb_quit(Fl_Widget* o, void* v)
 {
-	RelionMainWindow* T=(RelionMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
     T->cb_quit_i();
 }
 
-void RelionMainWindow::cb_quit_i()
+void GuiMainWindow::cb_quit_i()
 {
 	exit(0);
 }
+

@@ -61,6 +61,9 @@ public:
 	// Number of image groups with separate sigma2_noise spectra
 	int nr_groups;
 
+	// Perform SGD instead of expectation maximization?
+	bool do_sgd;
+
 	// Number of particles in each group
 	std::vector<long int> nr_particles_group;
 
@@ -93,6 +96,9 @@ public:
 
 	// Vector with all reference images
 	std::vector<MultidimArray<RFLOAT> > Iref;
+
+	// Vector with all SGD gradients
+	std::vector<MultidimArray<RFLOAT> > Igrad;
 
 	// Vector with masks for all bodies in multi-body refinement
 	std::vector<MultidimArray<RFLOAT> > masks_bodies;
@@ -128,6 +134,9 @@ public:
 	// One likelihood vs prior ratio spectrum for each class
 	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;
 
+	// One Fourier-coverage spectrum for each class
+	std::vector<MultidimArray<RFLOAT > > fourier_coverage_class;
+
 	// One value for each class
 	std::vector<RFLOAT > pdf_class;
 
@@ -154,6 +163,12 @@ public:
 
 	// Estimated accuracy at which translations can be assigned, one for each class
 	std::vector<RFLOAT> acc_trans;
+
+	// The estimate resolution, one for each class
+	std::vector<RFLOAT> estimated_resolution;
+
+	// Fourier coverage up to the estimate resolution, one  for each class
+	std::vector<RFLOAT> total_fourier_coverage;
 
 	// Spectral contribution to orientability of individual particles, one for each class
 	std::vector<MultidimArray<RFLOAT > > orientability_contrib;
@@ -237,6 +252,7 @@ public:
     		nr_classes = MD.nr_classes;
     		nr_bodies = MD.nr_bodies;
     		nr_groups = MD.nr_groups;
+    		do_sgd = MD.do_sgd;
     		nr_directions = MD.nr_directions;
     		LL = MD.LL;
     		padding_factor = MD.padding_factor;
@@ -259,6 +275,7 @@ public:
     		helical_rise_max = MD.helical_rise_max;
     		helical_rise_inistep= MD.helical_rise_inistep;
     		Iref = MD.Iref;
+    		Igrad = MD.Igrad;
     		masks_bodies = MD.masks_bodies;
     		com_bodies = MD.com_bodies;
     		PPref = MD.PPref;
@@ -271,12 +288,15 @@ public:
     		sigma2_class = MD.sigma2_class;
     		fsc_halves_class = MD.fsc_halves_class;
     		data_vs_prior_class = MD.data_vs_prior_class;
+    		fourier_coverage_class = MD.fourier_coverage_class;
     		pdf_class = MD.pdf_class;
     		pdf_direction = MD.pdf_direction;
     		prior_offset_class = MD.prior_offset_class;
     		nr_particles_group = MD.nr_particles_group;
     		acc_rot = MD.acc_rot;
     		acc_trans = MD.acc_trans;
+    		estimated_resolution = MD.estimated_resolution;
+    		total_fourier_coverage = MD.total_fourier_coverage;
     		orientability_contrib = MD.orientability_contrib;
     		helical_twist = MD.helical_twist;
     		helical_rise = MD.helical_rise;
@@ -289,6 +309,7 @@ public:
 	void clear()
 	{
 		Iref.clear();
+		Igrad.clear();
 		masks_bodies.clear();
 		com_bodies.clear();
 		PPref.clear();
@@ -301,6 +322,7 @@ public:
 		fsc_halves_class.clear();
 		sigma2_class.clear();
 		data_vs_prior_class.clear();
+		fourier_coverage_class.clear();
 		prior_offset_class.clear();
 		pdf_class.clear();
 		pdf_direction.clear();
@@ -311,13 +333,16 @@ public:
 		sigma2_rot = sigma2_tilt = sigma2_psi = 0.;
 		acc_rot.clear();
 		acc_trans.clear();
+		estimated_resolution.clear();
+		total_fourier_coverage.clear();
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
+		do_sgd=false;
 	}
 
 	// Initialise vectors with the right size
-	void initialise();
+	void initialise(bool _do_sgd = false);
 
 	//Read a model from a file
 	void read(FileName fn_in);
@@ -330,8 +355,8 @@ public:
 
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
-	void readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected);
+	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false);
 
 	// The group numbering in mydata may be different from the one in this model.
 	// Readjust all group_ids in the Experiment based on their group names
@@ -366,6 +391,7 @@ public:
 
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 
+	void calculateTotalFourierCoverage();
 };
 
 class MlWsumModel: public MlModel

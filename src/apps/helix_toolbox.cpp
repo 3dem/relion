@@ -71,6 +71,9 @@ public:
 	bool do_set_xmipp_origin;
 	bool do_impose_helical_symmetry_fourier_space;
 	bool do_check_parameters;
+	bool do_normalise_segments;
+	bool do_interpo_3D_curve;
+	bool do_select_3D_subtomo_from_2D_proj;
 	bool do_debug;
 	// ----------------------------------------
 
@@ -170,6 +173,9 @@ public:
 	// Cut out a small part of the helix within this angle (in degrees)
 	RFLOAT ang;
 
+	// Binning factor used in manual segment picking
+	int binning_factor;
+
 	// Random seed
 	int random_seed;
 
@@ -205,6 +211,9 @@ public:
 		do_set_xmipp_origin = false;
 		do_impose_helical_symmetry_fourier_space = false;
 		do_check_parameters = false;
+		do_normalise_segments = false;
+		do_interpo_3D_curve = false;
+		do_select_3D_subtomo_from_2D_proj = false;
 		do_debug = false;
 	};
 
@@ -243,18 +252,21 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (JAN 15, 2017)");
+		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (FEB 19, 2017)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_check_parameters = parser.checkOption("--check", "Check parameters for 3D helical reconstruction in RELION");
 		do_cut_out = parser.checkOption("--cut_out", "Cut out a small part of the helix");
 		do_create_cylinder_3D = parser.checkOption("--cylinder", "Create a cylinder as 3D initial reference");
 		do_impose_helical_symmetry = parser.checkOption("--impose", "Impose helical symmetry (in real space)");
+		do_interpo_3D_curve = parser.checkOption("--interpo", "Interpolate 3D curve for 3D helical sub-tomogram extraction");
+		do_normalise_segments = parser.checkOption("--norm", "Normalise 2D/3D helical segments in a STAR file");
 		do_PDB_helix = parser.checkOption("--pdb_helix", "Simulate a helix from a single PDB file of protein molecule");
 		do_remove_mics_with_bad_ctf = parser.checkOption("--remove_bad_ctf", "Remove micrographs with poor-quality CTF");
 		do_remove_segments_with_bad_tilt = parser.checkOption("--remove_bad_tilt", "Remove helical segments with large tilt angle deviation (away from 90 degrees)");
 		do_remove_segments_with_bad_psi = parser.checkOption("--remove_bad_psi", "Remove helical segments with large psi angle deviation (away from psi prior)");
 		do_local_search_helical_symmetry = parser.checkOption("--search", "Local search of helical symmetry");
+		do_select_3D_subtomo_from_2D_proj = parser.checkOption("--select_3dtomo", "Select 3D subtomograms given 2D projections");
 		do_simulate_helix_3D = parser.checkOption("--simulate_helix", "Create a helical 3D reference of spheres");
 		do_simulate_helical_segments_2D = parser.checkOption("--simulate_segments", "Simulate helical segments using a STAR file");
 		do_sort_datastar_tubeID = parser.checkOption("--sort_tube_id", "Sort segments in _data.star file according to helical tube IDs");
@@ -280,6 +292,7 @@ public:
 		ang = textToFloat(parser.getOption("--ang", "Cut out a small part of the helix within this angle (in degrees)", "91."));
 		pixel_size_A = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1."));
 		do_bimodal_searches = parser.checkOption("--bimodal", "Do bimodal searches of tilt and psi angles in 3D helical reconstruction?");
+		binning_factor = textToInteger(parser.getOption("--bin", "Binning factor used in manual segment picking", "1"));
 		boxdim = textToInteger(parser.getOption("--boxdim", "Box size (in pixels)", "-1"));
 		do_center_of_mass_each_PDB_molecule = parser.checkOption("--center_pdb", "Translate all atoms in the original PDB to the center of mass of this molecule?");
 		ctf_fom_min = textToFloat(parser.getOption("--ctf_fom_min", "Minimum figure-of-merit - threshold used in removing micrographs with bad CTF", "-999"));
@@ -377,6 +390,9 @@ public:
 		valid_options += (do_set_xmipp_origin) ? (1) : (0);
 		valid_options += (do_impose_helical_symmetry_fourier_space) ? (1) : (0);
 		valid_options += (do_check_parameters) ? (1) : (0);
+		valid_options += (do_normalise_segments) ? (1) : (0);
+		valid_options += (do_interpo_3D_curve) ? (1) : (0);
+		valid_options += (do_select_3D_subtomo_from_2D_proj) ? (1) : (0);
 		valid_options += (do_debug) ? (1) : (0);
 
 		if (valid_options <= 0)
@@ -797,7 +813,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Simulate helical segments / subtomograms using a STAR file" << std::endl;
-				std::cout << "  USAGE: --simulate_segments --i 3dvol-for-projection.mrc --o segments.star --boxdim 200 --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --angpix 1.126 (--bimodal --3d_tomo --sigma_tilt 5 --sigma_psi 5 --sigma_offset 5 --white_noise 1 --random_seed 1400014000)" << std::endl;
+				std::cout << "  USAGE: --simulate_segments --i 3dvol-for-projection.mrc --o segments.star --boxdim 200 --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --cyl_outer_diameter 200 --angpix 1.126 (--bimodal --3d_tomo --sigma_tilt 5 --sigma_psi 5 --sigma_offset 5 --white_noise 1 --random_seed 1400014000)" << std::endl;
 				std::cout << "  BEWARE: '--boxdim' is the shrunk box size of the simulated output (2D or 3D). It should not be bigger than the box size of the input 3D volume." << std::endl;
 				displayEmptyLine();
 				return;
@@ -816,6 +832,7 @@ public:
 					nr_asu,
 					nr_tubes,
 					do_bimodal_searches,
+					cyl_outer_diameter_A,
 					pixel_size_A,
 					rise_A,
 					twist_deg,
@@ -823,6 +840,8 @@ public:
 					sigma_tilt,
 					sigma_offset,
 					random_seed);
+
+			std::cout << " WARNING: Please check the output STAR files before you execute the .sh script! Use '*_helical_priors.star' or '*_no_priors.star' as the input particle STAR file!" << std::endl;
 		}
 		else if (do_cut_out)
 		{
@@ -941,6 +960,64 @@ public:
 			if (result)
 				std::cout << " Done! All the parameters seem OK for 3D helical reconstruction in RELION." << std::endl;
 		}
+		else if (do_normalise_segments)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Normalise 2D/3D helical segments in a STAR file" << std::endl;
+				std::cout << "  USAGE: --norm --i imgs_input.star --o_root _norm --angpix 1.126 --cyl_outer_diameter 200" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			normaliseHelicalSegments(
+					fn_in,
+					fn_out_root,
+					cyl_outer_diameter_A,
+					pixel_size_A);
+		}
+		else if (do_interpo_3D_curve)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Interpolate 3D curve for 3D helical sub-tomogram extraction" << std::endl;
+				std::cout << "  USAGE: --interpo --i_root Btub_tomo1 --o_root _interpo --nr_asu 1 --rise 52.77 --angpix 2.18 --boxdim 200 --bin 1 (--bimodal)" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			Interpolate3DCurves(
+					fn_in_root,
+					fn_out_root,
+					nr_asu,
+					rise_A,
+					pixel_size_A,
+					boxdim,
+					binning_factor,
+					do_bimodal_searches);
+		}
+		else if (do_select_3D_subtomo_from_2D_proj)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Select 3D subtomograms given 2D projections" << std::endl;
+				std::cout << "  USAGE: --select_3dtomo --i1 selected_2d_proj.star --i2 particle_3d_subtomo.star --o selected_3d_subtomo.star" << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			if ( (fn_in1.getExtension() != "star")
+					|| (fn_in2.getExtension() != "star")
+					|| (fn_out.getExtension() != "star") )
+				REPORT_ERROR("Input and output files (--i1, --i2, --o) should be in .star format!");
+
+			MetaDataTable MD_2d, MD_3d, MD_out;
+			MD_2d.read(fn_in1);
+			MD_3d.read(fn_in2);
+			select3DsubtomoFrom2Dproj(MD_2d, MD_3d, MD_out);
+			MD_out.write(fn_out);
+			std::cout << " Done! " << MD_out.numberOfObjects() << " out of " << MD_3d.numberOfObjects() << " subtomograms have been selected." << std::endl;
+		}
 		else if (do_debug)
 		{
 			if (show_usage_for_an_option)
@@ -954,7 +1031,8 @@ public:
 			//MD.read(fn_in);
 			//setPsiFlipRatioInStarFile(MD);
 			//MD.write(fn_out);
-			grabParticleCoordinates_Multiple(fn_in, fn_out);
+			grabParticleCoordinates_Multiple(fn_in, fn_out); // RECOVER THIS !
+			//readFileHeader(fn_in, fn_out, 9493);
 
 			//Image<RFLOAT> img;
 			//img.read(fn_in);
@@ -975,7 +1053,7 @@ public:
 
 
 
-
+// Just for debugging...
 #ifndef RELION_HELIX_TOOLBOX
 class helix_bilder_parameters
 {
@@ -983,7 +1061,7 @@ public:
 	IOParser parser;
 	FileName fn_in, fn_in1, fn_in2, fn_in_ctf, fn_in_ori, fn_out, fn_out1, fn_out2;
 	bool do_FT, do_inv_psi, do_inv_tilt;
-	RFLOAT rot_in, tilt_in, psi_in;
+	RFLOAT rot_in, tilt_in, psi_in, xoff_in, yoff_in, zoff_in;
 	int old_sampling, new_sampling;
 
 	void usage()
@@ -1013,6 +1091,10 @@ public:
 		tilt_in = textToFloat(parser.getOption("--tilt", "Tilt angle in degrees", "0."));
 		psi_in = textToFloat(parser.getOption("--psi", "Psi angle in degrees", "0."));
 
+		xoff_in = textToFloat(parser.getOption("--x", "Offest X in pixels", "0."));
+		yoff_in = textToFloat(parser.getOption("--y", "Offest Y in pixels", "0."));
+		zoff_in = textToFloat(parser.getOption("--z", "Offest Z in pixels", "0."));
+
 		fn_in_ctf = parser.getOption("--ictf", "Input file 1", "");
 		fn_in_ori = parser.getOption("--iori", "Input file 2", "");
 
@@ -1037,6 +1119,90 @@ public:
 
 	void run()
 	{
+		MetaDataTable MD1, MD2;
+		MD1.read(fn_in1);
+		MD2.read(fn_in2);
+		bool result = compareLabels(MD1, MD2);
+		std::cout << " MetaDataTables are the same? = " << result << std::endl;
+		return;
+
+		//std::cout << RAD2DEG(atan2(23.60, 2.73)) << std::endl;
+		//std::cout << RAD2DEG(atan2(-21.19, -10.73)) << std::endl;
+		//std::cout << RAD2DEG(atan2(0, 0)) << std::endl;
+		//return;
+
+
+		Matrix2D<RFLOAT> Ah_c, Ac_h, Amult, B;
+		RFLOAT rot_out, tilt_out, psi_out;
+
+		Euler_angles2matrix(rot_in, tilt_in, psi_in, Ah_c);
+		std::cout << " == Ah_c ==" << std::endl;
+		std::cout << Ah_c(0, 0) << ", " << Ah_c(0, 1) << ", " << Ah_c(0, 2) << std::endl;
+		std::cout << Ah_c(1, 0) << ", " << Ah_c(1, 1) << ", " << Ah_c(1, 2) << std::endl;
+		std::cout << Ah_c(2, 0) << ", " << Ah_c(2, 1) << ", " << Ah_c(2, 2) << std::endl;
+
+		//Euler_angles2matrix(rot_in, -tilt_in, -psi_in, Ac_h);
+		//std::cout << " == Ac_h ==" << std::endl;
+		//std::cout << Ac_h(0, 0) << ", " << Ac_h(0, 1) << ", " << Ac_h(0, 2) << std::endl;
+		//std::cout << Ac_h(1, 0) << ", " << Ac_h(1, 1) << ", " << Ac_h(1, 2) << std::endl;
+		//std::cout << Ac_h(2, 0) << ", " << Ac_h(2, 1) << ", " << Ac_h(2, 2) << std::endl;
+
+		//Amult = Ah_c * Ac_h;
+		//std::cout << " == Amult = h_c * c_h ==" << std::endl;
+		//std::cout << Amult(0, 0) << ", " << Amult(0, 1) << ", " << Amult(0, 2) << std::endl;
+		//std::cout << Amult(1, 0) << ", " << Amult(1, 1) << ", " << Amult(1, 2) << std::endl;
+		//std::cout << Amult(2, 0) << ", " << Amult(2, 1) << ", " << Amult(2, 2) << std::endl;
+
+		//Amult = Ac_h * Ah_c;
+		//std::cout << " == Amult = c_h * h_c ==" << std::endl;
+		//std::cout << Amult(0, 0) << ", " << Amult(0, 1) << ", " << Amult(0, 2) << std::endl;
+		//std::cout << Amult(1, 0) << ", " << Amult(1, 1) << ", " << Amult(1, 2) << std::endl;
+		//std::cout << Amult(2, 0) << ", " << Amult(2, 1) << ", " << Amult(2, 2) << std::endl;
+
+		Ac_h = Ah_c.transpose();
+		Euler_matrix2angles(Ac_h, rot_out, tilt_out, psi_out);
+		std::cout << " out rot, tilt, psi = " << rot_out << ", " << tilt_out << ", " << psi_out << std::endl;
+
+		std::cout << " ############################################# " << std::endl;
+		std::cout << " Rot, tilt, psi in = " << rot_in << ", " << tilt_in << ", " << psi_in << std::endl;
+		std::cout << " XYZ in = " << xoff_in << ", " << yoff_in << ", " << zoff_in << std::endl;
+		transformCartesianAndHelicalCoords(
+				xoff_in, yoff_in, zoff_in,
+				xoff_in, yoff_in, zoff_in,
+				rot_in, tilt_in, psi_in,
+				3,
+				CART_TO_HELICAL_COORDS);
+		std::cout << " XYZ h = " << xoff_in << ", " << yoff_in << ", " << zoff_in << std::endl;
+		std::cout << " Now clear Z" << std::endl;
+		zoff_in = 0.;
+		transformCartesianAndHelicalCoords(
+				xoff_in, yoff_in, zoff_in,
+				xoff_in, yoff_in, zoff_in,
+				rot_in, tilt_in, psi_in,
+				3,
+				HELICAL_TO_CART_COORDS);
+		std::cout << " XYZ c = " << xoff_in << ", " << yoff_in << ", " << zoff_in << std::endl;
+
+		MetaDataTable MD_in, MD_out;
+		MD_in.read(fn_in);
+		transformCartesianToHelicalCoordsForStarFiles(MD_in, MD_out);
+		MD_out.write(fn_out);
+
+		/*
+		Image<RFLOAT> img;
+		img.read(fn_in);
+		softMaskOutsideMapForHelix(
+				img(),
+				psi_in,
+				tilt_in,
+				25.,
+				20.);
+		img.write(fn_out);
+		*/
+
+
+
+
 		/*
 		Image<RFLOAT> img;
 		img.read(fn_in);
@@ -1049,10 +1215,12 @@ public:
 				5.);
 		img.write(fn_out);
 		*/
+		/*
 		MetaDataTable MD;
 		plotLatticePoints(MD,
 				1, 5, 2, 4);
 		MD.write(fn_out);
+		*/
 
 
 
@@ -1103,11 +1271,11 @@ public:
 
 
 
-		//RFLOAT xin = 10., yin = 7., zin = 10., psi = 0., tilt = 87.;
+		//RFLOAT xin = 10., yin = 7., zin = 10., psi = 0., tilt = 87., rot = 0.;
 		//std::cout << " x, y, z, psi = " << xin << ", " << yin << ", " << zin << ", " << psi << std::endl;
-		//transformCartesianAndHelicalCoords(xin, yin, zin, xin, yin, zin, psi, tilt, 2, HELICAL_TO_CART_COORDS);
+		//transformCartesianAndHelicalCoords(xin, yin, zin, xin, yin, zin, rot, tilt, psi, 2, HELICAL_TO_CART_COORDS);
 		//std::cout << " x, y, z, psi = " << xin << ", " << yin << ", " << zin << ", " << psi << std::endl;
-		//transformCartesianAndHelicalCoords(xin, yin, zin, xin, yin, zin, psi, tilt, 2, CART_TO_HELICAL_COORDS);
+		//transformCartesianAndHelicalCoords(xin, yin, zin, xin, yin, zin, rot, tilt, psi, 2, CART_TO_HELICAL_COORDS);
 		//std::cout << " x, y, z, psi = " << xin << ", " << yin << ", " << zin << ", " << psi << std::endl;
 
 
@@ -1180,7 +1348,7 @@ public:
 		char str[1000];
 		int dim;
 		Matrix1D<RFLOAT> in, out;
-		RFLOAT psi_deg, tilt_deg, x, y, z, angpix;
+		RFLOAT rot_deg = 0., psi_deg = 0., tilt_deg = 0., x = 0., y = 0., z = 0., angpix = 1.;
 		bool direction;
 
 		std::cout << " ========== Helical2Cartesian / Cartesian2Helical coordinates ==========" << std::endl;
@@ -1246,7 +1414,7 @@ public:
 				YY(in) = y;
 				ZZ(in) = z;
 			}
-			transformCartesianAndHelicalCoords(in, out, psi_deg, tilt_deg, direction);
+			transformCartesianAndHelicalCoords(in, out, rot_deg, tilt_deg, psi_deg, direction);
 			out /= angpix;
 			if(dim == 2)
 			{
@@ -1327,7 +1495,7 @@ int main(int argc, char *argv[])
     }
     catch (RelionError XE)
     {
-    	prm.usage();
+    	//prm.usage();
         std::cout << XE;
         exit(1);
     }

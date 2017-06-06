@@ -29,7 +29,7 @@
 #define TIMING_TOC(id)
 #endif
 
-void MlModel::initialise()
+void MlModel::initialise(bool _do_sgd)
 {
 
 	// Auxiliary vector with relevant size in Fourier space
@@ -49,12 +49,15 @@ void MlModel::initialise()
     fsc_halves_class.resize(aux);
     sigma2_class.resize(nr_classes * nr_bodies, aux);
     data_vs_prior_class.resize(nr_classes * nr_bodies, aux);
+    fourier_coverage_class.resize(nr_classes * nr_bodies, aux);
     // TODO handle these two correctly.
     bfactor_correction.resize(nr_groups, 0.);
     scale_correction.resize(nr_groups, 1.);
 
 	acc_rot.resize(nr_classes * nr_bodies, 0);
 	acc_trans.resize(nr_classes * nr_bodies, 0);
+	estimated_resolution.resize(nr_classes * nr_bodies, 0);
+	total_fourier_coverage.resize(nr_classes * nr_bodies, 0);
 
 	helical_twist.resize(nr_classes, 0);
 	helical_rise.resize(nr_classes, 0);
@@ -72,6 +75,10 @@ void MlModel::initialise()
     PPrefRank.clear();
     // Now fill the entire vector with instances of "ref"
     PPref.resize(nr_classes * nr_bodies, ref);
+
+    do_sgd = _do_sgd;
+    if (do_sgd)
+    	Igrad.resize(nr_classes);
 
 }
 
@@ -167,12 +174,18 @@ void MlModel::read(FileName fn_in)
 	else
 		MDclass.readStar(in, "model_classes");
 	int iclass = 0;
+	do_sgd = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 	{
 		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
 			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) ||
 			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]) 	)
 			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table");
+		// backwards compatible
+		if (!MDclass.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]))
+			estimated_resolution[iclass] = 0.;
+		if (!MDclass.getValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, total_fourier_coverage[iclass]))
+			total_fourier_coverage[iclass] = 0.;
 		if (ref_dim==2)
 			if (!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(prior_offset_class[iclass])) ||
 				!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(prior_offset_class[iclass])) )
@@ -202,6 +215,16 @@ void MlModel::read(FileName fn_in)
 		// Read in actual reference image
 		img.read(fn_tmp);
 		Iref[iclass] = img();
+
+		// Check to see whether there is a SGD-gradient entry as well
+		if (MDclass.getValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp))
+		{
+			do_sgd=true;
+			if (iclass == 0)
+				Igrad.resize(nr_classes);
+			img.read(fn_tmp);
+			Igrad[iclass] = img();
+		}
 		iclass++;
 	}
 
@@ -236,6 +259,9 @@ void MlModel::read(FileName fn_in)
 			    !MDsigma.getValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class(idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](idx)))
 				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
+			// backwards compatible with STAR files without Fourier coverage
+			if (!MDsigma.getValue(EMDL_MLMODEL_FOURIER_COVERAGE_REF, fourier_coverage_class[iclass](idx)))
+				fourier_coverage_class[iclass](idx) = 0.;
 		}
 	}
 
@@ -329,6 +355,18 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     		img.write(fn_out + "_bodies.mrcs");
     	else
     		img.write(fn_out + "_classes.mrcs");
+
+    	if (do_sgd)
+    	{
+        	for (int iclass = 0; iclass < nr_classes; iclass++)
+        	{
+        		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad[iclass])
+    			{
+        			DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad[iclass], i, j);
+    			}
+        	}
+       		img.write(fn_out + "_gradients.mrcs");
+    	}
     }
     else
     {
@@ -346,6 +384,16 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
     		img() = Iref[iclass];
     		img.write(fn_tmp);
+    	}
+    	if (do_sgd)
+    	{
+			for (int iclass = 0; iclass < nr_classes; iclass++)
+			{
+				fn_tmp.compose(fn_out+"_grad", iclass+1, "mrc", 3);
+
+				img() = Igrad[iclass];
+				img.write(fn_tmp);
+			}
     	}
 
     	if (do_write_bild)
@@ -370,7 +418,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     if (!fh)
         REPORT_ERROR( (std::string)"MlModel::write: Cannot write file: " + fn_tmp);
 
-    // Write the output STAR file
+	// Write the output STAR file
 	MDlog.setIsList(true);
 	MDlog.addObject();
 	MDlog.setName("model_general");
@@ -407,6 +455,9 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_LL, LL);
 	MDlog.setValue(EMDL_MLMODEL_AVE_PMAX, ave_Pmax);
 	MDlog.write(fh);
+
+	// Calculate resolutions and total Fourier coverages for each class
+	calculateTotalFourierCoverage();
 
     // Write metadata and images for all classes
 	FileName fn_root;
@@ -445,6 +496,15 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				fn_tmp.compose(fn_out+"_class",iclass+1,"mrc", 3); // class number from 1 to K!
 		}
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
+		if (do_sgd)
+		{
+			if (ref_dim==2)
+				fn_tmp.compose(iclass+1, fn_out + "_gradients.mrcs");
+			else
+				fn_tmp.compose(fn_out+"_grad",iclass+1,"mrc", 3);
+			MDclass.setValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp);
+		}
+
 		// Also set he maskname for multi-body refinement
 		if (nr_bodies > 1)
 			MDclass.setValue(EMDL_MASK_NAME, fn_tmp2);
@@ -454,6 +514,8 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, total_fourier_coverage[iclass]);
 
 		if (ref_dim==2)
 		{
@@ -485,6 +547,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			MDsigma.setValue(EMDL_RESOLUTION_ANGSTROM, getResolutionAngstrom(ii));
 			MDsigma.setValue(EMDL_MLMODEL_DATA_VS_PRIOR_REF, data_vs_prior_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class(ii));
+			MDsigma.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_REF, fourier_coverage_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](ii));
 			MDsigma.setValue(EMDL_MLMODEL_TAU2_REF, tau2_class[iclass](ii));
 			// Only write orientabilities if they have been determined
@@ -572,8 +635,8 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 }
 
 // Reading images from disc
-void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected)
+void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd)
 {
 
 	// Set some stuff
@@ -605,6 +668,7 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 			// ignore nr_classes from the command line, use number of entries in STAR file
 			nr_classes = 0;
 			Iref.clear();
+			Igrad.clear();
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDref)
 			{
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
@@ -616,6 +680,11 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 					REPORT_ERROR("MlOptimiser::read: size of reference images is not the same as the experimental images!");
 				}
 				Iref.push_back(img());
+				if (_do_sgd)
+				{
+					img() *= 0.;
+					Igrad.push_back(img());
+				}
 				nr_classes++;
 			}
 		}
@@ -631,6 +700,7 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 				REPORT_ERROR("MlOptimiser::read: size of reference image is not the same as the experimental images!");
 			}
 			Iref.clear();
+			Igrad.clear();
 			if (nr_bodies > 1)
 			{
 				for (int ibody = 0; ibody < nr_bodies; ibody++)
@@ -646,6 +716,11 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
 					Iref.push_back(img());
+					if (_do_sgd)
+					{
+						img() *= 0.;
+						Igrad.push_back(img());
+					}
 				}
 			}
 			if (nr_classes > 1)
@@ -656,22 +731,31 @@ void MlModel::readImages(FileName fn_ref, int _ori_size, Experiment &_mydata,
 	}
 	else
 	{
-		// If no -ref is given, assume this is a 2D refinement and calculate average of all unaligned images later on.
+		// If no -ref is given, calculate average of all unaligned images later on.
 		do_average_unaligned = true;
-		do_generate_seeds = true;
-		refs_are_ctf_corrected = false;
-		if (data_dim == 2)
-			img().initZeros(ori_size, ori_size);
-		else if (data_dim == 3)
+		do_generate_seeds = false; // after SGD introduction, this is now done in the estimation of initial sigma2 step!
+		refs_are_ctf_corrected = true;
+		if (_is_3d_model || data_dim == 3)
+		{
+			ref_dim = 3;
 			img().initZeros(ori_size, ori_size, ori_size);
+		}
 		else
-			REPORT_ERROR("MlOptimiser::read: ERROR data_dim should be either 2 or 3");
-		ref_dim = data_dim;
+		{
+			ref_dim = 2;
+			img().initZeros(ori_size, ori_size);
+		}
+		Iref.clear();
+		Igrad.clear();
 		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
 			Iref.push_back(img());
+			if (_do_sgd)
+				Igrad.push_back(img());
+		}
 	}
 
-	initialise();
+	initialise(_do_sgd);
 
 	// Now set the group names from the Experiment groups list
 	for (int i=0; i< nr_groups; i++)
@@ -770,6 +854,7 @@ void MlModel::initialiseBodyMasks(FileName fn_masks, FileName fn_root_out)
 	}
 
 }
+
 
 
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
@@ -883,6 +968,38 @@ void MlModel::initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _he
     }
 }
 
+void MlModel::calculateTotalFourierCoverage()
+{
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
+		int maxres = 0;
+		for (int ires = 0; ires < XSIZE(data_vs_prior_class[iclass]); ires++)
+		{
+			if (DIRECT_A1D_ELEM(data_vs_prior_class[iclass], ires) < 1.)
+				break;
+			maxres = ires;
+		}
+
+		estimated_resolution[iclass] = 1./getResolution(maxres);
+		total_fourier_coverage[iclass] = 0.;
+		RFLOAT count = 0;
+		for (long int k=FIRST_XMIPP_INDEX(maxres+2); k<=FIRST_XMIPP_INDEX(maxres+2) + maxres+1; k++) \
+		   for (long int i=FIRST_XMIPP_INDEX(maxres+2); i<=FIRST_XMIPP_INDEX(maxres+2) + maxres+1; i++) \
+			   for (long int j=FIRST_XMIPP_INDEX(maxres+2); j<=FIRST_XMIPP_INDEX(maxres+2) + maxres+1; j++) \
+			   {
+				   int r = sqrt(RFLOAT(k*k+i*i+j*j));
+				   if (r <= maxres)
+				   {
+					   total_fourier_coverage[iclass] += DIRECT_A1D_ELEM(fourier_coverage_class[iclass], r);
+					   count += 1.;
+				   }
+			   }
+		total_fourier_coverage[iclass] /= count;
+	}
+
+}
+
+
 /////////// MlWsumModel
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
@@ -926,6 +1043,8 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
     data_vs_prior_class.clear();
 	acc_rot.clear();
 	acc_trans.clear();
+	estimated_resolution.clear();
+	total_fourier_coverage.clear();
     orientability_contrib.clear();
 
 	helical_twist.resize(nr_classes);

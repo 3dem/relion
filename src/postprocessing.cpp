@@ -523,10 +523,7 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 		{
 			RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
 			RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
-			if (fscn > fsct)
-				DIRECT_A1D_ELEM(fsc_true, i) = 0.;
-			else
-				DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+			DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
 		}
 	}
 }
@@ -548,9 +545,10 @@ void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArra
 		if (ires <= ires_max)
 		{
 	        RFLOAT fsc = DIRECT_A1D_ELEM(my_fsc, ires);
-	        if (fsc < 0.0001)
-	        	REPORT_ERROR("Postprocessing::applyFscWeighting BUG: fsc <= 0");
-	        DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
+	        if (fsc > 0.)
+	        	DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
+	        else
+	        	DIRECT_A3D_ELEM(FT, k, i, j) *= 0.;
 		}
 		else
 		{
@@ -1134,7 +1132,7 @@ void Postprocessing::run()
 			getFSC(I1(), I2(), fsc_random_masked);
 		}
 		else
-			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.  You may want to check your mask.");
+			REPORT_ERROR("Postprocessing::run ERROR: FSC curve never drops below randomize_fsc_at.");
 
 		// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
 		// FSC_true = FSC_t - FSC_n / ( )

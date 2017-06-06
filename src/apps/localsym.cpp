@@ -18,44 +18,23 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <unistd.h>
-#include <string.h>
-
-#include <src/args.h>
-#include <src/image.h>
-#include <src/strings.h>
-#include <src/funcs.h>
-#include <src/memory.h>
-#include <src/euler.h>
-#include <src/time.h>
-#include <src/displayer.h>
+#include "src/local_symmetry.h"
 
 int main(int argc, char *argv[])
 {
-    Displayer prm;
+	local_symmetry_parameters prm;
 
-    try
+	try
     {
-        prm.read(argc, argv);
-
-
-        if (prm.do_gui)
-        {
-        	prm.runGui();
-        }
-        else
-        {
-        	prm.initialise();
-        	prm.run();
-        }
+		prm.read(argc, argv);
+		prm.run();
     }
-
     catch (RelionError XE)
     {
-        //prm.usage();
+        prm.usage();
         std::cerr << XE;
         exit(1);
     }
 
-        return 0;
+    return 0;
 }

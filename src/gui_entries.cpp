@@ -1,3 +1,5 @@
+
+
 /***************************************************************************
  *
  * Author: "Sjors H.W. Scheres"
@@ -33,67 +35,6 @@ float fltkTextToFloat(const char* str)
 // This allows CURRENT_ODIR browse buttons
 std::string current_browse_directory;
 
-bool replaceStringOnce(Fl_Text_Buffer *textbuf, std::string findthis, std::string replaceby)
-{
-	const char *find = findthis.c_str();
-	const char *replace = replaceby.c_str();
-
-	// Loop through the whole string
-	int pos = 0;
-	if (textbuf->search_forward(pos, find, &pos))
-	{
-		// Found a match; update the position and replace text...
-		textbuf->select(pos, pos+strlen(find));
-		textbuf->remove_selection();
-		textbuf->insert(pos, replace);
-		pos += strlen(replace);
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-void replaceStringAll(Fl_Text_Buffer *textbuf, std::string findthis, std::string replaceby)
-{
-
-	bool do_search_more = true;
-	while (do_search_more)
-		do_search_more = replaceStringOnce(textbuf, findthis, replaceby);
-}
-
-void appendLineString(Fl_Text_Buffer *textbuf, std::string copylinewiththis, int times)
-{
-	const char *find = copylinewiththis.c_str();
-	// Loop through the whole string
-	int pos = 0;
-	char * sel;
-
-	if (textbuf->search_forward(pos, find, &pos))
-	{
-		// Found a match; get the entire line and append at the end
-		int line0 = textbuf->line_start(pos);
-		int lineF = textbuf->line_end(pos);
-		textbuf->select(line0,lineF);
-		sel = textbuf->selection_text();
-	}
-	else
-	{
-		std::cerr <<" appendLineString ERROR: Could not find" << copylinewiththis << " in textfile..." << std::endl;
-		exit(1);
-	}
-
-	for (int n = 0; n < times; n++)
-	{
-		textbuf->append("\n");
-		textbuf->append(sel);
-		textbuf->append("\n");
-	}
-	textbuf->append("\n");
-
-}
-
 ShowHelpText::ShowHelpText(const char *help)
 {
     int w=640;
@@ -110,173 +51,195 @@ ShowHelpText::ShowHelpText(const char *help)
 
 ShowHelpText::~ShowHelpText(){};
 
-
-// ==============================================================================
-// AnyEntry =====================================================================
-// ==============================================================================
-
-void AnyEntry::initialise(int x, int y, int height,
-				   int wcol2, int wcol3,
-				   const char* title,
-				   const char* defaultvalue,
-				   const char* helptext)
+void GuiEntry::clear()
 {
-    // Set the label
-    label = title;
+	deactivate_option = -1;
+	joboption.clear();
+	/* This only gives segfaults....
+	if (inp != NULL)
+	{
+		delete inp;
+		inp = NULL;
+	}
+	if (help != NULL)
+	{
+		delete help;
+		help = NULL;
+	}
+	if (browse != NULL)
+	{
+		delete browse;
+		browse = NULL;
+	}
+	if (choice != NULL)
+	{
+		delete choice;
+		choice = NULL;
+	}
+	if (menu != NULL)
+	{
+		delete menu;
+		menu = NULL;
+	}
+	if (my_deactivate_group != NULL)
+	{
+		delete my_deactivate_group;
+		my_deactivate_group = NULL;
+	}
+	if (slider != NULL)
+	{
+		delete slider;
+		slider = NULL;
+	}
+	*/
+
+}
+void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int height, int wcol2, int wcol3)
+{
 
     // The input field
-	if (defaultvalue != NULL)
-	{
-		inp = new Fl_Input(XCOL2, y, wcol2, height, title);
-
-		// Set the input value
-		inp->value(defaultvalue);
-		inp->color(GUI_INPUT_COLOR);
-		inp->textsize(ENTRY_FONTSIZE);
-		inp->labelsize(ENTRY_FONTSIZE);
-	}
+	int mywidth = (joboption.joboption_type == JOBOPTION_SLIDER) ? 50 : wcol2;
+	inp = new Fl_Input(x, y, mywidth, height, joboption.label_gui.c_str());
+	inp->color(GUI_INPUT_COLOR);
+	inp->textsize(ENTRY_FONTSIZE);
+	inp->labelsize(ENTRY_FONTSIZE);
+	inp->value(joboption.default_value.c_str());
 
 	// Display help button if needed
-    if (helptext != NULL)
+    if (joboption.helptext != "")
     {
-    	// Set the help text
-		myhelptext = helptext;
-
 		// The Help button
 		help = new Fl_Button( XCOL3, y, wcol3, height, "?");
 		help->callback( cb_help, this );
 		help->color(GUI_BUTTON_COLOR);
 		help->labelsize(ENTRY_FONTSIZE);
     }
-}
 
-void AnyEntry::place(int &y,
-		const char * title,
-		const char* defaultvalue,
-		const char* helptext,
-		int x, int h, int wcol2, int wcol3 )
+    if (joboption.joboption_type == JOBOPTION_FILENAME)
+    {
+        // The Browse button
+        browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
+        browse->callback( cb_browse, this );
+        browse->color(GUI_BUTTON_COLOR);
+        browse->labelsize(ENTRY_FONTSIZE);
+
+    }
+    else if (joboption.joboption_type == JOBOPTION_INPUTNODE)
+    {
+
+        // The Browse button
+        browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
+        browse->callback( cb_browse_node, this );
+        browse->color(GUI_BUTTON_COLOR);
+        browse->labelsize(ENTRY_FONTSIZE);
+    }
+    else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
+    {
+
+		choice = new Fl_Choice(XCOL2, y, WCOL2, height);
+		if (joboption.joboption_type == JOBOPTION_RADIO)
+		{
+			if (joboption.radio_menu == RADIO_SAMPLING)
+			{
+				choice->menu(fl_sampling_options);
+				for (int i = 0; i < 9; i++)
+					if (std::string(job_sampling_options[i]) == joboption.default_value)
+						choice->picked(&fl_sampling_options[i]);
+			}
+			else if (joboption.radio_menu == RADIO_NODETYPE)
+			{
+				choice->menu(fl_node_type_options);
+				for (int i = 0; i < 10; i++)
+					if (std::string(job_nodetype_options[i]) == joboption.default_value)
+						choice->picked(&fl_node_type_options[i]);
+			}
+			else
+				REPORT_ERROR("BUG: unrecognised radio menu type.");
+
+		}
+		else // boolean
+		{
+			if (deactivate_this_group != NULL)
+				my_deactivate_group = deactivate_this_group;
+
+			choice->menu(bool_options);
+			if (joboption.default_value=="Yes")
+				choice->picked(&bool_options[0]);
+			else
+				choice->picked(&bool_options[1]);
+		}
+		choice->callback(cb_menu, this);
+		choice->textsize(ENTRY_FONTSIZE);
+
+		menu = choice;
+		//menu->color(GUI_BACKGROUND_COLOR);
+		menu->color(GUI_INPUT_COLOR);
+		menu->textsize(ENTRY_FONTSIZE);
+    }
+    else if (joboption.joboption_type == JOBOPTION_SLIDER)
+    {
+    	int floatwidth = 50;
+    	// Slider is shorter than wcol2, so that underlying input field becomes visible
+    	slider = new Fl_Slider(XCOL2 + floatwidth, y, wcol2 - floatwidth, height);
+    	slider->type(1);
+    	slider->callback(cb_slider, this);
+    	slider->minimum(joboption.min_value);
+    	slider->maximum(joboption.max_value);
+    	slider->step(joboption.step_value);
+    	slider->type(FL_HOR_NICE_SLIDER);
+    	slider->color(GUI_BACKGROUND_COLOR);
+    	inp->callback(cb_input, this);
+    	inp->when(FL_WHEN_ENTER_KEY|FL_WHEN_NOT_CHANGED);
+
+    	// Set the default in the input and the slider:
+    	inp->value(joboption.default_value.c_str());
+    	slider->value(textToDouble(joboption.default_value));
+
+    }
+
+
+}
+void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, int x, int h, int wcol2, int wcol3 )
 {
 
 	// Clear if existing
 	clear();
 
+	// What to do when continue is toggled
+	deactivate_option = _deactivate_option;
+
+	joboption = _joboption;
+
 	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, title, defaultvalue, helptext);
+	initialise(x, y, deactivate_this_group, h, wcol2, wcol3);
 
 	// Update the Y-coordinate
     y += h + 2;
 
 }
 
-void AnyEntry::placeOnSameYPosition(int y,
-		const char * title,
-		const char * title_full,
-		const char* defaultvalue,
-		const char* helptext,
-		int x, int h, int wcol2, int wcol3 )
+// Set the value back from the Fl_Input into the JobOption.value
+void GuiEntry::setValue(std::string _value)
 {
-
-	// Clear if existing
-	clear();
-
-    // Set the label
-    label = title;
-    if ( (title_full) && (strlen(title_full) > 0) )
-    	label_full = title_full;
-
-    // The input field
-	if (defaultvalue != NULL)
+	joboption.value = _value;
+	inp->value(_value.c_str());
+	// Also update menu or slider if necessary
+	if (menu != NULL)
 	{
-		inp = new Fl_Input(x, y, wcol2, h, title);
-
-		// Set the input value
-		inp->value(defaultvalue);
-		inp->color(GUI_INPUT_COLOR);
-		inp->textsize(ENTRY_FONTSIZE);
-		inp->labelsize(ENTRY_FONTSIZE);
+		const Fl_Menu_Item *p = menu->find_item(inp->value());
+		if ( p )
+			menu->picked(p);
+		else
+			REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
 	}
-
-	// Display help button if needed
-    if (helptext != NULL)
-    {
-    	// Set the help text
-		myhelptext = helptext;
-
-		// The Help button
-		help = new Fl_Button(x + wcol2 + COLUMN_SEPARATION, y, wcol3, h, "?");
-		help->callback( cb_help, this );
-		help->color(GUI_BUTTON_COLOR);
-		help->labelsize(ENTRY_FONTSIZE);
-    }
-}
-
-std::string AnyEntry::getValue()
-{
-	return (std::string)inp->value();
-}
-
-void AnyEntry::setValue(const char* val)
-{
-	inp->value(val);
-}
-
-void AnyEntry::writeValue(std::ostream& out)
-{
-	// Only write entries that have been initialised
-	if (label_full != "")
-		out << label_full << " == " << getValue() << std::endl;
-	else if (label != "")
-		out << label << " == " << getValue() << std::endl;
-}
-
-
-void AnyEntry::readValue(std::ifstream& in)
-{
-	std::string label_saved;
-	if (label_full != "")
-		label_saved = label_full;
-	else
-		label_saved = label;
-
-    if (label_saved != "")
-    {
-		// Start reading the ifstream at the top
-		in.clear(); // reset eof if happened...
-    	in.seekg(0, std::ios::beg);
-		std::string line;
-		while (getline(in, line, '\n'))
-		{
-			if (line.rfind(label_saved) == 0)
-			{
-				// found my label
-				int equalsigns = line.rfind("==");
-				std::string newval = line.substr(equalsigns + 3, line.length() - equalsigns - 3);
-				inp->value(newval.c_str());
-				return;
-			}
-		}
-    }
-}
-
-void AnyEntry::clear()
-{
-	if (label != "")
+	if (slider != NULL)
 	{
-		label="";
-		if (inp)
-		{
-			delete inp;
-			inp = NULL;
-		}
-		if (help)
-		{
-			delete help;
-			help = NULL;
-		}
+		slider->value(fltkTextToFloat(inp->value()));
 	}
 }
 
-void AnyEntry::deactivate(bool do_deactivate)
+
+void GuiEntry::deactivate(bool do_deactivate)
 {
 	if (do_deactivate)
 	{
@@ -284,6 +247,12 @@ void AnyEntry::deactivate(bool do_deactivate)
 			inp->deactivate();
 		if (help)
 			help->deactivate();
+		if (browse)
+			browse->deactivate();
+		if (menu)
+			menu->deactivate();
+		if (slider)
+			slider->deactivate();
 	}
 	else
 	{
@@ -291,120 +260,49 @@ void AnyEntry::deactivate(bool do_deactivate)
 			inp->activate();
 		if (help)
 			help->activate();
+		if (browse)
+			browse->activate();
+		if (menu)
+			menu->activate();
+		if (slider)
+			slider->activate();
 	}
 
 }
 
 // Help button call-back functions
-void AnyEntry::cb_help(Fl_Widget* o, void* v) {
+void GuiEntry::cb_help(Fl_Widget* o, void* v)
+{
 
-    AnyEntry* T=(AnyEntry*)v;
+    GuiEntry* T=(GuiEntry*)v;
     T->cb_help_i();
 }
 
-void AnyEntry::cb_help_i() {
-
-    ShowHelpText *help = new ShowHelpText(myhelptext);
-
-}
-
-
-// ==============================================================================
-// FileNameEntry ================================================================
-// ==============================================================================
-
-void FileNameEntry::initialise(int x, int y, int height,
-		                     int wcol2, int wcol3, int wcol4,
-		                     const char* title,
-		                     const char* defaultvalue,
-		                     const char* _pattern,
-		                     const char* _directory,
-		                     const char* helptext)
+void GuiEntry::cb_help_i()
 {
 
-	AnyEntry::initialise(x,y,height,
-			wcol2,wcol3,
-			title,
-			defaultvalue,
-			helptext);
+    ShowHelpText *help = new ShowHelpText(joboption.helptext.c_str());
 
-	// Store the pattern for the file chooser
-	pattern = _pattern;
-	directory = _directory;
-
-    // The Browse button
-    browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
-    browse->callback( cb_browse, this );
-    browse->color(GUI_BUTTON_COLOR);
-    browse->labelsize(ENTRY_FONTSIZE);
 }
 
-
-void FileNameEntry::place(int &y,
-		const char * title,
-		const char* defaultvalue,
-		const char* pattern,
-		const char* directory,
-		const char* helptext,
-		int x, int h, int wcol2, int wcol3, int wcol4)
+void GuiEntry::cb_browse(Fl_Widget* o, void* v)
 {
 
-	// Clear if existing
-	clear();
-
-	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, pattern, directory, helptext);
-
-	// Update the Y-coordinate
-    y += h + 2;
-
-}
-
-void FileNameEntry::clear()
-{
-	if (label != "")
-	{
-		AnyEntry::clear();
-		delete browse;
-	}
-}
-
-void FileNameEntry::deactivate(bool do_deactivate)
-{
-	AnyEntry::deactivate(do_deactivate);
-	if (do_deactivate)
-	{
-		browse->deactivate();
-	}
-	else
-	{
-		browse->activate();
-	}
-
-}
-
-void FileNameEntry::cb_browse(Fl_Widget* o, void* v) {
-
-    FileNameEntry* T=(FileNameEntry*)v;
+    GuiEntry* T=(GuiEntry*)v;
     T->cb_browse_i();
 }
 
 
-void FileNameEntry::cb_browse_i() {
+void GuiEntry::cb_browse_i()
+{
 
     Fl::scheme("gtk+");
-    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
+    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-    std::string test="";
-    if (directory != NULL)
-    {
-        std::string test2(directory);
-        test = test2;
-    }
-    if (test=="CURRENT_ODIR")
+    if (joboption.directory=="CURRENT_ODIR")
     	G_chooser->directory(current_browse_directory.c_str());
     else
-    	G_chooser->directory(directory);
+    	G_chooser->directory(joboption.directory.c_str());
     G_chooser->color(GUI_BACKGROUND_COLOR);
     G_chooser->show();
 
@@ -432,94 +330,19 @@ void FileNameEntry::cb_browse_i() {
 }
 
 
-// ==============================================================================
-// InputNodeEntry ================================================================
-// ==============================================================================
+void GuiEntry::cb_browse_node(Fl_Widget* o, void* v) {
 
-void InputNodeEntry::initialise(int x, int y, int height,
-		                     int wcol2, int wcol3, int wcol4,
-		                     const char* title,
-		                     int _type,
-		                     const char* defaultvalue,
-		                     const char* _pattern,
-		                     const char* helptext)
-{
-
-	AnyEntry::initialise(x,y,height,
-			wcol2,wcol3,
-			title,
-			defaultvalue,
-			helptext);
-
-	// Store the pattern for the file chooser
-	pattern = _pattern;
-	type = _type;
-    // The Browse button
-    browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
-    browse->callback( cb_browse_node, this );
-    browse->color(GUI_BUTTON_COLOR);
-    browse->labelsize(ENTRY_FONTSIZE);
-}
-
-
-void InputNodeEntry::place(int &y,
-		const char * title,
-		int _type,
-		const char* defaultvalue,
-		const char* pattern,
-		const char* helptext,
-		int x, int h, int wcol2, int wcol3, int wcol4 )
-{
-
-	// Clear if existing
-	clear();
-
-	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, _type, defaultvalue, pattern, helptext);
-
-	// Update the Y-coordinate
-    y += h + 2;
-
-}
-
-void InputNodeEntry::clear()
-{
-	// TODO: add stuff to track history here
-	if (label != "")
-	{
-		AnyEntry::clear();
-		delete browse;
-	}
-}
-
-void InputNodeEntry::deactivate(bool do_deactivate)
-{
-	// TODO: add stuff to track history here
-	AnyEntry::deactivate(do_deactivate);
-	if (do_deactivate)
-	{
-		browse->deactivate();
-	}
-	else
-	{
-		browse->activate();
-	}
-
-}
-
-void InputNodeEntry::cb_browse_node(Fl_Widget* o, void* v) {
-
-    InputNodeEntry* T=(InputNodeEntry*)v;
+    GuiEntry* T=(GuiEntry*)v;
     T->cb_browse_node_i();
 }
 
 
-void InputNodeEntry::cb_browse_node_i() {
+void GuiEntry::cb_browse_node_i() {
 
     Fl::scheme("gtk+");
-    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", pattern, Fl_File_Chooser::SINGLE, "");
+    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-    std::string fn_dir = ".Nodes/" + integerToString(type);
+    std::string fn_dir = ".Nodes/" + integerToString(joboption.node_type);
     G_chooser->directory(fn_dir.c_str());
     G_chooser->color(GUI_BACKGROUND_COLOR);
     G_chooser->show();
@@ -553,291 +376,37 @@ void InputNodeEntry::cb_browse_node_i() {
     inp->value(fn_out.c_str());
 }
 
+void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
 
-// ==============================================================================
-// RadioEntry ================================================================
-// ==============================================================================
-void RadioEntry::initialise(int x, int y, int height,
-		                     int wcol2, int wcol3, int wcol4,
-		                     const char* title,
-		                     Fl_Menu_Item *options,
-		                     Fl_Menu_Item* defaultvalue,
-		                     const char* helptext,
-		    				 Fl_Group * deactivate_this_group)
-{
-	AnyEntry::initialise(x,y,height,
-			wcol2,wcol3,
-			title,
-			defaultvalue->label(),
-			helptext);
-
-    // Pull-down menu button
-	//Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", "", Fl_File_Chooser::SINGLE, "");
-
-	my_deactivate_group = deactivate_this_group;
-	choice = new Fl_Choice(XCOL2, y, WCOL2, height);
-    choice->menu(options);
-    choice->picked(defaultvalue);
-    choice->callback(cb_menu, this);
-    choice->textsize(ENTRY_FONTSIZE);
-
-    menu = choice;
-    //menu->color(GUI_BACKGROUND_COLOR);
-    menu->color(GUI_INPUT_COLOR);
-    menu->textsize(ENTRY_FONTSIZE);
-}
-
-
-void RadioEntry::place(int &y,
-			const char * title,
-			Fl_Menu_Item *options,
-			Fl_Menu_Item* defaultvalue,
-			const char* helptext,
-			int x, int h, int wcol2, int wcol3, int wcol4 )
-
-{
-    // Clear if existing
-	clear();
-
-	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, options, defaultvalue, helptext);
-
-    // Update the Y-coordinate
-    y += h + 2;
-
-}
-
-void RadioEntry::clear()
-{
-	if (label != "")
-	{
-		AnyEntry::clear();
-		//delete choice;
-		delete menu;
-	}
-}
-
-void RadioEntry::deactivate(bool do_deactivate)
-{
-	AnyEntry::deactivate(do_deactivate);
-	if (do_deactivate)
-	{
-		menu->deactivate();
-	}
-	else
-	{
-		menu->activate();
-	}
-
-}
-
-std::string RadioEntry::getValue()
-{
-	return (std::string)inp->value();
-}
-
-void RadioEntry::readValue(std::ifstream& in)
-{
-	if (label != "")
-	{
-		AnyEntry::readValue(in);
-		const Fl_Menu_Item *p = choice->find_item(inp->value());
-		if ( p )
-			choice->picked(p);
-		else
-			std::cerr << "Error readValue: Menu item not found:" << inp->value()<< std::endl;
-	}
-}
-
-
-void RadioEntry::cb_menu(Fl_Widget* o, void* v) {
-
-    RadioEntry* T=(RadioEntry*)v;
+    GuiEntry* T=(GuiEntry*)v;
     T->cb_menu_i();
 }
 
 
-void RadioEntry::cb_menu_i()
+void GuiEntry::cb_menu_i()
 {
-
 	const Fl_Menu_Item* m = menu->mvalue();
 	// Set my own value
 	inp->value(m->label());
-
 	// In case this was a boolean that deactivates a group, do so:
 	if (my_deactivate_group != NULL)
-	if (strcmp(inp->value(), "No") == 0)
-		my_deactivate_group->deactivate();
-	else
-		my_deactivate_group->activate();
-
-}
-
-// ==============================================================================
-// BooleanEntry ================================================================
-// ==============================================================================
-void BooleanEntry::initialise(int x, int y, int height,
-		                     int wcol2, int wcol3, int wcol4,
-		                     const char* title,
-		                     bool defaultvalue,
-		                     const char* helptext,
-		    				 Fl_Group * deactivate_this_group)
-{
-
-	Fl_Menu_Item* defval;
-
-	if (defaultvalue)
-		defval = &bool_options[0];
-	else
-		defval = &bool_options[1];
-	RadioEntry::initialise(x,y,height,
-			wcol2,wcol3,wcol4,
-			title,
-			bool_options,
-			defval,
-			helptext,
-			deactivate_this_group);
-
-}
-
-void BooleanEntry::place(int &y,
-		const char * title,
-		bool defaultvalue,
-		const char* helptext,
-		Fl_Group * deactivate_this_group,
-		int x, int h, int wcol2, int wcol3, int wcol4 )
-{
-
-    // Clear if existing
-	clear();
-
-	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, helptext, deactivate_this_group);
-
-    // Update the Y-coordinate
-    y += h + 2;
-
-
-}
-
-bool BooleanEntry::getValue()
-{
-	if (strcmp(inp->value(), "Yes") == 0)
-		return true;
-	else
-		return false;
-}
-
-// ==============================================================================
-// SliderEntry ================================================================
-// ==============================================================================
-void SliderEntry::initialise(int x, int y, int height,
-		                     int wcol2, int wcol3, int wcol4,
-		                     const char* title,
-		                     float defaultvalue,
-		                     float minvalue,
-		                     float maxvalue,
-		                     float valuestep,
-		                     const char* helptext)
-{
-
-	int floatwidth = 50;
-	AnyEntry::initialise(x,y,height,
-			floatwidth,wcol3,
-			title,
-			"",
-			helptext);
-
-	// Initialise label
-	label = title;
-
-	// Slider is shorter than wcol2, so that underlying input field becomes visible
-	slider = new Fl_Slider(XCOL2 + floatwidth, y, wcol2 - floatwidth, height);
-	slider->type(1);
-	slider->callback(cb_slider, this);
-	slider->minimum(minvalue);
-	slider->maximum(maxvalue);
-	slider->step(valuestep);
-	slider->type(FL_HOR_NICE_SLIDER);
-	slider->color(GUI_BACKGROUND_COLOR);
-	inp->callback(cb_input, this);
-	inp->when(FL_WHEN_ENTER_KEY|FL_WHEN_NOT_CHANGED);
-
-	// Set the default in the input and the slider:
-	std::string str = floatToString(defaultvalue);
-	inp->value(str.c_str());
-	slider->value(defaultvalue);
-
-}
-
-void SliderEntry::place(int &y,
-		const char* title,
-		float defaultvalue,
-		float minvalue,
-		float maxvalue,
-		float valuestep,
-		const char* helptext,
-		int x, int h, int wcol2, int wcol3, int wcol4 )
-{
-
-    // Clear if existing
-	clear();
-
-	// Add the entry to the window
-	initialise(x, y, h, wcol2, wcol3, wcol4, title, defaultvalue, minvalue, maxvalue, valuestep, helptext);
-
-    // Update the Y-coordinate
-    y += h + 2;
-
-}
-
-void SliderEntry::clear()
-{
-	if (label != "")
 	{
-		AnyEntry::clear();
-		delete slider;
-	}
-}
-
-void SliderEntry::deactivate(bool do_deactivate)
-{
-	AnyEntry::deactivate(do_deactivate);
-	if (do_deactivate)
-	{
-		slider->deactivate();
-	}
-	else
-	{
-		slider->activate();
+		if (strcmp(inp->value(), "No") == 0)
+			my_deactivate_group->deactivate();
+		else
+			my_deactivate_group->activate();
 	}
 
 }
 
+void GuiEntry::cb_slider(Fl_Widget* o, void* v) {
 
-float SliderEntry::getValue()
-{
-	return fltkTextToFloat(inp->value());
-}
-
-void SliderEntry::readValue(std::ifstream& in)
-{
-	if (label != "")
-	{
-		AnyEntry::readValue(in);
-		// Also reset the slider
-		slider->value(fltkTextToFloat(inp->value()));
-	}
-}
-
-void SliderEntry::cb_slider(Fl_Widget* o, void* v) {
-
-    SliderEntry* T=(SliderEntry*)v;
+    GuiEntry* T=(GuiEntry*)v;
     T->cb_slider_i();
 }
 
 
-void SliderEntry::cb_slider_i() {
+void GuiEntry::cb_slider_i() {
 
     static int recurse = 0;
     if ( recurse ) {
@@ -851,14 +420,14 @@ void SliderEntry::cb_slider_i() {
     }
 }
 
-void SliderEntry::cb_input(Fl_Widget* o, void* v) {
+void GuiEntry::cb_input(Fl_Widget* o, void* v) {
 
-    SliderEntry* T=(SliderEntry*)v;
+    GuiEntry* T=(GuiEntry*)v;
     T->cb_input_i();
 }
 
 
-void SliderEntry::cb_input_i() {
+void GuiEntry::cb_input_i() {
 
     static int recurse = 0;
     if ( recurse ) {
@@ -869,5 +438,6 @@ void SliderEntry::cb_input_i() {
         recurse = 0;
     }
 }
+
 
 

@@ -8,6 +8,8 @@
 
 class CudaBackprojector
 {
+
+public:
 	int mdlX, mdlY, mdlZ, mdlXYZ,
 	    mdlInitY, mdlInitZ,
 	    maxR, maxR2,

@@ -136,6 +136,7 @@ enum EMDLabel
 
     EMDL_MICROGRAPH_ID,
     EMDL_MICROGRAPH_NAME,
+    EMDL_MICROGRAPH_NAME_WODOSE,
     EMDL_MICROGRAPH_MOVIE_NAME,
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
@@ -150,6 +151,9 @@ enum EMDLabel
     EMDL_MLMODEL_DIMENSIONALITY,
     EMDL_MLMODEL_DIMENSIONALITY_DATA,
     EMDL_MLMODEL_DIFF2_HALVES_REF,
+    EMDL_MLMODEL_ESTIM_RESOL_REF,
+	EMDL_MLMODEL_FOURIER_COVERAGE_REF,
+    EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF,
     EMDL_MLMODEL_FSC_HALVES_REF,
     EMDL_MLMODEL_GROUP_NAME,
     EMDL_MLMODEL_GROUP_NO,
@@ -187,6 +191,7 @@ enum EMDLabel
     EMDL_MLMODEL_SIGMA_TILT,
     EMDL_MLMODEL_SIGMA_PSI,
     EMDL_MLMODEL_REF_IMAGE,
+    EMDL_MLMODEL_SGD_GRADIENT_IMAGE,
     EMDL_MLMODEL_SIGMA2_NOISE,
     EMDL_MLMODEL_SIGMA2_REF,
     EMDL_MLMODEL_SSNR_REF,
@@ -215,6 +220,15 @@ enum EMDLabel
     EMDL_OPTIMISER_DO_CORRECT_SCALE,
     EMDL_OPTIMISER_DO_REALIGN_MOVIES,
     EMDL_OPTIMISER_DO_MAP,
+    EMDL_OPTIMISER_DO_SGD,
+    EMDL_OPTIMISER_SGD_MU,
+	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI,
+	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE,
+    EMDL_OPTIMISER_SGD_SUBSET_START,
+    EMDL_OPTIMISER_SGD_SUBSET_SIZE,
+    EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
+    EMDL_OPTIMISER_SGD_MAX_SUBSETS,
+    EMDL_OPTIMISER_SGD_STEPSIZE,
     EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
     EMDL_OPTIMISER_DO_SKIP_ALIGN,
     EMDL_OPTIMISER_DO_SKIP_ROTATE,
@@ -237,9 +251,11 @@ enum EMDLabel
     EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE,
     EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED,
     EMDL_OPTIMISER_HIGHRES_LIMIT_EXP,
+    EMDL_OPTIMISER_HIGHRES_LIMIT_SGD,
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
     EMDL_OPTIMISER_ITERATION_NO,
+    EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME,
     EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES,
     EMDL_OPTIMISER_MAGNIFICATION_RANGE,
     EMDL_OPTIMISER_MAGNIFICATION_STEP,
@@ -512,6 +528,7 @@ private:
 
         EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_LONG, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
@@ -526,6 +543,9 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_DIMENSIONALITY, EMDL_INT, "rlnReferenceDimensionality", "Dimensionality of the references (2D/3D)");
         EMDL::addLabel(EMDL_MLMODEL_DIMENSIONALITY_DATA, EMDL_INT, "rlnDataDimensionality", "Dimensionality of the data (2D/3D)");
         EMDL::addLabel(EMDL_MLMODEL_DIFF2_HALVES_REF, EMDL_DOUBLE, "rlnDiff2RandomHalves", "Power of the differences between two independent reconstructions from random halves of the data");
+        EMDL::addLabel(EMDL_MLMODEL_ESTIM_RESOL_REF, EMDL_DOUBLE, "rlnEstimatedResolution", "Estimated resolution (in A) for a reference");
+        EMDL::addLabel(EMDL_MLMODEL_FOURIER_COVERAGE_REF, EMDL_DOUBLE, "rlnFourierCompleteness", "Fraction of Fourier components (per resolution shell) with SNR>1");
+        EMDL::addLabel(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, EMDL_DOUBLE, "rlnOverallFourierCompleteness", "Fraction of all Fourier components up to the current resolution with SNR>1");
         EMDL::addLabel(EMDL_MLMODEL_FSC_HALVES_REF, EMDL_DOUBLE, "rlnGoldStandardFsc", "Fourier shell correlation between two independent reconstructions from random halves of the data");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NAME, EMDL_STRING, "rlnGroupName", "The name of a group of images (e.g. all images from a micrograph)");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NO, EMDL_LONG, "rlnGroupNumber", "The number of a group of images");
@@ -559,6 +579,7 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_POWER_REF, EMDL_DOUBLE, "rlnReferenceSpectralPower", "Spherical average of the power of the reference");
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_MODE, EMDL_INT, "rlnOrientationalPriorMode", "Mode for prior distributions on the orientations (0=no prior; 1=(rot,tilt,psi); 2=(rot,tilt); 3=rot; 4=tilt; 5=psi) ");
         EMDL::addLabel(EMDL_MLMODEL_REF_IMAGE, EMDL_STRING, "rlnReferenceImage", "Name of a reference image");
+        EMDL::addLabel(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, EMDL_STRING, "rlnSGDGradientImage", "Name of image containing the SGD gradient");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET, EMDL_DOUBLE, "rlnSigmaOffsets","Standard deviation in the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA2_NOISE, EMDL_DOUBLE, "rlnSigma2Noise", "Spherical average of the standard deviation in the noise (sigma)");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA2_REF, EMDL_DOUBLE, "rlnReferenceSigma2", "Spherical average of the estimated power in the noise of a reference");
@@ -589,6 +610,15 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_SCALE, EMDL_BOOL, "rlnDoCorrectScale", "Flag to indicate that internal (per-group) intensity-scale correction should be performed");
         EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
         EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
+        EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_MU, EMDL_DOUBLE, "rlnSgdMuFactor", "The mu-parameter that controls the momentum of the SGD gradients");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, EMDL_DOUBLE, "rlnSgdSigma2FudgeInitial", "The variance of the noise will initially be multiplied with this value (larger than 1)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_LONG, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_START, EMDL_INT, "rlnSgdNextSubset", "Number of the next subset to restart this run with");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_LONG, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many subsets the model is written to disk");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_LONG, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in SGD updates)");
         EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
         EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, EMDL_BOOL, "rlnDoSolventFlattening", "Flag to indicate that the references should be masked to set their solvent areas to a constant density");
@@ -613,9 +643,11 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, EMDL_DOUBLE, "rlnHelicalSigmaDistance", "Sigma of distance along the helical tracks");
         EMDL::addLabel(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, EMDL_BOOL, "rlnHelicalKeepTiltPriorFixed", "Flag to indicate that helical tilt priors are kept fixed (at 90 degrees) in global angular searches");
         EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, EMDL_DOUBLE, "rlnHighresLimitExpectation", "High-resolution-limit (in Angstrom) for the expectation step");
+        EMDL::addLabel(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, EMDL_DOUBLE, "rlnHighresLimitSGD", "High-resolution-limit (in Angstrom) for Stochastic Gradient Descent");
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");
         EMDL::addLabel(EMDL_OPTIMISER_ITERATION_NO, EMDL_INT, "rlnCurrentIteration", "The number of the current iteration");
+        EMDL::addLabel(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, EMDL_STRING, "rlnLocalSymmetryFile", "Local symmetry description file containing list of masks and their operators");
         EMDL::addLabel(EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES, EMDL_DOUBLE, "rlnJoinHalvesUntilThisResolution", "Resolution (in Angstrom) to join the two random half-reconstructions to prevent their diverging orientations (for C-symmetries)");
         EMDL::addLabel(EMDL_OPTIMISER_MAGNIFICATION_RANGE, EMDL_DOUBLE, "rlnMagnificationSearchRange", "Search range for magnification correction");
         EMDL::addLabel(EMDL_OPTIMISER_MAGNIFICATION_STEP, EMDL_DOUBLE, "rlnMagnificationSearchStep", "Step size  for magnification correction");

@@ -30,32 +30,33 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
-	continue_old = parser.checkOption("--only_do_unfinished", "Only run mottion correctiob for those micrographs for which there is not yet an output micrograph.");
+	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
-	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
-
-	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
-	int motioncorr_section = parser.addSection("MOTIONCORR options");
-	bin_factor =  textToFloat(parser.getOption("--bin_factor", "Binning factor (integer for MOTIONCORR; float for MOTIONCOR2)", "1"));
-	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCORR/MOTIONCOR2", "150"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms","-1"));
 	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
 	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
-	fn_other_motioncorr_args = parser.getOption("--other_motioncorr_args", "Additional arguments to MOTIONCORR/MOTIONCOR2", "");
-	fn_motioncorr_exe = parser.getOption("--motioncorr_exe","Location of MOTIONCORR executable (or through RELION_MOTIONCORR_EXECUTABLE environment variable)","");
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
-	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2 instead of MOTIONCORR.");
+	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2 instead of UNBLUR.");
+	fn_motioncor2_exe = parser.getOption("--motioncor2_exe","Location of MOTIONCOR2 executable (or through RELION_MOTIONCOR2_EXECUTABLE environment variable)","");
+	bin_factor =  textToFloat(parser.getOption("--bin_factor", "Binning factor (can be non-integer)", "1"));
+	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCOR2", "150"));
 	fn_gain_reference = parser.getOption("--gainref","Location of MRC file with the gain reference to be applied","");
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
+	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
+	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file","");
+	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
+
+	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
+	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
 	int unblur_section = parser.addSection("UNBLUR/SUMMOVIE options");
-	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCORR.");
+	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCOR2.");
 	fn_unblur_exe = parser.getOption("--unblur_exe","Location of UNBLUR (v1.0.2) executable (or through RELION_UNBLUR_EXECUTABLE environment variable)","");
 	fn_summovie_exe = parser.getOption("--summovie_exe","Location of SUMMOVIE(v1.0.2) executable (or through RELION_SUMMOVIE_EXECUTABLE environment variable)","");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms","-1"));
 	nr_threads = textToInteger(parser.getOption("--j","Number of threads in the unblur executable","1"));
 
 	int doseweight_section = parser.addSection("Dose-weighting options");
@@ -103,21 +104,19 @@ void MotioncorrRunner::initialise()
 		if (angpix < 0)
 			REPORT_ERROR("ERROR: For Unblur it is mandatory to provide the pixel size in Angstroms through --angpix.");
 	}
-	else
+	else if (do_motioncor2)
 	{
-		// Get the MOTIONCORR executable
-		if (fn_motioncorr_exe == "")
+		// Get the MOTIONCOR2 executable
+		if (fn_motioncor2_exe == "")
 		{
 			char * penv;
-			penv = getenv ("RELION_MOTIONCORR_EXECUTABLE");
+			penv = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
 			if (penv!=NULL)
-				fn_motioncorr_exe = (std::string)penv;
+				fn_motioncor2_exe = (std::string)penv;
 		}
 	}
-
-	// Only integer scale factors for MOTIONCORR
-	if (!do_motioncor2 && std::floor(bin_factor) != bin_factor)
-		REPORT_ERROR("ERROR: only integer binning factor allowed for MOTIONCORR. (MOTIONCOR2 permits floats.)");
+	else
+		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
 
 	if (do_dose_weighting)
 	{
@@ -139,7 +138,7 @@ void MotioncorrRunner::initialise()
 	}
 #endif
 
-	// Set up which micrograph movies to run MOTIONCORR on
+	// Set up which micrograph movies to run MOTIONCOR2 on
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
@@ -187,23 +186,12 @@ void MotioncorrRunner::initialise()
 		}
 	}
 
-	// Motioncorr starts counting frames at 0:
-	if (!(do_unblur || do_motioncor2))
-	{
-		first_frame_ali -= 1;
-		first_frame_sum -= 1;
-		if (last_frame_ali != 0)
-			last_frame_ali -= 1;
-		if (last_frame_sum != 0)
-			last_frame_sum -= 1;
-	}
-
 	if (verb > 0)
 	{
 		if (do_unblur)
 			std::cout << " Using UNBLUR executable in: " << fn_unblur_exe << std::endl;
 		else
-			std::cout << " Using MOTIONCORR executable in: " << fn_motioncorr_exe << std::endl;
+			std::cout << " Using MOTIONCOR2 executable in: " << fn_motioncor2_exe << std::endl;
 		std::cout << " to correct beam-induced motion for the following micrographs: " << std::endl;
 		if (continue_old)
 			std::cout << " (skipping all micrographs for which a corrected movie already exists) " << std::endl;
@@ -245,7 +233,7 @@ void MotioncorrRunner::run()
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
-			std::cout << " Correcting beam-induced motions using Xueming Li's MOTIONCORR ..." << std::endl;
+			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		init_progress_bar(fn_micrographs.size());
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
@@ -265,7 +253,7 @@ void MotioncorrRunner::run()
 		else if (do_motioncor2)
 			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts);
 		else
-			result = executeMotioncorr(fn_micrographs[imic], xshifts, yshifts);
+			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result)
 			plotShifts(fn_micrographs[imic], xshifts, yshifts);
@@ -281,149 +269,6 @@ void MotioncorrRunner::run()
 
 }
 
-
-bool MotioncorrRunner::executeMotioncorr(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
-{
-
-
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
-
-	FileName fn_out = fn_avg.withoutExtension() + ".out";
-	FileName fn_log = fn_avg.withoutExtension() + ".log";
-	FileName fn_err = fn_avg.withoutExtension() + ".err";
-	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
-
-	for (int ipass = 0; ipass < 3; ipass++)
-	{
-
-		std::string command = fn_motioncorr_exe + " ";
-
-		command += fn_mic + " -fcs " + fn_avg;
-		command += " -flg " + fn_log;
-		command += " -nst " + integerToString(first_frame_ali) + " -nss " + integerToString(first_frame_sum);
-		command += " -ned " + integerToString(last_frame_ali) + " -nes " + integerToString(last_frame_sum);
-		command += " -bft " + floatToString(bfactor);
-
-		if (do_save_movies)
-			command += " -dsp 0 -ssc 1 -fct " + fn_mov;
-
-		if (bin_factor > 1)
-			command += " -bin " + floatToString(bin_factor);
-
-
-		if (fn_other_motioncorr_args.length() > 0)
-			command += " " + fn_other_motioncorr_args;
-
-		if ( allThreadIDs.size() == 0)
-		{
-			// Automated mapping
-			command += " -gpu " + integerToString(rank % devCount);
-		}
-		else
-		{
-			if (rank >= allThreadIDs.size())
-				REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
-			command += " -gpu " + allThreadIDs[rank][0];
-		}
-
-		command += " >> " + fn_out + " 2>> " + fn_err;
-
-		// Save the command that was executed
-		std::ofstream fh;
-		fh.open(fn_cmd.c_str(), std::ios::out);
-		fh << command << std::endl;
-		fh.close();
-
-		if (system(command.c_str()))
-		{
-			std::cerr << " WARNING: there was an error executing: " << command << std::endl;
-		}
-		else
-		{
-			// After motion-correction, check for all-zero average micrographs
-			if (exists(fn_avg))
-			{
-				Image<RFLOAT> Itest;
-				Itest.read(fn_avg, false);
-				RFLOAT avg, stddev;
-				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-				Itest.MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, avg);
-				if (fabs(stddev) > 0.00001 || fabs(avg) > 0.00001)
-				{
-					break;
-				}
-			}
-			else if (ipass == 2)
-			{
-				std::cerr << " WARNING: " << fn_avg << " still did not exist or had zero mean and variance after 3 attempts! " << std::endl;
-				return false;
-			}
-		}
-	}
-
-	// Also analyse the shifts
-	getShiftsMotioncorr(fn_log, xshifts, yshifts);
-
-	// Success!
-	return true;
-}
-
-void MotioncorrRunner::getShiftsMotioncorr(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
-{
-
-	std::ifstream in(fn_log.data(), std::ios_base::in);
-	if (in.fail())
-		return;
-
-	xshifts.clear();
-	yshifts.clear();
-
-    std::string line;
-
-    // Start reading the ifstream at the top
-    in.seekg(0);
-
-    // Read through the shifts file
-    int i = 0;
-    bool have_found_final = false;
-    while (getline(in, line, '\n'))
-    {
-    	// ignore all commented lines, just read first two lines with data
-    	if (line.find("Final shift") != std::string::npos)
-    	{
-    		have_found_final = true;
-    	}
-    	else if (have_found_final)
-    	{
-    		if (line.find("Shift") != std::string::npos)
-    		{
-        		std::vector<std::string> words;
-        		tokenize(line, words);
-        		if (words.size() < 7)
-        		{
-        			std::cerr << " fn_log= " << fn_log << std::endl;
-        			REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
-        		}
-        		xshifts.push_back(textToFloat(words[5]));
-    			yshifts.push_back(textToFloat(words[6]));
-    		}
-    		else
-    		{
-    			// Stop now
-    			break;
-    		}
-    	}
-    }
-    in.close();
-
-
-    if (xshifts.size() != yshifts.size())
-    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
-
-}
-
-
 bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
 {
 
@@ -436,7 +281,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	FileName fn_err = fn_avg.withoutExtension() + ".err";
 	FileName fn_cmd = fn_avg.withoutExtension() + ".com";
 
-	std::string command = fn_motioncorr_exe + " ";
+	std::string command = fn_motioncor2_exe + " ";
 
 	if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
 		command += " -InTiff " + fn_mic;
@@ -445,11 +290,15 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 
 	command += " -OutMrc " + fn_avg;
 	command += " -Bft " + floatToString(bfactor);
+	command += " -PixSize " + floatToString(angpix);
 
 	if (do_save_movies)
 		command += " -OutStack 1";
 
 	command += " -Patch " + integerToString(patch_x) + " " + integerToString(patch_y);
+
+	if (group > 1)
+		command += " -Group " + integerToString(group);
 
 	if (fn_gain_reference != "")
 		command += " -Gain " + fn_gain_reference;
@@ -463,16 +312,17 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	{
 		// Cannot read TIFFs here...
 		if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
-			REPORT_ERROR("ERROR: you cannot use --last_frame_sum > 0 when reading TIFFs. Try using -Trunk in the --other_motioncorr_args instead.");
+			REPORT_ERROR("ERROR: you cannot use --last_frame_sum > 0 when reading TIFFs. Try using -Trunk in the --other_motioncor2_args instead.");
 
 		// Read in header of the movie, to see how many frames it has
 		Image<RFLOAT> Ihead;
 		Ihead.read(fn_mic, false);
 		int n_frames = NSIZE(Ihead());
-		int trunk = n_frames - last_frame_sum;
-		if (trunk < 0)
+
+		int trunc = n_frames - last_frame_sum;
+		if (trunc < 0)
 			REPORT_ERROR("ERROR: movie " + fn_mic + " does not have enough frames.");
-		command += " -Trunk " + integerToString(trunk);
+		command += " -Trunc " + integerToString(trunc);
 	}
 
 	if (bin_factor > 1)
@@ -482,12 +332,17 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	{
 		command += " -Kv " + floatToString(voltage);
 		command += " -FmDose " + floatToString(dose_per_frame);
-		command += " -PixSize " + floatToString(angpix);
 		command += " -InitDose " + floatToString(pre_exposure);
 	}
 
-	if (fn_other_motioncorr_args.length() > 0)
-		command += " " + fn_other_motioncorr_args;
+	if (fn_defect != "")
+		command += " -DefectFile " + fn_defect;
+
+	if (fn_archive != "")
+		command += " -ArcDir " + fn_archive;
+
+	if (fn_other_motioncor2_args.length() > 0)
+		command += " " + fn_other_motioncor2_args;
 
 	if ( allThreadIDs.size() == 0)
 	{
@@ -518,8 +373,15 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	{
 		if (do_dose_weighting)
 		{
-			// Move movie .mrc to new .mrcs filename
-			FileName fn_tmp = fn_avg.withoutExtension() + "_DW.mrc";
+			// Move .mrc to _noDW.mrc filename
+			FileName fn_tmp = fn_avg.withoutExtension() + "_noDW.mrc";
+			if (std::rename(fn_avg.c_str(), fn_tmp.c_str()))
+			{
+				std::cerr << "ERROR in renaming: " << fn_avg << " to " << fn_tmp <<std::endl;
+				return false;
+			}
+			// Move _DW.mrc to .mrc filename
+			fn_tmp = fn_avg.withoutExtension() + "_DW.mrc";
 			if (std::rename(fn_tmp.c_str(), fn_avg.c_str()))
 			{
 				std::cerr << "ERROR in renaming: " << fn_tmp << " to " << fn_avg <<std::endl;
@@ -723,7 +585,7 @@ bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 			return false;
 		}
 
-		// Plot ther FRC
+		// Plot the FRC
 		plotFRC(fn_frc);
 	}
 
@@ -911,12 +773,17 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 		if (exists(fn_avg))
 		{
 			MDavg.addObject();
+			if (do_dose_weighting && do_motioncor2)
+			{
+				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
+				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
+			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			if (do_save_movies && exists(fn_mov))
 			{
 				MDmov.addObject();
-				MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 				MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
+				MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			}
 		}
 	}

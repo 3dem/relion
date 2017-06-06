@@ -21,7 +21,11 @@
 #include "src/macros.h"
 #include "src/helix.h"
 
+// Wider search ranges for helical twist and rise
 #define WIDE_HELICAL_TWIST_AND_RISE_SEARCHES
+
+// Exclude segments close to the edges of the 2D micrographs / 3D tomograms. Please switch it on.
+#define EXCLUDE_SEGMENTS_ON_THE_EDGES
 
 void makeHelicalSymmetryList(
 		std::vector<HelicalSymmetryItem>& list,
@@ -1462,14 +1466,15 @@ void createCylindricalReferenceWithPolarity(
 void transformCartesianAndHelicalCoords(
 		Matrix1D<RFLOAT>& in,
 		Matrix1D<RFLOAT>& out,
-		RFLOAT psi_deg,
+		RFLOAT rot_deg,
 		RFLOAT tilt_deg,
+		RFLOAT psi_deg,
 		bool direction)
 {
 	int dim;
 	RFLOAT x0, y0, z0;
 	Matrix1D<RFLOAT> aux;
-	Matrix2D<RFLOAT> A;
+	Matrix2D<RFLOAT> A, B;
 
 	dim = in.size();
 	if( (dim != 2) && (dim != 3) )
@@ -1481,26 +1486,23 @@ void transformCartesianAndHelicalCoords(
 	YY(aux) = YY(in);
 	ZZ(aux) = (dim == 3) ? (ZZ(in)) : (0.);
 
-	if(dim == 2)
-	{
-		tilt_deg = 0.;
-	}
-	if(direction == CART_TO_HELICAL_COORDS)
-	{
-		psi_deg *= -1.;
-		tilt_deg *= -1.;
-	}
+	if (dim == 2)
+		rot_deg = tilt_deg = 0.;
 
 	A.clear();
 	A.resize(3, 3);
-	Euler_angles2matrix(0., tilt_deg, psi_deg, A, false);
+	// TODO: check whether rot_deg should be always set to 0 !
+	// TODO: fix the --random_seed and use --perturb 0 option for testing !
+	Euler_angles2matrix(rot_deg, tilt_deg, psi_deg, A, false);
+	if (direction == CART_TO_HELICAL_COORDS) // Don't put minus signs before angles, use 'transpose' instead
+		A = A.transpose();
 	aux = A * aux;
 
 	out.clear();
 	out.resize(2);
 	XX(out) = XX(aux);
 	YY(out) = YY(aux);
-	if(dim == 3)
+	if (dim == 3)
 	{
 		out.resize(3);
 		ZZ(out) = ZZ(aux);
@@ -1518,8 +1520,9 @@ void transformCartesianAndHelicalCoords(
 		RFLOAT& xout,
 		RFLOAT& yout,
 		RFLOAT& zout,
-		RFLOAT psi_deg,
+		RFLOAT rot_deg,
 		RFLOAT tilt_deg,
+		RFLOAT psi_deg,
 		int dim,
 		bool direction)
 {
@@ -1534,7 +1537,7 @@ void transformCartesianAndHelicalCoords(
 	YY(in) = yin;
 	if (dim == 3)
 		ZZ(in) = zin;
-	transformCartesianAndHelicalCoords(in, out, psi_deg, tilt_deg, direction);
+	transformCartesianAndHelicalCoords(in, out, rot_deg, tilt_deg, psi_deg, direction);
 	xout = XX(out);
 	yout = YY(out);
 	if (dim == 3)
@@ -1809,7 +1812,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
 	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix))
 		REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Wrong dimensions or box size!");
     if (fn_in.getExtension() != "star")
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): MetadataTable should have .star extension.");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): MetadataTable should have .star extension. Error(s) in " + fn_in);
 
     half_box_size_pix = box_size_pix / 2.;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
@@ -1824,9 +1827,9 @@ void convertHelicalTubeCoordsToMetaDataTable(
 		return;
 
     if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) )
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates! Error(s) in " + fn_in);
     if (MD_in.numberOfObjects() % 2)
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs! Error(s) in" + fn_in);
 
     // Sjors added MDin_has_id and MDin_has_pitch to allow manual calculation of different cross-over distances to be carried onto the extracted segments...
     bool MDin_has_id = MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
@@ -1868,7 +1871,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
     		|| (x2_coord_list.size() != y1_coord_list.size())
 			|| (y1_coord_list.size() != y2_coord_list.size())
 			|| (y2_coord_list.size() != x1_coord_list.size()) )
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): BUG in reading input STAR file!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): BUG in reading input STAR file " + fn_in);
     MD_in.clear();
 
     // Init output STAR file
@@ -1938,12 +1941,17 @@ void convertHelicalTubeCoordsToMetaDataTable(
     		}
     		else
     		{
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
     			// Avoid segments lying on the edges of the micrographs
     			if ( (xp < half_box_size_pix) || (xp > (Xdim - half_box_size_pix))
     					|| (yp < half_box_size_pix) || (yp > (Ydim - half_box_size_pix)) )
     			{
+    				// Extract from filament start-end coordinates. It is not necessary to notify the user.
+    				//std::cerr << " WARNING: Particle at (" << xp << ", " << yp << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
+    				//std::cerr << " Box_size_pix = " << box_size_pix << ", Dimensions = " << Xdim << " * " << Ydim << std::endl;
     				continue;
     			}
+#endif
 
     			MD_out.addObject();
     	    	MD_out.setValue(EMDL_IMAGE_COORD_X, xp);
@@ -2430,21 +2438,22 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
 		int& total_segments,
+		bool is_3D,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
+		RFLOAT Zdim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors)
 {
 	MetaDataTable MD_in;
-	RFLOAT psi_prior_flip_ratio;
 	if (fn_in.getExtension() != "star")
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Input file should have .star extension!!");
-	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix))
+	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix) || ((is_3D) && (Zdim < box_size_pix)) )
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Wrong dimensions or box size!");
 
-	RFLOAT x, y, half_box_size_pix;
-	half_box_size_pix = box_size_pix / 2.;
-	psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
+	RFLOAT x = 0., y = 0., z = 0.;
+	RFLOAT half_box_size_pix = box_size_pix / 2.;
+	RFLOAT psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
 	if (bimodal_angular_priors)
 		psi_prior_flip_ratio = BIMODAL_PSI_PRIOR_FLIP_RATIO;
 
@@ -2456,30 +2465,40 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 
 	if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X))
 			|| (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y))
+			|| ( (is_3D) && (!MD_in.containsLabel(EMDL_IMAGE_COORD_Z)) )
 			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_TILT_PRIOR))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR))
 			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
-		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Prior information of helical segments is missing!");
+		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Prior information of helical segments is missing in " + fn_in);
 
 	int nr_segments = 0;
+	z = 1.;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
 	{
 		MD_in.getValue(EMDL_IMAGE_COORD_X, x);
 		MD_in.getValue(EMDL_IMAGE_COORD_Y, y);
-
+		if (is_3D)
+			MD_in.getValue(EMDL_IMAGE_COORD_Z, z);
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
 		// Avoid segments lying on the edges of the micrographs
-		if ( (x < half_box_size_pix) || (x > (Xdim - half_box_size_pix)) || (y < half_box_size_pix) || (y > (Ydim - half_box_size_pix)) )
-		{}
-		else
+		if ( (x < half_box_size_pix) || (x > (Xdim - half_box_size_pix))
+				|| (y < half_box_size_pix) || (y > (Ydim - half_box_size_pix))
+				|| ( (is_3D) && ((z < half_box_size_pix) || (z > (Zdim - half_box_size_pix))) ) )
 		{
-			nr_segments++;
-			MD_out.addObject(MD_in.getObject());
-
-			// TODO: check whether there is a bug...
-			MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
+			std::cerr << " WARNING: Particle at (" << x << ", " << y << ", " << z << std::flush;
+			std::cerr << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
+			std::cerr << " Box_size_pix = " << box_size_pix << std::flush;
+			std::cerr << ", Dimensions = " << Xdim << " * " << Ydim << " * " << Zdim << std::endl;
+			continue;
 		}
+#endif
+		nr_segments++;
+		MD_out.addObject(MD_in.getObject());
+
+		// TODO: check whether there is a bug...
+		MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 	}
 	total_segments = nr_segments;
 	MD_in.clear();
@@ -2521,7 +2540,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	line.clear();
 	getline(fin, line, '\n');
 	psi_deg_old = 999999.;
@@ -2535,7 +2554,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 3)
-			REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x = textToFloat(words[0]);
 		y = textToFloat(words[1]);
 		psi_deg = textToFloat(words[2]);
@@ -2555,12 +2574,17 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		y_old = y;
 		psi_deg_old = psi_deg;
 
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
 		// Avoid segments lying on the edges of the micrographs
 		if ( (x < half_box_size_pix) || (x > (Xdim - half_box_size_pix)) || (y < half_box_size_pix) || (y > (Ydim - half_box_size_pix)) )
 		{
 			nr_segments_on_edges++;
+
+			std::cerr << " WARNING: Particle at (" << x << ", " << y << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
+			std::cerr << " Box_size_pix = " << box_size_pix << ", Dimensions = " << Xdim << " * " << Ydim << std::endl;
 			continue;
 		}
+#endif
 
 		nr_segments++;
 		MD_out.addObject();
@@ -2629,7 +2653,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	nr_tubes = nr_segments = 0;
 	while (getline(fin, line, '\n'))
 	{
@@ -2639,7 +2663,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 2)
-			REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		nr_tubes++;
 
 		// Read in starting and end points for this helical tube
@@ -2650,7 +2674,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 			words.clear();
 			tokenize(line, words);
 			if (words.size() != 2)
-				REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+				REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 			x[iline] = textToFloat(words[0]);
 			y[iline] = textToFloat(words[1]);
 		}
@@ -2696,12 +2720,17 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
     		}
     		else
     		{
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
     			// Avoid segments lying on the edges of the micrographs
     			if ( (xp < half_box_size_pix) || (xp > (Xdim - half_box_size_pix))
     					|| (yp < half_box_size_pix) || (yp > (Ydim - half_box_size_pix)) )
     			{
+    				// Extract from filament start-end coordinates. It is not necessary to notify the user.
+    				//std::cerr << " WARNING: Particle at (" << xp << ", " << yp << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
+    				//std::cerr << " Box_size_pix = " << box_size_pix << ", Dimensions = " << Xdim << " * " << Ydim << std::endl;
     				continue;
     			}
+#endif
 
     			MD_out.addObject();
     	    	MD_out.setValue(EMDL_IMAGE_COORD_X, xp);
@@ -2761,7 +2790,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	line.clear();
 	len_pix = 0.;
 	nr_segments_on_edges = nr_segments = nr_tubes = 0;
@@ -2796,7 +2825,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 2)
-			REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x = textToFloat(words[0]);
 		y = textToFloat(words[1]);
 
@@ -2806,12 +2835,17 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		x_old = x;
 		y_old = y;
 
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
 		// Avoid segments lying on the edges of the micrographs
 		if ( (x < half_box_size_pix) || (x > (Xdim - half_box_size_pix)) || (y < half_box_size_pix) || (y > (Ydim - half_box_size_pix)) )
 		{
 			nr_segments_on_edges++;
+
+			std::cerr << " WARNING: Particle at (" << x << ", " << y << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
+			std::cerr << " Box_size_pix = " << box_size_pix << ", Dimensions = " << Xdim << " * " << Ydim << std::endl;
 			continue;
 		}
+#endif
 
 		nr_segments++;
 		MD_out.addObject();
@@ -2878,7 +2912,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	nr_tubes = nr_segments = 0;
 	line.clear();
 	while (getline(fin, line, '\n'))
@@ -2894,14 +2928,14 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 5)
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x1 = textToFloat(words[0]);
 		y1 = textToFloat(words[1]);
 		width1 = textToFloat(words[2]);
 		width2 = textToFloat(words[3]);
 		tag = textToInteger(words[4]);
 		if ( (tag != (-1)) || (fabs(width1 - width2) > 0.01) )
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x1 += width1 / 2.;
 		y1 += width1 / 2.;
 
@@ -2911,14 +2945,14 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 5)
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x2 = textToFloat(words[0]);
 		y2 = textToFloat(words[1]);
 		width3 = textToFloat(words[2]);
 		width4 = textToFloat(words[3]);
 		tag = textToInteger(words[4]);
 		if ( (tag != (-2)) || (fabs(width3 - width4) > 0.01) || (fabs(width3 - width1) > 0.01) )
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x2 += width3 / 2.;
 		y2 += width3 / 2.;
 
@@ -2965,12 +2999,17 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
     		}
     		else
     		{
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
     			// Avoid segments lying on the edges of the micrographs
     			if ( (xp < half_box_size_pix) || (xp > (Xdim - half_box_size_pix))
     					|| (yp < half_box_size_pix) || (yp > (Ydim - half_box_size_pix)) )
     			{
+    				// Extract from filament start-end coordinates. It is not necessary to notify the user.
+    				//std::cerr << " WARNING: Particle at (" << xp << ", " << yp << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
+    				//std::cerr << " Box_size_pix = " << box_size_pix << ", Dimensions = " << Xdim << " * " << Ydim << std::endl;
     				continue;
     			}
+#endif
 
     			MD_out.addObject();
     	    	MD_out.setValue(EMDL_IMAGE_COORD_X, xp);
@@ -3658,6 +3697,7 @@ void simulateHelicalSegments(
 		int nr_asu,
 		int nr_tubes,
 		bool do_bimodal_searches,
+		RFLOAT cyl_outer_diameter_A,
 		RFLOAT angpix,
 		RFLOAT rise_A,
 		RFLOAT twist_deg,
@@ -3670,9 +3710,14 @@ void simulateHelicalSegments(
 	int nr_segments, tube_id;
 	RFLOAT rot, psi, tilt, new_psi, new_tilt, xoff, yoff, zoff, new_xoff, new_yoff, new_zoff, step_pix, psi_flip_ratio, len_pix;
 	MetaDataTable MD;
-	FileName fn_mic;
+	FileName fn_mic, fn_star_out_full, fn_star_out_priors, fn_star_out_wopriors, fn_ext;
 	std::ofstream fout;
 	std::string command;
+
+	if ( (fn_vol_in.contains("temporary")) || (fn_star_out.contains("temporary")) )
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Avoid 'temporary' in the input and output file names!");
+	if ( (is_3d_tomo) && (fn_star_out.contains("subtomo")) )
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Avoid 'subtomo' in the input and output file names!");
 
 	if (fn_vol_in.getExtension() != "mrc")
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Input 3D volume should be in .mrc format!");
@@ -3681,16 +3726,26 @@ void simulateHelicalSegments(
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Input volume should be a 3D cube (>10*10*10)!");
 	if ( (new_box_size > XSIZE(img())) || (new_box_size < 10) || (new_box_size % 2) )
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Cropped box size (an even number) should be at least 10, and smaller than the box size of the input 3D volume!");
+	if (angpix < 0.001)
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Pixel size should be larger than 0.001 Angstroms!");
+	if ( (rise_A < 0.001) || ((rise_A / angpix) < 0.001) || ((rise_A / angpix) > (0.3333 * new_box_size)) )
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Rise is smaller than 0.001 pixels or larger than 1/3 of the new (cropped) box size!");
+	if ( (fabs(twist_deg) < 0.001) || (fabs(twist_deg) > 180.))
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Error in helical twist!");
 
 	// TODO: raise error if nr_asu<0 or too big, n too small!
-	if ( (nr_tubes < 2) || (nr_subunits < 10) || (nr_asu < 1) || (((nr_subunits / nr_asu) / nr_tubes) < 5) || ((nr_subunits / nr_asu) > 999000) )
+	if ( (nr_tubes < 2) || (nr_subunits < 10) || (nr_asu < 1) || (((nr_subunits / nr_asu) / nr_tubes) < 3) || ((nr_subunits / nr_asu) > 999000) || ((nr_asu * rise_A / angpix) > new_box_size) )
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Errors in the number of tubes, asymmetrical units or total subunits!");
 	if ( (sigma_psi > 10.) || (sigma_tilt > 10.) )
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: sigma_psi and sigma_tilt should not be larger than 10 degrees.");
 	if (sigma_offset > 50.)
 		REPORT_ERROR("helix.cpp::simulateHelicalSegments: sigma_trans should not be larger than 50 pixels.");
-	if ( (fabs(twist_deg) < 0.001) || (fabs(twist_deg) > 180.))
-		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Error in helical twist!");
+
+	if (fn_star_out.getExtension() != "star")
+		REPORT_ERROR("helix.cpp::simulateHelicalSegments: Output file should be in STAR format!");
+	fn_star_out_full = fn_star_out.withoutExtension() + (std::string)("_info.star");
+	fn_star_out_priors = fn_star_out.withoutExtension() + (std::string)("_helical_priors.star");
+	fn_star_out_wopriors = fn_star_out.withoutExtension() + (std::string)("_no_priors.star");
 
 	if (is_3d_tomo)
 		fout.open("simulate-3d-subtomos.sh", std::ios::out);
@@ -3713,13 +3768,13 @@ void simulateHelicalSegments(
     MD.addLabel(EMDL_ORIENT_ROT);
     MD.addLabel(EMDL_ORIENT_TILT);
     MD.addLabel(EMDL_ORIENT_PSI);
-    MD.addLabel(EMDL_ORIENT_ROT_PRIOR);
-    MD.addLabel(EMDL_ORIENT_TILT_PRIOR);
-    MD.addLabel(EMDL_ORIENT_PSI_PRIOR);
     MD.addLabel(EMDL_ORIENT_ORIGIN_X);
     MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
     if (is_3d_tomo)
     	MD.addLabel(EMDL_ORIENT_ORIGIN_Z);
+    MD.addLabel(EMDL_ORIENT_ROT_PRIOR);
+    MD.addLabel(EMDL_ORIENT_TILT_PRIOR);
+    MD.addLabel(EMDL_ORIENT_PSI_PRIOR);
     MD.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
     MD.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
     MD.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
@@ -3739,7 +3794,7 @@ void simulateHelicalSegments(
 			len_pix = -step_pix;
 
 			if (is_3d_tomo)
-				tilt = rnd_unif(10., 170.); // If realWRAP function works well, set this to 0-180.
+				tilt = rnd_unif(0.01, 179.99); // If realWRAP function works well, set this to 0-180.
 			else
 				tilt = rnd_unif(85., 95.);
 			rot = rnd_unif(0.01, 359.99);
@@ -3748,7 +3803,7 @@ void simulateHelicalSegments(
 
 		len_pix += step_pix;
 		rot += twist_deg * ((RFLOAT)(nr_asu));
-		rot = realWRAP(rot, -180., 180.); // Does this realWRAP function works well? No...
+		rot = realWRAP(rot, -180., 180.); // Does this realWRAP function work well? No...
 		rot = (rot < -180.) ? (rot + 360.) : (rot);
 		rot = (rot > 180.) ? (rot - 360.) : (rot);
 
@@ -3756,8 +3811,8 @@ void simulateHelicalSegments(
 			new_tilt = tilt;
 		else
 			new_tilt = tilt + rnd_gaus(0., sigma_tilt);
-		new_tilt = (new_tilt < 0.) ? (new_tilt + 180.) : (new_tilt);
-		new_tilt = (new_tilt > 180.) ? (new_tilt - 180.) : (new_tilt);
+		new_tilt = (new_tilt < 0.) ? (-new_tilt) : (new_tilt); // Do NOT change the polarities
+		new_tilt = (new_tilt > 180.) ? (360. - new_tilt) : (new_tilt);
 
 		if (sigma_psi < 0.0001)
 			new_psi = psi;
@@ -3766,27 +3821,34 @@ void simulateHelicalSegments(
 		new_psi = (new_psi < -180.) ? (new_psi + 360.) : (new_psi);
 		new_psi = (new_psi > 180.) ? (new_psi - 360.) : (new_psi);
 
-		if (sigma_offset < 0.0001)
+		xoff = yoff = zoff = new_xoff = new_yoff = new_zoff = 0.;
+		if (sigma_offset > 0.0001)
 		{
-			xoff = yoff = zoff = 0.;
-			new_xoff = new_yoff = new_zoff = 0.;
-		}
-		else
-		{
+			/*
 			xoff = rnd_gaus(0., sigma_offset);
 			yoff = rnd_gaus(0., sigma_offset);
 			zoff = rnd_gaus(0., sigma_offset);
 			transformCartesianAndHelicalCoords(
 					xoff, yoff, zoff,
 					new_xoff, new_yoff, new_zoff,
-					new_psi, new_tilt,
+					rot, new_tilt, new_psi,
 					(is_3d_tomo) ? (3) : (2),
 					CART_TO_HELICAL_COORDS);
 			new_xoff = 0.;
 			transformCartesianAndHelicalCoords(
 					new_xoff, new_yoff, new_zoff,
 					xoff, yoff, zoff,
-					new_psi, new_tilt,
+					rot, new_tilt, new_psi,
+					(is_3d_tomo) ? (3) : (2),
+					HELICAL_TO_CART_COORDS);
+			*/
+			new_xoff = (is_3d_tomo) ? (rnd_gaus(0., sigma_offset)) : (rnd_unif(-0.5 * rise_A / angpix, 0.5 * rise_A / angpix));
+			new_yoff = rnd_gaus(0., sigma_offset);
+			new_zoff = (is_3d_tomo) ? (rnd_unif(-0.5 * rise_A / angpix, 0.5 * rise_A / angpix)) : (0.);
+			transformCartesianAndHelicalCoords(
+					new_xoff, new_yoff, new_zoff,
+					xoff, yoff, zoff,
+					rot, new_tilt, new_psi,
 					(is_3d_tomo) ? (3) : (2),
 					HELICAL_TO_CART_COORDS);
 		}
@@ -3795,13 +3857,13 @@ void simulateHelicalSegments(
     	MD.setValue(EMDL_ORIENT_ROT, rot);
     	MD.setValue(EMDL_ORIENT_TILT, new_tilt);
     	MD.setValue(EMDL_ORIENT_PSI, new_psi);
-    	MD.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
-    	MD.setValue(EMDL_ORIENT_TILT_PRIOR, new_tilt);
-    	MD.setValue(EMDL_ORIENT_PSI_PRIOR, new_psi);
     	MD.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
     	MD.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
     	if (is_3d_tomo)
     		MD.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+    	MD.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
+    	MD.setValue(EMDL_ORIENT_TILT_PRIOR, new_tilt);
+    	MD.setValue(EMDL_ORIENT_PSI_PRIOR, new_psi);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
     	MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
@@ -3832,31 +3894,73 @@ void simulateHelicalSegments(
     		fout << std::endl;
 
     		fout << "relion_image_handler --i temporary-image-3d.mrc --o " << fn_mic << " --new_box " << new_box_size << std::endl;
-    		fout << "rm -rf temporary-image-3d.mrc" << std::endl;
+    		//fout << "rm -rf temporary-image-3d.mrc" << std::endl;
     	}
 	}
-	MD.write(fn_star_out);
+	if (is_3d_tomo)
+	{
+		fout << "rm -rf temporary-image-3d.mrc" << std::endl;
+		fout << "relion_helix_toolbox --norm --i " << fn_star_out_full << " --o_root _norm --angpix " << angpix << " --cyl_outer_diameter " << cyl_outer_diameter_A << std::endl;
+		fout << "rm -rf subtomo-3d-??????.mrc" << std::endl;
+	}
+	MD.write(fn_star_out_full);
 
 	if (!is_3d_tomo)
 	{
-		fout << "relion_project --i " << fn_vol_in << " --o temporary-images-2d --angpix " << angpix << " --ang " << fn_star_out << std::flush;
+		fout << "relion_project --i " << fn_vol_in << " --o temporary-images-2d --angpix " << angpix << " --ang " << fn_star_out_full << std::flush;
 		if (white_noise > 0.)
 			fout << " --add_noise --white_noise " << white_noise;
 		fout << std::endl;
 
-		fout << "relion_image_handler --i temporary-images-2d.mrcs --o t.mrcs --new_box " << new_box_size << std::endl;
-		fout << "mv temporary-images-2d_t.mrcs.mrcs segments-2d.mrcs" << std::endl;
+		fout << "relion_image_handler --i temporary-images-2d.mrcs --o tt --new_box " << new_box_size << std::endl;
 		fout << "rm -rf temporary-images-2d.mrcs temporary-images-2d.star" << std::endl;
+		fout << "mv temporary-images-2d_tt.mrcs segments-2d.mrcs" << std::endl;
+		fout << "relion_helix_toolbox --norm --i " << fn_star_out_full << " --o_root _norm --angpix " << angpix << " --cyl_outer_diameter " << cyl_outer_diameter_A << std::endl;
+		fout << "rm -rf segments-2d.mrcs" << std::endl;
 	}
+
+	fout << "mv " << fn_star_out_full << " " << (fn_star_out_full.withoutExtension() + (std::string)(".txt")) << std::endl;
 	fout.close();
+
+	MD.deactivateLabel(EMDL_ORIENT_ROT_PRIOR);
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+    	MD.setValue(EMDL_ORIENT_ROT, 0.);
+    	if (!is_3d_tomo)
+    	{
+    		MD.setValue(EMDL_ORIENT_TILT, 90.);
+    		MD.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
+    	}
+    	MD.setValue(EMDL_ORIENT_ORIGIN_X, 0.);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_Y, 0.);
+    	if (is_3d_tomo)
+    		MD.setValue(EMDL_ORIENT_ORIGIN_Z, 0.);
+
+		MD.getValue(EMDL_IMAGE_NAME, fn_mic);
+		fn_ext = fn_mic.getExtension();
+		fn_mic = fn_mic.withoutExtension() + "_norm." + fn_ext;
+		MD.setValue(EMDL_IMAGE_NAME, fn_mic);
+	}
+	MD.write(fn_star_out_priors);
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+    	MD.setValue(EMDL_ORIENT_ROT, 0.);
+    	MD.setValue(EMDL_ORIENT_TILT, 0.);
+    	MD.setValue(EMDL_ORIENT_PSI, 0.);
+	}
+	MD.deactivateLabel(EMDL_ORIENT_TILT_PRIOR);
+	MD.deactivateLabel(EMDL_ORIENT_PSI_PRIOR);
+	MD.deactivateLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+	MD.deactivateLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+	MD.deactivateLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+	MD.write(fn_star_out_wopriors);
 
 	if (is_3d_tomo)
 		command = "chmod u+x simulate-3d-subtomos.sh";
 	else
 		command = "chmod u+x simulate-2d-segments.sh";
 	int res = system(command.c_str());
-
-	std::cout << " WARNING: Please check the output STAR file before you execute the .sh script!" << std::endl;
 
 	return;
 };
@@ -4041,7 +4145,7 @@ void HelicalSegmentPriorInfoEntry::clear()
 {
 	helical_tube_name.clear();
 	MDobjectID = -1;
-	psi_deg = tilt_deg = 0.;
+	rot_deg = psi_deg = tilt_deg = 0.;
 	dx_pix = dy_pix = dz_pix = 0.;
 	track_pos_pix = 0.;
 	has_wrong_polarity = false;
@@ -4119,7 +4223,8 @@ void updatePriorsForOneHelicalTube(
 
 	// Init
 	data_dim = (is_3D) ? (3) : (2);
-	do_avg = (sigma_segment_dist > 0.01) && (list.size() > 1); // Do local average of orientations and translations or just flip tilt and psi angles?
+	// TODO: test: Do not do local averaging if data_dim == 3
+	do_avg = (!is_3D) && (sigma_segment_dist > 0.01) && (list.size() > 1); // Do local average of orientations and translations or just flip tilt and psi angles?
 	sigma2_tilt = (sigma2_tilt > 0.) ? (sigma2_tilt) : (0.);
 	sigma2_psi = (sigma2_psi > 0.) ? (sigma2_psi) : (0.);
 	sigma2_offset = (sigma2_offset > 0.) ? (sigma2_offset) : (0.);
@@ -4159,12 +4264,12 @@ void updatePriorsForOneHelicalTube(
 	for (int id = sid; id <= eid; id++)
 	{
 		bool do_avg_ang, do_avg_trans;
-		RFLOAT this_psi, this_tilt, center_psi, center_tilt, center_pos, this_pos, sum_w, this_w, offset2;
+		RFLOAT this_rot, this_psi, this_tilt, center_psi, center_tilt, center_pos, this_pos, sum_w, this_w, offset2;
 		Matrix1D<RFLOAT> this_ang_vec, sum_ang_vec, this_trans_vec, center_trans_vec, sum_trans_vec;
 
 		// Init
 		do_avg_ang = do_avg_trans = false;
-		this_psi = this_tilt = center_psi = center_tilt = center_pos = this_pos = sum_w = this_w = offset2 = 0.;
+		this_rot = this_psi = this_tilt = center_psi = center_tilt = center_pos = this_pos = sum_w = this_w = offset2 = 0.;
 		this_ang_vec.initZeros(3);
 		sum_ang_vec.initZeros(3);
 		this_trans_vec.initZeros(data_dim);
@@ -4178,6 +4283,8 @@ void updatePriorsForOneHelicalTube(
 		sum_w = this_w = ((do_avg) ? (gaussian1D(this_pos, sigma_segment_dist, center_pos)) : (1.));
 
 		// Analyze orientations
+		if (is_3D)
+			this_rot = list[id].rot_deg;
 		this_psi = center_psi = list[id].psi_prior_deg = list[id].psi_deg; // REFRESH PSI PRIOR
 		this_tilt = center_tilt = list[id].tilt_prior_deg = list[id].tilt_deg; // REFRESH TILT PRIOR
 		Euler_angles2direction(this_psi, this_tilt, this_ang_vec);
@@ -4191,9 +4298,12 @@ void updatePriorsForOneHelicalTube(
 			if (is_3D)
 				ZZ(this_trans_vec) = list[id].dz_prior_pix = list[id].dz_pix; // REFRESH ZOFF PRIOR
 
-			transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, this_psi, this_tilt, CART_TO_HELICAL_COORDS);
+			transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
 			center_trans_vec = this_trans_vec; // Record helical coordinates of the central segment
-			XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
+			if (!is_3D)
+				XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
+			else
+				ZZ(this_trans_vec) = 0.;
 			sum_trans_vec = this_trans_vec * this_w;
 		}
 
@@ -4216,6 +4326,8 @@ void updatePriorsForOneHelicalTube(
 				sum_w += this_w;
 
 				// Analyze orientations
+				if (is_3D)
+					this_rot = list[idd].rot_deg;
 				this_psi = list[idd].psi_deg;
 				this_tilt = list[idd].tilt_deg;
 				Euler_angles2direction(this_psi, this_tilt, this_ang_vec);
@@ -4229,8 +4341,11 @@ void updatePriorsForOneHelicalTube(
 					if (is_3D)
 						ZZ(this_trans_vec) = list[idd].dz_pix;
 
-					transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, this_psi, this_tilt, CART_TO_HELICAL_COORDS);
-					XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
+					transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
+					if (!is_3D)
+						XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
+					else
+						ZZ(this_trans_vec) = 0.;
 					sum_trans_vec += this_trans_vec * this_w;
 				}
 			}
@@ -4245,7 +4360,7 @@ void updatePriorsForOneHelicalTube(
 				sum_trans_vec /= sum_w;
 				offset2 = (YY(sum_trans_vec) - YY(center_trans_vec)) * (YY(sum_trans_vec) - YY(center_trans_vec));
 				if (is_3D)
-					offset2 += (ZZ(sum_trans_vec) - ZZ(center_trans_vec)) * (ZZ(sum_trans_vec) - ZZ(center_trans_vec));
+					offset2 += (XX(sum_trans_vec) - XX(center_trans_vec)) * (XX(sum_trans_vec) - XX(center_trans_vec));
 				if (offset2 > range2_offset)
 					do_avg_ang = do_avg_trans = true;
 			}
@@ -4257,8 +4372,14 @@ void updatePriorsForOneHelicalTube(
 			}
 			if (do_avg_trans)
 			{
-				XX(sum_trans_vec) = XX(center_trans_vec);
-				transformCartesianAndHelicalCoords(sum_trans_vec, sum_trans_vec, this_psi, this_tilt, HELICAL_TO_CART_COORDS); // Averaged translations - use respective averaged tilt and psi
+				if (!is_3D)
+					XX(sum_trans_vec) = XX(center_trans_vec);
+				else
+				{
+					this_rot = list[id].rot_deg;
+					ZZ(sum_trans_vec) = ZZ(center_trans_vec);
+				}
+				transformCartesianAndHelicalCoords(sum_trans_vec, sum_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, HELICAL_TO_CART_COORDS); // Averaged translations - use respective averaged tilt and psi
 				list[id].dx_prior_pix = XX(sum_trans_vec); // REFRESH XOFF PRIOR
 				list[id].dy_prior_pix = YY(sum_trans_vec); // REFRESH YOFF PRIOR
 				if (is_3D)
@@ -4317,7 +4438,8 @@ void updatePriorsForHelicalReconstruction(
 		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: MetaDataTable is empty!");
 	if (!MD.containsLabel(EMDL_IMAGE_NAME))
 		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: rlnImageName is missing!");
-	if ( (!MD.containsLabel(EMDL_ORIENT_TILT))
+	if ( ( (is_3D) && (!MD.containsLabel(EMDL_ORIENT_ROT)) )
+			|| (!MD.containsLabel(EMDL_ORIENT_TILT))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI))
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X))
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y))
@@ -4337,16 +4459,17 @@ void updatePriorsForHelicalReconstruction(
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		HelicalSegmentPriorInfoEntry segment;
-		std::string str_image, str_mic;
+		std::string str_mic;
 		int tube_id;
 
 		segment.clear();
 
-		MD.getValue(EMDL_IMAGE_NAME, str_image);
-		str_mic = str_image.substr(str_image.find("@") + 1);
+		MD.getValue(EMDL_MICROGRAPH_NAME, str_mic);
 		MD.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
 		segment.helical_tube_name = str_mic + integerToString(tube_id);
 		MD.getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, segment.track_pos_pix);
+		if (is_3D)
+			MD.getValue(EMDL_ORIENT_ROT, segment.rot_deg);
 		MD.getValue(EMDL_ORIENT_TILT, segment.tilt_deg);
 		MD.getValue(EMDL_ORIENT_TILT_PRIOR, segment.tilt_prior_deg);
 		MD.getValue(EMDL_ORIENT_PSI, segment.psi_deg);
@@ -4452,6 +4575,7 @@ void updateAngularPriorsForHelicalReconstruction(
 	}
 }
 
+/*
 void testDataFileTransformXY(MetaDataTable& MD)
 {
 	if (MD.numberOfObjects() < 1)
@@ -4472,12 +4596,13 @@ void testDataFileTransformXY(MetaDataTable& MD)
 		YY(vec_cart) = yoff;
 		vec_helix.resize(2);
 
-		transformCartesianAndHelicalCoords(vec_cart, vec_helix, psi_deg, 90., CART_TO_HELICAL_COORDS);
+		transformCartesianAndHelicalCoords(vec_cart, vec_helix, 0., 90., psi_deg, CART_TO_HELICAL_COORDS);
 
 		MD.setValue(EMDL_ORIENT_ORIGIN_X, XX(vec_helix));
 		MD.setValue(EMDL_ORIENT_ORIGIN_Y, YY(vec_helix));
 	}
 }
+*/
 
 void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio)
 {
@@ -4604,4 +4729,957 @@ void calculateRadialAvg(MultidimArray<RFLOAT> &v, RFLOAT angpix)
 			rval[ii] /= rcount[ii];
 		std::cout << ii * angpix << "      " << rval[ii] << std::endl;
 	}
+}
+
+void transformCartesianToHelicalCoordsForStarFiles(
+		MetaDataTable& MD_in,
+		MetaDataTable& MD_out)
+{
+	RFLOAT rot, tilt, psi, xoff, yoff, zoff;
+	bool is_3d_trans = MD_in.containsLabel(EMDL_ORIENT_ORIGIN_Z);
+
+	MD_out.clear();
+	MD_out = MD_in;
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
+	{
+		MD_in.getValue(EMDL_ORIENT_ROT, rot);
+		MD_in.getValue(EMDL_ORIENT_TILT, tilt);
+		MD_in.getValue(EMDL_ORIENT_PSI, psi);
+		MD_in.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
+		MD_in.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+		if (is_3d_trans)
+			MD_in.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+
+		transformCartesianAndHelicalCoords(
+				xoff, yoff, zoff,
+				xoff, yoff, zoff,
+				rot, tilt, psi,
+				((is_3d_trans) ? (3) : (2)),
+				CART_TO_HELICAL_COORDS);
+
+		MD_out.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
+		MD_out.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+		if (is_3d_trans)
+			MD_out.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+		MD_out.nextObject();
+	}
+}
+
+void normaliseHelicalSegments(
+		FileName& fn_in,
+		FileName& fn_out_root,
+		RFLOAT helical_outer_diameter_A,
+		RFLOAT pixel_size_A)
+{
+	bool is_3D = false, is_mrcs = false, have_tilt_prior = false, have_psi_prior = false, read_angpix_from_star = false;
+	RFLOAT rot_deg = 0., tilt_deg = 0., psi_deg = 0., avg = 0., stddev = 0., val = 0., det_pixel_size = 0., mag = 0.;
+	Image<RFLOAT> img0;
+	MetaDataTable MD;
+	FileName img_name, file_ext;
+
+	if (fn_in.getExtension() != "star")
+		REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): Please provide a STAR file as input!");
+
+	// Read STAR file
+	MD.clear();
+	MD.read(fn_in);
+	have_tilt_prior = MD.containsLabel(EMDL_ORIENT_TILT_PRIOR);
+	have_psi_prior = MD.containsLabel(EMDL_ORIENT_PSI_PRIOR);
+	read_angpix_from_star = (MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)) && (MD.containsLabel(EMDL_CTF_MAGNIFICATION));
+	if ( (!MD.containsLabel(EMDL_IMAGE_NAME)) )
+		REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): MetaDataLabel _rlnImageName is missing!");
+	if ( (!have_tilt_prior) && (!MD.containsLabel(EMDL_ORIENT_TILT)) )
+		REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): MetaDataLabel _rlnAngleTilt or _rlnAngleTiltPrior is missing!");
+	if ( (!have_psi_prior) && (!MD.containsLabel(EMDL_ORIENT_PSI)) )
+		REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): MetaDataLabel _rlnAnglePsi or _rlnAnglePsiPrior is missing!");
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		// Read image name and angular priors
+		MD.getValue(EMDL_IMAGE_NAME, img_name);
+		file_ext = img_name.getExtension();
+		is_mrcs = (file_ext == "mrcs");
+		rot_deg = tilt_deg = psi_deg = 0.;
+		if (have_tilt_prior)
+			MD.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
+		else
+			MD.getValue(EMDL_ORIENT_TILT, tilt_deg);
+		if (have_psi_prior)
+			MD.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
+		else
+			MD.getValue(EMDL_ORIENT_PSI, psi_deg);
+		if (read_angpix_from_star)
+		{
+	    	MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, det_pixel_size);
+	    	MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+	    	pixel_size_A = det_pixel_size * 10000. / mag;
+		}
+		// DEBUG
+		//std::cout << " pixel_size_A = " << pixel_size_A << std::endl;
+		if (pixel_size_A < (1e-4))
+			REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): Invalid pixel size for image " + ((std::string)(img_name)));
+		if ((helical_outer_diameter_A / pixel_size_A) < 10.)
+			REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): Diameter of the tubular mask should be larger than 10 pixels!");
+
+		// Read image
+		img0.clear();
+		img0.read(img_name);
+		is_3D = (ZSIZE(img0()) > 1) || (NSIZE(img0()) > 1);
+		if ( (XSIZE(img0()) < (helical_outer_diameter_A / pixel_size_A)) || (YSIZE(img0()) < (helical_outer_diameter_A / pixel_size_A)) )
+			REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): Diameter of the tubular mask is larger than the box XY dimensions!");
+		if (!is_3D)
+			rot_deg = tilt_deg = 0.;
+
+		// Calculate avg and stddev
+		calculateBackgroundAvgStddev(
+				img0,
+				avg,
+				stddev,
+				0,
+				true,
+				helical_outer_diameter_A * 0.5 / pixel_size_A,
+				tilt_deg,
+				psi_deg);
+		if (stddev < 0.0001)
+		{
+			std::cout << " !!! WARNING: " << img_name << "  has bg_avg = " << avg << " and bg_stddev = " << stddev << " . bg_stddev is set to 0.0001. The image cannot be properly normalised!" << std::endl;
+			stddev = 0.0001;
+		}
+		else
+			std::cout << "  Normalising " << img_name << " with bg_avg = " << avg << " and bg_stddev = " << stddev << " . " << std::endl;
+
+		// Normalise
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img0())
+		{
+			val = DIRECT_MULTIDIM_ELEM(img0(),n);
+			DIRECT_MULTIDIM_ELEM(img0(), n) = (val - avg) / stddev;
+		}
+
+		// Rename
+		img_name = img_name.withoutExtension() + fn_out_root + "." + file_ext;
+
+		if (is_3D)
+		{
+			img0.setSamplingRateInHeader(pixel_size_A, pixel_size_A, pixel_size_A);
+			img0.setStatisticsInHeader();
+		}
+
+		// Write
+		if (is_3D)
+			img0.write(img_name);
+		else
+			img0.write(img_name, -1, true, WRITE_APPEND);
+		img0.clear();
+	}
+
+	if (!is_3D)
+	{
+		// Read the header of .mrcs stack
+		img_name = img_name.substr(img_name.find("@") + 1);
+		// Set the pixel size in the file header
+		img0.read(img_name);
+		img0.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size_A);
+		img0.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size_A);
+		img0.write(img_name);
+	}
+}
+
+// Copied online from http://paulbourke.net/miscellaneous/interpolation/
+// Author: Paul Bourke, December 1999
+/*
+   Tension: 1 is high, 0 normal, -1 is low
+   Bias: 0 is even,
+         positive is towards first segment,
+         negative towards the other
+*/
+// mu is the percentage between y1 and y2
+RFLOAT HermiteInterpolate1D(
+		RFLOAT y0, RFLOAT y1, RFLOAT y2, RFLOAT y3,
+		RFLOAT mu,
+		RFLOAT tension,
+		RFLOAT bias)
+{
+	RFLOAT m0 = 0., m1 = 0., mu2 = 0., mu3 = 0., a0 = 0., a1 = 0., a2 = 0., a3 = 0.;
+
+	mu2 = mu * mu;
+	mu3 = mu2 * mu;
+	m0  = (y1 - y0) * (1. + bias) * (1. - tension) / 2.;
+	m0 += (y2 - y1) * (1. - bias) * (1. - tension) / 2.;
+	m1  = (y2 - y1) * (1. + bias) * (1. - tension) / 2.;
+	m1 += (y3 - y2) * (1. - bias) * (1. - tension) / 2.;
+	a0  = 2. * mu3 - 3. * mu2 + 1.;
+	a1  = mu3 - 2. * mu2 + mu;
+	a2  = mu3 - mu2;
+	a3  = (-2.) * mu3 + 3. * mu2;
+
+	return (a0 * y1 + a1 * m0 + a2 * m1 + a3 * y2);
+}
+
+void HermiteInterpolateOne3DHelicalFilament(
+		MetaDataTable& MD_in,
+		MetaDataTable& MD_out,
+		int& total_segments,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT box_size_pix,
+		int helical_tube_id,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT Zdim,
+		bool bimodal_angular_priors)
+{
+	RFLOAT x0, x1, x2, x3, xa, xb, y0, y1, y2, y3, ya, yb, z0, z1, z2, z3, za, zb, mu1, mu2;
+	RFLOAT step_pix, chord_pix, accu_len_pix, present_len_pix, len_pix, psi_prior_flip_ratio, tilt_deg, psi_deg;
+    RFLOAT half_box_size_pix = box_size_pix / 2.;
+	int nr_partitions, nr_segments;
+	std::vector<RFLOAT> xlist, ylist, zlist;
+	Matrix1D<RFLOAT> dr;
+
+	// DEBUG: Do not exclude particles on the edges
+	// Xdim = Ydim = Zdim = 999999.;
+
+	if (MD_in.numberOfObjects() <= 1)
+		REPORT_ERROR("helix.cpp::HermiteInterpolateOne3DHelicalFilament(): MetaDataTable should have at least two points for interpolation!");
+	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix) || (Zdim < box_size_pix) )
+		REPORT_ERROR("helix.cpp::HermiteInterpolateOne3DHelicalFilament(): Wrong dimensions or box size!");
+	if (pixel_size_A < 0.001)
+		REPORT_ERROR("helix.cpp::HermiteInterpolateOne3DHelicalFilament(): Invalid pixel size!");
+	RFLOAT interbox_pix = ((RFLOAT)(nr_asu)) * rise_A / pixel_size_A;
+	if ( (nr_asu < 1) || (rise_A < 0.001) || (interbox_pix < 0.58) )
+		REPORT_ERROR("helix.cpp::HermiteInterpolateOne3DHelicalFilament(): Invalid helical rise or number of asymmetrical units!");
+	if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X))
+			|| (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y))
+			|| (!MD_in.containsLabel(EMDL_IMAGE_COORD_Z)) )
+		REPORT_ERROR("helix.cpp::HermiteInterpolateOne3DHelicalFilament(): MetaDataTable should have _rlnOriginX, _rlnOriginY and _rlnOriginZ!");
+
+	// Header of output file
+	MD_out.clear();
+	MD_out.addLabel(EMDL_IMAGE_COORD_X);
+	MD_out.addLabel(EMDL_IMAGE_COORD_Y);
+	MD_out.addLabel(EMDL_IMAGE_COORD_Z);
+	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
+	MD_out.addLabel(EMDL_ORIENT_TILT_PRIOR);
+	MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
+    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+
+	//half_box_size_pix = box_size_pix / 2.;
+    psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
+    if (bimodal_angular_priors)
+    	psi_prior_flip_ratio = BIMODAL_PSI_PRIOR_FLIP_RATIO;
+
+    // Load all manually picked coordinates
+    xlist.clear(); ylist.clear(); zlist.clear();
+    FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
+    {
+    	MD_in.getValue(EMDL_IMAGE_COORD_X, x0);
+    	MD_in.getValue(EMDL_IMAGE_COORD_Y, y0);
+    	MD_in.getValue(EMDL_IMAGE_COORD_Z, z0);
+    	xlist.push_back(x0);
+    	ylist.push_back(y0);
+    	zlist.push_back(z0);
+    }
+
+    // Interpolate
+    accu_len_pix = 0.;
+    present_len_pix = -1.;
+    nr_segments = 0;
+    dr.initZeros(3);
+    for (int id = 0; id < (xlist.size() - 1); id++)
+    {
+        // Step size for interpolation is smaller than 1% of the inter-box distance
+        // sqrt(0.57735 * 0.57735 * 0.57735 * 3) = 1.0, step size is larger than 1 pixel
+    	// TODO: 1% ? Too expensive computationally? Try 10% ?
+        step_pix = (interbox_pix < 57.735) ? (0.57735) : (interbox_pix / 100.); // 1%
+        //step_pix = (interbox_pix < 5.7735) ? (0.57735) : (interbox_pix / 10.); // 10%
+
+    	// Collect points 0, 1, 2, 3 for interpolations
+        x0 = x1 = x2 = x3 = y0 = y1 = y2 = y3 = z0 = z1 = z2 = z3 = 0.;
+    	// Point 0
+    	if (id == 0)
+    	{
+    		x0 = 2. * xlist[id] - xlist[id + 1];
+    		y0 = 2. * ylist[id] - ylist[id + 1];
+    		z0 = 2. * zlist[id] - zlist[id + 1];
+    	}
+    	else
+    	{
+    		x0 = xlist[id - 1]; y0 = ylist[id - 1]; z0 = zlist[id - 1];
+    	}
+    	// Point 1 and Point 2
+    	x1 = xlist[id]; y1 = ylist[id]; z1 = zlist[id];
+    	x2 = xlist[id + 1]; y2 = ylist[id + 1]; z2 = zlist[id + 1];
+    	// Point 3
+    	if (id == (xlist.size() - 2))
+    	{
+    		x3 = 2. * xlist[id + 1] - xlist[id];
+    		y3 = 2. * ylist[id + 1] - ylist[id];
+    		z3 = 2. * zlist[id + 1] - zlist[id];
+    	}
+    	else
+    	{
+    		x3 = xlist[id + 2]; y3 = ylist[id + 2]; z3 = zlist[id + 2];
+    	}
+
+    	// Chord distance between point 1 and 2
+    	// TODO: what will happen if the chord length is smaller than step_pix?
+    	chord_pix = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2) * (z1 - z2));
+    	nr_partitions = int(CEIL(chord_pix / step_pix));
+    	nr_partitions = (nr_partitions <= 0) ? (1) : (nr_partitions);
+
+    	// Partitioning
+    	for (int ip = 0; ip < nr_partitions; ip++)
+    	{
+    		xa = ya = za = xb = yb = zb = mu1 = mu2 = len_pix = 0.;
+    		mu1 = RFLOAT( (RFLOAT(ip)) / (RFLOAT(nr_partitions)) );
+    		mu2 = RFLOAT( (RFLOAT(ip) + 1.) / (RFLOAT(nr_partitions)) );
+    		xa = HermiteInterpolate1D(x0, x1, x2, x3, mu1);
+    		ya = HermiteInterpolate1D(y0, y1, y2, y3, mu1);
+    		za = HermiteInterpolate1D(z0, z1, z2, z3, mu1);
+    		xb = HermiteInterpolate1D(x0, x1, x2, x3, mu2);
+    		yb = HermiteInterpolate1D(y0, y1, y2, y3, mu2);
+    		zb = HermiteInterpolate1D(z0, z1, z2, z3, mu2);
+    		len_pix = sqrt((xa - xb) * (xa - xb) + (ya - yb) * (ya - yb) + (za - zb) * (za - zb));
+    		present_len_pix += len_pix;
+    		accu_len_pix += len_pix;
+
+    		// Output one segment (xb, yb, zb)
+    		if (present_len_pix > 0.)
+    		{
+    			present_len_pix -= interbox_pix;
+#ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
+    			// Check whether this segment lies on the edges of the 3D tomogram
+    			if ( (xb < half_box_size_pix) || (xb > (Xdim - half_box_size_pix))
+    					|| (yb < half_box_size_pix) || (yb > (Ydim - half_box_size_pix))
+    					|| (zb < half_box_size_pix) || (zb > (Zdim - half_box_size_pix)) )
+    			{
+    				std::cout << std::resetiosflags(std::ios::fixed);
+    				std::cout << " WARNING: Particle at (" << xb << ", " << yb << ", " << zb << ") is ignored because it is too close to the edge. " << std::flush;
+    				std::cout << " Box_size_pix = " << box_size_pix << ", Dimensions = " << Xdim << " * " << Ydim << " * " << Zdim << " ." << std::flush;
+    				std::cout << " Please choose a smaller box size OR reconstruct the 3D tomogram with a larger number of Z slices!" << std::endl;
+    				continue;
+    			}
+#endif
+
+    			// Add this segment to the list
+    			nr_segments++;
+    			MD_out.addObject();
+    			MD_out.setValue(EMDL_IMAGE_COORD_X, xb);
+    	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, yb);
+    	    	MD_out.setValue(EMDL_IMAGE_COORD_Z, zb);
+    	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+
+        		XX(dr) = xb - xa; YY(dr) = yb - ya; ZZ(dr) = zb - za;
+        		estimateTiltPsiPriors(dr, tilt_deg, psi_deg);
+        		if (fabs(tilt_deg) < 0.001)
+        			tilt_deg = 0.;
+        		if (fabs(psi_deg) < 0.001)
+        			psi_deg = 0.;
+    	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
+    	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
+
+    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, accu_len_pix);
+    	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
+    		}
+    	}
+    }
+    total_segments = nr_segments;
+}
+
+void Interpolate3DCurves(
+		FileName& fn_in_root,
+		FileName& fn_out_root,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT box_size_pix,
+		int binning_factor,
+		bool bimodal_angular_priors)
+{
+	Image<RFLOAT> img;
+	std::vector<FileName> fn_in_list;
+	FileName fn_tomo, fn_in_glob, fn_in, fn_out;
+	std::ifstream fin;
+	std::string line;
+	std::vector<std::string> words;
+	std::vector<RFLOAT> xlist, ylist, zlist;
+	MetaDataTable MD_in, MD_out, MD_all;
+	RFLOAT x0, y0, z0, val;
+	int nr_points = 0, total_segments = 0, nr_segments = 0;
+	int xdim = 0, ydim = 0, zdim = 0, xdim_img = 0, ydim_img = 0, zdim_img = 0;
+	long int ndim = 0, ndim_img = 0;
+	char buf_word[4], buf_qword[16], tmp_char;
+	bool contain_3d_points = false, flip_YZ = false;
+
+	// General parameter checks
+	if (binning_factor < 1)
+		REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Binning factor should be larger than 1!");
+	fn_tomo = fn_in_root + ".mrc";
+	if (!exists(fn_tomo))
+		REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Reconstructed 3D tomogram " + fn_tomo + " is not found!");
+	// Read the header of 3D reconstructed tomogram
+	img.clear();
+	img.read(fn_tomo, false);
+	img.getDimensions(xdim_img, ydim_img, zdim_img, ndim_img);
+	if (zdim_img <= 1)
+		REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Dimension Z of reconstructed 3D tomogram " + fn_tomo + " is 1!");
+	if (ndim_img != 1)
+		REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Dimension N of reconstructed 3D tomogram " + fn_tomo + " is not 1!");
+
+	// Glob all files
+	if (fn_in_root.length() <= 1)
+		REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Input rootname is an empty string!");
+	//std::cout << " fn_in_root = " << fn_in_root << std::endl; // DEBUG
+	//fn_in_glob = "*" + fn_in_root + "*"; // OLD
+	fn_in_glob = fn_in_root + "*"; // NEW
+	fn_in_glob.globFiles(fn_in_list);
+	//std::cout << " fn_in_glob = " << fn_in_glob << std::endl; // DEBUG
+	//std::cout << " nr_giles_globbed = " << fn_in_list.size() << std::endl;
+
+	if (fn_in_list.size() < 1)
+		REPORT_ERROR("helix.cpp::Interpolate3DCurves(): No input files are found!");
+
+	// Check input filenames
+	std::cout << " #############################################################" << std::endl;
+	std::cout << " Coordinate files (.mod, .star or .txt, .coords text files with XYZ coordinates) to be processed: " << std::endl;
+	for (int fid = 0; fid < fn_in_list.size(); fid++)
+	{
+		fn_in = fn_in_list[fid];
+		std::string fn_ext = fn_in.getExtension();
+		// Method 1
+		//if ( (fn_ext == "") || (fn_ext == "log") || (fn_ext == "mrc") || (fn_ext == "mrcs") || (fn_ext == "ctf")
+		//		|| (fn_ext == "st") || (fn_ext == "order") || (fn_ext == "tlt") || (fn_ext == "trial"))
+		//{
+		//	fn_in_list.erase(fn_in_list.begin() + fid);
+		//	fid--;
+		//	continue;
+		//}
+		// Method 2
+		if ( (fn_ext != "mod") && (fn_ext != "star") && (fn_ext != "coords") && (fn_ext != "txt") )
+		{
+			fn_in_list.erase(fn_in_list.begin() + fid);
+			fid--;
+			continue;
+		}
+		if ( (fn_in.contains(fn_in_root)) && ( (fn_in.afterFirstOf(fn_in_root)).contains(fn_in_root) ) )
+			REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Every input filename should contain one and only one input rootname! Invalid filename: " + (std::string)(fn_in));
+		std::cout << "  " << fn_in << std::endl;
+	}
+	std::cout << " " << fn_in_list.size() << " files (filaments) found." << std::endl;
+	std::cout << " Please check whether all coordinate files are included and remove files which do not contain manually picked coordinates!" << std::endl;
+	std::cout << " #############################################################" << std::endl;
+	std::cout << " Are all coordinate files included? Do all of the files shown above contain manually picked XYZ coordinates? (y/n): " << std::flush;
+	line.clear();
+	std::cin >> line;
+	if ( (line[0] != 'y') && (line[0] != 'Y') )
+	{
+		std::cout << std::endl << " No! Exit now..." << std::endl;
+		return;
+	}
+
+	// Check endianness - for MOD files only
+	int num = 1;
+	bool is_little_endian = false;
+	if(*(char *)&num == 1)
+		is_little_endian = true;
+	//std::cout << is_little_endian << std::endl;
+
+	// Real work begins...
+	MD_all.clear();
+	total_segments = nr_segments = 0;
+	for (int fid = 0; fid < fn_in_list.size(); fid++)
+	{
+		contain_3d_points = false;
+		flip_YZ = false;
+		xlist.clear(); ylist.clear(); zlist.clear();
+
+		// Open an input file
+		fn_in = fn_in_list[fid];
+		std::cout << " ### Input filename = " << fn_in << std::endl;
+
+		// MOD file format definition: http://bio3d.colorado.edu/imod/doc/binspec.html
+		if (fn_in.getExtension() == "mod")
+		{
+			fin.open(fn_in.c_str(), std::ios_base::in|std::ios_base::binary);
+			if (fin.fail())
+				REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Cannot open input file: " + (std::string)(fn_in));
+
+			// Scheme 1 - does not work for MOD files with more than one 'OBJT's (objects)
+			/*
+			fin.read(reinterpret_cast<char*>(buf_qword), sizeof(buf_qword)); // Read the first line
+			for (int id = 0; id < 14; id++) // Read model data structure (232 bytes)
+				fin.read(reinterpret_cast<char*>(buf_qword), sizeof(buf_qword));
+			for (int id = 0; id < 11; id++) // Read object data structure (first 160 out of 176 bytes)
+				fin.read(reinterpret_cast<char*>(buf_qword), sizeof(buf_qword));
+			// 26 lines in total omitted
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+			*/
+			// Scheme 2
+			fin.read(reinterpret_cast<char*>(buf_qword), sizeof(buf_qword)); // Read the first 16 bytes
+			fin.read(reinterpret_cast<char*>(buf_qword), sizeof(buf_qword)); // Read the second 16 bytes
+			if ( (buf_qword[0] != 'M') || (buf_qword[1] != 'o') || (buf_qword[2] != 'd') || (buf_qword[3] != 'e') || (buf_qword[4] != 'l') )
+				REPORT_ERROR("helix.cpp::Interpolate3DCurves(): IMOD file header does not contain 'Model' tag!");
+			for (int id = 0; id < 6; id++)
+				fin.read(reinterpret_cast<char*>(buf_qword), sizeof(buf_qword)); // Read the next 96 bytes
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Read the next 8 bytes
+			// Name of model ends
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Xdim
+			if (is_little_endian)
+			{
+				SWAP(buf_word[0], buf_word[3], tmp_char);
+				SWAP(buf_word[1], buf_word[2], tmp_char);
+			}
+			xdim = *(reinterpret_cast<int*>(buf_word));
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Ydim
+			if (is_little_endian)
+			{
+				SWAP(buf_word[0], buf_word[3], tmp_char);
+				SWAP(buf_word[1], buf_word[2], tmp_char);
+			}
+			ydim = *(reinterpret_cast<int*>(buf_word));
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Zdim
+			if (is_little_endian)
+			{
+				SWAP(buf_word[0], buf_word[3], tmp_char);
+				SWAP(buf_word[1], buf_word[2], tmp_char);
+			}
+			zdim = *(reinterpret_cast<int*>(buf_word));
+			std::cout << " Binning factor = " << binning_factor << std::endl;
+			std::cout << " Dimensions XYZ   (binned, unflipped coords) = " << xdim << " * " << ydim << " * " << zdim << std::endl;
+			std::cout << " Dimensions XYZ (unbinned, unflipped coords) = " << xdim * binning_factor << " * " << ydim * binning_factor << " * " << zdim * binning_factor << std::endl;
+			std::cout << " Dimensions XYZ           (3D tomogram .mrc) = " << xdim_img << " * " << ydim_img << " * " << zdim_img << std::endl;
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Number of objects
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Flags
+			if (is_little_endian)
+			{
+				SWAP(buf_word[0], buf_word[3], tmp_char);
+				SWAP(buf_word[1], buf_word[2], tmp_char);
+			}
+			if ((*(reinterpret_cast<int*>(buf_word))) & 0x00010000) // Check flag #16 - flip YZ?
+				flip_YZ = true;
+			//std::cout << (*(reinterpret_cast<int*>(buf_word))) << std::endl;
+			std::cout << " Model last viewed on Y/Z flipped or rotated image? = " << std::flush;
+			if (flip_YZ)
+				std::cout << "TRUE" << std::endl;
+			else
+				std::cout << "FALSE" << std::endl;
+			contain_3d_points = false;
+			while (fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word))) // Read 4-byte blocks
+			{
+				if ( (buf_word[0] == 'C') && (buf_word[1] == 'O') && (buf_word[2] == 'N') && (buf_word[3] == 'T') ) // Find contour section
+				{
+					contain_3d_points = true;
+					break;
+				}
+			}
+			if (!contain_3d_points)
+				REPORT_ERROR("helix.cpp::Interpolate3DCurves(): IMOD file does not seem to contain manually picked 3D coordiantes!");
+
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word)); // Number of 3D points (meshes)
+			if (is_little_endian)
+			{
+				SWAP(buf_word[0], buf_word[3], tmp_char);
+				SWAP(buf_word[1], buf_word[2], tmp_char);
+			}
+			nr_points = *(reinterpret_cast<int*>(buf_word));
+			//std::cout << nr_points << std::endl;
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+			if (nr_points <= 2)
+				REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Input coordinate file: " + (std::string)(fn_in) + " should contain at least 2 points!");
+
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+			fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+			std::cout << " Original XYZ coordinates (unbinned):" << std::endl;
+			for (int id = 0; id < nr_points; id++)
+			{
+				fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+				if (is_little_endian)
+				{
+					SWAP(buf_word[0], buf_word[3], tmp_char);
+					SWAP(buf_word[1], buf_word[2], tmp_char);
+				}
+				val = ((RFLOAT)(binning_factor)) * (*(reinterpret_cast<float*>(buf_word)));
+				xlist.push_back(val);
+
+				fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+				if (is_little_endian)
+				{
+					SWAP(buf_word[0], buf_word[3], tmp_char);
+					SWAP(buf_word[1], buf_word[2], tmp_char);
+				}
+				val = ((RFLOAT)(binning_factor)) * (*(reinterpret_cast<float*>(buf_word)));
+				if (flip_YZ)
+					zlist.push_back(val);
+				else
+					ylist.push_back(val);
+
+				fin.read(reinterpret_cast<char*>(buf_word), sizeof(buf_word));
+				if (is_little_endian)
+				{
+					SWAP(buf_word[0], buf_word[3], tmp_char);
+					SWAP(buf_word[1], buf_word[2], tmp_char);
+				}
+				val = ((RFLOAT)(binning_factor)) * (*(reinterpret_cast<float*>(buf_word)));
+				if (flip_YZ)
+					ylist.push_back(val);
+				else
+					zlist.push_back(val);
+
+				// OLD
+				//std::cout << "    " << xlist[xlist.size() - 1] << "        " << ylist[ylist.size() - 1] << "        " << zlist[zlist.size() - 1] << std::endl;
+				// NEW
+				std::cout << std::setw(15) << std::fixed << xlist[xlist.size() - 1];
+				std::cout << std::setw(15) << std::fixed << ylist[ylist.size() - 1];
+				std::cout << std::setw(15) << std::fixed << zlist[zlist.size() - 1];
+				std::cout << std::endl;
+			}
+			//std::cout << xlist.size() << std::endl;
+		}
+		else if (fn_in.getExtension() == "star")
+		{
+			MetaDataTable MD;
+			RFLOAT xx = 0., yy = 0., zz = 0.;
+			MD.clear();
+			MD.read(fn_in);
+			if ( (!MD.containsLabel(EMDL_IMAGE_COORD_X))
+					|| (!MD.containsLabel(EMDL_IMAGE_COORD_Y))
+					|| (!MD.containsLabel(EMDL_IMAGE_COORD_Z)) )
+				REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Input coordinate STAR file " + (std::string)(fn_in) + " should contain _rlnCoordinateX Y and Z!");
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			{
+				MD.getValue(EMDL_IMAGE_COORD_X, xx);
+				MD.getValue(EMDL_IMAGE_COORD_Y, yy);
+				MD.getValue(EMDL_IMAGE_COORD_Z, zz);
+				xlist.push_back(xx);
+				ylist.push_back(yy);
+				zlist.push_back(zz);
+			}
+		}
+		else
+		{
+			fin.open(fn_in.c_str(), std::ios_base::in);
+			if (fin.fail())
+				REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Cannot open coordinate file: " + (std::string)(fn_in));
+
+			// Read x, y, z coordinates into vectors and close the input file
+			while (getline(fin, line, '\n'))
+			{
+				words.clear();
+				tokenize(line, words);
+				if (words.size() == 0) // Empty line.
+					continue;
+				if (words.size() != 3)
+					REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Invalid input coordinate file " + fn_in);
+
+				xlist.push_back(textToFloat(words[0]));
+				ylist.push_back(textToFloat(words[1]));
+				zlist.push_back(textToFloat(words[2]));
+
+				// Screen output
+				std::cout << " Original XYZ coordinates:  " << textToFloat(words[0]) << ", "
+						<< textToFloat(words[1]) << ", " << textToFloat(words[2]) << std::endl;
+			}
+		}
+		fin.close();
+		if (xlist.size() < 2)
+			REPORT_ERROR("helix.cpp::Interpolate3DCurves(): Input coordinate file: " + (std::string)(fn_in) + " should contain at least 2 points!");
+
+		// Load control points for 3D interpolations
+		MD_in.clear();
+		MD_in.addLabel(EMDL_IMAGE_COORD_X);
+		MD_in.addLabel(EMDL_IMAGE_COORD_Y);
+		MD_in.addLabel(EMDL_IMAGE_COORD_Z);
+		// Mode 1 - Just use the manually picked points as control points
+		//for (int id = 0; id < xlist.size(); id++)
+		//{
+		//	MD_in.addObject();
+		//	MD_in.setValue(EMDL_IMAGE_COORD_X, xlist[id]);
+	    //	MD_in.setValue(EMDL_IMAGE_COORD_Y, ylist[id]);
+	    //	MD_in.setValue(EMDL_IMAGE_COORD_Z, zlist[id]);
+		//}
+		// Mode 2 - Manually picked points are zigzag. Choose middle points of short line segments as control points.
+		// Generate smooth curves
+		// However, tilt angles of the segments around start- and end- points of the filaments deviate more from ~90 degrees.
+		for (int id = 0; id < xlist.size(); id++)
+		{
+			if (id == 0) // Start point
+			{
+				MD_in.addObject();
+				MD_in.setValue(EMDL_IMAGE_COORD_X, xlist[0]);
+		    	MD_in.setValue(EMDL_IMAGE_COORD_Y, ylist[0]);
+		    	MD_in.setValue(EMDL_IMAGE_COORD_Z, zlist[0]);
+		    	continue;
+			}
+			// Middle points of each short line segment
+			MD_in.addObject();
+			MD_in.setValue(EMDL_IMAGE_COORD_X, (xlist[id] + xlist[id - 1]) / 2.);
+	    	MD_in.setValue(EMDL_IMAGE_COORD_Y, (ylist[id] + ylist[id - 1]) / 2.);
+	    	MD_in.setValue(EMDL_IMAGE_COORD_Z, (zlist[id] + zlist[id - 1]) / 2.);
+	    	if (id == (xlist.size() - 1)) // End point
+	    	{
+				MD_in.addObject();
+				MD_in.setValue(EMDL_IMAGE_COORD_X, xlist[id]);
+		    	MD_in.setValue(EMDL_IMAGE_COORD_Y, ylist[id]);
+		    	MD_in.setValue(EMDL_IMAGE_COORD_Z, zlist[id]);
+		    	break;
+	    	}
+		}
+		//std::cout << MD_in.numberOfObjects() << std::endl; // DEBUG
+		//fn_out = fn_in.beforeFirstOf(fn_in_root) + fn_out_root + ".star"; // DEBUG
+		//MD_in.write(fn_out); // DEBUG
+
+		// Interpolate
+		HermiteInterpolateOne3DHelicalFilament(
+				MD_in,
+				MD_out,
+				nr_segments,
+				nr_asu,
+				rise_A,
+				pixel_size_A,
+				box_size_pix,
+				fid + 1,
+				xdim_img, ydim_img, zdim_img,
+				bimodal_angular_priors);
+
+		// Output
+	    if (MD_out.numberOfObjects() < 1)
+	    	std::cout << " WARNING: No sub-tomograms have been interpolated on this helical filament!" << std::endl;
+	    else
+	    	MD_all.append(MD_out);
+		total_segments += nr_segments;
+		std::cout << " Interpolated " << nr_segments <<  " helical segments from 3D point set " << fn_in << std::endl;
+		std::cout << " ========================================================= " << std::endl;
+	}
+
+	//fn_out = fn_in.beforeFirstOf(fn_in_root) + fn_out_root + ".star"; // OLD
+	fn_out = fn_in_root + fn_out_root + ".star"; // NEW
+	// DEBUG
+	//std::cout << " fn_in = " << fn_in << std::endl;
+	//std::cout << " fn_in_root = " << fn_in_root << std::endl;
+	//std::cout << " fn_out_root = " << fn_out_root << std::endl;
+	//std::cout << " fn_out = " << fn_out << std::endl;
+
+	if (MD_all.numberOfObjects() < 1)
+		std::cout << " ### Done! WARNING: No sub-tomograms have been interpolated! Please check whether you have done everything correctly." << std::endl;
+	else
+	{
+		MD_all.write(fn_out);
+		std::cout << " ### Done! Interpolated " << total_segments << " helical segments on " << fn_in_list.size()
+				<< " filaments. Output file: " << fn_out << std::endl;
+	}
+}
+
+void estimateTiltPsiPriors(
+		Matrix1D<RFLOAT>& dr,
+		RFLOAT& tilt_deg,
+		RFLOAT& psi_deg)
+{
+	// euler.cpp: Euler_direction2angles: input angles = (a, b, g) then 3x3 matrix =
+	//  cosg*cosb*cosa - sing*sina,  cosg*cosb*sina + sing*cosa, -cosg*sinb,
+	// -sing*cosb*cosa - cosg*sina, -sing*cosb*sina + cosg*cosa,  sing*sinb,
+	//       sinb*cosa,                               sinb*sina,       cosb.
+
+	// euler.cpp: Euler_direction2angles: input angles = (0, b, g) then 3x3 matrix =
+	//  cosg*cosb, sing, -cosg*sinb,
+	// -sing*cosb, cosg,  sing*sinb,
+	//       sinb,    0,       cosb.
+
+	RFLOAT tilt_rad = 0., psi_rad = 0., vec_len = 0.;
+	int dim = dr.size();
+
+	if ( (dim != 2) && (dim != 3) )
+		REPORT_ERROR("helix.cpp::estimateTiltPsiPriors(): Input Matrix1D should have a size of 2 or 3!");
+
+	vec_len = XX(dr) * XX(dr) + YY(dr) * YY(dr);
+	vec_len += (dim == 3) ? (ZZ(dr) * ZZ(dr)) : (0.);
+	vec_len = sqrt(vec_len);
+	if (vec_len < 0.0001)
+		REPORT_ERROR("helix.cpp::estimateTiltPsiPriors(): Vector length is smaller than 0.0001!");
+
+	// A * (0, 0, z) = (x', y', z')
+	// x' = -z*cosg*sinb
+	// y' =  z*sing*sinb
+	// z' =       z*cosb
+	// cosb = z' / z
+	// tang = y' / (-x')
+	if (dim == 3)
+	{
+		// Tilt (b) should be [0, +180] degrees. Psi (g) should be [-180, +180] degrees
+		tilt_rad = acos(ZZ(dr) / vec_len); // 'acos' returns an angle within [0, +pi] radians for tilt
+		psi_rad = atan2(YY(dr), (-1.) * XX(dr)); // 'atan2' returns an angle within [-pi, +pi] radians for rot
+	}
+	else
+		psi_rad = (-1.) * atan2(YY(dr), XX(dr));
+
+	if (dim == 3)
+		tilt_deg = RAD2DEG(tilt_rad);
+	psi_deg = RAD2DEG(psi_rad);
+}
+
+void readFileHeader(
+		FileName& fn_in,
+		FileName& fn_out,
+		int nr_bytes)
+{
+	std::ifstream fin;
+	std::ofstream fout;
+	int nr_blocks = 0, curr_block = 0;
+	char data[100];
+
+	if (nr_bytes > 10 * 1024 * 1024)
+		REPORT_ERROR("helix.cpp::readFileHeader(): Don't copy more than 10MB data!");
+	fin.open(fn_in.c_str(), std::ios_base::in|std::ios_base::binary);
+	if (fin.fail())
+		REPORT_ERROR("helix.cpp::readFileHeader(): Cannot open input file: " + (std::string)(fn_in));
+	fout.open(fn_out.c_str(), std::ios_base::out|std::ios_base::binary);
+	if (fout.fail())
+		REPORT_ERROR("helix.cpp::readFileHeader(): Cannot open output file: " + (std::string)(fn_out));
+
+	nr_blocks = nr_bytes / 100;
+	nr_blocks = (nr_blocks < 1) ? (1) : (nr_blocks);
+	std::cout << " Copying the first " << nr_blocks * 100 << " bytes from " << fn_in << " to " << fn_out << " ..." << std::endl;
+
+	curr_block = 0;
+	while (fin.read(reinterpret_cast<char*>(data), sizeof(data)))
+	{
+		curr_block++;
+		fout.write(reinterpret_cast<char*>(data), sizeof(data));
+		if (curr_block >= nr_blocks)
+			break;
+	}
+
+	fin.close();
+	fout.close();
+}
+
+void select3DsubtomoFrom2Dproj(
+		MetaDataTable& MD_2d,
+		MetaDataTable& MD_3d,
+		MetaDataTable& MD_out)
+{
+	//std::vector<RFLOAT> xlist, ylist, zlist, idlist;
+	std::vector<std::string> mic_list, img_list;
+	int id = 0;
+	//RFLOAT xx = 0., yy = 0., zz = 0.;
+	FileName mic_str, img_str;
+	const size_t id_length = 6; // 6-digit ID
+	bool auto_pixel_size = false;
+	RFLOAT Dpix = -1., Mag = -1., _Dpix = -1., _Mag = -1.;
+
+	MD_out.clear();
+
+	if (MD_2d.numberOfObjects() < 1)
+		REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): MetaDataTable 2D projections is empty!");
+	if ( (!MD_2d.containsLabel(EMDL_IMAGE_COORD_X))
+			|| (!MD_2d.containsLabel(EMDL_IMAGE_COORD_Y))
+			|| (!MD_2d.containsLabel(EMDL_IMAGE_COORD_Z))
+			|| (!MD_2d.containsLabel(EMDL_MICROGRAPH_NAME))
+			|| (!MD_2d.containsLabel(EMDL_IMAGE_NAME)) )
+		REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): MetaDataTable 2D projections should contain labels _rlnCoordinateXYZ, _rlnMicrographName and _rlnImageName!");
+	// For particle rescaling  - Does MD_2d contain Dpix and Magnification?
+	auto_pixel_size = (MD_2d.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)) && (MD_2d.containsLabel(EMDL_CTF_MAGNIFICATION));
+
+	if (MD_3d.numberOfObjects() < 1)
+		REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): MetaDataTable 3D subtomograms is empty!");
+	if ( (!MD_3d.containsLabel(EMDL_IMAGE_COORD_X))
+			|| (!MD_3d.containsLabel(EMDL_IMAGE_COORD_Y))
+			|| (!MD_3d.containsLabel(EMDL_IMAGE_COORD_Z))
+			|| (!MD_3d.containsLabel(EMDL_MICROGRAPH_NAME))
+			|| (!MD_3d.containsLabel(EMDL_IMAGE_NAME)) )
+		REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): MetaDataTable 3D subtomograms should contain labels _rlnCoordinateXYZ, _rlnMicrographName and _rlnImageName!");
+	if (auto_pixel_size)
+	{
+		if ( (!MD_3d.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)) || (!MD_3d.containsLabel(EMDL_CTF_MAGNIFICATION)) )
+			REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): If MetaDataTable 2D projections contains Dpix and Magnification, then MetaDataTable 3D subtomograms should also do!");
+
+		// Firstly, check whether the pixel sizes of segments in MD_3d are the same
+		Dpix = -1., Mag = -1., _Dpix = -1., _Mag = -1.;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_3d)
+		{
+			MD_3d.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, _Dpix);
+			MD_3d.getValue(EMDL_CTF_MAGNIFICATION, _Mag);
+			if ( (!(_Dpix > 0.)) || (!(_Mag > 0.)) )
+				REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): Please ensure that all entries in MetaDataTable 3D subtomograms have valid Dpix and Magnification!");
+			if ( (Dpix < 0.) && (Mag < 0.) )
+			{
+				Dpix = _Dpix;
+				Mag = _Mag;
+				continue;
+			}
+			if ( (fabs(_Dpix - Dpix) > 0.001) || (fabs(_Mag - Mag) > 0.001) )
+				REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): Please ensure that all entries in MetaDataTable 3D subtomograms have the same pixel size!");
+		}
+		std::cout << " Dpix and Magnification of 3D sub-tomograms: " << Dpix << " and " << Mag << std::endl;
+
+		// Then, check whether the pixel sizes of segments in MD_2d are the same. Store Dpix and Mag.
+		Dpix = -1., Mag = -1., _Dpix = -1., _Mag = -1.;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_2d)
+		{
+			MD_2d.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, _Dpix);
+			MD_2d.getValue(EMDL_CTF_MAGNIFICATION, _Mag);
+			if ( (!(_Dpix > 0.)) || (!(_Mag > 0.)) )
+				REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): Please ensure that all entries in MetaDataTable 2D projections have valid Dpix and Magnification!");
+			if ( (Dpix < 0.) && (Mag < 0.) )
+			{
+				Dpix = _Dpix;
+				Mag = _Mag;
+				continue;
+			}
+			if ( (fabs(_Dpix - Dpix) > 0.001) || (fabs(_Mag - Mag) > 0.001) )
+				REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): Please ensure that all entries in MetaDataTable 2D projections have the same pixel size!");
+		}
+		std::cout << " Dpix and Magnification of 2D projections:   " << Dpix << " and " << Mag << std::endl;
+		std::cout << " Reset Dpix and Magnification of selected 3D sub-tomograms..." << std::endl;
+		// Dpix and Mag have been stored.
+	}
+
+	// Gather all the selected subtomograms
+	//xlist.clear(); ylist.clear(); zlist.clear(); idlist.clear();
+	mic_list.clear();
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_2d)
+	{
+		//MD_2d.getValue(EMDL_IMAGE_COORD_X, xx);
+		//MD_2d.getValue(EMDL_IMAGE_COORD_Y, yy);
+		//MD_2d.getValue(EMDL_IMAGE_COORD_Z, zz);
+		MD_2d.getValue(EMDL_MICROGRAPH_NAME, mic_str);
+		MD_2d.getValue(EMDL_IMAGE_NAME, img_str);
+
+		//id = textToInteger(img_str.beforeFirstOf("@")); // 6-digit ID
+		//xlist.push_back(xx); ylist.push_back(yy); zlist.push_back(zz); idlist.push_back(id);
+		mic_list.push_back(mic_str + img_str.beforeFirstOf("@"));
+	}
+	std::sort(mic_list.begin(), mic_list.end());
+
+	// Scan through all the subtomograms
+	MD_out.clear();
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_3d)
+	{
+		//MD_3d.getValue(EMDL_IMAGE_COORD_X, xx);
+		//MD_3d.getValue(EMDL_IMAGE_COORD_Y, yy);
+		//MD_3d.getValue(EMDL_IMAGE_COORD_Z, zz);
+		MD_3d.getValue(EMDL_MICROGRAPH_NAME, mic_str);
+		MD_3d.getValue(EMDL_IMAGE_NAME, img_str);
+
+		img_str = img_str.withoutExtension();
+		if (img_str.length() < id_length)
+			REPORT_ERROR("helix.cpp::select3DsubtomoFrom2Dproj(): img_str.length() < " + integerToString(id_length) + " ! img_str = " + (std::string)(img_str));
+		img_str = img_str.substr(img_str.length() - id_length, id_length);
+		//std::cout << "  " << img_str << std::flush;
+		img_str = mic_str + img_str;
+		if (std::binary_search(mic_list.begin(), mic_list.end(), img_str)) // Subtomogram selected
+		{
+			MD_out.addObject(MD_3d.getObject());
+			// For particle rescaling - reset pixel size
+			if (auto_pixel_size)
+			{
+				MD_out.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, Dpix);
+				MD_out.setValue(EMDL_CTF_MAGNIFICATION, Mag);
+			}
+		}
+	}
+	//std::cout << std::endl;
 }

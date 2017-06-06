@@ -754,6 +754,12 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 									MultidimArray<Complex > &out,
 									RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
 
+void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex > &in,
+									MultidimArray<Complex > &out,
+									RFLOAT oridim, long int newdim,
+									TabSine& tabsin, TabCosine& tabcos,
+									RFLOAT xshift, RFLOAT yshift, RFLOAT zshift = 0.);
+
 // Shift an image through phase-shifts in its Fourier Transform (without tabulated sine and cosine)
 // Note that in and out may be the same array, in that case in is overwritten with the result
 // if oridim is in pixels, xshift, yshift and zshift should be in pixels as well!
