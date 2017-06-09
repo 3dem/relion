@@ -1076,7 +1076,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  MlOptimiser *baseMLO,
 		 	 	 	 	 	 	  MlClass *cudaMLO,
 		 	 	 	 	 	 	  std::vector<IndexedDataArray> &FinePassWeights,
-		 	 	 	 	 	 	  std::vector<std::vector< IndexedDataArrayMask > > &FPCMasks,
+		 	 	 	 	 	 	  std::vector<std::vector< IndexedDataArrayMask<AccT> > > &FPCMasks,
 		 	 	 	 	 	 	  std::vector<ProjectionParams> &FineProjectionData,
 		 	 	 	 	 	 	  std::vector<cudaStager<unsigned long> > &stagerD2)
 {
@@ -1393,7 +1393,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											MlOptimiser *baseMLO,
 											MlClass *cudaMLO,
 											std::vector< IndexedDataArray> &PassWeights,
-											std::vector< std::vector< IndexedDataArrayMask > > &FPCMasks,
+											std::vector< std::vector< IndexedDataArrayMask<AccT> > > &FPCMasks,
 											CudaGlobalPtr<XFLOAT> &Mweight, // FPCMasks = Fine-Pass Class-Masks
 											bool failsafeMode = false)
 {
@@ -1918,7 +1918,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlClass *cudaMLO,
 						std::vector<IndexedDataArray> &FinePassWeights,
 						std::vector<ProjectionParams> &ProjectionData,
-						std::vector<std::vector<IndexedDataArrayMask> > &FPCMasks,
+						std::vector<std::vector<IndexedDataArrayMask<AccT> > > &FPCMasks,
 	 	 	 	 	 	std::vector<cudaStager<unsigned long> > &stagerSWS)
 {
 #ifdef TIMING

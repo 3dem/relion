@@ -80,9 +80,18 @@ endif(NOT DEFINED CUDA_ARCH)
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
 option(CUDA "Enable CUDA GPU acceleration" ON)
+option(ALTCPU "Enable Accelerated CPU version" ON)
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_GPU "DoublePrec_GPU" OFF)
 option(CudaTexture "CudaTexture" ON)
+
+# -----------------------------------------------ACCELERATED CPU VERSION
+if(ALTCPU)
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DALTCPU -DACC_CPU=1 ")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALTCPU -DACC_CPU=1 ")
+    message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
+    message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
+endif()
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
 if(DoublePrec_CPU)
@@ -121,7 +130,8 @@ if(CUDA_FOUND)
     endif()
     
     if(CUDA)
-    	add_definitions(-DCUDA)
+        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCUDA -DACC_CUDA=2 ")
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA -DACC_CUDA=2 ")
     endif()
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
@@ -268,6 +278,9 @@ endif()
 
 
 ADD_SUBDIRECTORY(src/apps)
+
+message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
+message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
 
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler 
