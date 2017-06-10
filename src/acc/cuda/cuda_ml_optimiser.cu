@@ -341,10 +341,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 
 			/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
 			//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
-			std::vector <IndexedDataArray> CoarsePassWeights(1, devBundle->allocator) ,FinePassWeights(sp.nr_particles, devBundle->allocator);
+			std::vector <IndexedDataArray<ACC_CUDA> > CoarsePassWeights(1, devBundle->allocator) ,FinePassWeights(sp.nr_particles, devBundle->allocator);
 			// -- This is a iframe-indexed vector, each entry of which is a class-indexed vector of masks, one for each
 			//    class in FinePassWeights
-			std::vector < std::vector <IndexedDataArrayMask> > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask>(baseMLO->mymodel.nr_classes, devBundle->allocator));
+			std::vector < std::vector <IndexedDataArrayMask<ACC_CUDA> > > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask<ACC_CUDA> >(baseMLO->mymodel.nr_classes, devBundle->allocator));
 			// -- This is a iframe-indexed vector, each entry of which is parameters used in the projection-operations *after* the
 			//    coarse pass, declared here to keep scope to storeWS
 			std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
@@ -391,10 +391,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 
 					op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);
 
-					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator);
+					AccPtr<XFLOAT, ACC_CUDA> Mweight(devBundle->allocator);
 					Mweight.setSize(sp.nr_particles * weightsPerPart);
-					Mweight.setHstPtr(op.Mweight.data);
-					Mweight.device_alloc();
+					Mweight.setHostPtr(op.Mweight.data);
+					Mweight.deviceAlloc();
 					deviceInitValue<XFLOAT>(Mweight, -999.);
 					Mweight.streamSync();
 
@@ -473,8 +473,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					CTIC(timer,"getAllSquaredDifferencesFine");
 					getAllSquaredDifferencesFine<MlOptimiserCuda,ACC_CUDA>(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
 					CTOC(timer,"getAllSquaredDifferencesFine");
-					FinePassWeights[0].weights.cp_to_host();
-					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
+					FinePassWeights[0].weights.cpToHost();
+					AccPtr<XFLOAT, ACC_CUDA> Mweight(devBundle->allocator); //DUMMY
 
 					CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
 					convertAllSquaredDifferencesToWeights<MlOptimiserCuda,ACC_CUDA,XFLOAT>(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, Mweight);

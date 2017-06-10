@@ -393,7 +393,7 @@ public:
 		if (ptr.hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Host pointer is not set.\n");
 #endif
-		setHstPtr(ptr.h_ptr);
+		setHostPtr(ptr.hPtr);
 	}
 
 };
@@ -513,6 +513,16 @@ public:
 	void cpOnDevice(T * dstDevPtr)
 	{}
 
+// TODO - is this appropriate on the host?
+	inline
+	T* operator~() {
+#ifdef DEBUG_CUDA
+		if (d_ptr == 0)
+			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+#endif
+		return AccPtrBase<T,ACC_CPU,AccPtr<T,ACC_CPU> >::dPtr;
+	};
+	
 	inline
 	void streamSync()
 	{}
@@ -728,7 +738,7 @@ public:
 #ifdef DEBUG_CUDA
 		if(size==0)
 				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
-		if (d_do_free)
+		if (doFreeDevice)
 				ACC_PTR_DEBUG_FATAL("Device double allocation.\n");
 #endif
 		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::doFreeDevice = true;
@@ -895,6 +905,18 @@ public:
 				dstDevPtr, AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size, stream);
 	}
 
+	/**
+	 * Acc pointer quick access
+	 */
+	inline
+	T* operator~() {
+#ifdef DEBUG_CUDA
+		if (d_ptr == 0)
+			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+#endif
+		return AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr;
+	};
+	
 	inline
 	void streamSync()
 	{
@@ -972,7 +994,7 @@ public:
 	void setDevicePtr(T *ptr)
 	{
 #ifdef DEBUG_CUDA
-			if (d_do_free)
+			if (doFreeDevice)
 				ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
 #endif
 		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr = ptr;
