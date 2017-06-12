@@ -44,9 +44,9 @@
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
-// 2.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
 // devel-version
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
+//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
 
 #define SELECTED true
 #define NOTSELECTED false

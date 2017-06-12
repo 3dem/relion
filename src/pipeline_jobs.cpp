@@ -2294,7 +2294,7 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["nr_iter"] = JobOption("Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed. Often 1 or 2 iterations with several thousand to 10k particles is enough.");
+	joboptions["nr_iter"] = JobOption("Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed. Often 1 or 2 iterations with approximately ten thousand particles, or 5-10 iterations with several thousand particles is enough.");
 	joboptions["sgd_subset_size"] = JobOption("SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
 	joboptions["sgd_write_subsets"] = JobOption("Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
 	joboptions["sgd_highres_limit"] = JobOption("Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
@@ -2357,6 +2357,9 @@ Provided this directory is on a fast local drive (e.g. an SSD drive), processing
 	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
 
 }
 
@@ -2461,6 +2464,12 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
+
+	// GPU-stuff
+	if (joboptions["use_gpu"].getBoolean())
+	{
+		command += " --gpu \"" + joboptions["gpu_ids"].getString() +"\"";
+	}
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
