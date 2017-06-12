@@ -5,6 +5,7 @@
 #include <ctime>
 #include <vector>
 #include <iostream>
+#include "src/acc/acc_ptr.h"
 #include "src/acc/cuda/cuda_projector.h"
 #include "src/acc/cuda/cuda_projector.cuh"
 #include "src/acc/cuda/cuda_projector_plan.h"
@@ -16,7 +17,6 @@
 #include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/utilities.h"
 #include "src/acc/data_types.h"
-#include "src/acc/acc_ptr.h"
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #include "src/complex.h"
 #include "src/helix.h"

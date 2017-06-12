@@ -307,7 +307,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		my_old_offset.selfROUND();
 
-		int img_size = img.data.nzyxdim;
+		size_t img_size = img.data.nzyxdim;
 
 
 
@@ -361,7 +361,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		d_img.deviceAlloc();
 
 		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
-			d_img_.cpOnDevice(~d_img);
+			d_img_.cpOnAcc(~d_img);
 		else
 			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.getHostPtr(), ~d_img, img_size, d_img.getStream());
 
@@ -404,7 +404,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //		accMLO->transformer1.reals.streamSync();
 //		accMLO->transformer1.fouriers.streamSync();
 
-		d_img.cpOnDevice(accMLO->transformer1.reals);
+		d_img.cpOnAcc(accMLO->transformer1.reals);
 
 		runCenterFFT(
 				accMLO->transformer1.reals,
@@ -536,7 +536,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			for (int i=0; i<img_size; i++)
 				d_img[i] = img.data.data[i];
-			d_img.cp_to_device();
+			d_img.cpToDevice();
 
 			CTOC(accMLO->timer,"softMaskOutsideMap");
 		}
@@ -552,7 +552,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			for (int i=0; i<img_size; i++)
 				d_img[i] = img.data.data[i];
-			d_img.cp_to_device();
+			d_img.cpToDevice();
 		}
 		else
 		{
@@ -585,8 +585,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			AccPtr<XFLOAT, AccT> softMaskSum_bg(SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
 			softMaskSum.deviceAlloc();
 			softMaskSum_bg.deviceAlloc();
-			softMaskSum.device_init(0.f);
-			softMaskSum_bg.device_init(0.f);
+			softMaskSum.deviceInit(0.f);
+			softMaskSum_bg.deviceInit(0.f);
 			cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
 																				img().nzyxdim,
 																				img.data.xdim,
@@ -644,7 +644,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTOC(accMLO->timer,"setSize");
 
 		CTIC(accMLO->timer,"transform");
-		d_img.cpOnDevice(accMLO->transformer1.reals);
+		d_img.cpOnAcc(accMLO->transformer1.reals);
 
 		runCenterFFT(								// runs on input GlobalPtr.stream
 				accMLO->transformer1.reals,
@@ -674,7 +674,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			AccPtr<XFLOAT, AccT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,accMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
 			spectrumAndXi2.deviceAlloc();
-			spectrumAndXi2.device_init(0);
+			spectrumAndXi2.deviceInit(0);
 			spectrumAndXi2.streamSync();
 
 			dim3 gridSize = CEIL((float)(accMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
@@ -688,7 +688,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 			else
 				cuda_kernel_powerClass<false><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
 					~accMLO->transformer1.fouriers,
@@ -699,7 +699,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
@@ -981,12 +981,12 @@ void getAllSquaredDifferencesCoarse(
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
 
-		trans_x.put_on_device();
-		trans_y.put_on_device();
-		trans_z.put_on_device();
+		trans_x.putOnDevice();
+		trans_y.putOnDevice();
+		trans_z.putOnDevice();
 
-		Fimg_real.put_on_device();
-		Fimg_imag.put_on_device();
+		Fimg_real.putOnDevice();
+		Fimg_imag.putOnDevice();
 
 		CTOC(accMLO->timer,"translation_1");
 
@@ -995,7 +995,7 @@ void getAllSquaredDifferencesCoarse(
 		corr_img.deviceAlloc();
 
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
-		corr_img.cp_to_device();
+		corr_img.cpToDevice();
 
 		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 		allWeights_pos = 0;
@@ -1192,14 +1192,14 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		corr_img.deviceAlloc();
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 
-		trans_x.put_on_device();
-		trans_y.put_on_device();
-		trans_z.put_on_device();
+		trans_x.putOnDevice();
+		trans_y.putOnDevice();
+		trans_z.putOnDevice();
 
 
-		Fimg_real.put_on_device();
-		Fimg_imag.put_on_device();
-		corr_img.cp_to_device();
+		Fimg_real.putOnDevice();
+		Fimg_imag.putOnDevice();
+		corr_img.cpToDevice();
 
 		CTOC(accMLO->timer,"kernel_init_1");
 		std::vector< AccPtr<XFLOAT, AccT> > eulers((sp.iclass_max-sp.iclass_min+1), accMLO->devBundle->allocator);
@@ -1270,15 +1270,15 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CTOC(accMLO->timer,"pair_list_1");
 
 				CTIC(accMLO->timer,"IndexedArrayMemCp2");
-//				FPCMasks[ipart][exp_iclass].jobOrigin.cp_to_device();
-//				FPCMasks[ipart][exp_iclass].jobExtent.cp_to_device();
+//				FPCMasks[ipart][exp_iclass].jobOrigin.cpToDevice();
+//				FPCMasks[ipart][exp_iclass].jobExtent.cpToDevice();
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
 				CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
 				CTIC(accMLO->timer,"generateEulerMatrices");
 				eulers[exp_iclass-sp.iclass_min].setSize(9*FineProjectionData[ipart].class_entries[exp_iclass]);
-				eulers[exp_iclass-sp.iclass_min].host_alloc();
+				eulers[exp_iclass-sp.iclass_min].hostAlloc();
 				generateEulerMatrices(
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
 						thisClassProjectionData,
@@ -1293,9 +1293,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
 
-		FinePassWeights[ipart].rot_id.cp_to_device(); //FIXME this is not used
-		FinePassWeights[ipart].rot_idx.cp_to_device();
-		FinePassWeights[ipart].trans_idx.cp_to_device();
+		FinePassWeights[ipart].rot_id.cpToDevice(); //FIXME this is not used
+		FinePassWeights[ipart].rot_idx.cpToDevice();
+		FinePassWeights[ipart].trans_idx.cpToDevice();
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -1446,7 +1446,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		for (int i = 0; i < pdf_orientation.getSize(); i ++)
 			pdf_orientation[i] /= pdf_orientation_mean;
 
-	pdf_orientation.cp_to_device();
+	pdf_orientation.cpToDevice();
 	CTOC(accMLO->timer,"get_orient_priors");
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
@@ -1603,7 +1603,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				for (int i = 0; i < pdf_offset.getSize(); i ++)
 					pdf_offset[i] = pdf_offset_t[i] /  pdf_offset_mean;
 
-			pdf_offset.cp_to_device();
+			pdf_offset.cpToDevice();
 			CTOC(accMLO->timer,"get_offset_priors");
 			CTIC(accMLO->timer,"sumweight1");
 
@@ -1621,8 +1621,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if (sizeof(weights_t) == sizeof(XFLOAT))
 				{
-					weights.setHostPtr((weights_t*) Mweight.h_ptr);
-					weights.setDevicePtr((weights_t*) Mweight.d_ptr);
+					weights.setHostPtr((weights_t*) Mweight.hPtr);
+					weights.setDevicePtr((weights_t*) Mweight.dPtr);
 					weights.setAllocator(Mweight.getAllocator());
 				}
 				else
@@ -1696,9 +1696,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-							pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
-							pdf_offset.dump_device_to_file("error_dump_pdf_offset");
-							unsorted_ipart.dump_device_to_file("error_dump_filtered");
+							pdf_orientation.dumpDeviceToFile("error_dump_pdf_orientation");
+							pdf_offset.dumpDeviceToFile("error_dump_pdf_offset");
+							unsorted_ipart.dumpDeviceToFile("error_dump_filtered");
 
 							std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
 						}
@@ -1727,7 +1727,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					{
 						AccPtr<size_t, AccT>  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
 						idx[0] = 0;
-						idx.put_on_device();
+						idx.putOnDevice();
 						cuda_kernel_find_threshold_idx_in_cumulative<weights_t>
 						<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, cumulative_sum.getStream() >>>(
 								~cumulative_sum,
@@ -1754,10 +1754,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-							unsorted_ipart.dump_device_to_file("error_dump_unsorted");
-							filtered.dump_device_to_file("error_dump_filtered");
-							sorted.dump_device_to_file("error_dump_sorted");
-							cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
+							unsorted_ipart.dumpDeviceToFile("error_dump_unsorted");
+							filtered.dumpDeviceToFile("error_dump_filtered");
+							sorted.dumpDeviceToFile("error_dump_sorted");
+							cumulative_sum.dumpDeviceToFile("error_dump_cumulative_sum");
 
 							std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
 						}
@@ -2114,11 +2114,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 
 		stagerSWS[ipart].cp_to_device();
-		oo_otrans_x.put_on_device();
-		oo_otrans_y.put_on_device();
-		oo_otrans_z.put_on_device();
+		oo_otrans_x.putOnDevice();
+		oo_otrans_y.putOnDevice();
+		oo_otrans_z.putOnDevice();
 
-		myp_oo_otrans_x2y2z2.cp_to_device();
+		myp_oo_otrans_x2y2z2.cpToDevice();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		AccPtr<XFLOAT, AccT>                      p_weights(sumBlockNum, accMLO->devBundle->allocator);
@@ -2133,7 +2133,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if (accMLO->dataIs3D)
 			p_thr_wsum_prior_offsetz_class.deviceAlloc();
 		else
-			p_thr_wsum_prior_offsetz_class.d_ptr  = p_thr_wsum_prior_offsety_class.d_ptr;
+			p_thr_wsum_prior_offsetz_class.dPtr  = p_thr_wsum_prior_offsety_class.dPtr;
 
 		p_thr_wsum_sigma2_offset.deviceAlloc();
 		CTOC(accMLO->timer,"collect_data_2_pre_kernel");
@@ -2382,9 +2382,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
-		trans_x.put_on_device();
-		trans_y.put_on_device();
-		trans_z.put_on_device();
+		trans_x.putOnDevice();
+		trans_y.putOnDevice();
+		trans_z.putOnDevice();
 
 
 		/*======================================================
@@ -2412,10 +2412,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			Fimgs_nomask_imag[i] = Fimg_nonmask.data[i].imag;
 		}
 
-		Fimgs_real.put_on_device();
-		Fimgs_imag.put_on_device();
-		Fimgs_nomask_real.put_on_device();
-		Fimgs_nomask_imag.put_on_device();
+		Fimgs_real.putOnDevice();
+		Fimgs_imag.putOnDevice();
+		Fimgs_nomask_real.putOnDevice();
+		Fimgs_nomask_imag.putOnDevice();
 
 		CTOC(accMLO->timer,"translation_3");
 
@@ -2457,7 +2457,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (unsigned i = 0; i < image_size; i++)
 				ctfs[i] = part_scale;
 
-		ctfs.put_on_device();
+		ctfs.putOnDevice();
 
 		/*======================================================
 		                       MINVSIGMA
@@ -2472,7 +2472,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (unsigned i = 0; i < image_size; i++)
 				Minvsigma2s[i] = 1;
 
-		Minvsigma2s.put_on_device();
+		Minvsigma2s.putOnDevice();
 
 		/*======================================================
 		                      CLASS LOOP
@@ -2485,14 +2485,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		AccPtr<XFLOAT, AccT> wdiff2s_sum(image_size, 0, accMLO->devBundle->allocator);
 
 		wdiff2s_AA.deviceAlloc();
-		wdiff2s_AA.device_init(0.f);
+		wdiff2s_AA.deviceInit(0.f);
 		wdiff2s_XA.deviceAlloc();
-		wdiff2s_XA.device_init(0.f);
+		wdiff2s_XA.deviceInit(0.f);
 
 		unsigned long AAXA_pos=0;
 
 		wdiff2s_sum.deviceAlloc();
-		wdiff2s_sum.device_init(0.f);
+		wdiff2s_sum.deviceInit(0.f);
 
 		CUSTOM_ALLOCATOR_REGION_NAME("BP_data");
 
@@ -2531,7 +2531,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			eulers[exp_iclass].setSize(orientation_num * 9);
 			eulers[exp_iclass].setStream(accMLO->classStreams[exp_iclass]);
-			eulers[exp_iclass].host_alloc();
+			eulers[exp_iclass].hostAlloc();
 
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
 
@@ -2542,7 +2542,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					!IS_NOT_INV);
 
 			eulers[exp_iclass].deviceAlloc();
-			eulers[exp_iclass].cp_to_device();
+			eulers[exp_iclass].cpToDevice();
 
 			CTOC(accMLO->timer,"generateEulerMatricesProjector");
 
@@ -2563,7 +2563,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			classPos+=orientation_num*translation_num;
 			CTOC(accMLO->timer,"pre_wavg_map");
 		}
-		sorted_weights.put_on_device();
+		sorted_weights.putOnDevice();
 
 		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2596,7 +2596,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~trans_x,
 					~trans_y,
 					~trans_z,
-					&sorted_weights.d_ptr[classPos],
+					&sorted_weights.dPtr[classPos],
 					~ctfs,
 					~wdiff2s_sum,
 					&wdiff2s_AA(AAXA_pos),
@@ -2632,7 +2632,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				~trans_x,
 				~trans_y,
 				~trans_z,
-				&sorted_weights.d_ptr[classPos],
+				&sorted_weights.dPtr[classPos],
 				~Minvsigma2s,
 				~ctfs,
 				translation_num,

@@ -4,6 +4,7 @@
 #include "src/complex.h"
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/acc_ptr.h"
 #include <cuda_runtime.h>
 
 class CudaProjector

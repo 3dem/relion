@@ -4,6 +4,7 @@
 #include <vector>
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/acc_ptr.h"
 #include "src/healpix_sampling.h"
 #include <iostream>
 #include <fstream>
@@ -11,8 +12,8 @@
 class CudaProjectorPlan
 {
 public:
-	CudaGlobalPtr< long unsigned> iorientclasses;
-	CudaGlobalPtr<XFLOAT> eulers;
+	AccPtr< long unsigned, ACC_CUDA> iorientclasses;
+	AccPtr<XFLOAT, ACC_CUDA> eulers;
 	long unsigned orientation_num;
 
 	CudaProjectorPlan(CudaCustomAllocator *allocator):

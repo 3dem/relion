@@ -441,7 +441,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	for (unsigned i = 0; i < v.nzyxdim; i ++)
 		img_in[i] = (XFLOAT) v.data[i];
 
-	img_in.put_on_device();
+	img_in.putOnDevice();
 //	img_aux.deviceAlloc();
 
 	if ( v.getDim() == 1 )
@@ -491,7 +491,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 
 
 		dim3 dim(ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE))));
-		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.d_ptr,
+		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.dPtr,
 										  v.nzyxdim,
 										  XSIZE(v),
 										  YSIZE(v),

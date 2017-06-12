@@ -1,15 +1,15 @@
 #ifndef ACC_PTR_H_
 #define ACC_PTR_H_
 
-#ifdef __NVCC__
+//#ifdef __NVCC__
 #ifdef CUDA
 #include "src/acc/cuda/cuda_settings.h"
 #include <cuda_runtime.h>
-#include "src/acc/cuda/shortcuts.cuh"
 #include "src/acc/cuda/custom_allocator.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/cuda/shortcuts.cuh"
 #endif
-#endif
+//#endif
 
 #include <signal.h>
 #include <fstream>
@@ -29,10 +29,12 @@
 //#define ACC_CPU 1
 //#define ACC_CUDA 2
 
-#ifndef __NVCC__
-typedef void CudaCustomAllocator;
-typedef void cudaStream_t;
-#endif
+//#ifndef __NVCC__
+//typedef void CudaCustomAllocator;
+//typedef void cudaStream_t;
+//#else
+#include "src/acc/cuda/cuda_mem_utils.h"
+//#endif  
 
 
 #define ACC_PTR_DEBUG_FATAL( err ) (HandleAccPtrDebugFatal( err, __FILE__, __LINE__ ))
@@ -59,7 +61,7 @@ public:
 	T *hPtr, *dPtr; //Host and device pointers
 	bool doFreeHost, doFreeDevice; //True if host or device needs to be freed
 
-	friend derivedT;
+//	friend derivedT;
 	
 	/*======================================================
 	           CONSTRUCTORS WITHOUT ALLOCATORS
@@ -158,7 +160,7 @@ public:
 			ACC_PTR_DEBUG_FATAL("Resizing host with present device allocation.\n");
 #endif
 	    freeHost();
-	    setHstPtr(newArr);
+	    setHostPtr(newArr);
 	    doFreeHost=true;
 	}
 
@@ -199,6 +201,9 @@ public:
 		memcpy ( dstDevPtr, hPtr, size );
 	}
 
+	/**
+	 * Copy a number (size) of bytes from device pointer to the provided new device pointer
+	 */
 	inline
 	void cpOnAcc(T * dstDevPtr)
 	{
@@ -249,6 +254,19 @@ public:
 		return hPtr[idx];
 	}
 
+	/**
+	 * Device data quick access
+	 */
+	inline
+	T& operator()(size_t idx) { return dPtr[idx]; };
+
+
+	/**
+	 * Device data quick access
+	 */
+	inline
+	const T& operator()(size_t idx) const { return dPtr[idx]; };
+	
 	/**
 	 * Acc pointer quick access
 	 */
@@ -710,7 +728,7 @@ public:
 
 	inline
 	AccPtr(const AccPtr<T, ACC_CUDA> &ptr, size_t start_idx, size_t size):
-		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size), &ptr.h_ptr[start_idx], 
+		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, &ptr.hPtr[start_idx], 
 			&ptr.dPtr[start_idx], false, false),
 			allocator(ptr.allocator), alloc(NULL), stream(ptr.stream)
 	{
@@ -923,9 +941,18 @@ public:
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
 	}
 
+	inline
+	T getDeviceAt(size_t idx)
+	{
+		T value;
+		cudaCpyDeviceToHost<T>(&AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr[idx],
+		&value, 1, stream);
+		streamSync();
+		return value;
+	}
 	void dumpDeviceToFile(std::string fileName)
 	{
-		T *tmp = new T[size];
+		T *tmp = new T[AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size];
 		cudaCpyDeviceToHost<T>(AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr, 
 				tmp, AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size, stream);
 
@@ -1018,7 +1045,7 @@ public:
 	T getValueOnDevice(size_t idx)
 	{
 		T value;
-		cudaCpyDeviceToHost<T>(&dPtr[idx], &value, 1, stream);
+		cudaCpyDeviceToHost<T>(&AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr[idx], &value, 1, stream);
 		streamSync();
 		return value;
 	}

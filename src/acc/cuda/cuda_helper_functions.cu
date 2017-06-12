@@ -12,8 +12,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
-		IndexedDataArray &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask &dataMask,
+		IndexedDataArray<ACC_CUDA> &FPW, // FPW=FinePassWeights
+		IndexedDataArrayMask<ACC_CUDA> &dataMask,
 		int chunk)
 {
 	long int w_base = dataMask.firstPos, w(0), k(0);
@@ -21,8 +21,8 @@ long int makeJobsForDiff2Fine(
 	// (this will be reduced at exit of this function)
 	dataMask.setNumberOfJobs(orientation_num*translation_num);
 	dataMask.setNumberOfWeights(orientation_num*translation_num);
-	dataMask.jobOrigin.host_alloc();
-	dataMask.jobExtent.host_alloc();
+	dataMask.jobOrigin.hostAlloc();
+	dataMask.jobExtent.hostAlloc();
 
 	dataMask.jobOrigin[k]=0;
 	for (long unsigned i = 0; i < orientation_num; i++)
@@ -81,7 +81,8 @@ long int makeJobsForDiff2Fine(
 	return(w);
 }
 
-int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, unsigned long NewJobNum) // FPW=FinePassWeights
+int  makeJobsForCollect(IndexedDataArray<ACC_CUDA> &FPW, 
+    IndexedDataArrayMask<ACC_CUDA> &dataMask, unsigned long NewJobNum) // FPW=FinePassWeights
 {
 	// reset the old (diff2Fine) job-definitions
 //	dataMask.jobOrigin.free_host();
@@ -89,8 +90,8 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, u
 //    dataMask.jobExtent.free_host();
 //    dataMask.jobExtent.free_device();
     dataMask.setNumberOfJobs(NewJobNum);
-//    dataMask.jobOrigin.host_alloc();
-//    dataMask.jobExtent.host_alloc();
+//    dataMask.jobOrigin.hostAlloc();
+//    dataMask.jobExtent.hostAlloc();
 
 	long int jobid=0;
 	dataMask.jobOrigin[jobid]=0;
@@ -111,8 +112,8 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, u
 		}
 	}
 	dataMask.setNumberOfJobs(jobid+1); // because max index is one less than size
-//	dataMask.jobOrigin.put_on_device();
-//	dataMask.jobExtent.put_on_device();
+//	dataMask.jobOrigin.putOnDevice();
+//	dataMask.jobExtent.putOnDevice();
 
 	return (jobid+1);
 }
@@ -140,7 +141,7 @@ void mapWeights(
 		mapped_weights[ (rot_idx[i]-orientation_start) * translation_num + trans_idx[i] ]= weights[i];
 }
 
-void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, CudaGlobalPtr<XFLOAT> &corr_img, long int ipart, long int group_id)
+void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT, ACC_CUDA> &corr_img, long int ipart, long int group_id)
 {
 	// CC or not
 	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
@@ -651,7 +652,7 @@ void mapAllWeightsToMweights(
 }
 
 
-size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT threshold)
+size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT, ACC_CUDA> &data, XFLOAT threshold)
 {
 	int grid_size = ceil((float)(data.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
 	if(grid_size==0)
@@ -660,9 +661,9 @@ size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT thres
 	}
 	else
 	{
-		CudaGlobalPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
+		AccPtr<size_t, ACC_CUDA >  idx(1, data.getStream(), data.getAllocator());
 		idx[0] = 0;
-		idx.put_on_device();
+		idx.putOnDevice();
 
 
 
@@ -671,7 +672,7 @@ size_t findThresholdIdxInCumulativeSum(CudaGlobalPtr<XFLOAT> &data, XFLOAT thres
 				threshold,
 				data.getSize()-1,
 				~idx);
-		idx.cp_to_host();
+		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
 
 		return idx[0];
@@ -1413,8 +1414,8 @@ void runCollect2jobs(	dim3 grid_dim,
 //}
 
 void windowFourierTransform2(
-		CudaGlobalPtr<CUDACOMPLEX > &d_in,
-		CudaGlobalPtr<CUDACOMPLEX > &d_out,
+		AccPtr<CUDACOMPLEX, ACC_CUDA > &d_in,
+		AccPtr<CUDACOMPLEX, ACC_CUDA > &d_out,
 		size_t iX, size_t iY, size_t iZ, //Input dimensions
 		size_t oX, size_t oY, size_t oZ,  //Output dimensions
 		size_t Npsi,
@@ -1434,7 +1435,7 @@ void windowFourierTransform2(
 	if(oX==iX)
 	{
 		HANDLE_ERROR(cudaStreamSynchronize(d_in.getStream()));
-		cudaCpyDeviceToDevice(&d_in.d_ptr[pos], ~d_out, oX*oY*oZ*Npsi, d_out.getStream() );
+		cudaCpyDeviceToDevice(&d_in.dPtr[pos], ~d_out, oX*oY*oZ*Npsi, d_out.getStream() );
 		return;
 	}
 
@@ -1444,8 +1445,8 @@ void windowFourierTransform2(
 
 		dim3 grid_dim(ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, d_out.getStream() >>>(
-				&d_in.d_ptr[pos],
-				d_out.d_ptr,
+				&d_in.dPtr[pos],
+				d_out.dPtr,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
@@ -1456,8 +1457,8 @@ void windowFourierTransform2(
 	{
 		dim3 grid_dim(ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, d_out.getStream() >>>(
-				&d_in.d_ptr[pos],
-				d_out.d_ptr,
+				&d_in.dPtr[pos],
+				d_out.dPtr,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ);

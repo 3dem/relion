@@ -26,11 +26,11 @@ class CudaFFT
 	bool planSet;
 public:
 #ifdef CUDA_DOUBLE_PRECISION
-	CudaGlobalPtr<cufftDoubleReal> reals;
-	CudaGlobalPtr<cufftDoubleComplex> fouriers;
+	AccPtr<cufftDoubleReal, ACC_CUDA> reals;
+	AccPtr<cufftDoubleComplex, ACC_CUDA> fouriers;
 #else
-	CudaGlobalPtr<cufftReal> reals;
-	CudaGlobalPtr<cufftComplex> fouriers;
+	AccPtr<cufftReal, ACC_CUDA> reals;
+	AccPtr<cufftComplex, ACC_CUDA> fouriers;
 #endif
 	cufftHandle cufftPlanForward, cufftPlanBackward;
 	int direction;
@@ -227,12 +227,12 @@ public:
 		}
 
 		reals.setSize(idist*batchSize[0]);
-		reals.device_alloc();
-		reals.host_alloc();
+		reals.deviceAlloc();
+		reals.hostAlloc();
 
 		fouriers.setSize(odist*batchSize[0]);
-		fouriers.device_alloc();
-		fouriers.host_alloc();
+		fouriers.deviceAlloc();
+		fouriers.hostAlloc();
 
 //		DEBUG_HANDLE_ERROR(cudaMemGetInfo( &avail, &total ));
 //		needed = estimate(batchSize[0], fudge);
@@ -262,7 +262,7 @@ public:
 	void backward()
 	{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~reals) ); }
 
-	void backward(CudaGlobalPtr<cufftDoubleReal> &dst)
+	void backward(AccPtr<cufftDoubleReal, ACC_CUDA> &dst)
 		{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~dst) ); }
 #else
 	 	if(direction<=0)
@@ -304,8 +304,8 @@ public:
 	{
 		if(planSet)
 		{
-			reals.free_if_set();
-			fouriers.free_if_set();
+			reals.freeIfSet();
+			fouriers.freeIfSet();
 			if(direction<=0)
 				HANDLE_CUFFT_ERROR(cufftDestroy(cufftPlanForward));
 			if(direction>=0)
