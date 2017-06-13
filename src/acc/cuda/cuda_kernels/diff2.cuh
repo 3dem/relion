@@ -452,7 +452,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		}
 		__syncthreads();
 	}
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	g_diff2s[iorient * translation_num + itrans] = - ( s_weight[0] / sqrt(s_norm[0]));
 #else
 	g_diff2s[iorient * translation_num + itrans] = - ( s_weight[0] / sqrtf(s_norm[0]));
@@ -596,7 +596,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 		}
 		if (tid < trans_num)
 		{
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 			s_outs[tid]= - s[tid*block_sz] / (sqrt(s_cc[tid*block_sz]));
 #else
 			s_outs[tid]= - s[tid*block_sz] / (sqrtf(s_cc[tid*block_sz]));

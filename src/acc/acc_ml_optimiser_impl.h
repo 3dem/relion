@@ -1,3 +1,4 @@
+#if 0
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
@@ -32,19 +33,20 @@
 #else
 #include "src/acc/cuda/cuda_utils_cub.cuh"
 #endif
+#endif // if 0
 
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-template <int AccT>
+template <class MlClass, int AccT>
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		MlOptimiserCuda *cudaMLO
+		MlClass *accMLO
 		)
 {
-		GTIC(cudaMLO->timer,"getFourierTransformsAndCtfs");
-		//cudaMLO->timer.cuda_gpu_tic("getFourierTransformsAndCtfs");
+		GTIC(accMLO->timer,"getFourierTransformsAndCtfs");
+		//accMLO->timer.cuda_gpu_tic("getFourierTransformsAndCtfs");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
@@ -54,11 +56,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
-		CTIC(cudaMLO->timer,"init");
+		CTIC(accMLO->timer,"init");
 		FileName fn_img;
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg;
-		MultidimArray<Complex > Faux(cudaMLO->transformer.fFourier,true);
+		MultidimArray<Complex > Faux(accMLO->transformer.fFourier,true);
 		MultidimArray<RFLOAT> Fctf;
 
 		// What is my particle_id?
@@ -95,7 +97,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
 			YY(my_prior) = 0.;
 
-		if (cudaMLO->dataIs3D)
+		if (accMLO->dataIs3D)
 		{
 			my_old_offset.resize(3);
 			my_prior.resize(3);
@@ -105,9 +107,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
 				ZZ(my_prior) = 0.;
 		}
-		CTOC(cudaMLO->timer,"init");
+		CTOC(accMLO->timer,"init");
 
-		CTIC(cudaMLO->timer,"nonZeroProb");
+		CTIC(accMLO->timer,"nonZeroProb");
 		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
 			// First try if there are some fixed prior angles
@@ -159,9 +161,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 
 		}
-		CTOC(cudaMLO->timer,"nonZeroProb");
+		CTOC(accMLO->timer,"nonZeroProb");
 
-		CTIC(cudaMLO->timer,"setXmippOrigin1");
+		CTIC(accMLO->timer,"setXmippOrigin1");
 		// Get the image and recimg data
 		if (baseMLO->do_parallel_disc_io)
 		{
@@ -171,27 +173,27 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			{
 
                 img().reshape(baseMLO->mydata.particles[part_id].img);
-                CTIC(cudaMLO->timer,"ParaReadPrereadImages");
+                CTIC(accMLO->timer,"ParaReadPrereadImages");
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mydata.particles[part_id].img)
 				{
                 	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(baseMLO->mydata.particles[part_id].img, n);
 				}
-				CTOC(cudaMLO->timer,"ParaReadPrereadImages");
+				CTOC(accMLO->timer,"ParaReadPrereadImages");
 			}
 			else
 			{
-				if (cudaMLO->dataIs3D)
+				if (accMLO->dataIs3D)
 				{
-					CTIC(cudaMLO->timer,"ParaRead3DImages");
+					CTIC(accMLO->timer,"ParaRead3DImages");
 					img.read(fn_img);
 					img().setXmippOrigin();
-					CTOC(cudaMLO->timer,"ParaRead3DImages");
+					CTOC(accMLO->timer,"ParaRead3DImages");
 				}
 				else
 				{
-					CTIC(cudaMLO->timer,"ParaRead2DImages");
+					CTIC(accMLO->timer,"ParaRead2DImages");
 					img() = baseMLO->exp_imgs[istop];
-					CTOC(cudaMLO->timer,"ParaRead2DImages");
+					CTOC(accMLO->timer,"ParaRead2DImages");
 				}
 			}
 			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
@@ -208,12 +210,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		else
 		{
 			// Unpack the image from the imagedata
-			if (cudaMLO->dataIs3D)
+			if (accMLO->dataIs3D)
 			{
-				CTIC(cudaMLO->timer,"Read3DImages");
-				CTIC(cudaMLO->timer,"resize");
+				CTIC(accMLO->timer,"Read3DImages");
+				CTIC(accMLO->timer,"resize");
 				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size,baseMLO-> mymodel.ori_size);
-				CTOC(cudaMLO->timer,"resize");
+				CTOC(accMLO->timer,"resize");
 				// Only allow a single image per call of this function!!! nr_pool needs to be set to 1!!!!
 				// This will save memory, as we'll need to store all translated images in memory....
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
@@ -233,12 +235,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					rec_img().setXmippOrigin();
 
 				}
-				CTOC(cudaMLO->timer,"Read3DImages");
+				CTOC(accMLO->timer,"Read3DImages");
 
 			}
 			else
 			{
-				CTIC(cudaMLO->timer,"Read2DImages");
+				CTIC(accMLO->timer,"Read2DImages");
 				img().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
 				{
@@ -256,12 +258,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					}
 					rec_img().setXmippOrigin();
 				}
-				CTOC(cudaMLO->timer,"Read2DImages");
+				CTOC(accMLO->timer,"Read2DImages");
 			}
 		}
-		CTOC(cudaMLO->timer,"setXmippOrigin1");
+		CTOC(accMLO->timer,"setXmippOrigin1");
 
-		CTIC(cudaMLO->timer,"selfTranslate");
+		CTIC(accMLO->timer,"selfTranslate");
 
 		/* FIXME :  For some reason the device-allocation inside "selfTranslate" takes a much longer time than expected.
 		 * 			I tried moving it up and placing the size under a bunch of if()-cases, but this simply transferred the
@@ -293,7 +295,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
 				if (!do_local_angular_searches)
 				{
-					if (! cudaMLO->dataIs3D)
+					if (! accMLO->dataIs3D)
 						XX(my_old_offset_helix_coords) = 0.;
 					else
 						ZZ(my_old_offset_helix_coords) = 0.;
@@ -305,7 +307,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		my_old_offset.selfROUND();
 
-		int img_size = img.data.nzyxdim;
+		size_t img_size = img.data.nzyxdim;
 
 
 
@@ -316,8 +318,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		 * Example usage of AccPtr and AccUtilities library function
 		 */
 
-		AccDataTypes::Image<XFLOAT,AccT> temp(img.data, cudaMLO->devBundle->allocator);
-		AccDataTypes::Image<XFLOAT,AccT> d_img_(img.data,cudaMLO->devBundle->allocator);
+		AccDataTypes::Image<XFLOAT,AccT> temp(img.data, accMLO->devBundle->allocator);
+		AccDataTypes::Image<XFLOAT,AccT> d_img_(img.data,accMLO->devBundle->allocator);
 
 		d_img_.accAlloc();
 		d_img_.accInit(0);
@@ -355,11 +357,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 
 		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
-		CudaGlobalPtr<XFLOAT> d_img(img_size,cudaMLO->devBundle->allocator);
-		d_img.device_alloc();
+		AccPtr<XFLOAT, AccT> d_img(img_size,accMLO->devBundle->allocator);
+		d_img.deviceAlloc();
 
 		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
-			d_img_.cpOnDevice(~d_img);
+			d_img_.cpOnAcc(~d_img);
 		else
 			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.getHostPtr(), ~d_img, img_size, d_img.getStream());
 
@@ -387,59 +389,59 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Also store priors on translations
 		op.prior[ipart] = my_prior;
 
-		CTOC(cudaMLO->timer,"selfTranslate");
+		CTOC(accMLO->timer,"selfTranslate");
 
-		CTIC(cudaMLO->timer,"calcFimg");
+		CTIC(accMLO->timer,"calcFimg");
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		size_t current_size_y = baseMLO->mymodel.current_size;
-		size_t current_size_z = (cudaMLO->dataIs3D) ? baseMLO->mymodel.current_size : 1;
+		size_t current_size_z = (accMLO->dataIs3D) ? baseMLO->mymodel.current_size : 1;
 
-		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
+		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 
 		//FIXME What is this?
-//		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
-//		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
-//		cudaMLO->transformer1.reals.streamSync();
-//		cudaMLO->transformer1.fouriers.streamSync();
+//		deviceInitValue(accMLO->transformer1.reals, (XFLOAT)0.);
+//		deviceInitComplexValue(accMLO->transformer1.fouriers, (XFLOAT)0.);
+//		accMLO->transformer1.reals.streamSync();
+//		accMLO->transformer1.fouriers.streamSync();
 
-		d_img.cp_on_device(cudaMLO->transformer1.reals);
+		d_img.cpOnAcc(accMLO->transformer1.reals);
 
 		runCenterFFT(
-				cudaMLO->transformer1.reals,
-				(int)cudaMLO->transformer1.xSize,
-				(int)cudaMLO->transformer1.ySize,
-				(int)cudaMLO->transformer1.zSize,
+				accMLO->transformer1.reals,
+				(int)accMLO->transformer1.xSize,
+				(int)accMLO->transformer1.ySize,
+				(int)accMLO->transformer1.zSize,
 				false
 				);
 
-		cudaMLO->transformer1.reals.streamSync();
+		accMLO->transformer1.reals.streamSync();
 
-		cudaMLO->transformer1.forward();
-		cudaMLO->transformer1.fouriers.streamSync();
+		accMLO->transformer1.forward();
+		accMLO->transformer1.fouriers.streamSync();
 
-		int FMultiBsize = ( (int) ceilf(( float)cudaMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
-						(XFLOAT*)~cudaMLO->transformer1.fouriers,
-						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
-						cudaMLO->transformer1.fouriers.getSize()*2);
-		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
+		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
+						(XFLOAT*)~accMLO->transformer1.fouriers,
+						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
+						accMLO->transformer1.fouriers.getSize()*2);
+		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
-		CudaGlobalPtr<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z, cudaMLO->devBundle->allocator);
-		d_Fimg.device_alloc();
+		AccPtr<CUDACOMPLEX, AccT> d_Fimg(current_size_x * current_size_y * current_size_z, accMLO->devBundle->allocator);
+		d_Fimg.deviceAlloc();
 
-		cudaMLO->transformer1.fouriers.streamSync();
+		accMLO->transformer1.fouriers.streamSync();
 
 		windowFourierTransform2(
-				cudaMLO->transformer1.fouriers,
+				accMLO->transformer1.fouriers,
 				d_Fimg,
-				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, cudaMLO->transformer1.zFSize, //Input dimensions
+				accMLO->transformer1.xFSize,accMLO->transformer1.yFSize, accMLO->transformer1.zFSize, //Input dimensions
 				current_size_x, current_size_y, current_size_z  //Output dimensions
 				);
-		CTOC(cudaMLO->timer,"calcFimg");
-		cudaMLO->transformer1.fouriers.streamSync();
+		CTOC(accMLO->timer,"calcFimg");
+		accMLO->transformer1.fouriers.streamSync();
 
-		CTIC(cudaMLO->timer,"cpFimg2Host");
-		d_Fimg.cp_to_host();
+		CTIC(accMLO->timer,"cpFimg2Host");
+		d_Fimg.cpToHost();
 		d_Fimg.streamSync();
 
 		Fimg.initZeros(current_size_z, current_size_y, current_size_x);
@@ -448,9 +450,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
 			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
 		}
-		CTOC(cudaMLO->timer,"cpFimg2Host");
+		CTOC(accMLO->timer,"cpFimg2Host");
 
-		CTIC(cudaMLO->timer,"selfApplyBeamTilt");
+		CTIC(accMLO->timer,"selfApplyBeamTilt");
 		// Here apply the beamtilt correction if necessary
 		// This will only be used for reconstruction, not for alignment
 		// But beamtilt only affects very high-resolution components anyway...
@@ -465,9 +467,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		op.Fimgs_nomask.at(ipart) = Fimg;
 
-		CTOC(cudaMLO->timer,"selfApplyBeamTilt");
+		CTOC(accMLO->timer,"selfApplyBeamTilt");
 
-		CTIC(cudaMLO->timer,"zeroMask");
+		CTIC(accMLO->timer,"zeroMask");
 		MultidimArray<RFLOAT> Mnoise;
 		bool is_helical_segment = (baseMLO->do_helical_refine) || ((baseMLO->mymodel.ref_dim == 2) && (baseMLO->helical_tube_outer_diameter > 0.));
 
@@ -492,8 +494,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// Create noisy image for outside the mask
 			MultidimArray<Complex > Fnoise;
 			Mnoise.resize(img());
-			cudaMLO->transformer.setReal(Mnoise);
-			cudaMLO->transformer.getFourierAlias(Fnoise);
+			accMLO->transformer.setReal(Mnoise);
+			accMLO->transformer.getFourierAlias(Fnoise);
 			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
 			{
@@ -510,16 +512,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				}
 			}
 			// Back to real space Mnoise
-			CTIC(cudaMLO->timer,"inverseFourierTransform");
-			cudaMLO->transformer.inverseFourierTransform();
-			CTOC(cudaMLO->timer,"inverseFourierTransform");
+			CTIC(accMLO->timer,"inverseFourierTransform");
+			accMLO->transformer.inverseFourierTransform();
+			CTOC(accMLO->timer,"inverseFourierTransform");
 
-			CTIC(cudaMLO->timer,"setXmippOrigin2");
+			CTIC(accMLO->timer,"setXmippOrigin2");
 			Mnoise.setXmippOrigin();
-			CTOC(cudaMLO->timer,"setXmippOrigin2");
+			CTOC(accMLO->timer,"setXmippOrigin2");
 
-			CTIC(cudaMLO->timer,"softMaskOutsideMap");
-			d_img.cp_to_host();
+			CTIC(accMLO->timer,"softMaskOutsideMap");
+			d_img.cpToHost();
 			d_img.streamSync();
 			for (int i=0; i<img_size; i++)
 				img.data.data[i] = d_img[i];
@@ -534,13 +536,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			for (int i=0; i<img_size; i++)
 				d_img[i] = img.data.data[i];
-			d_img.cp_to_device();
+			d_img.cpToDevice();
 
-			CTOC(cudaMLO->timer,"softMaskOutsideMap");
+			CTOC(accMLO->timer,"softMaskOutsideMap");
 		}
 		else if (is_helical_segment)
 		{
-			d_img.cp_to_host();
+			d_img.cpToHost();
 			d_img.streamSync();
 			for (int i=0; i<img_size; i++)
 				img.data.data[i] = d_img[i];
@@ -550,11 +552,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			for (int i=0; i<img_size; i++)
 				d_img[i] = img.data.data[i];
-			d_img.cp_to_device();
+			d_img.cpToDevice();
 		}
 		else
 		{
-			CTIC(cudaMLO->timer,"softMaskOutsideMap");
+			CTIC(accMLO->timer,"softMaskOutsideMap");
 
 			XFLOAT cosine_width = baseMLO->width_mask_edge;
 			XFLOAT radius = (XFLOAT)((RFLOAT)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
@@ -575,16 +577,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //																				radius,
 //																				radius_p,
 //																				cosine_width);
-//			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+//			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			XFLOAT sum_bg(0.);
 			dim3 block_dim = 128; //TODO: set balanced (hardware-dep?)
-			CudaGlobalPtr<XFLOAT> softMaskSum   (SOFTMASK_BLOCK_SIZE,0,cudaMLO->devBundle->allocator);
-			CudaGlobalPtr<XFLOAT> softMaskSum_bg(SOFTMASK_BLOCK_SIZE,0,cudaMLO->devBundle->allocator);
-			softMaskSum.device_alloc();
-			softMaskSum_bg.device_alloc();
-			softMaskSum.device_init(0.f);
-			softMaskSum_bg.device_init(0.f);
+			AccPtr<XFLOAT, AccT> softMaskSum   (SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
+			AccPtr<XFLOAT, AccT> softMaskSum_bg(SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
+			softMaskSum.deviceAlloc();
+			softMaskSum_bg.deviceAlloc();
+			softMaskSum.deviceInit(0.f);
+			softMaskSum_bg.deviceInit(0.f);
 			cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
 																				img().nzyxdim,
 																				img.data.xdim,
@@ -599,7 +601,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																				cosine_width,
 																				~softMaskSum,
 																				~softMaskSum_bg);
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			softMaskSum.streamSync();
 			sum_bg = (RFLOAT) getSumOnDevice(softMaskSum_bg) / (RFLOAT) getSumOnDevice(softMaskSum);
@@ -618,10 +620,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																			radius_p,
 																			cosine_width,
 																			sum_bg);
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 //			d_img.streamSync();
-//			d_img.cp_to_host();
+//			d_img.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 //			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
@@ -629,80 +631,80 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //				img.data.data[n]=(RFLOAT)d_img[n];
 //			}
 
-			CTOC(cudaMLO->timer,"softMaskOutsideMap");
+			CTOC(accMLO->timer,"softMaskOutsideMap");
 		}
-		CTOC(cudaMLO->timer,"zeroMask");
+		CTOC(accMLO->timer,"zeroMask");
 
-		CTIC(cudaMLO->timer,"setSize");
-		cudaMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
-//		deviceInitValue(cudaMLO->transformer1.reals, (XFLOAT)0.);
-//		deviceInitComplexValue(cudaMLO->transformer1.fouriers, (XFLOAT)0.);
-//		cudaMLO->transformer1.reals.streamSync();
-//		cudaMLO->transformer1.fouriers.streamSync();
-		CTOC(cudaMLO->timer,"setSize");
+		CTIC(accMLO->timer,"setSize");
+		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
+//		deviceInitValue(accMLO->transformer1.reals, (XFLOAT)0.);
+//		deviceInitComplexValue(accMLO->transformer1.fouriers, (XFLOAT)0.);
+//		accMLO->transformer1.reals.streamSync();
+//		accMLO->transformer1.fouriers.streamSync();
+		CTOC(accMLO->timer,"setSize");
 
-		CTIC(cudaMLO->timer,"transform");
-		d_img.cp_on_device(cudaMLO->transformer1.reals);
+		CTIC(accMLO->timer,"transform");
+		d_img.cpOnAcc(accMLO->transformer1.reals);
 
 		runCenterFFT(								// runs on input GlobalPtr.stream
-				cudaMLO->transformer1.reals,
-				(int)cudaMLO->transformer1.xSize,
-				(int)cudaMLO->transformer1.ySize,
-				(int)cudaMLO->transformer1.zSize,
+				accMLO->transformer1.reals,
+				(int)accMLO->transformer1.xSize,
+				(int)accMLO->transformer1.ySize,
+				(int)accMLO->transformer1.zSize,
 				false
 				);
-		cudaMLO->transformer1.reals.streamSync();
-		cudaMLO->transformer1.forward();
-		cudaMLO->transformer1.fouriers.streamSync();
+		accMLO->transformer1.reals.streamSync();
+		accMLO->transformer1.forward();
+		accMLO->transformer1.fouriers.streamSync();
 
-		int FMultiBsize2 = ( (int) ceilf(( float)cudaMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
-						(XFLOAT*)~cudaMLO->transformer1.fouriers,
-						(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
-						cudaMLO->transformer1.fouriers.getSize()*2);
-		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+		int FMultiBsize2 = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
+		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
+						(XFLOAT*)~accMLO->transformer1.fouriers,
+						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
+						accMLO->transformer1.fouriers.getSize()*2);
+		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
-		CTOC(cudaMLO->timer,"transform");
+		CTOC(accMLO->timer,"transform");
 
-		cudaMLO->transformer1.fouriers.streamSync();
+		accMLO->transformer1.fouriers.streamSync();
 
-		CTIC(cudaMLO->timer,"powerClass");
+		CTIC(accMLO->timer,"powerClass");
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
-			CudaGlobalPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,cudaMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
-			spectrumAndXi2.device_alloc();
-			spectrumAndXi2.device_init(0);
+			AccPtr<XFLOAT, AccT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,accMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
+			spectrumAndXi2.deviceAlloc();
+			spectrumAndXi2.deviceInit(0);
 			spectrumAndXi2.streamSync();
 
-			dim3 gridSize = CEIL((float)(cudaMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
-			if(cudaMLO->dataIs3D)
+			dim3 gridSize = CEIL((float)(accMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
+			if(accMLO->dataIs3D)
 				cuda_kernel_powerClass<true><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
-					~cudaMLO->transformer1.fouriers,
+					~accMLO->transformer1.fouriers,
 					~spectrumAndXi2,
-					cudaMLO->transformer1.fouriers.getSize(),
+					accMLO->transformer1.fouriers.getSize(),
 					spectrumAndXi2.getSize()-1,
-					cudaMLO->transformer1.xFSize,
-					cudaMLO->transformer1.yFSize,
-					cudaMLO->transformer1.zFSize,
+					accMLO->transformer1.xFSize,
+					accMLO->transformer1.yFSize,
+					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 			else
 				cuda_kernel_powerClass<false><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
-					~cudaMLO->transformer1.fouriers,
+					~accMLO->transformer1.fouriers,
 					~spectrumAndXi2,
-					cudaMLO->transformer1.fouriers.getSize(),
+					accMLO->transformer1.fouriers.getSize(),
 					spectrumAndXi2.getSize()-1,
-					cudaMLO->transformer1.xFSize,
-					cudaMLO->transformer1.yFSize,
-					cudaMLO->transformer1.zFSize,
+					accMLO->transformer1.xFSize,
+					accMLO->transformer1.yFSize,
+					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-					&spectrumAndXi2.d_ptr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			spectrumAndXi2.streamSync();
-			spectrumAndXi2.cp_to_host();
+			spectrumAndXi2.cpToHost();
 			spectrumAndXi2.streamSync();
 
 			op.power_imgs.at(ipart).resize(baseMLO->mymodel.ori_size/2 + 1);
@@ -715,45 +717,45 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			op.highres_Xi2_imgs.at(ipart) = 0.;
 		}
-		CTOC(cudaMLO->timer,"powerClass");
+		CTOC(accMLO->timer,"powerClass");
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
-		CTIC(cudaMLO->timer,"windowFourierTransform2");
+		CTIC(accMLO->timer,"windowFourierTransform2");
 		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
-		cudaMLO->transformer1.fouriers.streamSync();
+		accMLO->transformer1.fouriers.streamSync();
 		windowFourierTransform2(
-				cudaMLO->transformer1.fouriers,
+				accMLO->transformer1.fouriers,
 				d_Fimg,
-				cudaMLO->transformer1.xFSize,cudaMLO->transformer1.yFSize, cudaMLO->transformer1.zFSize, //Input dimensions
+				accMLO->transformer1.xFSize,accMLO->transformer1.yFSize, accMLO->transformer1.zFSize, //Input dimensions
 				current_size_x, current_size_y, current_size_z,  //Output dimensions
 				1, 	//Npsi
 				0,	//pos
-				cudaMLO->transformer1.fouriers.getStream()
+				accMLO->transformer1.fouriers.getStream()
 				);
-		CTOC(cudaMLO->timer,"windowFourierTransform2");
+		CTOC(accMLO->timer,"windowFourierTransform2");
 		// Also store its CTF
-		CTIC(cudaMLO->timer,"ctfCorr");
-		CTIC(cudaMLO->timer,"cpFimg2Host_2");
+		CTIC(accMLO->timer,"ctfCorr");
+		CTIC(accMLO->timer,"cpFimg2Host_2");
 		d_Fimg.streamSync();
-		d_Fimg.cp_to_host();
+		d_Fimg.cpToHost();
 		d_Fimg.streamSync();
 		for (int i = 0; i < Fimg.nzyxdim; i ++)
 		{
 			Fimg.data[i].real = (RFLOAT) d_Fimg[i].x;
 			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
 		}
-		CTOC(cudaMLO->timer,"cpFimg2Host_2");
+		CTOC(accMLO->timer,"cpFimg2Host_2");
 
 		Fctf.resize(Fimg);
 		// Now calculate the actual CTF
 		if (baseMLO->do_ctf_correction)
 		{
-			if (cudaMLO->dataIs3D)
+			if (accMLO->dataIs3D)
 			{
 				Image<RFLOAT> Ictf;
 				if (baseMLO->do_parallel_disc_io)
 				{
-					CTIC(cudaMLO->timer,"CTFRead3D_disk");
+					CTIC(accMLO->timer,"CTFRead3D_disk");
 					// Read CTF-image from disc
 					FileName fn_ctf;
 					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_ctf, true))
@@ -764,32 +766,32 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
-					CTOC(cudaMLO->timer,"CTFRead3D_disk");
+					CTOC(accMLO->timer,"CTFRead3D_disk");
 				}
 				else
 				{
-					CTIC(cudaMLO->timer,"CTFRead3D_array");
+					CTIC(accMLO->timer,"CTFRead3D_array");
 					// Unpack the CTF-image from the exp_imagedata array
 					Ictf().resize(baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Ictf())
 					{
 						DIRECT_A3D_ELEM(Ictf(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, baseMLO->mymodel.ori_size + k, i, j);
 					}
-					CTOC(cudaMLO->timer,"CTFRead3D_array");
+					CTOC(accMLO->timer,"CTFRead3D_array");
 				}
 				// Set the CTF-image in Fctf
-				CTIC(cudaMLO->timer,"CTFSet3D_array");
+				CTIC(accMLO->timer,"CTFSet3D_array");
 				Ictf().setXmippOrigin();
 				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
 				{
 					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
 					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
 				}
-				CTIC(cudaMLO->timer,"CTFSet3D_array");
+				CTIC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
 			{
-				CTIC(cudaMLO->timer,"CTFRead2D");
+				CTIC(accMLO->timer,"CTFRead2D");
 				CTF ctf;
 				ctf.setValues(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
 							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
@@ -803,35 +805,36 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 				ctf.getFftwImage(Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
-				CTIC(cudaMLO->timer,"CTFRead2D");
+				CTIC(accMLO->timer,"CTFRead2D");
 			}
 		}
 		else
 		{
 			Fctf.initConstant(1.);
 		}
-		CTOC(cudaMLO->timer,"ctfCorr");
+		CTOC(accMLO->timer,"ctfCorr");
 		// Store Fimg and Fctf
 		op.Fimgs.at(ipart) = Fimg;
 		op.Fctfs.at(ipart) = Fctf;
 
 	} // end loop ipart
-	//cudaMLO->transformer.clear();
+	//accMLO->transformer.clear();
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_FT);
 #endif
-	GTOC(cudaMLO->timer,"getFourierTransformsAndCtfs");
-	GATHERGPUTIMINGS(cudaMLO->timer);
+	GTOC(accMLO->timer,"getFourierTransformsAndCtfs");
+	GATHERGPUTIMINGS(accMLO->timer);
 }
 
+template <class MlClass, int AccT>
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
-		MlOptimiserCuda *cudaMLO,
-	 	CudaGlobalPtr<XFLOAT> &Mweight)
+		MlClass *accMLO,
+	 	AccPtr<XFLOAT, AccT> &Mweight)
 {
 
 #ifdef TIMING
@@ -841,7 +844,7 @@ void getAllSquaredDifferencesCoarse(
 
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
 
-	CTIC(cudaMLO->timer,"diff_pre_gpu");
+	CTIC(accMLO->timer,"diff_pre_gpu");
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	std::vector<MultidimArray<Complex > > dummy;
@@ -851,16 +854,16 @@ void getAllSquaredDifferencesCoarse(
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	CTOC(cudaMLO->timer,"diff_pre_gpu");
+	CTOC(accMLO->timer,"diff_pre_gpu");
 
-	std::vector<CudaProjectorPlan> projectorPlans(0, cudaMLO->devBundle->allocator);
+	std::vector<CudaProjectorPlan> projectorPlans(0, accMLO->devBundle->allocator);
 
 	//If particle specific sampling plan required
-	if (cudaMLO->devBundle->generateProjectionPlanOnTheFly)
+	if (accMLO->devBundle->generateProjectionPlanOnTheFly)
 	{
-		CTIC(cudaMLO->timer,"generateProjectionSetupCoarse");
+		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 
-		projectorPlans.resize(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
+		projectorPlans.resize(baseMLO->mymodel.nr_classes, accMLO->devBundle->allocator);
 
 		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
@@ -894,18 +897,18 @@ void getAllSquaredDifferencesCoarse(
 						);
 			}
 		}
-		CTOC(cudaMLO->timer,"generateProjectionSetupCoarse");
+		CTOC(accMLO->timer,"generateProjectionSetupCoarse");
 	}
 	else
-		projectorPlans = cudaMLO->devBundle->coarseProjectionPlans;
+		projectorPlans = accMLO->devBundle->coarseProjectionPlans;
 
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		allWeights_size += projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans;
 
-	CudaGlobalPtr<XFLOAT> allWeights(allWeights_size,cudaMLO->devBundle->allocator);
-	allWeights.device_alloc();
+	AccPtr<XFLOAT, AccT> allWeights(allWeights_size,accMLO->devBundle->allocator);
+	allWeights.deviceAlloc();
 
 	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
 
@@ -918,16 +921,16 @@ void getAllSquaredDifferencesCoarse(
 				Generate Translations
 		======================================*/
 
-		CTIC(cudaMLO->timer,"translation_1");
+		CTIC(accMLO->timer,"translation_1");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_z(translation_num, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_x(translation_num, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_y(translation_num, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_z(translation_num, accMLO->devBundle->allocator);
 
-		CudaGlobalPtr<XFLOAT> Fimg_real(image_size, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimg_imag(image_size, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimg_real(image_size, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimg_imag(image_size, accMLO->devBundle->allocator);
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -941,7 +944,7 @@ void getAllSquaredDifferencesCoarse(
 
 			xshift = oversampled_translations_x[0];
 			yshift = oversampled_translations_y[0];
-			if (cudaMLO->dataIs3D)
+			if (accMLO->dataIs3D)
 				zshift = oversampled_translations_z[0];
 
 			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -949,7 +952,7 @@ void getAllSquaredDifferencesCoarse(
 				RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 				RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op.metadata_offset + ipart, METADATA_PSI);
-				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (cudaMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
+				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 			}
 
 			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
@@ -978,27 +981,27 @@ void getAllSquaredDifferencesCoarse(
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
 
-		trans_x.put_on_device();
-		trans_y.put_on_device();
-		trans_z.put_on_device();
+		trans_x.putOnDevice();
+		trans_y.putOnDevice();
+		trans_z.putOnDevice();
 
-		Fimg_real.put_on_device();
-		Fimg_imag.put_on_device();
+		Fimg_real.putOnDevice();
+		Fimg_imag.putOnDevice();
 
-		CTOC(cudaMLO->timer,"translation_1");
+		CTOC(accMLO->timer,"translation_1");
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
-		CudaGlobalPtr<XFLOAT> corr_img(image_size, cudaMLO->devBundle->allocator);
-		corr_img.device_alloc();
+		AccPtr<XFLOAT, AccT> corr_img(image_size, accMLO->devBundle->allocator);
+		corr_img.deviceAlloc();
 
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
-		corr_img.cp_to_device();
+		corr_img.cpToDevice();
 
 		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 		allWeights_pos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1010,7 +1013,7 @@ void getAllSquaredDifferencesCoarse(
 				======================================*/
 
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
-						cudaMLO->devBundle->cudaProjectors[exp_iclass],
+						accMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -1030,9 +1033,9 @@ void getAllSquaredDifferencesCoarse(
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
 						image_size,
-						cudaMLO->classStreams[exp_iclass],
+						accMLO->classStreams[exp_iclass],
 						do_CC,
-						cudaMLO->dataIs3D);
+						accMLO->dataIs3D);
 
 				mapAllWeightsToMweights(
 						~projectorPlans[exp_iclass].iorientclasses,
@@ -1040,7 +1043,7 @@ void getAllSquaredDifferencesCoarse(
 						&Mweight(ipart*weightsPerPart),
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
-						cudaMLO->classStreams[exp_iclass]
+						accMLO->classStreams[exp_iclass]
 						);
 
 				/*====================================
@@ -1052,7 +1055,7 @@ void getAllSquaredDifferencesCoarse(
 		}
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
 		op.min_diff2[ipart] = getMinOnDevice(allWeights);
@@ -1066,13 +1069,14 @@ void getAllSquaredDifferencesCoarse(
 #endif
 }
 
+template <class MlClass, int AccT>
 void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  OptimisationParamters &op,
 		 	 	 	 	 	 	  SamplingParameters &sp,
 		 	 	 	 	 	 	  MlOptimiser *baseMLO,
-		 	 	 	 	 	 	  MlOptimiserCuda *cudaMLO,
-		 	 	 	 	 	 	  std::vector<IndexedDataArray> &FinePassWeights,
-		 	 	 	 	 	 	  std::vector<std::vector< IndexedDataArrayMask > > &FPCMasks,
+		 	 	 	 	 	 	  MlClass *accMLO,
+		 	 	 	 	 	 	  std::vector<IndexedDataArray<AccT> > &FinePassWeights,
+		 	 	 	 	 	 	  std::vector<std::vector< IndexedDataArrayMask<AccT> > > &FPCMasks,
 		 	 	 	 	 	 	  std::vector<ProjectionParams> &FineProjectionData,
 		 	 	 	 	 	 	  std::vector<cudaStager<unsigned long> > &stagerD2)
 {
@@ -1082,20 +1086,20 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 #endif
 
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
-	CTIC(cudaMLO->timer,"diff_pre_gpu");
+	CTIC(accMLO->timer,"diff_pre_gpu");
 
-	CTIC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
+	CTIC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, dummy, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
-	CTOC(cudaMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
+	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	MultidimArray<Complex > Fref;
 	Fref.resize(op.local_Minvsigma2s[0]);
 
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
-	CTOC(cudaMLO->timer,"diff_pre_gpu");
+	CTOC(accMLO->timer,"diff_pre_gpu");
 
 	/*=======================================================================================
 										  Particle Iteration
@@ -1112,16 +1116,16 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				Generate Translations
 		======================================*/
 
-		CTIC(cudaMLO->timer,"translation_2");
+		CTIC(accMLO->timer,"translation_2");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		CudaGlobalPtr<XFLOAT> Fimg_real(image_size, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimg_imag(image_size, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimg_real(image_size, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimg_imag(image_size, accMLO->devBundle->allocator);
 
-		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_z(translation_num, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_x(translation_num, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_y(translation_num, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_z(translation_num, accMLO->devBundle->allocator);
 
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
@@ -1139,7 +1143,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				xshift = oversampled_translations_x[iover_trans];
 				yshift = oversampled_translations_y[iover_trans];
-				if (cudaMLO->dataIs3D)
+				if (accMLO->dataIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -1147,7 +1151,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 					RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
-					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (cudaMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
+					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 				}
 
 				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
@@ -1179,27 +1183,27 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
 
-		CTOC(cudaMLO->timer,"translation_2");
+		CTOC(accMLO->timer,"translation_2");
 
 
-		CTIC(cudaMLO->timer,"kernel_init_1");
+		CTIC(accMLO->timer,"kernel_init_1");
 
-		CudaGlobalPtr<XFLOAT> corr_img(image_size, cudaMLO->devBundle->allocator);
-		corr_img.device_alloc();
+		AccPtr<XFLOAT, AccT> corr_img(image_size, accMLO->devBundle->allocator);
+		corr_img.deviceAlloc();
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 
-		trans_x.put_on_device();
-		trans_y.put_on_device();
-		trans_z.put_on_device();
+		trans_x.putOnDevice();
+		trans_y.putOnDevice();
+		trans_z.putOnDevice();
 
 
-		Fimg_real.put_on_device();
-		Fimg_imag.put_on_device();
-		corr_img.cp_to_device();
+		Fimg_real.putOnDevice();
+		Fimg_imag.putOnDevice();
+		corr_img.cpToDevice();
 
-		CTOC(cudaMLO->timer,"kernel_init_1");
-		std::vector< CudaGlobalPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), cudaMLO->devBundle->allocator);
-		cudaStager<XFLOAT> AllEulers(cudaMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
+		CTOC(accMLO->timer,"kernel_init_1");
+		std::vector< AccPtr<XFLOAT, AccT> > eulers((sp.iclass_max-sp.iclass_min+1), accMLO->devBundle->allocator);
+		cudaStager<XFLOAT> AllEulers(accMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
 		unsigned long newDataSize(0);
 
@@ -1221,7 +1225,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				if(orientation_num==0)
 					continue;
 
-				CTIC(cudaMLO->timer,"pair_list_1");
+				CTIC(accMLO->timer,"pair_list_1");
 				long unsigned significant_num(0);
 				long int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				long int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
@@ -1242,9 +1246,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				}
 
 				int chunkSize(0);
-				if(cudaMLO->dataIs3D)
+				if(accMLO->dataIs3D)
 					chunkSize = D2F_CHUNK_DATA3D;
-				else if(cudaMLO->refIs3D)
+				else if(accMLO->refIs3D)
 					chunkSize = D2F_CHUNK_DATA3D;
 				else
 					chunkSize = D2F_CHUNK_2D;
@@ -1263,25 +1267,25 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				newDataSize += significant_num;
 				FPCMasks[ipart][exp_iclass].weightNum = significant_num;
 				FPCMasks[ipart][exp_iclass].lastPos = FPCMasks[ipart][exp_iclass].firstPos + significant_num;
-				CTOC(cudaMLO->timer,"pair_list_1");
+				CTOC(accMLO->timer,"pair_list_1");
 
-				CTIC(cudaMLO->timer,"IndexedArrayMemCp2");
-//				FPCMasks[ipart][exp_iclass].jobOrigin.cp_to_device();
-//				FPCMasks[ipart][exp_iclass].jobExtent.cp_to_device();
+				CTIC(accMLO->timer,"IndexedArrayMemCp2");
+//				FPCMasks[ipart][exp_iclass].jobOrigin.cpToDevice();
+//				FPCMasks[ipart][exp_iclass].jobExtent.cpToDevice();
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
-				CTOC(cudaMLO->timer,"IndexedArrayMemCp2");
+				CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
-				CTIC(cudaMLO->timer,"generateEulerMatrices");
+				CTIC(accMLO->timer,"generateEulerMatrices");
 				eulers[exp_iclass-sp.iclass_min].setSize(9*FineProjectionData[ipart].class_entries[exp_iclass]);
-				eulers[exp_iclass-sp.iclass_min].host_alloc();
+				eulers[exp_iclass-sp.iclass_min].hostAlloc();
 				generateEulerMatrices(
 						baseMLO->mymodel.PPref[exp_iclass].padding_factor,
 						thisClassProjectionData,
 						&(eulers[exp_iclass-sp.iclass_min])[0],
 						!IS_NOT_INV);
 				AllEulers.stage(eulers[exp_iclass-sp.iclass_min]);
-				CTOC(cudaMLO->timer,"generateEulerMatrices");
+				CTOC(accMLO->timer,"generateEulerMatrices");
 			}
 		}
 
@@ -1289,12 +1293,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
 
-		FinePassWeights[ipart].rot_id.cp_to_device(); //FIXME this is not used
-		FinePassWeights[ipart].rot_idx.cp_to_device();
-		FinePassWeights[ipart].trans_idx.cp_to_device();
+		FinePassWeights[ipart].rot_id.cpToDevice(); //FIXME this is not used
+		FinePassWeights[ipart].rot_idx.cpToDevice();
+		FinePassWeights[ipart].trans_idx.cpToDevice();
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1309,19 +1313,19 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				if(significant_num==0)
 					continue;
 
-				CTIC(cudaMLO->timer,"Diff2MakeKernel");
+				CTIC(accMLO->timer,"Diff2MakeKernel");
 				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
-						cudaMLO->devBundle->cudaProjectors[exp_iclass],
+						accMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
 						op.local_Minvsigma2s[0].xdim-1);
-				CTOC(cudaMLO->timer,"Diff2MakeKernel");
+				CTOC(accMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
-				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
+				IndexedDataArray<AccT> thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
 
-				CTIC(cudaMLO->timer,"Diff2CALL");
+				CTIC(accMLO->timer,"Diff2CALL");
 
 				runDiff2KernelFine(
 						projKernel,
@@ -1346,32 +1350,32 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						image_size,
 						ipart,
 						exp_iclass,
-						cudaMLO->classStreams[exp_iclass],
+						accMLO->classStreams[exp_iclass],
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
-						cudaMLO->dataIs3D
+						accMLO->dataIs3D
 						);
 
 //				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-				CTOC(cudaMLO->timer,"Diff2CALL");
+				CTOC(accMLO->timer,"Diff2CALL");
 
 			} // end if class significant
 		} // end loop iclass
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		FinePassWeights[ipart].setDataSize( newDataSize );
 
-		CTIC(cudaMLO->timer,"collect_data_1");
+		CTIC(accMLO->timer,"collect_data_1");
 		if(baseMLO->adaptive_oversampling!=0)
 		{
 			op.min_diff2[ipart] = (RFLOAT) getMinOnDevice(FinePassWeights[ipart].weights);
 			op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(FinePassWeights[ipart].weights) /
 					(RFLOAT) FinePassWeights[ipart].weights.size;
 		}
-		CTOC(cudaMLO->timer,"collect_data_1");
+		CTOC(accMLO->timer,"collect_data_1");
 //		std::cerr << "  fine pass minweight  =  " << op.min_diff2[ipart] << std::endl;
 
 	}// end loop ipart
@@ -1382,15 +1386,15 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 }
 
 
-template<typename weights_t>
+template<class MlClass, int AccT, typename weights_t>
 void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
 											MlOptimiser *baseMLO,
-											MlOptimiserCuda *cudaMLO,
-											std::vector< IndexedDataArray> &PassWeights,
-											std::vector< std::vector< IndexedDataArrayMask > > &FPCMasks,
-											CudaGlobalPtr<XFLOAT> &Mweight, // FPCMasks = Fine-Pass Class-Masks
+											MlClass *accMLO,
+											std::vector< IndexedDataArray<AccT> > &PassWeights,
+											std::vector< std::vector< IndexedDataArrayMask<AccT> > > &FPCMasks,
+											AccPtr<XFLOAT, AccT> &Mweight, // FPCMasks = Fine-Pass Class-Masks
 											bool failsafeMode = false)
 {
 #ifdef TIMING
@@ -1402,19 +1406,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 
 	// Ready the "prior-containers" for all classes (remake every ipart)
-	CudaGlobalPtr<XFLOAT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, cudaMLO->devBundle->allocator);
-	CudaGlobalPtr<XFLOAT>  pdf_offset((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans, cudaMLO->devBundle->allocator);
+	AccPtr<XFLOAT, AccT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, accMLO->devBundle->allocator);
+	AccPtr<XFLOAT, AccT>  pdf_offset((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans, accMLO->devBundle->allocator);
 
 	RFLOAT pdf_orientation_mean(0);
 	unsigned pdf_orientation_count(0);
 
 	CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_PDF");
 
-	pdf_orientation.device_alloc();
-	pdf_offset.device_alloc();
+	pdf_orientation.deviceAlloc();
+	pdf_offset.deviceAlloc();
 
 	// pdf_orientation is ipart-independent, so we keep it above ipart scope
-	CTIC(cudaMLO->timer,"get_orient_priors");
+	CTIC(accMLO->timer,"get_orient_priors");
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		for (long int idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
 			for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
@@ -1442,8 +1446,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		for (int i = 0; i < pdf_orientation.getSize(); i ++)
 			pdf_orientation[i] /= pdf_orientation_mean;
 
-	pdf_orientation.cp_to_device();
-	CTOC(cudaMLO->timer,"get_orient_priors");
+	pdf_orientation.cpToDevice();
+	CTOC(accMLO->timer,"get_orient_priors");
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
 	{
@@ -1468,7 +1472,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		RFLOAT old_offset_z;
 		RFLOAT old_offset_x = XX(op.old_offset[ipart]);
 		RFLOAT old_offset_y = YY(op.old_offset[ipart]);
-		if (cudaMLO->dataIs3D)
+		if (accMLO->dataIs3D)
 			old_offset_z = ZZ(op.old_offset[ipart]);
 
 		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
@@ -1476,14 +1480,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if(exp_ipass==0)
 			{
 				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-				PassWeights[ipart].weights.setDevPtr(&Mweight(ipart*nr_coarse_weights));
-				PassWeights[ipart].weights.setHstPtr(&Mweight[ipart*nr_coarse_weights]);
+				PassWeights[ipart].weights.setDevicePtr(&Mweight(ipart*nr_coarse_weights));
+				PassWeights[ipart].weights.setHostPtr(&Mweight[ipart*nr_coarse_weights]);
 				PassWeights[ipart].weights.setSize(nr_coarse_weights);
 			}
-			PassWeights[ipart].weights.h_do_free=false;
+			PassWeights[ipart].weights.doFreeHost=false;
 
 			std::pair<int, XFLOAT> min_pair=getArgMinOnDevice(PassWeights[ipart].weights);
-			PassWeights[ipart].weights.cp_to_host();
+			PassWeights[ipart].weights.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 			//Set all device-located weights to zero, and only the smallest one to 1.
@@ -1492,7 +1496,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			XFLOAT unity=1;
 			DEBUG_HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights[ipart].weights(min_pair.first) ), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
 
-			PassWeights[ipart].weights.cp_to_host();
+			PassWeights[ipart].weights.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 			my_significant_weight = 0.999;
@@ -1520,7 +1524,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
-			CTIC(cudaMLO->timer,"get_offset_priors");
+			CTIC(accMLO->timer,"get_offset_priors");
 
 			double pdf_offset_mean(0);
 			std::vector<double> pdf_offset_t(pdf_offset.getSize());
@@ -1541,14 +1545,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				{
 					myprior_x = XX(op.prior[ipart]);
 					myprior_y = YY(op.prior[ipart]);
-					if (cudaMLO->dataIs3D)
+					if (accMLO->dataIs3D)
 						myprior_z = ZZ(op.prior[ipart]);
 				}
 
 				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-					if (cudaMLO->dataIs3D)
+					if (accMLO->dataIs3D)
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
@@ -1557,7 +1561,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
-						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (cudaMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
+						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
 					}
 					// (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
 
@@ -1568,10 +1572,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
 					double tdiff2 = 0.;
 
-					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (cudaMLO->dataIs3D) )
+					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->dataIs3D) )
 						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
 					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-					if (cudaMLO->dataIs3D)
+					if (accMLO->dataIs3D)
 					{
 						RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
 						if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
@@ -1599,9 +1603,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				for (int i = 0; i < pdf_offset.getSize(); i ++)
 					pdf_offset[i] = pdf_offset_t[i] /  pdf_offset_mean;
 
-			pdf_offset.cp_to_device();
-			CTOC(cudaMLO->timer,"get_offset_priors");
-			CTIC(cudaMLO->timer,"sumweight1");
+			pdf_offset.cpToDevice();
+			CTOC(accMLO->timer,"get_offset_priors");
+			CTIC(accMLO->timer,"sumweight1");
 
 			long int block_num;
 
@@ -1612,24 +1616,24 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if(exp_ipass==0)
 			{
-				CudaGlobalPtr<weights_t> weights(Mweight.getAllocator());
+				AccPtr<weights_t, AccT> weights(Mweight.getAllocator());
 				weights.setSize(Mweight.getSize());
 
 				if (sizeof(weights_t) == sizeof(XFLOAT))
 				{
-					weights.setHstPtr((weights_t*) Mweight.h_ptr);
-					weights.setDevPtr((weights_t*) Mweight.d_ptr);
+					weights.setHostPtr((weights_t*) Mweight.hPtr);
+					weights.setDevicePtr((weights_t*) Mweight.dPtr);
 					weights.setAllocator(Mweight.getAllocator());
 				}
 				else
 				{
-					weights.device_alloc();
+					weights.deviceAlloc();
 					block_num = ceilf((float)Mweight.getSize()/(float)BLOCK_SIZE);
 					cuda_kernel_cast<XFLOAT,weights_t><<<block_num,BLOCK_SIZE,0>>>
 							(~Mweight,~weights,Mweight.getSize());
 				}
 
-				CudaGlobalPtr<weights_t>  ipartMweight(
+				AccPtr<weights_t, AccT>  ipartMweight(
 						weights,
 						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
@@ -1662,7 +1666,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							sp.nr_trans);
 				}
 
-				CTIC(cudaMLO->timer,"sort");
+				CTIC(accMLO->timer,"sort");
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 				long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
@@ -1670,15 +1674,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (ipart_length > 1)
 				{
 					//Wrap the current ipart data in a new pointer
-					CudaGlobalPtr<weights_t> unsorted_ipart(weights,
+					AccPtr<weights_t, AccT> unsorted_ipart(weights,
 							ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 							ipart_length);
 
-					CudaGlobalPtr<weights_t> filtered(unsorted_ipart.getSize(), cudaMLO->devBundle->allocator);
+					AccPtr<weights_t, AccT> filtered(unsorted_ipart.getSize(), accMLO->devBundle->allocator);
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
 
-					filtered.device_alloc();
+					filtered.deviceAlloc();
 
 					MoreThanCubOpt<weights_t> moreThanOpt(0.);
 					size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
@@ -1692,9 +1696,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-							pdf_orientation.dump_device_to_file("error_dump_pdf_orientation");
-							pdf_offset.dump_device_to_file("error_dump_pdf_offset");
-							unsorted_ipart.dump_device_to_file("error_dump_filtered");
+							pdf_orientation.dumpDeviceToFile("error_dump_pdf_orientation");
+							pdf_offset.dumpDeviceToFile("error_dump_pdf_offset");
+							unsorted_ipart.dumpDeviceToFile("error_dump_filtered");
 
 							std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
 						}
@@ -1703,15 +1707,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					}
 					filtered.setSize(filteredSize);
 
-					CudaGlobalPtr<weights_t> sorted(filteredSize, cudaMLO->devBundle->allocator);
-					CudaGlobalPtr<weights_t> cumulative_sum(filteredSize, cudaMLO->devBundle->allocator);
-					sorted.device_alloc();
-					cumulative_sum.device_alloc();
+					AccPtr<weights_t, AccT> sorted(filteredSize, accMLO->devBundle->allocator);
+					AccPtr<weights_t, AccT> cumulative_sum(filteredSize, accMLO->devBundle->allocator);
+					sorted.deviceAlloc();
+					cumulative_sum.deviceAlloc();
 
 					sortOnDevice(filtered, sorted);
 					scanOnDevice(sorted, cumulative_sum);
 
-					CTOC(cudaMLO->timer,"sort");
+					CTOC(accMLO->timer,"sort");
 
 					op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
@@ -1721,16 +1725,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					int grid_size = ceil((float)(cumulative_sum.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
 					if(grid_size > 0)
 					{
-						CudaGlobalPtr<size_t >  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
+						AccPtr<size_t, AccT>  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
 						idx[0] = 0;
-						idx.put_on_device();
+						idx.putOnDevice();
 						cuda_kernel_find_threshold_idx_in_cumulative<weights_t>
 						<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, cumulative_sum.getStream() >>>(
 								~cumulative_sum,
 								(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart],
 								cumulative_sum.getSize()-1,
 								~idx);
-						idx.cp_to_host();
+						idx.cpToHost();
 						DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cumulative_sum.getStream()));
 
 						thresholdIdx = idx[0];
@@ -1750,10 +1754,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-							unsorted_ipart.dump_device_to_file("error_dump_unsorted");
-							filtered.dump_device_to_file("error_dump_filtered");
-							sorted.dump_device_to_file("error_dump_sorted");
-							cumulative_sum.dump_device_to_file("error_dump_cumulative_sum");
+							unsorted_ipart.dumpDeviceToFile("error_dump_unsorted");
+							filtered.dumpDeviceToFile("error_dump_filtered");
+							sorted.dumpDeviceToFile("error_dump_sorted");
+							cumulative_sum.dumpDeviceToFile("error_dump_cumulative_sum");
 
 							std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
 						}
@@ -1770,26 +1774,26 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					weights_t significant_weight = sorted.getDeviceAt(thresholdIdx);
 
-					CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+					CTIC(accMLO->timer,"getArgMaxOnDevice");
 					std::pair<int, weights_t> max_pair = getArgMaxOnDevice(unsorted_ipart);
-					CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].coarseIdx = max_pair.first;
 					op.max_weight[ipart] = max_pair.second;
 
 					// Store nr_significant_coarse_samples for this particle
 					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
-					CudaGlobalPtr<bool> Mcoarse_significant(
+					AccPtr<bool, AccT> Mcoarse_significant(
 							&op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min],
 							(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
-							cudaMLO->devBundle->allocator);
+							accMLO->devBundle->allocator);
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
-					Mcoarse_significant.device_alloc();
+					Mcoarse_significant.deviceAlloc();
 
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 					arrayOverThreshold<weights_t>(unsorted_ipart, Mcoarse_significant, significant_weight);
-					Mcoarse_significant.cp_to_host();
+					Mcoarse_significant.cpToHost();
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				}
 				else if (ipart_length == 1)
@@ -1803,7 +1807,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			{
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
@@ -1812,14 +1816,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					{
 						// Use the constructed mask to build a partial (class-specific) input
 						// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
-						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
-						CudaGlobalPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
-						CudaGlobalPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
+						IndexedDataArray<AccT> thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
+						AccPtr<XFLOAT, AccT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
+						AccPtr<XFLOAT, AccT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
 						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 						dim3 block_dim(block_num);
 
-						cuda_kernel_exponentiate_weights_fine<<<block_dim,SUMW_BLOCK_SIZE,0,cudaMLO->classStreams[exp_iclass]>>>(
+						cuda_kernel_exponentiate_weights_fine<<<block_dim,SUMW_BLOCK_SIZE,0,accMLO->classStreams[exp_iclass]>>>(
 								~pdf_orientation_class,
 								~pdf_offset_class,
 								~thisClassPassWeights.weights,
@@ -1831,33 +1835,33 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								~FPCMasks[ipart][exp_iclass].jobOrigin,
 								~FPCMasks[ipart][exp_iclass].jobExtent,
 								FPCMasks[ipart][exp_iclass].jobNum);
-								LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+								LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 					}
 
 				}
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				PassWeights[ipart].weights.cp_to_host(); // note that the host-pointer is shared: we're copying to Mweight.
+				PassWeights[ipart].weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
 
 
-				CTIC(cudaMLO->timer,"sort");
+				CTIC(accMLO->timer,"sort");
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				size_t weightSize = PassWeights[ipart].weights.getSize();
 
-				CudaGlobalPtr<XFLOAT> sorted(weightSize, cudaMLO->devBundle->allocator);
-				CudaGlobalPtr<XFLOAT> cumulative_sum(weightSize, cudaMLO->devBundle->allocator);
+				AccPtr<XFLOAT, AccT> sorted(weightSize, accMLO->devBundle->allocator);
+				AccPtr<XFLOAT, AccT> cumulative_sum(weightSize, accMLO->devBundle->allocator);
 
 				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
 
-				sorted.device_alloc();
-				cumulative_sum.device_alloc();
+				sorted.deviceAlloc();
+				cumulative_sum.deviceAlloc();
 
 				sortOnDevice(PassWeights[ipart].weights, sorted);
 				scanOnDevice(sorted, cumulative_sum);
-				CTOC(cudaMLO->timer,"sort");
+				CTOC(accMLO->timer,"sort");
 
 				if(baseMLO->adaptive_oversampling!=0)
 				{
@@ -1882,9 +1886,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 					my_significant_weight = sorted.getDeviceAt(thresholdIdx);
 
-					CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+					CTIC(accMLO->timer,"getArgMaxOnDevice");
 					std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
-					CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
 					op.max_weight[ipart] = max_pair.second;
 				}
@@ -1893,7 +1897,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					my_significant_weight = sorted.getDeviceAt(0);
 				}
 			}
-			CTOC(cudaMLO->timer,"sumweight1");
+			CTOC(accMLO->timer,"sumweight1");
 		}
 
 		op.significant_weight[ipart] = (RFLOAT) my_significant_weight;
@@ -1908,19 +1912,20 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 }
 
+template<class MlClass, int AccT>
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlOptimiser *baseMLO,
-						MlOptimiserCuda *cudaMLO,
-						std::vector<IndexedDataArray> &FinePassWeights,
+						MlClass *accMLO,
+						std::vector<IndexedDataArray<AccT> > &FinePassWeights,
 						std::vector<ProjectionParams> &ProjectionData,
-						std::vector<std::vector<IndexedDataArrayMask> > &FPCMasks,
+						std::vector<std::vector<IndexedDataArrayMask<AccT> > > &FPCMasks,
 	 	 	 	 	 	std::vector<cudaStager<unsigned long> > &stagerSWS)
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_WSUM);
 #endif
-	CTIC(cudaMLO->timer,"store_init");
+	CTIC(accMLO->timer,"store_init");
 
 	int ibody(0); //Not supported yet
 
@@ -1984,13 +1989,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	thr_wsum_sigma2_offset = 0.;
 	unsigned image_size = op.Fimgs[0].nzyxdim;
 
-	CTOC(cudaMLO->timer,"store_init");
+	CTOC(accMLO->timer,"store_init");
 
 	/*=======================================================================================
 	                           COLLECT 2 AND SET METADATA
 	=======================================================================================*/
 
-	CTIC(cudaMLO->timer,"collect_data_2");
+	CTIC(accMLO->timer,"collect_data_2");
 	int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
 	int nr_fake_classes = (sp.iclass_max-sp.iclass_min+1);
 	int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
@@ -1999,17 +2004,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
-		CudaGlobalPtr<XFLOAT>          oo_otrans_x(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator); // old_offset_oversampled_trans_x
-		CudaGlobalPtr<XFLOAT>          oo_otrans_y(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT>          oo_otrans_z(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> myp_oo_otrans_x2y2z2(nr_fake_classes*nr_transes, cudaMLO->devBundle->allocator); // my_prior_old_offs....x^2*y^2*z^2
+		AccPtr<XFLOAT, AccT>          oo_otrans_x(nr_fake_classes*nr_transes, accMLO->devBundle->allocator); // old_offset_oversampled_trans_x
+		AccPtr<XFLOAT, AccT>          oo_otrans_y(nr_fake_classes*nr_transes, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT>          oo_otrans_z(nr_fake_classes*nr_transes, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> myp_oo_otrans_x2y2z2(nr_fake_classes*nr_transes, accMLO->devBundle->allocator); // my_prior_old_offs....x^2*y^2*z^2
 
-		myp_oo_otrans_x2y2z2.device_alloc();
+		myp_oo_otrans_x2y2z2.deviceAlloc();
 
 		int sumBlockNum =0;
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
-		CTIC(cudaMLO->timer,"collect_data_2_pre_kernel");
+		CTIC(accMLO->timer,"collect_data_2_pre_kernel");
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
@@ -2017,7 +2022,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
+			IndexedDataArray<AccT> thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
 
 			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
 			block_nums[nr_fake_classes*ipart + fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[ipart][exp_iclass], ProjectionData[ipart].orientation_num[exp_iclass]);
@@ -2041,7 +2046,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			{
 				myprior_x = XX(op.prior[ipart]);
 				myprior_y = YY(op.prior[ipart]);
-				if (cudaMLO->dataIs3D)
+				if (accMLO->dataIs3D)
 				{
 					myprior_z = ZZ(op.prior[ipart]);
 					old_offset_z = ZZ(op.old_offset[ipart]);
@@ -2062,12 +2067,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
 					oo_otrans_y[fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
-					if (cudaMLO->dataIs3D)
+					if (accMLO->dataIs3D)
 						oo_otrans_z[fake_class*nr_transes+iitrans] = old_offset_z + oversampled_translations_z[iover_trans];
 
 					// Calculate the vector length of myprior
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-					if (cudaMLO->dataIs3D)
+					if (accMLO->dataIs3D)
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
@@ -2076,7 +2081,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
-						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (cudaMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
+						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
 					}
 
 					// TODO: Feb20,2017 - Shaoda does not understand what you are doing here ... ???
@@ -2089,15 +2094,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 					RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
 					RFLOAT diffz = 0;
-					if (cudaMLO->dataIs3D)
+					if (accMLO->dataIs3D)
 						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
 					// ======= SHAODA ==========
 					//RFLOAT diffx = 0.;
-					//if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (cudaMLO->dataIs3D) )
+					//if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->dataIs3D) )
 					//	diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 					//RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
 					//RFLOAT diffz = 0;
-					//if (cudaMLO->dataIs3D)
+					//if (accMLO->dataIs3D)
 					//{
 					//	if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
 					//		diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
@@ -2109,29 +2114,29 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 
 		stagerSWS[ipart].cp_to_device();
-		oo_otrans_x.put_on_device();
-		oo_otrans_y.put_on_device();
-		oo_otrans_z.put_on_device();
+		oo_otrans_x.putOnDevice();
+		oo_otrans_y.putOnDevice();
+		oo_otrans_z.putOnDevice();
 
-		myp_oo_otrans_x2y2z2.cp_to_device();
+		myp_oo_otrans_x2y2z2.cpToDevice();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		CudaGlobalPtr<XFLOAT>                      p_weights(sumBlockNum, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetx_class(sumBlockNum, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsety_class(sumBlockNum, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> p_thr_wsum_prior_offsetz_class(sumBlockNum, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT>       p_thr_wsum_sigma2_offset(sumBlockNum, cudaMLO->devBundle->allocator);
-		p_weights.device_alloc();
-		p_thr_wsum_prior_offsetx_class.device_alloc();
-		p_thr_wsum_prior_offsety_class.device_alloc();
+		AccPtr<XFLOAT, AccT>                      p_weights(sumBlockNum, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> p_thr_wsum_prior_offsetx_class(sumBlockNum, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> p_thr_wsum_prior_offsety_class(sumBlockNum, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> p_thr_wsum_prior_offsetz_class(sumBlockNum, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT>       p_thr_wsum_sigma2_offset(sumBlockNum, accMLO->devBundle->allocator);
+		p_weights.deviceAlloc();
+		p_thr_wsum_prior_offsetx_class.deviceAlloc();
+		p_thr_wsum_prior_offsety_class.deviceAlloc();
 
-		if (cudaMLO->dataIs3D)
-			p_thr_wsum_prior_offsetz_class.device_alloc();
+		if (accMLO->dataIs3D)
+			p_thr_wsum_prior_offsetz_class.deviceAlloc();
 		else
-			p_thr_wsum_prior_offsetz_class.d_ptr  = p_thr_wsum_prior_offsety_class.d_ptr;
+			p_thr_wsum_prior_offsetz_class.dPtr  = p_thr_wsum_prior_offsety_class.dPtr;
 
-		p_thr_wsum_sigma2_offset.device_alloc();
-		CTOC(cudaMLO->timer,"collect_data_2_pre_kernel");
+		p_thr_wsum_sigma2_offset.deviceAlloc();
+		CTOC(accMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
 
 
@@ -2142,7 +2147,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
+			IndexedDataArray<AccT> thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
 
 
 			int cpos=fake_class*nr_transes;
@@ -2171,19 +2176,19 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[ipart][exp_iclass].jobOrigin,
 						~FPCMasks[ipart][exp_iclass].jobExtent,
-						cudaMLO->dataIs3D);
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),cudaMLO->errorStatus);
+						accMLO->dataIs3D);
+			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			partial_pos+=block_num;
 		}
 
-		CTIC(cudaMLO->timer,"collect_data_2_post_kernel");
-		p_weights.cp_to_host();
-		p_thr_wsum_sigma2_offset.cp_to_host();
-		p_thr_wsum_prior_offsetx_class.cp_to_host();
-		p_thr_wsum_prior_offsety_class.cp_to_host();
-		if (cudaMLO->dataIs3D)
-			p_thr_wsum_prior_offsetz_class.cp_to_host();
+		CTIC(accMLO->timer,"collect_data_2_post_kernel");
+		p_weights.cpToHost();
+		p_thr_wsum_sigma2_offset.cpToHost();
+		p_thr_wsum_prior_offsetx_class.cpToHost();
+		p_thr_wsum_prior_offsety_class.cpToHost();
+		if (accMLO->dataIs3D)
+			p_thr_wsum_prior_offsetz_class.cpToHost();
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		int iorient = 0;
@@ -2219,7 +2224,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 			partial_pos+=block_num;
 		} // end loop iclass
-		CTOC(cudaMLO->timer,"collect_data_2_post_kernel");
+		CTOC(accMLO->timer,"collect_data_2_post_kernel");
 	} // end loop ipart
 
 	/*======================================================
@@ -2229,11 +2234,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
-		CTIC(cudaMLO->timer,"setMetadata");
+		CTIC(accMLO->timer,"setMetadata");
 
-//		CTIC(cudaMLO->timer,"getArgMaxOnDevice");
+//		CTIC(accMLO->timer,"getArgMaxOnDevice");
 //		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
-//		CTOC(cudaMLO->timer,"getArgMaxOnDevice");
+//		CTOC(accMLO->timer,"getArgMaxOnDevice");
 //		op.max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
 //		op.max_weight[ipart] = max_pair.second;
 
@@ -2293,7 +2298,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			XX(shifts) = oversampled_translations_x[op.max_index[ipart].iovertrans];
 			YY(shifts) = oversampled_translations_y[op.max_index[ipart].iovertrans];
 		}
-		if (cudaMLO->dataIs3D)
+		if (accMLO->dataIs3D)
 		{
 			shifts.resize(3);
 			if (baseMLO->mymodel.nr_bodies == 1)
@@ -2308,7 +2313,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_xoff) = XX(shifts);
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_yoff) = YY(shifts);
-		if (cudaMLO->dataIs3D)
+		if (accMLO->dataIs3D)
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_zoff) = ZZ(shifts);
 
 		if (ibody == 0)
@@ -2319,9 +2324,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CRITICAL("Relion is finding a normalised probability greater than 1");
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PMAX) = pmax;
 		}
-		CTOC(cudaMLO->timer,"setMetadata");
+		CTOC(accMLO->timer,"setMetadata");
 	}
-	CTOC(cudaMLO->timer,"collect_data_2");
+	CTOC(accMLO->timer,"collect_data_2");
 
 
 
@@ -2329,7 +2334,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	                                   MAXIMIZATION
 	=======================================================================================*/
 
-	CTIC(cudaMLO->timer,"maximization");
+	CTIC(accMLO->timer,"maximization");
 
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
@@ -2342,9 +2347,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		CudaGlobalPtr<XFLOAT> trans_x(translation_num, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_y(translation_num, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> trans_z(translation_num, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_x(translation_num, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_y(translation_num, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> trans_z(translation_num, accMLO->devBundle->allocator);
 
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
@@ -2359,7 +2364,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				xshift = oversampled_translations_x[iover_trans];
 				yshift = oversampled_translations_y[iover_trans];
-				if (cudaMLO->dataIs3D)
+				if (accMLO->dataIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -2367,7 +2372,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT);
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI);
-					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (cudaMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
+					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 				}
 
 				trans_x[j] = -2 * PI * xshift / (double)baseMLO->mymodel.ori_size;
@@ -2377,9 +2382,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
-		trans_x.put_on_device();
-		trans_y.put_on_device();
-		trans_z.put_on_device();
+		trans_x.putOnDevice();
+		trans_y.putOnDevice();
+		trans_z.putOnDevice();
 
 
 		/*======================================================
@@ -2388,12 +2393,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUSTOM_ALLOCATOR_REGION_NAME("TRANS_3");
 
-		CTIC(cudaMLO->timer,"translation_3");
+		CTIC(accMLO->timer,"translation_3");
 
-		CudaGlobalPtr<XFLOAT> Fimgs_real(image_size, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_imag(image_size, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_real(image_size, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> Fimgs_nomask_imag(image_size, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimgs_real(image_size, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimgs_imag(image_size, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimgs_nomask_real(image_size, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Fimgs_nomask_imag(image_size, accMLO->devBundle->allocator);
 
 		MultidimArray<Complex > Fimg, Fimg_nonmask;
 		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
@@ -2407,12 +2412,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			Fimgs_nomask_imag[i] = Fimg_nonmask.data[i].imag;
 		}
 
-		Fimgs_real.put_on_device();
-		Fimgs_imag.put_on_device();
-		Fimgs_nomask_real.put_on_device();
-		Fimgs_nomask_imag.put_on_device();
+		Fimgs_real.putOnDevice();
+		Fimgs_imag.putOnDevice();
+		Fimgs_nomask_real.putOnDevice();
+		Fimgs_nomask_imag.putOnDevice();
 
-		CTOC(cudaMLO->timer,"translation_3");
+		CTOC(accMLO->timer,"translation_3");
 
 
 		/*======================================================
@@ -2441,7 +2446,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
-		CudaGlobalPtr<XFLOAT> ctfs(image_size, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> ctfs(image_size, accMLO->devBundle->allocator);
 
 		if (baseMLO->do_ctf_correction)
 		{
@@ -2452,13 +2457,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (unsigned i = 0; i < image_size; i++)
 				ctfs[i] = part_scale;
 
-		ctfs.put_on_device();
+		ctfs.putOnDevice();
 
 		/*======================================================
 		                       MINVSIGMA
 		======================================================*/
 
-		CudaGlobalPtr<XFLOAT> Minvsigma2s(image_size, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> Minvsigma2s(image_size, accMLO->devBundle->allocator);
 
 		if (baseMLO->do_map)
 			for (unsigned i = 0; i < image_size; i++)
@@ -2467,7 +2472,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			for (unsigned i = 0; i < image_size; i++)
 				Minvsigma2s[i] = 1;
 
-		Minvsigma2s.put_on_device();
+		Minvsigma2s.putOnDevice();
 
 		/*======================================================
 		                      CLASS LOOP
@@ -2475,30 +2480,30 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUSTOM_ALLOCATOR_REGION_NAME("wdiff2s");
 
-		CudaGlobalPtr<XFLOAT> wdiff2s_AA(baseMLO->mymodel.nr_classes*image_size, 0, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> wdiff2s_XA(baseMLO->mymodel.nr_classes*image_size, 0, cudaMLO->devBundle->allocator);
-		CudaGlobalPtr<XFLOAT> wdiff2s_sum(image_size, 0, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> wdiff2s_AA(baseMLO->mymodel.nr_classes*image_size, 0, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> wdiff2s_XA(baseMLO->mymodel.nr_classes*image_size, 0, accMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> wdiff2s_sum(image_size, 0, accMLO->devBundle->allocator);
 
-		wdiff2s_AA.device_alloc();
-		wdiff2s_AA.device_init(0.f);
-		wdiff2s_XA.device_alloc();
-		wdiff2s_XA.device_init(0.f);
+		wdiff2s_AA.deviceAlloc();
+		wdiff2s_AA.deviceInit(0.f);
+		wdiff2s_XA.deviceAlloc();
+		wdiff2s_XA.deviceInit(0.f);
 
 		unsigned long AAXA_pos=0;
 
-		wdiff2s_sum.device_alloc();
-		wdiff2s_sum.device_init(0.f);
+		wdiff2s_sum.deviceAlloc();
+		wdiff2s_sum.deviceInit(0.f);
 
 		CUSTOM_ALLOCATOR_REGION_NAME("BP_data");
 
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
-		CudaGlobalPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, cudaMLO->devBundle->allocator);
-		std::vector<CudaGlobalPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, cudaMLO->devBundle->allocator);
+		AccPtr<XFLOAT, AccT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, accMLO->devBundle->allocator);
+		std::vector<AccPtr<XFLOAT, AccT> > eulers(baseMLO->mymodel.nr_classes, accMLO->devBundle->allocator);
 
 		int classPos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2507,16 +2512,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], cudaMLO->devBundle->allocator);
+			IndexedDataArray<AccT> thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
 
-			CTIC(cudaMLO->timer,"thisClassProjectionSetupCoarse");
+			CTIC(accMLO->timer,"thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
 			ProjectionParams thisClassProjectionData(	ProjectionData[ipart],
 														ProjectionData[ipart].class_idx[exp_iclass],
 														ProjectionData[ipart].class_idx[exp_iclass]+ProjectionData[ipart].class_entries[exp_iclass]);
 
 			thisClassProjectionData.orientation_num[0] = ProjectionData[ipart].orientation_num[exp_iclass];
-			CTOC(cudaMLO->timer,"thisClassProjectionSetupCoarse");
+			CTOC(accMLO->timer,"thisClassProjectionSetupCoarse");
 
 			long unsigned orientation_num(thisClassProjectionData.orientation_num[0]);
 
@@ -2525,10 +2530,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			eulers[exp_iclass].setSize(orientation_num * 9);
-			eulers[exp_iclass].setStream(cudaMLO->classStreams[exp_iclass]);
-			eulers[exp_iclass].host_alloc();
+			eulers[exp_iclass].setStream(accMLO->classStreams[exp_iclass]);
+			eulers[exp_iclass].hostAlloc();
 
-			CTIC(cudaMLO->timer,"generateEulerMatricesProjector");
+			CTIC(accMLO->timer,"generateEulerMatricesProjector");
 
 			generateEulerMatrices(
 					baseMLO->mymodel.PPref[exp_iclass].padding_factor,
@@ -2536,17 +2541,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					&eulers[exp_iclass][0],
 					!IS_NOT_INV);
 
-			eulers[exp_iclass].device_alloc();
-			eulers[exp_iclass].cp_to_device();
+			eulers[exp_iclass].deviceAlloc();
+			eulers[exp_iclass].cpToDevice();
 
-			CTOC(cudaMLO->timer,"generateEulerMatricesProjector");
+			CTOC(accMLO->timer,"generateEulerMatricesProjector");
 
 
 			/*======================================================
 								 MAP WEIGHTS
 			======================================================*/
 
-			CTIC(cudaMLO->timer,"pre_wavg_map");
+			CTIC(accMLO->timer,"pre_wavg_map");
 
 			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
 				sorted_weights[classPos+i] = -999.;
@@ -2556,13 +2561,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 								= thisClassFinePassWeights.weights[i];
 
 			classPos+=orientation_num*translation_num;
-			CTOC(cudaMLO->timer,"pre_wavg_map");
+			CTOC(accMLO->timer,"pre_wavg_map");
 		}
-		sorted_weights.put_on_device();
+		sorted_weights.putOnDevice();
 
 		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		classPos = 0;
@@ -2577,7 +2582,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			long unsigned orientation_num(ProjectionData[ipart].orientation_num[exp_iclass]);
 
 			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
-					cudaMLO->devBundle->cudaProjectors[exp_iclass],
+					accMLO->devBundle->cudaProjectors[exp_iclass],
 					op.local_Minvsigma2s[0].xdim,
 					op.local_Minvsigma2s[0].ydim,
 					op.local_Minvsigma2s[0].zdim,
@@ -2591,7 +2596,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~trans_x,
 					~trans_y,
 					~trans_z,
-					&sorted_weights.d_ptr[classPos],
+					&sorted_weights.dPtr[classPos],
 					~ctfs,
 					~wdiff2s_sum,
 					&wdiff2s_AA(AAXA_pos),
@@ -2605,8 +2610,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					exp_iclass,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
-					cudaMLO->dataIs3D,
-					cudaMLO->classStreams[exp_iclass]);
+					accMLO->dataIs3D,
+					accMLO->classStreams[exp_iclass]);
 
 			/*======================================================
 								BACKPROJECTION
@@ -2617,17 +2622,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 #endif
 
-			CTIC(cudaMLO->timer,"backproject");
+			CTIC(accMLO->timer,"backproject");
 
 			runBackProjectKernel(
-				cudaMLO->devBundle->cudaBackprojectors[exp_iclass],
+				accMLO->devBundle->cudaBackprojectors[exp_iclass],
 				projKernel,
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
 				~trans_x,
 				~trans_y,
 				~trans_z,
-				&sorted_weights.d_ptr[classPos],
+				&sorted_weights.dPtr[classPos],
 				~Minvsigma2s,
 				~ctfs,
 				translation_num,
@@ -2638,11 +2643,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2s[0].ydim,
 				op.local_Minvsigma2s[0].zdim,
 				orientation_num,
-				cudaMLO->dataIs3D,
+				accMLO->dataIs3D,
 				baseMLO->do_sgd,
-				cudaMLO->classStreams[exp_iclass]);
+				accMLO->classStreams[exp_iclass]);
 
-			CTOC(cudaMLO->timer,"backproject");
+			CTOC(accMLO->timer,"backproject");
 
 #ifdef TIMING
 			if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -2660,12 +2665,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
 		// its absence in other parts of the code has caused issues. It is also very low-cost.
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		wdiff2s_AA.cp_to_host();
-		wdiff2s_XA.cp_to_host();
-		wdiff2s_sum.cp_to_host();
+		wdiff2s_AA.cpToHost();
+		wdiff2s_XA.cpToHost();
+		wdiff2s_sum.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		AAXA_pos=0;
@@ -2696,10 +2701,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 	} // end loop ipart
-	CTOC(cudaMLO->timer,"maximization");
+	CTOC(accMLO->timer,"maximization");
 
 
-	CTIC(cudaMLO->timer,"store_post_gpu");
+	CTIC(accMLO->timer,"store_post_gpu");
 
 	// Extend norm_correction and sigma2_noise estimation to higher resolutions for all particles
 	// Also calculate dLL for each particle and store in metadata
@@ -2819,12 +2824,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
 
-	CTOC(cudaMLO->timer,"store_post_gpu");
+	CTOC(accMLO->timer,"store_post_gpu");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_WSUM);
 #endif
 }
+
+#if 0
+template<class MlClass, int AccT>
 size_t MlDeviceBundle::checkFixedSizedObjects(int shares)
 {
 	int devCount;
@@ -3012,7 +3020,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if (thread_id == 0)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_THR);
 #endif
-//	CTOC(cudaMLO->timer,"interParticle");
+//	CTOC(accMLO->timer,"interParticle");
 
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
@@ -3180,10 +3188,10 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 
 					op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);
 
-					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator);
+					AccPtr<XFLOAT, AccT> Mweight(devBundle->allocator);
 					Mweight.setSize(sp.nr_particles * weightsPerPart);
-					Mweight.setHstPtr(op.Mweight.data);
-					Mweight.device_alloc();
+					Mweight.setHostPtr(op.Mweight.data);
+					Mweight.deviceAlloc();
 					deviceInitValue<XFLOAT>(Mweight, -999.);
 					Mweight.streamSync();
 
@@ -3200,7 +3208,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					catch (RelionError XE)
 					{
 						getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef ACC_DOUBLE_PRECISION
 						try {
 							convertAllSquaredDifferencesToWeights<double>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
 						}
@@ -3262,8 +3270,8 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					CTIC(timer,"getAllSquaredDifferencesFine");
 					getAllSquaredDifferencesFine(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
 					CTOC(timer,"getAllSquaredDifferencesFine");
-					FinePassWeights[0].weights.cp_to_host();
-					CudaGlobalPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
+					FinePassWeights[0].weights.cpToHost();
+					AccPtr<XFLOAT, AccT> Mweight(devBundle->allocator); //DUMMY
 
 					CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
 					convertAllSquaredDifferencesToWeights<XFLOAT>(ipass, op, sp, baseMLO, this, FinePassWeights, FinePassClassMasks, Mweight);
@@ -3300,7 +3308,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 		CTOC(timer,"oneTask");
 	}
 
-//	CTIC(cudaMLO->timer,"interParticle");
+//	CTIC(accMLO->timer,"interParticle");
 //	exit(0);
 
 #ifdef TIMING
@@ -3310,3 +3318,4 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 #endif
 }
 
+#endif // if 0

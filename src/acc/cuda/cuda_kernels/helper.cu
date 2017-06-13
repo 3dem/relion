@@ -48,7 +48,7 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 			XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
 			XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2;								// Different for all threads
 			// next line because of numerical precision of exp-function
-	#if defined(CUDA_DOUBLE_PRECISION)
+	#if defined(ACC_DOUBLE_PRECISION)
 				if (diff2 > 700.)
 					s_weights[tid] = 0.;
 				else
@@ -124,7 +124,7 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 					}
 					else
 					{
-#if defined(CUDA_DOUBLE_PRECISION)
+#if defined(ACC_DOUBLE_PRECISION)
 						raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
 #else
 						raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
@@ -174,7 +174,7 @@ __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 					img_pixels[tid]=sum_bg_total;
 				else
 				{
-#if defined(CUDA_DOUBLE_PRECISION)
+#if defined(ACC_DOUBLE_PRECISION)
 					raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
 #else
 					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
@@ -245,7 +245,7 @@ __global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
 				}
 				else
 				{
-#if defined(CUDA_DOUBLE_PRECISION)
+#if defined(ACC_DOUBLE_PRECISION)
 					raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
 #else
 					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
@@ -309,7 +309,7 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 				img_pixels[tid]=bg_value;
 			else
 			{
-#if defined(CUDA_DOUBLE_PRECISION)
+#if defined(ACC_DOUBLE_PRECISION)
 				raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
 #else
 				raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
@@ -533,7 +533,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 			diff2 *= d_Mstddev[pixel];
 			diff2 += sum_ref2_under_circ_mask;
 
-#if defined(CUDA_DOUBLE_PRECISION)
+#if defined(ACC_DOUBLE_PRECISION)
 			diff2 = exp(-diff2 / 2.); // exponentiate to reflect the Gaussian error model. sigma=1 after normalization, 0.4=1/sqrt(2pi)
 #else
 			diff2 = expf(-diff2 / 2.f);

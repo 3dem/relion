@@ -1,5 +1,6 @@
-#ifndef CUDA_ML_OPTIMISER_H_
-#define CUDA_ML_OPTIMISER_H_
+#ifndef ACC_ML_OPTIMISER_H_
+#define ACC_ML_OPTIMISER_H_
+#if 0
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
@@ -10,27 +11,16 @@
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include <stack>
 //#include <cufft.h>
+#endif
 
-#ifdef CUDA_DOUBLE_PRECISION
+#include "src/acc/acc_ptr.h"
+
+#ifdef ACC_DOUBLE_PRECISION
 #define XFLOAT double
 #else
 #define XFLOAT float
 #endif
 
-//#ifdef DEBUG_CUDA
-//#define HANDLE_CUFFT_ERROR( err ) (CufftHandleError( err, __FILE__, __LINE__ ))
-//#else
-//#define HANDLE_CUFFT_ERROR( err ) (err) //Do nothing
-//#endif
-//static void CufftHandleError( cufftResult err, const char *file, int line )
-//{
-//    if (err != CUFFT_SUCCESS)
-//    {
-//        fprintf(stderr, "Cufft error in file '%s' in line %i : %s.\n",
-//                __FILE__, __LINE__, "error" );
-//		raise(SIGSEGV);
-//    }
-//}
 
 class SamplingParameters
 {
@@ -181,142 +171,6 @@ public:
 	};
 };
 
-
-class IndexedDataArrayMask
-{
-public:
-	// indexes of job partition
-	//   every element in jobOrigin    is a reference to point to a position in a IndexedDataArray.weights array where that job starts RELATIVE to firstPos
-	//   every element in jobExtent    specifies the number of weights for that job
-	CudaGlobalPtr<size_t> jobOrigin, jobExtent;
-
-	size_t firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
-	size_t weightNum, jobNum; // number of weights and jobs this class
-
-	inline
-	 IndexedDataArrayMask(CudaCustomAllocator *allocator):
-	jobOrigin(allocator),
-	jobExtent(allocator),
-	firstPos(),
-	lastPos(),
-	weightNum(),
-	jobNum()
-	{};
-
-public:
-
-	void setNumberOfJobs(size_t newSize)
-	{
-		jobNum=newSize;
-		jobOrigin.setSize(newSize);
-		jobExtent.setSize(newSize);
-	}
-
-	void setNumberOfWeights(size_t newSize)
-	{
-		weightNum=newSize;
-	}
-
-	inline
-	 ~IndexedDataArrayMask()
-	{
-//		jobOrigin.free_host();
-//		jobExtent.free_host();
-	};
-};
-
-class IndexedDataArray
-{
-public:
-	//actual data
-	CudaGlobalPtr<XFLOAT> weights;
-
-	// indexes with same length as data
-	// -- basic indices ---------------------------------
-	//     rot_id  = id of rot     = which of all POSSIBLE orientations                               this weight signifies
-	//     rot_idx = index of rot  = which in the sequence of the determined significant orientations this weight signifies
-	//   trans_id  = id of trans   = which of all POSSIBLE translations                               this weight signifies
-	// -- special indices ---------------------------------
-	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
-	CudaGlobalPtr<size_t> rot_id, rot_idx, trans_idx, ihidden_overs;
-
-	inline
-	 IndexedDataArray(CudaCustomAllocator *allocator):
-		weights(allocator),
-		rot_id(allocator),
-		rot_idx(allocator),
-		trans_idx(allocator),
-		ihidden_overs(allocator)
-	{};
-
-	// constructor which takes a parent IndexedDataArray and a mask to create a child
-	inline
-	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask, CudaCustomAllocator *allocator):
-		weights(		&(parent.weights.h_ptr[mask.firstPos])		,&(parent.weights.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
-		rot_id(			&(parent.rot_id.h_ptr[mask.firstPos])		,&(parent.rot_id.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
-		rot_idx(		&(parent.rot_idx.h_ptr[mask.firstPos])		,&(parent.rot_idx.d_ptr[mask.firstPos])			,mask.weightNum, allocator),
-		trans_idx(		&(parent.trans_idx.h_ptr[mask.firstPos])	,&(parent.trans_idx.d_ptr[mask.firstPos])		,mask.weightNum, allocator),
-		ihidden_overs(	&(parent.ihidden_overs.h_ptr[mask.firstPos]),&(parent.ihidden_overs.d_ptr[mask.firstPos])	,mask.weightNum, allocator)
-	{
-		weights.d_do_free=false;
-		rot_id.d_do_free=false;
-		rot_idx.d_do_free=false;
-		trans_idx.d_do_free=false;
-		ihidden_overs.d_do_free=false;
-
-		weights.h_do_free=false;
-		rot_id.h_do_free=false;
-		rot_idx.h_do_free=false;
-		trans_idx.h_do_free=false;
-		ihidden_overs.h_do_free=false;
-	};
-
-public:
-
-	void setDataSize(size_t newSize)
-	{
-		weights.setSize(newSize);
-		rot_id.setSize(newSize);
-		rot_idx.setSize(newSize);
-		trans_idx.setSize(newSize);
-		ihidden_overs.setSize(newSize);
-	}
-
-	void resize_host_all(size_t newSize)
-	{
-		weights.resize_host(newSize);
-		rot_id.resize_host(newSize);
-		rot_idx.resize_host(newSize);
-		trans_idx.resize_host(newSize);
-		ihidden_overs.resize_host(newSize);
-	}
-
-	void host_alloc_all()
-	{
-		weights.host_alloc();
-		rot_id.host_alloc();
-		rot_idx.host_alloc();
-		trans_idx.host_alloc();
-		ihidden_overs.host_alloc();
-	}
-
-	void device_alloc_all()
-	{
-		weights.device_alloc();
-		rot_id.device_alloc();
-		rot_idx.device_alloc();
-		trans_idx.device_alloc();
-		ihidden_overs.device_alloc();
-	}
-
-	void dual_alloc_all()
-	{
-		host_alloc_all();
-		device_alloc_all();
-	}
-};
-
-
 class ProjectionParams
 {
 
@@ -398,6 +252,238 @@ public:
 		iover_rots.push_back(NEWiover_rots);
 	}
 };
+
+template <int AccT>
+class IndexedDataArrayMaskBase
+{
+public:
+	// indexes of job partition
+	//   every element in jobOrigin    is a reference to point to a position in a IndexedDataArray.weights array where that job starts RELATIVE to firstPos
+	//   every element in jobExtent    specifies the number of weights for that job
+	AccPtr<size_t, AccT> jobOrigin, jobExtent;
+
+	size_t firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
+	size_t weightNum, jobNum; // number of weights and jobs this class
+	
+
+public:
+
+	IndexedDataArrayMaskBase() :
+		jobOrigin(), 	jobExtent(), 	firstPos(), 	lastPos(),
+		weightNum(), 	jobNum()
+	{}
+		
+	IndexedDataArrayMaskBase(CudaCustomAllocator *allocator) :
+		jobOrigin(allocator), 	jobExtent(allocator), 	firstPos(), 	lastPos(),
+		weightNum(), 	jobNum()
+	{}
+	
+	void setNumberOfJobs(size_t newSize)
+	{
+		jobNum=newSize;
+		jobOrigin.resizeHost(newSize);
+		jobExtent.resizeHost(newSize);
+	}
+
+	void setNumberOfWeights(size_t newSize)
+	{
+		weightNum=newSize;
+	}
+
+	inline
+	 ~IndexedDataArrayMaskBase()
+	{
+//		jobOrigin.free_host();
+//		jobExtent.free_host();
+	};
+};
+
+template <int AccT>
+class IndexedDataArrayMask : public IndexedDataArrayMaskBase<AccT>
+{};
+
+template <>
+class IndexedDataArrayMask<ACC_CUDA> : public IndexedDataArrayMaskBase<ACC_CUDA>
+{
+public:
+	inline
+	IndexedDataArrayMask(CudaCustomAllocator *allocator):
+	IndexedDataArrayMaskBase<ACC_CUDA>(allocator)
+	{};
+};
+
+template <>
+class IndexedDataArrayMask<ACC_CPU> : public IndexedDataArrayMaskBase<ACC_CPU>
+{
+public:
+	inline
+	IndexedDataArrayMask(CudaCustomAllocator *allocator):
+	IndexedDataArrayMaskBase<ACC_CPU>()
+	{};
+};
+
+
+template <int AccT>
+class IndexedDataArrayBase
+{
+public:
+	//actual data
+	AccPtr<XFLOAT, AccT> weights;
+
+	// indexes with same length as data
+	// -- basic indices ---------------------------------
+	//     rot_id  = id of rot     = which of all POSSIBLE orientations                               this weight signifies
+	//     rot_idx = index of rot  = which in the sequence of the determined significant orientations this weight signifies
+	//   trans_id  = id of trans   = which of all POSSIBLE translations                               this weight signifies
+	// -- special indices ---------------------------------
+	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
+	AccPtr<size_t, AccT> rot_id, rot_idx, trans_idx, ihidden_overs;
+
+public:	
+	inline
+	 IndexedDataArrayBase():
+		weights(),
+		rot_id(),
+		rot_idx(),
+		trans_idx(),
+		ihidden_overs()
+	{};
+	
+	inline
+	 IndexedDataArrayBase(CudaCustomAllocator *allocator):
+		weights(allocator),
+		rot_id(allocator),
+		rot_idx(allocator),
+		trans_idx(allocator),
+		ihidden_overs(allocator)
+	{};
+
+	// constructor which takes a parent IndexedDataArray and a mask to create a child
+	inline
+	 IndexedDataArrayBase(IndexedDataArrayBase<AccT> &parent, IndexedDataArrayMask<AccT> &mask):
+		weights(		&(parent.weights.hPtr[mask.firstPos])		,&(parent.weights.dPtr[mask.firstPos])			,mask.weightNum),
+		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,&(parent.rot_id.dPtr[mask.firstPos])			,mask.weightNum),
+		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,&(parent.rot_idx.dPtr[mask.firstPos])			,mask.weightNum),
+		trans_idx(		&(parent.trans_idx.hPtr[mask.firstPos])	,&(parent.trans_idx.dPtr[mask.firstPos])		,mask.weightNum),
+		ihidden_overs(	&(parent.ihidden_overs.hPtr[mask.firstPos]),&(parent.ihidden_overs.dPtr[mask.firstPos])	,mask.weightNum)
+	{
+		weights.doFreeDevice=false;
+		rot_id.doFreeDevice=false;
+		rot_idx.doFreeDevice=false;
+		trans_idx.doFreeDevice=false;
+		ihidden_overs.doFreeDevice=false;
+
+		weights.doFreeHost=false;
+		rot_id.doFreeHost=false;
+		rot_idx.doFreeHost=false;
+		trans_idx.doFreeHost=false;
+		ihidden_overs.doFreeHost=false;
+	};
+	
+	inline
+	 IndexedDataArrayBase(IndexedDataArrayBase<AccT> &parent, IndexedDataArrayMask<AccT> &mask, CudaCustomAllocator *allocator):
+		weights(		&(parent.weights.hPtr[mask.firstPos])		,&(parent.weights.dPtr[mask.firstPos])			,mask.weightNum, allocator),
+		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,&(parent.rot_id.dPtr[mask.firstPos])			,mask.weightNum, allocator),
+		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,&(parent.rot_idx.dPtr[mask.firstPos])			,mask.weightNum, allocator),
+		trans_idx(		&(parent.trans_idx.hPtr[mask.firstPos])	,&(parent.trans_idx.dPtr[mask.firstPos])		,mask.weightNum, allocator),
+		ihidden_overs(	&(parent.ihidden_overs.hPtr[mask.firstPos]),&(parent.ihidden_overs.dPtr[mask.firstPos])	,mask.weightNum, allocator)
+	{
+		weights.doFreeDevice=false;
+		rot_id.doFreeDevice=false;
+		rot_idx.doFreeDevice=false;
+		trans_idx.doFreeDevice=false;
+		ihidden_overs.doFreeDevice=false;
+
+		weights.doFreeHost=false;
+		rot_id.doFreeHost=false;
+		rot_idx.doFreeHost=false;
+		trans_idx.doFreeHost=false;
+		ihidden_overs.doFreeHost=false;
+	};
+
+public:
+
+	void setDataSize(size_t newSize)
+	{
+		weights.setSize(newSize);
+		rot_id.setSize(newSize);
+		rot_idx.setSize(newSize);
+		trans_idx.setSize(newSize);
+		ihidden_overs.setSize(newSize);
+	}
+
+	void resize_host_all(size_t newSize)
+	{
+		weights.resizeHost(newSize);
+		rot_id.resizeHost(newSize);
+		rot_idx.resizeHost(newSize);
+		trans_idx.resizeHost(newSize);
+		ihidden_overs.resizeHost(newSize);
+	}
+
+	void host_alloc_all()
+	{
+		weights.hostAlloc();
+		rot_id.hostAlloc();
+		rot_idx.hostAlloc();
+		trans_idx.hostAlloc();
+		ihidden_overs.hostAlloc();
+	}
+
+	void device_alloc_all()
+	{
+		weights.deviceAlloc();
+		rot_id.deviceAlloc();
+		rot_idx.deviceAlloc();
+		trans_idx.deviceAlloc();
+		ihidden_overs.deviceAlloc();
+	}
+
+	void dual_alloc_all()
+	{
+		host_alloc_all();
+		device_alloc_all();
+	}
+};
+
+template <int AccT>
+class IndexedDataArray: public IndexedDataArrayBase<AccT>
+{};
+
+template <>
+class IndexedDataArray<ACC_CUDA> : public IndexedDataArrayBase<ACC_CUDA>
+{
+public:
+	inline
+	IndexedDataArray(CudaCustomAllocator *allocator):
+	IndexedDataArrayBase<ACC_CUDA>(allocator)
+	{};
+	
+	inline
+	IndexedDataArray(IndexedDataArrayBase<ACC_CUDA> &parent, 
+			IndexedDataArrayMask<ACC_CUDA> &mask, CudaCustomAllocator *allocator):
+	IndexedDataArrayBase<ACC_CUDA>(parent, mask, allocator)
+	{};
+};
+
+template <>
+class IndexedDataArray<ACC_CPU> : public IndexedDataArrayBase<ACC_CPU>
+{
+public:
+	inline
+	IndexedDataArray(CudaCustomAllocator *allocator):
+	IndexedDataArrayBase<ACC_CPU>()
+	{};
+	
+	inline
+	IndexedDataArray(IndexedDataArrayBase<ACC_CPU> &parent, 
+			IndexedDataArrayMask<ACC_CPU> &mask, CudaCustomAllocator *allocator):
+	IndexedDataArrayBase<ACC_CPU>(parent, mask)
+	{};
+};
+
+
+#if 0
 
 /*
  * Bundle of device-objects
@@ -519,5 +605,5 @@ public:
 	}
 
 };
-
+#endif // if 0
 #endif

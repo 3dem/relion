@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 #include "src/acc/cuda/cuda_settings.h"
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 __device__ inline double cuda_atomic_add(double* address, double val)
 {
 	unsigned long long int* address_as_ull = (unsigned long long int*)address;
@@ -118,7 +118,7 @@ __device__ __forceinline__ void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT s, c;
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	sincos( x * tx + y * ty , &s, &c );
 #else
 	sincosf( x * tx + y * ty , &s, &c );
@@ -141,7 +141,7 @@ __device__ __forceinline__ void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT s, c;
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	sincos( x * tx + y * ty + z * tz, &s, &c );
 #else
 	sincosf( x * tx + y * ty + z * tz, &s, &c );

@@ -9,7 +9,7 @@
 #define LAUNCH_CHECK
 #define CUDA_BENCHMARK_OLD true
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	#define XFLOAT double
 	#define CUDACOMPLEX double2
 #else

@@ -97,7 +97,7 @@ __global__ void cuda_kernel_make_eulers_2D(
 	XFLOAT ca, sa;
 	XFLOAT a = alphas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	sincos(a, &sa, &ca);
 #else
 	sincosf(a, &sa, &ca);
@@ -153,7 +153,7 @@ __global__ void cuda_kernel_make_eulers_3D(
 	b = betas[oid]  * (XFLOAT)PI / (XFLOAT)180.0;
 	g = gammas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	sincos(a, &sa, &ca);
 	sincos(b,  &sb, &cb);
 	sincos(g, &sg, &cg);
@@ -244,19 +244,19 @@ void CudaProjectorPlan::setup(
 
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
-	CudaGlobalPtr<XFLOAT> alphas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
-	CudaGlobalPtr<XFLOAT> betas (nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
-	CudaGlobalPtr<XFLOAT> gammas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT, ACC_CUDA> alphas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT, ACC_CUDA> betas (nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT, ACC_CUDA> gammas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
 
-	CudaGlobalPtr<XFLOAT> perturb(9, eulers.getAllocator());
+	AccPtr<XFLOAT, ACC_CUDA> perturb(9, eulers.getAllocator());
 
-	eulers.free_if_set();
+	eulers.hostAlloc();
 	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);
-	eulers.host_alloc();
+	eulers.hostAlloc();
 
-	iorientclasses.free_if_set();
+	iorientclasses.hostAlloc();
 	iorientclasses.setSize(nr_dir * nr_psi * nr_oversampled_rot);
-	iorientclasses.host_alloc();
+	iorientclasses.hostAlloc();
 
 	orientation_num = 0;
 
@@ -271,7 +271,7 @@ void CudaProjectorPlan::setup(
 			Euler_angles2matrix(myperturb, myperturb, myperturb, R);
 			for (int i = 0; i < 9; i ++)
 				perturb[i] = (XFLOAT) R.mdata[i];
-			perturb.put_on_device();
+			perturb.putOnDevice();
 		}
 	}
 
@@ -361,20 +361,20 @@ void CudaProjectorPlan::setup(
 	TIMING_TOC(TIMING_SAMPLING);
 
 	iorientclasses.setSize(orientation_num);
-	iorientclasses.put_on_device();
+	iorientclasses.putOnDevice();
 
 	eulers.setSize(orientation_num * 9);
-	eulers.device_alloc();
+	eulers.deviceAlloc();
 
 	alphas.setSize(orientation_num);
-	alphas.put_on_device();
+	alphas.putOnDevice();
 
 	if(sampling.is_3D)
 	{
 		betas.setSize(orientation_num);
-		betas.put_on_device();
+		betas.putOnDevice();
 		gammas.setSize(orientation_num);
-		gammas.put_on_device();
+		gammas.putOnDevice();
 	}
 
 	int grid_size = ceil((float)orientation_num/(float)BLOCK_SIZE);
@@ -447,9 +447,9 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 void CudaProjectorPlan::clear()
 {
 	orientation_num = 0;
-	iorientclasses.free_if_set();
+	iorientclasses.hostAlloc();
 	iorientclasses.setSize(0);
-	eulers.free_if_set();
+	eulers.hostAlloc();
 	eulers.setSize(0);
 #ifdef PP_TIMING
 	timer.printTimes(false);

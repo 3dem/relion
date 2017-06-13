@@ -16,7 +16,7 @@
 
 #include <stack>
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 #define XFLOAT double
 #else
 #define XFLOAT float
@@ -61,8 +61,11 @@ public:
 
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
-	void calculateStddevAndMeanUnderMask(CudaGlobalPtr< CUDACOMPLEX > &d_Fmic, CudaGlobalPtr< CUDACOMPLEX > &d_Fmic2, CudaGlobalPtr< CUDACOMPLEX > &d_Fmsk,
-			int nr_nonzero_pixels_mask, CudaGlobalPtr< XFLOAT > &d_Mstddev, CudaGlobalPtr< XFLOAT > &d_Mmean,
+	void calculateStddevAndMeanUnderMask(AccPtr< CUDACOMPLEX, ACC_CUDA > &d_Fmic, 
+			AccPtr< CUDACOMPLEX, ACC_CUDA > &d_Fmic2, 
+			AccPtr< CUDACOMPLEX, ACC_CUDA > &d_Fmsk,
+			int nr_nonzero_pixels_mask, AccPtr< XFLOAT, ACC_CUDA > &d_Mstddev, 
+			AccPtr< XFLOAT, ACC_CUDA > &d_Mmean,
 			size_t x, size_t y, size_t mic_size, size_t workSize);
 
 	~AutoPickerCuda()

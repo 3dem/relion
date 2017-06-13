@@ -27,7 +27,7 @@ void cpyHostToDevice( T *h_ptr, T *d_ptr, size_t size)
 
 template< typename T>
 static inline
-void cpyHostToDevice( T *h_ptr, T *d_ptr, size_t size, cudaStream_t &stream)
+void cpyHostToDevice( T *h_ptr, T *d_ptr, size_t size, cudaStream_t stream)
 {
 	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( d_ptr, h_ptr, size * sizeof(T), cudaMemcpyHostToDevice, stream));
 };

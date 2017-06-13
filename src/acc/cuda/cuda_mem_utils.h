@@ -19,6 +19,9 @@
 #include "src/error.h"
 #include "src/parallel.h"
 
+// Forward definition
+template <typename T, int AccT>  class AccPtr;
+
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 #include <execinfo.h>
 #include <cxxabi.h>
@@ -140,7 +143,7 @@ void cudaCpyDeviceToHost( T *d_ptr, T *h_ptr, size_t size, cudaStream_t &stream)
 
 template< typename T>
 static inline
-void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t &stream)
+void cudaCpyDeviceToDevice( T *src, T *des, size_t size, cudaStream_t stream)
 {
 	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( des, src, size * sizeof(T), cudaMemcpyDeviceToDevice, stream));
 };
@@ -807,6 +810,8 @@ public:
 	}
 };
 
+// CudaGlobalPtr replaced by AccPtr
+#if 0
 template <typename T, bool CustomAlloc=true>
 class CudaGlobalPtr
 {
@@ -1384,12 +1389,13 @@ public:
 		free_if_set();
 	}
 };
+#endif // CudaGlobalPtr replaced by AccPtr
 
 template <typename T>
 class cudaStager
 {
 public:
-	CudaGlobalPtr<T> AllData;
+	AccPtr<T, ACC_CUDA> AllData;
 	size_t size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
 
 	/*======================================================
@@ -1436,8 +1442,8 @@ public:
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=size;
-		if(AllData.h_ptr==NULL)
-			AllData.host_alloc();
+		if(AllData.hPtr==NULL)
+			AllData.hostAlloc();
 		else
 			printf("WARNING : host_alloc when host-ptr is non-null");
 		AllData.size=temp_size;
@@ -1451,8 +1457,8 @@ public:
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
-		if(AllData.h_ptr==NULL)
-			AllData.host_alloc();
+		if(AllData.hPtr==NULL)
+			AllData.hostAlloc();
 		else
 			printf("WARNING : host_alloc when host-ptr is non-null");
 		AllData.size=temp_size;
@@ -1466,8 +1472,8 @@ public:
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=size;
-		if(AllData.d_ptr==NULL)
-			AllData.device_alloc();
+		if(AllData.dPtr==NULL)
+			AllData.deviceAlloc();
 		else
 			printf("WARNING : device_alloc when dev-ptr is non-null");
 		AllData.size=temp_size;
@@ -1481,8 +1487,8 @@ public:
 		}
 		size_t temp_size=AllData.size;
 		AllData.size=alloc_size;
-		if(AllData.d_ptr==NULL)
-			AllData.device_alloc();
+		if(AllData.dPtr==NULL)
+			AllData.deviceAlloc();
 		else
 			printf("WARNING : device_alloc when dev-ptr is non-null");
 		AllData.size=temp_size;
@@ -1500,7 +1506,7 @@ public:
 
 
 
-	void stage(CudaGlobalPtr<T> &input)
+	void stage(AccPtr<T, ACC_CUDA> &input)
 	{
 		if(AllData.size+input.size>size)
 		{
@@ -1510,13 +1516,13 @@ public:
 		}
 
 		for(size_t i=0 ; i<input.size; i++)
-			AllData.h_ptr[AllData.size+i] = input.h_ptr[i];
+			AllData.hPtr[AllData.size+i] = input.hPtr[i];
 
 		// reset the staged object to this new position (TODO: disable for pinned mem)
-		if(input.h_ptr!=NULL && input.h_do_free)
-			input.free_host_if_set();
-		input.h_ptr=&AllData.h_ptr[AllData.size];
-		input.d_ptr=&AllData.d_ptr[AllData.size];
+		if(input.hPtr!=NULL && input.doFreeHost)
+			input.freeHostIfSet();
+		input.hPtr=&AllData.hPtr[AllData.size];
+		input.dPtr=&AllData.dPtr[AllData.size];
 
 		AllData.size+=input.size;
 	}
@@ -1525,12 +1531,12 @@ public:
 
 	void cp_to_device()
 	{
-		AllData.cp_to_device();
+		AllData.cpToDevice();
 	}
 
 	void cp_to_host()
 	{
-		AllData.cp_to_host();
+		AllData.cpToHost();
 	}
 };
 
