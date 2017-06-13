@@ -77,7 +77,7 @@
 #define MY_MPI_COMPLEX MPI_DOUBLE_COMPLEX
 #endif
 
-#ifdef DEBUG_CUDA
+#if defined CUDA and DEBUG_CUDA
 #define CRITICAL(string) raise(SIGSEGV);
 #else
 #define CRITICAL(string) REPORT_ERROR(string);
