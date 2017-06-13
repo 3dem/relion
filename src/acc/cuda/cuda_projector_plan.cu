@@ -97,7 +97,7 @@ __global__ void cuda_kernel_make_eulers_2D(
 	XFLOAT ca, sa;
 	XFLOAT a = alphas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	sincos(a, &sa, &ca);
 #else
 	sincosf(a, &sa, &ca);
@@ -153,7 +153,7 @@ __global__ void cuda_kernel_make_eulers_3D(
 	b = betas[oid]  * (XFLOAT)PI / (XFLOAT)180.0;
 	g = gammas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	sincos(a, &sa, &ca);
 	sincos(b,  &sb, &cb);
 	sincos(g, &sg, &cg);

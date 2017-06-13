@@ -704,7 +704,7 @@ void runDiff2KernelCoarse(
 		if(projector.mdlZ!=0)
 		{
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 			if (translation_num > blocks3D*4)
 				CRITICAL(ERR_TRANSLIM);
 #else
@@ -914,7 +914,7 @@ void runDiff2KernelCoarse(
 							image_size);
 				}
 			}
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef ACC_DOUBLE_PRECISION
 			else
 			{
 				if (even_orientation_num != 0)

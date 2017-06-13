@@ -25,7 +25,7 @@ class CudaFFT
 {
 	bool planSet;
 public:
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	AccPtr<cufftDoubleReal, ACC_CUDA> reals;
 	AccPtr<cufftDoubleComplex, ACC_CUDA> fouriers;
 #else
@@ -67,7 +67,7 @@ public:
 
 	    size_t biggness;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	    if(direction<=0)
 	    {
 			HANDLE_CUFFT_ERROR( cufftEstimateMany(dimension, inembed, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batch, &biggness));
@@ -242,7 +242,7 @@ public:
 //		std::cout << "avail  = ";
 //		printf("%15li\n", avail);
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 	    if(direction<=0)
 	    {
 	    	HANDLE_CUFFT_ERROR( cufftPlanMany(&cufftPlanForward,  dimension, inembed, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, batchSize[0]));

@@ -16,7 +16,7 @@
 
 #include <stack>
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 #define XFLOAT double
 #else
 #define XFLOAT float

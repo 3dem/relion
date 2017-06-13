@@ -3208,7 +3208,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 					catch (RelionError XE)
 					{
 						getAllSquaredDifferencesCoarse(ipass, op, sp, baseMLO, this, Mweight);
-#ifndef CUDA_DOUBLE_PRECISION
+#ifndef ACC_DOUBLE_PRECISION
 						try {
 							convertAllSquaredDifferencesToWeights<double>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight);
 						}

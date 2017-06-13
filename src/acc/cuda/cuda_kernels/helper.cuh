@@ -10,7 +10,7 @@
 #include "src/acc/cuda/cuda_projector.cuh"
 #include "src/acc/cuda/cuda_projector.h"
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 #define FAILSAFE_PRIOR_MIN_LIM 1e-300
 #else
 #define FAILSAFE_PRIOR_MIN_LIM 1e-30
@@ -52,7 +52,7 @@ __global__ void cuda_kernel_exponentiate_weights_coarse(
 					weight = FAILSAFE_PRIOR_MIN_LIM;
 
 				// next line because of numerical precision of exp-function
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 				if (diff2 > 700.)
 					weight = 0.;
 				else
@@ -543,7 +543,7 @@ __global__ void cuda_kernel_powerClass(		CUDACOMPLEX * g_image,
 			coords_in_range = !(x==0 && y<0.f);
 		}
 
-#if defined(CUDA_DOUBLE_PRECISION)
+#if defined(ACC_DOUBLE_PRECISION)
 		int ires = __double2int_rn(sqrt((XFLOAT)d));
 #else
 		int ires = __float2int_rn(sqrtf((XFLOAT)d));

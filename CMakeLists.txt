@@ -82,7 +82,7 @@ endif(NOT DEFINED CUDA_ARCH)
 option(CUDA "Enable CUDA GPU acceleration" ON)
 option(ALTCPU "Enable Accelerated CPU version" ON)
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
-option(DoublePrec_GPU "DoublePrec_GPU" OFF)
+option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(CudaTexture "CudaTexture" ON)
 
 # -----------------------------------------------ACCELERATED CPU VERSION
@@ -101,13 +101,13 @@ else(DoublePrec_CPU)
     add_definitions(-DRELION_SINGLE_PRECISION)
 endif(DoublePrec_CPU)
 
-if(DoublePrec_GPU)
-    message(STATUS "Setting gpu precision to double")
-    add_definitions(-DCUDA_DOUBLE_PRECISION)
+if(DoublePrec_ACC)
+    message(STATUS "Setting accelerated code precision to double")
+    add_definitions(-DACC_DOUBLE_PRECISION)
 	set(CudaTexture FALSE)
-else(DoublePrec_GPU)
-    message(STATUS "Setting gpu precision to single")
-endif(DoublePrec_GPU)
+else(DoublePrec_ACC)
+    message(STATUS "Setting accelerated code precision to single")
+endif(DoublePrec_ACC)
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
  #This *has* to be AFTER project()
@@ -121,7 +121,7 @@ endif()
 
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
-    if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_GPU) )
+    if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_ACC) )
         message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
 		set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
 	elseif( ${CUDA_VERSION} VERSION_LESS "7.0")
