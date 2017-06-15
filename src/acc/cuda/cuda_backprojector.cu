@@ -47,7 +47,7 @@ void CudaBackprojector::initMdl()
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
 	{
-        printf("Model dimensions must be set with setMdlDim before call to setupMdl.");
+        printf("Model dimensions must be set with setMdlDim before call to initMdl.");
         CRITICAL(ERR_MDLDIM);
 	}
 	if (voxelCount != 0)
@@ -61,6 +61,8 @@ void CudaBackprojector::initMdl()
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlReal,   0, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlImag,   0, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
+
+    voxelCount = mdlXYZ;
 }
 
 

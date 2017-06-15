@@ -63,6 +63,8 @@ void Backprojector::initMdl()
 	memset(d_mdlReal,     0, mdlXYZ * sizeof(XFLOAT));
 	memset(d_mdlImag,     0, mdlXYZ * sizeof(XFLOAT));
 	memset(d_mdlWeight,   0, mdlXYZ * sizeof(XFLOAT));
+	
+	voxelCount = mdlXYZ;
 }
 
 void backproject2D(

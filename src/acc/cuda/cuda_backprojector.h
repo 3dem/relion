@@ -16,6 +16,7 @@ public:
 	    padding_factor;
 
 	size_t allocaton_size;
+	int voxelCount;
 
 	XFLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
 
@@ -28,7 +29,7 @@ public:
 				mdlInitY(0), mdlInitZ(0),
 				maxR(0), maxR2(0),
 				padding_factor(0),
-				allocaton_size(0),
+				allocaton_size(0), voxelCount(0),
 				d_mdlReal(NULL), d_mdlImag(NULL), d_mdlWeight(NULL),
 				stream(0)
 	{}
