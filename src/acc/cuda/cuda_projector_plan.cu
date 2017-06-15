@@ -250,11 +250,11 @@ void CudaProjectorPlan::setup(
 
 	AccPtr<XFLOAT, ACC_CUDA> perturb(9, eulers.getAllocator());
 
-	eulers.hostAlloc();
+	eulers.freeIfSet();
 	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);
 	eulers.hostAlloc();
 
-	iorientclasses.hostAlloc();
+	iorientclasses.freeIfSet();
 	iorientclasses.setSize(nr_dir * nr_psi * nr_oversampled_rot);
 	iorientclasses.hostAlloc();
 
@@ -447,9 +447,9 @@ void CudaProjectorPlan::printTo(std::ostream &os) // print
 void CudaProjectorPlan::clear()
 {
 	orientation_num = 0;
-	iorientclasses.hostAlloc();
+	iorientclasses.freeIfSet();
 	iorientclasses.setSize(0);
-	eulers.hostAlloc();
+	eulers.freeIfSet();
 	eulers.setSize(0);
 #ifdef PP_TIMING
 	timer.printTimes(false);

@@ -23,7 +23,7 @@ static std::pair<int, T> getArgMaxOnDevice(AccPtr<T, ACC_CUDA> &ptr)
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with pointer of zero size.\n");
-if (ptr.d_ptr == NULL)
+if (ptr.dPtr == NULL)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with null allocator.\n");
@@ -59,7 +59,7 @@ static std::pair<int, T> getArgMinOnDevice(AccPtr<T, ACC_CUDA> &ptr)
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with pointer of zero size.\n");
-if (ptr.d_ptr == NULL)
+if (ptr.dPtr == NULL)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with null allocator.\n");
@@ -95,7 +95,7 @@ static T getMaxOnDevice(AccPtr<T, ACC_CUDA> &ptr)
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
 	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
-if (ptr.d_ptr == NULL)
+if (ptr.dPtr == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null allocator.\n");
@@ -127,7 +127,7 @@ static T getMinOnDevice(AccPtr<T, ACC_CUDA> &ptr)
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
 	printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
-if (ptr.d_ptr == NULL)
+if (ptr.dPtr == NULL)
 	printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getMinOnDevice called with null allocator.\n");
@@ -159,7 +159,7 @@ static T getSumOnDevice(AccPtr<T, ACC_CUDA> &ptr)
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
 	printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
-if (ptr.d_ptr == NULL)
+if (ptr.dPtr == NULL)
 	printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getSumOnDevice called with null allocator.\n");
@@ -191,7 +191,7 @@ static void sortOnDevice(AccPtr<T, ACC_CUDA> &in, AccPtr<T, ACC_CUDA> &out)
 #ifdef DEBUG_CUDA
 if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: sortOnDevice called with pointer of zero size.\n");
-if (in.d_ptr == NULL || out.d_ptr == NULL)
+if (in.dPtr == NULL || out.dPtr == NULL)
 	printf("DEBUG_ERROR: sortOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: sortOnDevice called with null allocator.\n");
@@ -219,7 +219,7 @@ static void sortDescendingOnDevice(AccPtr<T, ACC_CUDA> &in, AccPtr<T, ACC_CUDA> 
 #ifdef DEBUG_CUDA
 if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with pointer of zero size.\n");
-if (in.d_ptr == NULL || out.d_ptr == NULL)
+if (in.dPtr == NULL || out.dPtr == NULL)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with null allocator.\n");
@@ -290,7 +290,7 @@ static int filterOnDevice(AccPtr<T, ACC_CUDA> &in, AccPtr<T, ACC_CUDA> &out, Sel
 #ifdef DEBUG_CUDA
 if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: filterOnDevice called with pointer of zero size.\n");
-if (in.d_ptr == NULL || out.d_ptr == NULL)
+if (in.dPtr == NULL || out.dPtr == NULL)
 	printf("DEBUG_ERROR: filterOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: filterOnDevice called with null allocator.\n");
@@ -324,7 +324,7 @@ static void scanOnDevice(AccPtr<T, ACC_CUDA> &in, AccPtr<T, ACC_CUDA> &out)
 #ifdef DEBUG_CUDA
 if (in.size == 0 || out.size == 0)
 	printf("DEBUG_ERROR: scanOnDevice called with pointer of zero size.\n");
-if (in.d_ptr == NULL || out.d_ptr == NULL)
+if (in.dPtr == NULL || out.dPtr == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null allocator.\n");

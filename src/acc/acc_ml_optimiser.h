@@ -281,8 +281,8 @@ public:
 	void setNumberOfJobs(size_t newSize)
 	{
 		jobNum=newSize;
-		jobOrigin.resizeHost(newSize);
-		jobExtent.resizeHost(newSize);
+		jobOrigin.setSize(newSize);
+		jobExtent.setSize(newSize);
 	}
 
 	void setNumberOfWeights(size_t newSize)

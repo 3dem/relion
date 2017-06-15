@@ -448,7 +448,7 @@ public:
 	
 	inline
 	AccPtr(size_t size):
-		AccPtrBase<T,ACC_CPU,AccPtr<T,ACC_CPU> >(size, NULL, NULL, false, false)
+		AccPtrBase<T,ACC_CPU,AccPtr<T,ACC_CPU> >(size, new T[size], NULL, false, false)
 	{}
 
 	inline
@@ -535,7 +535,7 @@ public:
 	inline
 	T* operator~() {
 #ifdef DEBUG_CUDA
-		if (d_ptr == 0)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == 0)
 			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
 #endif
 		return AccPtrBase<T,ACC_CPU,AccPtr<T,ACC_CPU> >::dPtr;
@@ -624,13 +624,13 @@ public:
 
 	inline
 	AccPtr(size_t size, CudaCustomAllocator *allocator):
-		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, NULL, NULL, false, false),
+		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, new T[size], NULL, false, false),
 		allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, NULL, NULL, false, false),
+		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, new T[size], NULL, false, false),
 		allocator(allocator), alloc(NULL), stream(stream)
 	{}
 
@@ -670,7 +670,7 @@ public:
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream):
-		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, NULL, NULL, false, false),
+		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, new T[size], NULL, false, false),
 		allocator(NULL), alloc(NULL), stream(stream)
 	{}
 	
@@ -695,7 +695,7 @@ public:
 	
 	inline
 	AccPtr(size_t size):
-		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, NULL, NULL, false, false),
+		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >(size, new T[size], NULL, false, false),
 		allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
 	{
 	}
@@ -754,9 +754,9 @@ public:
 	void deviceAlloc()
 	{
 #ifdef DEBUG_CUDA
-		if(size==0)
+		if(AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size==0)
 				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
-		if (doFreeDevice)
+		if (AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::doFreeDevice)
 				ACC_PTR_DEBUG_FATAL("Device double allocation.\n");
 #endif
 		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::doFreeDevice = true;
@@ -784,7 +784,7 @@ public:
 	void deviceInit(int value)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Memset requested before allocation in deviceInit().\n");
 #endif
 		cudaMemInit<T>( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr, 
@@ -798,9 +798,9 @@ public:
 	void cpToDevice()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("cpToDevice() called before allocation.\n");
-		if (hPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL host pointer in cpToDevice().\n");
 #endif
 		CudaShortcuts::cpyHostToDevice<T>(AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::hPtr, 
@@ -850,9 +850,9 @@ public:
 	void cpToHost()
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("cp_to_host() called before device allocation.\n");
-		if (h_ptr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host().\n");
 #endif
 		cudaCpyDeviceToHost<T>(AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr, 
@@ -867,9 +867,9 @@ public:
 	void cpToHost(size_t thisSize)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("cp_to_host(thisSize) called before device allocation.\n");
-		if (h_ptr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(thisSize).\n");
 #endif
 		cudaCpyDeviceToHost<T>(AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr, 
@@ -883,7 +883,7 @@ public:
 	void cpToHost(T* hstPtr, size_t thisSize)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("cp_to_host(hstPtr, thisSize) called before device allocation.\n");
 		if (hstPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(hstPtr, thisSize).\n");
@@ -899,9 +899,9 @@ public:
 	void cpToHostOnStream(cudaStream_t s)
 	{
 #ifdef DEBUG_CUDA
-		if (dPtr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("cp_to_host_on_stream(s) called before device allocation.\n");
-		if (h_ptr == NULL)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::pHtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host_on_stream(s).\n");
 #endif
 		cudaCpyDeviceToHost<T>(	AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr, 
@@ -929,7 +929,7 @@ public:
 	inline
 	T* operator~() {
 #ifdef DEBUG_CUDA
-		if (d_ptr == 0)
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr == 0)
 			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
 #endif
 		return AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr;
@@ -952,14 +952,15 @@ public:
 	}
 	void dumpDeviceToFile(std::string fileName)
 	{
-		T *tmp = new T[AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size];
+		size_t tmpSize = AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size;
+		T *tmp = new T[tmpSize];
 		cudaCpyDeviceToHost<T>(AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr, 
-				tmp, AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size, stream);
+				tmp, tmpSize, stream);
 
 		std::ofstream f;
 		f.open(fileName.c_str());
 		streamSync();
-		for (unsigned i = 0; i < AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::size; i ++)
+		for (unsigned i = 0; i < tmpSize; i ++)
 			f << tmp[i] << std::endl;
 		f.close();
 		delete [] tmp;
@@ -1021,8 +1022,8 @@ public:
 	void setDevicePtr(T *ptr)
 	{
 #ifdef DEBUG_CUDA
-			if (doFreeDevice)
-				ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
+		if ( AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::doFreeDevice)
+			ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
 #endif
 		AccPtrBase<T,ACC_CUDA,AccPtr<T,ACC_CUDA> >::dPtr = ptr;
 	}
