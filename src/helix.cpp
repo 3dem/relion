@@ -3335,10 +3335,12 @@ void makeHelicalReference3DWithPolarity(
 		RFLOAT particle_diameter_A,
 		RFLOAT cyl_diameter_A,
 		RFLOAT topbottom_ratio,
-		int sym_Cn)
+		int sym_Cn,
+		int nr_filaments_helix_with_seam)
 {
 	RFLOAT rise_pix, tube_diameter_pix, particle_diameter_pix, particle_radius_pix, cyl_radius_pix, top_radius_pix, bottom_radius_pix;
 	int particle_radius_max_pix;
+	bool append_additional_densities = false;
 	Matrix2D<RFLOAT> matrix1, matrix2;
 	Matrix1D<RFLOAT> vec0, vec1, vec2;
 	out.clear();
@@ -3347,12 +3349,16 @@ void makeHelicalReference3DWithPolarity(
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Box size should be larger than 5!");
 	if (pixel_size_A < 0.001)
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Pixel size (in Angstroms) should be larger than 0.001!");
-	if ( (fabs(twist_deg) < 0.01) || (fabs(twist_deg) > 179.99) || ((rise_A / pixel_size_A) < 0.001) )
+	if ( (fabs(twist_deg) > 179.99) || ((rise_A / pixel_size_A) < 0.001) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Wrong helical twist or rise!");
 	if (sym_Cn < 1)
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Rotation symmetry Cn is invalid (n should be positive integer)!");
 	if ( (topbottom_ratio < 0.) || (topbottom_ratio > 1.) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Top-bottom width ratio should be 0~1!");
+	if ( (nr_filaments_helix_with_seam > 1) && (sym_Cn != 1) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Set Cn point group symmetry to 1 for a helix with seam!");
+	if ( (nr_filaments_helix_with_seam > 1) && (!(topbottom_ratio > 0.9999)) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Set top-bottom width ratio to 1 for a helix with seam!");
 
 	rise_pix = rise_A / pixel_size_A;
 	tube_diameter_pix = tube_diameter_A / pixel_size_A;
@@ -3390,6 +3396,7 @@ void makeHelicalReference3DWithPolarity(
 	vec2.clear();
 	vec2.resize(2);
 
+	append_additional_densities = false;
 	for (int id = 0; ;id++)
 	{
 		RFLOAT rot1_deg, x1, y1, z1;
@@ -3465,6 +3472,55 @@ void makeHelicalReference3DWithPolarity(
 				}
 			}
 		}
+
+		if (nr_filaments_helix_with_seam > 1)
+		{
+			if (id % nr_filaments_helix_with_seam == 0)
+				append_additional_densities = (append_additional_densities == true) ? (false) : (true);
+
+			if (append_additional_densities)
+			{
+				x1 *= (tube_diameter_pix + particle_diameter_pix) / tube_diameter_pix;
+				y1 *= (tube_diameter_pix + particle_diameter_pix) / tube_diameter_pix;
+				z1 += particle_diameter_pix / 2.;
+
+				for (int dz = -particle_radius_max_pix / 2.; dz <= particle_radius_max_pix / 2.; dz++)
+				{
+					for (int dy = -particle_radius_max_pix / 2.; dy <= particle_radius_max_pix / 2.; dy++)
+					{
+						for (int dx = -particle_radius_max_pix / 2.; dx <= particle_radius_max_pix / 2.; dx++)
+						{
+							RFLOAT _x, _y, _z, dist, val_old, val_new;
+							int x2, y2, z2;
+
+							x2 = ROUND(x1 + dx);
+							y2 = ROUND(y1 + dy);
+							z2 = ROUND(z1 + dz);
+
+							if ( (x2 < FIRST_XMIPP_INDEX(box_size)) || (x2 > LAST_XMIPP_INDEX(box_size))
+									|| (y2 < FIRST_XMIPP_INDEX(box_size)) || (y2 > LAST_XMIPP_INDEX(box_size))
+									|| (z2 < FIRST_XMIPP_INDEX(box_size)) || (z2 > LAST_XMIPP_INDEX(box_size)) )
+								continue;
+
+							_x = (RFLOAT)(x2) - x1;
+							_y = (RFLOAT)(y2) - y1;
+							_z = (RFLOAT)(z2) - z1;
+
+							dist = sqrt(_x * _x + _y * _y + _z * _z);
+							if (dist > (particle_radius_pix / 2.))
+								continue;
+
+							val_old = A3D_ELEM(out, z2, y2, x2);
+							val_new = 0.;
+
+							val_new = 0.5 + 0.5 * cos(2. * PI * dist / particle_radius_pix);
+							if (val_new > val_old)
+								A3D_ELEM(out, z2, y2, x2) = val_new;
+						}
+					}
+				}// End of looping over x,y,z
+			}
+		}// End of nr_filaments_helix_with_seam > 1
 	}
 	return;
 }
