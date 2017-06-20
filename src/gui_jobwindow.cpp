@@ -1322,10 +1322,9 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("nr_iter");
 	place("sgd_subset_size");
-	place("sgd_max_subsets");
 	place("sgd_write_subsets");
-	place("sgd_sigma2fudge_halflife");
 	place("sgd_highres_limit");
+	place("sgd_sigma2fudge_halflife");
 
 	tab3->end();
 	tab4->begin();
@@ -1348,6 +1347,22 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	// Set up queue groups for running tab
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+
+    place("use_gpu", TOGGLE_LEAVE_ACTIVE, group5);
+
+    group5->begin();
+	place("gpu_ids", TOGGLE_LEAVE_ACTIVE);
+    group5->end();
+
+    guientries["use_gpu"].cb_menu_i();
+
 
 	tab5->end();
 

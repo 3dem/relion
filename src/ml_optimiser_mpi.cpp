@@ -30,6 +30,7 @@
 //#define DEBUG
 //#define DEBUG_MPIEXP2
 //#define DEBUG_SEQUENTIAL
+//#define DEBUG_SEQUENTIAL2
 
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
@@ -1257,6 +1258,12 @@ void MlOptimiserMpi::expectation()
     			while (true)
     				sleep(1000);
 #endif
+#ifdef DEBUG_SEQUENTIAL2
+    		// Let all slaves except the first one sleep forever
+    		if (node->rank != 2)
+    			while (true)
+    				sleep(1000);
+#endif
 
 
     		// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
@@ -1931,7 +1938,7 @@ void MlOptimiserMpi::maximization()
 				if (node->rank == reconstruct_rank1)
 				{
 
-					if (do_sgd)
+					if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 					{
 
 						MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
@@ -2685,6 +2692,8 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 		}
     }
 
+	MPI_Barrier(MPI_COMM_WORLD);
+
 }
 
 void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, int ihalf)
@@ -3135,13 +3144,8 @@ void MlOptimiserMpi::iterate()
 
 			verb = old_verb;
 
-			if (nr_subsets > 1 && sgd_max_subsets > 0)
-			{
-				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-				if (total_nr_subsets > sgd_max_subsets)
-					break; // break out of loop over the subsets, and start next iteration
-			}
-
+			if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
+				break; // break out of loop over the subsets
 
 #ifdef TIMING
 			// Only first slave prints it timing information
@@ -3158,31 +3162,32 @@ void MlOptimiserMpi::iterate()
 		subset_start = 1;
 
 		// Stop subsets after sgd_max_subsets has been reached
-		if (nr_subsets > 1 && sgd_max_subsets > 0)
+		if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
 		{
-			long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-			if (total_nr_subsets > sgd_max_subsets)
+			// Write out without a _sub in the name
+			nr_subsets = 1;
+			if (node->rank == 1)
+				//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
+				MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
+			else if (node->isMaster())
 			{
-				// Write out without a _sub in the name
-				nr_subsets = 1;
-				if (node->rank == 1)
-					//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
-					MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
-				else if (node->isMaster())
-					// The master only writes the data file (he's the only one who has and manages these data!)
-					MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+				// The master only writes the data file (he's the only one who has and manages these data!)
+				MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+			}
 
-				if (do_sgd)
-				{
-					// For initial model generation, just stop after the sgd_max_subsets has been reached
-					break;
-				}
-				else
-				{
-					// For subsets in 2D classification, now continue rest of iterations without subsets in the next iteration
-					subset_size = -1;
-				}
-
+			if (do_sgd)
+			{
+				// For initial model generation, just stop after the sgd_max_subsets has been reached
+				if (verb > 0)
+					std::cout << " SGD has reached the maximum number of subsets, so stopping now..." << std::endl;
+				break;
+			}
+			else
+			{
+				if (verb > 0)
+					std::cout << " Run has reached the maximum number of subsets, continuing without subsets now..." << std::endl;
+				// For subsets in 2D classification, now continue rest of iterations without subsets in the next iteration
+				subset_size = -1;
 			}
 		}
 

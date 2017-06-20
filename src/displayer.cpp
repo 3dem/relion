@@ -1432,13 +1432,30 @@ int pickerViewerCanvas::handle(int ev)
 				if (xcoor_p*xcoor_p + ycoor_p*ycoor_p < rad2)
 					return 0;
 			}
+			RFLOAT aux = -999., zero = 0.;
+			int iaux = -999;
 			// Else store new coordinate
-			MDcoords.addObject();
+			if (!MDcoords.isEmpty())
+			{
+				// If there were already entries in MDcoords, then copy the last one.
+				// This will take care of re-picking in coordinate files from previous refinements
+				long int last_idx = MDcoords.numberOfObjects() - 1;
+				MDcoords.addObject(MDcoords.getObject(last_idx));
+				RFLOAT aux2;
+				if (MDcoords.getValue(EMDL_ORIENT_ROT, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ROT, aux);
+				if (MDcoords.getValue(EMDL_ORIENT_TILT, aux2))
+					MDcoords.setValue(EMDL_ORIENT_TILT, aux);
+				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_X, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ORIGIN_X, zero);
+				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_Y, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+			}
+			else
+				MDcoords.addObject();
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
 			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
-			RFLOAT aux = -999.;
-			int iaux = -999;
 			MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
 			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
 			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
@@ -1963,7 +1980,13 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --col " + (std::string)col_input->value();
 		cl += " --ori_scale " + (std::string)ori_scale_input->value();
-		cl += " --max_nr_images " + (std::string)max_nr_images_input->value();
+		if (textToInteger(max_nr_images_input->value()) > 0)
+		{
+			if (sort_button->value())
+				std::cerr << " WARNING: you cannot sort particles and use a maximum number of images. Ignoring the latter..." << std::endl;
+			else
+				cl += " --max_nr_images " + (std::string)max_nr_images_input->value();
+		}
 	}
 	else
 	{
@@ -1982,11 +2005,13 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --allow_save ";
 		if (fn_parts != "")
+		{
 			cl += " --fn_parts " + fn_parts;
+			if ( textToInteger(max_parts_per_class_input->value()) > 0)
+				cl += " --max_nr_parts_per_class " + (std::string)max_parts_per_class_input->value();
+		}
 		if (fn_imgs != "")
 			cl += " --fn_imgs " + fn_imgs;
-		if ( textToInteger(max_parts_per_class_input->value()) > 0)
-			cl += " --max_nr_parts_per_class " + (std::string)max_parts_per_class_input->value();
 	}
 
 	if (nr_regroups > 0)
@@ -1998,6 +2023,7 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --recenter";
 	}
+
 
 	// send job in the background
 	cl += " &";

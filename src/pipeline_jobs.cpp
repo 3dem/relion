@@ -2284,7 +2284,9 @@ void RelionJob::initialiseInimodelJob()
 
 	hidden_name = ".gui_inimodel";
 
-	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
+	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
+In SGD, it is very important that there are particles from enough different orientations. One only needs a few thousand to 10k particles. When selecting good 2D classes in the Subset Selection jobtype, use the option to select a maximum number of particles from each class to generate more even angular distributions for SGD.\
+\n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
@@ -2292,28 +2294,20 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["nr_iter"] = JobOption("Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed.");
+	joboptions["nr_iter"] = JobOption("Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed. Often 1 or 2 iterations with approximately ten thousand particles, or 5-10 iterations with several thousand particles is enough.");
 	joboptions["sgd_subset_size"] = JobOption("SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
-	joboptions["sgd_max_subsets"] = JobOption("Maximum number of subsets:", 50, -1, 200, 10, "Stop the SGD optimisation after this many subsets have been processed. \
-The total number of particles processed will then be equal to the subset size times this number. Often, processing 10k particles is enough to get a decent low-resolution model. If you have fewer particles, you can perform more than one iteration instead.");
 	joboptions["sgd_write_subsets"] = JobOption("Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
-	joboptions["sgd_sigma2fudge_halflife"] = JobOption("SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
-having 50% after this many particles have been processed. Switch increased noise variance off by setting this value to a negative number. Some difficult cases require switching this on or off, easier cases are successful with both options. When switched on, values around 1000 have been found useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
 	joboptions["sgd_highres_limit"] = JobOption("Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is essential in SGD, as there is very little regularisation, i.e. overfitting will start to happen very quickly. \
 Values in the range of 15-30 Angstroms have proven useful.");
+	joboptions["sgd_sigma2fudge_halflife"] = JobOption("SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
+having 50% after this many particles have been processed. By default, this option is switched off by setting this value to a negative number. \
+In some difficult cases, switching this option on helps. In such cases, values around 1000 have found to be useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
 
 	//joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
 These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
-	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
-set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
-* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
-* I2: Crowther 222 \n \
-* I3: 52-setting (as used in SPIDER?)\n \
-* I4: A different 52 setting \n \
-The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
-RELION uses XMIPP's libraries for symmetry operations. \
-Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
+	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "Initial SGD runs are often performed in C1. If a particle is confirmed to have symmetry, the SGD can also be repeated with the corresponding \
+point group symmetry. That has the advantage that the symetry axes in the reference will be aligned correctly.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -2342,7 +2336,7 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 
 	joboptions["sampling"] = JobOption("Angular sampling interval:", RADIO_SAMPLING, 1, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
-The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can be used than in normal 3D classifications/refinements");
+The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. ");
 	joboptions["offset_range"] = JobOption("Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n");
@@ -2363,6 +2357,9 @@ Provided this directory is on a fast local drive (e.g. an SSD drive), processing
 	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
 
 }
 
@@ -2403,7 +2400,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	command += " --sgd ";
 	command += " --subset_size " + joboptions["sgd_subset_size"].getString();
 	command += " --strict_highres_sgd " + joboptions["sgd_highres_limit"].getString();
-	command += " --max_subsets " + joboptions["sgd_max_subsets"].getString();
 	command += " --write_subsets " + joboptions["sgd_write_subsets"].getString();
 
 	if (!is_continue)
@@ -2468,6 +2464,12 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
+
+	// GPU-stuff
+	if (joboptions["use_gpu"].getBoolean())
+	{
+		command += " --gpu \"" + joboptions["gpu_ids"].getString() +"\"";
+	}
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
@@ -4066,7 +4068,7 @@ void RelionJob::initialiseLocalresJob()
 		default_location = mydefault;
 	}
 
-	joboptions["do_resmap_locres"] = JobOption("Use ResMap for local-resolution estimation?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");
+	joboptions["do_resmap_locres"] = JobOption("Use ResMap?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");
 	joboptions["fn_resmap"] = JobOption("ResMap executable:", std::string(default_location), "ResMap*", ".", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
 	joboptions["fn_mask"] = JobOption("User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 	joboptions["pval"] = JobOption("P-value:", 0.05, 0., 1., 0.01, "This value is typically left at 0.05. If you change it, report the modified value in your paper!");
@@ -4074,7 +4076,7 @@ void RelionJob::initialiseLocalresJob()
 	joboptions["maxres"] = JobOption("Lowest resolution (A): ", 0., 0., 10., 0.1, "ResMaps maxRes parameter. By default (0), the program will stop at 4x the pixel size");
 	joboptions["stepres"] = JobOption("Resolution step size (A)", 1., 0.1, 3, 0.1, "ResMaps stepSize parameter." );
 
-	joboptions["do_relion_locres"] = JobOption("Use Relion for local-resolution estimation?", false, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
+	joboptions["do_relion_locres"] = JobOption("Use Relion?", false, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
 \n \n The output relion_locres.mrc map can be used to color the surface of a map in UCSF Chimera according to its local resolution. The output relion_locres_filtered.mrc is a composite map that is locally filtered to the estimated resolution. \
 This is a developmental feature in need of further testing, but initial results indicate it may be useful. \n \n Note that only this program can use MPI, the ResMap wrapper cannot use MPI.");
 
