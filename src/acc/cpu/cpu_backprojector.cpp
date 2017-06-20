@@ -7,9 +7,6 @@
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
 
-namespace CpuKernels
-{
-
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_PREFETCH_COUNT 3
@@ -17,7 +14,7 @@ namespace CpuKernels
 #define BP_REF3D_BLOCK_SIZE 128
 #define BP_DATA3D_BLOCK_SIZE 640
 
-size_t Backprojector::setMdlDim(
+size_t CpuBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, int paddingFactor)
@@ -54,7 +51,7 @@ size_t Backprojector::setMdlDim(
 	return allocaton_size;
 }
 
-void Backprojector::initMdl()
+void CpuBackprojector::initMdl()
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -161,7 +158,7 @@ void backproject2D(
 					weight = weight * inv_minsigma_ctf;
 					Fweight += weight * ctf;
 
-				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
+				CpuKernels::translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
 				real += temp_real * weight;
 				imag += temp_imag * weight;
@@ -291,10 +288,10 @@ void backproject3D(
 
 			if(DATA3D)
 			{
-				z =  floorfracf(pixel, img_x*img_y);
+				z =  CpuKernels::floorfracf(pixel, img_x*img_y);
 				xy = pixel % (img_x*img_y);
 				x =             xy  % img_x;
-				y = floorfracf( xy,   img_x);
+				y = CpuKernels::floorfracf( xy,   img_x);
 				if (z > max_r)
 				{
 					if (z >= img_z - max_r)
@@ -309,7 +306,7 @@ void backproject3D(
 			else
 			{
 				x =             pixel % img_x;
-				y = floorfracf( pixel , img_x);
+				y = CpuKernels::floorfracf( pixel , img_x);
 			}
 			if (y > max_r)
 			{
@@ -351,9 +348,9 @@ void backproject3D(
 						weight = weight * inv_minsigma_ctf;
 						Fweight[tid] += weight * ctf;
 						if(DATA3D)
-							translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+							CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 						else
-							translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
+							CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
 
 						real[tid] += temp_real * weight;
 						imag[tid] += temp_imag * weight;
@@ -507,7 +504,7 @@ void backprojectRef3D(
 	XFLOAT sin_x[trans_num][img_x], cos_x[trans_num][img_x];
 	XFLOAT sin_y[trans_num][img_y], cos_y[trans_num][img_y];
 	
-	computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, img_x, img_y,
+	CpuKernels::computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, img_x, img_y,
 							   &sin_x[0][0], &cos_x[0][0], 
 							   &sin_y[0][0], &cos_y[0][0]);	
 	
@@ -573,7 +570,7 @@ void backprojectRef3D(
 				XFLOAT shifted_imag = cc * img_imag + ss * img_real;
 				/*
 				XFLOAT shifted_real, shifted_imag;
-				translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
+				CpuKernels::translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
 							   img_real, img_imag, shifted_real, shifted_imag);
 				*/
 				real[x] += shifted_real * my_weight;
@@ -683,7 +680,7 @@ void backprojectRef3D(
 	} // for y direction
 }
 
-void Backprojector::backproject(
+void CpuBackprojector::backproject(
 		XFLOAT *d_img_real,
 		XFLOAT *d_img_imag,
 		XFLOAT *trans_x,
@@ -796,14 +793,14 @@ void Backprojector::backproject(
 }
 
 
-void Backprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
+void CpuBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 {
 	memcpy(r, d_mdlReal,   mdlXYZ * sizeof(XFLOAT));
 	memcpy(i, d_mdlImag,   mdlXYZ * sizeof(XFLOAT));
 	memcpy(w, d_mdlWeight, mdlXYZ * sizeof(XFLOAT));
 }
 
-void Backprojector::clear()
+void CpuBackprojector::clear()
 {
 	mdlX = 0;
 	mdlY = 0;
@@ -826,9 +823,7 @@ void Backprojector::clear()
 	}
 }
 
-Backprojector::~Backprojector()
+CpuBackprojector::~CpuBackprojector()
 {
 	clear();
 }
-
-} // end of namespace CpuKernels

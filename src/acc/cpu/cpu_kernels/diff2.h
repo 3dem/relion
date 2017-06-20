@@ -59,7 +59,8 @@ void diff2_coarse_2D(
 	
 	// pre-compute sin and cos for x and y component
     computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
-                               sin_x, cos_x, sin_y, cos_y);
+			&sin_x[0][0], &cos_x[0][0], 
+			&sin_y[0][0], &cos_y[0][0]);
 	
 	//Setup variables
 	XFLOAT s_ref_real[eulers_per_block][xSize];
@@ -324,7 +325,7 @@ void diff2_coarse(
 		XFLOAT *trans_z,		
 		XFLOAT *g_real,
 		XFLOAT *g_imag,
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
 		int translation_num,
@@ -466,7 +467,7 @@ void diff2_fine_2D(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,		
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,
@@ -498,7 +499,9 @@ void diff2_fine_2D(
 	    trans_y[i] = g_trans_y[itrans];	       
 	}		
     computeSincosLookupTable2D(trans_num, trans_x, trans_y,
-                               xSize, ySize, sin_x, cos_x, sin_y, cos_y);		
+			xSize, ySize,
+			&sin_x[0][0], &cos_x[0][0], 
+			&sin_y[0][0], &cos_y[0][0]);		
 	XFLOAT s[trans_num];    
 	memset(s, 0, sizeof(XFLOAT) * trans_num);
 			
@@ -593,7 +596,7 @@ void diff2_fine_3D(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,		
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,
@@ -755,7 +758,7 @@ template<bool REF3D>
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		unsigned trans_num,
 		int      image_size,
@@ -780,7 +783,8 @@ template<bool REF3D>
 	XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
 	
     computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
-                               sin_x, cos_x, sin_y, cos_y);
+			&sin_x[0][0], &cos_x[0][0], 
+			&sin_y[0][0], &cos_y[0][0]);
 	
 	XFLOAT s_weight[trans_num][xSize];
 	memset(s_weight, 0, sizeof(XFLOAT) * xSize * trans_num);
@@ -879,7 +883,7 @@ void diff2_CC_coarse_3D(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,	
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		unsigned trans_num,
 		int      image_size,
@@ -1026,7 +1030,7 @@ void diff2_CC_fine_2D(
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,
@@ -1055,7 +1059,8 @@ void diff2_CC_fine_2D(
 	    trans_y[i] = g_trans_y[itrans];	    
 	}	
 	computeSincosLookupTable2D(trans_num, trans_x, trans_y, xSize, ySize,
-                               sin_x, cos_x, sin_y, cos_y);
+			&sin_x[0][0], &cos_x[0][0], 
+			&sin_y[0][0], &cos_y[0][0]);
 
 	unsigned long int iorient = d_rot_idx[d_job_idx[bid]];	
 	XFLOAT e0,e1,e3,e4,e6,e7;
@@ -1162,7 +1167,7 @@ void diff2_CC_fine_3D(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,		
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,

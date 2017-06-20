@@ -26,11 +26,11 @@ class CudaFFT
 	bool planSet;
 public:
 #ifdef ACC_DOUBLE_PRECISION
-	AccPtr<cufftDoubleReal, ACC_CUDA> reals;
-	AccPtr<cufftDoubleComplex, ACC_CUDA> fouriers;
+	AccPtr<cufftDoubleReal> reals;
+	AccPtr<cufftDoubleComplex> fouriers;
 #else
-	AccPtr<cufftReal, ACC_CUDA> reals;
-	AccPtr<cufftComplex, ACC_CUDA> fouriers;
+	AccPtr<cufftReal> reals;
+	AccPtr<cufftComplex> fouriers;
 #endif
 	cufftHandle cufftPlanForward, cufftPlanBackward;
 	int direction;
@@ -262,7 +262,7 @@ public:
 	void backward()
 	{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~reals) ); }
 
-	void backward(AccPtr<cufftDoubleReal, ACC_CUDA> &dst)
+	void backward(AccPtr<cufftDoubleReal> &dst)
 		{ HANDLE_CUFFT_ERROR( cufftExecZ2D(cufftPlanBackward, ~fouriers, ~dst) ); }
 #else
 	 	if(direction<=0)

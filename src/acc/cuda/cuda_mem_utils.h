@@ -20,7 +20,7 @@
 #include "src/parallel.h"
 
 // Forward definition
-template <typename T, int AccT>  class AccPtr;
+template <typename T>  class AccPtr;
 
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
 #include <execinfo.h>
@@ -1395,7 +1395,7 @@ template <typename T>
 class cudaStager
 {
 public:
-	AccPtr<T, ACC_CUDA> AllData;
+	AccPtr<T> AllData;
 	size_t size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
 
 	/*======================================================
@@ -1506,7 +1506,7 @@ public:
 
 
 
-	void stage(AccPtr<T, ACC_CUDA> &input)
+	void stage(AccPtr<T> &input)
 	{
 		if(AllData.size+input.size>size)
 		{

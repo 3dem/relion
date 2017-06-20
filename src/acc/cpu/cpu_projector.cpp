@@ -3,10 +3,8 @@
 #include "src/acc/cpu/cpu_projector.h"
 #include <signal.h>
 
-namespace CpuKernels
-{
 
-bool Projector::setMdlDim(
+bool CpuProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
 		int maxr, int paddingFactor)
@@ -42,7 +40,7 @@ bool Projector::setMdlDim(
 }
 
 
-void Projector::initMdl(XFLOAT *real, XFLOAT *imag)
+void CpuProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 {
     XFLOAT *pData = mdlComplex;
     for(int i=0; i<mdlXYZ; i++) {
@@ -51,7 +49,7 @@ void Projector::initMdl(XFLOAT *real, XFLOAT *imag)
     }
 }
 
-void Projector::initMdl(Complex *data)
+void CpuProjector::initMdl(Complex *data)
 {
     XFLOAT *tmpReal = new XFLOAT[mdlXYZ];   
     XFLOAT *tmpImag = new XFLOAT[mdlXYZ];
@@ -68,7 +66,7 @@ void Projector::initMdl(Complex *data)
     delete [] tmpImag;   
 }
 
-void Projector::clear()
+void CpuProjector::clear()
 {
 	mdlX = 0;
 	mdlY = 0;
@@ -87,4 +85,3 @@ void Projector::clear()
 	}
 }
 
-} // End of namespace CpuKernels

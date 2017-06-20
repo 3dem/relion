@@ -12,8 +12,8 @@
 class CudaProjectorPlan
 {
 public:
-	AccPtr< long unsigned, ACC_CUDA> iorientclasses;
-	AccPtr<XFLOAT, ACC_CUDA> eulers;
+	AccPtr< long unsigned> iorientclasses;
+	AccPtr<XFLOAT> eulers;
 	long unsigned orientation_num;
 
 	CudaProjectorPlan(CudaCustomAllocator *allocator):

@@ -450,7 +450,7 @@ void rotateOnly(int              blockIdx_x,
 				int              threadIdx_x,
 				ACCCOMPLEX     *d_Faux,
 				XFLOAT           psi,
-				ProjectorKernel &projector,
+				CpuProjectorKernel &projector,
 				int              startPsi
 		       )
 {
@@ -499,7 +499,7 @@ void rotateAndCtf(  int              blockIdx_x,
 					ACCCOMPLEX     *d_Faux,
 					XFLOAT          *d_ctf,
 					XFLOAT           psi,
-					ProjectorKernel &projector,
+					CpuProjectorKernel &projector,
 					int       startPsi
 				)
 {

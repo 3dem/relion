@@ -12,7 +12,7 @@
 #include "src/acc/cuda/cub/device/device_reduce.cuh"
 
 template <typename T>
-static T getMaxOnDevice(AccPtr<T, ACC_CUDA> &ptr)
+static T getMaxOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
@@ -28,7 +28,7 @@ if (ptr.getAllocator() == NULL)
 }
 
 template <typename T>
-static std::pair<int, T> getArgMaxOnDevice(AccPtr<T, ACC_CUDA> &ptr)
+static std::pair<int, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
@@ -48,7 +48,7 @@ if (ptr.getAllocator() == NULL)
 }
 
 template <typename T>
-static T getMinOnDevice(AccPtr<T, ACC_CUDA> &ptr)
+static T getMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
@@ -65,7 +65,7 @@ if (ptr.getAllocator() == NULL)
 
 
 template <typename T>
-static std::pair<int, T> getArgMinOnDevice(AccPtr<T, ACC_CUDA> &ptr)
+static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
@@ -85,7 +85,7 @@ if (ptr.getAllocator() == NULL)
 }
 
 template <typename T>
-static T getSumOnDevice(AccPtr<T, ACC_CUDA> &ptr)
+static T getSumOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
 if (ptr.size == 0)
@@ -104,7 +104,7 @@ if (ptr.getAllocator() == NULL)
 }
 
 template <typename T>
-static void sortOnDevice(AccPtr<T, ACC_CUDA> &in, AccPtr<T, ACC_CUDA> &out)
+static void sortOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 {
 #ifdef DEBUG_CUDA
 if (in.size == 0 || out.size == 0)

@@ -110,7 +110,7 @@ void initValue(T *data,  size_t Size, T value)
 }
 
 #define WEIGHT_MAP_BLOCK_SIZE 512
-void tbb_kernel_allweights_to_mweights(
+void allweights_to_mweights(
 		unsigned long * d_iorient,
 		XFLOAT * d_allweights,
 		XFLOAT * d_mweights,
@@ -128,7 +128,7 @@ void mapAllWeightsToMweights(
 
 #define OVER_THRESHOLD_BLOCK_SIZE 512
 template< typename T>
-void tbb_kernel_array_over_threshold(
+void array_over_threshold(
 		int blockIdx_x, int threadIdx_x, 
 		std::vector<T>    &data,
 		std::vector<bool> &passed,
@@ -151,7 +151,7 @@ void arrayOverThreshold(std::vector<T> &data, std::vector<bool> &passed, T thres
 	int grid_size = ceil((float)data.size()/(float)OVER_THRESHOLD_BLOCK_SIZE);
 	for(int i=0; i<grid_size; i++) {
 		for(int j=0; j<OVER_THRESHOLD_BLOCK_SIZE; j++)
-			tbb_kernel_array_over_threshold<T>(
+			array_over_threshold<T>(
 						i, j,
 						data,
 						passed,
@@ -162,7 +162,7 @@ void arrayOverThreshold(std::vector<T> &data, std::vector<bool> &passed, T thres
 
 #define FIND_IN_CUMULATIVE_BLOCK_SIZE 512
 template< typename T>
-void tbb_kernel_find_threshold_idx_in_cumulative(
+void find_threshold_idx_in_cumulative(
 		int blockIdx_x, int threadIdx_x, 
 		T *data,
 		T threshold,
@@ -220,7 +220,7 @@ void runDiff2KernelFine(
 
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
-void tbb_kernel_window_fourier_transform(
+void window_fourier_transform(
 					int blockIdx_x,
 					int blockIdx_y,  
 					int threadIdx_x, 
@@ -302,12 +302,12 @@ void windowFourierTransform2(
 
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
-void tbb_kernel_window_fourier_transform(
+void window_fourier_transform(
 		int blockIdx_x,
 		int blockIdx_y,  
 		int threadIdx_x,
-		CUDACOMPLEX *g_in,
-		CUDACOMPLEX *g_out,
+		ACCCOMPLEX *g_in,
+		ACCCOMPLEX *g_out,
 		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
 		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
 		size_t max_idx,
@@ -349,8 +349,8 @@ void tbb_kernel_window_fourier_transform(
 }
 
 void windowFourierTransform2(
-		std::vector<CUDACOMPLEX > &d_in,
-		std::vector<CUDACOMPLEX > &d_out,
+		std::vector<ACCCOMPLEX > &d_in,
+		std::vector<ACCCOMPLEX > &d_out,
 		size_t iX, size_t iY, size_t iZ, //Input dimensions
 		size_t oX, size_t oY, size_t oZ,  //Output dimensions
 		size_t Npsi = 1,
@@ -419,7 +419,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward)
 		int  dim = ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE)));
 		for(int i=0; i<dim; i++) {
 			for(int k=0; k<CFTT_BLOCK_SIZE; k++)
-				tbb_kernel_centerFFT_2D(i, 0, k, img_in,
+				centerFFT_2D(i, 0, k, img_in,
 				v.nzyxdim, XSIZE(v), YSIZE(v), xshift, yshift);
 		}
 
@@ -548,7 +548,7 @@ void runCenterFFT( std::vector< T > &img_in,
 	for(int i=0; i<blocks; i++) {
 		for(int j=0; j<batchSize; j++)
 			for(int k=0; k<CFTT_BLOCK_SIZE; k++)
-				tbb_kernel_centerFFT_2D(i, j, k,
+				centerFFT_2D(i, j, k,
 					&img_in[0],
 					 xSize*ySize,
 					 xSize,
@@ -591,7 +591,7 @@ void runCenterFFT(std::vector< T > &img_in,
 		for(int i=0; i<block; i++){
 			for(int j=0; j<batchSize; j++)
 				for(int k=0; k<CFTT_BLOCK_SIZE; k++)
-					tbb_kernel_centerFFT_3D(
+					centerFFT_3D(
 						i,j,k,
 						&img_in[0],
 						xSize*ySize*zSize,
@@ -619,7 +619,7 @@ void runCenterFFT(std::vector< T > &img_in,
 		for(int i=0; i<block; i++){
 			for(int j=0; j<batchSize; j++)
 				for(int k=0; k<CFTT_BLOCK_SIZE; k++)
-					tbb_kernel_centerFFT_2D(
+					centerFFT_2D(
 						i, j, k,
 						&img_in[0],
 						xSize*ySize,
@@ -662,7 +662,7 @@ void lowPassFilterMapGPU(
 	{
 	   for(int i=0; i<blocks; i++) {
 			for(int j=0; j<CFTT_BLOCK_SIZE; j++)
-			   tbb_kernel_frequencyPass<true>(i, j,
+			   kernel_frequencyPass<true>(i, j,
 				img_in,
 				ori_size,
 				Xdim,
@@ -679,7 +679,7 @@ void lowPassFilterMapGPU(
 	{
 		for(int i=0; i<blocks; i++) {
 			for(int j=0; j<CFTT_BLOCK_SIZE; j++)
-				tbb_kernel_frequencyPass<false>(i, j,
+				kernel_frequencyPass<false>(i, j,
 						img_in,
 						ori_size,
 						Xdim,

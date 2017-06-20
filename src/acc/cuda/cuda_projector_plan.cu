@@ -244,11 +244,11 @@ void CudaProjectorPlan::setup(
 
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
-	AccPtr<XFLOAT, ACC_CUDA> alphas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
-	AccPtr<XFLOAT, ACC_CUDA> betas (nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
-	AccPtr<XFLOAT, ACC_CUDA> gammas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT> alphas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT> betas (nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT> gammas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
 
-	AccPtr<XFLOAT, ACC_CUDA> perturb(9, eulers.getAllocator());
+	AccPtr<XFLOAT> perturb(9, eulers.getAllocator());
 
 	eulers.freeIfSet();
 	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);

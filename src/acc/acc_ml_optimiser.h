@@ -253,14 +253,13 @@ public:
 	}
 };
 
-template <int AccT>
-class IndexedDataArrayMaskBase
+class IndexedDataArrayMask
 {
 public:
 	// indexes of job partition
 	//   every element in jobOrigin    is a reference to point to a position in a IndexedDataArray.weights array where that job starts RELATIVE to firstPos
 	//   every element in jobExtent    specifies the number of weights for that job
-	AccPtr<size_t, AccT> jobOrigin, jobExtent;
+	AccPtr<size_t> jobOrigin, jobExtent;
 
 	size_t firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
 	size_t weightNum, jobNum; // number of weights and jobs this class
@@ -268,12 +267,12 @@ public:
 
 public:
 
-	IndexedDataArrayMaskBase() :
+	IndexedDataArrayMask() :
 		jobOrigin(), 	jobExtent(), 	firstPos(), 	lastPos(),
 		weightNum(), 	jobNum()
 	{}
 		
-	IndexedDataArrayMaskBase(CudaCustomAllocator *allocator) :
+	IndexedDataArrayMask(CudaCustomAllocator *allocator) :
 		jobOrigin(allocator), 	jobExtent(allocator), 	firstPos(), 	lastPos(),
 		weightNum(), 	jobNum()
 	{}
@@ -291,44 +290,18 @@ public:
 	}
 
 	inline
-	 ~IndexedDataArrayMaskBase()
+	 ~IndexedDataArrayMask()
 	{
 //		jobOrigin.free_host();
 //		jobExtent.free_host();
 	};
 };
 
-template <int AccT>
-class IndexedDataArrayMask : public IndexedDataArrayMaskBase<AccT>
-{};
-
-template <>
-class IndexedDataArrayMask<ACC_CUDA> : public IndexedDataArrayMaskBase<ACC_CUDA>
-{
-public:
-	inline
-	IndexedDataArrayMask(CudaCustomAllocator *allocator):
-	IndexedDataArrayMaskBase<ACC_CUDA>(allocator)
-	{};
-};
-
-template <>
-class IndexedDataArrayMask<ACC_CPU> : public IndexedDataArrayMaskBase<ACC_CPU>
-{
-public:
-	inline
-	IndexedDataArrayMask(CudaCustomAllocator *allocator):
-	IndexedDataArrayMaskBase<ACC_CPU>()
-	{};
-};
-
-
-template <int AccT>
-class IndexedDataArrayBase
+class IndexedDataArray
 {
 public:
 	//actual data
-	AccPtr<XFLOAT, AccT> weights;
+	AccPtr<XFLOAT> weights;
 
 	// indexes with same length as data
 	// -- basic indices ---------------------------------
@@ -337,11 +310,11 @@ public:
 	//   trans_id  = id of trans   = which of all POSSIBLE translations                               this weight signifies
 	// -- special indices ---------------------------------
 	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
-	AccPtr<size_t, AccT> rot_id, rot_idx, trans_idx, ihidden_overs;
+	AccPtr<size_t> rot_id, rot_idx, trans_idx, ihidden_overs;
 
 public:	
 	inline
-	 IndexedDataArrayBase():
+	 IndexedDataArray():
 		weights(),
 		rot_id(),
 		rot_idx(),
@@ -350,7 +323,7 @@ public:
 	{};
 	
 	inline
-	 IndexedDataArrayBase(CudaCustomAllocator *allocator):
+	 IndexedDataArray(CudaCustomAllocator *allocator):
 		weights(allocator),
 		rot_id(allocator),
 		rot_idx(allocator),
@@ -360,7 +333,7 @@ public:
 
 	// constructor which takes a parent IndexedDataArray and a mask to create a child
 	inline
-	 IndexedDataArrayBase(IndexedDataArrayBase<AccT> &parent, IndexedDataArrayMask<AccT> &mask):
+	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask):
 		weights(		&(parent.weights.hPtr[mask.firstPos])		,&(parent.weights.dPtr[mask.firstPos])			,mask.weightNum),
 		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,&(parent.rot_id.dPtr[mask.firstPos])			,mask.weightNum),
 		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,&(parent.rot_idx.dPtr[mask.firstPos])			,mask.weightNum),
@@ -381,7 +354,7 @@ public:
 	};
 	
 	inline
-	 IndexedDataArrayBase(IndexedDataArrayBase<AccT> &parent, IndexedDataArrayMask<AccT> &mask, CudaCustomAllocator *allocator):
+	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask, CudaCustomAllocator *allocator):
 		weights(		&(parent.weights.hPtr[mask.firstPos])		,&(parent.weights.dPtr[mask.firstPos])			,mask.weightNum, allocator),
 		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,&(parent.rot_id.dPtr[mask.firstPos])			,mask.weightNum, allocator),
 		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,&(parent.rot_idx.dPtr[mask.firstPos])			,mask.weightNum, allocator),
@@ -444,42 +417,6 @@ public:
 		host_alloc_all();
 		device_alloc_all();
 	}
-};
-
-template <int AccT>
-class IndexedDataArray: public IndexedDataArrayBase<AccT>
-{};
-
-template <>
-class IndexedDataArray<ACC_CUDA> : public IndexedDataArrayBase<ACC_CUDA>
-{
-public:
-	inline
-	IndexedDataArray(CudaCustomAllocator *allocator):
-	IndexedDataArrayBase<ACC_CUDA>(allocator)
-	{};
-	
-	inline
-	IndexedDataArray(IndexedDataArrayBase<ACC_CUDA> &parent, 
-			IndexedDataArrayMask<ACC_CUDA> &mask, CudaCustomAllocator *allocator):
-	IndexedDataArrayBase<ACC_CUDA>(parent, mask, allocator)
-	{};
-};
-
-template <>
-class IndexedDataArray<ACC_CPU> : public IndexedDataArrayBase<ACC_CPU>
-{
-public:
-	inline
-	IndexedDataArray(CudaCustomAllocator *allocator):
-	IndexedDataArrayBase<ACC_CPU>()
-	{};
-	
-	inline
-	IndexedDataArray(IndexedDataArrayBase<ACC_CPU> &parent, 
-			IndexedDataArrayMask<ACC_CPU> &mask, CudaCustomAllocator *allocator):
-	IndexedDataArrayBase<ACC_CPU>(parent, mask)
-	{};
 };
 
 #endif

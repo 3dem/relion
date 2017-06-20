@@ -61,11 +61,11 @@ public:
 
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
-	void calculateStddevAndMeanUnderMask(AccPtr< CUDACOMPLEX, ACC_CUDA > &d_Fmic, 
-			AccPtr< CUDACOMPLEX, ACC_CUDA > &d_Fmic2, 
-			AccPtr< CUDACOMPLEX, ACC_CUDA > &d_Fmsk,
-			int nr_nonzero_pixels_mask, AccPtr< XFLOAT, ACC_CUDA > &d_Mstddev, 
-			AccPtr< XFLOAT, ACC_CUDA > &d_Mmean,
+	void calculateStddevAndMeanUnderMask(AccPtr< CUDACOMPLEX > &d_Fmic, 
+			AccPtr< CUDACOMPLEX > &d_Fmic2, 
+			AccPtr< CUDACOMPLEX > &d_Fmsk,
+			int nr_nonzero_pixels_mask, AccPtr< XFLOAT > &d_Mstddev, 
+			AccPtr< XFLOAT > &d_Mmean,
 			size_t x, size_t y, size_t mic_size, size_t workSize);
 
 	~AutoPickerCuda()

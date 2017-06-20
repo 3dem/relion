@@ -283,7 +283,7 @@ void rotateOnly(int              blockIdx_x,
 				int              threadIdx_x,
 				ACCCOMPLEX     *d_Faux,
 				XFLOAT           psi,
-				ProjectorKernel &projector,
+				CpuProjectorKernel &projector,
 				int              startPsi);
 
 void rotateAndCtf(  int              blockIdx_x, 
@@ -292,7 +292,7 @@ void rotateAndCtf(  int              blockIdx_x,
 					ACCCOMPLEX     *d_Faux,
 					XFLOAT          *d_ctf,
 					XFLOAT           psi,
-					ProjectorKernel &projector,
+					CpuProjectorKernel &projector,
 					int              startPsi = 0);
 
 /*
@@ -427,7 +427,7 @@ void cast(  int blockIdx_x,
 }
 
 template<bool do_highpass>
-void frequencyPass( int          blockIdx_x,
+void kernel_frequencyPass( int          blockIdx_x,
 					int          threadIdx_x,
 					ACCCOMPLEX *A,
 					long int     ori_size,

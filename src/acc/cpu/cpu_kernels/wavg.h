@@ -25,7 +25,7 @@ template<bool REFCTF, bool REF3D>
 void wavg_ref3D(
         int                 blockIdx_x,
 		XFLOAT * RESTRICT   g_eulers,
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		unsigned            image_size,
 		unsigned long       orientation_num,
 		XFLOAT * RESTRICT   g_img_real,
@@ -150,7 +150,7 @@ template<bool REFCTF>
 void wavg_3D(
         int                 blockIdx_x,
 		XFLOAT * RESTRICT   g_eulers,
-		ProjectorKernel &projector,
+		CpuProjectorKernel &projector,
 		unsigned            image_size,
 		unsigned long       orientation_num,
 		XFLOAT * RESTRICT   g_img_real,

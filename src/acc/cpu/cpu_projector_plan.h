@@ -7,8 +7,7 @@
 #include <iostream>
 #include <fstream>
 
-namespace CpuKernels
-{
+
 class CpuProjectorPlan
 {
 public:
@@ -57,5 +56,5 @@ public:
 
 	void clear();
 };
-} // Namespace CpuKernels
+
 #endif

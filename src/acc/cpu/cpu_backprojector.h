@@ -3,10 +3,8 @@
 
 #include "src/acc/cpu/cpu_settings.h"
 
-namespace CpuKernels
-{
 
-class Backprojector
+class CpuBackprojector
 {
 public:
 	int mdlX, mdlY, mdlZ, mdlXYZ,
@@ -20,7 +18,7 @@ public:
 
 public:
 
-	Backprojector():
+	CpuBackprojector():
 				mdlX(0), mdlY(0), mdlZ(0), mdlXYZ(0),
 				mdlInitY(0), mdlInitZ(0),
 				maxR(0), maxR2(0),
@@ -59,9 +57,7 @@ public:
 
 	void clear();
 
-	~Backprojector();
+	~CpuBackprojector();
 };
-
-} // end of namespace CpuKernels
 
 #endif

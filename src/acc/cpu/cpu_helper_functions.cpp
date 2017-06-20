@@ -1,7 +1,14 @@
 #ifdef ALTCPU
+
+// Make sure we build for CPU
+#undef CUDA
+typedef void * cudaStream_t;
+typedef void * CudaCustomAllocator;
+#define cudaStreamPerThread 0
+
 #include "src/acc/cpu/cpu_helper_functions.h"
 #include "src/acc/cpu/cpu_settings.h"
-#include <parallel_for.h>
+//#include <parallel_for.h>
  
 namespace CpuKernels
 {
@@ -96,7 +103,7 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, u
 	dataMask.jobOrigin[jobid]=0;
 	dataMask.jobExtent[jobid]=1;
 	long int crot =FPW.rot_idx[jobid]; // set current rot
-	for(long int n=1; n<FPW.rot_idx.size(); n++)
+	for(long int n=1; n<FPW.rot_idx.getSize(); n++)
 	{
 		if(FPW.rot_idx[n]==crot)
 		{
@@ -305,7 +312,7 @@ void runWavgKernel(
 	{
 		if(data_is_3D)
 			for(int i=0; i<orientation_num; i++) {
-			  tbb_kernel_wavg_3D<true>(i,
+			  wavg_3D<true>(i,
 				eulers,
 				projector,
 				image_size,
@@ -328,7 +335,7 @@ void runWavgKernel(
 			}
 		else if (projector.mdlZ!=0)
 			for(int i=0; i<orientation_num; i++) {
-			  tbb_kernel_wavg_ref3D<true, true>(i,
+			  wavg_ref3D<true, true>(i,
 				eulers,
 				projector,
 				image_size,
@@ -351,7 +358,7 @@ void runWavgKernel(
 			}
 		else 
 			for(int i=0; i<orientation_num; i++) {
-			  tbb_kernel_wavg_ref3D<true, false>(i,
+			  wavg_ref3D<true, false>(i,
 				eulers,
 				projector,
 				image_size,
@@ -377,7 +384,7 @@ void runWavgKernel(
 	{
         if(data_is_3D)
 			for(int i=0; i<orientation_num; i++) {
-			  tbb_kernel_wavg_3D<false>(i,
+			  wavg_3D<false>(i,
 				eulers,
 				projector,
 				image_size,
@@ -400,7 +407,7 @@ void runWavgKernel(
 			}
 		else if (projector.mdlZ!=0)
 			for(int i=0; i<orientation_num; i++) {
-			  tbb_kernel_wavg_ref3D<false, true>(i,
+			  wavg_ref3D<false, true>(i,
 				eulers,
 				projector,
 				image_size,
@@ -423,7 +430,7 @@ void runWavgKernel(
 			}
 		else 
 			for(int i=0; i<orientation_num; i++) {
-			  tbb_kernel_wavg_ref3D<false, false>(i,
+			  wavg_ref3D<false, false>(i,
 				eulers,
 				projector,
 				image_size,
@@ -447,7 +454,7 @@ void runWavgKernel(
 	}
 }
 
- void tbb_kernel_allweights_to_mweights(
+ void allweights_to_mweights(
 					int blockIdx_x, int threadIdx_x,
 		unsigned long * d_iorient,
 		XFLOAT * d_allweights,
@@ -473,7 +480,7 @@ void mapAllWeightsToMweights(
 	int grid_size = ceil((float)(orientation_num*translation_num)/(float)WEIGHT_MAP_BLOCK_SIZE);
 	for(int i=0; i<grid_size; i++) {
 		for(int j=0; j<WEIGHT_MAP_BLOCK_SIZE; j++)
-			tbb_kernel_allweights_to_mweights(i, j,
+			allweights_to_mweights(i, j,
 				d_iorient,
 				d_allweights,
 				d_mweights,
@@ -496,7 +503,7 @@ size_t findThresholdIdxInCumulativeSum(std::vector<XFLOAT> &data, XFLOAT thresho
 		idx[0] = 0;
 		for(int i=0; i<grid_size; i++) {
 			for(int j=0; j<FIND_IN_CUMULATIVE_BLOCK_SIZE; j++)
-				tbb_kernel_find_threshold_idx_in_cumulative(i, j,
+				find_threshold_idx_in_cumulative(i, j,
 					&data[0],
 					 threshold,
 					 data.size()-1,
@@ -538,7 +545,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<(int)(even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D); i++) 
-						tbb_kernel_diff2_coarse_3D<D2C_EULERS_PER_BLOCK_DATA3D>
+						diff2_coarse_3D<D2C_EULERS_PER_BLOCK_DATA3D>
 							( i, 
 							  d_eulers,
 							  trans_x,
@@ -553,7 +560,7 @@ void runDiff2KernelCoarse(
 							  image_size);
 				else 
 					for(int i=0; i<(int)(even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D); i++) 
-						tbb_kernel_diff2_coarse_2D<true, D2C_EULERS_PER_BLOCK_REF3D>
+						diff2_coarse_2D<true, D2C_EULERS_PER_BLOCK_REF3D>
 								( i, 
 								  d_eulers,
 								  trans_x,
@@ -572,7 +579,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<rest; i++)
-						tbb_kernel_diff2_coarse_3D<1>
+						diff2_coarse_3D<1>
 							(i, 
 							 &d_eulers[9*even_orientation_num],
 							  trans_x,
@@ -587,7 +594,7 @@ void runDiff2KernelCoarse(
 							  image_size);
 				else
 					for(int i=0; i<rest; i++)
-						tbb_kernel_diff2_coarse_2D<true,1>
+						diff2_coarse_2D<true,1>
 							(i, 
 							 &d_eulers[9*even_orientation_num],
 							  trans_x,
@@ -611,7 +618,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<even_orientation_num/D2C_EULERS_PER_BLOCK_2D; i++)
-							tbb_kernel_diff2_coarse_2D<true, D2C_EULERS_PER_BLOCK_2D>
+							diff2_coarse_2D<true, D2C_EULERS_PER_BLOCK_2D>
 							(i, 
 							 d_eulers,
 							 trans_x,
@@ -626,7 +633,7 @@ void runDiff2KernelCoarse(
 							 image_size);
 				else
 					for(int i=0; i<even_orientation_num/D2C_EULERS_PER_BLOCK_2D; i++)
-							tbb_kernel_diff2_coarse_2D<false,D2C_EULERS_PER_BLOCK_2D>
+							diff2_coarse_2D<false,D2C_EULERS_PER_BLOCK_2D>
 							(i, 
 							 d_eulers,
 							 trans_x,
@@ -645,7 +652,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<rest; i++)
-							tbb_kernel_diff2_coarse_2D<true, 1>
+							diff2_coarse_2D<true, 1>
 							(i, 
 							&d_eulers[9*even_orientation_num],
 							 trans_x,
@@ -660,7 +667,7 @@ void runDiff2KernelCoarse(
 							 image_size);
 				else
 					for(int i=0; i<rest; i++)
-							tbb_kernel_diff2_coarse_2D<false, 1>
+							diff2_coarse_2D<false, 1>
 							(i, 
 							&d_eulers[9*even_orientation_num],
 							 trans_x,
@@ -687,7 +694,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<(int)(even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D); i++) 
-						tbb_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, D2C_EULERS_PER_BLOCK_DATA3D, 4>
+						diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, D2C_EULERS_PER_BLOCK_DATA3D, 4>
 							( i, 
 							  d_eulers,
 							  trans_x,
@@ -702,7 +709,7 @@ void runDiff2KernelCoarse(
 							  image_size);
 				else 
 					for(int i=0; i<(int)(even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D); i++) 
-						tbb_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, D2C_EULERS_PER_BLOCK_REF3D, 4>
+						diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, D2C_EULERS_PER_BLOCK_REF3D, 4>
 								( i, 
 								  d_eulers,
 								  trans_x,
@@ -721,7 +728,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<rest; i++)
-						tbb_kernel_diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, 1, 4>
+						diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, 1, 4>
 							(i, 
 							 &d_eulers[9*even_orientation_num],
 							  trans_x,
@@ -736,7 +743,7 @@ void runDiff2KernelCoarse(
 							  image_size);
 				else
 					for(int i=0; i<rest; i++)
-						tbb_kernel_diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, 1, 4>
+						diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, 1, 4>
 							(i, 
 							 &d_eulers[9*even_orientation_num],
 							  trans_x,
@@ -760,7 +767,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<even_orientation_num/D2C_EULERS_PER_BLOCK_2D; i++)
-							tbb_kernel_diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
+							diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
 							(i, 
 							 d_eulers,
 							 trans_x,
@@ -775,7 +782,7 @@ void runDiff2KernelCoarse(
 							 image_size);
 				else
 					for(int i=0; i<even_orientation_num/D2C_EULERS_PER_BLOCK_2D; i++)
-							tbb_kernel_diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
+							diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>
 							(i, 
 							 d_eulers,
 							 trans_x,
@@ -794,7 +801,7 @@ void runDiff2KernelCoarse(
 			{
 				if(data_is_3D)
 					for(int i=0; i<rest; i++)
-							tbb_kernel_diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, 1, 2>
+							diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, 1, 2>
 							(i, 
 							&d_eulers[9*even_orientation_num],
 							 trans_x,
@@ -809,7 +816,7 @@ void runDiff2KernelCoarse(
 							 image_size);
 				else
 					for(int i=0; i<rest; i++)
-							tbb_kernel_diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, 1, 2>
+							diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, 1, 2>
 							(i, 
 							&d_eulers[9*even_orientation_num],
 							 trans_x,
@@ -829,7 +836,7 @@ void runDiff2KernelCoarse(
 	{	   
 		if(data_is_3D) {
 			for(int i=0; i<orientation_num; i++)          
-				tbb_kernel_diff2_CC_coarse_3D
+				diff2_CC_coarse_3D
 							(i, 
 							 d_eulers,
 							 Fimg_real,
@@ -846,7 +853,7 @@ void runDiff2KernelCoarse(
 		}
 		else if(projector.mdlZ!=0){
 			for(int i=0; i<orientation_num; i++) 
-				tbb_kernel_diff2_CC_coarse_2D<true>
+				diff2_CC_coarse_2D<true>
 							(i, 
 							 d_eulers,
 							 Fimg_real,
@@ -862,7 +869,7 @@ void runDiff2KernelCoarse(
 		}
 		else{
 			for(int i=0; i<orientation_num; i++)              
-				tbb_kernel_diff2_CC_coarse_2D<false>
+				diff2_CC_coarse_2D<false>
 							 (i, 
 							 d_eulers,
 							 Fimg_real,
@@ -908,7 +915,7 @@ void runDiff2KernelFine(
 	{
 			if(data_is_3D)
 				for(int i=0; i<job_num_count; i++)
-				   tbb_kernel_diff2_fine_3D
+				   diff2_fine_3D
 					   (i, 
 						eulers,
 						Fimgs_real,
@@ -927,7 +934,7 @@ void runDiff2KernelFine(
 						job_num);
 			else if(projector.mdlZ!=0)
 				for(int i=0; i<job_num_count; i++)
-					tbb_kernel_diff2_fine_2D<true>
+					diff2_fine_2D<true>
 						(i, 
 						 eulers,
 						Fimgs_real,
@@ -946,7 +953,7 @@ void runDiff2KernelFine(
 						job_num);
 			else
 				for(int i=0; i<job_num_count; i++)
-					tbb_kernel_diff2_fine_2D<false>
+					diff2_fine_2D<false>
 						(i, 
 						eulers,
 						Fimgs_real,
@@ -968,7 +975,7 @@ void runDiff2KernelFine(
 	{
 		if(data_is_3D){
 			for(int i=0; i<job_num_count; i++) {
-				tbb_kernel_diff2_CC_fine_3D
+				diff2_CC_fine_3D
 					   (i, 
 						eulers,
 						Fimgs_real,
@@ -990,7 +997,7 @@ void runDiff2KernelFine(
 		}
 		else if(projector.mdlZ!=0){
 			for(int i=0; i<job_num_count; i++) {    	        
-				tbb_kernel_diff2_CC_fine_2D<true>
+				diff2_CC_fine_2D<true>
 					   (i, 
 						eulers,
 						Fimgs_real,
@@ -1012,7 +1019,7 @@ void runDiff2KernelFine(
 		else{
 			for(int i=0; i<job_num_count; i++) {
 				 //We MAY have to do up to PROJDIFF_CHUNK_SIZE translations in each block
-				tbb_kernel_diff2_CC_fine_2D<false>
+				diff2_CC_fine_2D<false>
 					   (i, 
 						eulers,
 						Fimgs_real,
@@ -1063,7 +1070,7 @@ void runCollect2jobs(	int      grid_dim,
 	if(data_is_3D)
 	{
 		for(int i=0; i<grid_dim; i++)
-			tbb_kernel_collect2jobs<true>(i, 
+			collect2jobs<true>(i, 
 				oo_otrans_x,          // otrans-size -> make const
 				oo_otrans_y,          // otrans-size -> make const
 				oo_otrans_z,          // otrans-size -> make const
@@ -1089,7 +1096,7 @@ void runCollect2jobs(	int      grid_dim,
 	else
 	{
 		for(int i=0; i<grid_dim; i++)
-			tbb_kernel_collect2jobs<false>(i, 
+			collect2jobs<false>(i, 
 				oo_otrans_x,          // otrans-size -> make const
 				oo_otrans_y,          // otrans-size -> make const
 				oo_otrans_z,          // otrans-size -> make const
@@ -1138,7 +1145,7 @@ void runCollect2jobs(	int      grid_dim,
 //		long int max_r2 = (iX - 1) * (iX - 1);
 //
 //		unsigned grid_dim = ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE);
-//		tbb_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream  >>>(
+//		window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream  >>>(
 //				d_in_real,
 //				d_in_imag,
 //				d_out_real,
@@ -1151,7 +1158,7 @@ void runCollect2jobs(	int      grid_dim,
 //	else
 //	{
 //		unsigned grid_dim = ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE);
-//		tbb_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream  >>>(
+//		window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, stream  >>>(
 //				d_in_real,
 //				d_in_imag,
 //				d_out_real,
@@ -1192,7 +1199,7 @@ void windowFourierTransform2(
 		for(int i=0; i<grid_dim; i++) {
 			for(int j=0; j<Npsi; j++) 
 				for(int k=0; k< WINDOW_FT_BLOCK_SIZE; k++)
-					tbb_kernel_window_fourier_transform<true>(i, j, k,
+					window_fourier_transform<true>(i, j, k,
 						&d_in[pos],
 						&d_out[0],
 						iX, iY, iZ, iX * iY, //Input dimensions
@@ -1207,7 +1214,7 @@ void windowFourierTransform2(
 		for(int i=0; i<grid_dim; i++) {
 			for(int j=0; j<Npsi; j++) 
 				for(int k=0; k< WINDOW_FT_BLOCK_SIZE; k++)
-					tbb_kernel_window_fourier_transform<false>(i, j, k,
+					window_fourier_transform<false>(i, j, k,
 						&d_in[pos],
 						&d_out[0],
 						iX, iY, iZ, iX * iY, //Input dimensions

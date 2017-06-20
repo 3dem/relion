@@ -12,8 +12,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
-		IndexedDataArray<ACC_CUDA> &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask<ACC_CUDA> &dataMask,
+		IndexedDataArray &FPW, // FPW=FinePassWeights
+		IndexedDataArrayMask &dataMask,
 		int chunk)
 {
 	long int w_base = dataMask.firstPos, w(0), k(0);
@@ -81,8 +81,8 @@ long int makeJobsForDiff2Fine(
 	return(w);
 }
 
-int  makeJobsForCollect(IndexedDataArray<ACC_CUDA> &FPW, 
-    IndexedDataArrayMask<ACC_CUDA> &dataMask, unsigned long NewJobNum) // FPW=FinePassWeights
+int  makeJobsForCollect(IndexedDataArray &FPW, 
+    IndexedDataArrayMask &dataMask, unsigned long NewJobNum) // FPW=FinePassWeights
 {
 	// reset the old (diff2Fine) job-definitions
 //	dataMask.jobOrigin.free_host();
@@ -141,7 +141,7 @@ void mapWeights(
 		mapped_weights[ (rot_idx[i]-orientation_start) * translation_num + trans_idx[i] ]= weights[i];
 }
 
-void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT, ACC_CUDA> &corr_img, long int ipart, long int group_id)
+void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT> &corr_img, long int ipart, long int group_id)
 {
 	// CC or not
 	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
@@ -652,7 +652,7 @@ void mapAllWeightsToMweights(
 }
 
 
-size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT, ACC_CUDA> &data, XFLOAT threshold)
+size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT> &data, XFLOAT threshold)
 {
 	int grid_size = ceil((float)(data.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
 	if(grid_size==0)
@@ -661,7 +661,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT, ACC_CUDA> &data, XFLOAT th
 	}
 	else
 	{
-		AccPtr<size_t, ACC_CUDA >  idx(1, data.getStream(), data.getAllocator());
+		AccPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
 		idx[0] = 0;
 		idx.putOnDevice();
 
@@ -1414,8 +1414,8 @@ void runCollect2jobs(	dim3 grid_dim,
 //}
 
 void windowFourierTransform2(
-		AccPtr<CUDACOMPLEX, ACC_CUDA > &d_in,
-		AccPtr<CUDACOMPLEX, ACC_CUDA > &d_out,
+		AccPtr<CUDACOMPLEX > &d_in,
+		AccPtr<CUDACOMPLEX > &d_out,
 		size_t iX, size_t iY, size_t iZ, //Input dimensions
 		size_t oX, size_t oY, size_t oZ,  //Output dimensions
 		size_t Npsi,

@@ -165,8 +165,6 @@ public:
 #include <fftw3.h>
 #include <tbb/spin_mutex.h>
 
-namespace CpuKernels
-{
 
 extern tbb::spin_mutex      mkl_mutex;
 
@@ -317,6 +315,5 @@ public:
 	~MklFFT()
 	{ clear(); }
 };
-}  // Namespace CpuKernels
 
 #endif

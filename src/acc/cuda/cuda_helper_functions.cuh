@@ -38,8 +38,8 @@ long int makeJobsForDiff2Fine(
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
 		long int nr_over_orient, long int nr_over_trans, int ipart,
-		IndexedDataArray<ACC_CUDA> &FPW, // FPW=FinePassWeights
-		IndexedDataArrayMask<ACC_CUDA> &dataMask,
+		IndexedDataArray &FPW, // FPW=FinePassWeights
+		IndexedDataArrayMask &dataMask,
 		int chunk);
 
 /*
@@ -47,8 +47,8 @@ long int makeJobsForDiff2Fine(
  * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
  * with computed differences into a reduced object to be back-projected.
  */
-int  makeJobsForCollect(IndexedDataArray<ACC_CUDA> &FPW, 
-        IndexedDataArrayMask<ACC_CUDA> &dataMask, 
+int  makeJobsForCollect(IndexedDataArray &FPW, 
+        IndexedDataArrayMask &dataMask, 
         unsigned long NewJobNum); // FPW=FinePassWeights
 
 /*
@@ -66,7 +66,7 @@ void mapWeights(
 		long unsigned *trans_idx,
 		unsigned long current_oversampling);
 
-void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT, ACC_CUDA> &corr_img, long int ipart, long int group_id);
+void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT> &corr_img, long int ipart, long int group_id);
 
 void generateEulerMatrices(
 		XFLOAT padding_factor,
@@ -156,7 +156,7 @@ __global__ void cuda_kernel_init_value(
 }
 
 template< typename T>
-void deviceInitComplexValue(AccPtr<T, ACC_CUDA> &data, XFLOAT value)
+void deviceInitComplexValue(AccPtr<T> &data, XFLOAT value)
 {
 	int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_complex_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
@@ -166,7 +166,7 @@ void deviceInitComplexValue(AccPtr<T, ACC_CUDA> &data, XFLOAT value)
 }
 
 template< typename T>
-void deviceInitValue(AccPtr<T, ACC_CUDA> &data, T value)
+void deviceInitValue(AccPtr<T> &data, T value)
 {
 	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
@@ -177,7 +177,7 @@ void deviceInitValue(AccPtr<T, ACC_CUDA> &data, T value)
 }
 
 template< typename T>
-void deviceInitValue(AccPtr<T, ACC_CUDA> &data, T value, size_t Size)
+void deviceInitValue(AccPtr<T> &data, T value, size_t Size)
 {
 	int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
@@ -223,7 +223,7 @@ __global__ void cuda_kernel_array_over_threshold(
 }
 
 template< typename T>
-void arrayOverThreshold(AccPtr<T, ACC_CUDA> &data, AccPtr<bool, ACC_CUDA> &passed, T threshold)
+void arrayOverThreshold(AccPtr<T> &data, AccPtr<bool> &passed, T threshold)
 {
 	int grid_size = ceil((float)data.getSize()/(float)OVER_THRESHOLD_BLOCK_SIZE);
 	cuda_kernel_array_over_threshold<T><<< grid_size, OVER_THRESHOLD_BLOCK_SIZE, 0, data.getStream() >>>(
@@ -247,7 +247,7 @@ __global__ void cuda_kernel_find_threshold_idx_in_cumulative(
 		idx[0] = i+1;
 }
 
-size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT, ACC_CUDA> &data, XFLOAT threshold);
+size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT> &data, XFLOAT threshold);
 
 void runDiff2KernelCoarse(
 		CudaProjectorKernel &projector,
@@ -420,8 +420,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 }
 
 void windowFourierTransform2(
-		AccPtr<CUDACOMPLEX, ACC_CUDA> &d_in,
-		AccPtr<CUDACOMPLEX, ACC_CUDA> &d_out,
+		AccPtr<CUDACOMPLEX> &d_in,
+		AccPtr<CUDACOMPLEX> &d_out,
 		size_t iX, size_t iY, size_t iZ, //Input dimensions
 		size_t oX, size_t oY, size_t oZ,  //Output dimensions
 		size_t Npsi = 1,
@@ -435,8 +435,8 @@ void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT
 template <typename T>
 void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allocator)
 {
-	AccPtr<XFLOAT, ACC_CUDA >  img_in (v.nzyxdim, allocator);   // with original data pointer
-//	AccPtr<XFLOAT, ACC_CUDA >  img_aux(v.nzyxdim, allocator);   // temporary holder
+	AccPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
+//	AccPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
 
 	for (unsigned i = 0; i < v.nzyxdim; i ++)
 		img_in[i] = (XFLOAT) v.data[i];
@@ -609,13 +609,13 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 
 
 template <typename T>
-void runCenterFFT( AccPtr< T, ACC_CUDA > &img_in,
+void runCenterFFT( AccPtr< T > &img_in,
 				  int xSize,
 				  int ySize,
 				  bool forward,
 				  int batchSize = 1)
 {
-//	AccPtr<XFLOAT, ACC_CUDA >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	AccPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
 //	img_aux.deviceAlloc();
 
 	int xshift = (xSize / 2);
@@ -644,14 +644,14 @@ void runCenterFFT( AccPtr< T, ACC_CUDA > &img_in,
 }
 
 template <typename T>
-void runCenterFFT( AccPtr< T, ACC_CUDA > &img_in,
+void runCenterFFT( AccPtr< T > &img_in,
 				  int xSize,
 				  int ySize,
 				  int zSize,
 				  bool forward,
 				  int batchSize = 1)
 {
-//	AccPtr<XFLOAT, ACC_CUDA >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	AccPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
 //	img_aux.deviceAlloc();
 
 	if(zSize>1)
@@ -707,7 +707,7 @@ void runCenterFFT( AccPtr< T, ACC_CUDA > &img_in,
 
 template <typename T>
 void lowPassFilterMapGPU(
-		AccPtr< T, ACC_CUDA > &img_in,
+		AccPtr< T > &img_in,
 		size_t Zdim,
 		size_t Ydim,
 		size_t Xdim,

@@ -3,8 +3,6 @@
 
 #include "src/acc/settings.h"
 
-namespace CpuKernels
-{
 
 // GENERAL -----------------------------
 #define MAX_RESOL_SHARED_MEM 		32
@@ -59,6 +57,5 @@ namespace CpuKernels
 #  define RESTRICT
 #endif
 
-}
 
 #endif /* CPU_SETTINGS_H_ */

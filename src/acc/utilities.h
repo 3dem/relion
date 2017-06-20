@@ -11,7 +11,7 @@ namespace AccUtilities
 	template <typename T, int Acc>
 	static
 	void
-	multiply(AccPtr<T,Acc> &ptr, T value)
+	multiply(AccDataTypes::Image<T,Acc> &ptr, T value)
 	{
 		if (Acc == ACC_CPU)
 		{

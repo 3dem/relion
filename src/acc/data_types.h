@@ -8,7 +8,7 @@ namespace AccDataTypes
 {
 
 template <typename T, int AccT = ACC_CPU>
-class Image : public AccPtr<T,AccT>
+class Image : public AccPtr<T>
 {
 private:
 	int x,y,z;
@@ -21,57 +21,57 @@ public:
 	======================================================*/
 
 	Image(CudaCustomAllocator *allocator):
-		AccPtr<T,AccT>(allocator),
+		AccPtr<T>(allocator),
 		x(0), y(0), z(0), fourier(false)
 	{}
 
 	Image(cudaStream_t stream, CudaCustomAllocator *allocator):
-		AccPtr<T,AccT>(stream, allocator),
+		AccPtr<T>(stream, allocator),
 		x(0), y(0), z(0), fourier(false)
 	{}
 
 	Image(int xdim, int ydim, CudaCustomAllocator *allocator):
-		AccPtr<T,AccT>(xdim*ydim, allocator),
+		AccPtr<T>(xdim*ydim, allocator),
 		x(xdim), y(ydim), z(1), fourier(false)
 	{}
 
 	Image(int xdim, int ydim, int zdim, CudaCustomAllocator *allocator):
-		AccPtr<T,AccT>(xdim*ydim*zdim, allocator),
+		AccPtr<T>(xdim*ydim*zdim, allocator),
 		x(xdim), y(ydim), z(zdim), fourier(false)
 	{}
 
 	Image(int xdim, int ydim, cudaStream_t stream, CudaCustomAllocator *allocator):
-		 AccPtr<T,AccT>(xdim*ydim, stream, allocator),
+		 AccPtr<T>(xdim*ydim, stream, allocator),
 		 x(xdim), y(ydim), z(1), fourier(false)
 	{}
 
 	Image(int xdim, int ydim, int zdim, cudaStream_t stream, CudaCustomAllocator *allocator):
-		 AccPtr<T,AccT>(xdim*ydim*zdim, stream, allocator),
+		 AccPtr<T>(xdim*ydim*zdim, stream, allocator),
 		 x(xdim), y(ydim), z(zdim), fourier(false)
 	{}
 
 	template <typename T1>
 	Image(MultidimArray<T1> img, CudaCustomAllocator *allocator):
-		AccPtr<T,AccT>(img.nzyxdim, allocator),
+		AccPtr<T>(img.nzyxdim, allocator),
 		x(img.xdim), y(img.ydim), z(img.zdim), fourier(false)
 	{}
 
 	template <typename T1>
 	Image(MultidimArray<T1> img, cudaStream_t stream, CudaCustomAllocator *allocator):
-		 AccPtr<T,AccT>(img.nzyxdim, stream, allocator),
+		 AccPtr<T>(img.nzyxdim, stream, allocator),
 		x(img.xdim), y(img.ydim), z(img.zdim), fourier(false)
 	{}
 
 	Image(int box_dim, bool is_fourier, bool is3D, CudaCustomAllocator *allocator)
 	{
 		setSize(box_dim, is_fourier, is3D);
-		AccPtr<T,AccT>(x*y*z, allocator);
+		AccPtr<T>(x*y*z, allocator);
 	}
 
 	Image(int box_dim, bool is_fourier, bool is3D, cudaStream_t stream, CudaCustomAllocator *allocator)
 	{
 		setSize(box_dim, is_fourier, is3D);
-		AccPtr<T,AccT>(x*y*z, stream, allocator);
+		AccPtr<T>(x*y*z, stream, allocator);
 	}
 
 	/*======================================================
@@ -89,7 +89,7 @@ public:
 
 	int getxyz()
 	{
-		return AccPtr<T,AccT>::getSize();
+		return AccPtr<T>::getSize();
 	}
 
 	bool is3D() { return z > 1; }
@@ -106,7 +106,7 @@ public:
 			else
 				z = 1;
 		}
-		AccPtr<T,AccT>::setSize(x*y*z);
+		AccPtr<T>::setSize(x*y*z);
 	}
 
 	void setSize(int xdim, int ydim)
@@ -114,7 +114,7 @@ public:
 		x = xdim;
 		y = ydim;
 
-		AccPtr<T,AccT>::setSize(x*y);
+		AccPtr<T>::setSize(x*y);
 	}
 
 	void setSize(int xdim, int ydim, int zdim)
@@ -123,7 +123,7 @@ public:
 		y = ydim;
 		z = zdim;
 
-		AccPtr<T,AccT>::setSize(x*y*z);
+		AccPtr<T>::setSize(x*y*z);
 	}
 
 	template <typename T1>
@@ -133,7 +133,7 @@ public:
 		y = img.xdim;
 		z = img.xdim;
 
-		AccPtr<T,AccT>::setSize(x*y*z);
+		AccPtr<T>::setSize(x*y*z);
 	}
 
 	template <typename T1>
@@ -141,17 +141,17 @@ public:
 	{
 		if (img.xdim != x || img.ydim != y || img.zdim != z)
 		{
-			if (img.nzyxdim > AccPtr<T,AccT>::getSize())
+			if (img.nzyxdim > AccPtr<T>::getSize())
 			{
-				AccPtr<T,AccT>::freeIfSet();
+				AccPtr<T>::freeIfSet();
 				setSize(img);
-				AccPtr<T,AccT>::hostAlloc();
+				AccPtr<T>::hostAlloc();
 			}
 			else
 				setSize(img);
 		}
 
-		T *ptr = AccPtr<T,AccT>::getHostPtr();
+		T *ptr = AccPtr<T>::getHostPtr();
 
 		if (sizeof(T) == sizeof(T1))
 			memcpy(ptr, img.data, sizeof(T)*img.nzyxdim);

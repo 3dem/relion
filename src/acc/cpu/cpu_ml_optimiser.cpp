@@ -25,21 +25,8 @@
 
 // Make sure we build for CPU
 #undef CUDA
-
-// ACC_CPU only and GCC 4.8
 typedef void * cudaStream_t;
-class CudaCustomAllocator
-{
-	CudaCustomAllocator();
-	class Alloc
-	{
-		friend class CudaCustomAllocator;
-		void markReadyEvent(cudaStream_t stream = 0) {}
-	};
-};
-#define ACC_CUDA 2
-// End ACC_CPU only and GCC 4.8
-
+typedef void * CudaCustomAllocator;
 #define cudaStreamPerThread 0
 
 #include <sys/time.h>

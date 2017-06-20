@@ -4,12 +4,9 @@
 #include "src/complex.h"
 #include "src/acc/cpu/cpu_settings.h"
 
-namespace CpuKernels
+class CpuProjector
 {
-
-class Projector
-{
-	friend class ProjectorKernel;
+	friend class CpuProjectorKernel;
 
 	int mdlX, mdlY, mdlZ, mdlXYZ, mdlMaxR,
 	    mdlInitY, mdlInitZ,
@@ -21,7 +18,7 @@ class Projector
 	XFLOAT *mdlComplex;
 
 public:
-	Projector():
+	CpuProjector():
 			mdlX(0), mdlY(0), mdlZ(0),
 			mdlXYZ(0), mdlMaxR(0),
 			mdlInitY(0), mdlInitZ(0),
@@ -41,7 +38,7 @@ public:
 
 	void clear();
 
-	~Projector()
+	~CpuProjector()
 	{
 		clear();
 	};
@@ -171,7 +168,7 @@ void complex3D(XFLOAT* mdlComplex, XFLOAT &real, XFLOAT &imag,
 }
 
 
-class ProjectorKernel
+class CpuProjectorKernel
 {
 
 public:
@@ -183,7 +180,7 @@ public:
 
 	XFLOAT *mdlComplex;
 
-	ProjectorKernel(
+	CpuProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
 			int mdlInitY, int mdlInitZ,
@@ -199,7 +196,7 @@ public:
 			mdlComplex(mdlComplex)
 		{};
 
-	ProjectorKernel(
+	CpuProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
 			int mdlInitY, int mdlInitZ,
@@ -337,11 +334,11 @@ public:
 	    }
 	}
 
-	static ProjectorKernel makeKernel(Projector &p, int imgX, int imgY, int imgZ, int imgMaxR)
+	static CpuProjectorKernel makeKernel(CpuProjector &p, int imgX, int imgY, int imgZ, int imgMaxR)
 	{
 		int maxR = p.mdlMaxR >= imgMaxR ? imgMaxR : p.mdlMaxR;
 
-		ProjectorKernel k(
+		CpuProjectorKernel k(
 					p.mdlX, p.mdlY, p.mdlZ,
 					imgX, imgY, imgZ, 
 					p.mdlInitY, p.mdlInitZ,
@@ -353,6 +350,5 @@ public:
 	}
 };
 
-} // end of namespace CpuKernels
 
 #endif
