@@ -20,11 +20,100 @@
 
 #include "src/local_symmetry.h"
 
-#define DEBUG
-//#define NEW_APPLY_SYMMETRY_METHOD
+//#define DEBUG
+#define NEW_APPLY_SYMMETRY_METHOD
 
 static std::string str_new_mask = "NEW_MASK_AND_OPERATORS";
 static std::string str_mask_filename = "MASKFILENAME";
+
+void sum3DCubicMask(
+		const MultidimArray<RFLOAT> v,
+		RFLOAT& val_sum,
+		RFLOAT& val_ctr)
+{
+	RFLOAT val = 0.;
+	val_sum = val_ctr = 0.;
+
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(v)
+	{
+		val = DIRECT_A3D_ELEM(v, k, i, j);
+		if ( (val < -(XMIPP_EQUAL_ACCURACY)) || ((val - 1.) > (XMIPP_EQUAL_ACCURACY)))
+			REPORT_ERROR("ERROR: mask - values are not in range [0,1]!");
+		if (val > XMIPP_EQUAL_ACCURACY)
+		{
+			val_sum += val;
+			val_ctr += 1.;
+		}
+	}
+
+	if ( (val_ctr < 0.9) || (val_sum < 0.01) )
+		REPORT_ERROR("ERROR: mask is empty!");
+}
+
+bool similar3DCubicMasks(
+		RFLOAT mask1_sum,
+		RFLOAT mask1_ctr,
+		RFLOAT mask2_sum,
+		RFLOAT mask2_ctr)
+{
+	RFLOAT q_sum = 1., q_ctr = 1.;
+
+	if ( (mask1_ctr < 0.9) || (mask1_sum < 0.01) || (mask2_ctr < 0.9) || (mask2_sum < 0.01) )
+		REPORT_ERROR("ERROR: mask1 and/or mask2 are empty!");
+
+	q_sum = (mask1_sum > mask2_sum) ? (mask1_sum / mask2_sum) : (mask2_sum / mask1_sum);
+	q_ctr = (mask1_ctr > mask2_ctr) ? (mask1_ctr / mask2_ctr) : (mask2_ctr / mask1_ctr);
+
+	if ( (q_sum > 1.1) || (q_ctr > 1.1) )
+		return false;
+	return true;
+}
+
+void truncateMultidimArray(
+		MultidimArray<RFLOAT>& v,
+		RFLOAT minval,
+		RFLOAT maxval)
+{
+	RFLOAT val = 0.;
+
+	if (minval > maxval)
+		REPORT_ERROR("ERROR: minval should be smaller than maxval!");
+	/*
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(v)
+	{
+		val = DIRECT_A3D_ELEM(v, k, i, j);
+		if (val < minval)
+			DIRECT_A3D_ELEM(v, k, i, j) = minval;
+		if (val > maxval)
+			DIRECT_A3D_ELEM(v, k, i, j) = maxval;
+	}
+	*/
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(v)
+	{
+		val = DIRECT_MULTIDIM_ELEM(v, n);
+		if (val < minval)
+			DIRECT_MULTIDIM_ELEM(v, n) = minval;
+		if (val > maxval)
+			DIRECT_MULTIDIM_ELEM(v, n) = maxval;
+	}
+}
+
+void Localsym_outputOperator(
+		const Matrix1D<RFLOAT>& op,
+		std::ostream* o_ptr,
+		RFLOAT scale_angpix)
+{
+	if (VEC_XSIZE(op) != NR_LOCALSYM_PARAMETERS)
+		REPORT_ERROR("ERROR: op is not a local symmetry operator!");
+	if (o_ptr == NULL)
+		REPORT_ERROR("ERROR: std::ostream* o_ptr == NULL !");
+	if (scale_angpix < 0.001)
+		REPORT_ERROR("ERROR: Invalid scale of pixel size!");
+
+	(*o_ptr) << "Angles (rot, tilt, psi) = (" << VEC_ELEM(op, AA_POS) << ", " << VEC_ELEM(op, BB_POS) << ", " << VEC_ELEM(op, GG_POS)
+			<< ") degree(s). Translations (dx, dy, dz) = (" << scale_angpix * VEC_ELEM(op, DX_POS) << ", "
+			<< scale_angpix * VEC_ELEM(op, DY_POS) << ", " << scale_angpix * VEC_ELEM(op, DZ_POS) << ") Angstrom(s)." << std::flush;
+}
 
 void Localsym_composeOperator(
 		Matrix1D<RFLOAT>& op,
@@ -60,9 +149,27 @@ void Localsym_scaleTranslations(
 		Matrix1D<RFLOAT>& op,
 		RFLOAT factor)
 {
+	if (VEC_XSIZE(op) != NR_LOCALSYM_PARAMETERS)
+		REPORT_ERROR("ERROR: op is not a local symmetry operator!");
+
 	VEC_ELEM(op, DX_POS) *= factor;
 	VEC_ELEM(op, DY_POS) *= factor;
 	VEC_ELEM(op, DZ_POS) *= factor;
+}
+
+void Localsym_shiftTranslations(
+		Matrix1D<RFLOAT>& op,
+		const Matrix1D<RFLOAT>& voffset)
+{
+	if (VEC_XSIZE(op) != NR_LOCALSYM_PARAMETERS)
+		REPORT_ERROR("ERROR: op is not a local symmetry operator!");
+
+	if (VEC_XSIZE(voffset) != 3)
+		REPORT_ERROR("ERROR: voffset is not a vectorR3!");
+
+	VEC_ELEM(op, DX_POS) += XX(voffset);
+	VEC_ELEM(op, DY_POS) += YY(voffset);
+	VEC_ELEM(op, DZ_POS) += ZZ(voffset);
 }
 
 void Localsym_translations2vector(
@@ -307,8 +414,9 @@ void readRelionFormatMasksAndOperators(
 		if (verb)
 		{
 			std::cout << " * Mask #" << (id_mask + 1) << " = " << fn_mask_list[id_mask] << std::endl;
-			std::cout << "   --> Operator #" << int(0) << " = " << RFLOAT(0.) << ", " << RFLOAT(0.)
-					<< ", " << RFLOAT(0.) << "; " << RFLOAT(0.) << ", " << RFLOAT(0.) << ", " << RFLOAT(0.) << " (the original)"<< std::endl;
+			std::cout << "   --> Operator #" << int(0) << " = " << std::flush;
+			Localsym_outputOperator(op_i, &std::cout);
+			std::cout << " (the original)" << std::endl;
 		}
 
 		// Find all operators for this mask
@@ -336,7 +444,9 @@ void readRelionFormatMasksAndOperators(
 
 			if (verb)
 			{
-				std::cout << "   --> Operator #" << (dummy.size() + 1) << " = " << aa << ", " << bb << ", " << gg << "; " << dx << ", " << dy << ", " << dz << std::endl;
+				std::cout << "   --> Operator #" << (dummy.size() + 1) << " = " << std::flush;
+				Localsym_outputOperator(op, &std::cout);
+				std::cout << std::endl;
 			}
 
 			Localsym_scaleTranslations(op, 1. / angpix);
@@ -379,6 +489,152 @@ void readRelionFormatMasksAndOperators(
 			}
 		}
 	}
+}
+
+void readRelionFormatMasksWithoutOperators(
+		FileName fn_info,
+		std::vector<FileName>& fn_mask_list,
+		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
+		std::vector<std::vector<FileName> >& op_masks,
+		bool verb)
+{
+	FileName fn;
+	MetaDataTable MD;
+	std::vector<FileName> fns, fns_empty;
+	long int id = 0, ide = 0;
+	std::vector<long int> ids;
+	std::vector<std::vector<FileName> > op_masks_tmp;
+	Matrix1D<RFLOAT> op_empty;
+	std::vector<Matrix1D<RFLOAT> > ops_empty;
+
+	// Initialisation
+	fn_mask_list.clear();
+	ops.clear();
+	op_masks.clear();
+
+	if (fn_info.getExtension() != "star")
+		REPORT_ERROR("ERROR: " + (std::string)(fn_info) + " is not a STAR file!");
+	if (verb)
+		std::cout << " Reading list of masks from " << fn_info << "..." << std::endl;
+
+	MD.clear();
+	MD.read(fn_info);
+	if ( (MD.numberOfObjects() < 2) || (MD.numberOfObjects() > 999) )
+		REPORT_ERROR("ERROR: STAR file " + (std::string)(fn_info) + " should have 2~999 entries!");
+	if ( (!MD.containsLabel(EMDL_MASK_NAME)) || (!MD.containsLabel(EMDL_AREA_ID)) )
+		REPORT_ERROR("ERROR: Label EMDL_MASK_NAME and/or EMDL_AREA_ID are missing in STAR file " + (std::string)(fn_info) + " !");
+	if (verb)
+		std::cout << " Reading list of masks for all operators from " << fn_info << "..." << std::endl;
+
+	// Collect all entries
+	fns.clear();
+	ids.clear();
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		MD.getValue(EMDL_MASK_NAME, fn);
+		MD.getValue(EMDL_AREA_ID, id);
+		fns.push_back(fn);
+		ids.push_back(id);
+		if (id <= 0)
+			REPORT_ERROR("ERROR: EMDL_AREA_ID is not a positive integer: " + (std::string)(fn));
+	}
+
+	// Check whether there exist duplicated mask filenames
+	// fns.size() = id_max
+	for (int ii = 0; ii < fns.size() - 1; ii++)
+	{
+		for (int jj = ii + 1; jj < fns.size(); jj++)
+		{
+			if (fns[ii] == fns[jj])
+				REPORT_ERROR("ERROR: Duplicated mask filenames have been detected: " + fns[ii]);
+		}
+	}
+
+	// Initialise empty op_masks_tmp[0 ... id_max]
+	op_masks_tmp.clear();
+	fns_empty.clear();
+	for (int ii = 0; ii <= fns.size(); ii++)
+		op_masks_tmp.push_back(fns_empty);
+
+	// Collect mask filenames according to their IDs
+	for (int ii = 0; ii < fns.size(); ii++)
+	{
+		// 1 <= ids[ii] <= id_max, op_masks_tmp.size() = id_max + 1
+		if (ids[ii] >= op_masks_tmp.size())
+			REPORT_ERROR("ERROR: Mask filename contains invalid ID: " + fns[ii]);
+		op_masks_tmp[ids[ii]].push_back(fns[ii]);
+	}
+
+	// Find the largest area ID (id_e) with mask filenames
+	ide = 0;
+	// op_masks_tmp.size() = id_max + 1
+	for (int ii = op_masks_tmp.size() - 1; ii >= 1; ii--)
+	{
+		if (op_masks_tmp[ii].size() > 0)
+		{
+			ide = ii;
+			break;
+		}
+	}
+	if (ide <= 0)
+		REPORT_ERROR("ERROR: No masks (this should not happen)!");
+
+	// All area IDs 1 ... id_e should be assigned with >= 2 mask filenames
+	for (int ii = 1; ii <= ide; ii++)
+	{
+		if (op_masks_tmp[ii].size() < 2)
+			REPORT_ERROR("ERROR: There should be multiple (>= 2) masks for each set of regions!");
+	}
+
+	// Input files are valid. Now output arrays for the program.
+	fn_mask_list.clear();
+	ops.clear();
+	op_masks.clear();
+	Localsym_composeOperator(op_empty, 0., 90., 0.);
+	fns_empty.clear();
+	ops_empty.clear();
+	for (int ii = 1; ii <= ide; ii++)
+	{
+		// For each set of N regions:
+		// There is a same mask filename in the local symmetry description file
+		fn_mask_list.push_back(op_masks_tmp[ii][0]);
+
+		// There is a list of N-1 mask filenames used for global searches
+		op_masks.push_back(fns_empty);
+
+		// There is a list of N-1 operators in the local symmetry description file
+		ops.push_back(ops_empty);
+
+		// Fill in N-1 mask filenames and N-1 operators into the arrays
+		for (int jj = 1; jj < op_masks_tmp[ii].size(); jj++)
+		{
+			op_masks[op_masks.size() - 1].push_back(op_masks_tmp[ii][jj]);
+			ops[ops.size() - 1].push_back(op_empty);
+		}
+	}
+
+	// Screen output
+	if (verb)
+	{
+		op_empty.initZeros(NR_LOCALSYM_PARAMETERS);
+
+		for (int imask = 0; imask < fn_mask_list.size(); imask++)
+		{
+			std::cout << " * Mask #" << (imask + 1) << " = " << fn_mask_list[imask] << std::endl;
+			std::cout << "   --> Operator #" << int(0) << " = " << std::flush;
+			Localsym_outputOperator(op_empty, &std::cout);
+			std::cout << " (the original)" << std::endl;
+
+			for (int iop = 0; iop < ops[imask].size(); iop++)
+			{
+				std::cout << "   --> Operator #" << (iop + 1) << " = " << std::flush;
+				Localsym_outputOperator(ops[imask][iop], &std::cout);
+				std::cout << " (undefined) - from mask " << op_masks[imask][iop] << std::endl;
+			}
+		}
+	}
+
+	// TODO: this function needs thorough tests!!!
 }
 
 void writeRelionFormatMasksAndOperators(
@@ -527,8 +783,9 @@ void readDMFormatMasksAndOperators(FileName fn_info,
 			if (verb)
 			{
 				std::cout << " * Mask #" << fn_mask_list.size() << " = " << fn_mask << std::endl;
-				std::cout << "   --> Operator #" << int(0) << " = " << RFLOAT(0.) << ", " << RFLOAT(0.)
-						<< ", " << RFLOAT(0.) << "; " << RFLOAT(0.) << ", " << RFLOAT(0.) << ", " << RFLOAT(0.) << " (the original)"<< std::endl;
+				std::cout << "   --> Operator #" << int(0) << " = " << std::flush;
+				Localsym_outputOperator(op_i, &std::cout);
+				std::cout << " (the original)" << std::endl;
 			}
 
 			// Get all the operators for this mask
@@ -685,10 +942,12 @@ void readDMFormatMasksAndOperators(FileName fn_info,
 					continue;
 
 				if (verb)
-					std::cout << "   --> Operator #" << (ops.size() + 1) << " = " << aa << ", " << bb << ", " << gg << "; " << dx << ", " << dy << ", " << dz << std::endl;
-
+				{
+					std::cout << "   --> Operator #" << (ops.size() + 1) << " = " << std::flush;
+					Localsym_outputOperator(op, &std::cout);
+					std::cout << std::endl;
+				}
 				Localsym_scaleTranslations(op, 1. / angpix);
-
 				ops.push_back(op);
 
 			}
@@ -1070,114 +1329,52 @@ void applyLocalSymmetry(
 	map = vol;
 }
 
-/*
-void getMaxSizeOfMask(
-		const MultidimArray<RFLOAT>& mask,
-		long int& xcen,
-		long int& ycen,
-		long int& zcen,
-		long int& newdim)
+void getMinCropSize(
+		MultidimArray<RFLOAT>& vol,
+		Matrix1D<RFLOAT>& center,
+		long int& mindim,
+		RFLOAT edge)
 {
-	RFLOAT val = 0.;
-	long int xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmin = 0, zmax = 0;
-	const long int my_long_int_max = 99999999;
+	RFLOAT val = 0., dist2 = 0., dist2_max = 0.;
+	RFLOAT xori = 0., yori = 0., zori = 0.;
+	Matrix1D<RFLOAT> new_center;
 
-	xmin = ymin = zmin =  my_long_int_max;
-	xmax = ymax = zmax = -my_long_int_max;
-	xcen = ycen = zcen = newdim = -1;
+	mindim = -1;
+	center.initZeros(3);
+	new_center.initZeros(3);
 
-	if ((NSIZE(mask) != 1) || (ZSIZE(mask) <= 1) || (YSIZE(mask) <= 1) || (XSIZE(mask) <= 1))
+	if ((NSIZE(vol) != 1) || (ZSIZE(vol) <= 1) || (YSIZE(vol) <= 1) || (XSIZE(vol) <= 1))
 		REPORT_ERROR("ERROR: input mask is not 3D!");
 
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(mask)
+	vol.setXmippOrigin();
+	vol.centerOfMass(center);
+	xori = XX(center); yori = YY(center); zori = ZZ(center);
+
+	dist2_max = -999.;
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol)
 	{
-		val = DIRECT_A3D_ELEM(mask, k, i, j);
-		if ((val < -(XMIPP_EQUAL_ACCURACY)) || ((val - 1.) > (XMIPP_EQUAL_ACCURACY)))
-			REPORT_ERROR("ERROR: mask values are not in range [0,1]!");
+		val = A3D_ELEM(vol, k, i, j);
+
+		if (val < -(XMIPP_EQUAL_ACCURACY))
+			REPORT_ERROR("ERROR: all voxels in the input map should have positive values!");
 
 		if (val > (XMIPP_EQUAL_ACCURACY))
 		{
-			if (k < zmin)
-				zmin = k;
-			if (k > zmax)
-				zmax = k;
-			if (j < ymin)
-				ymin = j;
-			if (j > ymax)
-				ymax = j;
-			if (i < xmin)
-				xmin = i;
-			if (i > xmax)
-				xmax = i;
+			dist2 = (RFLOAT(k) - zori) * (RFLOAT(k) - zori) + (RFLOAT(i) - yori) * (RFLOAT(i) - yori) + (RFLOAT(j) - xori) * (RFLOAT(j) - xori);
+			if (dist2 > dist2_max)
+				dist2_max = dist2;
 		}
 	}
 
-	if ( (xmin == my_long_int_max) || (ymin == my_long_int_max) || (zmin == my_long_int_max)
-			|| (xmax == (-my_long_int_max)) || (ymax == (-my_long_int_max)) || (zmax == (-my_long_int_max)) )
-		REPORT_ERROR("ERROR: mask is empty!");
+	if (dist2_max < 0.)
+		REPORT_ERROR("ERROR: the input map is empty!");
+	if (dist2_max > 99999999. * 99999999.)
+		REPORT_ERROR("ERROR: size of the input map is too large (> 99999999)!");
 
-	// TODO: check this re-centering is doing the right thing!!!
-	if ((xmax - xmin) % 2 == 0)
-		xmax++;
-	xcen = FIRST_XMIPP_INDEX(xmax - xmin + 1) + xmax;
-	if ((ymax - ymin) % 2 == 0)
-		ymax++;
-	ycen = FIRST_XMIPP_INDEX(ymax - ymin + 1) + ymax;
-	if ((zmax - zmin) % 2 == 0)
-		zmax++;
-	zcen = FIRST_XMIPP_INDEX(zmax - zmin + 1) + zmax;
-
-	newdim = CEIL(sqrt(RFLOAT((zmax - zmin) * (zmax - zmin) + (ymax - ymin) * (ymax - ymin) + (xmax - xmin) * (xmax - xmin))));
-	if (newdim % 2)
-		newdim++;
-}
-*/
-
-void getSmallerSizeOfMask(
-		const MultidimArray<RFLOAT>& mask,
-		const Matrix1D<RFLOAT>& op_search_ranges,
-		long int& newdim)
-{
-	RFLOAT xx = 0., yy = 0., zz = 0., xinit = 0., yinit = 0., zinit = 0., val = 0., rr = 0., rrmax = 0.;
-	long int calcdim = 0;
-
-	if ((NSIZE(mask) != 1) || (ZSIZE(mask) <= 1) || (YSIZE(mask) <= 1) || (XSIZE(mask) <= 1)
-			|| (ZSIZE(mask) != YSIZE(mask)) || (ZSIZE(mask) != XSIZE(mask))
-			|| (ZSIZE(mask) % 2) )
-		REPORT_ERROR("ERROR: Input mask is not 3D cube!");
-
-	newdim = ZSIZE(mask);
-
-    zinit = RFLOAT(FIRST_XMIPP_INDEX(ZSIZE(mask)));
-    yinit = RFLOAT(FIRST_XMIPP_INDEX(YSIZE(mask)));
-    xinit = RFLOAT(FIRST_XMIPP_INDEX(XSIZE(mask)));
-    rrmax = -1.;
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(mask)
-	{
-		val = DIRECT_A3D_ELEM(mask, k, i, j);
-		if ((val < -(XMIPP_EQUAL_ACCURACY)) || ((val - 1.) > (XMIPP_EQUAL_ACCURACY)))
-			REPORT_ERROR("ERROR: mask values are not in range [0,1]!");
-
-		if (val > (XMIPP_EQUAL_ACCURACY))
-		{
-			zz = RFLOAT(k) + zinit;
-			yy = RFLOAT(i) + yinit;
-			xx = RFLOAT(j) + xinit;
-
-			rr = xx * xx + yy * yy + zz * zz;
-			if (rr > rrmax)
-				rrmax = rr;
-		}
-	}
-	rrmax = sqrt(rrmax);
-
-	Localsym_decomposeOperator(op_search_ranges, val, val, val, xx, yy, zz, val);
-	rrmax += sqrt(xx * xx + yy * yy + zz * zz);
-	calcdim = (long int)(ceil(rrmax));
-	if (calcdim % 2)
-		calcdim++;
-	if (calcdim < newdim)
-		newdim = calcdim;
+	dist2_max = sqrt(dist2_max);
+	if (edge > 0.)
+		dist2_max += edge;
+	mindim = 2 * (long int)(ceil(dist2_max)); // bestdim % 2 = 0
 }
 
 bool compareOperatorsByCC(
@@ -1185,34 +1382,6 @@ bool compareOperatorsByCC(
 		const Matrix1D<RFLOAT>& rhs)
 {
 	return (VEC_ELEM(lhs, CC_POS) < VEC_ELEM(rhs, CC_POS));
-}
-
-bool useHealpixAngularSamplings(
-		const Matrix1D<RFLOAT>& op,
-		const Matrix1D<RFLOAT>& op_search_ranges,
-		RFLOAT use_healpix_tilt_min)
-{
-	RFLOAT aa = 0., bb = 0., gg = 0., aa_range = 0., bb_range = 0., gg_range = 0., dummy = 0.;
-
-	if (use_healpix_tilt_min < (XMIPP_EQUAL_ACCURACY))
-		return true;
-	if (use_healpix_tilt_min > (90. - (XMIPP_EQUAL_ACCURACY)))
-		return false;
-
-	Localsym_decomposeOperator(op_search_ranges, aa_range, bb_range, gg_range, dummy, dummy, dummy, dummy);
-
-	// Always use Healpix if all rot and tilt angles are to be searched
-	aa_range = (aa_range > 180.) ? (-1.) : (aa_range);
-	bb_range = (bb_range >  90.) ? (-1.) : (bb_range);
-	if ( (aa_range < 0.) && (bb_range < 0.) )
-		return true;
-
-	Localsym_decomposeOperator(op, aa, bb, gg, dummy, dummy, dummy, dummy);
-	standardiseEulerAngles(aa, bb, gg, aa, bb, gg);
-	if ( (bb > use_healpix_tilt_min) && (bb < (180. - use_healpix_tilt_min)) )
-		return true;
-
-	return false;
 }
 
 void getLocalSearchOperatorSamplings(
@@ -1290,12 +1459,12 @@ void getLocalSearchOperatorSamplings(
 
 	if (verb)
 	{
-		std::cout << " + Local searches of local symmetry operator: Angles = ("
-				<< aa_init << ", " << bb_init << ", " << gg_init << "), Translations (rescaled, binned) = ("
-				<< dx_init << ", " << dy_init << ", " << dz_init << ") ..." << std::endl;
-		std::cout << " + Generating sampling points with ranges: Angles = +/- ("
-				<< aa_range << ", " << bb_range << ", " << gg_range << "), Translations (rescaled, binned) = +/- ("
-				<< dx_range << ", " << dy_range << ", " << dz_range << ")." << std::endl;
+		std::cout << " + Local searches of local symmetry operator: Angles (rot, tilt, psi) = ("
+				<< aa_init << ", " << bb_init << ", " << gg_init << ") degree(s), center of mass (x, y, z; cropped, rescaled, binned) = ("
+				<< dx_init << ", " << dy_init << ", " << dz_init << ") pixel(s)..." << std::endl;
+		std::cout << " + Generating sampling points with ranges: Angles (rot, tilt, psi) = +/- ("
+				<< aa_range << ", " << bb_range << ", " << gg_range << ") degree(s), center of mass (x, y, z; cropped, rescaled, binned) = +/- ("
+				<< dx_range << ", " << dy_range << ", " << dz_range << ") pixel(s)." << std::endl;
 		std::cout << " + Generating sampling points with step sizes: " << ang_search_step << " degree(s), "
 				<< trans_search_step << " rescaled (binned) pixel(s)." << std::endl;
 	}
@@ -1417,13 +1586,13 @@ void getLocalSearchOperatorSamplings(
 	{
 		if (use_healpix)
 		{
-			std::cout << std::endl << "  PSI = " << std::flush;
+			std::cout << "  PSI = " << std::flush;
 			for (int ii = 0; ii < pointer_psi_nonzeroprior.size(); ii++)
 				std::cout << sampling.psi_angles[pointer_psi_nonzeroprior[ii]] << ", " << std::flush;
 		}
 		else
 		{
-			std::cout << std::endl << "  ROT = " << std::flush;
+			std::cout << "  ROT = " << std::flush;
 			for (int ii = 0; ii < aas.size(); ii++)
 				std::cout << aas[ii] << ", " << std::flush;
 			std::cout << std::endl << " TILT = " << std::flush;
@@ -1442,8 +1611,7 @@ void getLocalSearchOperatorSamplings(
 		std::cout << std::endl << "   DZ = " << std::flush;
 		for (int ii = 0; ii < dzs.size(); ii++)
 			std::cout << dzs[ii] << ", " << std::flush;
-		std::cout << std::endl;
-		std::cout << "  NR_TOTAL_DIR = " << nr_dir << ", NR_TOTAL_TRANS <= " << dxs.size() * dys.size() * dzs.size() << std::endl;
+		std::cout << std::endl << "  NR_TOTAL_DIR = " << nr_dir << ", NR_TOTAL_TRANS <= " << dxs.size() * dys.size() * dzs.size() << std::endl;
 	}
 #endif
 
@@ -1519,80 +1687,29 @@ void getLocalSearchOperatorSamplings(
 		REPORT_ERROR("ERROR: No sampling points!");
 }
 
-void checkSamplingRatesForMask(
-		const MultidimArray<RFLOAT>& mask,
-		RFLOAT ang_search_step,
-		RFLOAT trans_search_step)
-{
-	RFLOAT mask_val = 0., rr = 0., rrmax = -1., xinit = 0., yinit = 0., zinit = 0., xx = 0., yy = 0., zz = 0.;
-
-	if ((NSIZE(mask) != 1) || (ZSIZE(mask) <= 1) || (YSIZE(mask) <= 1) || (XSIZE(mask) <= 1))
-		REPORT_ERROR("ERROR: Input mask is not 3D!");
-	if ( (ang_search_step < 0.01) || (trans_search_step < 0.01) )
-		REPORT_ERROR("ERROR: Angular / translational samplings are smaller than 0.01!");
-
-    zinit = RFLOAT(FIRST_XMIPP_INDEX(ZSIZE(mask)));
-    yinit = RFLOAT(FIRST_XMIPP_INDEX(YSIZE(mask)));
-    xinit = RFLOAT(FIRST_XMIPP_INDEX(XSIZE(mask)));
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(mask)
-	{
-		mask_val = DIRECT_A3D_ELEM(mask, k, i, j);
-		if ((mask_val < -(XMIPP_EQUAL_ACCURACY)) || ((mask_val - 1.) > (XMIPP_EQUAL_ACCURACY)))
-			REPORT_ERROR("ERROR: mask values are not in range [0,1]!");
-
-		if (mask_val > (XMIPP_EQUAL_ACCURACY))
-		{
-			zz = RFLOAT(k) + zinit;
-			yy = RFLOAT(i) + yinit;
-			xx = RFLOAT(j) + xinit;
-
-			rr = xx * xx + yy * yy + zz * zz;
-			if (rr > rrmax)
-				rrmax = rr;
-		}
-	}
-	rrmax = sqrt(rrmax);
-
-	std::cout << " + Angular search step = " << ang_search_step << " degree(s) is equivalent to translational search step = "
-			<< rrmax * tan(DEG2RAD(ang_search_step)) << " pixel(s) with the current rescaled (binned) mask." << std::endl;
-	std::cout << " + You need an angular step of " << RAD2DEG(atan2(trans_search_step, rrmax)) << " degree(s) to match translational search step = "
-			<< trans_search_step << " pixel(s) with the current rescaled (binned) mask." << std::endl;
-}
-
 void calculateOperatorCC(
-		const MultidimArray<RFLOAT>& map,
+		const MultidimArray<RFLOAT>& src,
+		const MultidimArray<RFLOAT>& dest,
 		const MultidimArray<RFLOAT>& mask,
 		std::vector<Matrix1D<RFLOAT> >& op_samplings,
 		bool do_sort,
 		bool verb)
 {
-	RFLOAT val = 0., mask_val = 0., mask_val_sum = 0., cc = 0.;
+	RFLOAT val = 0., mask_val = 0., mask_val_sum = 0., mask_val_ctr = 0., cc = 0.;
 	int barstep = 0, updatebar = 0, totalbar = 0;
-
-	Matrix1D<RFLOAT> op_tmp;
 	Matrix2D<RFLOAT> op_mat;
 	MultidimArray<RFLOAT> vol;
 
 	if (op_samplings.size() < 1)
 		REPORT_ERROR("ERROR: No sampling points!");
 
-	if ((NSIZE(map) != 1) || (ZSIZE(map) <= 1) || (YSIZE(map) <= 1) || (XSIZE(map) <= 1))
-		REPORT_ERROR("ERROR: Input map is not 3D!");
-	if ((NSIZE(map) != NSIZE(mask)) || (ZSIZE(map) != ZSIZE(mask)) || (YSIZE(map) != YSIZE(mask)) || (XSIZE(map) != XSIZE(mask)))
-		REPORT_ERROR("ERROR: Input map and mask should have the same sizes!");
+	if ( (!isMultidimArray3DCubic(src)) || (!isMultidimArray3DCubic(dest)) || (!isMultidimArray3DCubic(mask)) )
+		REPORT_ERROR("ERROR: MultidimArray src, dest, mask should all be 3D cubic!");
+	if ( (!src.sameShape(dest)) || (!src.sameShape(mask)) )
+		REPORT_ERROR("ERROR: MultidimArray src, dest, mask should have the same sizes!");
 
 	// Check the mask, calculate the sum of mask values
-	mask_val_sum = 0.;
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(mask)
-	{
-		mask_val = DIRECT_A3D_ELEM(mask, k, i, j);
-		if ((mask_val < -(XMIPP_EQUAL_ACCURACY)) || ((mask_val - 1.) > (XMIPP_EQUAL_ACCURACY)))
-			REPORT_ERROR("ERROR: mask values are not in range [0,1]!");
-
-		if (mask_val > (XMIPP_EQUAL_ACCURACY))
-			mask_val_sum += mask_val;
-	}
+	sum3DCubicMask(mask, mask_val_sum, mask_val_ctr);
 	if (mask_val_sum < 1.)
 		std::cout << " + WARNING: sum of mask values is smaller than 1! Please check whether it is a correct mask!" << std::endl;
 
@@ -1607,8 +1724,7 @@ void calculateOperatorCC(
 	for (int iop = 0; iop < op_samplings.size(); iop++)
 	{
 		Localsym_operator2matrix(op_samplings[iop], op_mat, LOCALSYM_OP_DO_INVERT);
-
-		applyGeometry(map, vol, op_mat, IS_NOT_INV, DONT_WRAP);
+		applyGeometry(dest, vol, op_mat, IS_NOT_INV, DONT_WRAP);
 
 		cc = 0.;
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(vol)
@@ -1617,7 +1733,7 @@ void calculateOperatorCC(
 			if (mask_val < XMIPP_EQUAL_ACCURACY)
 				continue;
 
-			val = DIRECT_A3D_ELEM(vol, k, i, j) - DIRECT_A3D_ELEM(map, k, i, j);
+			val = DIRECT_A3D_ELEM(vol, k, i, j) - DIRECT_A3D_ELEM(src, k, i, j);
 			//cc += val * val;
 			cc += mask_val * val * val; // weighted by mask value ?
 		}
@@ -1642,6 +1758,351 @@ void calculateOperatorCC(
 		std::stable_sort(op_samplings.begin(), op_samplings.end(), compareOperatorsByCC);
 }
 
+void separateMasksBFS(
+		const FileName& fn_in,
+		const int K,
+		RFLOAT val_thres)
+{
+	MetaDataTable MD;
+	MultidimArray<int> vol_rec;
+	Image<RFLOAT> img, img_out;
+	FileName fn_out;
+	RFLOAT x_angpix = 0., y_angpix = 0., z_angpix = 0., float_val = 0.;
+	long int pos_val_ctr = 0, xx = 0, yy = 0, zz = 0;
+	int id = 0, int_val = 0;
+	std::queue<Matrix1D<int> > q;
+	Matrix1D<int> vec1;
+	const int K_max = 999;
+
+	// Check K
+	if ( (K < 2) || (K > K_max) )
+		REPORT_ERROR("ERROR: number of sub-masks should be at 2~999 !");
+	if (K > 20)
+		std::cerr << " WARNING: K = " << K << " seems too large!" << std::endl;
+#ifdef DEBUG
+	std::cout << " K = " << K << std::endl;
+#endif
+
+    // Read the header of input map
+	img.read(fn_in);
+	//img().setXmippOrigin();
+	if ((NSIZE(img()) != 1) || (ZSIZE(img()) <= 10) || (YSIZE(img()) <= 10) || (XSIZE(img()) <= 10))
+		REPORT_ERROR("ERROR: Image file " + fn_in + " is an invalid 3D map! (< 10 X 10 X 10 pixels)");
+	if ( (XSIZE(img()) != YSIZE(img())) || (XSIZE(img()) != ZSIZE(img())) )
+		REPORT_ERROR("ERROR: Image file " + fn_in + " is not a 3D cubic map!");
+	img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, x_angpix);
+	img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Y, y_angpix);
+	img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Z, z_angpix);
+
+	// Initialise vol_rec
+	vol_rec.initZeros(img());
+	//vol_rec.setXmippOrigin();
+
+	// Count voxels with positive values
+	pos_val_ctr = 0;
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
+	{
+		float_val = DIRECT_A3D_ELEM(img(), k, i, j);
+		//if (val < -(XMIPP_EQUAL_ACCURACY))
+		//	REPORT_ERROR("ERROR: Image file " + fn_in + " contains negative values!");
+		if (float_val > val_thres)
+			pos_val_ctr++;
+		else
+			DIRECT_A3D_ELEM(vol_rec, k, i, j) = -1; // Mark as invalid!
+	}
+	if (pos_val_ctr <= K)
+		REPORT_ERROR("ERROR: Image file " + fn_in + " has nearly no voxels with positive values!");
+#ifdef DEBUG
+	std::cout << " pos_val_ctr = " << pos_val_ctr << std::endl;
+#endif
+
+	id = 0;
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(vol_rec)
+	{
+		int_val = DIRECT_A3D_ELEM(vol_rec, k, i, j);
+		if (int_val != 0)
+			continue;
+
+		id++;
+#ifdef DEBUG
+		std::cout << " id= " << id << ", kij= " << k << ", " << i << ", " << j << ", " << std::endl;
+#endif
+		q.push(vectorR3(int(j), int(i), int(k)));
+		DIRECT_A3D_ELEM(vol_rec, k, i, j) = id;
+		while(!q.empty())
+		{
+			vec1 = q.front();
+			q.pop();
+			DIRECT_A3D_ELEM(vol_rec, ZZ(vec1), YY(vec1), XX(vec1)) = id;
+			for (int dz = -1; dz <= 1; dz++)
+			{
+				for (int dy = -1; dy <= 1; dy++)
+				{
+					for (int dx = -1; dx <= 1; dx++)
+					{
+						if ( (dx * dy * dz) != 0)
+							continue;
+						zz = ZZ(vec1) + dz; yy = YY(vec1) + dy; xx = XX(vec1) + dx;
+						if ( (zz < 0) || (zz >= ZSIZE(vol_rec)) || (yy < 0) || (yy >= YSIZE(vol_rec)) || (xx < 0) || (xx >= XSIZE(vol_rec)) )
+							continue;
+
+						if (DIRECT_A3D_ELEM(vol_rec, zz, yy, xx) == 0)
+						{
+							q.push(vectorR3(int(xx), int(yy), int(zz)));
+							DIRECT_A3D_ELEM(vol_rec, zz, yy, xx) = id;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	std::cout << " " << id << " region(s) detected on map " << fn_in << "." << std::endl;
+	if (K != id)
+	{
+		std::cout << " But the number of regions specified is " << K << "! Please check your input map. Exit now with no file output..." << std::endl;
+#ifndef DEBUG
+		return;
+#endif
+	}
+
+	// Write output maps and STAR file
+	MD.clear();
+	MD.addLabel(EMDL_MASK_NAME);
+	for (int icen = 0; (icen < K) && (icen < id); icen++)
+	{
+		fn_out = fn_in.withoutExtension() + "_sub" + integerToString(icen + 1, 3, '0') + ".mrc";
+		img_out().initZeros(img());
+		//img_out().setXmippOrigin();
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(vol_rec)
+		{
+			if (DIRECT_A3D_ELEM(vol_rec, k, i, j) == (icen + 1) )
+				DIRECT_A3D_ELEM(img_out(), k, i, j) = 1.;
+		}
+
+		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, x_angpix);
+		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, y_angpix);
+		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, z_angpix);
+		img_out.write(fn_out);
+
+		MD.addObject();
+		MD.setValue(EMDL_MASK_NAME, fn_out);
+	}
+	fn_out = fn_in.withoutExtension() + "_masklist.star";
+	MD.write(fn_out);
+}
+
+/*
+void separateMasksKMeans(
+		const FileName& fn_in,
+		const int K,
+		int random_seed)
+{
+	Image<RFLOAT> img, img_out;
+	std::vector<Matrix1D<RFLOAT> > ocen, ncen;
+	std::vector<RFLOAT> wcen;
+	std::vector<int> vec_rec;
+	Matrix1D<int> vec;
+	Matrix2D<RFLOAT> mat;
+	RFLOAT a = 0., b = 0., g = 0., x = 0., y = 0., z = 0., val = 0., dist2 = 0, dist2_min = 0.;
+	RFLOAT x_angpix = 0., y_angpix = 0., z_angpix = 0.;
+	int best_cen = -1, pos_val_ctr = 0;
+	long int cen_ptr = 0;
+	FileName fn_out;
+	MultidimArray<int> vol_rec;
+	const int K_max = 999;
+	int vec_len_max = 1024000, q = 0;
+
+	// Check K
+	if ( (K < 2) || (K > K_max) )
+		REPORT_ERROR("ERROR: number of sub-masks should be at 2~999 !");
+	if (K > 20)
+		std::cerr << " WARNING: K = " << K << " seems too large!" << std::endl;
+#ifdef DEBUG
+	std::cout << " K = " << K << std::endl;
+#endif
+
+	// Initialise arrays for centroids
+	ocen.clear(); ncen.clear(); wcen.clear();
+	for (int ii = 0; ii < K; ii++)
+	{
+		ocen.push_back(vectorR3(0., 0., 0.));
+		ncen.push_back(vectorR3(0., 0., 0.));
+		wcen.push_back(0.);
+	}
+
+	// Initialise random number generator
+	if (random_seed < 0)
+		random_seed = time(NULL);
+    init_random_generator(random_seed);
+
+    // Read the header of input map
+	img.read(fn_in);
+	img().setXmippOrigin();
+	if ((NSIZE(img()) != 1) || (ZSIZE(img()) <= 10) || (YSIZE(img()) <= 10) || (XSIZE(img()) <= 10))
+		REPORT_ERROR("ERROR: Image file " + fn_in + " is an invalid 3D map! (< 10 X 10 X 10 pixels)");
+	if ( (XSIZE(img()) != YSIZE(img())) || (XSIZE(img()) != ZSIZE(img())) )
+		REPORT_ERROR("ERROR: Image file " + fn_in + " is not a 3D cubic map!");
+	img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, x_angpix);
+	img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Y, y_angpix);
+	img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Z, z_angpix);
+
+	// Count voxels with positive values
+	pos_val_ctr = 0;
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
+	{
+		val = DIRECT_A3D_ELEM(img(), k, i, j);
+		//if (val < -(XMIPP_EQUAL_ACCURACY))
+		//	REPORT_ERROR("ERROR: Image file " + fn_in + " contains negative values!");
+		if (val > XMIPP_EQUAL_ACCURACY)
+			pos_val_ctr++;
+	}
+	if (pos_val_ctr <= K)
+		REPORT_ERROR("ERROR: Image file " + fn_in + " has nearly no voxels with positive values!");
+#ifdef DEBUG
+	std::cout << " pos_val_ctr = " << pos_val_ctr << std::endl;
+#endif
+
+	// ????
+	vol_rec.initZeros(img());
+	vol_rec.setXmippOrigin();
+
+	// Randomly select K centroids
+	vec_rec.clear();
+	vec_len_max = (vec_len_max >= pos_val_ctr) ? (pos_val_ctr) : (vec_len_max);
+	q = pos_val_ctr / vec_len_max;
+	q = (q <= 1) ? (1) : (q);
+	vec.initZeros(vec_len_max + 1);
+	for (int ii = 1; ii <= K; ii++) // Knuth shuffle
+	{
+		cen_ptr = (long int)(rnd_unif(RFLOAT(ii), RFLOAT(vec_len_max)));
+		cen_ptr = (cen_ptr < ii) ? (ii) : (cen_ptr);
+		cen_ptr = (cen_ptr > vec_len_max) ? (vec_len_max) : (cen_ptr);
+		if (VEC_ELEM(vec, cen_ptr) != 0)
+			vec_rec.push_back(q * VEC_ELEM(vec, cen_ptr));
+		else
+			vec_rec.push_back(q * cen_ptr);
+		VEC_ELEM(vec, cen_ptr) = ii;
+	}
+#ifdef DEBUG
+	std::cout << " " << vec_rec.size() << " voxel IDs in total: " << std::flush;
+	for (int ii = 0; ii < vec_rec.size(); ii++)
+		std::cout << vec_rec[ii] << ", " << std::flush;
+	std::cout << std::endl;
+#endif
+	best_cen = pos_val_ctr = 0;
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(img())
+	{
+		if (best_cen >= K)
+			break;
+		if (A3D_ELEM(img(), k, i, j) > XMIPP_EQUAL_ACCURACY)
+		{
+			pos_val_ctr++;
+			if (vec_rec[best_cen] == pos_val_ctr)
+			{
+				ocen[best_cen] = vectorR3(RFLOAT(k), RFLOAT(i), RFLOAT(j));
+				best_cen++;
+			}
+		}
+	}
+	for (int ii = 0; ii < K; ii++)
+	{
+#ifdef DEBUG
+		std::cout << " Centroid #" << ii + 1 << " : XYZ= " << XX(ocen[ii]) << ", " << YY(ocen[ii]) << ", " << ZZ(ocen[ii]) << std::endl;
+#endif
+	}
+
+	//a = rnd_unif(-179., 179.);
+	//b = rnd_unif(1., 179.);
+	//g = rnd_unif(-179., 179.);
+	//Euler_angles2matrix(a, b, g, mat);
+	//for (int ii = 0; ii < K; ii++)
+	//{
+	//	z = RFLOAT(ii) * RFLOAT(ZSIZE(img())) / RFLOAT(K) + RFLOAT(STARTINGZ(img()));
+	//	y = rnd_unif(0., YSIZE(img())) + RFLOAT(STARTINGY(img()));
+	//	x = rnd_unif(0., XSIZE(img())) + RFLOAT(STARTINGX(img()));
+	//	z /= sqrt(3.); y /= sqrt(3.); x /= sqrt(3.);
+
+	//	ocen[ii] = mat * vectorR3(x, y, z);
+//#ifdef DEBUG
+	//	std::cout << " Centroid #" << ii + 1 << " : XYZ= " << XX(ocen[ii]) << ", " << YY(ocen[ii]) << ", " << ZZ(ocen[ii]) << std::endl;
+//#endif
+	//}
+
+	// K-means
+	for (int iter = 1; iter <= 100; iter++)
+	{
+#ifdef DEBUG
+		std::cout << std::endl;
+#endif
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(img())
+		{
+			// For voxels with positive values
+			val = A3D_ELEM(img(), k, i, j);
+			if (val < XMIPP_EQUAL_ACCURACY)
+				continue;
+
+			// Find the smallest distance to one of the centroids
+			dist2_min = 1e+30;
+			best_cen = -1;
+			for (int icen = 0; icen < K; icen++)
+			{
+				z = ZZ(ocen[icen]); y = YY(ocen[icen]); x = XX(ocen[icen]);
+				dist2 = (RFLOAT(k) - z) * (RFLOAT(k) - z) + (RFLOAT(i) - y) * (RFLOAT(i) - y) + (RFLOAT(j) - x) * (RFLOAT(j) - x);
+				if (dist2 < dist2_min)
+				{
+					dist2_min = dist2;
+					best_cen = icen;
+				}
+			}
+			if (best_cen < 0)
+				REPORT_ERROR("ERROR: best_cen < 0 !");
+
+			ZZ(ncen[best_cen]) += k * val;
+			YY(ncen[best_cen]) += i * val;
+			XX(ncen[best_cen]) += j * val;
+			wcen[best_cen] += val;
+
+			A3D_ELEM(vol_rec, k, i, j) = best_cen + 1;
+		}
+
+		// Update centroids
+		for (int ii = 0; ii < K; ii++)
+		{
+			if (wcen[ii] < XMIPP_EQUAL_ACCURACY)
+				REPORT_ERROR("ERROR: wcen[ii] <= 0 !");
+			ocen[ii] = ncen[ii] / wcen[ii];
+
+			ncen[ii] = vectorR3(0., 0., 0.);
+			wcen[ii] = 0.;
+#ifdef DEBUG
+			std::cout << " Centroid #" << ii + 1 << " : XYZ= " << XX(ocen[ii]) << ", " << YY(ocen[ii]) << ", " << ZZ(ocen[ii]) << std::endl;
+#endif
+		}
+	}
+
+	// Write output maps
+	for (int icen = 0; icen < K; icen++)
+	{
+		fn_out = fn_in.withoutExtension() + "_sub" + integerToString(icen + 1, 3, '0') + ".mrc";
+		img_out().initZeros(img());
+		img_out().setXmippOrigin();
+
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_rec)
+		{
+			if (A3D_ELEM(vol_rec, k, i, j) == (icen + 1) )
+				A3D_ELEM(img_out(), k, i, j) = A3D_ELEM(img(), k, i, j);
+		}
+
+		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, x_angpix);
+		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, y_angpix);
+		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, z_angpix);
+		img_out.write(fn_out);
+	}
+}
+*/
+
 void local_symmetry_parameters::initBoolOptions()
 {
 	show_usage_for_an_option = false;
@@ -1650,6 +2111,7 @@ void local_symmetry_parameters::initBoolOptions()
 	do_duplicate_local_symmetry = false;
 	do_local_search_local_symmetry_ops = false;
 	do_txt2rln = false;
+	do_transform = false;
 	do_debug = false;
 }
 
@@ -1674,40 +2136,49 @@ void local_symmetry_parameters::read(int argc, char **argv)
 	parser.setCommandLine(argc, argv);
 
 	int init_section = parser.addSection("Show usage");
-	show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (MAY 05, 2017)");
+	show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (JUN 15, 2017)");
 
 	int options_section = parser.addSection("Options");
 	do_apply_local_symmetry = parser.checkOption("--apply", "Apply local symmetry to a 3D cryo-EM density map");
 	do_duplicate_local_symmetry = parser.checkOption("--duplicate", "Duplicate subunits/masks according to local symmetry operators");
 	do_local_search_local_symmetry_ops = parser.checkOption("--search", "Local searches of local symmetry operators");
+	do_transform = parser.checkOption("--transform", "Transform a map according to three Euler angles and XYZ translations");
 	do_txt2rln = parser.checkOption("--txt2rln", "Convert operators from DM to RELION STAR format");
 	do_debug = parser.checkOption("--debug", "(DEBUG ONLY)");
 
 	int params_section = parser.addSection("Parameters (alphabetically ordered)");
-	//angpix_ops = textToFloat(parser.getOption("--angpix_ops", "Pixel size (in Angstroms) of local symmetry operators", "-1."));
-	angpix_image = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms) of input image", "-1."));
-	ang_range = textToFloat(parser.getOption("--ang_range", "Angular search range of operators (in degrees), overwrite rot-tilt-psi ranges if set to positive", "2."));
-	ang_rot_range = textToFloat(parser.getOption("--ang_rot_range", "Angular (rot) search range of operators (in degrees)", "2."));
-	ang_tilt_range = textToFloat(parser.getOption("--ang_tilt_range", "Angular (tilt) search range of operators (in degrees)", "2."));
-	ang_psi_range = textToFloat(parser.getOption("--ang_psi_range", "Angular (psi) search range of operators (in degrees)", "2."));
+	angpix_image = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms) of input image", "1."));
+	ang_range = textToFloat(parser.getOption("--ang_range", "Angular search range of operators (in degrees), overwrite rot-tilt-psi ranges if set to positive", "0."));
+	ang_rot_range = textToFloat(parser.getOption("--ang_rot_range", "Angular (rot) search range of operators (in degrees)", "0."));
+	ang_tilt_range = textToFloat(parser.getOption("--ang_tilt_range", "Angular (tilt) search range of operators (in degrees)", "0."));
+	ang_psi_range = textToFloat(parser.getOption("--ang_psi_range", "Angular (psi) search range of operators (in degrees)", "0."));
 	ang_step = textToFloat(parser.getOption("--ang_step", "Angular search step of operators (in degrees)", "1."));
-	binning_factor = textToFloat(parser.getOption("--bin", "Binning factor (< 1 means no binning)", "-1."));
-	fn_unsym = parser.getOption("--i_map", "Input 3D unsymmetised map", "");
-	fn_info_in = parser.getOption("--i_mask_info", "Input file with mask filenames and rotational / translational operators", "maskinfo.txt");
-	offset_range = textToFloat(parser.getOption("--offset_range", "Translational search range of operators (in Angstroms), overwrite x-y-z ranges if set to positive", "2."));
-	offset_x_range = textToFloat(parser.getOption("--offset_x_range", "Translational (x) search range of operators (in Angstroms)", "2."));
-	offset_y_range = textToFloat(parser.getOption("--offset_y_range", "Translational (y) search range of operators (in Angstroms)", "2."));
-	offset_z_range = textToFloat(parser.getOption("--offset_z_range", "Translational (z) search range of operators (in Angstroms)", "2."));
+	binning_factor = textToFloat(parser.getOption("--bin", "Binning factor (<= 1 means no binning)", "-1."));
+	ini_threshold = textToFloat(parser.getOption("--ini_threshold", "Initial threshold for binarization", "0.01"));
+	fn_unsym = parser.getOption("--i_map", "Input 3D unsymmetrised map", "");
+	fn_info_in = parser.getOption("--i_mask_info", "Input file with mask filenames and rotational / translational operators (for local searches)", "maskinfo.txt");
+	fn_op_mask_info_in = parser.getOption("--i_op_mask_info", "Input file with mask filenames for all operators (for global searches)", "None");
+	nr_masks = textToInteger(parser.getOption("--n", "Create this number of masks according to the input density map", "2"));
+	offset_range = textToFloat(parser.getOption("--offset_range", "Translational search range of operators (in Angstroms), overwrite x-y-z ranges if set to positive", "0."));
+	offset_x_range = textToFloat(parser.getOption("--offset_x_range", "Translational (x) search range of operators (in Angstroms)", "0."));
+	offset_y_range = textToFloat(parser.getOption("--offset_y_range", "Translational (y) search range of operators (in Angstroms)", "0."));
+	offset_z_range = textToFloat(parser.getOption("--offset_z_range", "Translational (z) search range of operators (in Angstroms)", "0."));
 	offset_step = textToFloat(parser.getOption("--offset_step", "Translational search step of operators (in Angstroms)", "1."));
-	fn_sym = parser.getOption("--o_map", "Output 3D symmetised map", "");
+	fn_sym = parser.getOption("--o_map", "Output 3D symmetrised map", "");
 	fn_info_out = parser.getOption("--o_mask_info", "Output file with mask filenames and rotational / translational operators", "maskinfo_refined.txt");
+	psi = textToFloat(parser.getOption("--psi", "Third Euler angle (psi, in degrees)", "0."));
+	rot = textToFloat(parser.getOption("--rot", "First Euler angle (rot, in degrees)", "0."));
 	sphere_percentage = textToFloat(parser.getOption("--sphere_percentage", "Diameter of spherical mask divided by the box size (< 0.99)", "-1."));
+	tilt = textToFloat(parser.getOption("--tilt", "Second Euler angle (tilt, in degrees)", "0."));
+	xoff = textToFloat(parser.getOption("--xoff", "X-offset (in Angstroms)", "0."));
+	yoff = textToFloat(parser.getOption("--yoff", "Y-offset (in Angstroms)", "0."));
+	zoff = textToFloat(parser.getOption("--zoff", "Z-offset (in Angstroms)", "0."));
 	verb = parser.checkOption("--verb", "Verbose output?");
 
 	int expert_section = parser.addSection("Parameters (expert options - alphabetically ordered)");
 	fn_mask = parser.getOption("--i_mask", "(DEBUG) Input mask", "mask.mrc");
 	fn_info_in_parsed_ext = parser.getOption("--i_mask_info_parsed_ext", "Extension of parsed input file with mask filenames and rotational / translational operators", "parsed");
-	use_healpix_tilt_min = textToFloat(parser.getOption("--use_healpix_tilt_min", "Don't use Healpix for angular samplings if the original tilt value is <X or >(180-X), always use Healpix if set to negative", "30."));
+	use_healpix_sampling = parser.checkOption("--use_healpix", "Use Healpix for angular samplings?");
 	width_edge_pix = textToFloat(parser.getOption("--width", "Width of cosine soft edge (in pixels)", "5."));
 
    	// Check for errors in the command-line option
@@ -1727,11 +2198,11 @@ void local_symmetry_parameters::run()
 
 	// Check options
 	int valid_options = 0;
-
 	valid_options += (do_apply_local_symmetry) ? (1) : (0);
 	valid_options += (do_duplicate_local_symmetry) ? (1) : (0);
 	valid_options += (do_local_search_local_symmetry_ops) ? (1) : (0);
 	valid_options += (do_txt2rln) ? (1) : (0);
+	valid_options += (do_transform) ? (1) : (0);
 	valid_options += (do_debug) ? (1) : (0);
 
 	if (valid_options <= 0)
@@ -1745,7 +2216,7 @@ void local_symmetry_parameters::run()
 		{
 			displayEmptyLine();
 			std::cout << " Apply local symmetry to a 3D cryo-EM density map" << std::endl;
-			std::cout << "  USAGE: " << std::endl;
+			std::cout << "  USAGE: --apply --angpix 1.34 --i_map unsym.mrc --i_mask_info maskinfo.star --o_map sym.mrc (--sphere_percentage 0.9)" << std::endl;
 			displayEmptyLine();
 			return;
 		}
@@ -1836,64 +2307,57 @@ void local_symmetry_parameters::run()
 		if (show_usage_for_an_option)
 		{
 			displayEmptyLine();
-			std::cout << " Local searches of local symmetry operators" << std::endl;
-			std::cout << "  USAGE: --search --i_map unsym.mrc --i_mask_info maskinfo.txt --o_mask_info maskinfo_new.txt --ang_range 2 --ang_step 0.5 --offset_range 2 --offset_step 1" << std::endl;
+			std::cout << " Searches of local symmetry operators" << std::endl;
+			std::cout << "    MPI: mpirun -n 23 relion_localsym_mpi ..." << std::endl;
+			std::cout << "  USAGE FOR GLOBAL SEARCHES:" << std::endl;
+			std::cout << "         --search --i_map unsym.mrc --i_op_mask_info mask_list.star --o_mask_info maskinfo_iter000.star --angpix 1.34 (--bin 2)" << std::endl;
+			std::cout << "         --ang_step 5 (--offset_range 2 --offset_step 1)" << std::endl;
+			std::cout << "  USAGE FOR LOCAL SEARCHES:" << std::endl;
+			std::cout << "         --search --i_map unsym.mrc --i_mask_info maskinfo_iter001.star --o_mask_info maskinfo_iter002.star --angpix 1.34 (--bin 2)" << std::endl;
+			std::cout << "         --ang_range 2 (--ang_rot_range 2 --ang_tilt_range 2 --ang_psi_range 2) --ang_step 0.5" << std::endl;
+			std::cout << "         --offset_range 2 (--offset_x_range 2 --offset_y_range 2 --offset_z_range 2) --offset_step 1" << std::endl;
+			std::cout << "  Ranges/steps of angular and translational searches are in degrees and Angstroms respectively." << std::endl;
 			displayEmptyLine();
 			return;
 		}
 
-		FileName fn_searched_op_samplings;
-		Matrix1D<RFLOAT> op_search_ranges;
-		std::vector<Matrix1D<RFLOAT> > op_samplings;
-		Image<RFLOAT> map, mask;
-		long int olddim = 0, newdim = 0;
-		RFLOAT mask_val = 0.;
-		bool use_healpix = true;
+		// Adapted from local_symmetry_mpi.cpp
 
+		long int newdim = 0, cropdim = 0, z0 = 0, y0 = 0, x0 = 0, zf = 0, yf = 0, xf = 0;
+		RFLOAT aa = 0, bb = 0, gg = 0., dx = 0., dy = 0., dz = 0., cc = 0., tmp_binning_factor = 1.;
+		RFLOAT mask_sum = 0., mask_ctr = 0., mask2_sum = 0., mask2_ctr = 0.;
+
+		Image<RFLOAT> map, mask, mask2;
+		Matrix1D<RFLOAT> op_search_ranges, op, com0_int, com1_int, com1_float, com1_diff, vecR3;
+		//std::vector<FileName> fn_mask_list;
+		//std::vector<std::vector<Matrix1D<RFLOAT> > > op_list;
+		std::vector<std::vector<FileName> > op_mask_list;
+		std::vector<Matrix1D<RFLOAT> > op_samplings;
+		MultidimArray<RFLOAT> src_cropped, dest_cropped, mask_cropped;
+		Matrix2D<RFLOAT> mat1;
+		FileName fn_searched_op_samplings;
+		//FileName fn_parsed, fn_tmp;
+
+		map.clear(); mask.clear(); mask2.clear();
+		op_search_ranges.clear(); op.clear(); com0_int.clear(); com1_int.clear(); com1_float.clear(); com1_diff.clear(); vecR3.clear();
+		fn_mask_list.clear();
+		op_list.clear();
+		op_mask_list.clear();
+		op_samplings.clear();
+		src_cropped.clear(); dest_cropped.clear(); mask_cropped.clear();
+		mat1.clear();
+		fn_parsed.clear(); fn_tmp.clear(); fn_searched_op_samplings.clear();
+
+		displayEmptyLine();
+
+		// Master gets search ranges (in degrees and pixels), sets offset_step (in pixels).
 		if (angpix_image < 0.001)
 			REPORT_ERROR("Invalid pixel size!");
-
-		// Parse mask info file
-		if (fn_info_in.getExtension() == "star")
+		if (fn_op_mask_info_in != "None")
 		{
-			readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, angpix_image, do_verb);
+			ang_range = 180.;
+			std::cout << " Global searches: reset angular searching ranges to +/-180 degrees." << std::endl;
 		}
-		else
-		{
-			fn_parsed = fn_info_in + std::string(".") + fn_info_in_parsed_ext;
-			parseDMFormatMasksAndOperators(fn_info_in, fn_parsed);
-			readDMFormatMasksAndOperators(fn_parsed, fn_mask_list, op_list, angpix_image, do_verb);
-		}
-
-		// Read the unsymmetrised map
-		map.read(fn_unsym);
-		if ((NSIZE(map()) != 1) || (ZSIZE(map()) <= 1) || (YSIZE(map()) <= 1) || (XSIZE(map()) <= 1)
-				|| (ZSIZE(map()) != YSIZE(map())) || (ZSIZE(map()) != XSIZE(map()))
-				|| (ZSIZE(map()) % 2) )
-			REPORT_ERROR("ERROR: Input map is not 3D cube!");
-		olddim = newdim = ZSIZE(map());
-		if ((binning_factor - 1.) > XMIPP_EQUAL_ACCURACY)
-		{
-			newdim = (long int)(ceil(RFLOAT(olddim) / binning_factor));
-			if (newdim < 2)
-				REPORT_ERROR("ERROR: Binning factor is too large!");
-			if ((newdim + 1) < olddim) // Need rescaling
-			{
-				// Dimension should always be even
-				if (newdim % 2)
-					newdim++;
-				resizeMap(map(), newdim);
-			}
-			else
-				newdim = olddim;
-			binning_factor = RFLOAT(olddim) / RFLOAT(newdim);
-			if (newdim != olddim)
-				std::cout << " + Rescale box size from " << olddim << " to " << newdim << ". Binning factor = " << binning_factor << std::endl;
-		}
-		else
-			binning_factor = 1.;
-
-		// Get search ranges
 		Localsym_composeOperator(
 				op_search_ranges,
 				(ang_range > (XMIPP_EQUAL_ACCURACY)) ? (ang_range) : (ang_rot_range),
@@ -1905,98 +2369,257 @@ void local_symmetry_parameters::run()
 		Localsym_scaleTranslations(op_search_ranges, 1. / angpix_image);
 		offset_step /= angpix_image;
 
-		// Rescale translational search ranges and steps
-		if (newdim != olddim)
+		// Master parses and reads mask info file
+		// Local searches
+		if (fn_op_mask_info_in == "None")
 		{
-			Localsym_scaleTranslations(op_search_ranges, 1. / binning_factor);
-			offset_step /= binning_factor;
-
-			for (int imask = 0; imask < op_list.size(); imask++)
+			if (fn_info_in.getExtension() == "star")
 			{
-				for (int iop = 0; iop < op_list[imask].size(); iop++)
-					Localsym_scaleTranslations(op_list[imask][iop], 1. / binning_factor);
+				readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, angpix_image, true);
+			}
+			else
+			{
+				fn_parsed = fn_info_in + std::string(".") + fn_info_in_parsed_ext;
+				parseDMFormatMasksAndOperators(fn_info_in, fn_parsed);
+				readDMFormatMasksAndOperators(fn_parsed, fn_mask_list, op_list, angpix_image, true);
 			}
 		}
+		else
+		{
+			// Global searches
+			std::cout << " Global searches: option --i_mask_info " << fn_info_in << " is ignored." << std::endl;
+			readRelionFormatMasksWithoutOperators(fn_op_mask_info_in, fn_mask_list, op_list, op_mask_list, true);
+		}
 
-		// Loop over all masks
+		// Master reads input map
+		std::cout << std::endl << " Pixel size = " << angpix_image << " Angstrom(s)" << std::endl;
+		std::cout << " Read input map " << fn_unsym << " ..." << std::endl;
+		map.read(fn_unsym);
+		map().setXmippOrigin();
+		if (!isMultidimArray3DCubic(map()))
+			REPORT_ERROR("ERROR: Input map " + fn_unsym + " is not 3D cube!");
+
+		// All nodes loop over all masks
 		for (int imask = 0; imask < fn_mask_list.size(); imask++)
 		{
-			// Read the mask
+			displayEmptyLine();
+
+			// Master reads and checks the mask
+			std::cout << " Read mask #" << imask + 1 << ": " << fn_mask_list[imask] << " ..." << std::endl;
 			mask.read(fn_mask_list[imask]);
-			if ((NSIZE(mask()) != 1) || (ZSIZE(mask()) <= 1) || (YSIZE(mask()) <= 1) || (XSIZE(mask()) <= 1)
-					|| (ZSIZE(mask()) != YSIZE(mask())) || (ZSIZE(mask()) != XSIZE(mask()))
-					|| (ZSIZE(mask()) % 2) )
-				REPORT_ERROR("ERROR: Input mask is not 3D cube!");
-			if (olddim != ZSIZE(mask()))
-				REPORT_ERROR("ERROR: Input map and masks should have the same size!");
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(mask())
-			{
-				mask_val = DIRECT_A3D_ELEM(mask(), k, i, j);
-				if ((mask_val < -(XMIPP_EQUAL_ACCURACY)) || ((mask_val - 1.) > (XMIPP_EQUAL_ACCURACY)))
-					REPORT_ERROR("ERROR: mask " + std::string(fn_mask_list[imask]) + " - values are not in range [0,1]!");
-			}
-			if (newdim != olddim)
-			{
-				resizeMap(mask(), newdim);
+			mask().setXmippOrigin();
+			if (!isMultidimArray3DCubic(mask()))
+				REPORT_ERROR("ERROR: Input mask " + fn_mask_list[imask] + " is not 3D cube!");
+			if (!map().sameShape(mask()))
+				REPORT_ERROR("ERROR: Input map " + fn_unsym + " and mask " + fn_mask_list[imask] + " should have the same size!");
+			sum3DCubicMask(mask(), mask_sum, mask_ctr);
 
-				// Mask values might go out of range after rescaling. Fix it if it happens
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(mask())
+			// Get com0 of this mask. Assume that com0 has all integer values!
+			getMinCropSize(mask(), com0_int, cropdim, offset_range / angpix_image);
+			if (cropdim < 2)
+				REPORT_ERROR("ERROR: Mask " + fn_mask_list[imask] + " is too small!");
+			XX(com0_int) = round(XX(com0_int));
+			YY(com0_int) = round(YY(com0_int));
+			ZZ(com0_int) = round(ZZ(com0_int));
+			std::cout << " Mask #" << imask + 1 << " : center of mass XYZ = (" << XX(com0_int) << ", " << YY(com0_int) << ", " << ZZ(com0_int) << ") pixel(s)."<< std::endl;
+
+			// Crop the mask and the corresponding region of the map
+			z0 = ROUND(ZZ(com0_int)) + FIRST_XMIPP_INDEX(cropdim);
+			zf = ROUND(ZZ(com0_int)) + LAST_XMIPP_INDEX(cropdim);
+			y0 = ROUND(YY(com0_int)) + FIRST_XMIPP_INDEX(cropdim);
+			yf = ROUND(YY(com0_int)) + LAST_XMIPP_INDEX(cropdim);
+			x0 = ROUND(XX(com0_int)) + FIRST_XMIPP_INDEX(cropdim);
+			xf = ROUND(XX(com0_int)) + LAST_XMIPP_INDEX(cropdim);
+
+			std::cout << " Mask #" << imask + 1 << " : cropped box size = " << cropdim << " pixels." << std::endl;
+#ifdef DEBUG
+			std::cout << " Window: x0, y0, z0 = " << x0 << ", " << y0 << ", " << z0 << "; xf, yf, zf = " << xf << ", " << yf << ", " << zf << std::endl;
+#endif
+			mask().window(mask_cropped, z0, y0, x0, zf, yf, xf);
+			mask_cropped.setXmippOrigin();
+			map().window(src_cropped, z0, y0, x0, zf, yf, xf);
+			src_cropped.setXmippOrigin();
+
+			// Rescale the map and the mask (if binning_factor > 1), set 'newdim'.
+			tmp_binning_factor = 1.;
+			newdim = cropdim;
+			if ((binning_factor - 1.) > XMIPP_EQUAL_ACCURACY)
+			{
+				newdim = (long int)(ceil(RFLOAT(cropdim) / binning_factor));
+				if (newdim < 2)
+					REPORT_ERROR("ERROR: Binning factor is too large / Mask is too small!");
+				if ((newdim + 1) < cropdim) // Need rescaling
 				{
-					mask_val = DIRECT_A3D_ELEM(mask(), k, i, j);
-					if (mask_val < 0.)
-						DIRECT_A3D_ELEM(mask(), k, i, j) = 0.;
-					if (mask_val > 1.)
-						DIRECT_A3D_ELEM(mask(), k, i, j) = 1.;
+					// Dimension should always be even
+					if (newdim % 2)
+						newdim++;
+					resizeMap(mask_cropped, newdim);
+					mask_cropped.setXmippOrigin();
+					resizeMap(src_cropped, newdim);
+					src_cropped.setXmippOrigin();
+					tmp_binning_factor = RFLOAT(cropdim) / RFLOAT(newdim);
+					std::cout << " + Rescale cropped box size from " << cropdim << " to " << newdim << " pixels. Binning factor = " << tmp_binning_factor << std::endl;
+
+					// Mask values might go out of range after rescaling. Fix it if it happens
+					truncateMultidimArray(mask_cropped, 0., 1.);
 				}
+				else
+					newdim = cropdim;
 			}
+#ifdef DEBUG
+			std::cout << " newdim= " << newdim << ", cropdim= " << cropdim << std::endl;
+#endif
 
-			checkSamplingRatesForMask(mask(), ang_step, offset_step);
-
-			// Loop over all operators of this mask
+			// All nodes loop over all operators of this mask
 			for (int iop = 0; iop < op_list[imask].size(); iop++)
 			{
-				// Check whether use Healpix
-				use_healpix = useHealpixAngularSamplings(op_list[imask][iop], op_search_ranges, use_healpix_tilt_min);
+				std::cout << std::endl;
 
-				// Get sampling points
+				// Master gets sampling points
+				com1_float.initZeros(3);
+				com1_int.initZeros(3);
+				com1_diff.initZeros(3);
+
+				Localsym_decomposeOperator(op_list[imask][iop], aa, bb, gg, dx, dy, dz, cc);
+
+				if (fn_op_mask_info_in == "None")
+				{
+					// Local searches
+					// Get com1_float. (floating point numbers)
+					// Com1f = R * Com0 + v
+					Euler_angles2matrix(aa, bb, gg, mat1);
+					com1_float = mat1 * com0_int;
+					com1_float += vectorR3(dx, dy, dz);
+				}
+				else
+				{
+					// Global searches
+					// Master reads and checks the mask
+					std::cout << " Read mask #" << imask + 1 << " operator #" << iop + 1 << " : " << op_mask_list[imask][iop] << " ..." << std::endl;
+					mask2.read(op_mask_list[imask][iop]);
+					mask2().setXmippOrigin();
+					if (!isMultidimArray3DCubic(mask2()))
+						REPORT_ERROR("ERROR: Input mask " + op_mask_list[imask][iop] + " is not 3D cube!");
+					if (!map().sameShape(mask2()))
+						REPORT_ERROR("ERROR: Input map " + fn_unsym + " and mask " + op_mask_list[imask][iop] + " should have the same size!");
+					sum3DCubicMask(mask2(), mask2_sum, mask2_ctr);
+					if (!similar3DCubicMasks(mask_sum, mask_ctr, mask2_sum, mask2_ctr))
+						std::cerr << " WARNING: masks " << fn_mask_list[imask] << " and " << op_mask_list[imask][iop] << " seem different! Please check whether they are covering regions from the same set!" << std::endl;
+
+					// Calculate Com1f of this mask
+					mask2().centerOfMass(com1_float);
+					std::cout << " Mask #" << imask + 1 << " operator #" << iop + 1 << " : center of mass XYZ = (" << XX(com1_float) << ", " << YY(com1_float) << ", " << ZZ(com1_float) << ") pixel(s)."<< std::endl;
+				}
+
+				// Get com1_int and com1_diff
+				// diff = Com1f - Com1i
+				XX(com1_int) = round(XX(com1_float));
+				YY(com1_int) = round(YY(com1_float));
+				ZZ(com1_int) = round(ZZ(com1_float));
+				XX(com1_diff) = XX(com1_float) - XX(com1_int);
+				YY(com1_diff) = YY(com1_float) - YY(com1_int);
+				ZZ(com1_diff) = ZZ(com1_float) - ZZ(com1_int);
+
+				// Crop this region
+				z0 = ROUND(ZZ(com1_int)) + FIRST_XMIPP_INDEX(cropdim);
+				zf = ROUND(ZZ(com1_int)) + LAST_XMIPP_INDEX(cropdim);
+				y0 = ROUND(YY(com1_int)) + FIRST_XMIPP_INDEX(cropdim);
+				yf = ROUND(YY(com1_int)) + LAST_XMIPP_INDEX(cropdim);
+				x0 = ROUND(XX(com1_int)) + FIRST_XMIPP_INDEX(cropdim);
+				xf = ROUND(XX(com1_int)) + LAST_XMIPP_INDEX(cropdim);
+#ifdef DEBUG
+				std::cout << " Window: x0, y0, z0 = " << x0 << ", " << y0 << ", " << z0 << "; xf, yf, zf = " << xf << ", " << yf << ", " << zf << std::endl;
+#endif
+				map().window(dest_cropped, z0, y0, x0, zf, yf, xf);
+				dest_cropped.setXmippOrigin();
+
+				// Do the same rescaling
+				if (newdim != cropdim)
+				{
+					resizeMap(dest_cropped, newdim);
+					dest_cropped.setXmippOrigin();
+				}
+
+				// Master gets sampling points
+				// Get sampling points - Rescale translational search ranges and steps
+				Localsym_composeOperator(op, aa, bb, gg, XX(com1_diff), YY(com1_diff), ZZ(com1_diff), cc);
+				if (newdim != cropdim)
+				{
+					Localsym_scaleTranslations(op_search_ranges, 1. / tmp_binning_factor);
+					offset_step *= 1. / tmp_binning_factor;
+					Localsym_scaleTranslations(op, 1. / tmp_binning_factor);
+				}
 				getLocalSearchOperatorSamplings(
-						op_list[imask][iop],
+						op,
 						op_search_ranges,
 						op_samplings,
 						ang_step,
 						offset_step,
-						use_healpix,
+						use_healpix_sampling,
 						true);
-
-				// Calculate all CCs for the sampling points
-				calculateOperatorCC(map(), mask(), op_samplings, do_sort, do_verb);
-
-				// For rescaled maps
-				if (newdim != olddim)
+				if (newdim != cropdim)
 				{
-					for (int isamp = 0; isamp < op_samplings.size(); isamp++)
-						Localsym_scaleTranslations(op_samplings[isamp], binning_factor);
+					Localsym_scaleTranslations(op_search_ranges, tmp_binning_factor);
+					offset_step *= tmp_binning_factor;
+					Localsym_scaleTranslations(op, tmp_binning_factor);
 				}
 
-				// Output the local searches results
-				fn_tmp.compose("cc_mask", imask + 1, "tmp", 3);  // "cc_mask001.tmp"
-				fn_tmp = fn_tmp.withoutExtension(); // "cc_mask001"
-				fn_searched_op_samplings.compose(fn_tmp + "_op", iop + 1, "star", 3); // "cc_mask001_op001.star"
-				writeRelionFormatLocalSearchOperatorResults(fn_searched_op_samplings, op_samplings, angpix_image);
+				// TODO: test this!!!
+				if (op_samplings.size() <= 0)
+					REPORT_ERROR("ERROR: No sampling points!");
 
-				// Update this operator and do screen output
+				// Calculate all CCs for the sampling points
+				calculateOperatorCC(src_cropped, dest_cropped, mask_cropped, op_samplings, false, do_verb);
+
+				// TODO: For rescaled maps
+				if (newdim != cropdim)
+				{
+					for (int isamp = 0; isamp < op_samplings.size(); isamp++)
+						Localsym_scaleTranslations(op_samplings[isamp], tmp_binning_factor);
+				}
+				// Now translations are all unscaled.
+
+				// TODO: add vectors together!!!
+				// Update com1_float
+				for (int isamp = 0; isamp < op_samplings.size(); isamp++)
+				{
+					// Get new_com1
+					// newCom1f = Com1f + best_trans_samp - diff
+					Localsym_shiftTranslations(op_samplings[isamp], com1_float - com1_diff); // equivalently, com1_int
+
+					// Update v = newCom1f + ( - newR * com0)
+					Localsym_decomposeOperator(op_samplings[isamp], aa, bb, gg, dx, dy, dz, cc);
+					Euler_angles2matrix(aa, bb, gg, mat1);
+					vecR3 = vectorR3(dx, dy, dz) - mat1 * com0_int;
+					Localsym_composeOperator(op_samplings[isamp], aa, bb, gg, XX(vecR3), YY(vecR3), ZZ(vecR3), cc);
+				}
+
+				// Master sorts the results
+				std::stable_sort(op_samplings.begin(), op_samplings.end(), compareOperatorsByCC);
+
+				// Master outputs the local searches results
+				fn_tmp.compose(fn_info_out.withoutExtension() + "_cc_mask", imask + 1, "tmp", 3);  // "*_cc_mask001.tmp"
+				fn_tmp = fn_tmp.withoutExtension(); // "*_cc_mask001"
+				fn_searched_op_samplings.compose(fn_tmp + "_op", iop + 1, "star", 3); // "*_cc_mask001_op001.star"
+				writeRelionFormatLocalSearchOperatorResults(fn_searched_op_samplings, op_samplings, angpix_image);
+				std::cout << " + List of sampling points for this local symmetry opeartor: " << fn_searched_op_samplings << std::endl;
+
+				// Master updates this operator and do screen output
 				op_list[imask][iop] = op_samplings[0];
-				std::cout << " + Done! Local refined local symmetry operator: Angles = ("
-						<< VEC_ELEM(op_samplings[0], AA_POS) << ", " << VEC_ELEM(op_samplings[0], BB_POS) << ", " << VEC_ELEM(op_samplings[0], GG_POS) << "), Translations = ("
-						<< angpix_image * VEC_ELEM(op_samplings[0], DX_POS) << ", " << angpix_image * VEC_ELEM(op_samplings[0], DY_POS) << ", " << angpix_image * VEC_ELEM(op_samplings[0], DZ_POS) << ")." << std::endl;
+				std::cout << " + Done! Local refined local symmetry operator: " << std::flush;
+				Localsym_outputOperator(op_samplings[0], &std::cout, angpix_image);
+				std::cout << std::endl;
 			}
 		}
 
-		// Write out new mask info file
+		// Master writes out new mask info file
 		if (fn_info_out.getExtension() == "star")
 			writeRelionFormatMasksAndOperators(fn_info_out, fn_mask_list, op_list, angpix_image);
 		else
 			writeDMFormatMasksAndOperators(fn_info_out, fn_mask_list, op_list, angpix_image);
+
+		displayEmptyLine();
+		std::cout << " Done! New local symmetry description file: " << fn_info_out << std::endl;
 	}
 	else if (do_txt2rln)
 	{
@@ -2017,20 +2640,41 @@ void local_symmetry_parameters::run()
 		readDMFormatMasksAndOperators(fn_parsed, fn_mask_list, op_list, 1., do_verb);
 		writeRelionFormatMasksAndOperators(fn_info_out, fn_mask_list, op_list, 1.);
 	}
+	else if (do_transform)
+	{
+		if (show_usage_for_an_option)
+		{
+			displayEmptyLine();
+			std::cout << " Transform a map according to three Euler angles and XYZ translations" << std::endl;
+			std::cout << "  USAGE: --transform --angpix 1.34 --i_map in.mrc --o_map out.mrc --rot 5 --tilt 5 --psi 5 --xoff 5 --yoff 5 --zoff 5" << std::endl;
+			displayEmptyLine();
+			return;
+		}
+
+		Image<RFLOAT> img;
+		Matrix2D<RFLOAT> op_mat;
+		Matrix1D<RFLOAT> op;
+
+		img.read(fn_unsym);
+		standardiseEulerAngles(rot, tilt, psi, rot, tilt, psi);
+		Localsym_composeOperator(op, rot, tilt, psi, xoff / angpix_image, yoff / angpix_image, zoff / angpix_image);
+
+		std::cout << " Pixel size = " << angpix_image << " Angstrom(s)" << std::endl;
+		std::cout << " Transform input map " << fn_unsym << " : " << std::flush;
+		Localsym_outputOperator(op, &std::cout, angpix_image);
+		std::cout << std::endl;
+
+		Localsym_operator2matrix(op, op_mat, LOCALSYM_OP_DONT_INVERT);
+		selfApplyGeometry(img(), op_mat, IS_NOT_INV, DONT_WRAP);
+		img.write(fn_sym);
+
+		std::cout << " Done writing " << fn_sym << std::endl;
+	}
 	else if (do_debug)
 	{
-		Image<RFLOAT> img1;
-		RFLOAT mask_val = 0.;
-		img1.read(fn_mask);
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img1())
-		{
-			mask_val = DIRECT_A3D_ELEM(img1(), k, i, j);
-			if (mask_val > 1.)
-				DIRECT_A3D_ELEM(img1(), k, i, j) = 1.;
-			else if (mask_val < 0.)
-				DIRECT_A3D_ELEM(img1(), k, i, j) = 0.;
-		}
-		img1.write(fn_sym);
+		//separateMasksKMeans(fn_unsym, 4);
+		separateMasksBFS(fn_unsym, nr_masks, ini_threshold);
+
 		/*
 		Image<RFLOAT> img1, img2;
 		std::vector<Matrix1D<RFLOAT> > op_samplings;
@@ -2073,4 +2717,23 @@ void local_symmetry_parameters::run()
 	{
 		REPORT_ERROR("Please specify an option!");
 	}
+	if ( (!show_usage_for_an_option) && (!do_debug) )
+	{
+		writeCommand("relion_localsym.log", "`which relion_localsym`");
+	}
 }
+
+void local_symmetry_parameters::writeCommand(FileName fn_cmd, std::string str_executable_name)
+{
+	std::ofstream ofs;
+	ofs.open(fn_cmd.c_str(), std::ofstream::out | std::ofstream::app);
+
+	time_t now = time(0);
+    char nodename[64] = "undefined";
+    gethostname(nodename,sizeof(nodename));
+    std::string hostname(nodename);
+	ofs << std::endl << " ++++ Executed the following command at host " << hostname << " on " << ctime(&now);
+	ofs << "  " << str_executable_name << " " << std::flush;
+	parser.writeCommandLine(ofs);
+	ofs.close();
+};
