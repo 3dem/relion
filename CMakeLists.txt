@@ -80,7 +80,7 @@ endif(NOT DEFINED CUDA_ARCH)
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
 option(CUDA "Enable CUDA GPU acceleration" ON)
-option(ALTCPU "Enable Accelerated CPU version" ON)
+option(ALTCPU "Enable Accelerated CPU version" OFF)
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(CudaTexture "CudaTexture" ON)
@@ -89,8 +89,8 @@ option(CudaTexture "CudaTexture" ON)
 if(ALTCPU)
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DALTCPU -DACC_CPU=1 ")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALTCPU -DACC_CPU=1 ")
-    message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
-    message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
+    message(STATUS "ALTCPU CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
+    message(STATUS "ALTCPU CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
 endif()
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
@@ -167,6 +167,19 @@ if(NOT GUI)
     message(STATUS "Omitting GUI targets as per your request")
 endif()
 
+# ----------------------------------- Intel Compiler support and build flags ---------
+string(REGEX MATCH "(.*)mpiicc(.*)" intel_c_compiler_test ${CMAKE_C_COMPILER})
+message(STATUS "intel_c_compiler_test: ${intel_c_compiler_test}")
+if(intel_c_compiler_test)
+    SET(MPI_C_COMPILER ${CMAKE_C_COMPILER})
+endif()
+
+string(REGEX MATCH "(.*)mpiicpc(.*)" intel_cxx_compiler_test ${CMAKE_CXX_COMPILER})
+message(STATUS "intel_cxx_compiler_test: ${intel_cxx_compiler_test}")
+if(intel_cxx_compiler_test)
+    SET(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+endif()
+
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
 
@@ -176,8 +189,13 @@ message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
 message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
 message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
 
-SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+if (NOT intel_c_compiler_test)
+    SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+endif()
+if (NOT intel_cxx_compiler_test)
+    SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+endif()
+
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -281,6 +299,10 @@ ADD_SUBDIRECTORY(src/apps)
 
 message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
 message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
+message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
+message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
+message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
 
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler 
