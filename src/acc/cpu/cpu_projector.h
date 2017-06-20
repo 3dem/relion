@@ -2,7 +2,7 @@
 #define CPU_PROJECTOR_H_
 
 #include "src/complex.h"
-#include "src/acc/cpu/settings.h"
+#include "src/acc/cpu/cpu_settings.h"
 
 namespace CpuKernels
 {

@@ -1,7 +1,7 @@
 #ifndef CPU_BACKPROJECTOR_H_
 #define CPU_BACKPROJECTOR_H_
 
-#include "src/acc/cpu/settings.h"
+#include "src/acc/cpu/cpu_settings.h"
 
 namespace CpuKernels
 {

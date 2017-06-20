@@ -9,6 +9,9 @@
 #define LAUNCH_CHECK
 #define CUDA_BENCHMARK_OLD true
 
+// TODO - transition this to use definitions in "src/acc/settings.h"
+// Challenge:  what to do about definitions of float2/double2 in
+// environments with/without CUDA SDK
 #ifdef ACC_DOUBLE_PRECISION
 	#define XFLOAT double
 	#define CUDACOMPLEX double2

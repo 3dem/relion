@@ -33,7 +33,9 @@
 //typedef void CudaCustomAllocator;
 //typedef void cudaStream_t;
 //#else
-#include "src/acc/cuda/cuda_mem_utils.h"
+#ifdef CUDA
+	#include "src/acc/cuda/cuda_mem_utils.h"
+#endif
 //#endif  
 
 

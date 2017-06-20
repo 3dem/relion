@@ -130,7 +130,7 @@ if(CUDA_FOUND)
     endif()
     
     if(CUDA)
-        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCUDA -DACC_CUDA=2 ")
+        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -DCUDA -DACC_CUDA=2 ")
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA -DACC_CUDA=2 ")
     endif()
 else(CUDA_FOUND)

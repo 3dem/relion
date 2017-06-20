@@ -1,3 +1,5 @@
+// WARNING - the following is dicey - CPU may use different values for some
+// constants in some situations - hopefully none of the kernels here.
 #include "src/acc/cuda/cuda_settings.h"
 
 

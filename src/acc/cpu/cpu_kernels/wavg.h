@@ -5,10 +5,10 @@
 #include <iostream>
 #include <fstream>
 
-#include "src/acc/cpu/settings.h"
-#include "src/acc/cpu/projector.h"
+#include "src/acc/cpu/cpu_settings.h"
+#include "src/acc/cpu/cpu_projector.h"
 #include "src/acc/cpu/utilities.h"
-#include "src/acc/cpu/helper.h"
+#include "src/acc/cpu/cpu_kernels/helper.h"
 
 #define RESTRICT
 

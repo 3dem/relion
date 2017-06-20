@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include "src/acc/cpu/projector.h"
+#include "src/acc/cpu/cpu_projector.h"
 #include <signal.h>
 
 namespace CpuKernels

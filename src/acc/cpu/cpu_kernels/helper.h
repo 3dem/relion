@@ -5,9 +5,9 @@
 #include <iostream>
 #include <fstream>
 #include "src/macros.h"
-#include "src/acc/cpu/settings.h"
+#include "src/acc/cpu/cpu_settings.h"
 #include "src/acc/cpu/utilities.h"
-#include "src/acc/cpu/projector.h"
+#include "src/acc/cpu/cpu_projector.h"
 
 namespace CpuKernels
 {
