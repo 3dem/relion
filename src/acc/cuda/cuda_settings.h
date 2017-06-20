@@ -15,9 +15,11 @@
 #ifdef ACC_DOUBLE_PRECISION
 	#define XFLOAT double
 	#define CUDACOMPLEX double2
+	#define ACCCOMPLEX  double2	
 #else
 	#define XFLOAT float
 	#define CUDACOMPLEX float2
+	#define ACCCOMPLEX  float2	
 #endif
 
 #ifdef RELION_SINGLE_PRECISION

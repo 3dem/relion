@@ -605,6 +605,94 @@ inline void translatePixel(
 	tImag = c * imag + s * real;
 }
 
+// sincos lookup table optimization. Function translatePixel calls 
+// sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions. 
+// The first dimension is x or y pixel index, and the second dimension is x or y
+// translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
+// cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
+// compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
+inline void  computeSincosLookupTable2D(int      trans_num,
+                                        XFLOAT  *trans_x,
+										XFLOAT  *trans_y,										
+										int      xSize,
+										int      ySize,
+										XFLOAT  *sin_x,
+										XFLOAT  *cos_x,
+	                                    XFLOAT  *sin_y,
+	                                    XFLOAT  *cos_y)
+{
+	for(int i=0; i<trans_num; i++) {
+		XFLOAT tx = trans_x[i];
+		XFLOAT ty = trans_y[i];
+
+		for(int x=0; x<xSize; x++) {
+		   int index = i * xSize + x;
+#ifdef ACC_DOUBLE_PRECISION
+			sincos ( x * tx, &sin_x[index], &cos_x[index] );
+#else
+			sincosf( x * tx, &sin_x[index], &cos_x[index] );
+#endif            
+		}
+		
+		for(int y=0; y<ySize; y++) {
+            int index = i * ySize + y;
+#ifdef ACC_DOUBLE_PRECISION
+			sincos ( y * ty, &sin_y[index], &cos_y[index] );
+#else
+			sincosf( y * ty, &sin_y[index], &cos_y[index] );
+#endif            
+		}        
+	}
+}	                                    
+				
+inline void  computeSincosLookupTable3D(int      trans_num,
+                                        XFLOAT  *trans_x,
+										XFLOAT  *trans_y,
+										XFLOAT  *trans_z,										
+										int      xSize,
+										int      ySize,
+										int      zSize,
+										XFLOAT  *sin_x,
+										XFLOAT  *cos_x,
+	                                    XFLOAT  *sin_y,
+	                                    XFLOAT  *cos_y,
+	                                    XFLOAT  *sin_z,
+	                                    XFLOAT  *cos_z)
+{	                                    
+	for(int i=0; i<trans_num; i++) {
+		XFLOAT tx = trans_x[i];
+		XFLOAT ty = trans_y[i];
+		XFLOAT tz = trans_z[i];
+
+		for(int x=0; x<xSize; x++) {
+		   int index = i * xSize + x;
+#ifdef ACC_DOUBLE_PRECISION
+			sincos ( x * tx, &sin_x[index], &cos_x[index] );
+#else
+			sincosf( x * tx, &sin_x[index], &cos_x[index] );
+#endif            
+		}
+		
+		for(int y=0; y<ySize; y++) {
+            int index = i * ySize + y;
+#ifdef ACC_DOUBLE_PRECISION
+			sincos ( y * ty, &sin_y[index], &cos_y[index] );
+#else
+			sincosf( y * ty, &sin_y[index], &cos_y[index] );
+#endif            
+		}           
+		
+		for(int z=0; z<zSize; z++) {
+			int index = i * zSize + z;
+#ifdef ACC_DOUBLE_PRECISION
+			sincos ( z * tz, &sin_z[index], &cos_z[index] );
+#else
+			sincosf( z * tz, &sin_z[index], &cos_z[index] );
+#endif            
+		}        		
+	}
+}
+									
 } // end of namespace CpuKernels
 
 #endif /* HELPER_KERNELS_H_ */

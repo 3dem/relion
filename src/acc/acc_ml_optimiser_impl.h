@@ -426,7 +426,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						accMLO->transformer1.fouriers.getSize()*2);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
-		AccPtr<CUDACOMPLEX, AccT> d_Fimg(current_size_x * current_size_y * current_size_z, accMLO->devBundle->allocator);
+		AccPtr<ACCCOMPLEX, AccT> d_Fimg(current_size_x * current_size_y * current_size_z, accMLO->devBundle->allocator);
 		d_Fimg.deviceAlloc();
 
 		accMLO->transformer1.fouriers.streamSync();
