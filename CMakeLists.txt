@@ -79,7 +79,7 @@ else(NOT DEFINED CUDA_ARCH)
 endif(NOT DEFINED CUDA_ARCH)
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
-option(CUDA "Enable CUDA GPU acceleration" OFF)
+option(CUDA "Enable CUDA GPU acceleration" ON)
 option(ALTCPU "Enable Accelerated CPU version" ON)
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
