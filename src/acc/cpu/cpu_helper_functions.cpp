@@ -8,7 +8,7 @@ typedef void * CudaCustomAllocator;
 
 #include "src/acc/cpu/cpu_helper_functions.h"
 #include "src/acc/cpu/cpu_settings.h"
-//#include <parallel_for.h>
+#include <parallel_for.h>
  
 namespace CpuKernels
 {

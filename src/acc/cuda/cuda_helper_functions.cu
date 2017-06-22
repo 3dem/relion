@@ -1,3 +1,4 @@
+#undef ALTCPU
 #include <cuda_runtime.h>
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_helper_functions.cuh"

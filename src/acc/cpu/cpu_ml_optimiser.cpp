@@ -51,10 +51,11 @@ typedef void * CudaCustomAllocator;
 #include <signal.h>
 #include <map>
 
-//#include <parallel_for.h>
-//#include <queuing_mutex.h>
+#include <parallel_for.h>
+#include <queuing_mutex.h>
 
-//#include "src/acc/acc_ml_optimiser_impl.h"
+#include "src/acc/acc_ml_optimiser.h"
+#include "src/acc/acc_ml_optimiser_impl.h"
 
 
 #include <tbb/spin_mutex.h>
@@ -2698,6 +2699,11 @@ void MlOptimiserCpu::resetData()
 	transformer2.clear();
 
 	failsafe_attempts = 0;
+};
+
+void MlOptimiserCpu::expectationOneParticle(unsigned long my_ori_particle)
+{
+	accDoExpectationOneParticle<MlOptimiserCpu, ACC_CPU>(this, my_ori_particle);
 };
 
 #if 0

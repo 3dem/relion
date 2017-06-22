@@ -79,7 +79,7 @@ else(NOT DEFINED CUDA_ARCH)
 endif(NOT DEFINED CUDA_ARCH)
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
-option(CUDA "Enable CUDA GPU acceleration" ON)
+option(CUDA "Enable CUDA GPU acceleration" OFF)
 option(ALTCPU "Enable Accelerated CPU version" ON)
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
@@ -172,11 +172,23 @@ if(NOT GUI)
     message(STATUS "Omitting GUI targets as per your request")
 endif()
 
-# ----------------------------------- Intel Compiler support and build flags ---------
+# ---------------------------------------------------------------------------TBB --
+find_package(TBB)
+
+message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
+message(STATUS "TBB_VERSION : ${TBB_VERSION}")
+include_directories("${TBB_INCLUDE_DIRS}/tbb")
+
+# ----------------------------------------------------------Intel Compiler support --
+# ----------------------------------  and build flags including MKL and TBB ---------
+#
 string(REGEX MATCH "(.*)mpiicc(.*)" intel_c_compiler_test ${CMAKE_C_COMPILER})
 message(STATUS "intel_c_compiler_test: ${intel_c_compiler_test}")
 if(intel_c_compiler_test)
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -tbb -limf ")
     SET(MPI_C_COMPILER ${CMAKE_C_COMPILER})
+else()
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ltbb ")
 endif()
 
 string(REGEX MATCH "(.*)mpiicpc(.*)" intel_cxx_compiler_test ${CMAKE_CXX_COMPILER})
@@ -308,6 +320,7 @@ message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
 message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
 message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
+message(STATUS "CMAKE_EXE_LINKER_FLAGS : ${CMAKE_EXE_LINKER_FLAGS}")
 
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler 

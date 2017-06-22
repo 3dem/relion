@@ -16,6 +16,7 @@
 #include "src/acc/cpu/mkl_fft.h"
 #include "src/acc/cpu/cpu_benchmark_utils.h"
 #include <stack>
+
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/acc_ptr.h"
 
@@ -363,6 +364,7 @@ public:
 
 #endif
 
+
 class MlOptimiserCpu
 {
 public:
@@ -407,12 +409,12 @@ public:
 			failsafe_attempts(0),
 			generateProjectionPlanOnTheFly(false)
 	{};
-
+	
 	void resetData();
 
 //	void doThreadExpectationSomeParticles(int thread_id);
 
-//    void expectationOneParticle(unsigned long my_ori_particle);
+    void expectationOneParticle(unsigned long my_ori_particle);
     
 	~MlOptimiserCpu()
 	{
@@ -424,4 +426,43 @@ public:
 
 };
 
+/*
+class ApplyFoo {
+    float *const my_a;
+public:
+    void operator()( const blocked_range<size_t>& r ) const {
+        float *a = my_a;
+        for( size_t i=r.begin(); i!=r.end(); ++i ) 
+           Foo(a[i]);
+    }
+    ApplyFoo( float a[] ) :
+        my_a(a)
+    {}
+};
+*/
+
+class cpuThreadExpectationSomeParticles {
+	MlOptimiser *const my_optimiser;
+public:
+	void operator()( const tbb::blocked_range<size_t>& r ) const {
+		MlOptimiser *mloptimiser = my_optimiser;
+		MlOptimiser::CpuOptimiserType::reference ref = mloptimiser->tbbCpuOptimiser.local();
+		MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
+		if(cpuOptimiser == NULL) 
+		{           
+			 cpuOptimiser = new MlOptimiserCpu(mloptimiser, "cpu_optimiser");
+			 cpuOptimiser->resetData();
+			 cpuOptimiser->setupFixedSizedObjects();
+			 cpuOptimiser->setupTunableSizedObjects();
+			 ref = cpuOptimiser;
+        }
+		for( size_t i=r.begin(); i!=r.end(); ++i ) 
+		{
+			cpuOptimiser->expectationOneParticle(i);
+		}
+	}
+	cpuThreadExpectationSomeParticles( MlOptimiser *optimiser ) :
+		my_optimiser(optimiser)
+	{}
+};
 #endif

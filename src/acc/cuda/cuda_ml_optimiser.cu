@@ -1,3 +1,4 @@
+#undef ALTCPU
 #include <sys/time.h>
 #include <stdio.h>
 #include <time.h>
