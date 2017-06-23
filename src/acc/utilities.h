@@ -3,100 +3,96 @@
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/data_types.h"
-#include "src/acc/cuda/utilities.cu"
-#include "src/acc/cpu/utilities.cpp"
+#ifdef CUDA
+#include "src/acc/cuda/cuda_kernels/helper.cuh"
+#else
+#include "src/acc/cpu/cpu_kernels/helper.h"
+#endif
 
 namespace AccUtilities
 {
-	template <typename T, int Acc>
+	template <typename T>
 	static
 	void
-	multiply(AccDataTypes::Image<T,Acc> &ptr, T value)
+	multiply(AccDataTypes::Image<T> &ptr, T value)
 	{
-		if (Acc == ACC_CPU)
-		{
-			CpuKernels::multiply(
-				ptr(),
-				value,
-				ptr.getSize());
-		}
-		else
-		{
-			int BSZ = ( (int) ceilf(( float)ptr.getSize() /(float)BLOCK_SIZE));
-			CudaKernels::multiply<<<BSZ,BLOCK_SIZE,0,ptr.getStream()>>>(
-				ptr(),
-				value,
-				ptr.getSize());
-		}
+#ifdef CUDA
+		int BSZ = ( (int) ceilf(( float)ptr.getSize() /(float)BLOCK_SIZE));
+		CudaKernels::cuda_kernel_multi<T><<<BSZ,BLOCK_SIZE,0,ptr.getStream()>>>(
+			ptr(),
+			value,
+			ptr.getSize());
+#else
+		CpuKernels::cpu_kernel_multi<T>(
+		ptr(),
+		value,
+		ptr.getSize());
+#endif
 	}
 
-	template <typename T, int Acc>
+	template <typename T>
 	static
 	void
 	translate(
-		AccDataTypes::Image<T,Acc> &in,
-		AccDataTypes::Image<T,Acc> &out,
+		AccDataTypes::Image<T> &in,
+		AccDataTypes::Image<T> &out,
 		int dx,
 		int dy,
 		int dz=0)
 	{
+#ifdef CUDA
+	int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)BLOCK_SIZE));
 
-		if (Acc == ACC_CPU)
-		{
-			if (in.is3D())
-			{
-				CpuKernels::translate3D(
-					in(),
-					out(),
-					in.getxyz(),
-					in.getx(),
-					in.gety(),
-					in.getz(),
-					dx,
-					dy,
-					dz);
-			}
-			else
-			{
-				CpuKernels::translate2D(
-					in(),
-					out(),
-					in.getxyz(),
-					in.getx(),
-					in.gety(),
-					dx,
-					dy);
-			}
-		}
-		else
-		{
-			int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)BLOCK_SIZE));
-
-			if (in.is3D())
-			{
-				CudaKernels::translate3D<<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
-					in(),
-					out(),
-					in.getxyz(),
-					in.getx(),
-					in.gety(),
-					in.getz(),
-					dx,
-					dy,
-					dz);
-			}
-			else
-			{
-				CudaKernels::translate2D<<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
-					in(),
-					out(),
-					in.getxyz(),
-					in.getx(),
-					in.gety(),
-					dx,
-					dy);
-			}
-		}
+	if (in.is3D())
+	{
+		CudaKernels::cuda_kernel_translate3D<T><<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
+			in(),
+			out(),
+			in.getxyz(),
+			in.getx(),
+			in.gety(),
+			in.getz(),
+			dx,
+			dy,
+			dz);
+	}
+	else
+	{
+		CudaKernels::cuda_kernel_translate2D<T><<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
+			in(),
+			out(),
+			in.getxyz(),
+			in.getx(),
+			in.gety(),
+			dx,
+			dy);
+	}
+#else
+	if (in.is3D())
+	{
+		CpuKernels::cpu_translate3D<T>(
+			in(),
+			out(),
+			in.getxyz(),
+			in.getx(),
+			in.gety(),
+			in.getz(),
+			dx,
+			dy,
+			dz);
+	}
+	else
+	{
+		CpuKernels::cpu_translate2D<T>(
+			in(),
+			out(),
+			in.getxyz(),
+			in.getx(),
+			in.gety(),
+			dx,
+			dy);
+	}
+#endif
 	}
 };
 

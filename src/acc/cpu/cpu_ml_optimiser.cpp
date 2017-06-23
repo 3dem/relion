@@ -44,6 +44,9 @@ typedef void * CudaCustomAllocator;
 #include "src/acc/cpu/cpu_kernels/diff2.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
 #include "src/acc/cpu/cpu_helper_functions.h"
+#include "src/acc/utilities.h"
+#include "src/acc/data_types.h"
+#include "src/acc/acc_ptr.h"
 #include "src/complex.h"
 #include "src/helix.h"
 #include <fstream>

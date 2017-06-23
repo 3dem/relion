@@ -12,6 +12,7 @@
 #include "src/acc/cuda/cuda_projector_plan.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
+#include "src/acc/cuda/cuda_kernels/helper_impl.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_helper_functions.cuh"
@@ -36,6 +37,35 @@
 
 #include "src/acc/acc_ml_optimiser_impl.h"
 
+// Some explicit template instantiations
+template __global__ void CudaKernels::cuda_kernel_translate2D<XFLOAT>(XFLOAT *, XFLOAT*, int, int, int, int, int);
+
+template __global__ void CudaKernels::cuda_kernel_translate3D<XFLOAT>(XFLOAT *,
+											XFLOAT * ,
+											int ,
+											int ,
+											int ,
+											int , 
+											int ,
+											int ,
+											int);
+
+template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size);
+
+template __global__ void CudaKernels::cuda_kernel_multi<XFLOAT>( XFLOAT *A,
+		XFLOAT S,
+		int image_size);
+
+template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A,
+								   XFLOAT *B,
+								   XFLOAT *OUT,
+								   XFLOAT S,
+		  	  	  	  	  	  	   int image_size);
+
+// High-level CUDA objects
 
 size_t MlDeviceBundle::checkFixedSizedObjects(int shares)
 {

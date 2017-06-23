@@ -7,7 +7,7 @@
 namespace AccDataTypes
 {
 
-template <typename T, int AccT = ACC_CPU>
+template <typename T>
 class Image : public AccPtr<T>
 {
 private:

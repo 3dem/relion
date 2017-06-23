@@ -51,9 +51,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
 #endif
+#ifdef CUDA
 	//FourierTransformer transformer;
 	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
-
+#endif
+	
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
 		CTIC(accMLO->timer,"init");
@@ -318,8 +320,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		 * Example usage of AccPtr and AccUtilities library function
 		 */
 
-		AccDataTypes::Image<XFLOAT,AccT> temp(img.data, accMLO->devBundle->allocator);
-		AccDataTypes::Image<XFLOAT,AccT> d_img_(img.data,accMLO->devBundle->allocator);
+		AccDataTypes::Image<XFLOAT> temp(img.data, accMLO->devBundle->allocator);
+		AccDataTypes::Image<XFLOAT> d_img_(img.data,accMLO->devBundle->allocator);
 
 		d_img_.accAlloc();
 		d_img_.accInit(0);
@@ -355,18 +357,18 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		 * Setup continuation into ordinary GPU pipeline
 		 */
 
-
+#ifdef CUDA
 		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
+#endif
 		AccPtr<XFLOAT> d_img(img_size,accMLO->devBundle->allocator);
 		d_img.deviceAlloc();
 
-		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
+//		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
 			d_img_.cpOnAcc(~d_img);
-		else
-			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.getHostPtr(), ~d_img, img_size, d_img.getStream());
+//		else
+//			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.getHostPtr(), ~d_img, img_size, d_img.getStream());
 
 		d_img.streamSync();
-
 
 		/*
 		 * Continue ordinary pipeline
@@ -420,7 +422,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
+		CudaKernels::cuda_kernel_multi<XFLOAT><<<FMultiBsize,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
 						(XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
@@ -658,7 +660,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize2 = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize2,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
+		CudaKernels::cuda_kernel_multi<XFLOAT><<<FMultiBsize2,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
 						(XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);

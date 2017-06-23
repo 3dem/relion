@@ -15,12 +15,13 @@
 
 #include "src/acc/acc_ptr.h"
 
+/*
 #ifdef ACC_DOUBLE_PRECISION
 #define XFLOAT double
 #else
 #define XFLOAT float
 #endif
-
+*/
 
 class SamplingParameters
 {

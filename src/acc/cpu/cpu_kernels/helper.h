@@ -217,20 +217,22 @@ void cosineFilter(	int      blockIdx_x,
 								
 //----------------------------------------------------------------------------
 
-void translate2D(   int      blockIdx_x,
+template <typename T>
+void cpu_translate2D(   int      blockIdx_x,
 					int      threadIdx_x,
-					XFLOAT * g_image_in,
-					XFLOAT * g_image_out,
+					T * g_image_in,
+					T * g_image_out,
 					int      image_size,
 					int      xdim,
 					int      ydim, //not used
 					int      dx,
 					int      dy);
 
-void translate3D(   int      blockIdx_x,
+template <typename T>
+void cpu_translate3D(   int      blockIdx_x,
 					int      threadIdx_x,
-					XFLOAT * g_image_in,
-					XFLOAT * g_image_out,
+					T * g_image_in,
+					T * g_image_out,
 					int      image_size,
 					int      xdim,
 					int      ydim,
@@ -364,11 +366,12 @@ void batch_convol_B(int           blockIdx_x,
  *
  *  OUT[i] = A[i]*S
  */
-void multi( int       blockIdx_x, 
+template <typename T>
+void cpu_kernel_multi( int       blockIdx_x, 
 			int       threadIdx_x,
-			XFLOAT   *A,
-			XFLOAT   *OUT,
-			XFLOAT    S,
+			T   *A,
+			T   *OUT,
+			T    S,
 			int       image_size);
 
 /*
@@ -376,22 +379,24 @@ void multi( int       blockIdx_x,
  *
  *  A[i] = A[i]*S
  */
-void multi( int       blockIdx_x, 
+template <typename T>
+void cpu_kernel_multi( int       blockIdx_x, 
 			int       threadIdx_x,
-			XFLOAT   *A,
-			XFLOAT    S,
+			T   *A,
+			T    S,
 			int       image_size);
 /*
  * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
  *
  *  OUT[i] = A[i]*B[i]*S
  */
-void multi( int     blockIdx_x, 
+template <typename T>
+void cpu_kernel_multi( int     blockIdx_x, 
 			int     threadIdx_x,
-			XFLOAT *A,
-			XFLOAT *B,
-			XFLOAT *OUT,
-			XFLOAT  S,
+			T *A,
+			T *B,
+			T *OUT,
+			T  S,
 			int     image_size);
 
 void finalizeMstddev(   int       blockIdx_x, 

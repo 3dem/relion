@@ -200,13 +200,13 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< CUDACOMPLEX > &d_Fm
 	CTOC(timer,"PRE-Transform_0");
 
 	Bsize = ( (int) ceilf(( float)cudaTransformer2.reals.size/(float)BLOCK_SIZE));
-	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.dPtr,
+	cuda_kernel_multi<XFLOAT><<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.dPtr,
 											 cudaTransformer2.reals.dPtr,
 										     (XFLOAT) normfft,
 										     cudaTransformer2.reals.size);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CTIC(timer,"PRE-multi_1");
-	cuda_kernel_multi<<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.dPtr,
+	cuda_kernel_multi<XFLOAT><<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.dPtr,
 											 cudaTransformer2.reals.dPtr,
 											 d_Mstddev.dPtr,
 											 (XFLOAT) -1,
@@ -474,7 +474,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		CTIC(timer,"FourierTransform_0");
 		micTransformer.forward();
 		int FMultiBsize = ( (int) ceilf(( float)micTransformer.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+		CudaKernels::cuda_kernel_multi<XFLOAT><<<FMultiBsize,BLOCK_SIZE>>>(
 				(XFLOAT*)~micTransformer.fouriers,
 				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
 				micTransformer.fouriers.getSize()*2);
@@ -520,7 +520,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		CTIC(timer,"FourierTransform_1");
 
 		micTransformer.forward();
-		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE>>>(
+		CudaKernels::cuda_kernel_multi<XFLOAT><<<FMultiBsize,BLOCK_SIZE>>>(
 				(XFLOAT*)~micTransformer.fouriers,
 				(XFLOAT)1/((XFLOAT)(micTransformer.reals.getSize())),
 				micTransformer.fouriers.getSize()*2);

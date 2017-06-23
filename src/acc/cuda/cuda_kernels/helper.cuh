@@ -226,17 +226,20 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 											XFLOAT sum_bg_total);
 
 //----------------------------------------------------------------------------
-
-__global__ void cuda_kernel_translate2D(	XFLOAT * g_image_in,
-											XFLOAT * g_image_out,
+namespace CudaKernels
+{
+template <typename T>
+__global__ void cuda_kernel_translate2D(	T * g_image_in,
+											T * g_image_out,
 											int image_size,
 											int xdim,
 											int ydim, //not used
 											int dx,
 											int dy);
 
-__global__ void cuda_kernel_translate3D(	XFLOAT * g_image_in,
-											XFLOAT * g_image_out,
+template <typename T>
+__global__ void cuda_kernel_translate3D(	T * g_image_in,
+											T * g_image_out,
 											int image_size,
 											int xdim,
 											int ydim,
@@ -244,6 +247,7 @@ __global__ void cuda_kernel_translate3D(	XFLOAT * g_image_in,
 											int dx,
 											int dy,
 											int dz);
+}
 //----------------------------------------------------------------------------
 //__global__ void cuda_kernel_selfTranslate2D(	XFLOAT * g_image_in,
 //												XFLOAT * g_image_out,
@@ -380,29 +384,35 @@ __global__ void cuda_kernel_batch_convol_B(	 CUDACOMPLEX *d_A,
  *
  *  OUT[i] = A[i]*S
  */
-__global__ void cuda_kernel_multi( XFLOAT *A,
-								   XFLOAT *OUT,
-								   XFLOAT S,
+template <typename T>
+__global__ void cuda_kernel_multi( T *A,
+								   T *OUT,
+								   T S,
 		  	  	  	  	  	  	   int image_size);
 
+namespace CudaKernels
+{
 /*
  * In place multiplies scalar array A by a scalar S
  *
  *  A[i] = A[i]*S
  */
+template <typename T>
 __global__ void cuda_kernel_multi(
-		XFLOAT *A,
-		XFLOAT S,
+		T *A,
+		T S,
 		int image_size);
+}
 /*
  * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
  *
  *  OUT[i] = A[i]*B[i]*S
  */
-__global__ void cuda_kernel_multi( XFLOAT *A,
-								   XFLOAT *B,
-								   XFLOAT *OUT,
-								   XFLOAT S,
+template <typename T>
+__global__ void cuda_kernel_multi( T *A,
+								   T *B,
+								   T *OUT,
+								   T S,
 		  	  	  	  	  	  	   int image_size);
 
 __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
