@@ -3,7 +3,7 @@
 
 #include <src/macros.h>
 #include <math.h>
-#include "src/cpu_utils/cpu_settings.h"
+#include "src/acc/cpu/cpu_settings.h"
 
 namespace CpuKernels
 {

@@ -342,7 +342,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			// Apply the norm_correction term
 			if (baseMLO->do_norm_correction)
+			{
 				AccUtilities::multiply(temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
+#ifdef CUDA
+				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+#endif
+			}
 		}
 
 		AccUtilities::translate(
@@ -422,12 +427,22 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		CudaKernels::cuda_kernel_multi<XFLOAT><<<FMultiBsize,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
-						(XFLOAT*)~accMLO->transformer1.fouriers,
+//TODO - figure out how to pass FMultiBsize in and use it on both platforms
+//TODO - How do we pass streams down inside/outside CUDASDK build environment
+		AccUtilities::multiply((XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
-		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+/*
+		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
+										(XFLOAT*)~cudaMLO->transformer1.fouriers,
+										(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
+										cudaMLO->transformer1.fouriers.getSize()*2);
+ */
 
+#ifdef CUDA
+		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+#endif
+				
 		AccPtr<ACCCOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z, accMLO->devBundle->allocator);
 		d_Fimg.deviceAlloc();
 
@@ -589,6 +604,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			softMaskSum_bg.deviceAlloc();
 			softMaskSum.deviceInit(0.f);
 			softMaskSum_bg.deviceInit(0.f);
+			AccUtilities::softMaskBackgroundValue(~d_img,
+					img,
+					true,
+					radius,
+					radius_p,
+					cosine_width,
+					~softMaskSum,
+					~softMaskSum_bg,
+					128, SOFTMASK_BLOCK_SIZE);
+			/*
 			cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
 																				img().nzyxdim,
 																				img.data.xdim,
@@ -603,7 +628,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 																				cosine_width,
 																				~softMaskSum,
 																				~softMaskSum_bg);
+*/
+#ifdef CUDA
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+#endif
+
 
 			softMaskSum.streamSync();
 			sum_bg = (RFLOAT) getSumOnDevice(softMaskSum_bg) / (RFLOAT) getSumOnDevice(softMaskSum);
@@ -660,8 +689,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize2 = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		CudaKernels::cuda_kernel_multi<XFLOAT><<<FMultiBsize2,BLOCK_SIZE,0,accMLO->transformer1.fouriers.getStream()>>>(
-						(XFLOAT*)~accMLO->transformer1.fouriers,
+//TODO - figure out how to pass FMultiBsize2 in and use it on both platforms
+		AccUtilities::multiply((XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);

@@ -180,10 +180,9 @@ void exponentiate_weights_fine(
 				   unsigned long *d_job_num,
 				   long int job_num);
 
-void softMaskBackgroundValue(	int     blockIdx_x,
-								int     threadIdx_x,
-								int     gridDim_x,
-								XFLOAT *vol,
+void softMaskBackgroundValue(	int      block_dim,
+                                int      block_size,
+                                XFLOAT  *vol,
 								long int vol_size,
 								long int xdim,
 								long int ydim,
@@ -191,12 +190,12 @@ void softMaskBackgroundValue(	int     blockIdx_x,
 								long int xinit,
 								long int yinit,
 								long int zinit,
-								bool do_Mnoise,
-								XFLOAT radius,
-								XFLOAT radius_p,
-								XFLOAT cosine_width,
-								XFLOAT *g_sum,
-								XFLOAT *g_sum_bg);
+								bool     do_Mnoise,
+								XFLOAT   radius,
+								XFLOAT   radius_p,
+								XFLOAT   cosine_width,
+								XFLOAT  *g_sum,
+								XFLOAT  *g_sum_bg);
 
 void cosineFilter(	int      blockIdx_x,
 					int      threadIdx_x,
@@ -218,9 +217,7 @@ void cosineFilter(	int      blockIdx_x,
 //----------------------------------------------------------------------------
 
 template <typename T>
-void cpu_translate2D(   int      blockIdx_x,
-					int      threadIdx_x,
-					T * g_image_in,
+void cpu_translate2D(T * g_image_in,
 					T * g_image_out,
 					int      image_size,
 					int      xdim,
@@ -229,9 +226,7 @@ void cpu_translate2D(   int      blockIdx_x,
 					int      dy);
 
 template <typename T>
-void cpu_translate3D(   int      blockIdx_x,
-					int      threadIdx_x,
-					T * g_image_in,
+void cpu_translate3D(T * g_image_in,
 					T * g_image_out,
 					int      image_size,
 					int      xdim,
@@ -367,9 +362,7 @@ void batch_convol_B(int           blockIdx_x,
  *  OUT[i] = A[i]*S
  */
 template <typename T>
-void cpu_kernel_multi( int       blockIdx_x, 
-			int       threadIdx_x,
-			T   *A,
+void cpu_kernel_multi( T   *A,
 			T   *OUT,
 			T    S,
 			int       image_size);
@@ -380,9 +373,7 @@ void cpu_kernel_multi( int       blockIdx_x,
  *  A[i] = A[i]*S
  */
 template <typename T>
-void cpu_kernel_multi( int       blockIdx_x, 
-			int       threadIdx_x,
-			T   *A,
+void cpu_kernel_multi( T   *A,
 			T    S,
 			int       image_size);
 /*
@@ -391,9 +382,7 @@ void cpu_kernel_multi( int       blockIdx_x,
  *  OUT[i] = A[i]*B[i]*S
  */
 template <typename T>
-void cpu_kernel_multi( int     blockIdx_x, 
-			int     threadIdx_x,
-			T *A,
+void cpu_kernel_multi( T *A,
 			T *B,
 			T *OUT,
 			T  S,
