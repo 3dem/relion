@@ -427,11 +427,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-//TODO - figure out how to pass FMultiBsize in and use it on both platforms
-//TODO - How do we pass streams down inside/outside CUDASDK build environment
+
 		AccUtilities::multiply((XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
-						accMLO->transformer1.fouriers.getSize()*2);
+						accMLO->transformer1.fouriers.getSize()*2,
+						FMultiBsize, accMLO->transformer1.fouriers.getStream());
 /*
 		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
 										(XFLOAT*)~cudaMLO->transformer1.fouriers,
@@ -612,30 +612,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					cosine_width,
 					~softMaskSum,
 					~softMaskSum_bg,
-					128, SOFTMASK_BLOCK_SIZE);
-			/*
-			cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
-																				img().nzyxdim,
-																				img.data.xdim,
-																				img.data.ydim,
-																				img.data.zdim,
-																				img.data.xdim/2,
-																				img.data.ydim/2,
-																				img.data.zdim/2, //unused
-																				true,
-																				radius,
-																				radius_p,
-																				cosine_width,
-																				~softMaskSum,
-																				~softMaskSum_bg);
-*/
+					block_dim, SOFTMASK_BLOCK_SIZE);
+
 #ifdef CUDA
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
 
 
 			softMaskSum.streamSync();
-			sum_bg = (RFLOAT) getSumOnDevice(softMaskSum_bg) / (RFLOAT) getSumOnDevice(softMaskSum);
+			sum_bg = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum_bg) / 
+					 (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum);
 			softMaskSum.streamSync();
 
 			cuda_kernel_cosineFilter<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
@@ -689,10 +675,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize2 = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-//TODO - figure out how to pass FMultiBsize2 in and use it on both platforms
 		AccUtilities::multiply((XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
-						accMLO->transformer1.fouriers.getSize()*2);
+						accMLO->transformer1.fouriers.getSize()*2,
+						FMultiBsize2, accMLO->transformer1.fouriers.getStream());
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 		CTOC(accMLO->timer,"transform");
@@ -1089,8 +1075,8 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
-		op.min_diff2[ipart] = getMinOnDevice(allWeights);
-		op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(allWeights) / (RFLOAT) allWeights_size;
+		op.min_diff2[ipart] = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
+		op.avg_diff2[ipart] = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(allWeights) / (RFLOAT) allWeights_size;
 
 	} // end loop ipart
 
@@ -1402,8 +1388,8 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		CTIC(accMLO->timer,"collect_data_1");
 		if(baseMLO->adaptive_oversampling!=0)
 		{
-			op.min_diff2[ipart] = (RFLOAT) getMinOnDevice(FinePassWeights[ipart].weights);
-			op.avg_diff2[ipart] = (RFLOAT) getSumOnDevice(FinePassWeights[ipart].weights) /
+			op.min_diff2[ipart] = (RFLOAT) AccUtilities::getMinOnDevice<XFLOAT>(FinePassWeights[ipart].weights);
+			op.avg_diff2[ipart] = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(FinePassWeights[ipart].weights) /
 					(RFLOAT) FinePassWeights[ipart].weights.size;
 		}
 		CTOC(accMLO->timer,"collect_data_1");
@@ -1517,7 +1503,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 			PassWeights[ipart].weights.doFreeHost=false;
 
-			std::pair<int, XFLOAT> min_pair=getArgMinOnDevice(PassWeights[ipart].weights);
+			std::pair<int, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights[ipart].weights);
 			PassWeights[ipart].weights.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
@@ -1540,7 +1526,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
 			else
 			{
-				std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
+				std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
 				op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
 				op.max_weight[ipart] = max_pair.second;
 			}
@@ -1715,8 +1701,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					filtered.deviceAlloc();
 
-					MoreThanCubOpt<weights_t> moreThanOpt(0.);
-					size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+					//MoreThanCubOpt<weights_t> moreThanOpt(0.);
+					//size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+					size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<weights_t>(unsorted_ipart, filtered);
 
 					if (filteredSize == 0)
 					{
@@ -1743,8 +1730,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					sorted.deviceAlloc();
 					cumulative_sum.deviceAlloc();
 
-					sortOnDevice(filtered, sorted);
-					scanOnDevice(sorted, cumulative_sum);
+					AccUtilities::sortOnDevice<weights_t>(filtered, sorted);
+					AccUtilities::scanOnDevice<weights_t>(sorted, cumulative_sum);
 
 					CTOC(accMLO->timer,"sort");
 
@@ -1806,7 +1793,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					weights_t significant_weight = sorted.getDeviceAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<int, weights_t> max_pair = getArgMaxOnDevice(unsorted_ipart);
+					std::pair<int, weights_t> max_pair = AccUtilities::getArgMaxOnDevice<weights_t>(unsorted_ipart);
 					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].coarseIdx = max_pair.first;
 					op.max_weight[ipart] = max_pair.second;
@@ -1890,8 +1877,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				sorted.deviceAlloc();
 				cumulative_sum.deviceAlloc();
 
-				sortOnDevice(PassWeights[ipart].weights, sorted);
-				scanOnDevice(sorted, cumulative_sum);
+				AccUtilities::sortOnDevice<XFLOAT>(PassWeights[ipart].weights, sorted);
+				AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
 				CTOC(accMLO->timer,"sort");
 
 				if(baseMLO->adaptive_oversampling!=0)
@@ -1918,7 +1905,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					my_significant_weight = sorted.getDeviceAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(PassWeights[ipart].weights);
+					std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
 					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
 					op.max_weight[ipart] = max_pair.second;

@@ -11,6 +11,8 @@
 #include "src/acc/cuda/cub/device/device_radix_sort.cuh"
 #include "src/acc/cuda/cub/device/device_reduce.cuh"
 
+namespace CudaKernels
+{
 template <typename T>
 static T getMaxOnDevice(AccPtr<T> &ptr)
 {
@@ -122,6 +124,7 @@ if (in.getAllocator() == NULL)
 	out.cp_to_device();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 }
-
+// namespace CudaKernels
 #endif
+
 

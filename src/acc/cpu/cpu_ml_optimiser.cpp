@@ -27,6 +27,7 @@
 #undef CUDA
 typedef void * cudaStream_t;
 typedef void * CudaCustomAllocator;
+typedef int dim3;
 #define cudaStreamPerThread 0
 
 #include <sys/time.h>

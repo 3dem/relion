@@ -17,7 +17,6 @@
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_helper_functions.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/utilities.h"
 #include "src/acc/data_types.h"
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #include "src/complex.h"
@@ -35,35 +34,29 @@
 #include "src/acc/cuda/cuda_utils_cub.cuh"
 #endif
 
+#include "src/acc/utilities.h"
+
 #include "src/acc/acc_ml_optimiser_impl.h"
 
-// Some explicit template instantiations
-template __global__ void CudaKernels::cuda_kernel_translate2D<XFLOAT>(XFLOAT *, XFLOAT*, int, int, int, int, int);
+// -------------------------------  Some explicit template instantiations
+template __global__ void CudaKernels::cuda_kernel_translate2D<XFLOAT>(XFLOAT *,
+    XFLOAT*, int, int, int, int, int);
 
 template __global__ void CudaKernels::cuda_kernel_translate3D<XFLOAT>(XFLOAT *,
-											XFLOAT * ,
-											int ,
-											int ,
-											int ,
-											int , 
-											int ,
-											int ,
-											int);
+    XFLOAT *, int, int, int, int, int, int, int);
 
 template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A,
-								   XFLOAT *OUT,
-								   XFLOAT S,
-		  	  	  	  	  	  	   int image_size);
+	XFLOAT *OUT, XFLOAT S, int image_size);
 
 template __global__ void CudaKernels::cuda_kernel_multi<XFLOAT>( XFLOAT *A,
-		XFLOAT S,
-		int image_size);
+	XFLOAT S, int image_size);
 
-template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A,
-								   XFLOAT *B,
-								   XFLOAT *OUT,
-								   XFLOAT S,
-		  	  	  	  	  	  	   int image_size);
+template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A, XFLOAT *B,
+	XFLOAT *OUT, XFLOAT S, int image_size);
+
+//template XFLOAT CudaKernels::getSumOnDevice(AccPtr<XFLOAT> &ptr);
+
+// ----------------------------------------------------------------------
 
 // High-level CUDA objects
 

@@ -17,6 +17,8 @@
 #include "src/acc/cuda/cub/device/device_scan.cuh"
 #include "src/acc/cuda/cub/device/device_select.cuh"
 
+namespace CudaKernels
+{
 template <typename T>
 static std::pair<int, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 {
@@ -346,4 +348,5 @@ if (in.getAllocator() == NULL)
 	alloc->doFreeWhenReady();
 }
 
+} // namespace CudaKernels
 #endif
