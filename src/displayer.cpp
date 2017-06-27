@@ -243,7 +243,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 }
 
 int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-		RFLOAT _scale, int _particle_radius, FileName _fn_coords,
+		RFLOAT _scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
 		FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
     // Scroll bars
@@ -252,6 +252,7 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	int ysize_canvas = CEIL(YSIZE(image)*_scale);
 	pickerViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
 	canvas.particle_radius = _particle_radius;
+	canvas.do_startend = _do_startend;
 	canvas.SetScroll(&scroll);
 	canvas.fill(image, _minval, _maxval, _sigma_contrast, _scale);
 	canvas.fn_coords = _fn_coords;
@@ -1353,8 +1354,12 @@ void pickerViewerCanvas::draw()
 {
 	RFLOAT scale = boxes[0]->scale;
 
+	long int icoord = 0;
+	int xcoori_start, ycoori_start;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
 	{
+		icoord++;
+
 		RFLOAT xcoor, ycoor;
 		MDcoords.getValue(EMDL_IMAGE_COORD_X, xcoor);
 		MDcoords.getValue(EMDL_IMAGE_COORD_Y, ycoor);
@@ -1403,6 +1408,19 @@ void pickerViewerCanvas::draw()
 		xcoori = ROUND(xcoor * scale) + scroll->x() - scroll->hscrollbar.value();
 		ycoori = ROUND(ycoor * scale) + scroll->y() - scroll->scrollbar.value();
 		fl_circle(xcoori, ycoori, particle_radius);
+
+		if (do_startend)
+		{
+			if (icoord%2==1)
+			{
+				xcoori_start = xcoori;
+				ycoori_start = ycoori;
+			}
+			else
+			{
+				fl_line(xcoori_start, ycoori_start, xcoori, ycoori);
+			}
+		}
 	}
 }
 
@@ -1531,11 +1549,12 @@ int pickerViewerCanvas::handle(int ev)
 void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 {
 
-	if (MDcoords.numberOfObjects() < 1)
-	{
-		std::cout <<" No coordinates to save. Use left-mouse clicks to pick coordinates first..." << std::endl;
-		return;
-	}
+	// Allow saving empty coordinate files, in case user decides to delete all particles!
+	//if (MDcoords.numberOfObjects() < 1)
+	//{
+	//	std::cout <<" No coordinates to save. Use left-mouse clicks to pick coordinates first..." << std::endl;
+	//	return;
+	//}
 
 	FileName fn_out;
 	if (ask_filename)
@@ -2069,6 +2088,7 @@ void Displayer::read(int argc, char **argv)
 
 	int pick_section  = parser.addSection("Picking options");
 	do_pick = parser.checkOption("--pick", "Pick coordinates in input image");
+	do_pick_startend = parser.checkOption("--pick_start_end", "Pick start-end coordinates in input image");
 	fn_coords = parser.getOption("--coords", "STAR file with picked particle coordinates", "");
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
@@ -2179,7 +2199,7 @@ void Displayer::initialise()
     	REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
     if (show_fourier_amplitudes || show_fourier_phase_angles)
     {
-    	if (do_pick)
+    	if (do_pick || do_pick_startend)
     		REPORT_ERROR("Displayer::initialise ERROR: cannot pick particles from Fourier maps!");
     	if (fn_in.isStarFile())
     		REPORT_ERROR("Displayer::initialise ERROR: use single 2D image files as input!");
@@ -2290,7 +2310,7 @@ int Displayer::run()
     if (do_gui)
     {
     }
-    else if (do_pick)
+    else if (do_pick || do_pick_startend)
     {
 
         Image<RFLOAT> img;
@@ -2303,7 +2323,7 @@ int Displayer::run()
         basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
         if (fn_coords=="")
             fn_coords = fn_in.withoutExtension()+"_coords.star";
-        win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, ROUND(scale*particle_radius), fn_coords,
+        win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, ROUND(scale*particle_radius), do_pick_startend, fn_coords,
         		fn_color, fn_in, color_label, color_blue_value, color_red_value);
     }
 
