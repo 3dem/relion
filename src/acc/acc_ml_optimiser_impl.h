@@ -604,15 +604,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			softMaskSum_bg.deviceAlloc();
 			softMaskSum.deviceInit(0.f);
 			softMaskSum_bg.deviceInit(0.f);
-			AccUtilities::softMaskBackgroundValue(~d_img,
+			AccUtilities::softMaskBackgroundValue(block_dim, SOFTMASK_BLOCK_SIZE,
+					~d_img,
 					img,
 					true,
 					radius,
 					radius_p,
 					cosine_width,
 					~softMaskSum,
-					~softMaskSum_bg,
-					block_dim, SOFTMASK_BLOCK_SIZE);
+					~softMaskSum_bg);
 
 #ifdef CUDA
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
@@ -623,26 +623,28 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			sum_bg = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum_bg) / 
 					 (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum);
 			softMaskSum.streamSync();
-
-			cuda_kernel_cosineFilter<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
-																			img().nzyxdim,
-																			img.data.xdim,
-																			img.data.ydim,
-																			img.data.zdim,
-																			img.data.xdim/2,
-																			img.data.ydim/2,
-																			img.data.zdim/2, //unused
-																			true,
-																			radius,
-																			radius_p,
-																			cosine_width,
-																			sum_bg);
+			
+			AccUtilities::cosineFilter(block_dim,SOFTMASK_BLOCK_SIZE,
+										~d_img,
+										img().nzyxdim,
+										img.data.xdim,
+										img.data.ydim,
+										img.data.zdim,
+										img.data.xdim/2,
+										img.data.ydim/2,
+										img.data.zdim/2, //unused
+										true,
+										radius,
+										radius_p,
+										cosine_width,
+										sum_bg);
+#ifdef CUDA
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 //			d_img.streamSync();
 //			d_img.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-
+#endif
 //			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 //			{
 //				img.data.data[n]=(RFLOAT)d_img[n];
@@ -679,8 +681,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2,
 						FMultiBsize2, accMLO->transformer1.fouriers.getStream());
+#ifdef CUDA	
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-
+#endif
+		
 		CTOC(accMLO->timer,"transform");
 
 		accMLO->transformer1.fouriers.streamSync();

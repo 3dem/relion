@@ -197,9 +197,8 @@ void softMaskBackgroundValue(	int      block_dim,
 								XFLOAT  *g_sum,
 								XFLOAT  *g_sum_bg);
 
-void cosineFilter(	int      blockIdx_x,
-					int      threadIdx_x,
-					int      gridDim_x,
+void cosineFilter(	int      block_dim,
+                    int      block_size,
 					XFLOAT *vol,
 					long int vol_size,
 					long int xdim,

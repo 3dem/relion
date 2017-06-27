@@ -90,62 +90,61 @@ void SoftMaskBackgroundValue(	int      block_dim,
 								XFLOAT  *g_sum,
 								XFLOAT  *g_sum_bg)
 {
-		int     gridDim_x = block_dim;	
-		for(int bid=0; bid<block_dim; bid++) 
+	int     gridDim_x = block_dim;	
+	for(int bid=0; bid<block_dim; bid++) 
+	{
+		for(int tid=0; tid<block_size; tid++) 
 		{
-			for(int tid=0; tid<block_size; tid++) 
+	//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+			XFLOAT r, raisedcos;
+			int x,y,z;
+			XFLOAT     img_pixels;
+
+			long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim_x);
+			int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+
+			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
 			{
-		//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-				XFLOAT r, raisedcos;
-				int x,y,z;
-				XFLOAT     img_pixels;
-
-				long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim_x);
-				int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
-
-				for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+				if(texel<vol_size)
 				{
-					if(texel<vol_size)
+					img_pixels = vol[texel];
+
+					z =   texel / (xdim*ydim) ;
+					y = ( texel % (xdim*ydim) ) / xdim ;
+					x = ( texel % (xdim*ydim) ) % xdim ;
+
+					z-=zinit;
+					y-=yinit;
+					x-=xinit;
+
+					r = sqrt(XFLOAT(x*x + y*y + z*z));
+
+					if (r < radius)
+						continue;
+					else if (r > radius_p)
 					{
-						img_pixels = vol[texel];
-
-						z =   texel / (xdim*ydim) ;
-						y = ( texel % (xdim*ydim) ) / xdim ;
-						x = ( texel % (xdim*ydim) ) % xdim ;
-
-						z-=zinit;
-						y-=yinit;
-						x-=xinit;
-
-						r = sqrt(XFLOAT(x*x + y*y + z*z));
-
-						if (r < radius)
-							continue;
-						else if (r > radius_p)
-						{
-							g_sum[tid]    += (XFLOAT)1.0;
-							g_sum_bg[tid] += img_pixels;
-						}
-						else
-						{
-		#if defined(ACC_DOUBLE_PRECISION)
-							raisedcos = 0.5 + 0.5  * cos ( (radius_p - r) / cosine_width * M_PI);
-		#else
-							raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
-		#endif
-							g_sum[tid] += raisedcos;
-							g_sum_bg[tid] += raisedcos * img_pixels;
-						}
+						g_sum[tid]    += (XFLOAT)1.0;
+						g_sum_bg[tid] += img_pixels;
+					}
+					else
+					{
+	#if defined(ACC_DOUBLE_PRECISION)
+						raisedcos = 0.5 + 0.5  * cos ( (radius_p - r) / cosine_width * M_PI);
+	#else
+						raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
+	#endif
+						g_sum[tid] += raisedcos;
+						g_sum_bg[tid] += raisedcos * img_pixels;
 					}
 				}
-			} // tid
-		} // bid
+			}
+		} // tid
+	} // bid
 }
 
 
-void cosineFilter(	int      blockIdx_x,
-					int      threadIdx_x,
-					int      gridDim_x,
+void cosineFilter(	int      block_dim,
+					int      block_size,
 					XFLOAT  *vol,
 					long int vol_size,
 					long int xdim,
@@ -160,52 +159,54 @@ void cosineFilter(	int      blockIdx_x,
 					XFLOAT   cosine_width,
 					XFLOAT   bg_value)
 {
-
-	int tid = threadIdx_x;
-	int bid = blockIdx_x;
-
-//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-	XFLOAT r, raisedcos;
-	int x,y,z;
-	XFLOAT     img_pixels;
-
-	long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim_x);
-	int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
-
-	for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+	int     gridDim_x = block_dim;	
+	for(int bid=0; bid<block_dim; bid++) 
 	{
-		if(texel<vol_size)
+		for(int tid=0; tid<block_size; tid++) 
 		{
-			img_pixels= vol[texel];
+//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
+			XFLOAT r, raisedcos;
+			int x,y,z;
+			XFLOAT     img_pixels;
 
-			z =   texel / (xdim*ydim) ;
-			y = ( texel % (xdim*ydim) ) / xdim ;
-			x = ( texel % (xdim*ydim) ) % xdim ;
+			long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim_x);
+			int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
 
-			z-=zinit;
-			y-=yinit;
-			x-=xinit;
-
-			r = sqrt(XFLOAT(x*x + y*y + z*z));
-
-			if (r < radius)
-				continue;
-			else if (r > radius_p)
-				img_pixels=bg_value;
-			else
+			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
 			{
-#if defined(ACC_DOUBLE_PRECISION)
-				raisedcos = 0.5 + 0.5  * cos ( (radius_p - r) / cosine_width * M_PI);
-#else
-				raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
-#endif
-				img_pixels= img_pixels*(1-raisedcos) + bg_value*raisedcos;
+				if(texel<vol_size)
+				{
+					img_pixels= vol[texel];
 
+					z =   texel / (xdim*ydim) ;
+					y = ( texel % (xdim*ydim) ) / xdim ;
+					x = ( texel % (xdim*ydim) ) % xdim ;
+
+					z-=zinit;
+					y-=yinit;
+					x-=xinit;
+
+					r = sqrt(XFLOAT(x*x + y*y + z*z));
+
+					if (r < radius)
+						continue;
+					else if (r > radius_p)
+						img_pixels=bg_value;
+					else
+					{
+		#if defined(ACC_DOUBLE_PRECISION)
+						raisedcos = 0.5 + 0.5  * cos ( (radius_p - r) / cosine_width * M_PI);
+		#else
+						raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
+		#endif
+						img_pixels= img_pixels*(1-raisedcos) + bg_value*raisedcos;
+
+					}
+					vol[texel]=img_pixels;
+				}
 			}
-			vol[texel]=img_pixels;
-		}
-
-	}
+		} // tid
+	} // bid
 }
 
 template <typename T>

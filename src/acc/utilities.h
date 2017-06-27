@@ -206,6 +206,8 @@ static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 }
 
 static void softMaskBackgroundValue(
+		dim3 inblock_dim, 
+		int inblock_size,
 		XFLOAT *vol,
 		Image<RFLOAT> &img,
 		bool     do_Mnoise,
@@ -213,44 +215,92 @@ static void softMaskBackgroundValue(
 		XFLOAT   radius_p,
 		XFLOAT   cosine_width,
 		XFLOAT  *g_sum,
-		XFLOAT  *g_sum_bg,
-		dim3 inblock_dim, 
-		int inblock_size)
-	{
+		XFLOAT  *g_sum_bg)
+{
 #ifdef CUDA
-		cuda_kernel_softMaskBackgroundValue<<<inblock_dim,inblock_size>>>(	vol,
-																	img().nzyxdim,
-																	img.data.xdim,
-																	img.data.ydim,
-																	img.data.zdim,
-																	img.data.xdim/2,
-																	img.data.ydim/2,
-																	img.data.zdim/2, //unused
-																	do_Mnoise,
-																	radius,
-																	radius_p,
-																	cosine_width,
-																	g_sum,
-																	g_sum_bg);
+	cuda_kernel_softMaskBackgroundValue<<<inblock_dim,inblock_size>>>(	vol,
+																img().nzyxdim,
+																img.data.xdim,
+																img.data.ydim,
+																img.data.zdim,
+																img.data.xdim/2,
+																img.data.ydim/2,
+																img.data.zdim/2, //unused
+																do_Mnoise,
+																radius,
+																radius_p,
+																cosine_width,
+																g_sum,
+																g_sum_bg);
 #else
-		int block_dim = inblock_dim;
-		CpuKernels::softMaskBackgroundValue(block_dim, inblock_size,
-			vol,
-			img().nzyxdim,
-			img.data.xdim,
-			img.data.ydim,
-			img.data.zdim,
-			img.data.xdim/2,
-			img.data.ydim/2,
-			img.data.zdim/2, //unused
-			do_Mnoise,
-			radius,
-			radius_p,
-			cosine_width,
-			g_sum,
-			g_sum_bg);
+	int block_dim = inblock_dim;
+	CpuKernels::softMaskBackgroundValue(block_dim, inblock_size,
+		vol,
+		img().nzyxdim,
+		img.data.xdim,
+		img.data.ydim,
+		img.data.zdim,
+		img.data.xdim/2,
+		img.data.ydim/2,
+		img.data.zdim/2, //unused
+		do_Mnoise,
+		radius,
+		radius_p,
+		cosine_width,
+		g_sum,
+		g_sum_bg);
 #endif
-	}
+}
+
+void cosineFilter(
+		dim3 inblock_dim, 
+		int inblock_size,
+		XFLOAT *vol,
+		long int vol_size,
+		long int xdim,
+		long int ydim,
+		long int zdim,
+		long int xinit,
+		long int yinit,
+		long int zinit,
+		bool do_Mnoise,
+		XFLOAT radius,
+		XFLOAT radius_p,
+		XFLOAT cosine_width,
+		XFLOAT sum_bg_total)
+{
+#ifdef CUDA
+	cuda_kernel_cosineFilter<<<inblock_dim,inblock_size>>>(	vol,
+															vol_size,
+															xdim,
+															ydim,
+															zdim,
+															xinit,
+															yinit,
+															zinit, //unused
+															do_Mnoise,
+															radius,
+															radius_p,
+															cosine_width,
+															sum_bg_total);
+#else
+	int block_dim = inblock_dim;
+	CpuKernels::cosineFilter(block_dim, inblock_size,
+							vol,
+							vol_size,
+							xdim,
+							ydim,
+							zdim,
+							xinit,
+							yinit,
+							zinit, //unused
+							do_Mnoise,
+							radius,
+							radius_p,
+							cosine_width,
+							sum_bg_total);	
+#endif
+}
 };  // namespace 
 
 
