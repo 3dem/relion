@@ -790,6 +790,9 @@ void JobWindow::initialiseManualpickWindow()
 	place("angpix");
 
 	current_y += STEPY/2;
+	place ("do_startend");
+
+	current_y += STEPY/2;
 	place("ctfscale");
 
 	tab2->end();

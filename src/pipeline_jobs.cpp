@@ -1326,6 +1326,8 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
 
+	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
+
 	joboptions["ctfscale"] = JobOption("Scale for CTF image:", 1, 0.1, 2, 0.1, "CTFFINDs CTF image (with the Thonrings) will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
 
 	joboptions["do_color"] = JobOption("Blue<>red color particles?", false, "If set to true, then the circles for each particles are coloured from red to blue (or the other way around) for a given metadatalabel. If this metadatalabel is not in the picked coordinates STAR file \
@@ -1387,6 +1389,11 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	command += " --ctf_scale " + joboptions["ctfscale"].getString();
 
 	command += " --particle_diameter " + joboptions["diameter"].getString();
+
+	if (joboptions["do_startend"].getBoolean())
+	{
+		command += " --pick_start_end ";
+	}
 
 	if (joboptions["do_color"].getBoolean())
 	{
