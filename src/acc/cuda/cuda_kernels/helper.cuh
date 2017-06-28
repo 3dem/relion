@@ -579,4 +579,19 @@ __global__ void cuda_kernel_powerClass(		CUDACOMPLEX * g_image,
 		cuda_atomic_add(&g_highres_Xi2[0], s_highres_Xi2[0]);
 }
 
+template<bool invert>
+__global__ void cuda_kernel_make_eulers_2D(
+		XFLOAT *alphas,
+		XFLOAT *eulers,
+		unsigned orientation_num);
+
+template<bool invert,bool perturb>
+__global__ void cuda_kernel_make_eulers_3D(
+		XFLOAT *alphas,
+		XFLOAT *betas,
+		XFLOAT *gammas,
+		XFLOAT *eulers,
+		unsigned orientation_num,
+		XFLOAT *R);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

@@ -252,7 +252,7 @@ static void softMaskBackgroundValue(
 #endif
 }
 
-void cosineFilter(
+static void cosineFilter(
 		dim3 inblock_dim, 
 		int inblock_size,
 		XFLOAT *vol,
@@ -340,7 +340,55 @@ void powerClass(dim3		in_gridSize,
 #endif
 }
 
-};  // namespace 
+
+template<bool invert>
+void acc_make_eulers_2D(int grid_size, int block_size,
+		cudaStream_t stream,
+		XFLOAT *alphas,
+		XFLOAT *eulers,
+		unsigned orientation_num)
+{
+#ifdef CUDA
+	cuda_kernel_make_eulers_2D<invert><<<grid_size,block_size,0,stream>>>(
+		alphas,
+		eulers,
+		orientation_num);
+#else
+	CpuKernels::cpu_kernel_make_eulers_2D<invert>(grid_size, block_size,
+		alphas, eulers, orientation_num);
+#endif
+}
+
+template<bool invert,bool perturb>
+void acc_make_eulers_3D(int grid_size, int block_size,
+		cudaStream_t stream,
+		XFLOAT *alphas,
+		XFLOAT *betas,
+		XFLOAT *gammas,
+		XFLOAT *eulers,
+		unsigned orientation_num,
+		XFLOAT *R)
+{
+#ifdef CUDA
+	cuda_kernel_make_eulers_3D<invert,perturb><<<grid_size,block_size,0,stream>>>(
+		alphas,
+		betas,
+		gammas,
+		eulers,
+		orientation_num,
+		R);
+#else
+	CpuKernels::cpu_kernel_make_eulers_3D<invert,perturb>(grid_size, block_size,
+		alphas,
+		betas,
+		gammas,
+		eulers,
+		orientation_num,
+		R);
+#endif
+}
+
+};  // namespace AccUtilities
 
 
 #endif //ACC_UTILITIES_H_

@@ -1,29 +1,27 @@
-#ifndef CUDA_PROJECTOR_PLAN_H_
-#define CUDA_PROJECTOR_PLAN_H_
+#ifndef ACC_PROJECTOR_PLAN_H_
+#define ACC_PROJECTOR_PLAN_H_
 
 #include <vector>
-#include "src/acc/cuda/cuda_settings.h"
-#include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/acc_ptr.h"
 #include "src/healpix_sampling.h"
 #include <iostream>
 #include <fstream>
 
-class CudaProjectorPlan
+class AccProjectorPlan
 {
 public:
 	AccPtr< long unsigned> iorientclasses;
 	AccPtr<XFLOAT> eulers;
 	long unsigned orientation_num;
 
-	CudaProjectorPlan(CudaCustomAllocator *allocator):
+	AccProjectorPlan(CudaCustomAllocator *allocator):
 		iorientclasses(allocator),
 		eulers(allocator),
 		orientation_num(0)
 	{};
 
 	//Copy constructor
-	CudaProjectorPlan( const CudaProjectorPlan& other ):
+	AccProjectorPlan( const AccProjectorPlan& other ):
 		iorientclasses(other.iorientclasses),
 		eulers(other.eulers),
 		orientation_num(other.orientation_num)

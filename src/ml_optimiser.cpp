@@ -48,8 +48,8 @@
 #endif
 #ifdef ALTCPU
 	#ifndef CUDA
-		typedef void * cudaStream_t;
-		typedef void * CudaCustomAllocator;
+		typedef float cudaStream_t;
+		typedef double CudaCustomAllocator;
 		#define cudaStreamPerThread 0
 	#endif
 	#include <tbb/tbb.h>

@@ -3,7 +3,7 @@
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/cuda/cuda_projector_plan.h"
+#include "src/acc/acc_projector_plan.h"
 #include "src/acc/cuda/cuda_projector.h"
 #include "src/acc/cuda/cuda_backprojector.h"
 #include "src/acc/cuda/cuda_fft.h"
@@ -48,7 +48,7 @@ public:
 
 	//Used for precalculations of projection setup
 	bool generateProjectionPlanOnTheFly;
-	std::vector< CudaProjectorPlan > coarseProjectionPlans;
+	std::vector< AccProjectorPlan > coarseProjectionPlans;
 
 	MlOptimiser *baseMLO;
 

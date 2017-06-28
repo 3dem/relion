@@ -25,8 +25,8 @@
 
 // Make sure we build for CPU
 #undef CUDA
-typedef void * cudaStream_t;
-typedef void * CudaCustomAllocator;
+typedef float cudaStream_t;
+typedef double CudaCustomAllocator;
 typedef int dim3;
 #define cudaStreamPerThread 0
 #define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
@@ -43,7 +43,7 @@ typedef int dim3;
 #include <vector>
 #include <iostream>
 #include "src/acc/cpu/cpu_projector.h"
-#include "src/acc/cpu/cpu_projector_plan.h"
+#include "src/acc/acc_projector_plan.h"
 #include "src/acc/cpu/cpu_benchmark_utils.h"
 #include "src/acc/cpu/cpu_ml_optimiser.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"

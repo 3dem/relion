@@ -664,9 +664,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						(XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
-#ifdef CUDA	
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#endif
 		
 		CTOC(accMLO->timer,"transform");
 
@@ -860,7 +858,7 @@ void getAllSquaredDifferencesCoarse(
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
-	std::vector<CudaProjectorPlan> projectorPlans(0, accMLO->devBundle->allocator);
+	std::vector<AccProjectorPlan> projectorPlans(0, accMLO->devBundle->allocator);
 
 	//If particle specific sampling plan required
 	if (accMLO->devBundle->generateProjectionPlanOnTheFly)

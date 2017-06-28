@@ -733,5 +733,143 @@ void square(int     blockIdx_x,
 		A[pixel] = A[pixel]*A[pixel];
 }
 
+template<bool invert>
+void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
+		XFLOAT *alphas,
+		XFLOAT *eulers,
+		unsigned orientation_num)
+{
+	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
+		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {							
+			unsigned oid = blockIdx_x * BLOCK_SIZE + threadIdx_x; //Orientation id
+
+			if (oid >= orientation_num)
+				return;
+
+			XFLOAT ca, sa;
+			XFLOAT a = alphas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
+
+#ifdef CUDA_DOUBLE_PRECISION
+			sincos(a, &sa, &ca);
+#else
+			sincosf(a, &sa, &ca);
+#endif
+
+			if(!invert)
+			{
+				eulers[9 * oid + 0] = ca;//00
+				eulers[9 * oid + 1] = sa;//01
+				eulers[9 * oid + 2] = 0 ;//02
+				eulers[9 * oid + 3] =-sa;//10
+				eulers[9 * oid + 4] = ca;//11
+				eulers[9 * oid + 5] = 0 ;//12
+				eulers[9 * oid + 6] = 0 ;//20
+				eulers[9 * oid + 7] = 0 ;//21
+				eulers[9 * oid + 8] = 1 ;//22
+			}
+			else
+			{
+				eulers[9 * oid + 0] = ca;//00
+				eulers[9 * oid + 1] =-sa;//10
+				eulers[9 * oid + 2] = 0 ;//20
+				eulers[9 * oid + 3] = sa;//01
+				eulers[9 * oid + 4] = ca;//11
+				eulers[9 * oid + 5] = 0 ;//21
+				eulers[9 * oid + 6] = 0 ;//02
+				eulers[9 * oid + 7] = 0 ;//12
+				eulers[9 * oid + 8] = 1 ;//22
+			}
+		} // threadIdx_x
+	} // blockIdx_x
+}
+
+template<bool invert,bool perturb>
+void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
+		XFLOAT *alphas,
+		XFLOAT *betas,
+		XFLOAT *gammas,
+		XFLOAT *eulers,
+		unsigned orientation_num,
+		XFLOAT *R)
+{
+	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
+        for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++) {
+			XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
+			XFLOAT ca, sa, cb, sb, cg, sg, cc, cs, sc, ss;
+
+			unsigned oid = blockIdx_x * BLOCK_SIZE + threadIdx_x; //Orientation id
+
+			if (oid >= orientation_num)
+				return;
+
+			for (int i = 0; i < 9; i ++)
+				B[i] = (XFLOAT) 0.f;
+
+			a = alphas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
+			b = betas[oid]  * (XFLOAT)PI / (XFLOAT)180.0;
+			g = gammas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
+
+#ifdef CUDA_DOUBLE_PRECISION
+			sincos(a, &sa, &ca);
+			sincos(b,  &sb, &cb);
+			sincos(g, &sg, &cg);
+#else
+			sincosf(a, &sa, &ca);
+			sincosf(b,  &sb, &cb);
+			sincosf(g, &sg, &cg);
+#endif
+
+			cc = cb * ca;
+			cs = cb * sa;
+			sc = sb * ca;
+			ss = sb * sa;
+
+			A[0] = ( cg * cc - sg * sa);//00
+			A[1] = ( cg * cs + sg * ca);//01
+			A[2] = (-cg * sb )         ;//02
+			A[3] = (-sg * cc - cg * sa);//10
+			A[4] = (-sg * cs + cg * ca);//11
+			A[5] = ( sg * sb )         ;//12
+			A[6] = ( sc )              ;//20
+			A[7] = ( ss )              ;//21
+			A[8] = ( cb )              ;//22
+
+			if (perturb)
+				for (int i = 0; i < 3; i++)
+					for (int j = 0; j < 3; j++)
+						for (int k = 0; k < 3; k++)
+							B[i * 3 + j] += A[i * 3 + k] * R[k * 3 + j];
+			else
+				for (int i = 0; i < 9; i++)
+					B[i] = A[i];
+
+			if(invert)
+			{
+				eulers[9 * oid + 0] = B[0];//00
+				eulers[9 * oid + 1] = B[3];//01
+				eulers[9 * oid + 2] = B[6];//02
+				eulers[9 * oid + 3] = B[1];//10
+				eulers[9 * oid + 4] = B[4];//11
+				eulers[9 * oid + 5] = B[7];//12
+				eulers[9 * oid + 6] = B[2];//20
+				eulers[9 * oid + 7] = B[5];//21
+				eulers[9 * oid + 8] = B[8];//22
+			}
+			else
+			{
+				eulers[9 * oid + 0] = B[0];//00
+				eulers[9 * oid + 1] = B[1];//10
+				eulers[9 * oid + 2] = B[2];//20
+				eulers[9 * oid + 3] = B[3];//01
+				eulers[9 * oid + 4] = B[4];//11
+				eulers[9 * oid + 5] = B[5];//21
+				eulers[9 * oid + 6] = B[6];//02
+				eulers[9 * oid + 7] = B[7];//12
+				eulers[9 * oid + 8] = B[8];//22
+			}
+		} // threadIdx_x
+	} // blockIdx_x
+}
+
 } // end of namespace CpuKernels
 

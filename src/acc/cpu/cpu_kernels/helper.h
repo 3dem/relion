@@ -686,7 +686,22 @@ inline void  computeSincosLookupTable3D(int      trans_num,
 		}        		
 	}
 }
-									
+
+template<bool invert>
+void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
+		XFLOAT *alphas,
+		XFLOAT *eulers,
+		unsigned orientation_num);
+
+template<bool invert,bool perturb>
+void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
+		XFLOAT *alphas,
+		XFLOAT *betas,
+		XFLOAT *gammas,
+		XFLOAT *eulers,
+		unsigned orientation_num,
+		XFLOAT *R);
+
 } // end of namespace CpuKernels
 
 #endif /* HELPER_KERNELS_H_ */

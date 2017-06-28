@@ -56,9 +56,9 @@ public:
 	CudaCustomAllocator::Alloc *alloc;
 	cudaStream_t stream;
 #else
-	void *allocator;
-	void *alloc;
-	void *stream;
+	double *allocator;
+	char *alloc;
+	float stream;
 #endif
 	
 	size_t size; //Size used when copying data from and to device

@@ -9,7 +9,7 @@
 #include "src/acc/acc_ptr.h"
 #include "src/acc/cuda/cuda_projector.h"
 #include "src/acc/cuda/cuda_projector.cuh"
-#include "src/acc/cuda/cuda_projector_plan.h"
+#include "src/acc/acc_projector_plan.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/helper_impl.cuh"
@@ -45,16 +45,14 @@ template __global__ void CudaKernels::cuda_kernel_translate2D<XFLOAT>(XFLOAT *,
 template __global__ void CudaKernels::cuda_kernel_translate3D<XFLOAT>(XFLOAT *,
     XFLOAT *, int, int, int, int, int, int, int);
 
-template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A,
-	XFLOAT *OUT, XFLOAT S, int image_size);
+template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *,
+	XFLOAT *, XFLOAT, int);
 
-template __global__ void CudaKernels::cuda_kernel_multi<XFLOAT>( XFLOAT *A,
-	XFLOAT S, int image_size);
+template __global__ void CudaKernels::cuda_kernel_multi<XFLOAT>( XFLOAT *,
+	XFLOAT, int);
 
-template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *A, XFLOAT *B,
-	XFLOAT *OUT, XFLOAT S, int image_size);
-
-//template XFLOAT CudaKernels::getSumOnDevice(AccPtr<XFLOAT> &ptr);
+template __global__ void cuda_kernel_multi<XFLOAT>( XFLOAT *, XFLOAT *,
+	XFLOAT *, XFLOAT, int);
 
 // ----------------------------------------------------------------------
 

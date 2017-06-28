@@ -10,7 +10,6 @@
 #define CPU_ML_OPTIMISER_H_
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
-#include "src/acc/cpu/cpu_projector_plan.h"
 #include "src/acc/cpu/cpu_projector.h"
 #include "src/acc/cpu/cpu_backprojector.h"
 #include "src/acc/cpu/mkl_fft.h"
@@ -19,6 +18,7 @@
 
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/acc_ptr.h"
+#include "src/acc/acc_projector_plan.h"
 
 #if 0
 #ifdef CUDA_DOUBLE_PRECISION
@@ -394,7 +394,7 @@ public:
 	//Used for precalculations of projection setup
 	bool generateProjectionPlanOnTheFly;
 	
-	std::vector< CpuProjectorPlan > coarseProjectionPlans;
+	std::vector< AccProjectorPlan > coarseProjectionPlans;
 	
 
 	MlOptimiserCpu(MlOptimiser *baseMLOptimiser, const char * timing_fnm) :
