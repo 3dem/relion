@@ -130,14 +130,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_force_converge =  parser.checkOption("--force_converge", "Force an auto-refinement run to converge immediately upon continuation.");
 
 	// For multi-body refinement
-	bool fn_body_masks_was_empty = (fn_body_masks == "");
+	bool fn_body_masks_was_empty = (fn_body_masks == "None");
 	std::string fnt;
 	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
 	if (fnt != "OLD")
 		fn_body_masks = fnt;
 
 	// Is this a new multi-body refinement?
-	if (fn_body_masks_was_empty && fn_body_masks != "")
+	if (fn_body_masks_was_empty && fn_body_masks != "None")
 		do_initialise_bodies = true;
 	else
 		do_initialise_bodies = false;
@@ -327,13 +327,17 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	int corrections_section = parser.addSection("Corrections");
 
-	// Can only switch the following option ON, not OFF
+	// Can also switch the following option OFF
 	if (parser.checkOption("--scale", "Switch on intensity-scale corrections on image groups", "OLD"))
 		do_scale_correction = true;
+	if (parser.checkOption("--no_scale", "Switch off intensity-scale corrections on image groups", "OLD"))
+		do_scale_correction = false;
 
-	// Can only switch the following option ON, not OFF
+	// Can also switch the following option OFF
 	if (parser.checkOption("--norm", "Switch on normalisation-error correction","OLD"))
 		do_norm_correction = true;
+	if (parser.checkOption("--no_norm", "Switch off normalisation-error correction","OLD"))
+		do_norm_correction = false;
 
 	int computation_section = parser.addSection("Computation");
 
@@ -544,6 +548,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Only perform CTF phase-flipping? (default is full amplitude-correction)");
 	do_norm_correction = parser.checkOption("--norm", "Perform normalisation-error correction?");
 	do_scale_correction = parser.checkOption("--scale", "Perform intensity-scale corrections on image groups?");
+	// Allow switching off norm and scale (which is on by default in the GUI)
+	if (parser.checkOption("--no_norm", "Switch off normalisation-error correction?"))
+		do_norm_correction = false;
+	if (parser.checkOption("--no_scale", "Switch off intensity-scale corrections on image groups?"))
+		do_scale_correction = false;
 
 	// SGD stuff
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
@@ -644,6 +653,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
     // By default, start with nr_bodies to 1
     mymodel.nr_bodies = 1;
+    fn_body_masks = "None";
 
     // Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
@@ -795,7 +805,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets))
 		sgd_max_subsets = -1;
 	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
-		fn_body_masks = "";
+		fn_body_masks = "None";
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FSC, do_phase_random_fsc))
 		do_phase_random_fsc = false;
 
@@ -840,7 +850,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		mymodel.read(fn_model);
 	}
 
-    if (fn_body_masks != "")
+    if (fn_body_masks != "None")
     {
     	// Set up the bodies in the model
     	mymodel.initialiseBodies(fn_body_masks, fn_out);
