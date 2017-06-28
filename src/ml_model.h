@@ -134,6 +134,9 @@ public:
 	// One likelihood vs prior ratio spectrum for each class
 	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;
 
+	// One Fourier-coverage spectrum for each class
+	std::vector<MultidimArray<RFLOAT > > fourier_coverage_class;
+
 	// One value for each class
 	std::vector<RFLOAT > pdf_class;
 
@@ -160,6 +163,12 @@ public:
 
 	// Estimated accuracy at which translations can be assigned, one for each class
 	std::vector<RFLOAT> acc_trans;
+
+	// The estimate resolution, one for each class
+	std::vector<RFLOAT> estimated_resolution;
+
+	// Fourier coverage up to the estimate resolution, one  for each class
+	std::vector<RFLOAT> total_fourier_coverage;
 
 	// Spectral contribution to orientability of individual particles, one for each class
 	std::vector<MultidimArray<RFLOAT > > orientability_contrib;
@@ -279,12 +288,15 @@ public:
     		sigma2_class = MD.sigma2_class;
     		fsc_halves_class = MD.fsc_halves_class;
     		data_vs_prior_class = MD.data_vs_prior_class;
+    		fourier_coverage_class = MD.fourier_coverage_class;
     		pdf_class = MD.pdf_class;
     		pdf_direction = MD.pdf_direction;
     		prior_offset_class = MD.prior_offset_class;
     		nr_particles_group = MD.nr_particles_group;
     		acc_rot = MD.acc_rot;
     		acc_trans = MD.acc_trans;
+    		estimated_resolution = MD.estimated_resolution;
+    		total_fourier_coverage = MD.total_fourier_coverage;
     		orientability_contrib = MD.orientability_contrib;
     		helical_twist = MD.helical_twist;
     		helical_rise = MD.helical_rise;
@@ -310,6 +322,7 @@ public:
 		fsc_halves_class.clear();
 		sigma2_class.clear();
 		data_vs_prior_class.clear();
+		fourier_coverage_class.clear();
 		prior_offset_class.clear();
 		pdf_class.clear();
 		pdf_direction.clear();
@@ -320,6 +333,8 @@ public:
 		sigma2_rot = sigma2_tilt = sigma2_psi = 0.;
 		acc_rot.clear();
 		acc_trans.clear();
+		estimated_resolution.clear();
+		total_fourier_coverage.clear();
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
@@ -376,6 +391,7 @@ public:
 
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 
+	void calculateTotalFourierCoverage();
 };
 
 class MlWsumModel: public MlModel

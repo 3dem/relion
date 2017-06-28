@@ -1640,6 +1640,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 	if (joboptions["do_reextract"].getBoolean())
 	{
+		if (joboptions["fndata_reextract"].getString() == "")
+		{
+			error_message = "ERROR: empty field for refined particles STAR file...";
+			return false;
+		}
 		command += " --reextract_data_star " + joboptions["fndata_reextract"].getString();
 		Node node2(joboptions["fndata_reextract"].getString(), joboptions["fndata_reextract"].node_type);
 		inputNodes.push_back(node2);
@@ -2279,7 +2284,9 @@ void RelionJob::initialiseInimodelJob()
 
 	hidden_name = ".gui_inimodel";
 
-	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
+	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
+In SGD, it is very important that there are particles from enough different orientations. One only needs a few thousand to 10k particles. When selecting good 2D classes in the Subset Selection jobtype, use the option to select a maximum number of particles from each class to generate more even angular distributions for SGD.\
+\n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
@@ -2287,28 +2294,20 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["nr_iter"] = JobOption("Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed.");
+	joboptions["nr_iter"] = JobOption("Number of iterations:", 1, 1, 10, 1, "Number of iterations to be performed. Often 1 or 2 iterations with approximately ten thousand particles, or 5-10 iterations with several thousand particles is enough.");
 	joboptions["sgd_subset_size"] = JobOption("SGD subset size:", 200, 100, 1000, 100, "How many particles will be processed for each SGD step. Often 200 seems to work well.");
-	joboptions["sgd_max_subsets"] = JobOption("Maximum number of subsets:", 50, -1, 200, 10, "Stop the SGD optimisation after this many subsets have been processed. \
-The total number of particles processed will then be equal to the subset size times this number. Often, processing 10k particles is enough to get a decent low-resolution model. If you have fewer particles, you can perform more than one iteration instead.");
 	joboptions["sgd_write_subsets"] = JobOption("Write-out frequency subsets:", 10, -1, 25, 1, "Every how many subsets do you want to write the model to disk. Negative value means only write out model after entire iteration. ");
-	joboptions["sgd_sigma2fudge_halflife"] = JobOption("SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
-having 50% after this many particles have been processed. Switch increased noise variance off by setting this value to a negative number. Some difficult cases require switching this on or off, easier cases are successful with both options. When switched on, values around 1000 have been found useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
 	joboptions["sgd_highres_limit"] = JobOption("Limit resolution SGD to (A): ", 20, -1, 40, 1, "If set to a positive number, then the SGD will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is essential in SGD, as there is very little regularisation, i.e. overfitting will start to happen very quickly. \
 Values in the range of 15-30 Angstroms have proven useful.");
+	joboptions["sgd_sigma2fudge_halflife"] = JobOption("SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
+having 50% after this many particles have been processed. By default, this option is switched off by setting this value to a negative number. \
+In some difficult cases, switching this option on helps. In such cases, values around 1000 have found to be useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
 
 	//joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
 These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
-	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
-set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
-* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
-* I2: Crowther 222 \n \
-* I3: 52-setting (as used in SPIDER?)\n \
-* I4: A different 52 setting \n \
-The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
-RELION uses XMIPP's libraries for symmetry operations. \
-Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
+	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "Initial SGD runs are often performed in C1. If a particle is confirmed to have symmetry, the SGD can also be repeated with the corresponding \
+point group symmetry. That has the advantage that the symetry axes in the reference will be aligned correctly.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -2337,7 +2336,7 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 
 	joboptions["sampling"] = JobOption("Angular sampling interval:", RADIO_SAMPLING, 1, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
-The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can be used than in normal 3D classifications/refinements");
+The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. ");
 	joboptions["offset_range"] = JobOption("Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n");
@@ -2358,6 +2357,9 @@ Provided this directory is on a fast local drive (e.g. an SSD drive), processing
 	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+
+	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
 
 }
 
@@ -2398,7 +2400,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	command += " --sgd ";
 	command += " --subset_size " + joboptions["sgd_subset_size"].getString();
 	command += " --strict_highres_sgd " + joboptions["sgd_highres_limit"].getString();
-	command += " --max_subsets " + joboptions["sgd_max_subsets"].getString();
 	command += " --write_subsets " + joboptions["sgd_write_subsets"].getString();
 
 	if (!is_continue)
@@ -2463,6 +2464,12 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
+
+	// GPU-stuff
+	if (joboptions["use_gpu"].getBoolean())
+	{
+		command += " --gpu \"" + joboptions["gpu_ids"].getString() +"\"";
+	}
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
@@ -2606,6 +2613,21 @@ particle mask for each segment. If the psi priors of the extracted segments are 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter - outer (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
 particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.");
+	joboptions["range_tilt"] = JobOption("Angular search range - tilt (deg):", std::string("15"), "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
+A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
+	joboptions["range_psi"] = JobOption("Angular search range - psi (deg):", std::string("10"), "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
+A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
+	joboptions["do_apply_helical_symmetry"] = JobOption("Apply helical symmetry?", true, "If set to Yes, helical symmetry will be applied in every iteration. Set to No if you have just started a project, helical symmetry is unknown or not yet estimated.");
 	joboptions["helical_nr_asu"] = JobOption("Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
 is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
 signal to noise ratio in helical reconstruction.");
@@ -2613,7 +2635,11 @@ signal to noise ratio in helical reconstruction.");
 Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.");
 	joboptions["helical_rise_initial"] = JobOption("Initial helical rise (A):", std::string("0"), "Initial helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
 Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.");
-	joboptions["do_local_search_helical_symmetry"] = JobOption("Do local searches of symmetry?", true, "If set to Yes, then perform local searches of helical twist and rise within given ranges.");
+	joboptions["helical_z_percentage"] = JobOption("Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
+number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+	joboptions["do_local_search_helical_symmetry"] = JobOption("Do local searches of symmetry?", false, "If set to Yes, then perform local searches of helical twist and rise within given ranges.");
 	joboptions["helical_twist_min"] = JobOption("Helical twist search (deg) - Min:", std::string("0"), "Minimum, maximum and initial step for helical twist search. Set helical twist (in degrees) \
 to positive value if it is a right-handed helix. Generally it is not necessary for the user to provide an initial step (less than 1 degree, 5~1000 samplings as default). But it needs to be set manually if the default value \
 does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.");
@@ -2632,24 +2658,6 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 	joboptions["helical_rise_inistep"] = JobOption("Helical rise search (A) - Step:", std::string("0"), "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
 Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
 does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.");
-	joboptions["helical_z_percentage"] = JobOption("Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
-The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
-number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
-helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
-	joboptions["range_tilt"] = JobOption("Angular search range - tilt (deg):", std::string("15"), "Local angular searches will be performed \
-within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
-A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
-in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
-Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
-A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
-	joboptions["range_psi"] = JobOption("Angular search range - psi (deg):", std::string("15"), "Local angular searches will be performed \
-within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
-A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
-in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
-Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
-A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["helical_range_distance"] = JobOption("Range factor of local averaging:", -1., 1., 5., 0.1, "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. Polarities are also set to be the same for segments coming from the same tube during local refinement. \
 Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
 
@@ -2830,26 +2838,30 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		if (textToFloat(joboptions["helical_tube_inner_diameter"].getString()) > 0.)
 			command += " --helical_inner_diameter " + joboptions["helical_tube_inner_diameter"].getString();
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
-		command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
-		command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
-		command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
-		command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
-		if (joboptions["do_local_search_helical_symmetry"].getBoolean())
+		if (joboptions["do_apply_helical_symmetry"].getBoolean())
 		{
-			command += " --helical_symmetry_search";
-			command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
-			command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
-			if (textToFloat(joboptions["helical_twist_inistep"].getString()) > 0.)
-				command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
-			command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
-			command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
-			if (textToFloat(joboptions["helical_rise_inistep"].getString()) > 0.)
-				command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
+			command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
+			command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
+			command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
+			command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
+			if (joboptions["do_local_search_helical_symmetry"].getBoolean())
+			{
+				command += " --helical_symmetry_search";
+				command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
+				command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
+				if (textToFloat(joboptions["helical_twist_inistep"].getString()) > 0.)
+					command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
+				command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
+				command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
+				if (textToFloat(joboptions["helical_rise_inistep"].getString()) > 0.)
+					command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
+			}
 		}
+		else
+			command += " --ignore_helical_symmetry";
 		if ( (joboptions["dont_skip_align"].getBoolean()) && (!joboptions["do_local_ang_searches"].getBoolean()) )
 		{
-			RFLOAT val;
-			val = textToFloat(joboptions["range_tilt"].getString());
+			RFLOAT val = textToFloat(joboptions["range_tilt"].getString());
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_tilt " + floatToString(val / 3.);
@@ -2982,6 +2994,21 @@ particle mask for each segment. If the psi priors of the extracted segments are 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter - outer (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
 particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.");
+	joboptions["range_tilt"] = JobOption("Angular search range - tilt (deg):", std::string("15"), "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
+A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
+	joboptions["range_psi"] = JobOption("Angular search range - psi (deg):", std::string("10"), "Local angular searches will be performed \
+within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
+A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
+	joboptions["do_apply_helical_symmetry"] = JobOption("Apply helical symmetry?", true, "If set to Yes, helical symmetry will be applied in every iteration. Set to No if you have just started a project, helical symmetry is unknown or not yet estimated.");
 	joboptions["helical_nr_asu"] = JobOption("Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
 is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
 signal to noise ratio in helical reconstruction.");
@@ -2989,7 +3016,11 @@ signal to noise ratio in helical reconstruction.");
 Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.");
 	joboptions["helical_rise_initial"] = JobOption("Initial helical rise (A):", std::string("0"), "Initial helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
 Helical rise is a positive value in Angstroms. If local searches of helical symmetry are planned, initial values of helical twist and rise should be within their respective ranges.");
-	joboptions["do_local_search_helical_symmetry"] = JobOption("Do local searches of symmetry?", true, "If set to Yes, then perform local searches of helical twist and rise within given ranges.");
+	joboptions["helical_z_percentage"] = JobOption("Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
+number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+	joboptions["do_local_search_helical_symmetry"] = JobOption("Do local searches of symmetry?", false, "If set to Yes, then perform local searches of helical twist and rise within given ranges.");
 	joboptions["helical_twist_min"] = JobOption("Helical twist search (deg) - Min:", std::string("0"), "Minimum, maximum and initial step for helical twist search. Set helical twist (in degrees) \
 to positive value if it is a right-handed helix. Generally it is not necessary for the user to provide an initial step (less than 1 degree, 5~1000 samplings as default). But it needs to be set manually if the default value \
 does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.");
@@ -3008,24 +3039,6 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 	joboptions["helical_rise_inistep"] = JobOption("Helical rise search (A) - Step:", std::string("0"), "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
 Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
 does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.");
-	joboptions["helical_z_percentage"] = JobOption("Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
-The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
-number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
-helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
-	joboptions["range_tilt"] = JobOption("Angular search range - tilt (deg):", std::string("15"), "Local angular searches will be performed \
-within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
-A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
-in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
-Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
-A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
-	joboptions["range_psi"] = JobOption("Angular search range - psi (deg):", std::string("15"), "Local angular searches will be performed \
-within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
-A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
-in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
-Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
-A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["helical_range_distance"] = JobOption("Range factor of local averaging:", -1., 1., 5., 0.1, "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. Polarities are also set to be the same for segments coming from the same tube during local refinement. \
 Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
 
@@ -3200,24 +3213,28 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			if (textToFloat(joboptions["helical_tube_inner_diameter"].getString()) > 0.)
 				command += " --helical_inner_diameter " + joboptions["helical_tube_inner_diameter"].getString();
 			command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
-			command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
-			command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
-			command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
-			command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
-			if (joboptions["do_local_search_helical_symmetry"].getBoolean())
+			if (joboptions["do_apply_helical_symmetry"].getBoolean())
 			{
-				command += " --helical_symmetry_search";
-				command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
-				command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
-				if (textToFloat(joboptions["helical_twist_inistep"].getString()) > 0.)
-					command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
-				command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
-				command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
-				if (textToFloat(joboptions["helical_rise_inistep"].getString()) > 0.)
-					command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
+				command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
+				command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
+				command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
+				command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
+				if (joboptions["do_local_search_helical_symmetry"].getBoolean())
+				{
+					command += " --helical_symmetry_search";
+					command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
+					command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
+					if (textToFloat(joboptions["helical_twist_inistep"].getString()) > 0.)
+						command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
+					command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
+					command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
+					if (textToFloat(joboptions["helical_rise_inistep"].getString()) > 0.)
+						command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
+				}
 			}
-			RFLOAT val;
-			val = textToFloat(joboptions["range_tilt"].getString());
+			else
+				command += " --ignore_helical_symmetry";
+			RFLOAT val = textToFloat(joboptions["range_tilt"].getString());
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_tilt " + floatToString(val / 3.);
@@ -3225,6 +3242,8 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
+			if (joboptions["helical_range_distance"].getNumber() > 0.)
+				command += " --helical_sigma_distance " + floatToString(joboptions["helical_range_distance"].getNumber() / 3.);
 		}
 	}
 

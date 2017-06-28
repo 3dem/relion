@@ -30,6 +30,7 @@
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
 #include "src/helix.h"
+#include "src/local_symmetry.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -536,6 +537,15 @@ public:
 	TabSine tab_sin;
 	TabCosine tab_cos;
 
+	// Local symmetry information (STAR or plain-text format)
+	FileName fn_local_symmetry;
+
+	// Local symmetry - list of masks
+	std::vector<FileName> fn_local_symmetry_masks;
+
+	// Local symmetry - list of operators
+	std::vector<std::vector<Matrix1D<RFLOAT> > > fn_local_symmetry_operators;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -751,6 +761,10 @@ public:
 	 * Do rise and twist for all asymmetrical units in Fourier space
 	 * */
 	void symmetriseReconstructions();
+
+	/* Apply local symmetry according to a list of masks and their operators
+	 * */
+	void applyLocalSymmetryForEachRef();
 
 	/* Apply helical symmetry (twist and rise) to the central Z slices of real space references. (Do average for every particle)
 	 * Then elongate and fill the perfect helix along Z axis.

@@ -757,7 +757,6 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Co
 
 }
 
-
 void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
@@ -765,6 +764,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 MultidimArray<RFLOAT> &tau2,
                                 MultidimArray<RFLOAT> &sigma2,
                                 MultidimArray<RFLOAT> &data_vs_prior,
+                                MultidimArray<RFLOAT> &fourier_coverage,
                                 MultidimArray<RFLOAT> fsc, // only input
                                 RFLOAT normalise,
                                 bool update_tau2_with_fsc,
@@ -911,12 +911,14 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     RCTOC(ReconTimer,ReconS_2);
 	// Apply MAP-additional term to the Fnewweight array
 	// This will regularise the actual reconstruction
-	if (do_map)
+    if (do_map)
 	{
-		// Then, add the inverse of tau2-spectrum values to the weight
+
+    	// Then, add the inverse of tau2-spectrum values to the weight
 		// and also calculate spherical average of data_vs_prior ratios
 		if (!update_tau2_with_fsc)
 			data_vs_prior.initZeros(ori_size/2 + 1);
+		fourier_coverage.initZeros(ori_size/2 + 1);
 		counter.initZeros(ori_size/2 + 1);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
  		{
@@ -948,6 +950,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				// Keep track of spectral evidence-to-prior ratio and remaining noise in the reconstruction
 				if (!update_tau2_with_fsc)
 					DIRECT_A1D_ELEM(data_vs_prior, ires) += invw / invtau2;
+
+				// Keep track of the coverage in Fourier space
+				if (invw / invtau2 >= 1.)
+					DIRECT_A1D_ELEM(fourier_coverage, ires) += 1.;
+
 				DIRECT_A1D_ELEM(counter, ires) += 1.;
 
 				// Only for (ires >= minres_map) add Wiener-filter like term
@@ -973,6 +980,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				else
 					DIRECT_A1D_ELEM(data_vs_prior, i) /= DIRECT_A1D_ELEM(counter, i);
 			}
+		}
+
+		// Calculate Fourier coverage in each shell
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fourier_coverage)
+		{
+			if (DIRECT_A1D_ELEM(counter, i) > 0.)
+				DIRECT_A1D_ELEM(fourier_coverage, i) /= DIRECT_A1D_ELEM(counter, i);
 		}
 
 	} //end if do_map
@@ -1077,6 +1091,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 		ttt.write("reconstruct_gridding_correction_term.spi");
 	#endif
+
 
 		// Clear memory
 		Fweight.clear();
@@ -1254,6 +1269,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     if(printTimes)
     	ReconTimer.printTimes(true);
 #endif
+
 
 #ifdef DEBUG_RECONSTRUCT
     std::cerr<<"done with reconstruct"<<std::endl;
@@ -1696,7 +1712,7 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 #endif
 
     // Resize incoming complex array to the correct size
-    windowFourierTransform(Fin, padoridim);
+	windowFourierTransform(Fin, padoridim);
 	RCTOC(OriDimTimer,OriDim2);
 	RCTIC(OriDimTimer,OriDim3);
  	if (ref_dim == 2)

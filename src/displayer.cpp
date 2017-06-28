@@ -165,7 +165,7 @@ bool DisplayBox::unSelect()
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, bool _do_class,
 		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
-		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts)
+		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
 {
     // Scroll bars
     Fl_Scroll scroll(0, 0, w(), h());
@@ -192,6 +192,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		canvas.do_allow_save = do_allow_save;
 		canvas.fn_selected_imgs= fn_selected_imgs;
 		canvas.fn_selected_parts = fn_selected_parts;
+		canvas.max_nr_parts_per_class = max_nr_parts_per_class;
 		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter, max_nr_images);
 		canvas.nr_regroups = _nr_regroup;
 		canvas.do_recenter = _do_recenter;
@@ -980,9 +981,38 @@ void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTab
 		}
 	}
 
+	if (max_nr_parts_per_class > 0)
+	{
+		// Randomise the order, to pick random particles from each class
+		// Unfortunately, this leads to random order of particles in the output file! So be it for now...
+		MetaDataTable MDtmp = MDpart;
+		MDpart.clear();
+		MDtmp.sort(EMDL_UNDEFINED, false, false, true);
+		for (long int ipos = 0; ipos < boxes.size(); ipos++)
+		{
+			if (boxes[ipos]->selected == selected)
+			{
+				int nr_selected = 0;
+				boxes[ipos]->MDimg.getValue(EMDL_PARTICLE_CLASS, myclass);
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDtmp)
+				{
+					MDtmp.getValue(EMDL_PARTICLE_CLASS, iclass);
+					if (iclass == myclass)
+					{
+						MDpart.addObject(MDtmp.getObject());
+						nr_selected++;
+						if (nr_selected >= max_nr_parts_per_class)
+							break;
+					}
+				}
+			}
+		}
+	}
+
 	// Maintain the original image ordering
 	if (MDpart.containsLabel(EMDL_SORTED_IDX))
 		MDpart.sort(EMDL_SORTED_IDX);
+
 }
 
 void multiViewerCanvas::saveSelectedParticles(bool save_selected)
@@ -1402,13 +1432,30 @@ int pickerViewerCanvas::handle(int ev)
 				if (xcoor_p*xcoor_p + ycoor_p*ycoor_p < rad2)
 					return 0;
 			}
+			RFLOAT aux = -999., zero = 0.;
+			int iaux = -999;
 			// Else store new coordinate
-			MDcoords.addObject();
+			if (!MDcoords.isEmpty())
+			{
+				// If there were already entries in MDcoords, then copy the last one.
+				// This will take care of re-picking in coordinate files from previous refinements
+				long int last_idx = MDcoords.numberOfObjects() - 1;
+				MDcoords.addObject(MDcoords.getObject(last_idx));
+				RFLOAT aux2;
+				if (MDcoords.getValue(EMDL_ORIENT_ROT, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ROT, aux);
+				if (MDcoords.getValue(EMDL_ORIENT_TILT, aux2))
+					MDcoords.setValue(EMDL_ORIENT_TILT, aux);
+				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_X, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ORIGIN_X, zero);
+				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_Y, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+			}
+			else
+				MDcoords.addObject();
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
 			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
-			RFLOAT aux = -999.;
-			int iaux = -999;
 			MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
 			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
 			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
@@ -1710,6 +1757,7 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		sort_choice = new Fl_Choice(x, y, width-x, height, "on:");
 		for (int i = 0; i < sort_labels.size(); i++)
 			sort_choice->add(sort_labels[i].c_str(), 0, 0,0, FL_MENU_VALUE);
+		sort_choice->add("RANDOMLY", 0, 0,0, FL_MENU_VALUE);
 		sort_choice->picked(sort_choice->menu());
 		sort_choice->color(GUI_INPUT_COLOR);
 		y += ystep;
@@ -1729,7 +1777,10 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	{
 		// Multiview box
 		Fl_Box *box3;
-		box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(1.5*ystep), "");
+		if (do_allow_save && fn_parts != "")
+			box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(2.5*ystep), "");
+		else
+			box3 = new Fl_Box(15, y-ROUND(0.25*ystep), width - 15, ROUND(1.5*ystep), "");
 
 		box3->color(GUI_BACKGROUND_COLOR);
 		box3->box(FL_DOWN_BOX);
@@ -1747,9 +1798,19 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		ori_scale_input->color(GUI_INPUT_COLOR);
 
 		max_nr_images_input = new Fl_Input(x3p, y, 40, height, "Max. nr. images:");
-		max_nr_images_input->value("-1");
+		max_nr_images_input->value("1000");
 		max_nr_images_input->color(GUI_INPUT_COLOR);
-		y += ROUND(1.75*ystep);
+
+		if (do_allow_save && fn_parts != "")
+		{
+			y += ystep;
+			max_parts_per_class_input = new Fl_Input(x2p, y, 40, height, "Max nr selected parts per class:");
+			max_parts_per_class_input->value("-1");
+			max_parts_per_class_input->color(GUI_INPUT_COLOR);
+			y += ROUND(1.75*ystep);
+		}
+		else
+			y += ROUND(1.75*ystep);
 
 	}
 	else // is_single
@@ -1896,9 +1957,16 @@ void displayerGuiWindow::cb_display_i()
 		if (sort_button->value())
 		{
 			const Fl_Menu_Item* m2 = sort_choice->mvalue();
-			cl += " --sort " + (std::string)m2->label();
-			if (reverse_sort_button->value())
-				cl += " --reverse ";
+			if ((std::string)m2->label() == "RANDOMLY")
+			{
+				cl += " --random_sort ";
+			}
+			else
+			{
+				cl += " --sort " + (std::string)m2->label();
+				if (reverse_sort_button->value())
+					cl += " --reverse ";
+			}
 		}
 
 		if (read_whole_stack_button->value())
@@ -1931,7 +1999,11 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --allow_save ";
 		if (fn_parts != "")
+		{
 			cl += " --fn_parts " + fn_parts;
+			if ( textToInteger(max_parts_per_class_input->value()) > 0)
+				cl += " --max_nr_parts_per_class " + (std::string)max_parts_per_class_input->value();
+		}
 		if (fn_imgs != "")
 			cl += " --fn_imgs " + fn_imgs;
 	}
@@ -1945,6 +2017,7 @@ void displayerGuiWindow::cb_display_i()
 	{
 		cl += " --recenter";
 	}
+
 
 	// send job in the background
 	cl += " &";
@@ -1977,12 +2050,14 @@ void Displayer::read(int argc, char **argv)
 	do_apply_orient = parser.checkOption("--apply_orient","Apply the orientation as stored in the input STAR file angles and offsets");
 	ori_scale = textToFloat(parser.getOption("--ori_scale", "Relative scale for viewing individual images in multiviewer", "1"));
 	sort_label = EMDL::str2Label(parser.getOption("--sort", "Metadata label to sort images on", "EMDL_UNDEFINED"));
+	random_sort = parser.checkOption("--random_sort", "Use random order in the sorting");
 	reverse_sort = parser.checkOption("--reverse", "Use reverse order (from high to low) in the sorting");
 	do_class = parser.checkOption("--class", "Use this to analyse classes in input model.star file");
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
 	fn_selected_imgs = parser.getOption("--fn_imgs", "Name of the STAR file in which to save selected images.", "");
 	fn_selected_parts = parser.getOption("--fn_parts", "Name of the STAR file in which to save particles from selected classes.", "");
+	max_nr_parts_per_class  = textToInteger(parser.getOption("--max_nr_parts_per_class", "Select maximum this number of particles from each selected classes.", "-1"));
 	do_recenter = parser.checkOption("--recenter", "Recenter the selected images to the center-of-mass of all positive pixel values. ");
 	max_nr_images = textToInteger(parser.getOption("--max_nr_images", "Only show this many images (default is show all)", "-1"));
 
@@ -2244,16 +2319,17 @@ int Displayer::run()
         	}
         }
 
-        if (sort_label != EMDL_UNDEFINED)
+        if (sort_label != EMDL_UNDEFINED || random_sort)
         {
-        	MDin.sort(sort_label, reverse_sort, true); // true means only store sorted_idx!
+        	MDin.sort(sort_label, reverse_sort, true, random_sort); // true means only store sorted_idx!
         	// When sorting: never read in the whole stacks!
         	do_read_whole_stacks = false;
         }
 
         basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
         win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-        		max_nr_images, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups, do_allow_save, fn_selected_imgs, fn_selected_parts);
+        		max_nr_images, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
+				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
 
     }
     else
