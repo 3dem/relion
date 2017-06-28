@@ -309,13 +309,18 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	int corrections_section = parser.addSection("Corrections");
 
-	// Can only switch the following option ON, not OFF
+
+	// Can also switch the following option OFF
 	if (parser.checkOption("--scale", "Switch on intensity-scale corrections on image groups", "OLD"))
 		do_scale_correction = true;
+	if (parser.checkOption("--no_scale", "Switch off intensity-scale corrections on image groups", "OLD"))
+		do_scale_correction = false;
 
-	// Can only switch the following option ON, not OFF
+	// Can also switch the following option OFF
 	if (parser.checkOption("--norm", "Switch on normalisation-error correction","OLD"))
 		do_norm_correction = true;
+	if (parser.checkOption("--no_norm", "Switch off normalisation-error correction","OLD"))
+		do_norm_correction = false;
 
 	int computation_section = parser.addSection("Computation");
 
@@ -527,6 +532,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Only perform CTF phase-flipping? (default is full amplitude-correction)");
 	do_norm_correction = parser.checkOption("--norm", "Perform normalisation-error correction?");
 	do_scale_correction = parser.checkOption("--scale", "Perform intensity-scale corrections on image groups?");
+	// Allow switching off norm and scale (which is on by default in the GUI)
+	if (parser.checkOption("--no_norm", "Switch off normalisation-error correction?"))
+		do_norm_correction = false;
+	if (parser.checkOption("--no_scale", "Switch off intensity-scale corrections on image groups?"))
+		do_scale_correction = false;
 
 	// SGD stuff
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
