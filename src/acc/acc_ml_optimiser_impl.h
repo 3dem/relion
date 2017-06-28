@@ -51,10 +51,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
 #endif
-#ifdef CUDA
+
 	//FourierTransformer transformer;
 	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
-#endif
 	
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
@@ -343,14 +342,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// Apply the norm_correction term
 			if (baseMLO->do_norm_correction)
 			{
-				AccUtilities::multiply(temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
-#ifdef CUDA
+				AccUtilities::multiply(BLOCK_SIZE, temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
 				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#endif
 			}
 		}
 
-		AccUtilities::translate(
+		AccUtilities::translate(BLOCK_SIZE,
 			temp,  // translate from temp...
 			d_img_, // ... into d_img
 			XX(my_old_offset),
@@ -362,9 +359,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		 * Setup continuation into ordinary GPU pipeline
 		 */
 
-#ifdef CUDA
 		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
-#endif
+
 		AccPtr<XFLOAT> d_img(img_size,accMLO->devBundle->allocator);
 		d_img.deviceAlloc();
 
@@ -428,20 +424,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
 
-		AccUtilities::multiply((XFLOAT*)~accMLO->transformer1.fouriers,
+		AccUtilities::multiply(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
+						(XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
-						accMLO->transformer1.fouriers.getSize()*2,
-						FMultiBsize, accMLO->transformer1.fouriers.getStream());
-/*
-		cuda_kernel_multi<<<FMultiBsize,BLOCK_SIZE,0,cudaMLO->transformer1.fouriers.getStream()>>>(
-										(XFLOAT*)~cudaMLO->transformer1.fouriers,
-										(XFLOAT)1/((XFLOAT)(cudaMLO->transformer1.reals.getSize())),
-										cudaMLO->transformer1.fouriers.getSize()*2);
- */
+						accMLO->transformer1.fouriers.getSize()*2);
 
-#ifdef CUDA
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#endif
 				
 		AccPtr<ACCCOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z, accMLO->devBundle->allocator);
 		d_Fimg.deviceAlloc();
@@ -614,10 +602,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					~softMaskSum,
 					~softMaskSum_bg);
 
-#ifdef CUDA
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#endif
-
 
 			softMaskSum.streamSync();
 			sum_bg = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum_bg) / 
@@ -638,13 +623,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 										radius_p,
 										cosine_width,
 										sum_bg);
-#ifdef CUDA
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 //			d_img.streamSync();
 //			d_img.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#endif
 //			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
 //			{
 //				img.data.data[n]=(RFLOAT)d_img[n];
@@ -677,10 +660,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize2 = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		AccUtilities::multiply((XFLOAT*)~accMLO->transformer1.fouriers,
+		AccUtilities::multiply(FMultiBsize2, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
+						(XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
-						accMLO->transformer1.fouriers.getSize()*2,
-						FMultiBsize2, accMLO->transformer1.fouriers.getStream());
+						accMLO->transformer1.fouriers.getSize()*2);
 #ifdef CUDA	
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
@@ -700,7 +683,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			dim3 gridSize = CEIL((float)(accMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
 			if(accMLO->dataIs3D)
-				cuda_kernel_powerClass<true><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+				AccUtilities::powerClass<true>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
 					~spectrumAndXi2,
 					accMLO->transformer1.fouriers.getSize(),
@@ -711,7 +694,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
 					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 			else
-				cuda_kernel_powerClass<false><<<gridSize,POWERCLASS_BLOCK_SIZE,0,0>>>(
+				AccUtilities::powerClass<false>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
 					~spectrumAndXi2,
 					accMLO->transformer1.fouriers.getSize(),
@@ -723,7 +706,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-
+			
 			spectrumAndXi2.streamSync();
 			spectrumAndXi2.cpToHost();
 			spectrumAndXi2.streamSync();

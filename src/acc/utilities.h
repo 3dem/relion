@@ -13,11 +13,11 @@ namespace AccUtilities
 {
 	
 template <typename T>
-static void multiply(AccDataTypes::Image<T> &ptr, T value)
+static void multiply(int block_size, AccDataTypes::Image<T> &ptr, T value)
 {
 #ifdef CUDA
-	int BSZ = ( (int) ceilf(( float)ptr.getSize() /(float)BLOCK_SIZE));
-	CudaKernels::cuda_kernel_multi<T><<<BSZ,BLOCK_SIZE,0,ptr.getStream()>>>(
+	int BSZ = ( (int) ceilf(( float)ptr.getSize() /(float)block_size));
+	CudaKernels::cuda_kernel_multi<T><<<BSZ,block_size,0,ptr.getStream()>>>(
 		ptr(),
 		value,
 		ptr.getSize());
@@ -30,10 +30,10 @@ static void multiply(AccDataTypes::Image<T> &ptr, T value)
 }
 	
 template <typename T>
-static void multiply(T *array, T value, size_t size, int MultiBsize, cudaStream_t stream)
+static void multiply(int MultiBsize, int block_size, cudaStream_t stream, T *array, T value, size_t size)
 {
 #ifdef CUDA
-	CudaKernels::cuda_kernel_multi<T><<<MultiBsize,BLOCK_SIZE,0,stream>>>(
+	CudaKernels::cuda_kernel_multi<T><<<MultiBsize,block_size,0,stream>>>(
 		array,
 		value,
 		size);
@@ -46,7 +46,7 @@ static void multiply(T *array, T value, size_t size, int MultiBsize, cudaStream_
 }
 
 template <typename T>
-static void translate(
+static void translate(int block_size,
 	AccDataTypes::Image<T> &in,
 	AccDataTypes::Image<T> &out,
 	int dx,
@@ -54,11 +54,11 @@ static void translate(
 	int dz=0)
 {
 #ifdef CUDA
-int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)BLOCK_SIZE));
+int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)block_size));
 
 if (in.is3D())
 {
-	CudaKernels::cuda_kernel_translate3D<T><<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
+	CudaKernels::cuda_kernel_translate3D<T><<<BSZ,block_size,0,in.getStream()>>>(
 		in(),
 		out(),
 		in.getxyz(),
@@ -71,7 +71,7 @@ if (in.is3D())
 }
 else
 {
-	CudaKernels::cuda_kernel_translate2D<T><<<BSZ,BLOCK_SIZE,0,in.getStream()>>>(
+	CudaKernels::cuda_kernel_translate2D<T><<<BSZ,block_size,0,in.getStream()>>>(
 		in(),
 		out(),
 		in.getxyz(),
@@ -301,6 +301,45 @@ void cosineFilter(
 							sum_bg_total);	
 #endif
 }
+
+template<bool DATA3D>
+void powerClass(dim3		in_gridSize,
+				int			in_blocksize,
+				ACCCOMPLEX  *g_image,
+				XFLOAT      *g_spectrum,
+				int          image_size,
+				int          spectrum_size,
+				int          xdim,
+				int          ydim,
+				int          zdim,
+				int          res_limit,
+				XFLOAT      *g_highres_Xi2)
+{
+#ifdef CUDA
+	cuda_kernel_powerClass<DATA3D><<<in_gridSize,in_blocksize,0,0>>>(g_image,
+		g_spectrum,
+		image_size,
+		spectrum_size,
+		xdim,
+		ydim,
+		zdim,
+		res_limit,
+		g_highres_Xi2);
+#else
+	int grid_size = in_gridSize;
+	CpuKernels::powerClass<DATA3D>(grid_size,
+		g_image,
+		g_spectrum,
+		image_size,
+		spectrum_size,
+		xdim,
+		ydim,
+		zdim,
+		res_limit,
+		g_highres_Xi2);
+#endif
+}
+
 };  // namespace 
 
 

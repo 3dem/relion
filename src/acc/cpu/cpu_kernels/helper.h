@@ -483,9 +483,9 @@ void kernel_frequencyPass( int          blockIdx_x,
 }
 
 template<bool DATA3D>
-void powerClass(int           blockIdx_x,
-				ACCCOMPLEX *g_image,
-				XFLOAT      *g_spectrum,
+void powerClass(int          gridSize,
+				ACCCOMPLEX   *g_image,
+				XFLOAT       *g_spectrum,
 				int          image_size,
 				int          spectrum_size,
 				int          xdim,
@@ -494,64 +494,65 @@ void powerClass(int           blockIdx_x,
 				int          res_limit,
 				XFLOAT      *g_highres_Xi2)
 {
-	int bid =  blockIdx_x;
+	for(int bid=0; bid<gridSize; bid++)
+	{
+		XFLOAT normFaux;
 
-	XFLOAT normFaux;
+		int x,y,xy,d;
+		int xydim = xdim*ydim;
+		bool coords_in_range(true);
 
-	int x,y,xy,d;
-	int xydim = xdim*ydim;
-	bool coords_in_range(true);
-	
-	XFLOAT s_highres_Xi2[POWERCLASS_BLOCK_SIZE];
-    for(int tid=0; tid<POWERCLASS_BLOCK_SIZE; tid++)
-        s_highres_Xi2[tid] = (XFLOAT)0.;
-        
-    for(int tid=0; tid<POWERCLASS_BLOCK_SIZE; tid++){
-        int voxel=tid + bid*POWERCLASS_BLOCK_SIZE;
-    	if(voxel<image_size)
-	    {
-	    	if(DATA3D)
-	    	{
-	    		int z =  voxel / xydim;
-	    		xy = voxel % xydim;
-	    		y =  xy / xdim;
-	    		x =  xy % xdim;
-    
-	    		y = ((y<xdim) ? y : y-ydim);
-	    		z = ((z<xdim) ? z : z-zdim);
+		XFLOAT s_highres_Xi2[POWERCLASS_BLOCK_SIZE];
+		for(int tid=0; tid<POWERCLASS_BLOCK_SIZE; tid++)
+			s_highres_Xi2[tid] = (XFLOAT)0.;
 
-	    		d  = (x*x + y*y + z*z);
-	    		coords_in_range = !(x==0 && y<0.f && z<0.f);
-	    	}
-	    	else
-	    	{
-	    		x = voxel % xdim;
-	    		y = (voxel-x) / (xdim);
-    
-	    		y = ((y<xdim) ? y : y-ydim);
-	    		d  = (x*x + y*y);
-	    		coords_in_range = !(x==0 && y<0.f);
-	    	}
+		for(int tid=0; tid<POWERCLASS_BLOCK_SIZE; tid++){
+			int voxel=tid + bid*POWERCLASS_BLOCK_SIZE;
+			if(voxel<image_size)
+			{
+				if(DATA3D)
+				{
+					int z =  voxel / xydim;
+					xy = voxel % xydim;
+					y =  xy / xdim;
+					x =  xy % xdim;
 
-#if defined(ACC_DOUBLE_PRECISION)
-	    	int ires = (int)(sqrt((XFLOAT)d) + 0.5);
-#else
-	    	int ires = (int)(sqrtf((XFLOAT)d) + 0.5f);
-#endif
-	    	if((ires>0.f) && (ires<spectrum_size) && coords_in_range)
-	    	{
-	    		normFaux = g_image[voxel].x*g_image[voxel].x + g_image[voxel].y*g_image[voxel].y;
-	    		g_spectrum[ires] += normFaux;
-	    		if(ires>=res_limit)
-	    			s_highres_Xi2[tid] += normFaux;
-	    	}
-	    }
+					y = ((y<xdim) ? y : y-ydim);
+					z = ((z<xdim) ? z : z-zdim);
+
+					d  = (x*x + y*y + z*z);
+					coords_in_range = !(x==0 && y<0.f && z<0.f);
+				}
+				else
+				{
+					x = voxel % xdim;
+					y = (voxel-x) / (xdim);
+
+					y = ((y<xdim) ? y : y-ydim);
+					d  = (x*x + y*y);
+					coords_in_range = !(x==0 && y<0.f);
+				}
+
+		#if defined(ACC_DOUBLE_PRECISION)
+				int ires = (int)(sqrt((XFLOAT)d) + 0.5);
+		#else
+				int ires = (int)(sqrtf((XFLOAT)d) + 0.5f);
+		#endif
+				if((ires>0.f) && (ires<spectrum_size) && coords_in_range)
+				{
+					normFaux = g_image[voxel].x*g_image[voxel].x + g_image[voxel].y*g_image[voxel].y;
+					g_spectrum[ires] += normFaux;
+					if(ires>=res_limit)
+						s_highres_Xi2[tid] += normFaux;
+				}
+			}
+		}
+
+		for(int tid=1; tid<POWERCLASS_BLOCK_SIZE; tid++)
+			s_highres_Xi2[0] += s_highres_Xi2[tid];
+
+		g_highres_Xi2[0] += s_highres_Xi2[0];
 	}
-	
-	for(int tid=1; tid<POWERCLASS_BLOCK_SIZE; tid++)
-		s_highres_Xi2[0] += s_highres_Xi2[tid];
-
-    g_highres_Xi2[0] += s_highres_Xi2[0];
 }
 
 inline void translatePixel(
